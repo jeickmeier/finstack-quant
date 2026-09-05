@@ -494,7 +494,7 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
     let trade_date = create_date(2025, Month::July, 3).expect("Valid date");
 
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .expect("valid notional")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")
@@ -523,7 +523,7 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_final_date_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .expect("valid notional")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")

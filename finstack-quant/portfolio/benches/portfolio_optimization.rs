@@ -54,8 +54,8 @@ fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portf
         let coupon = 0.03 + (index % 6) as f64 * 0.005;
         let mut bond = Bond::fixed(
             format!("BOND_{index:03}"),
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(coupon),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,

@@ -93,11 +93,11 @@
 //! );
 //! let market_t0 = MarketContext::new().insert_price(
 //!     "AAPL-SPOT",
-//!     MarketScalar::Price(Money::new(180.0, Currency::USD)),
+//!     MarketScalar::Price(Money::from((180_i64, Currency::USD))),
 //! );
 //! let market_t1 = MarketContext::new().insert_price(
 //!     "AAPL-SPOT",
-//!     MarketScalar::Price(Money::new(185.0, Currency::USD)),
+//!     MarketScalar::Price(Money::from((185_i64, Currency::USD))),
 //! );
 //!
 //! let config = FinstackConfig::default();
@@ -111,10 +111,10 @@
 //! );
 //! let attribution = attribute_pnl(&AttributionMethod::Parallel, &request)?;
 //!
-//! assert_eq!(attribution.total_pnl, Money::new(500.0, Currency::USD));
+//! assert_eq!(attribution.total_pnl, Money::from((500_i64, Currency::USD)));
 //! assert_eq!(
 //!     attribution.market_scalars_pnl,
-//!     Money::new(500.0, Currency::USD),
+//!     Money::from((500_i64, Currency::USD)),
 //! );
 //! # Ok(())
 //! # }

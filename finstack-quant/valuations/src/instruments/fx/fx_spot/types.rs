@@ -274,7 +274,7 @@ impl FxSpot {
             settlement_lag_days: None,
             spot_rate: None,
             discount_curve_id: None,
-            notional: Money::new(1.0, base_currency),
+            notional: Money::from((1_i64, base_currency)),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -497,7 +497,7 @@ impl FxSpot {
     pub fn example() -> Result<Self> {
         Ok(
             Self::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-                .with_notional(Money::new(1_000_000.0, Currency::EUR))?
+                .with_notional(Money::from((1_000_000_i64, Currency::EUR)))?
                 .with_rate(1.10)?
                 .with_settlement_lag_days(2),
         )
@@ -589,13 +589,13 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
             .map(|id| market.get_discount(id))
             .transpose()?;
         self.dated_cashflows(market, as_of)?.into_iter().try_fold(
-            Money::new(0.0, self.quote_currency),
+            Money::from((0_i64, self.quote_currency)),
             |acc, (date, amount)| {
                 let df = match disc.as_ref() {
                     Some(curve) => curve.df_between_dates(as_of, date)?,
                     None => 1.0,
                 };
-                acc.checked_add(Money::new(amount.amount() * df, amount.currency()))
+                acc.checked_add(Money::new(amount.amount() * df, amount.currency())?)
             },
         )
     }
@@ -609,8 +609,8 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
 
 // Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -626,7 +626,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 crate::cashflow::traits::ScheduleBuildOpts {
-                    notional_hint: self.notional(),
+                    notional_hint: self.notional()?,
                     meta: crate::cashflow::builder::CashFlowMeta {
                         representation:
                             crate::cashflow::builder::CashflowRepresentation::NoResidual,
@@ -657,7 +657,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
             let value = Money::new(
                 self.get_effective_notional().amount() * rate,
                 self.quote_currency,
-            );
+            )?;
             vec![(settle_date, value)]
         };
 
@@ -666,7 +666,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
             crate::cashflow::primitives::CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F, // Standard for FX spot
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
                     ..Default::default()
@@ -768,7 +768,7 @@ mod tests {
     #[test]
     fn test_fx_spot_notional_currency_validation() {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD);
-        let wrong_notional = Money::new(1000.0, Currency::GBP);
+        let wrong_notional = Money::from((1000_i64, Currency::GBP));
 
         let result = spot.with_notional(wrong_notional);
         assert!(result.is_err(), "Should reject notional in wrong currency");
@@ -777,7 +777,7 @@ mod tests {
     #[test]
     fn test_fx_spot_with_notional() {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::new(1_000_000.0, Currency::EUR))
+            .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .expect("valid notional")
             .with_rate(1.10)
             .expect("valid rate");
@@ -846,7 +846,7 @@ mod tests {
             .id(InstrumentId::new("USDUSD"))
             .base_currency(Currency::USD)
             .quote_currency(Currency::USD)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .attributes(Attributes::new())
             .build();
 
@@ -936,7 +936,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_rate_opt(Some(-1.10))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
             .build();
         assert!(result.is_err(), "builder must reject a negative spot rate");
@@ -946,7 +946,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_rate_opt(Some(0.0))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
             .build();
         assert!(result.is_err(), "builder must reject a zero spot rate");

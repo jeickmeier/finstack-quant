@@ -35,8 +35,8 @@ fn spec_with_config(config: Option<AttributionConfig>) -> AttributionSpec {
     let t1 = create_date(2025, Month::January, 2).expect("t1");
     let bond = Bond::fixed(
         "RATE-BUMP-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).expect("issue"),
         create_date(2034, Month::January, 1).expect("maturity"),
         finstack_quant_core::dates::StubKind::ShortFront,

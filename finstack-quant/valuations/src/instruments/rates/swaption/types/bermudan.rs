@@ -191,7 +191,7 @@ impl BermudanSwaption {
         Self {
             id: InstrumentId::new("BERM-10NC2-USD"),
             option_type: OptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             settlement: SwaptionSettlement::Physical,
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
             bermudan_schedule: BermudanSchedule::co_terminal(

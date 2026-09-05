@@ -15,8 +15,8 @@ fn test_ytw_equals_ytm_for_non_callable_bond_from_price() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "YTW_NON_CALL",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -63,8 +63,8 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "YTW_PRICE_SENSITIVE",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -135,8 +135,8 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
     let call_date = date!(2027 - 04 - 01);
     let mut bond = Bond::fixed(
         "YTW-OFF-CYCLE-CALL",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -187,13 +187,13 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
         .collect::<Vec<_>>();
     call_flows.push((
         call_date,
-        Money::new(1_000_000.0 + accrued_on_call, Currency::USD),
+        Money::new(1_000_000.0 + accrued_on_call, Currency::USD).expect("valid money fixture"),
     ));
 
     let expected_call_yield = solve_ytm(
         &call_flows,
         quote_date,
-        Money::new(1_050_000.0, Currency::USD),
+        Money::new(1_050_000.0, Currency::USD).expect("valid money fixture"),
         YtmPricingSpec {
             day_count: bond.cashflow_spec.day_count(),
             notional: bond.notional,
@@ -236,7 +236,7 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -323,7 +323,7 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -336,8 +336,14 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
     let step_date = date!(2026 - 01 - 01);
     let amort_spec = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (step_date, Money::new(500_000.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (
+                step_date,
+                Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                maturity,
+                Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            ),
         ],
     };
     let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)

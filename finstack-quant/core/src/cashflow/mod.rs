@@ -54,8 +54,8 @@
 //! use time::macros::date;
 //!
 //! let base = date!(2025 - 01 - 01);
-//! let cf1 = (date!(2025 - 07 - 01), Money::new(1000.0, Currency::USD));
-//! let cf2 = (date!(2026 - 01 - 01), Money::new(1000.0, Currency::USD));
+//! let cf1 = (date!(2025 - 07 - 01), Money::from((1000_i64, Currency::USD)));
+//! let cf2 = (date!(2026 - 01 - 01), Money::from((1000_i64, Currency::USD)));
 //!
 //! // Create a flat discount curve at 5% annual rate
 //! let rate: f64 = 0.05;

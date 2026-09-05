@@ -76,7 +76,7 @@ impl StructuredCredit {
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
         let effective_as_of = lifecycle.effective_as_of(context, as_of);
         let result = self.price_stochastic_base(context, effective_as_of)?;
-        Ok(self.apply_stochastic_price_scenario(result))
+        self.apply_stochastic_price_scenario(result)
     }
 
     fn default_stochastic_pricing_mode(&self) -> PricingMode {
@@ -119,7 +119,7 @@ impl StructuredCredit {
         let effective_as_of = lifecycle.effective_as_of(context, as_of);
         let result =
             self.price_stochastic_base_with_mode(context, effective_as_of, pricing_mode)?;
-        Ok(self.apply_stochastic_price_scenario(result))
+        self.apply_stochastic_price_scenario(result)
     }
 
     fn price_stochastic_base_with_mode(
@@ -148,22 +148,24 @@ impl StructuredCredit {
     fn apply_stochastic_price_scenario(
         &self,
         mut result: StochasticPricingResult,
-    ) -> StochasticPricingResult {
-        let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
-            return result;
-        };
-        let factor = 1.0 + shock;
-        result.npv = Money::new(result.npv.amount() * factor, result.npv.currency());
-        result.clean_price *= factor;
-        result.dirty_price *= factor;
-        result.pv_std_error *= factor.abs();
-        let lo = result.pv_confidence_interval.0 * factor;
-        let hi = result.pv_confidence_interval.1 * factor;
-        result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
-        for tranche in &mut result.tranche_results {
-            tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency());
-        }
-        result
+    ) -> finstack_quant_core::Result<StochasticPricingResult> {
+        Ok({
+            let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
+                return Ok(result);
+            };
+            let factor = 1.0 + shock;
+            result.npv = Money::new(result.npv.amount() * factor, result.npv.currency())?;
+            result.clean_price *= factor;
+            result.dirty_price *= factor;
+            result.pv_std_error *= factor.abs();
+            let lo = result.pv_confidence_interval.0 * factor;
+            let hi = result.pv_confidence_interval.1 * factor;
+            result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
+            for tranche in &mut result.tranche_results {
+                tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency())?;
+            }
+            result
+        })
     }
 
     fn run_stochastic_pricer(
@@ -426,16 +428,16 @@ impl StructuredCredit {
     ) -> finstack_quant_core::Result<Money> {
         let disc = context.get_discount(&self.discount_curve_id)?;
 
-        let mut pv = Money::new(0.0, self.pool.get_base_currency());
+        let mut pv = Money::from((0_i64, self.pool.get_base_currency()));
         for (date, amount) in &cashflows.cashflows {
             if *date > as_of {
                 let df = disc.df_between_dates(as_of, *date)?;
-                let flow_pv = Money::new(amount.amount() * df, amount.currency());
+                let flow_pv = Money::new(amount.amount() * df, amount.currency())?;
                 pv = pv.checked_add(flow_pv)?;
             }
         }
 
-        Ok(crate::instruments::common_impl::helpers::apply_scenario_value(self, pv))
+        crate::instruments::common_impl::helpers::apply_scenario_value(self, pv)
     }
 
     /// Get full valuation with metrics for a specific tranche.
@@ -489,7 +491,7 @@ impl StructuredCredit {
             .get(&MetricId::Accrued)
             .copied()
             .unwrap_or(0.0);
-        let accrued = Money::new(accrued_value, pv.currency());
+        let accrued = Money::new(accrued_value, pv.currency())?;
 
         let clean_price = if notional > 0.0 {
             dirty_price - (accrued.amount() / notional) * 100.0

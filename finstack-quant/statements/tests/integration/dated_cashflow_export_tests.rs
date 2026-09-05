@@ -15,8 +15,14 @@ fn exports_node_series_to_dated_schedule_using_period_end_minus_one_day() {
         .value(
             "noi",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
             ],
         )
         .build()

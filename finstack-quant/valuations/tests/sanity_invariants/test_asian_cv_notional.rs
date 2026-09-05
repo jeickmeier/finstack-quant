@@ -57,7 +57,10 @@ mod cv_notional_tests {
         MarketContext::new()
             .insert(discount)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Price(Money::new(SPOT, Currency::USD)))
+            .insert_price(
+                "SPX",
+                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+            )
             .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
     }
 
@@ -72,7 +75,7 @@ mod cv_notional_tests {
             option_type,
             expiry,
             averaging_method: AveragingMethod::Arithmetic,
-            notional: Money::new(notional, Currency::USD),
+            notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
             fixing_dates: vec![
                 date(2025, Month::April, 1),
                 date(2025, Month::July, 1),

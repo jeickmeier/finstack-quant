@@ -39,7 +39,7 @@ fn test_currency_safety_mismatch() {
         .insert(discount_curve)
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(150.0, Currency::EUR)),
+            MarketScalar::Price(Money::new(150.0, Currency::EUR).expect("valid money fixture")),
         ) // EUR mismatch!
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
@@ -224,7 +224,7 @@ fn test_time_mapping_with_quarterly_coupons() {
 
     let bond = finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond {
         id: "TEST_QUARTERLY".to_string().into(),
-        notional: Money::new(bond_params::NOTIONAL, Currency::USD),
+        notional: Money::new(bond_params::NOTIONAL, Currency::USD).expect("valid money fixture"),
         issue_date: issue,
         maturity,
         discount_curve_id: "USD-OIS".into(),

@@ -37,12 +37,12 @@ fn test_dv01_scales_with_notional() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep_1m = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .build();
 
     let dep_2m = DepositBuilder::new(base)
-        .notional(Money::new(2_000_000.0, Currency::USD))
+        .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .build();
 
@@ -80,10 +80,13 @@ fn test_dv01_zero_for_zero_period() {
         .id(finstack_quant_core::types::InstrumentId::new(
             "DEP-ZERO-DV01",
         ))
-        .notional(finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+        )
         .start_date(base)
         .maturity(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -103,7 +106,7 @@ fn test_dv01_reasonable_magnitude() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .build();
 

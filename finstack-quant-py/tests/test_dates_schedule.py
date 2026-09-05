@@ -106,8 +106,10 @@ def test_fiscal_week_stepping_includes_week_53() -> None:
         week_52.prev()
 
 
-def test_schedule_generate_from_spec_and_dataframe() -> None:
-    schedule = Schedule.generate("2025-01-15", "2026-01-15", frequency="6M", calendar="usny")
+def test_schedule_builder_from_spec_and_dataframe() -> None:
+    schedule = (
+        Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").adjust_with("modified_following", "usny").build()
+    )
     assert [d.isoformat() for d in schedule] == ["2025-01-15", "2025-07-15", "2026-01-15"]
     assert schedule.payment_dates == [date(2025, 7, 15), date(2026, 1, 15)]
     assert Schedule.from_json(schedule.to_json()) == schedule
@@ -120,9 +122,6 @@ def test_schedule_generate_from_spec_and_dataframe() -> None:
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]
     assert len(frame) == 2
     assert frame["fixing_date"].isna().all()
-
-    with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
-        Schedule.generate("2025-01-15", "2026-01-15", bogus=1)
 
 
 def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
@@ -166,7 +165,6 @@ def test_dates_pickle_round_trips() -> None:
     from finstack_quant.core.dates import (
         DayCount,
         DayCountContext,
-        DayCountContextState,
         HolidayCalendar,
         Tenor,
         TenorUnit,
@@ -181,14 +179,14 @@ def test_dates_pickle_round_trips() -> None:
         PeriodId.parse("2025Q1"),
         HolidayCalendar("usny"),
         DayCountContext("usny", "6M", coupon_period=("2025-01-01", "2025-07-01")),
-        DayCountContextState(bus_basis=250),
+        DayCountContext(bus_basis=250),
         StubKind.LONG_BACK,
         BusinessDayConvention.MODIFIED_PRECEDING,
         ScheduleErrorPolicy.GRACEFUL_EMPTY,
         Thirty360Convention.ITALIAN,
         FiscalConfig.uk(),
         build_periods("2024Q1..Q4", "2024Q2"),
-        Schedule.generate("2025-01-15", "2026-01-15"),
+        Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build(),
     ]
     for value in values:
         assert pickle.loads(pickle.dumps(value)) == value  # noqa: S301
@@ -270,3 +268,10 @@ def test_thirty360_and_date_extension_free_functions() -> None:
     assert quarter("2025-08-15") == 3
     assert fiscal_year("2024-10-15", FiscalConfig.us_federal()) == 2025
     assert months_until("2020-01-15", "2022-03-10") == 25
+
+
+def test_empty_schedule_dataframe() -> None:
+    schedule = Schedule.from_json('{"dates":[],"payment_dates":[],"fixing_dates":[],"warnings":[]}')
+    frame = schedule.to_dataframe()
+    assert frame.empty
+    assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]

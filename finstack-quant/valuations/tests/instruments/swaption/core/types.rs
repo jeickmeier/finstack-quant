@@ -121,7 +121,7 @@ fn test_swaption_cash_annuity_zero_forward_and_invalid_frequency() {
     let annuity = swaption.cash_annuity_par_yield(0.0).unwrap();
     assert_approx_eq(annuity, expected, 1e-8, "cash annuity zero rate");
 
-    assert!(Tenor::try_new(0, TenorUnit::Months).is_err());
+    assert!(Tenor::new(0, TenorUnit::Months).is_err());
 }
 
 #[test]
@@ -223,7 +223,8 @@ fn test_bermudan_swaption_schedule_and_conversion() {
         finstack_quant_core::money::Money::new(
             1_000_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         0.03,
         swap_start,
         swap_end,
@@ -274,7 +275,8 @@ fn test_bermudan_builder_helpers_and_time_accessors() {
         finstack_quant_core::money::Money::new(
             2_000_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         0.031,
         swap_start,
         swap_end,

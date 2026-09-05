@@ -378,7 +378,7 @@ impl BondFuturePricer {
         as_of: Date,
     ) -> Result<Money> {
         if as_of > future.delivery_end {
-            return Ok(Money::new(0.0, future.notional.currency()));
+            return Ok(Money::from((0_i64, future.notional.currency())));
         }
         // Calculate the theoretical model price, carrying the CTD forward to
         // the contract's delivery date.
@@ -400,7 +400,7 @@ impl BondFuturePricer {
         let npv_amount = price_diff * (notional_value / 100.0) * position_sign;
 
         // Return as Money with same currency as notional
-        Ok(Money::new(npv_amount, future.notional.currency()))
+        Money::new(npv_amount, future.notional.currency())
     }
 }
 
@@ -497,8 +497,9 @@ mod tests {
     fn create_test_bond(notional: f64, coupon_rate: f64, issue: Date, maturity: Date) -> Bond {
         Bond::fixed(
             "TEST_BOND",
-            Money::new(notional, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(coupon_rate)
+                .expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -985,7 +986,7 @@ mod tests {
 
         BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .expiry(expiry)
             .delivery_start(expiry + time::Duration::days(1))
             .delivery_end(expiry + time::Duration::days(10))
@@ -1270,8 +1271,8 @@ mod tests {
 
         let bond_a = Bond::fixed(
             "BOND-A",
-            Money::new(100_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.04),
+            Money::from((100_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
             date!(2020 - 01 - 15),
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1280,8 +1281,8 @@ mod tests {
         .expect("Bond::fixed should succeed with valid parameters");
         let bond_b = Bond::fixed(
             "BOND-B",
-            Money::new(100_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((100_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             date!(2020 - 01 - 15),
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1300,7 +1301,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(expiry)
             .delivery_start(delivery_start)
             .delivery_end(delivery_end)

@@ -78,8 +78,8 @@ fn build_and_evaluate() -> Result<StatementResult> {
     let model = ModelBuilder::new("acme")
         .periods("2025Q1..Q4", Some("2025Q2"))?
         .value("revenue", &[
-            (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10_000_000.0)),
-            (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(11_000_000.0)),
+            (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
+            (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
         ])
         .forecast("revenue", ForecastSpec {
             method: ForecastMethod::GrowthPct,

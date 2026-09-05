@@ -227,7 +227,7 @@ mod tests {
 
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {

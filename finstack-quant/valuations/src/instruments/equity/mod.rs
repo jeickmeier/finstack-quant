@@ -45,7 +45,7 @@
 //!     "SPX",
 //!     4500.0,
 //!     date!(2025 - 07 - 15),
-//!     Money::new(100.0, Currency::USD),
+//!     Money::from((100_i64, Currency::USD)),
 //!     market_data,
 //! )
 //! .expect("valid option");

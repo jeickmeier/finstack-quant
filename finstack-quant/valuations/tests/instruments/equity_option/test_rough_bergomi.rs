@@ -437,11 +437,11 @@ fn rbergomi_price_scales_with_notional() {
     let market = rbergomi_market(as_of, spot, 0.20, 0.0, 1.4, 0.1, -0.85);
 
     let mut call_100 = create_call(as_of, expiry, strike);
-    call_100.notional = Money::new(100.0, Currency::USD);
+    call_100.notional = Money::new(100.0, Currency::USD).expect("valid money fixture");
     call_100.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let mut call_300 = create_call(as_of, expiry, strike);
-    call_300.notional = Money::new(300.0, Currency::USD);
+    call_300.notional = Money::new(300.0, Currency::USD).expect("valid money fixture");
     call_300.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let registry = standard_pricer_registry();

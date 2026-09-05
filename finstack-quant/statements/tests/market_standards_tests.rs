@@ -49,10 +49,22 @@ fn test_rolling_mean_matches_pandas_full_window() {
         .value(
             "data",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(20.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(30.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(40.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(20.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(30.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(40.0),
+                ),
             ],
         )
         .compute("rolling_mean_3", "rolling_mean(data, 3)")
@@ -64,12 +76,18 @@ fn test_rolling_mean_matches_pandas_full_window() {
     let results = evaluator.evaluate(&model).unwrap();
 
     assert_eq!(
-        results.get("rolling_mean_3", &PeriodId::quarter(2025, 3)),
+        results.get(
+            "rolling_mean_3",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
         Some(20.0),
         "Q3 should average [10, 20, 30]"
     );
     assert_eq!(
-        results.get("rolling_mean_3", &PeriodId::quarter(2025, 4)),
+        results.get(
+            "rolling_mean_3",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        ),
         Some(30.0),
         "Q4 should average [20, 30, 40]"
     );
@@ -85,10 +103,22 @@ fn test_variance_uses_sample_not_population() {
         .value(
             "data",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(2.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(4.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(4.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(4.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(4.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(4.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(4.0),
+                ),
             ],
         )
         .compute("rolling_var_4", "rolling_var(data, 4)")
@@ -109,7 +139,10 @@ fn test_variance_uses_sample_not_population() {
     // Sample variance (n-1): 3.0 / 3 = 1.0
     // Population variance (n): 3.0 / 4 = 0.75
     let variance = results
-        .get("rolling_var_4", &PeriodId::quarter(2025, 4))
+        .get(
+            "rolling_var_4",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
         .unwrap();
 
     let expected_sample_var = 1.0;
@@ -128,7 +161,10 @@ fn test_variance_uses_sample_not_population() {
 
     // Standard deviation should be sqrt of variance
     let std_dev = results
-        .get("rolling_std_4", &PeriodId::quarter(2025, 4))
+        .get(
+            "rolling_std_4",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
         .unwrap();
     assert_sample_stat(
         std_dev,
@@ -146,7 +182,10 @@ fn test_variance_single_value_returns_nan() {
         .unwrap()
         .value(
             "data",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .compute("variance", "var(data)")
         .unwrap()
@@ -160,14 +199,22 @@ fn test_variance_single_value_returns_nan() {
 
     // With sample variance, single value should return NaN (undefined)
     let variance = results
-        .get("variance", &PeriodId::quarter(2025, 1))
+        .get(
+            "variance",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert!(
         variance.is_nan(),
         "Variance of single value should be NaN with sample variance"
     );
 
-    let std_dev = results.get("std_dev", &PeriodId::quarter(2025, 1)).unwrap();
+    let std_dev = results
+        .get(
+            "std_dev",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert!(
         std_dev.is_nan(),
         "Std dev of single value should be NaN with sample variance"
@@ -184,11 +231,26 @@ fn test_ttm_quarterly_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2024, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2024, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::quarter(2024, 3), AmountOrScalar::scalar(120.0)),
-                (PeriodId::quarter(2024, 4), AmountOrScalar::scalar(130.0)),
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(140.0)),
+                (
+                    PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(140.0),
+                ),
             ],
         )
         .compute("revenue_ttm", "ttm(revenue)")
@@ -201,12 +263,18 @@ fn test_ttm_quarterly_data() {
 
     // Quarterly TTM should sum last 4 quarters
     let q4_2024_ttm = results
-        .get("revenue_ttm", &PeriodId::quarter(2024, 4))
+        .get(
+            "revenue_ttm",
+            &PeriodId::quarter(2024, 4).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q4_2024_ttm, 460.0, "TTM Q4 2024 = 100+110+120+130");
 
     let q1_2025_ttm = results
-        .get("revenue_ttm", &PeriodId::quarter(2025, 1))
+        .get(
+            "revenue_ttm",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q1_2025_ttm, 500.0, "TTM Q1 2025 = 110+120+130+140");
 }
@@ -219,18 +287,54 @@ fn test_ttm_monthly_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::month(2024, 1), AmountOrScalar::scalar(10.0)),
-                (PeriodId::month(2024, 2), AmountOrScalar::scalar(11.0)),
-                (PeriodId::month(2024, 3), AmountOrScalar::scalar(12.0)),
-                (PeriodId::month(2024, 4), AmountOrScalar::scalar(13.0)),
-                (PeriodId::month(2024, 5), AmountOrScalar::scalar(14.0)),
-                (PeriodId::month(2024, 6), AmountOrScalar::scalar(15.0)),
-                (PeriodId::month(2024, 7), AmountOrScalar::scalar(16.0)),
-                (PeriodId::month(2024, 8), AmountOrScalar::scalar(17.0)),
-                (PeriodId::month(2024, 9), AmountOrScalar::scalar(18.0)),
-                (PeriodId::month(2024, 10), AmountOrScalar::scalar(19.0)),
-                (PeriodId::month(2024, 11), AmountOrScalar::scalar(20.0)),
-                (PeriodId::month(2024, 12), AmountOrScalar::scalar(21.0)),
+                (
+                    PeriodId::month(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10.0),
+                ),
+                (
+                    PeriodId::month(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(11.0),
+                ),
+                (
+                    PeriodId::month(2024, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(12.0),
+                ),
+                (
+                    PeriodId::month(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(13.0),
+                ),
+                (
+                    PeriodId::month(2024, 5).expect("valid period fixture"),
+                    AmountOrScalar::scalar(14.0),
+                ),
+                (
+                    PeriodId::month(2024, 6).expect("valid period fixture"),
+                    AmountOrScalar::scalar(15.0),
+                ),
+                (
+                    PeriodId::month(2024, 7).expect("valid period fixture"),
+                    AmountOrScalar::scalar(16.0),
+                ),
+                (
+                    PeriodId::month(2024, 8).expect("valid period fixture"),
+                    AmountOrScalar::scalar(17.0),
+                ),
+                (
+                    PeriodId::month(2024, 9).expect("valid period fixture"),
+                    AmountOrScalar::scalar(18.0),
+                ),
+                (
+                    PeriodId::month(2024, 10).expect("valid period fixture"),
+                    AmountOrScalar::scalar(19.0),
+                ),
+                (
+                    PeriodId::month(2024, 11).expect("valid period fixture"),
+                    AmountOrScalar::scalar(20.0),
+                ),
+                (
+                    PeriodId::month(2024, 12).expect("valid period fixture"),
+                    AmountOrScalar::scalar(21.0),
+                ),
             ],
         )
         .compute("revenue_ttm", "ttm(revenue)")
@@ -243,7 +347,10 @@ fn test_ttm_monthly_data() {
 
     // Monthly TTM should sum last 12 months
     let m12_ttm = results
-        .get("revenue_ttm", &PeriodId::month(2024, 12))
+        .get(
+            "revenue_ttm",
+            &PeriodId::month(2024, 12).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(m12_ttm, 186.0, "Monthly TTM should sum all 12 months");
 }
@@ -256,10 +363,22 @@ fn test_ytd_quarterly_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(120.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(130.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
             ],
         )
         .compute("revenue_ytd", "ytd(revenue)")
@@ -271,13 +390,22 @@ fn test_ytd_quarterly_data() {
     let results = evaluator.evaluate(&model).unwrap();
 
     let q1_ytd = results
-        .get("revenue_ytd", &PeriodId::quarter(2025, 1))
+        .get(
+            "revenue_ytd",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     let q2_ytd = results
-        .get("revenue_ytd", &PeriodId::quarter(2025, 2))
+        .get(
+            "revenue_ytd",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     let q3_ytd = results
-        .get("revenue_ytd", &PeriodId::quarter(2025, 3))
+        .get(
+            "revenue_ytd",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
         .unwrap();
 
     assert_eq!(q1_ytd, 100.0, "YTD Q1 = 100");
@@ -293,12 +421,30 @@ fn test_qtd_monthly_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::month(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 2), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 3), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 4), AmountOrScalar::scalar(100.0)),
-                (PeriodId::month(2025, 5), AmountOrScalar::scalar(110.0)),
-                (PeriodId::month(2025, 6), AmountOrScalar::scalar(120.0)),
+                (
+                    PeriodId::month(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::month(2025, 5).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::month(2025, 6).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
             ],
         )
         .compute("revenue_qtd", "qtd(revenue)")
@@ -310,13 +456,22 @@ fn test_qtd_monthly_data() {
     let results = evaluator.evaluate(&model).unwrap();
 
     let m4_qtd = results
-        .get("revenue_qtd", &PeriodId::month(2025, 4))
+        .get(
+            "revenue_qtd",
+            &PeriodId::month(2025, 4).expect("valid period fixture"),
+        )
         .unwrap();
     let m5_qtd = results
-        .get("revenue_qtd", &PeriodId::month(2025, 5))
+        .get(
+            "revenue_qtd",
+            &PeriodId::month(2025, 5).expect("valid period fixture"),
+        )
         .unwrap();
     let m6_qtd = results
-        .get("revenue_qtd", &PeriodId::month(2025, 6))
+        .get(
+            "revenue_qtd",
+            &PeriodId::month(2025, 6).expect("valid period fixture"),
+        )
         .unwrap();
 
     assert_eq!(m4_qtd, 100.0, "QTD Apr = 100");
@@ -332,21 +487,66 @@ fn test_fiscal_ytd_monthly_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::month(2024, 4), AmountOrScalar::scalar(80.0)),
-                (PeriodId::month(2024, 5), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 6), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 7), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 8), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 9), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 10), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 11), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2024, 12), AmountOrScalar::scalar(90.0)),
-                (PeriodId::month(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::month(2025, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::month(2025, 3), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 4), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 5), AmountOrScalar::scalar(0.0)),
-                (PeriodId::month(2025, 6), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::month(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(80.0),
+                ),
+                (
+                    PeriodId::month(2024, 5).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 6).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 7).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 8).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 9).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 10).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 11).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2024, 12).expect("valid period fixture"),
+                    AmountOrScalar::scalar(90.0),
+                ),
+                (
+                    PeriodId::month(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::month(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::month(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 5).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::month(2025, 6).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         // April fiscal year
@@ -359,7 +559,10 @@ fn test_fiscal_ytd_monthly_data() {
     let results = evaluator.evaluate(&model).unwrap();
 
     let feb_2025_fytd = results
-        .get("revenue_fiscal_ytd", &PeriodId::month(2025, 2))
+        .get(
+            "revenue_fiscal_ytd",
+            &PeriodId::month(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
 
     assert_eq!(
@@ -377,10 +580,22 @@ fn test_ttm_semi_annual_data() {
         .value(
             "revenue",
             &[
-                (PeriodId::half(2024, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::half(2024, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::half(2025, 1), AmountOrScalar::scalar(120.0)),
-                (PeriodId::half(2025, 2), AmountOrScalar::scalar(130.0)),
+                (
+                    PeriodId::half(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::half(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::half(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::half(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
             ],
         )
         .compute("revenue_ttm", "ttm(revenue)")
@@ -393,7 +608,10 @@ fn test_ttm_semi_annual_data() {
 
     // Semi-annual TTM should sum last 2 halves (1 year)
     let h2_2025_ttm = results
-        .get("revenue_ttm", &PeriodId::half(2025, 2))
+        .get(
+            "revenue_ttm",
+            &PeriodId::half(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(h2_2025_ttm, 250.0, "Semi-annual TTM = last 2 halves");
 }
@@ -434,7 +652,10 @@ fn test_exponential_smoothing_requires_alpha() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .forecast(
             "revenue",
@@ -474,7 +695,10 @@ fn test_exponential_smoothing_requires_beta() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .forecast(
             "revenue",
@@ -505,7 +729,10 @@ fn test_moving_average_requires_window() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .forecast(
             "revenue",
@@ -535,7 +762,7 @@ fn test_seasonal_requires_mode() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
         )
         .forecast(
             "revenue",
@@ -565,7 +792,7 @@ fn test_seasonal_decomposition_requires_season_length() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
         )
         .forecast(
             "revenue",
@@ -598,10 +825,22 @@ fn test_lag_quarterly_periods() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(120.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(130.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
             ],
         )
         .compute("lagged", "lag(revenue, 1)")
@@ -613,11 +852,21 @@ fn test_lag_quarterly_periods() {
     let results = evaluator.evaluate(&model).unwrap();
 
     assert_eq!(
-        results.get("lagged", &PeriodId::quarter(2025, 2)).unwrap(),
+        results
+            .get(
+                "lagged",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         100.0
     );
     assert_eq!(
-        results.get("lagged", &PeriodId::quarter(2025, 4)).unwrap(),
+        results
+            .get(
+                "lagged",
+                &PeriodId::quarter(2025, 4).expect("valid period fixture")
+            )
+            .unwrap(),
         120.0
     );
 }
@@ -630,10 +879,22 @@ fn test_lag_monthly_periods() {
         .value(
             "revenue",
             &[
-                (PeriodId::month(2024, 11), AmountOrScalar::scalar(100.0)),
-                (PeriodId::month(2024, 12), AmountOrScalar::scalar(110.0)),
-                (PeriodId::month(2025, 1), AmountOrScalar::scalar(120.0)),
-                (PeriodId::month(2025, 2), AmountOrScalar::scalar(130.0)),
+                (
+                    PeriodId::month(2024, 11).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::month(2024, 12).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::month(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::month(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
             ],
         )
         .compute("lagged", "lag(revenue, 2)")
@@ -646,11 +907,21 @@ fn test_lag_monthly_periods() {
 
     // M01 lag 2 should be M11 (crosses year boundary)
     assert_eq!(
-        results.get("lagged", &PeriodId::month(2025, 1)).unwrap(),
+        results
+            .get(
+                "lagged",
+                &PeriodId::month(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         100.0
     );
     assert_eq!(
-        results.get("lagged", &PeriodId::month(2025, 2)).unwrap(),
+        results
+            .get(
+                "lagged",
+                &PeriodId::month(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         110.0
     );
 }
@@ -664,7 +935,7 @@ fn test_seasonal_mode_enum_additive() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
         )
         .forecast(
             "revenue",
@@ -684,9 +955,24 @@ fn test_seasonal_mode_enum_additive() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Verify additive mode produces reasonable forecasts
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     // All forecasts should be valid numbers (additive mode is working)
     assert!(!q2.is_nan(), "Q2 forecast should be valid");
@@ -701,7 +987,7 @@ fn test_seasonal_mode_enum_multiplicative() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
         )
         .forecast(
             "revenue",
@@ -721,9 +1007,24 @@ fn test_seasonal_mode_enum_multiplicative() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Verify multiplicative mode produces reasonable forecasts
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     // All forecasts should be positive and reasonable
     assert!(q2 > 0.0, "Q2 forecast should be positive");
@@ -739,7 +1040,10 @@ fn test_seasonal_mode_typo_errors() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .forecast(
             "revenue",
@@ -776,8 +1080,14 @@ fn test_rolling_window_with_limited_history() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
             ],
         )
         .compute("rolling_mean_4", "rolling_mean(revenue, 4)")
@@ -794,7 +1104,10 @@ fn test_rolling_window_with_limited_history() {
     // 2-observation history is never presented as a 4-period statistic.
     for quarter in [1, 2] {
         let value = results
-            .get("rolling_mean_4", &PeriodId::quarter(2025, quarter))
+            .get(
+                "rolling_mean_4",
+                &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+            )
             .unwrap();
         assert!(
             value.is_nan(),
@@ -804,12 +1117,18 @@ fn test_rolling_window_with_limited_history() {
 
     // Explicit min_periods=1 restores expanding-until-full behavior.
     let q1_value = results
-        .get("rolling_mean_4_mp1", &PeriodId::quarter(2025, 1))
+        .get(
+            "rolling_mean_4_mp1",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q1_value, 100.0, "min_periods=1: 1 value returns that value");
 
     let q2_value = results
-        .get("rolling_mean_4_mp1", &PeriodId::quarter(2025, 2))
+        .get(
+            "rolling_mean_4_mp1",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q2_value, 105.0, "min_periods=1: mean of available values");
 }
@@ -822,7 +1141,7 @@ fn test_seasonal_allows_negative_values() {
         .unwrap()
         .value(
             "net_income",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10.0))],
+            &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(10.0))],
         )
         .forecast(
             "net_income",
@@ -843,13 +1162,22 @@ fn test_seasonal_allows_negative_values() {
 
     // Check that seasonal decomposition handles negative values correctly
     let q2 = results
-        .get("net_income", &PeriodId::quarter(2025, 2))
+        .get(
+            "net_income",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     let q3 = results
-        .get("net_income", &PeriodId::quarter(2025, 3))
+        .get(
+            "net_income",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
         .unwrap();
     let q4 = results
-        .get("net_income", &PeriodId::quarter(2025, 4))
+        .get(
+            "net_income",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
         .unwrap();
 
     // The key test: seasonal forecast should not force values to be non-negative
@@ -870,10 +1198,22 @@ fn test_ewm_statistics_match_pandas_adjust_false() {
         .value(
             "returns",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.10)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.05)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(0.15)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(0.08)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.10),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.05),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.15),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.08),
+                ),
             ],
         )
         .compute("mean", "ewm_mean(returns, 0.3)")
@@ -891,7 +1231,7 @@ fn test_ewm_statistics_match_pandas_adjust_false() {
 
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
-    let q4 = PeriodId::quarter(2025, 4);
+    let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
     let mean = results.get("mean", &q4).unwrap();
     let variance_default = results.get("variance_default", &q4).unwrap();
@@ -924,39 +1264,66 @@ fn test_ewm_statistics_match_pandas_adjust_false() {
 
 #[test]
 fn test_period_kind_accessor() {
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     assert_eq!(q1.kind(), PeriodKind::Quarterly);
 
-    let m1 = PeriodId::month(2025, 1);
+    let m1 = PeriodId::month(2025, 1).expect("valid period fixture");
     assert_eq!(m1.kind(), PeriodKind::Monthly);
 }
 
 #[test]
 fn test_periods_per_year() {
-    assert_eq!(PeriodId::quarter(2025, 1).periods_per_year(), 4);
-    assert_eq!(PeriodId::month(2025, 1).periods_per_year(), 12);
-    assert_eq!(PeriodId::half(2025, 1).periods_per_year(), 2);
+    assert_eq!(
+        PeriodId::quarter(2025, 1)
+            .expect("valid period fixture")
+            .periods_per_year(),
+        4
+    );
+    assert_eq!(
+        PeriodId::month(2025, 1)
+            .expect("valid period fixture")
+            .periods_per_year(),
+        12
+    );
+    assert_eq!(
+        PeriodId::half(2025, 1)
+            .expect("valid period fixture")
+            .periods_per_year(),
+        2
+    );
     assert_eq!(PeriodId::annual(2025).periods_per_year(), 1);
 }
 
 #[test]
 fn test_period_next() {
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = q1.next().unwrap();
-    assert_eq!(q2, PeriodId::quarter(2025, 2));
+    assert_eq!(
+        q2,
+        PeriodId::quarter(2025, 2).expect("valid period fixture")
+    );
 
-    let q4 = PeriodId::quarter(2025, 4);
+    let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
     let next_q1 = q4.next().unwrap();
-    assert_eq!(next_q1, PeriodId::quarter(2026, 1));
+    assert_eq!(
+        next_q1,
+        PeriodId::quarter(2026, 1).expect("valid period fixture")
+    );
 }
 
 #[test]
 fn test_period_prev() {
-    let q2 = PeriodId::quarter(2025, 2);
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     let q1 = q2.prev().unwrap();
-    assert_eq!(q1, PeriodId::quarter(2025, 1));
+    assert_eq!(
+        q1,
+        PeriodId::quarter(2025, 1).expect("valid period fixture")
+    );
 
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let prev_q4 = q1.prev().unwrap();
-    assert_eq!(prev_q4, PeriodId::quarter(2024, 4));
+    assert_eq!(
+        prev_q4,
+        PeriodId::quarter(2024, 4).expect("valid period fixture")
+    );
 }

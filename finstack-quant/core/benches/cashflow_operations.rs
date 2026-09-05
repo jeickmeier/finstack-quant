@@ -55,7 +55,10 @@ fn money_flows(n: usize) -> Vec<(Date, Money)> {
     (1..=n)
         .map(|i| {
             let date = base + time::Duration::days(i as i64 * 91);
-            (date, Money::new(1000.0, Currency::USD))
+            (
+                date,
+                Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect()
 }

@@ -64,10 +64,13 @@ fn create_market() -> MarketContext {
         .insert_surface(flat_vol_surface("SPX_VOL"))
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
-        .insert_price("SPX", MarketScalar::Price(Money::new(100.0, Currency::USD)))
+        .insert_price(
+            "SPX",
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        )
         .insert_price("SPX_DIV", MarketScalar::Unitless(0.02))
 }
 
@@ -84,14 +87,14 @@ fn create_barrier_option() -> BarrierOption {
         id: InstrumentId::new("GREEKS-BARRIER"),
         underlying_ticker: "SPX".into(),
         strike: 100.0,
-        barrier: Money::new(80.0, Currency::USD),
+        barrier: Money::new(80.0, Currency::USD).expect("valid money fixture"),
         rebate: None,
         rebate_timing: Default::default(),
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry: as_of() + time::Duration::days(365),
         observed_barrier_breached: None,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         use_gobet_miri: false,
         discount_curve_id: CurveId::new("USD_DISC"),
@@ -123,7 +126,7 @@ fn create_asian_option() -> AsianOption {
         .averaging_method(finstack_quant_valuations::instruments::AveragingMethod::Arithmetic)
         .expiry(as_of() + time::Duration::days(365))
         .fixing_dates(fixing_dates)
-        .notional(Money::new(100.0, Currency::USD))
+        .notional(Money::new(100.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD_DISC"))
         .spot_id("SPX".into())

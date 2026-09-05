@@ -71,7 +71,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
     // USD bonds (60% of portfolio)
     for i in 0..60 {
         let currency = Currency::try_from("USD").unwrap();
-        let notional = Money::new(1_000_000.0, currency);
+        let notional = Money::new(1_000_000.0, currency).expect("valid money fixture");
         let maturity_years = 1 + (i % 10); // 1-10 year maturities
         let maturity = as_of + time::Duration::days((maturity_years * 365) as i64);
         let coupon = 0.04 + (i as f64 * 0.001); // 4.0% - 6.9%
@@ -79,7 +79,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
         let bond = Bond::fixed(
             format!("USD-BOND-{:03}", i + 1),
             notional,
-            finstack_quant_core::types::Rate::from_decimal(coupon),
+            finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -93,7 +93,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
     // EUR bonds (25% of portfolio)
     for i in 0..25 {
         let currency = Currency::try_from("EUR").unwrap();
-        let notional = Money::new(1_000_000.0, currency);
+        let notional = Money::new(1_000_000.0, currency).expect("valid money fixture");
         let maturity_years = 1 + (i % 10);
         let maturity = as_of + time::Duration::days((maturity_years * 365) as i64);
         let coupon = 0.03 + (i as f64 * 0.001); // 3.0% - 5.4%
@@ -101,7 +101,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
         let bond = Bond::fixed(
             format!("EUR-BOND-{:03}", i + 1),
             notional,
-            finstack_quant_core::types::Rate::from_decimal(coupon),
+            finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -115,7 +115,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
     // GBP bonds (15% of portfolio)
     for i in 0..15 {
         let currency = Currency::try_from("GBP").unwrap();
-        let notional = Money::new(1_000_000.0, currency);
+        let notional = Money::new(1_000_000.0, currency).expect("valid money fixture");
         let maturity_years = 1 + (i % 10);
         let maturity = as_of + time::Duration::days((maturity_years * 365) as i64);
         let coupon = 0.045 + (i as f64 * 0.001); // 4.5% - 6.4%
@@ -123,7 +123,7 @@ fn build_bond_portfolio(as_of: Date) -> Vec<Bond> {
         let bond = Bond::fixed(
             format!("GBP-BOND-{:03}", i + 1),
             notional,
-            finstack_quant_core::types::Rate::from_decimal(coupon),
+            finstack_quant_core::types::Rate::from_decimal(coupon).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -280,11 +280,11 @@ fn test_dataframe_export_metric_keys() {
     let market = Arc::new(create_multi_currency_market(as_of));
 
     let currency = Currency::try_from("USD").unwrap();
-    let notional = Money::new(1_000_000.0, currency);
+    let notional = Money::new(1_000_000.0, currency).expect("valid money fixture");
     let bond = Bond::fixed(
         "TEST-BOND-EXPORT",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         as_of + time::Duration::days(5 * 365),
         finstack_quant_core::dates::StubKind::ShortFront,

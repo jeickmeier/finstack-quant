@@ -55,7 +55,7 @@ fn create_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_PARITY".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -85,7 +85,7 @@ fn create_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "FLOOR_PARITY".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -255,7 +255,7 @@ fn test_caplet_floorlet_parity() {
     let caplet = CapFloor {
         id: "CAPLET".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -283,7 +283,7 @@ fn test_caplet_floorlet_parity() {
     let floorlet = CapFloor {
         id: "FLOORLET".into(),
         rate_option_type: RateOptionType::Floorlet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: start,
         maturity: end,

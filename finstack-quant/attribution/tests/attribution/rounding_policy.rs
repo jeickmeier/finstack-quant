@@ -19,7 +19,7 @@ fn parallel_stamps_configured_rounding_context() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-ROUND",
-        Money::new(1_000.0, Currency::USD),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
     ));
     let market_t0 = MarketContext::new();
     let market_t1 = MarketContext::new();
@@ -74,7 +74,7 @@ fn explain_uses_stamped_rounding_context() {
     let rounding = finstack_quant_core::config::rounding_context_from(&FinstackConfig::default());
 
     let mut attr = PnlAttribution::new(
-        Money::new(1000.0, Currency::USD),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
         "EXPLAIN",
         as_of_t0,
         as_of_t1,
@@ -83,8 +83,8 @@ fn explain_uses_stamped_rounding_context() {
     attr.meta.rounding = rounding;
 
     // Set non-zero components to exercise formatting paths
-    attr.carry = Money::new(10.0, Currency::USD);
-    attr.fx_pnl = Money::new(5.0, Currency::USD);
+    attr.carry = Money::new(10.0, Currency::USD).expect("valid money fixture");
+    attr.fx_pnl = Money::new(5.0, Currency::USD).expect("valid money fixture");
     attr.compute_residual()
         .expect("Residual computation should succeed");
 
@@ -109,7 +109,7 @@ fn all_methods_stamp_configured_rounding_context() {
     let as_of_t1 = date!(2025 - 01 - 02);
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-ROUND-ALL",
-        Money::new(1_000.0, Currency::USD),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
     ));
     let market = MarketContext::new();
 

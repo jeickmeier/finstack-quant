@@ -349,22 +349,22 @@ mod tests {
 
     #[test]
     fn approximate_period_end_quarterly() {
-        let q1 = PeriodId::quarter(2025, 1);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&q1),
             Date::from_calendar_date(2025, Month::March, 31).expect("valid date")
         );
-        let q2 = PeriodId::quarter(2025, 2);
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&q2),
             Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
         );
-        let q3 = PeriodId::quarter(2025, 3);
+        let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&q3),
             Date::from_calendar_date(2025, Month::September, 30).expect("valid date")
         );
-        let q4 = PeriodId::quarter(2025, 4);
+        let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&q4),
             Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
@@ -373,22 +373,22 @@ mod tests {
 
     #[test]
     fn approximate_period_end_monthly() {
-        let jan = PeriodId::month(2025, 1);
+        let jan = PeriodId::month(2025, 1).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&jan),
             Date::from_calendar_date(2025, Month::January, 31).expect("valid date")
         );
-        let feb = PeriodId::month(2024, 2); // leap year
+        let feb = PeriodId::month(2024, 2).expect("valid period fixture"); // leap year
         assert_eq!(
             approximate_period_end(&feb),
             Date::from_calendar_date(2024, Month::February, 29).expect("valid date")
         );
-        let feb_non_leap = PeriodId::month(2025, 2);
+        let feb_non_leap = PeriodId::month(2025, 2).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&feb_non_leap),
             Date::from_calendar_date(2025, Month::February, 28).expect("valid date")
         );
-        let jun = PeriodId::month(2025, 6);
+        let jun = PeriodId::month(2025, 6).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&jun),
             Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
@@ -397,12 +397,12 @@ mod tests {
 
     #[test]
     fn approximate_period_end_semi_annual() {
-        let h1 = PeriodId::half(2025, 1);
+        let h1 = PeriodId::half(2025, 1).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&h1),
             Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
         );
-        let h2 = PeriodId::half(2025, 2);
+        let h2 = PeriodId::half(2025, 2).expect("valid period fixture");
         assert_eq!(
             approximate_period_end(&h2),
             Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
@@ -425,7 +425,7 @@ mod tests {
 
         // Quarterly model: annualized sigma must be std_dev * sqrt(4) = 2x.
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start: time::macros::date!(2025 - 01 - 01),
             end: time::macros::date!(2025 - 04 - 01),
             is_actual: true,
@@ -465,8 +465,8 @@ mod tests {
             threshold_schedule: None,
         });
 
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         let mut nodes = IndexMap::new();
         // The covenant metric only covers p1 (breaching).
@@ -507,8 +507,8 @@ mod tests {
         engine.add_spec(spec);
 
         // 2. Setup Results (Forecast)
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         let mut nodes = IndexMap::new();
         let mut net_debt_ebitda = IndexMap::new();

@@ -199,7 +199,7 @@ fn b6_simm_im_scales_with_position_quantity() {
         "irs-1",
         NettingSetId::bilateral("BANK", "CSA"),
         20_000.0,
-        Money::new(1.0, Currency::USD),
+        Money::new(1.0, Currency::USD).expect("valid money fixture"),
     ));
 
     let unit = run_margin(Arc::clone(&instrument), &[1.0]);
@@ -236,9 +236,9 @@ fn b6_clearing_im_scales_with_position_quantity() {
             "irs-cleared",
             NettingSetId::cleared("LCH"),
             0.0,
-            Money::new(1.0, Currency::USD),
+            Money::new(1.0, Currency::USD).expect("valid money fixture"),
         )
-        .with_im_exposure_base(Money::new(100.0, Currency::USD)),
+        .with_im_exposure_base(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
 
     let unit = run_margin(Arc::clone(&instrument), &[1.0]);
@@ -265,7 +265,7 @@ fn b6_short_position_nets_simm_sensitivities() {
         "irs-1",
         NettingSetId::bilateral("BANK", "CSA"),
         20_000.0,
-        Money::new(1.0, Currency::USD),
+        Money::new(1.0, Currency::USD).expect("valid money fixture"),
     ));
 
     let result = run_margin(instrument, &[5.0, -5.0]);
@@ -335,7 +335,7 @@ fn usd_instrument(
         id,
         netting_set_id,
         20_000.0,
-        Money::new(mtm, Currency::USD),
+        Money::new(mtm, Currency::USD).expect("valid money fixture"),
     ))
 }
 
@@ -402,7 +402,7 @@ fn calculate_converts_foreign_currency_netting_set_to_base() {
         "irs-eur",
         eur_set.clone(),
         20_000.0,
-        Money::new(2_000_000.0, Currency::EUR),
+        Money::new(2_000_000.0, Currency::EUR).expect("valid money fixture"),
     ));
     let usd_only = run_margin_for(
         &[usd_instrument("irs-usd", usd_set.clone(), 500_000.0)],

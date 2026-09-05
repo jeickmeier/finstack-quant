@@ -64,8 +64,8 @@
 //!
 //! let bond = Bond::fixed(
 //!     "US-TREASURY-5Y",
-//!     Money::new(1_000_000.0, Currency::USD),
-//!     finstack_quant_core::types::Rate::from_percent(4.5),
+//!     Money::from((1_000_000_i64, Currency::USD)),
+//!     finstack_quant_core::types::Rate::from_percent(4.5).expect("valid rate fixture"),
 //!     issue,
 //!     maturity,
 //!     finstack_quant_core::dates::StubKind::None,

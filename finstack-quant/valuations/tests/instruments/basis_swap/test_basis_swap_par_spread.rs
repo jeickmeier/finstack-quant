@@ -52,7 +52,7 @@ fn par_spread_zeros_npv() {
     // Create swap with zero spread
     let swap = BasisSwap::new(
         "PAR-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -100,7 +100,7 @@ fn par_spread_zeros_npv() {
     // Create new swap with par spread applied
     let swap_at_par = BasisSwap::new(
         "PAR-TEST-APPLIED",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -152,7 +152,7 @@ fn par_spread_formula_validation() {
 
     let swap = BasisSwap::new(
         "FORMULA-TEST",
-        Money::new(5_000_000.0, USD),
+        Money::new(5_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -227,7 +227,7 @@ fn par_spread_with_existing_spread() {
 
     let swap = BasisSwap::new(
         "EXISTING-SPREAD-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -302,7 +302,7 @@ fn par_spread_inverted_curves() {
 
     let swap = BasisSwap::new(
         "INVERTED-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -359,7 +359,7 @@ fn par_spread_long_maturity() {
 
     let swap = BasisSwap::new(
         "LONG-MAT-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -419,7 +419,7 @@ fn par_spread_sign_convention() {
     // If 1M rate > 3M rate, primary leg receives less, so positive spread needed
     let swap = BasisSwap::new(
         "SIGN-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -497,7 +497,7 @@ fn incremental_par_spread_sign_convention() {
     // First, create a swap with zero spread to find the par spread
     let zero_spread_swap = BasisSwap::new(
         "INC-SIGN-ZERO",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -546,7 +546,7 @@ fn incremental_par_spread_sign_convention() {
     let below_par_spread = par_spread_bp - 5.0; // 5bp below par
     let swap_below_par = BasisSwap::new(
         "INC-SIGN-BELOW",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -607,7 +607,7 @@ fn incremental_par_spread_sign_convention() {
     let above_par_spread = par_spread_bp + 5.0; // 5bp above par
     let swap_above_par = BasisSwap::new(
         "INC-SIGN-ABOVE",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -666,7 +666,7 @@ fn incremental_par_spread_sign_convention() {
     // Case 3: Current spread AT par -> Zero incremental
     let swap_at_par = BasisSwap::new(
         "INC-SIGN-AT-PAR",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -736,7 +736,7 @@ fn zero_notional_par_spread_is_rejected_at_construction() {
     };
     assert!(BasisSwap::new(
         "ZERO-NOTIONAL-PAR",
-        Money::new(0.0, USD),
+        Money::new(0.0, USD).expect("valid money fixture"),
         leg("USD-SOFR-3M"),
         leg("USD-SOFR-1M"),
     )

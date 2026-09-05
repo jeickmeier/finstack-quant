@@ -43,7 +43,7 @@ impl FrameTimeSeries {
         let mut periods = Vec::with_capacity(rows.len());
         let mut values = HashMap::with_capacity(rows.len());
         for (date, pairs) in rows {
-            let period = PeriodId::try_day(date.year(), date.ordinal()).map_err(core_to_py)?;
+            let period = PeriodId::day(date.year(), date.ordinal()).map_err(core_to_py)?;
             if values.insert(period, pairs.into_iter().collect()).is_some() {
                 return Err(value_error(format!(
                     "metrics frame index contains duplicate date {date}"

@@ -131,7 +131,7 @@ impl StructuredCredit {
         let mut pool = AssetPool::new("POOL-1", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "COLLATERAL-1",
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             0.07,
             legal,
             // ACT/360 matches the CLO/leveraged-loan market convention and
@@ -143,7 +143,7 @@ impl StructuredCredit {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.06 },
             legal,
         )

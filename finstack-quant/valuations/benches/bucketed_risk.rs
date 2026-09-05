@@ -40,8 +40,8 @@ fn create_bond(tenor_years: i32) -> Bond {
 
     Bond::fixed(
         format!("BOND-{}Y", tenor_years),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -56,7 +56,7 @@ fn create_swap(tenor_years: i32) -> InterestRateSwap {
 
     rates_support::usd_irs_swap(
         InstrumentId::new(format!("IRS-{}Y", tenor_years)),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04, // 4% fixed rate
         start,
         end,
@@ -71,7 +71,7 @@ fn create_cds(tenor_years: i32) -> CreditDefaultSwap {
 
     credit_support::cds_buy_protection(
         format!("CDS-{}Y", tenor_years),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200 bp spread
         start,
         maturity,

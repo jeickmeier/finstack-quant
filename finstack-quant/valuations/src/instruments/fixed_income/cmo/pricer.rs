@@ -190,7 +190,7 @@ pub(crate) fn generate_tranche_cashflows(
                 total_interest,
                 collateral_factor,
                 pac_context.as_ref(),
-            );
+            )?;
 
             if let Some(alloc) = result.allocations.iter().find(|a| a.tranche_id == *ref_id) {
                 tranche_cfs.push(TrancheCashflow {
@@ -230,7 +230,7 @@ pub(crate) fn build_reference_tranche_schedule(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.interest, tranche.current_face.currency()),
+                Money::new(cf.interest, tranche.current_face.currency())?,
                 CFKind::Fixed,
                 0.0,
                 Some(tranche.coupon),
@@ -240,7 +240,7 @@ pub(crate) fn build_reference_tranche_schedule(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.scheduled_principal, tranche.current_face.currency()),
+                Money::new(cf.scheduled_principal, tranche.current_face.currency())?,
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -250,7 +250,7 @@ pub(crate) fn build_reference_tranche_schedule(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.prepayment_principal, tranche.current_face.currency()),
+                Money::new(cf.prepayment_principal, tranche.current_face.currency())?,
                 CFKind::PrePayment,
                 0.0,
                 None,
@@ -277,7 +277,7 @@ pub(crate) fn build_reference_tranche_schedule(
 /// Create assumed collateral for CMO valuation.
 fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPassthrough> {
     let defaults = embedded_registry()?.cmo_collateral_defaults();
-    let total_face = cmo.waterfall.total_current_face();
+    let total_face = cmo.waterfall.total_current_face()?;
     let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
     let wam = cmo.collateral_wam.unwrap_or(defaults.wam_months);
 
@@ -320,7 +320,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
         .unwrap_or(Currency::USD);
 
     if schedule.get_flows().is_empty() {
-        return Ok(Money::new(0.0, currency));
+        return Ok(Money::from((0_i64, currency)));
     }
 
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
@@ -330,7 +330,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
         pv += cf.amount.amount() * df;
     }
 
-    Ok(Money::new(pv, currency))
+    Money::new(pv, currency)
 }
 
 #[cfg(test)]
@@ -662,7 +662,8 @@ mod tests {
                 cf.interest,
                 collateral_factor,
                 None,
-            );
+            )
+            .expect("valid execute_waterfall_with_principal_breakdown fixture");
             total_in += cf.scheduled_principal + cf.prepayment + cf.interest;
             total_out += result
                 .allocations

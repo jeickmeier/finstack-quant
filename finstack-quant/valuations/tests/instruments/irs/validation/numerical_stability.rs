@@ -63,7 +63,7 @@ fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> Forwa
 fn test_validation_rejects_end_before_start() {
     let result = test_utils::usd_irs_swap(
         InstrumentId::new("INVALID_DATES"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2029 - 01 - 01), // Start after end
         date!(2024 - 01 - 01), // End before start
@@ -83,7 +83,7 @@ fn test_validation_rejects_end_before_start() {
 fn test_validation_rejects_zero_notional() {
     let result = test_utils::usd_irs_swap(
         InstrumentId::new("ZERO_NOTIONAL"),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -103,7 +103,7 @@ fn test_validation_rejects_zero_notional() {
 fn test_validation_rejects_negative_notional() {
     let result = test_utils::usd_irs_swap(
         InstrumentId::new("NEGATIVE_NOTIONAL"),
-        Money::new(-1_000_000.0, Currency::USD),
+        Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -118,7 +118,7 @@ fn test_validation_rejects_extreme_rate() {
     // 15000% rate should be rejected as non-physical
     let result = test_utils::usd_irs_swap(
         InstrumentId::new("EXTREME_RATE"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         150.0, // 15000% rate - well above MAX_RATE_MAGNITUDE (100.0)
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -139,7 +139,7 @@ fn test_validation_accepts_negative_rate() {
     // -0.5% rate should be accepted (realistic in EUR/JPY markets)
     let result = test_utils::usd_irs_swap(
         InstrumentId::new("NEGATIVE_RATE"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         -0.005, // -0.5% rate
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -153,7 +153,7 @@ fn test_validation_accepts_negative_rate() {
 fn test_validation_accepts_valid_swap() {
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("VALID_SWAP"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -181,7 +181,7 @@ fn test_30y_swap_numerical_stability() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("SWAP_30Y"),
-        Money::new(100_000_000.0, Currency::USD), // Large notional
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"), // Large notional
         0.05,
         as_of,
         end,
@@ -238,7 +238,7 @@ fn test_annuity_deterministic_across_runs() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("DETERMINISM_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -290,7 +290,7 @@ fn test_expired_swap_handling() {
 
     let swap = InterestRateSwap {
         id: InstrumentId::new("EXPIRED_SWAP"),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -371,7 +371,7 @@ fn test_very_short_swap_1_month() {
     // Use manual construction for very short swap since quarterly frequency won't work
     let swap = InterestRateSwap {
         id: InstrumentId::new("SHORT_SWAP"),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -431,7 +431,7 @@ fn test_extreme_rate_environment_stress() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("STRESS_HIGH"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -487,7 +487,7 @@ fn test_golden_5y_usd_swap_par_npv() {
     // First compute actual par rate for this swap
     let temp_swap = test_utils::usd_irs_swap(
         InstrumentId::new("TEMP_PAR"),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -508,7 +508,7 @@ fn test_golden_5y_usd_swap_par_npv() {
     // Now create a swap at the computed par rate
     let swap_at_par = test_utils::usd_irs_swap(
         InstrumentId::new("GOLDEN_PAR"),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         par_rate, // Use computed par rate
         as_of,
         end,
@@ -544,7 +544,7 @@ fn test_golden_annuity_5y_at_5pct() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("GOLDEN_ANNUITY"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -586,7 +586,7 @@ fn test_golden_dv01_approximation() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("GOLDEN_DV01"),
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -632,7 +632,7 @@ fn test_missing_curve_produces_clear_error() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("MISSING_CURVE_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,

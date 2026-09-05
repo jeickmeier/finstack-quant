@@ -95,7 +95,7 @@ pub use crate::instruments::common_impl::parameters::legs::BasisSwapLeg;
 ///
 /// let swap = BasisSwap::new(
 ///     "BASIS_SWAP_001",
-///     Money::new(1_000_000.0, Currency::USD),
+///     Money::from((1_000_000_i64, Currency::USD)),
 ///     primary_leg,
 ///     reference_leg,
 /// );
@@ -391,7 +391,7 @@ impl BasisSwap {
 
         Self::new(
             "BASIS-SWAP-USD-3M1M-5Y",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -488,7 +488,7 @@ impl BasisSwap {
                     )?;
                 acc.add(flow.amount.amount() * df);
             }
-            return Ok(Money::new(acc.total(), currency));
+            return Money::new(acc.total(), currency);
         }
         let fwd = context.get_forward(&leg.forward_curve_id)?;
 
@@ -510,7 +510,7 @@ impl BasisSwap {
         )?;
 
         if periods.is_empty() {
-            return Ok(Money::new(0.0, currency));
+            return Ok(Money::from((0_i64, currency)));
         }
 
         let leg_periods: Vec<LegPeriod> = periods
@@ -552,7 +552,7 @@ impl BasisSwap {
             fixings,
         )?;
 
-        Ok(Money::new(pv, currency))
+        Money::new(pv, currency)
     }
 
     /// Calculates the discounted accrual sum (annuity) for a leg.
@@ -817,7 +817,7 @@ impl BasisSwap {
             flows.push(CashFlow::new(
                 period.payment_date,
                 period.reset_date,
-                Money::new(coupon_amount, self.notional.currency()),
+                Money::new(coupon_amount, self.notional.currency())?,
                 CFKind::FloatReset,
                 projection.accrual_year_fraction,
                 Some(all_in_rate),
@@ -889,8 +889,8 @@ impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -904,7 +904,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
             .scale_amounts(-1.0)?;
         Ok(merge_cashflow_schedules(
             [primary, reference],
-            Notional::par(self.notional.amount(), self.notional.currency()),
+            Notional::par(self.notional.amount(), self.notional.currency())?,
             self.primary_leg.day_count,
         )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -995,7 +995,7 @@ mod tests {
 
         let swap = BasisSwap::new(
             "TEST_BASIS",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -1076,7 +1076,7 @@ mod tests {
 
         let swap = BasisSwap::new(
             "TEST_BASIS_NO_CAL",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -1157,7 +1157,7 @@ mod tests {
 
         let swap_no_lag = BasisSwap::new(
             "TEST_BASIS_NO_LAG",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg_no_lag,
             reference_leg.clone(),
         )
@@ -1165,7 +1165,7 @@ mod tests {
 
         let swap_with_lag = BasisSwap::new(
             "TEST_BASIS_WITH_LAG",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg_with_lag,
             reference_leg,
         )
@@ -1216,7 +1216,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "INVALID_DATES",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_eq,
             reference_eq,
         )
@@ -1238,7 +1238,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "INVERTED_DATES",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_inv,
             reference_inv,
         )
@@ -1269,7 +1269,7 @@ mod tests {
 
         let err = BasisSwap::new(
             "SAME_CURVE",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             leg.clone(),
             BasisSwapLeg {
                 spread_bp: Decimal::ZERO,
@@ -1320,7 +1320,7 @@ mod tests {
         // Use the explicit same-curve constructor
         let swap = BasisSwap::new_allowing_same_curve(
             "SAME_CURVE_OK",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             leg.clone(),
             BasisSwapLeg {
                 spread_bp: Decimal::ZERO,
@@ -1409,7 +1409,7 @@ mod tests {
 
         let swap = BasisSwap::new(
             "PAR_SPREAD_TEST",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg.clone(),
             reference_leg.clone(),
         )
@@ -1438,7 +1438,7 @@ mod tests {
 
         let swap_at_par = BasisSwap::new(
             "PAR_SPREAD_VERIFY",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg_at_par,
             reference_leg,
         )
@@ -1487,7 +1487,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "NEG_PAY_PRIMARY",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_neg_payment,
             reference_leg.clone(),
         )
@@ -1505,7 +1505,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "NEG_RESET_PRIMARY",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_neg_reset,
             reference_leg.clone(),
         )
@@ -1523,7 +1523,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "NEG_PAY_REF",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             valid_leg.clone(),
             ref_neg_payment,
         )
@@ -1541,7 +1541,7 @@ mod tests {
         };
         let err = BasisSwap::new(
             "NEG_RESET_REF",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             valid_leg,
             ref_neg_reset,
         )
@@ -1600,7 +1600,7 @@ mod tests {
         };
         let swap = BasisSwap::new(
             "BASIS-CF",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -1668,7 +1668,7 @@ mod tests {
         };
         let swap = BasisSwap::new(
             "SOFR-OIS-3M",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary,
             reference,
         )
@@ -1777,7 +1777,7 @@ mod tests {
         };
         let swap = BasisSwap::new(
             "SOFR-OIS-ANN",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary,
             reference,
         )
@@ -1882,7 +1882,7 @@ mod tests {
         };
         let swap = BasisSwap::new(
             "OIS-SIMPLE",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             overnight,
             term,
         )

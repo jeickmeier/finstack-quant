@@ -116,8 +116,8 @@ fn test_simple_swaption_black_pricer_type_mismatch() {
     let market = create_flat_market(as_of, 0.03, 0.20);
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -142,7 +142,8 @@ fn test_bermudan_pricer_cached_model_sets_measure() {
     let swaption = BermudanSwaption::new(
         "BERM-CACHED",
         OptionType::Call,
-        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD),
+        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+            .expect("valid money fixture"),
         0.03,
         swap_start,
         swap_end,
@@ -189,7 +190,8 @@ fn test_bermudan_pricer_expired_returns_zero() {
     let swaption = BermudanSwaption::new(
         "BERM-EXPIRED",
         OptionType::Put,
-        Money::new(2_000_000.0, finstack_quant_core::currency::Currency::USD),
+        Money::new(2_000_000.0, finstack_quant_core::currency::Currency::USD)
+            .expect("valid money fixture"),
         0.04,
         swap_start,
         swap_end,
@@ -221,7 +223,8 @@ fn test_bermudan_tree_pricer_rejects_mixed_curves() {
     let swaption = BermudanSwaption::new(
         "BERM-MIXED",
         OptionType::Call,
-        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD),
+        Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+            .expect("valid money fixture"),
         0.03,
         swap_start,
         swap_end,

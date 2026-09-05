@@ -123,7 +123,7 @@ pub struct CreditNumeratorNodes<'a> {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let period = Period {
-///     id: PeriodId::quarter(2025, 1),
+///     id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     start: time::macros::date!(2025 - 01 - 01),
 ///     end: time::macros::date!(2025 - 04 - 01),
 ///     is_actual: false,
@@ -143,13 +143,13 @@ pub struct CreditNumeratorNodes<'a> {
 ///     IndexMap::from([(
 ///         period.id,
 ///         CashflowBreakdown {
-///             interest_expense_cash: Money::new(50_000.0, Currency::USD),
+///             interest_expense_cash: Money::from((50_000_i64, Currency::USD)),
 ///             interest_income_cash: None,
-///             interest_expense_pik: Money::new(0.0, Currency::USD),
-///             principal_payment: Money::new(100_000.0, Currency::USD),
-///             fees: Money::new(0.0, Currency::USD),
-///             debt_balance: Money::new(4_000_000.0, Currency::USD),
-///             accrued_interest: Money::new(0.0, Currency::USD),
+///             interest_expense_pik: Money::from((0_i64, Currency::USD)),
+///             principal_payment: Money::from((100_000_i64, Currency::USD)),
+///             fees: Money::from((0_i64, Currency::USD)),
+///             debt_balance: Money::from((4_000_000_i64, Currency::USD)),
+///             accrued_interest: Money::from((0_i64, Currency::USD)),
 ///         },
 ///     )]),
 /// );
@@ -335,13 +335,13 @@ mod tests {
         let mut result = StatementResult::new();
         let periods = vec![
             Period {
-                id: PeriodId::quarter(2025, 1),
+                id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 start: time::macros::date!(2025 - 01 - 01),
                 end: time::macros::date!(2025 - 04 - 01),
                 is_actual: false,
             },
             Period {
-                id: PeriodId::quarter(2025, 2),
+                id: PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 start: time::macros::date!(2025 - 04 - 01),
                 end: time::macros::date!(2025 - 07 - 01),
                 is_actual: false,
@@ -350,14 +350,26 @@ mod tests {
 
         // EBITDA = 500k per quarter
         let mut ebitda_map = IndexMap::new();
-        ebitda_map.insert(PeriodId::quarter(2025, 1), 500_000.0);
-        ebitda_map.insert(PeriodId::quarter(2025, 2), 500_000.0);
+        ebitda_map.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            500_000.0,
+        );
+        ebitda_map.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            500_000.0,
+        );
         result.nodes.insert("ebitda".to_string(), ebitda_map);
 
         // CFADS = 450k per quarter, distinct from EBITDA.
         let mut cfads_map = IndexMap::new();
-        cfads_map.insert(PeriodId::quarter(2025, 1), 450_000.0);
-        cfads_map.insert(PeriodId::quarter(2025, 2), 450_000.0);
+        cfads_map.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            450_000.0,
+        );
+        cfads_map.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            450_000.0,
+        );
         result.nodes.insert("cfads".to_string(), cfads_map);
 
         // CS cashflows: Bond with 50k interest, 100k principal per period
@@ -367,13 +379,13 @@ mod tests {
             inst_map.insert(
                 p.id,
                 CashflowBreakdown {
-                    interest_expense_cash: Money::new(50_000.0, Currency::USD),
+                    interest_expense_cash: Money::from((50_000_i64, Currency::USD)),
                     interest_income_cash: None,
-                    interest_expense_pik: Money::new(0.0, Currency::USD),
-                    principal_payment: Money::new(100_000.0, Currency::USD),
-                    fees: Money::new(0.0, Currency::USD),
-                    debt_balance: Money::new(4_000_000.0, Currency::USD),
-                    accrued_interest: Money::new(0.0, Currency::USD),
+                    interest_expense_pik: Money::from((0_i64, Currency::USD)),
+                    principal_payment: Money::from((100_000_i64, Currency::USD)),
+                    fees: Money::from((0_i64, Currency::USD)),
+                    debt_balance: Money::from((4_000_000_i64, Currency::USD)),
+                    accrued_interest: Money::from((0_i64, Currency::USD)),
                 },
             );
         }
@@ -416,7 +428,7 @@ mod tests {
             .expect("instrument")
             .values_mut()
         {
-            cf.fees = Money::new(25_000.0, Currency::USD);
+            cf.fees = Money::from((25_000_i64, Currency::USD));
         }
         let metrics = metrics(&result, &cs, "BOND-001", &periods, None);
 
@@ -465,9 +477,9 @@ mod tests {
         let (result, mut cs, periods) = make_result_and_cs();
         let inst = cs.by_instrument.get_mut("BOND-001").expect("instrument");
         inst.get_mut(&periods[0].id).expect("q1").debt_balance =
-            Money::new(4_000_000.0, Currency::USD);
+            Money::from((4_000_000_i64, Currency::USD));
         inst.get_mut(&periods[1].id).expect("q2").debt_balance =
-            Money::new(3_000_000.0, Currency::USD);
+            Money::from((3_000_000_i64, Currency::USD));
 
         let refs = constant_refs(&periods, 10_000_000.0);
         let metrics = metrics(&result, &cs, "BOND-001", &periods, Some(refs.as_slice()));
@@ -503,22 +515,28 @@ mod tests {
     fn test_missing_coverage_period_is_skipped_not_treated_as_zero() {
         let (mut result, cs, periods) = make_result_and_cs();
         if let Some(ebitda) = result.nodes.get_mut("ebitda") {
-            ebitda.shift_remove(&PeriodId::quarter(2025, 2));
+            ebitda.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
         if let Some(cfads) = result.nodes.get_mut("cfads") {
-            cfads.shift_remove(&PeriodId::quarter(2025, 2));
+            cfads.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
 
         let metrics = metrics(&result, &cs, "BOND-001", &periods, None);
 
         assert_eq!(metrics.dscr.len(), 1);
         assert_eq!(metrics.interest_coverage.len(), 1);
-        assert_eq!(metrics.dscr[0].0, PeriodId::quarter(2025, 1));
+        assert_eq!(
+            metrics.dscr[0].0,
+            PeriodId::quarter(2025, 1).expect("valid period fixture")
+        );
         assert!(
             (metrics.dscr_min.expect("dscr_min should be set") - metrics.dscr[0].1).abs() < 1e-12
         );
         // The dropped period must be surfaced rather than silently omitted.
-        assert_eq!(metrics.skipped_periods, vec![PeriodId::quarter(2025, 2)]);
+        assert_eq!(
+            metrics.skipped_periods,
+            vec![PeriodId::quarter(2025, 2).expect("valid period fixture")]
+        );
     }
 
     #[test]
@@ -532,18 +550,24 @@ mod tests {
     fn test_missing_coverage_period_still_computes_ltv() {
         let (mut result, cs, periods) = make_result_and_cs();
         if let Some(ebitda) = result.nodes.get_mut("ebitda") {
-            ebitda.shift_remove(&PeriodId::quarter(2025, 2));
+            ebitda.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
         if let Some(cfads) = result.nodes.get_mut("cfads") {
-            cfads.shift_remove(&PeriodId::quarter(2025, 2));
+            cfads.shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         }
 
         let refs = constant_refs(&periods, 10_000_000.0);
         let metrics = metrics(&result, &cs, "BOND-001", &periods, Some(refs.as_slice()));
 
         assert_eq!(metrics.ltv.len(), 2);
-        assert_eq!(metrics.ltv[0].0, PeriodId::quarter(2025, 1));
-        assert_eq!(metrics.ltv[1].0, PeriodId::quarter(2025, 2));
+        assert_eq!(
+            metrics.ltv[0].0,
+            PeriodId::quarter(2025, 1).expect("valid period fixture")
+        );
+        assert_eq!(
+            metrics.ltv[1].0,
+            PeriodId::quarter(2025, 2).expect("valid period fixture")
+        );
         assert!((metrics.ltv[0].1 - 0.4).abs() < 0.01);
         assert!((metrics.ltv[1].1 - 0.4).abs() < 0.01);
     }

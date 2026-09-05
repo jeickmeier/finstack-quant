@@ -29,7 +29,7 @@ fn flat_jpy_market(as_of: time::Date) -> MarketContext {
 fn two_year_jgb_style_bond() -> Bond {
     Bond::builder()
         .id("JGB-SIMPLE".into())
-        .notional(Money::new(100.0, Currency::JPY))
+        .notional(Money::new(100.0, Currency::JPY).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2027 - 01 - 01))
         .cashflow_spec(
@@ -153,8 +153,8 @@ fn jgb_street_ytm_is_unchanged_and_distinct_from_simple_yield() {
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::with_convention(
         "JGB-STREET",
-        Money::new(100_000_000.0, Currency::JPY),
-        finstack_quant_core::types::Rate::from_decimal(0.02),
+        Money::new(100_000_000.0, Currency::JPY).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.02).expect("valid rate fixture"),
         date!(2025 - 01 - 01),
         date!(2030 - 01 - 01),
         BondConvention::Jgb,
@@ -232,7 +232,7 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
     let market = MarketContext::new().insert(disc).insert(fwd);
     let bond = Bond::floating(
         "FRN-SIMPLE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
         150,
         as_of,

@@ -124,7 +124,7 @@ fn margin_portfolio(n_positions: usize, n_netting_sets: usize, as_of: Date) -> P
             netting_set_id: netting_set,
             attributes: Attributes::default(),
             ir_delta: 1_000.0 + index as f64,
-            mtm: Money::new(100_000.0 + index as f64, Currency::USD),
+            mtm: Money::new(100_000.0 + index as f64, Currency::USD).expect("valid money fixture"),
         };
         let position = Position::new(
             format!("POS_{index}"),

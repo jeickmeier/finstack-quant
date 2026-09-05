@@ -160,15 +160,13 @@ fn test_evaluation_result_serde() {
 
 #[test]
 fn test_eval_opts_serde() {
-    let mut opts = EvalOpts::default();
-    opts.max_arena_bytes = 1_073_741_824;
+    let opts = EvalOpts {
+        max_arena_bytes: 1_073_741_824,
+    };
 
     let json = serde_json::to_string(&opts).expect("Failed to serialize EvalOpts");
 
-    // `plan` is #[serde(skip)]: the internal execution-plan topology is not
-    // part of the wire format, so a deserialized EvalOpts can never inject a plan that eval()
-    // would execute instead of the compiled AST. This pins the field's
-    // absence from the serialized form.
+    // Execution plans are not caller-supplied evaluation options.
     assert!(
         !json.contains("\"plan\""),
         "EvalOpts.plan must not be serialized, got: {json}"
@@ -178,12 +176,11 @@ fn test_eval_opts_serde() {
         serde_json::from_str(&json).expect("Failed to deserialize EvalOpts");
 
     assert_eq!(opts.max_arena_bytes, deserialized.max_arena_bytes);
-    assert!(!deserialized.has_plan());
 }
 
 #[test]
 fn test_eval_opts_rejects_inbound_plan_field() {
-    // EvalOpts is strict (deny_unknown_fields) and `plan` is serde-skipped:
+    // EvalOpts is strict (deny_unknown_fields) and has no `plan` field:
     // payloads carrying a `plan` field must be rejected rather than silently
     // executing an injected plan.
     let json = r#"{"plan":null,"max_arena_bytes":1024}"#;

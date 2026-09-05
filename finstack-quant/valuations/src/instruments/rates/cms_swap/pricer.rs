@@ -65,7 +65,7 @@ impl CmsSwapPricer {
             }
         };
 
-        Ok(Money::new(npv, inst.notional.currency()))
+        Money::new(npv, inst.notional.currency())
     }
 
     fn price_internal(&self, inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
@@ -269,7 +269,7 @@ impl CmsSwapReplicationPricer {
             }
         };
 
-        Ok(Money::new(npv, inst.notional.currency()))
+        Money::new(npv, inst.notional.currency())
     }
 
     /// PV of the CMS leg with each coupon's expected rate from static
@@ -633,7 +633,7 @@ mod tests {
         let second_pay = date(2025, 7, 1);
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-FLOAT"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![start])
@@ -753,7 +753,7 @@ mod tests {
         let pay = date(2026, 4, 1);
         let mut builder = CmsSwap::builder()
             .id(InstrumentId::new("CMS-CAPPED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![fixing])
@@ -866,7 +866,7 @@ mod tests {
     fn seasoned_cms_swap(fixing: Date, pay: Date) -> CmsSwap {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-SEASONED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![fixing])
@@ -943,7 +943,7 @@ mod tests {
         let pay = date(2026, 4, 1);
         let mut builder = CmsSwap::builder()
             .id(InstrumentId::new("CMS-FLOORED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![fixing])
@@ -1028,7 +1028,7 @@ mod tests {
     fn single_fixing_cms_swap(cms_tenor: f64, fixing: Date, payment: Date) -> CmsSwap {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-REPL"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(cms_tenor)
             .cms_fixing_dates(vec![fixing])

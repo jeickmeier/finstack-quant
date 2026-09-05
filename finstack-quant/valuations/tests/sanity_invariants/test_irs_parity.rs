@@ -63,7 +63,7 @@ fn create_5y_swap(
 
     rates_support::usd_irs_swap(
         "IRS-QLPARITY-5Y",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         fixed_rate,
         start,
         end,

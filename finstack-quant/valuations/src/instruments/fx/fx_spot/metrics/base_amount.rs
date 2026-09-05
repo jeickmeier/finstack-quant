@@ -39,7 +39,7 @@ mod tests {
 
     fn sample_fx() -> FxSpot {
         FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::new(1_250_000.0, Currency::EUR))
+            .with_notional(Money::from((1_250_000_i64, Currency::EUR)))
             .expect("should succeed")
             .with_rate(1.18)
             .expect("should succeed")

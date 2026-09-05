@@ -288,7 +288,7 @@ fn initialize_build_state(
             flows.push(CashFlow::new(
                 ev.date,
                 None,
-                Money::new(flow_amount, ev.cash.currency()),
+                Money::new(flow_amount, ev.cash.currency())?,
                 ev.kind,
                 0.0,
                 None,

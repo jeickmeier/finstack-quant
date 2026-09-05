@@ -94,8 +94,14 @@ fn test_results_get_node() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
             ],
         )
         .build()
@@ -117,9 +123,18 @@ fn test_results_all_periods() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(120.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
             ],
         )
         .build()
@@ -139,7 +154,10 @@ fn test_results_get_or() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .build()
         .unwrap();
@@ -147,8 +165,8 @@ fn test_results_get_or() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     // Existing value
     assert_eq!(results.get_or("revenue", &q1, 0.0), 100.0);
@@ -190,19 +208,19 @@ fn test_where_clause_masking() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(800_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(900_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_500_000.0),
                 ),
             ],
@@ -218,25 +236,45 @@ fn test_where_clause_masking() {
 
     // Q1: revenue < 1M, bonus should be 0 (masked by where clause)
     assert_eq!(
-        results.get("bonus", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "bonus",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         0.0
     );
 
     // Q2: revenue > 1M, bonus should be calculated
     assert_eq!(
-        results.get("bonus", &PeriodId::quarter(2025, 2)).unwrap(),
+        results
+            .get(
+                "bonus",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         12_000.0
     );
 
     // Q3: revenue < 1M, bonus should be 0
     assert_eq!(
-        results.get("bonus", &PeriodId::quarter(2025, 3)).unwrap(),
+        results
+            .get(
+                "bonus",
+                &PeriodId::quarter(2025, 3).expect("valid period fixture")
+            )
+            .unwrap(),
         0.0
     );
 
     // Q4: revenue > 1M, bonus should be calculated
     assert_eq!(
-        results.get("bonus", &PeriodId::quarter(2025, 4)).unwrap(),
+        results
+            .get(
+                "bonus",
+                &PeriodId::quarter(2025, 4).expect("valid period fixture")
+            )
+            .unwrap(),
         15_000.0
     );
 }
@@ -250,11 +288,11 @@ fn test_where_clause_with_complex_condition() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
             ],
@@ -262,8 +300,14 @@ fn test_where_clause_with_complex_condition() {
         .value(
             "margin",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.1)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.2)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.1),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.2),
+                ),
             ],
         )
         .compute("incentive", "revenue * 0.05")
@@ -278,7 +322,10 @@ fn test_where_clause_with_complex_condition() {
     // Q1: revenue > 100k but margin < 0.15 - should be 0
     assert_eq!(
         results
-            .get("incentive", &PeriodId::quarter(2025, 1))
+            .get(
+                "incentive",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
             .unwrap(),
         0.0
     );
@@ -286,7 +333,10 @@ fn test_where_clause_with_complex_condition() {
     // Q2: revenue > 100k AND margin > 0.15 - should be calculated
     assert_eq!(
         results
-            .get("incentive", &PeriodId::quarter(2025, 2))
+            .get(
+                "incentive",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
             .unwrap(),
         6_000.0
     );
@@ -518,7 +568,10 @@ fn test_node_id_hyphenated_builder_accepted() {
         .unwrap()
         .value(
             "lease-1",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(500.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(500.0),
+            )],
         )
         .build()
         .expect("hyphenated node id should be valid");

@@ -48,7 +48,7 @@ fn term_loan(maturity: Date) -> TermLoan {
     TermLoan::builder()
         .id("TL-BENCH".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(base)
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -72,8 +72,8 @@ fn term_loan(maturity: Date) -> TermLoan {
 fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-BENCH".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(as_of())
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
@@ -280,7 +280,7 @@ fn bench_cmo_waterfall_pv(c: &mut Criterion) {
                 let balance = 10_000_000.0;
                 CmoTranche::sequential(
                     format!("T{}", i).as_str(),
-                    Money::new(balance, Currency::USD),
+                    Money::new(balance, Currency::USD).expect("valid money fixture"),
                     coupon,
                     (i + 1) as u32,
                 )
@@ -356,7 +356,7 @@ fn bench_dollar_roll_pv(c: &mut Criterion) {
             .agency(finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram::Fnma)
             .coupon(0.04)
             .term(finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm::ThirtyYear)
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .front_settlement_year(2025)
             .front_settlement_month(3)
             .back_settlement_year(2025)

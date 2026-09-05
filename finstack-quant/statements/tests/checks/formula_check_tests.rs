@@ -14,7 +14,7 @@ use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::AmountOrScalar;
 
 fn q(quarter: u8) -> PeriodId {
-    PeriodId::quarter(2025, quarter)
+    PeriodId::quarter(2025, quarter).expect("valid period fixture")
 }
 
 fn s(v: f64) -> AmountOrScalar {
@@ -498,7 +498,7 @@ fn capital_structure_reference_uses_result_cashflows() {
         .unwrap();
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-    breakdown.interest_expense_cash = Money::new(25.0, Currency::USD);
+    breakdown.interest_expense_cash = Money::new(25.0, Currency::USD).expect("valid money fixture");
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.totals.insert(q(1), breakdown);
     cashflows.reporting_currency = Some(Currency::USD);

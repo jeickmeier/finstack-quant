@@ -30,7 +30,7 @@ fn create_test_deliverable_bond() -> DeliverableBond {
 fn create_test_bond_future() -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -64,7 +64,7 @@ fn create_bond_future_with_basket() -> BondFuture {
 
     BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -276,7 +276,7 @@ fn test_bond_future_with_basket_roundtrip() {
 fn test_bond_future_long_position_roundtrip() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -303,7 +303,7 @@ fn test_bond_future_long_position_roundtrip() {
 fn test_bond_future_short_position_roundtrip() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -336,7 +336,7 @@ fn test_bond_future_with_attributes_roundtrip() {
 
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -394,7 +394,7 @@ fn test_bond_future_different_currencies() {
     for (currency, curve_id) in currencies {
         let future = BondFuture::builder()
             .id(InstrumentId::new("TEST"))
-            .notional(Money::new(1_000_000.0, currency))
+            .notional(Money::new(1_000_000.0, currency).expect("valid money fixture"))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -571,7 +571,7 @@ fn test_bond_future_compact_json() {
 fn test_bond_future_large_notional() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000_000.0, Currency::USD)) // $1 billion
+        .notional(Money::new(1_000_000_000.0, Currency::USD).expect("valid money fixture")) // $1 billion
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -599,7 +599,7 @@ fn test_bond_future_large_notional() {
 fn test_bond_future_fractional_price() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
@@ -626,7 +626,7 @@ fn test_bond_future_fractional_price() {
 fn test_bond_future_empty_attributes() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())

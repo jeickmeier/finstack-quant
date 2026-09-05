@@ -85,7 +85,7 @@ fn dv01_per_curve_breakdown() {
     let as_of = d(2025, 1, 2);
     let swap = BasisSwap::new(
         "DV01-NET-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
     )
@@ -141,7 +141,7 @@ fn dv01_scales_with_notional() {
     for notional in &notionals {
         let swap = BasisSwap::new(
             format!("DV01-SCALE-{}", notional),
-            Money::new(*notional, USD),
+            Money::new(*notional, USD).expect("valid money fixture"),
             make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
             make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
         )
@@ -187,7 +187,7 @@ fn dv01_vs_numerical_bump() {
 
     let swap = BasisSwap::new(
         "DV01-BUMP-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
     )
@@ -225,7 +225,7 @@ fn annuity_positive_and_increasing() {
     for maturity in &maturities {
         let swap = BasisSwap::new(
             format!("ANNUITY-{}", maturity),
-            Money::new(10_000_000.0, USD),
+            Money::new(10_000_000.0, USD).expect("valid money fixture"),
             make_leg("USD-SOFR-3M", d(2025, 1, 2), *maturity, Decimal::ZERO),
             make_leg("USD-SOFR-1M", d(2025, 1, 2), *maturity, Decimal::ZERO),
         )
@@ -256,7 +256,7 @@ fn bucketed_dv01_sums_to_total() {
     let as_of = d(2025, 1, 2);
     let swap = BasisSwap::new(
         "BUCKETED-DV01-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
     )
@@ -283,7 +283,7 @@ fn dv01_leg_components_reasonable() {
 
     let swap = BasisSwap::new(
         "DV01-COMPONENTS-TEST",
-        Money::new(notional, USD),
+        Money::new(notional, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
     )
@@ -351,7 +351,7 @@ fn sensitivity_to_spread() {
     for spread in &spreads {
         let swap = BasisSwap::new(
             format!("SPREAD-SENS-{}", spread),
-            Money::new(10_000_000.0, USD),
+            Money::new(10_000_000.0, USD).expect("valid money fixture"),
             make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), *spread),
             make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
         )
@@ -413,7 +413,7 @@ fn annuity_with_payment_lag_differs_from_no_lag() {
 
     let swap_no_lag = BasisSwap::new(
         "ANNUITY-NO-LAG",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
     )
@@ -429,7 +429,7 @@ fn annuity_with_payment_lag_differs_from_no_lag() {
     };
     let swap_with_lag = BasisSwap::new(
         "ANNUITY-WITH-LAG",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         primary_with_lag,
         reference_with_lag,
     )
@@ -481,7 +481,7 @@ fn test_bucketed_dv01_per_curve() {
 
     let swap = BasisSwap::new(
         "BUCKETED-DV01-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
         make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2027, 1, 2), Decimal::ZERO),
     )

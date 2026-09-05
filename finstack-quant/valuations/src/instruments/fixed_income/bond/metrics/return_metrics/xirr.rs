@@ -178,8 +178,8 @@ mod tests {
     fn xirr_to_maturity_for_par_10pct_2y_is_near_10pct() {
         let bond = Bond::fixed(
             "X",
-            Money::new(100.0, Currency::USD),
-            Rate::from_percent(10.0),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_percent(10.0).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2026 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -192,7 +192,7 @@ mod tests {
             Arc::new(bond),
             curves,
             date!(2024 - 01 - 15),
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             MetricContext::default_config(),
         );
 
@@ -206,8 +206,8 @@ mod tests {
     fn xirr_to_worst_equals_to_maturity_for_bullet_bond() {
         let bond = Bond::fixed(
             "X",
-            Money::new(100.0, Currency::USD),
-            Rate::from_percent(10.0),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_percent(10.0).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2026 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -220,7 +220,7 @@ mod tests {
             Arc::new(bond),
             curves,
             date!(2024 - 01 - 15),
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             MetricContext::default_config(),
         );
 
@@ -322,8 +322,8 @@ mod tests {
         let call_date = date!(2025 - 12 - 15);
         let mut make_whole_bond = Bond::fixed(
             "XIRR-MAKE-WHOLE",
-            Money::new(100.0, Currency::USD),
-            Rate::from_percent(10.0),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_percent(10.0).expect("valid rate fixture"),
             issue,
             date!(2027 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -371,7 +371,7 @@ mod tests {
                 Arc::new(bond),
                 Arc::clone(&curves),
                 issue,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 MetricContext::default_config(),
             );
             calculator.calculate(&mut ctx).expect("XIRR")

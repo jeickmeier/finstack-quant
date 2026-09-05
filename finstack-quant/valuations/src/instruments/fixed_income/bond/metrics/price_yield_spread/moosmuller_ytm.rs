@@ -42,7 +42,7 @@ impl MetricCalculator for MoosmullerYtmCalculator {
             Money::new(
                 quote_ctx.dirty_from_clean_pct(clean_px, notional.amount()),
                 notional.currency(),
-            )
+            )?
         } else {
             let pv_at_quote =
                 crate::instruments::fixed_income::bond::pricing::settlement::model_dirty_at_quote_date(
@@ -52,7 +52,7 @@ impl MetricCalculator for MoosmullerYtmCalculator {
                     quote_ctx.quote_date,
                     context.base_value.amount(),
                 )?;
-            Money::new(pv_at_quote, notional.currency())
+            Money::new(pv_at_quote, notional.currency())?
         };
 
         if context.cashflows.is_none() {

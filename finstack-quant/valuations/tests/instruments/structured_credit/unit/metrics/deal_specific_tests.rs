@@ -28,7 +28,7 @@ fn rmbs_instrument() -> StructuredCredit {
     let mut pool = AssetPool::new("POOL", DealType::Rmbs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "MORTGAGE-1",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -39,7 +39,7 @@ fn rmbs_instrument() -> StructuredCredit {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -72,7 +72,7 @@ fn cmbs_instrument() -> StructuredCredit {
     let mut pool = AssetPool::new("POOL", DealType::Cmbs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "MORTGAGE-1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -83,7 +83,7 @@ fn cmbs_instrument() -> StructuredCredit {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -104,14 +104,14 @@ fn abs_instrument() -> StructuredCredit {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "AUTO-1",
-        Money::new(80_000_000.0, Currency::USD),
+        Money::new(80_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "AUTO-2",
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -122,7 +122,7 @@ fn abs_instrument() -> StructuredCredit {
         0.0,
         80.0,
         TrancheSeniority::Senior,
-        Money::new(80_000_000.0, Currency::USD),
+        Money::new(80_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -132,7 +132,7 @@ fn abs_instrument() -> StructuredCredit {
         80.0,
         100.0,
         TrancheSeniority::Subordinated,
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -154,7 +154,7 @@ fn metric_context(instrument: StructuredCredit, as_of: Date) -> MetricContext {
         Arc::new(instrument),
         Arc::new(MarketContext::new()),
         as_of,
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     )
 }
@@ -163,7 +163,8 @@ fn metric_context(instrument: StructuredCredit, as_of: Date) -> MetricContext {
 fn test_abs_deal_specific_calculators_return_expected_values() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut abs = abs_instrument();
-    abs.pool.cumulative_defaults = Money::new(5_000_000.0, Currency::USD);
+    abs.pool.cumulative_defaults =
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
 
     let charge_off = AbsChargeOffCalculator
         .calculate(&mut metric_context(abs.clone(), as_of))
@@ -180,13 +181,14 @@ fn test_abs_deal_specific_calculators_return_expected_values() {
 fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut empty_pool = AssetPool::new("EMPTY", DealType::Abs, Currency::USD);
-    empty_pool.cumulative_defaults = Money::new(10_000.0, Currency::USD);
+    empty_pool.cumulative_defaults =
+        Money::new(10_000.0, Currency::USD).expect("valid money fixture");
     let zero_tranche = Tranche::new(
         "A",
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -214,8 +216,10 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
 #[test]
 fn test_cmbs_dscr_calculator_uses_typed_noi_and_debt_service() {
     let mut cmbs = cmbs_instrument();
-    cmbs.credit_factors.annual_noi = Some(Money::new(1_350_000.0, Currency::USD));
-    cmbs.credit_factors.annual_debt_service = Some(Money::new(1_000_000.0, Currency::USD));
+    cmbs.credit_factors.annual_noi =
+        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
+    cmbs.credit_factors.annual_debt_service =
+        Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
 
     let dscr = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(
@@ -237,8 +241,10 @@ fn test_cmbs_dscr_requires_typed_inputs_and_matching_currency() {
     assert!(missing.to_string().contains("annual_noi"));
 
     let mut mismatch = cmbs_instrument();
-    mismatch.credit_factors.annual_noi = Some(Money::new(1_350_000.0, Currency::USD));
-    mismatch.credit_factors.annual_debt_service = Some(Money::new(1_000_000.0, Currency::EUR));
+    mismatch.credit_factors.annual_noi =
+        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
+    mismatch.credit_factors.annual_debt_service =
+        Some(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"));
     let err = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(mismatch, as_of))
         .expect_err("currency mismatch should be rejected");
@@ -248,8 +254,10 @@ fn test_cmbs_dscr_requires_typed_inputs_and_matching_currency() {
     ));
 
     let mut zero_service = cmbs_instrument();
-    zero_service.credit_factors.annual_noi = Some(Money::new(1_350_000.0, Currency::USD));
-    zero_service.credit_factors.annual_debt_service = Some(Money::new(0.0, Currency::USD));
+    zero_service.credit_factors.annual_noi =
+        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
+    zero_service.credit_factors.annual_debt_service =
+        Some(Money::new(0.0, Currency::USD).expect("valid money fixture"));
     let err = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(zero_service, as_of))
         .expect_err("zero debt service should be rejected");

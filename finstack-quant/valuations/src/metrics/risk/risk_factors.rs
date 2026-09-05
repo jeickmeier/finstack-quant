@@ -307,8 +307,8 @@ mod tests {
         // Use Bond::fixed factory method
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(100_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2029 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -370,8 +370,8 @@ mod tests {
         let as_of = date!(2024 - 01 - 01);
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(100_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2029 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -404,7 +404,7 @@ mod tests {
             .option_type(crate::instruments::OptionType::Call)
             .exercise_style(crate::instruments::ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(crate::instruments::SettlementType::Cash)
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
@@ -474,7 +474,7 @@ mod tests {
             )
             .expiry(date!(2025 - 01 - 01))
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))

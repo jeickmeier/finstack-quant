@@ -105,7 +105,7 @@ impl Instrument for RatesCreditInteractionInstrument {
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
         let rate = market.get_discount("USD-OIS")?.zero(1.0);
         let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
-        Ok(Money::new(1_000_000.0 * rate * hazard, Currency::USD))
+        Ok(Money::new(1_000_000.0 * rate * hazard, Currency::USD).expect("valid money fixture"))
     }
 }
 
@@ -175,7 +175,7 @@ impl Instrument for CreditVolInteractionInstrument {
         let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
         let surface = market.get_surface("EQ-VOL")?;
         let vol = get_surface_vol(&surface, 1.0, 100.0)?;
-        Ok(Money::new(1_000_000.0 * hazard * vol, Currency::USD))
+        Ok(Money::new(1_000_000.0 * hazard * vol, Currency::USD).expect("valid money fixture"))
     }
 }
 
@@ -256,7 +256,7 @@ fn single_factor_instrument_has_zero_cross_factor() {
     let deposit = Arc::new(
         Deposit::builder()
             .id(InstrumentId::new("DEP-1Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(as_of_t0)
             .maturity(as_of_t0.add_months(12))
             .day_count(DayCount::Act360)
@@ -442,13 +442,13 @@ fn synthetic_metrics_based_instrument_surfaces_rates_credit_cross_factor() {
     let val_t0 = ValuationResult::stamped(
         "METRICS-XFACTOR",
         as_of_t0,
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped(
         "METRICS-XFACTOR",
         as_of_t1,
-        Money::new(150.0, Currency::USD),
+        Money::new(150.0, Currency::USD).expect("valid money fixture"),
     );
 
     let metrics_based = attribute_pnl_metrics_based(

@@ -474,13 +474,6 @@ impl PyDayCountContext {
         self.inner.end_is_termination_date
     }
 
-    /// Convert to a serializable state snapshot.
-    fn to_state(&self) -> PyDayCountContextState {
-        PyDayCountContextState {
-            inner: self.inner.clone(),
-        }
-    }
-
     /// Serialize to the canonical JSON wire form (strict field names).
     #[allow(clippy::wrong_self_convention)]
     fn to_json(&self) -> PyResult<String> {
@@ -505,124 +498,6 @@ impl PyDayCountContext {
 
     fn __repr__(&self) -> String {
         state_repr("DayCountContext", &self.inner)
-    }
-}
-
-/// Serializable snapshot of ``DayCountContext`` for persistence.
-///
-/// Takes the same parameters as ``DayCountContext`` and validates them the
-/// same way (an inverted ``coupon_period`` raises ``ValueError``).
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.dates import DayCountContextState, Tenor
-/// >>> state = DayCountContextState("usny", Tenor.quarterly(), 252)
-/// >>> (state.calendar_id, state.to_context().frequency.months)
-/// ('usny', 3)
-#[pyclass(
-    name = "DayCountContextState",
-    module = "finstack_quant.core.dates",
-    frozen,
-    eq,
-    skip_from_py_object
-)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PyDayCountContextState {
-    /// Inner serializable state.
-    pub(crate) inner: DayCountContextState,
-}
-
-#[pymethods]
-impl PyDayCountContextState {
-    /// Create a context state (see the class docstring for parameters).
-    #[new]
-    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None, end_is_termination_date=false))]
-    fn new(
-        calendar_id: Option<String>,
-        frequency: Option<&Bound<'_, PyAny>>,
-        bus_basis: Option<u16>,
-        coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
-        end_is_termination_date: bool,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            inner: build_state(
-                calendar_id,
-                frequency,
-                bus_basis,
-                coupon_period,
-                end_is_termination_date,
-            )?,
-        })
-    }
-
-    /// Reconstruct a live ``DayCountContext`` from this state.
-    fn to_context(&self) -> PyDayCountContext {
-        PyDayCountContext {
-            inner: self.inner.clone(),
-        }
-    }
-
-    /// Optional calendar identifier.
-    #[getter]
-    fn calendar_id(&self) -> Option<&str> {
-        self.inner.calendar_id.as_deref()
-    }
-
-    /// Optional coupon frequency.
-    #[getter]
-    fn frequency(&self) -> Option<PyTenor> {
-        self.inner.frequency.map(PyTenor::from_inner)
-    }
-
-    /// Optional custom business-day divisor.
-    #[getter]
-    fn bus_basis(&self) -> Option<u16> {
-        self.inner.bus_basis
-    }
-
-    /// Optional reference coupon period as ``(start, end)`` dates.
-    #[getter]
-    fn coupon_period<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
-        self.inner
-            .coupon_period
-            .map(|(s, e)| Ok((date_to_py(py, s)?, date_to_py(py, e)?)))
-            .transpose()
-    }
-
-    /// Whether the accrual end is the instrument termination date.
-    #[getter]
-    fn end_is_termination_date(&self) -> bool {
-        self.inner.end_is_termination_date
-    }
-
-    /// Serialize to the canonical JSON wire form (strict field names).
-    #[allow(clippy::wrong_self_convention)]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| {
-            crate::errors::serde_json_to_py(e, "cannot serialize DayCountContextState")
-        })
-    }
-
-    /// Deserialize from canonical JSON; raises ``ValueError`` on malformed input.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str::<DayCountContextState>(json)
-            .map(|inner| Self { inner })
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid DayCountContextState JSON"))
-    }
-
-    /// Support ``pickle`` through the JSON round-trip.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    fn __repr__(&self) -> String {
-        state_repr("DayCountContextState", &self.inner)
     }
 }
 
@@ -809,7 +684,6 @@ fn py_days_30e_360_isda(
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDayCount>()?;
     m.add_class::<PyDayCountContext>()?;
-    m.add_class::<PyDayCountContextState>()?;
     m.add_class::<PyThirty360Convention>()?;
     m.add_function(wrap_pyfunction!(py_days_30_360, m)?)?;
     m.add_function(wrap_pyfunction!(py_days_30e_360_isda, m)?)?;
@@ -820,7 +694,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 pub const EXPORTS: &[&str] = &[
     "DayCount",
     "DayCountContext",
-    "DayCountContextState",
     "Thirty360Convention",
     "days_30_360",
     "days_30e_360_isda",

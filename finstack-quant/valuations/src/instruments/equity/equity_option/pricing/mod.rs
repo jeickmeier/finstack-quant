@@ -118,7 +118,13 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
                 Money::new(
                     intrinsic * equity_option.notional.amount(),
                     equity_option.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                    )
+                })?,
             ));
         }
 
@@ -142,7 +148,13 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
         let pv = Money::new(
             price * equity_option.notional.amount(),
             equity_option.notional.currency(),
-        );
+        )
+        .map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(equity_option),
+            )
+        })?;
         Ok(crate::results::ValuationResult::stamped(
             equity_option.id(),
             as_of,
@@ -211,7 +223,7 @@ mod tests {
             .option_type(option_type)
             .exercise_style(exercise_style)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -633,7 +645,7 @@ mod tests {
         let expiry = date(2026, 1, 1);
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0).insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::EUR)),
+            MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
         );
         let option = option(expiry, OptionType::Call, ExerciseStyle::European);
 

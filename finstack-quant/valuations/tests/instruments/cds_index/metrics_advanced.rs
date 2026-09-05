@@ -49,7 +49,7 @@ fn test_jump_to_default_negative_for_protection_seller() {
     let idx = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-JTD-SELL",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Receive, // Sell protection
         start,
         end,

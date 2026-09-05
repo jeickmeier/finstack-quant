@@ -401,7 +401,12 @@ impl PricerRegistry {
         // Scenario price adjustments are a valuation-boundary operation. The
         // model kernel remains unshocked; every result and metric context sees
         // this one adjusted value.
-        base_result.value = lifecycle.apply_value(base_result.value);
+        base_result.value = lifecycle.apply_value(base_result.value).map_err(|error| {
+            PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(instrument),
+            )
+        })?;
 
         if metrics.is_empty() {
             return Ok(base_result);
@@ -593,11 +598,11 @@ mod tests {
     fn fixed_test_bond() -> crate::instruments::fixed_income::bond::Bond {
         crate::instruments::fixed_income::bond::Bond::fixed(
             "US912828XG33",
-            finstack_quant_core::money::Money::new(
-                1_000.0,
+            finstack_quant_core::money::Money::from((
+                1_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ),
-            finstack_quant_core::types::Rate::from_decimal(0.04),
+            )),
+            finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
             time::macros::date!(2020 - 01 - 15),
             time::macros::date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -669,7 +674,8 @@ mod tests {
                 finstack_quant_core::money::Money::new(
                     self.amount,
                     finstack_quant_core::currency::Currency::USD,
-                ),
+                )
+                .expect("valid money fixture"),
             ))
         }
     }
@@ -713,10 +719,10 @@ mod tests {
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
             self.base_calls.fetch_add(1, Ordering::SeqCst);
-            Ok(finstack_quant_core::money::Money::new(
-                100.0,
+            Ok(finstack_quant_core::money::Money::from((
+                100_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
         }
 
         fn base_value_raw(
@@ -773,7 +779,8 @@ mod tests {
             Ok(finstack_quant_core::money::Money::new(
                 self.raw_value,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )
+            .expect("valid money fixture"))
         }
 
         fn base_value_raw(
@@ -833,10 +840,10 @@ mod tests {
             let mut result = crate::results::ValuationResult::stamped(
                 instrument.id(),
                 result_as_of,
-                finstack_quant_core::money::Money::new(
-                    100.0,
+                finstack_quant_core::money::Money::from((
+                    100_i64,
                     finstack_quant_core::currency::Currency::USD,
-                ),
+                )),
             )
             .with_measures(measures)
             .with_details(crate::results::ValuationDetails::Fx(
@@ -874,10 +881,10 @@ mod tests {
             Ok(crate::results::ValuationResult::stamped(
                 instrument.id(),
                 as_of,
-                finstack_quant_core::money::Money::new(
-                    100.0,
+                finstack_quant_core::money::Money::from((
+                    100_i64,
                     finstack_quant_core::currency::Currency::USD,
-                ),
+                )),
             ))
         }
     }

@@ -92,7 +92,7 @@ fn test_cds_par_spread_roundtrip_1y() {
     // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator
     let cds = crate::test_support::credit::cds_buy_protection(
         "ROUNDTRIP-CDS",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         par_spread_bp,
         base,
         maturity,
@@ -193,7 +193,7 @@ fn test_cds_par_spread_roundtrip_multi_tenor() {
         // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator
         let cds = crate::test_support::credit::cds_buy_protection(
             format!("ROUNDTRIP-CDS-{}", maturity),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             *par_spread_bp,
             base,
             *maturity,
@@ -273,7 +273,7 @@ fn test_cds_par_spread_calculation_consistency() {
     // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator
     let cds_test = crate::test_support::credit::cds_buy_protection(
         "TEST-CDS",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         150.0, // Different spread (150bp)
         base,
         maturity,

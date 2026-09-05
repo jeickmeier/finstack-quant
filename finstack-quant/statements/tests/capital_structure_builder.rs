@@ -19,7 +19,7 @@ fn test_add_bond() {
         .expect("valid period range")
         .add_bond(
             "BOND-001",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             issue,
             maturity,
@@ -51,7 +51,7 @@ fn test_add_swap() {
         .expect("valid period range")
         .add_swap(
             "SWAP-001",
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,
             start,
             maturity,
@@ -84,7 +84,7 @@ fn test_add_multiple_instruments() {
         .expect("valid period range")
         .add_bond(
             "BOND-001",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             issue,
             maturity,
@@ -93,7 +93,7 @@ fn test_add_multiple_instruments() {
         .expect("valid bond")
         .add_bond(
             "BOND-002",
-            Money::new(2_000_000.0, Currency::USD),
+            Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             issue,
             maturity,
@@ -145,7 +145,7 @@ fn parity_add_bond_and_add_bond_with_convention_same_id() {
             .expect("valid period range")
             .add_bond(
                 "BOND-SIMPLE",
-                Money::new(1_000_000.0, Currency::USD),
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 maturity,
@@ -161,8 +161,8 @@ fn parity_add_bond_and_add_bond_with_convention_same_id() {
             .expect("valid period range")
             .add_bond_with_convention(
                 "BOND-CONV",
-                Money::new(1_000_000.0, Currency::USD),
-                Rate::from_decimal(0.05),
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                Rate::from_decimal(0.05).expect("valid rate fixture"),
                 issue,
                 maturity,
                 BondConvention::UsCorporate,
@@ -207,7 +207,7 @@ fn parity_add_swap_and_add_swap_with_conventions_produce_swap_variant() {
             .expect("valid period range")
             .add_swap(
                 "SWAP-SIMPLE",
-                Money::new(5_000_000.0, Currency::USD),
+                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.04,
                 start,
                 maturity,
@@ -224,7 +224,7 @@ fn parity_add_swap_and_add_swap_with_conventions_produce_swap_variant() {
             .expect("valid period range")
             .add_swap_with_conventions(
                 "SWAP-CONV",
-                Money::new(5_000_000.0, Currency::USD),
+                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.04,
                 start,
                 maturity,

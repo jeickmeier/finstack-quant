@@ -91,8 +91,8 @@ mod tests {
     fn parse_positions_json_builds_boxed_instruments() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -119,8 +119,8 @@ mod tests {
     fn parse_positions_json_rejects_bare_instruments() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -147,8 +147,8 @@ mod tests {
     fn pricing_positions_preserves_order_and_weights() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,

@@ -1167,8 +1167,8 @@ mod tests {
         let maturity = date!(2026 - 01 - 01);
         let bond = Bond::fixed(
             "NODE-TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.0),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1340,8 +1340,8 @@ mod tests {
         let maturity = date!(2025 - 01 - 01);
         let mut bond = Bond::fixed(
             "ACT365F-GRID",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.0),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1389,7 +1389,7 @@ mod tests {
         let issue = date!(2024 - 01 - 01);
         let as_of = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
-        let money = |amount| Money::new(amount, Currency::USD);
+        let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
         let schedule = CashFlowSchedule::from_parts(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
@@ -1411,7 +1411,7 @@ mod tests {
                 ),
                 CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
             ],
-            Notional::par(1_000.0, Currency::USD),
+            Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
@@ -1453,7 +1453,7 @@ mod tests {
         let issue = date!(2024 - 01 - 01);
         let as_of = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
-        let money = |amount| Money::new(amount, Currency::USD);
+        let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
         let schedule = CashFlowSchedule::from_parts(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
@@ -1461,7 +1461,7 @@ mod tests {
                 CashFlow::new(as_of, None, money(200.0), CFKind::Amortization, 0.0, None),
                 CashFlow::new(maturity, None, money(800.0), CFKind::Notional, 0.0, None),
             ],
-            Notional::par(1_000.0, Currency::USD),
+            Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
@@ -1504,8 +1504,8 @@ mod tests {
         let maturity = date!(2026 - 01 - 01);
         let mut bond = Bond::fixed(
             "MAKE-WHOLE-ACCRUED",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.10),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1577,8 +1577,8 @@ mod tests {
         let exercise = date!(2025 - 07 - 01);
         let mut bond = Bond::fixed(
             "BAD-BARRIERS",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.0),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1634,8 +1634,8 @@ mod tests {
         let tree_steps = 9;
         let mut bond = Bond::fixed(
             "OFF-GRID-NONEX-CF",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1732,8 +1732,8 @@ mod tests {
         let tree_steps = 9;
         let mut bond = Bond::fixed(
             "FIRST-STEP-COUPON",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1831,8 +1831,8 @@ mod tests {
         let tree_steps = 7;
         let mut bond = Bond::fixed(
             "OFF-GRID-CALL-CF",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,

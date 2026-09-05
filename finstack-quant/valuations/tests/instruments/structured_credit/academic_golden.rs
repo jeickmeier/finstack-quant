@@ -293,19 +293,19 @@ fn test_wal_golden_uniform_amortization() {
     let cashflows = vec![
         (
             Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
         ), // Year 1
         (
             Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
         ), // Year 2
         (
             Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
         ), // Year 3
         (
             Date::from_calendar_date(2029, Month::January, 1).unwrap(),
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
         ), // Year 4
     ];
 
@@ -339,15 +339,15 @@ fn test_wal_golden_front_loaded() {
     let cashflows = vec![
         (
             Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.70, Currency::USD),
+            Money::new(total_principal * 0.70, Currency::USD).expect("valid money fixture"),
         ), // Year 1: 70%
         (
             Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.20, Currency::USD),
+            Money::new(total_principal * 0.20, Currency::USD).expect("valid money fixture"),
         ), // Year 2: 20%
         (
             Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.10, Currency::USD),
+            Money::new(total_principal * 0.10, Currency::USD).expect("valid money fixture"),
         ), // Year 3: 10%
     ];
 
@@ -381,15 +381,15 @@ fn test_wal_golden_back_loaded() {
     let cashflows = vec![
         (
             Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.10, Currency::USD),
+            Money::new(total_principal * 0.10, Currency::USD).expect("valid money fixture"),
         ), // Year 1: 10%
         (
             Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.20, Currency::USD),
+            Money::new(total_principal * 0.20, Currency::USD).expect("valid money fixture"),
         ), // Year 2: 20%
         (
             Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-            Money::new(total_principal * 0.70, Currency::USD),
+            Money::new(total_principal * 0.70, Currency::USD).expect("valid money fixture"),
         ), // Year 3: 70%
     ];
 
@@ -430,7 +430,7 @@ fn test_was_golden_calculation() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "LOAN1",
-            Money::new(50_000_000.0, Currency::USD),
+            Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity,
@@ -442,7 +442,7 @@ fn test_was_golden_calculation() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "LOAN2",
-            Money::new(30_000_000.0, Currency::USD),
+            Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             450.0,
             maturity,
@@ -454,7 +454,7 @@ fn test_was_golden_calculation() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "LOAN3",
-            Money::new(20_000_000.0, Currency::USD),
+            Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             500.0,
             maturity,

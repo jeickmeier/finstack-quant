@@ -161,8 +161,7 @@ fn rates_leg() -> finstack_quant_scenarios::Result<()> {
     let gfc = registry.get("gfc_2008").expect("built-in template");
     let rates_only = gfc
         .component("gfc_2008_rates")
-        .expect("component id from metadata.components")
-        .build()?;
+        .expect("component id from metadata.components");
     println!("{} operations", rates_only.operations.len());
     Ok(())
 }

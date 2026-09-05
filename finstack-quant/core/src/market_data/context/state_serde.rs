@@ -283,7 +283,10 @@ fn validate_restore_references(
         &mut report,
         limits,
         "dividends",
-        state.dividends.iter().map(|entry| entry.id.to_string()),
+        state
+            .dividends
+            .iter()
+            .map(|entry| entry.get_id().to_string()),
     );
     duplicate_id_diagnostics(
         &mut report,
@@ -678,7 +681,7 @@ fn restore_market_context(
 
     // Reconstruct dividends
     for schedule in state.dividends {
-        let id = schedule.id.clone();
+        let id = schedule.get_id().clone();
         Arc::make_mut(&mut ctx.dividends).insert(id, Arc::new(schedule));
     }
 

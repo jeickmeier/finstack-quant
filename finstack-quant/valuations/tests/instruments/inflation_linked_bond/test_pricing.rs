@@ -356,8 +356,10 @@ fn test_npv_scales_with_notional() {
     let mut ilb_1m = sample_tips();
     let mut ilb_2m = sample_tips();
 
-    ilb_1m.notional = finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD);
-    ilb_2m.notional = finstack_quant_core::money::Money::new(2_000_000.0, Currency::USD);
+    ilb_1m.notional = finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD)
+        .expect("valid money fixture");
+    ilb_2m.notional = finstack_quant_core::money::Money::new(2_000_000.0, Currency::USD)
+        .expect("valid money fixture");
 
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);
@@ -425,7 +427,7 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
 
     let bond = InflationLinkedBond::builder()
         .id(InstrumentId::new("ILB-NOMINAL-PV"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .real_coupon(rust_decimal::Decimal::ZERO)
         .frequency(Tenor::annual())
         .day_count(DayCount::Act365F)

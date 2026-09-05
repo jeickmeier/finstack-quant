@@ -22,7 +22,7 @@ fn get_base_builder(as_of: Date) -> LookbackOptionBuilder {
         .option_type(finstack_quant_valuations::instruments::OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(expiry)
-        .notional(Money::new(1.0, Currency::USD))
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .spot_id("SPX-SPOT".into())
@@ -51,10 +51,9 @@ fn create_test_market(as_of: Date) -> MarketContext {
     // Spot price: 100.0
     market = market.insert_price(
         "SPX-SPOT",
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::new(
-            100.0,
-            Currency::USD,
-        )),
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        ),
     );
 
     // Vol surface: flat 20%
@@ -102,7 +101,9 @@ fn test_fixed_strike_call_seasoning() {
     // Current intrinsic = 120 - 100 = 20.
     // Should be much more valuable than unseasoned.
     let seasoned_high = get_base_builder(as_of)
-        .observed_max_opt(Some(Money::new(120.0, Currency::USD)))
+        .observed_max_opt(Some(
+            Money::new(120.0, Currency::USD).expect("valid money fixture"),
+        ))
         .build()
         .unwrap();
 
@@ -119,7 +120,9 @@ fn test_fixed_strike_call_seasoning() {
     // Effective Max = max(80, 100) = 100.
     // Should be equal to unseasoned.
     let seasoned_low = get_base_builder(as_of)
-        .observed_max_opt(Some(Money::new(80.0, Currency::USD)))
+        .observed_max_opt(Some(
+            Money::new(80.0, Currency::USD).expect("valid money fixture"),
+        ))
         .build()
         .unwrap();
 
@@ -157,7 +160,9 @@ fn test_floating_strike_put_seasoning() {
         .strike_opt(None) // Floating strike
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
         .lookback_type(LookbackType::FloatingStrike)
-        .observed_max_opt(Some(Money::new(120.0, Currency::USD)))
+        .observed_max_opt(Some(
+            Money::new(120.0, Currency::USD).expect("valid money fixture"),
+        ))
         .build()
         .unwrap();
     let pv_seasoned_high = seasoned_high.value(&market, as_of).unwrap().amount();
@@ -189,7 +194,9 @@ fn test_fixed_strike_put_seasoning() {
     let seasoned_low = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
-        .observed_min_opt(Some(Money::new(80.0, Currency::USD)))
+        .observed_min_opt(Some(
+            Money::new(80.0, Currency::USD).expect("valid money fixture"),
+        ))
         .build()
         .unwrap();
     let pv_seasoned_low = seasoned_low.value(&market, as_of).unwrap().amount();
@@ -205,7 +212,9 @@ fn test_fixed_strike_put_seasoning() {
     let seasoned_high = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
-        .observed_min_opt(Some(Money::new(120.0, Currency::USD)))
+        .observed_min_opt(Some(
+            Money::new(120.0, Currency::USD).expect("valid money fixture"),
+        ))
         .build()
         .unwrap();
     let pv_seasoned_high = seasoned_high.value(&market, as_of).unwrap().amount();
@@ -221,10 +230,9 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
     let as_of = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let market = create_test_market(as_of).insert_price(
         "SPX-SPOT",
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::new(
-            120.0,
-            Currency::USD,
-        )),
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(
+            Money::new(120.0, Currency::USD).expect("valid money fixture"),
+        ),
     );
 
     let expired = LookbackOption::builder()
@@ -234,7 +242,7 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
         .option_type(finstack_quant_valuations::instruments::OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(as_of)
-        .notional(Money::new(1.0, Currency::USD))
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .spot_id("SPX-SPOT".into())
@@ -244,7 +252,9 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
             finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
         )
         .observed_min_opt(None)
-        .observed_max_opt(Some(Money::new(130.0, Currency::USD)))
+        .observed_max_opt(Some(
+            Money::new(130.0, Currency::USD).expect("valid money fixture"),
+        ))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         .build()
         .unwrap();

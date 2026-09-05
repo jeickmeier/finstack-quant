@@ -49,7 +49,7 @@ fn pool() -> AssetPool {
     for i in 0..10 {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             format!("A{i}"),
-            Money::new(100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             legal_maturity(),
             DayCount::Thirty360,
@@ -65,7 +65,7 @@ fn tranches() -> TrancheStructure {
             0.0,
             80.0,
             TrancheSeniority::Senior,
-            Money::new(800_000.0, Currency::USD),
+            Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             legal_maturity(),
         )
@@ -75,7 +75,7 @@ fn tranches() -> TrancheStructure {
             80.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(200_000.0, Currency::USD),
+            Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             legal_maturity(),
         )

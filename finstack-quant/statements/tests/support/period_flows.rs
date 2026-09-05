@@ -33,13 +33,13 @@ pub fn aggregate_period_flows(
         if !currencies.contains(&currency) {
             currencies.push(currency);
         }
-        let mut opening = Money::new(0.0, currency);
+        let mut opening = Money::new(0.0, currency).expect("valid money fixture");
         for period in periods {
             let (breakdown, closing, _net_new_funding, _warnings) = calculate_period_flows(
                 instrument.as_ref(),
                 period,
                 opening,
-                Money::new(0.0, currency),
+                Money::new(0.0, currency).expect("valid money fixture"),
                 market_ctx,
                 as_of,
                 None,

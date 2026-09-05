@@ -261,7 +261,7 @@ pub(crate) fn synthetic_underlying_cds(
         Money::new(
             option.notional.amount() * notional_scale,
             option.notional.currency(),
-        ),
+        )?,
         PayReceive::Pay,
         option.underlying_convention,
         spread_bp,
@@ -428,7 +428,7 @@ mod settlement_and_sigma_tests {
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             as_of.add_months(12),
             as_of.add_months(60),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             OptionType::Call,
         )
         .expect("valid params")
@@ -448,7 +448,7 @@ mod settlement_and_sigma_tests {
             CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             as_of.add_months(12),
             as_of.add_months(60),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             OptionType::Call,
         )
         .expect("valid params")

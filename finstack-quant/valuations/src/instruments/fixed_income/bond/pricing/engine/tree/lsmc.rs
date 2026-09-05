@@ -372,7 +372,7 @@ pub(crate) fn price_bond_lsmc(
     .with_num_simulated_paths(pricing_simulated_paths)
     .with_std_dev(stats.std_dev());
     Ok(BondLsmcResult {
-        estimate: MoneyEstimate::from_estimate(estimate, bond.notional.currency()),
+        estimate: MoneyEstimate::from_estimate(estimate, bond.notional.currency())?,
         training_paths: training_estimators,
         training_simulated_paths,
         make_whole_training_paths,
@@ -3202,7 +3202,7 @@ mod tests {
     fn stochastic_test_bond(as_of: Date, maturity: Date) -> Bond {
         Bond::builder()
             .id("LSMC_OPTION_ORDERING".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(

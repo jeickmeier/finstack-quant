@@ -51,7 +51,7 @@
 //! // Cashflows to discount
 //! let cf1 = (
 //!     Date::from_calendar_date(2026, Month::January, 1).expect("Valid date"),
-//!     Money::new(100.0, Currency::USD)
+//!     Money::from((100_i64, Currency::USD))
 //! );
 //! let flows = vec![cf1];
 //!
@@ -113,7 +113,7 @@ use crate::money::Money;
 ///
 /// let flows = vec![(
 ///     Date::from_calendar_date(2026, Month::January, 1).expect("Valid date"),
-///     Money::new(100.0, Currency::USD),
+///     Money::from((100_i64, Currency::USD)),
 /// )];
 ///
 /// // Use the trait method
@@ -259,9 +259,8 @@ pub fn flat_discount_factor(rate: f64, years: f64) -> crate::Result<f64> {
 ///
 /// # Day Count Selection
 ///
-/// Discounting always uses the curve's internal day count. The `day_count` parameter
-/// is retained for source compatibility but cannot override the curve
-/// abscissa. Instrument accrual day count belongs in cashflow generation.
+/// Discounting uses the curve's internal day count. Instrument accrual day count
+/// belongs in cashflow generation.
 ///
 /// # Example
 ///
@@ -282,7 +281,7 @@ pub fn flat_discount_factor(rate: f64, years: f64) -> crate::Result<f64> {
 ///
 /// let flows = vec![(
 ///     Date::from_calendar_date(2026, Month::January, 1).expect("Valid date"),
-///     Money::new(100.0, Currency::USD),
+///     Money::from((100_i64, Currency::USD)),
 /// )];
 ///
 /// // Uses the curve's day count.
@@ -342,7 +341,7 @@ pub(crate) fn npv_with_ctx<D: Discounting + ?Sized>(
     // per-flow values is exact at that scale. For bit-exact precision,
     // callers should pre-discount amounts in Decimal and sum via
     // sum_prediscounted_money().
-    let mut total = Money::new(0.0, ccy);
+    let mut total = Money::from((0_i64, ccy));
     for_each_discounted(disc, base, ctx, flows, |amt, df| {
         let disc_amt = amt.checked_mul_f64(df)?;
         total = total.checked_add(disc_amt)?;
@@ -472,7 +471,7 @@ mod hardening_tests {
         let base = create_date(2025, Month::January, 6).expect("Valid test date"); // Monday
         let pay = create_date(2025, Month::January, 13).expect("Valid test date"); // Next Monday
         let curve = flat_curve("BRL-FLAT", base, 0.10, DayCount::Bus252);
-        let flows = vec![(pay, Money::new(100.0, Currency::USD))];
+        let flows = vec![(pay, Money::from((100_i64, Currency::USD)))];
         let ctx = DayCountContext {
             calendar: Some(&TARGET2),
             frequency: None,
@@ -512,7 +511,7 @@ mod hardening_tests {
 
         let val_date = create_date(2026, Month::January, 1).expect("date"); // 1y forward
         let flow_date = create_date(2027, Month::January, 1).expect("date"); // 2y forward
-        let flows = vec![(flow_date, Money::new(1_000_000.0, Currency::USD))];
+        let flows = vec![(flow_date, Money::from((1_000_000_i64, Currency::USD)))];
 
         // Valuation at the curve base: PV = CF · DF(0→2y) = CF · 0.88.
         let pv_at_curve_base = npv(&curve, curve_base, &flows).expect("npv");
@@ -683,8 +682,8 @@ mod tests {
         // ().
         let pay = base + time::Duration::days(1);
         let flows = vec![
-            (pay, Money::new(10.0, crate::currency::Currency::USD)),
-            (pay, Money::new(5.0, crate::currency::Currency::USD)),
+            (pay, Money::from((10_i64, crate::currency::Currency::USD))),
+            (pay, Money::from((5_i64, crate::currency::Currency::USD))),
         ];
         let pv = flows
             .npv(&curve, base)
@@ -700,8 +699,8 @@ mod tests {
         let base = curve.base_date();
         let pay = base + time::Duration::days(1);
         let flows = vec![
-            (pay, Money::new(10.0, crate::currency::Currency::USD)),
-            (pay, Money::new(5.0, crate::currency::Currency::USD)),
+            (pay, Money::from((10_i64, crate::currency::Currency::USD))),
+            (pay, Money::from((5_i64, crate::currency::Currency::USD))),
         ];
         let pv = flows
             .npv(&curve, base)
@@ -717,7 +716,7 @@ mod tests {
         let base = curve.base_date();
         let flows = vec![(
             base + time::Duration::days(1),
-            Money::new(10.0, Currency::USD),
+            Money::from((10_i64, Currency::USD)),
         )];
 
         let err = npv_with_ctx(&curve, base, DayCountContext::default(), &flows)
@@ -738,7 +737,7 @@ mod tests {
         let base = curve.base_date();
         let flows = vec![(
             base + time::Duration::days(1),
-            Money::new(10.0, Currency::USD),
+            Money::from((10_i64, Currency::USD)),
         )];
 
         let err = npv_with_ctx(&curve, base, DayCountContext::default(), &flows)
@@ -756,7 +755,7 @@ mod tests {
         let base = create_date(2025, Month::January, 6).expect("Valid test date");
         let pay = create_date(2025, Month::January, 13).expect("Valid test date");
         let curve = flat_curve("BRL-FLAT", base, 0.10, DayCount::Bus252);
-        let flows = vec![(pay, Money::new(100.0, Currency::USD))];
+        let flows = vec![(pay, Money::from((100_i64, Currency::USD)))];
 
         assert!(npv_with_ctx(&curve, base, DayCountContext::default(), &flows).is_err());
     }
@@ -765,10 +764,10 @@ mod tests {
     fn test_npv_simple_with_flat_curve() {
         let base = create_date(2024, Month::January, 1).expect("Valid test date");
         let flows = vec![
-            (base, Money::new(-100000.0, Currency::USD)),
+            (base, Money::from((-100000_i64, Currency::USD))),
             (
                 create_date(2025, Month::January, 1).expect("Valid test date"),
-                Money::new(110000.0, Currency::USD),
+                Money::from((110000_i64, Currency::USD)),
             ),
         ];
         let rate: f64 = 0.05;
@@ -788,10 +787,10 @@ mod tests {
     fn test_npv_zero_discount() {
         let base = create_date(2024, Month::January, 1).expect("Valid test date");
         let flows = vec![
-            (base, Money::new(-100.0, Currency::USD)),
+            (base, Money::from((-100_i64, Currency::USD))),
             (
                 create_date(2025, Month::January, 1).expect("Valid test date"),
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
             ),
         ];
         let day_count = DayCount::Act365F;
@@ -814,9 +813,9 @@ mod tests {
         let past = create_date(2024, Month::July, 1).expect("Valid test date");
         let future = create_date(2025, Month::July, 1).expect("Valid test date");
         let flows = vec![
-            (past, Money::new(-50.0, Currency::USD)), // past relative to base
-            (base, Money::new(-25.0, Currency::USD)), // on the valuation date
-            (future, Money::new(55.0, Currency::USD)), // future relative to base
+            (past, Money::from((-50_i64, Currency::USD))), // past relative to base
+            (base, Money::from((-25_i64, Currency::USD))), // on the valuation date
+            (future, Money::from((55_i64, Currency::USD))), // future relative to base
         ];
         let rate: f64 = 0.05;
         let day_count = DayCount::Act365F;
@@ -843,9 +842,9 @@ mod tests {
         let flows = vec![
             (
                 create_date(2024, Month::July, 1).expect("Valid test date"),
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
             ),
-            (base, Money::new(50.0, Currency::USD)),
+            (base, Money::from((50_i64, Currency::USD))),
         ];
         let day_count = DayCount::Act365F;
         let curve = flat_curve("TEST", base, (1.05_f64).ln(), day_count);
@@ -885,7 +884,7 @@ mod tests {
             .map(|i| {
                 // ~91 days per quarter
                 let date = base + time::Duration::days(i as i64 * 91);
-                (date, Money::new(100.0, Currency::USD))
+                (date, Money::from((100_i64, Currency::USD)))
             })
             .collect();
 

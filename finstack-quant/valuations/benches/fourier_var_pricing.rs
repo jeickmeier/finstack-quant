@@ -41,8 +41,8 @@ fn make_var_market() -> MarketContext {
 fn make_var_bond(base: Date) -> Bond {
     Bond::fixed(
         "BOND-10Y",
-        Money::new(10_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.045),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.045).expect("valid rate fixture"),
         base,
         base + time::Duration::days(365 * 10),
         finstack_quant_core::dates::StubKind::ShortFront,

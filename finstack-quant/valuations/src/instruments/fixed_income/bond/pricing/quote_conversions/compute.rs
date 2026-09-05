@@ -180,7 +180,7 @@ pub fn compute_quotes(
     let base_value = finstack_quant_core::money::Money::new(
         pricing_dispatch.price_raw(&bond_for_metrics, curves, as_of)?,
         bond_for_metrics.notional.currency(),
-    );
+    )?;
     let metric_registry = match options.metric_registry.as_deref() {
         Some(registry) => registry,
         None => standard_registry(),

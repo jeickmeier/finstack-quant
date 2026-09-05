@@ -214,7 +214,7 @@ mod cases {
         let mut pool = AssetPool::new("MIXED", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::floating_rate_loan(
             "A-3M",
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             "USD-3M",
             0.0,
             maturity,
@@ -222,7 +222,7 @@ mod cases {
         ));
         pool.assets.push(PoolAsset::floating_rate_loan(
             "A-6M",
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             "USD-6M",
             0.0,
             maturity,
@@ -233,7 +233,7 @@ mod cases {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(200.0, Currency::USD),
+            Money::from((200_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
@@ -280,12 +280,12 @@ mod cases {
             pik_flows: Vec::new(),
             deferred_flows: Vec::new(),
             writedown_flows: Vec::new(),
-            final_balance: Money::new(0.0, currency),
-            total_interest: Money::new(0.0, currency),
-            total_principal: Money::new(0.0, currency),
-            total_pik: Money::new(0.0, currency),
-            total_deferred: Money::new(0.0, currency),
-            total_writedown: Money::new(0.0, currency),
+            final_balance: Money::from((0_i64, currency)),
+            total_interest: Money::from((0_i64, currency)),
+            total_principal: Money::from((0_i64, currency)),
+            total_pik: Money::from((0_i64, currency)),
+            total_deferred: Money::from((0_i64, currency)),
+            total_writedown: Money::from((0_i64, currency)),
         }
     }
 
@@ -294,11 +294,11 @@ mod cases {
         let pay_date = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
         let mut usd = empty_tranche_cashflows("AAA", Currency::USD);
         usd.cashflows
-            .push((pay_date, Money::new(100.0, Currency::USD)));
+            .push((pay_date, Money::from((100_i64, Currency::USD))));
 
         let mut eur = empty_tranche_cashflows("BBB", Currency::EUR);
         eur.cashflows
-            .push((pay_date, Money::new(50.0, Currency::EUR)));
+            .push((pay_date, Money::from((50_i64, Currency::EUR))));
 
         let mut results = HashMap::default();
         results.insert(usd.tranche_id.clone(), usd);
@@ -336,7 +336,7 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.06,
             maturity,
             DayCount::Thirty360,
@@ -346,7 +346,7 @@ mod cases {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             // Non-zero coupon so the stub-period accrued interest is non-zero.
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -477,7 +477,7 @@ mod cases {
             let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 "L1",
-                Money::new(100_000_000.0, Currency::USD),
+                Money::from((100_000_000_i64, Currency::USD)),
                 0.07,
                 maturity,
                 DayCount::Thirty360,
@@ -494,7 +494,7 @@ mod cases {
                 0.0,
                 100.0,
                 TrancheSeniority::Senior,
-                Money::new(100_000_000.0, Currency::USD),
+                Money::from((100_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
             )
@@ -563,7 +563,7 @@ mod cases {
         // losses against the (already-amortizing) subordinated tranche.
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "L1",
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             0.07,
             maturity,
             DayCount::Thirty360,
@@ -576,7 +576,7 @@ mod cases {
                 0.0,
                 70.0,
                 TrancheSeniority::Senior,
-                Money::new(70_000_000.0, Currency::USD),
+                Money::from((70_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
             )
@@ -586,7 +586,7 @@ mod cases {
                 70.0,
                 92.0,
                 TrancheSeniority::Subordinated,
-                Money::new(22_000_000.0, Currency::USD),
+                Money::from((22_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.07 },
                 maturity,
             )
@@ -596,7 +596,7 @@ mod cases {
                 92.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(8_000_000.0, Currency::USD),
+                Money::from((8_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity,
             )
@@ -658,14 +658,14 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "L1",
-            Money::new(80_000_000.0, Currency::USD),
+            Money::from((80_000_000_i64, Currency::USD)),
             0.07,
             maturity,
             DayCount::Thirty360,
         ));
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "L2",
-            Money::new(20_000_000.0, Currency::USD),
+            Money::from((20_000_000_i64, Currency::USD)),
             0.065,
             maturity,
             DayCount::Thirty360,
@@ -676,7 +676,7 @@ mod cases {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(80_000_000.0, Currency::USD),
+                Money::from((80_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
             )
@@ -686,7 +686,7 @@ mod cases {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(20_000_000.0, Currency::USD),
+                Money::from((20_000_000_i64, Currency::USD)),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity,
             )
@@ -749,7 +749,7 @@ mod cases {
             day_count: DayCount::Thirty360,
             id: InstrumentId::new("MTG1"),
             asset_type: AssetType::SingleFamilyMortgage { ltv: None },
-            balance: Money::new(original_balance, Currency::USD),
+            balance: Money::new(original_balance, Currency::USD).expect("valid money fixture"),
             rate,
             spread_bp: None,
             index_id: None,
@@ -770,7 +770,7 @@ mod cases {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(original_balance, Currency::USD),
+            Money::new(original_balance, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -870,7 +870,7 @@ mod cases {
             day_count: DayCount::Thirty360,
             id: InstrumentId::new("MTG1"),
             asset_type: AssetType::SingleFamilyMortgage { ltv: None },
-            balance: Money::new(balance, Currency::USD),
+            balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
             rate,
             spread_bp: None,
             index_id: None,
@@ -891,7 +891,7 @@ mod cases {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(balance, Currency::USD),
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -1066,7 +1066,7 @@ mod cases {
                 attach,
                 detach,
                 seniority,
-                Money::new(bal, Currency::USD),
+                Money::new(bal, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
             )
@@ -1101,18 +1101,18 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.06,
             maturity,
             DayCount::Thirty360,
         ));
-        pool.reserve_account = Money::new(reserve, Currency::USD);
+        pool.reserve_account = Money::new(reserve, Currency::USD).expect("valid money fixture");
         let tranche = Tranche::new(
             "A",
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -1158,7 +1158,7 @@ mod cases {
         deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.02 };
         deal.waterfall_rules = Some(WaterfallRules {
             excess_spread: Some(ExcessSpreadSpec {
-                target_balance: Money::new(10_000_000.0, Currency::USD),
+                target_balance: Money::from((10_000_000_i64, Currency::USD)),
                 trap_loss_pct: None,
             }),
             ..Default::default()
@@ -1193,7 +1193,7 @@ mod cases {
             let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 "A1",
-                Money::new(10_000_000.0, Currency::USD),
+                Money::from((10_000_000_i64, Currency::USD)),
                 0.06,
                 maturity,
                 DayCount::Thirty360,
@@ -1204,7 +1204,7 @@ mod cases {
                     attach,
                     detach,
                     sen,
-                    Money::new(bal, Currency::USD),
+                    Money::new(bal, Currency::USD).expect("valid money fixture"),
                     TrancheCoupon::Fixed { rate: 0.02 },
                     maturity,
                 )
@@ -1229,7 +1229,7 @@ mod cases {
             deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
             deal.waterfall_rules = Some(WaterfallRules {
                 excess_spread: Some(ExcessSpreadSpec {
-                    target_balance: Money::new(10_000_000.0, Currency::USD),
+                    target_balance: Money::from((10_000_000_i64, Currency::USD)),
                     trap_loss_pct: None,
                 }),
                 ..Default::default()
@@ -1353,7 +1353,7 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.08,
             maturity,
             DayCount::Thirty360,
@@ -1363,7 +1363,7 @@ mod cases {
             20.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(8_000_000.0, Currency::USD),
+            Money::from((8_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -1373,7 +1373,7 @@ mod cases {
             0.0,
             20.0,
             TrancheSeniority::Equity,
-            Money::new(2_000_000.0, Currency::USD),
+            Money::from((2_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
@@ -1406,7 +1406,7 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.08,
             maturity,
             DayCount::Thirty360,
@@ -1417,7 +1417,7 @@ mod cases {
                 attach,
                 detach,
                 seniority,
-                Money::new(bal, Currency::USD),
+                Money::new(bal, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate },
                 maturity,
             )
@@ -1562,7 +1562,9 @@ mod cases {
     #[test]
     fn interest_tier_split_is_identity_without_triggers() {
         let deal = clo_with_mezz(vec![]);
-        let waterfall = deal.create_waterfall();
+        let waterfall = deal
+            .create_waterfall()
+            .expect("valid create_waterfall fixture");
 
         let tier_ids: Vec<&str> = waterfall.tiers.iter().map(|t| t.id.as_str()).collect();
         assert_eq!(
@@ -1620,7 +1622,9 @@ mod cases {
             oc_trigger: Some(1.50),
             ic_trigger: None,
         }]);
-        let waterfall = deal.create_waterfall();
+        let waterfall = deal
+            .create_waterfall()
+            .expect("valid create_waterfall fixture");
         assert_eq!(
             waterfall.coverage_triggers.len(),
             1,
@@ -1635,20 +1639,20 @@ mod cases {
             &deal.tranches,
             &deal.pool,
             WaterfallContext {
-                available_cash: Money::new(500_000.0, ccy),
-                interest_collections: Money::new(200_000.0, ccy),
-                principal_collections: Money::new(300_000.0, ccy),
+                available_cash: Money::from((500_000_i64, ccy)),
+                interest_collections: Money::from((200_000_i64, ccy)),
+                principal_collections: Money::from((300_000_i64, ccy)),
                 payment_date: pay,
                 period_start: cleanup_test_date(),
                 valuation_date: cleanup_test_date(),
-                pool_balance: Money::new(10_000_000.0, ccy),
+                pool_balance: Money::from((10_000_000_i64, ccy)),
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
                 deferred_interest: None,
-                reserve_balance: Money::new(0.0, ccy),
-                restricted_cash: Money::new(0.0, Currency::USD),
-                recovery_proceeds: Money::new(0.0, ccy),
+                reserve_balance: Money::from((0_i64, ccy)),
+                restricted_cash: Money::from((0_i64, Currency::USD)),
+                recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
             },
         )
@@ -1680,24 +1684,26 @@ mod cases {
         let market = MarketContext::new().insert(cleanup_discount_curve());
         let ccy = Currency::USD;
         let result = execute_waterfall(
-            &deal.create_waterfall(),
+            &deal
+                .create_waterfall()
+                .expect("valid create_waterfall fixture"),
             &deal.tranches,
             &deal.pool,
             WaterfallContext {
-                available_cash: Money::new(500_000.0, ccy),
-                interest_collections: Money::new(200_000.0, ccy),
-                principal_collections: Money::new(300_000.0, ccy),
+                available_cash: Money::from((500_000_i64, ccy)),
+                interest_collections: Money::from((200_000_i64, ccy)),
+                principal_collections: Money::from((300_000_i64, ccy)),
                 payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
                 period_start: cleanup_test_date(),
                 valuation_date: cleanup_test_date(),
-                pool_balance: Money::new(10_000_000.0, ccy),
+                pool_balance: Money::from((10_000_000_i64, ccy)),
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
                 deferred_interest: None,
-                reserve_balance: Money::new(0.0, ccy),
-                restricted_cash: Money::new(0.0, Currency::USD),
-                recovery_proceeds: Money::new(0.0, ccy),
+                reserve_balance: Money::from((0_i64, ccy)),
+                restricted_cash: Money::from((0_i64, Currency::USD)),
+                recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
             },
         )
@@ -1717,7 +1723,9 @@ mod cases {
             deal.coverage_triggers.is_empty(),
             "the default must be no triggers"
         );
-        let waterfall = deal.create_waterfall();
+        let waterfall = deal
+            .create_waterfall()
+            .expect("valid create_waterfall fixture");
         assert!(
             waterfall.coverage_triggers.is_empty(),
             "deal with no triggers must build a waterfall with none"
@@ -1760,6 +1768,7 @@ mod cases {
 
         let fee_tiers = |deal: &StructuredCredit| {
             deal.create_waterfall()
+                .expect("valid create_waterfall fixture")
                 .tiers
                 .iter()
                 .filter(|t| t.id == "fees")
@@ -1777,24 +1786,26 @@ mod cases {
         let ccy = Currency::USD;
         let run = |deal: &StructuredCredit| {
             execute_waterfall(
-                &deal.create_waterfall(),
+                &deal
+                    .create_waterfall()
+                    .expect("valid create_waterfall fixture"),
                 &deal.tranches,
                 &deal.pool,
                 WaterfallContext {
-                    available_cash: Money::new(500_000.0, ccy),
-                    interest_collections: Money::new(500_000.0, ccy),
-                    principal_collections: Money::new(0.0, ccy),
+                    available_cash: Money::from((500_000_i64, ccy)),
+                    interest_collections: Money::from((500_000_i64, ccy)),
+                    principal_collections: Money::from((0_i64, ccy)),
                     payment_date: Date::from_calendar_date(2024, Month::April, 1).expect("date"),
                     period_start: cleanup_test_date(),
                     valuation_date: cleanup_test_date(),
-                    pool_balance: Money::new(10_000_000.0, ccy),
+                    pool_balance: Money::from((10_000_000_i64, ccy)),
                     market: &market,
                     tranche_balances: None,
                     asset_balances: None,
                     deferred_interest: None,
-                    reserve_balance: Money::new(0.0, ccy),
-                    restricted_cash: Money::new(0.0, Currency::USD),
-                    recovery_proceeds: Money::new(0.0, ccy),
+                    reserve_balance: Money::from((0_i64, ccy)),
+                    restricted_cash: Money::from((0_i64, Currency::USD)),
+                    recovery_proceeds: Money::from((0_i64, ccy)),
                     floating_rate_shift: 0.0,
                 },
             )
@@ -1867,7 +1878,7 @@ mod cases {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.06,
             maturity,
             DayCount::Thirty360,
@@ -1878,7 +1889,7 @@ mod cases {
             0.0,
             80.0, // 80% of original balance = 8 M face
             TrancheSeniority::Senior,
-            Money::new(8_000_000.0, Currency::USD),
+            Money::from((8_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -1888,7 +1899,7 @@ mod cases {
             80.0,
             100.0, // junior 20% = 2 M face
             TrancheSeniority::Equity,
-            Money::new(2_000_000.0, Currency::USD),
+            Money::from((2_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
@@ -2035,7 +2046,7 @@ mod cases {
                 day_count: DayCount::Thirty360,
                 id: InstrumentId::new("BND1"),
                 asset_type: AssetType::HighYieldBond { industry: None },
-                balance: Money::new(balance, Currency::USD),
+                balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
                 rate,
                 spread_bp: None,
                 index_id: None,
@@ -2059,7 +2070,7 @@ mod cases {
                 0.0,
                 100.0,
                 TrancheSeniority::Senior,
-                Money::new(balance, Currency::USD),
+                Money::new(balance, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
             )
@@ -2132,7 +2143,7 @@ mod cases {
             let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 "A1",
-                Money::new(100_000_000.0, Currency::USD),
+                Money::from((100_000_000_i64, Currency::USD)),
                 0.06,
                 maturity,
                 DayCount::Thirty360,
@@ -2143,7 +2154,7 @@ mod cases {
                     0.0,
                     90.0,
                     TrancheSeniority::Senior,
-                    Money::new(face_senior, Currency::USD),
+                    Money::new(face_senior, Currency::USD).expect("valid money fixture"),
                     TrancheCoupon::Fixed { rate: 0.05 },
                     maturity,
                 )
@@ -2153,7 +2164,7 @@ mod cases {
                     90.0,
                     100.0,
                     TrancheSeniority::Equity,
-                    Money::new(10_000_000.0, Currency::USD),
+                    Money::from((10_000_000_i64, Currency::USD)),
                     TrancheCoupon::Fixed { rate: 0.0 },
                     maturity,
                 )

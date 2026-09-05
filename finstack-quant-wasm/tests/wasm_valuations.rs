@@ -20,8 +20,8 @@ fn bond_instrument_json() -> String {
 
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        Rate::from_decimal(0.05).expect("valid rate fixture"),
         time::Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         time::Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -74,7 +74,7 @@ fn structured_credit_instrument_json() -> String {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity,
         DayCount::Thirty360,
@@ -85,7 +85,7 @@ fn structured_credit_instrument_json() -> String {
             0.0,
             80.0,
             TrancheSeniority::Senior,
-            Money::new(800_000.0, Currency::USD),
+            Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -95,7 +95,7 @@ fn structured_credit_instrument_json() -> String {
             80.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(200_000.0, Currency::USD),
+            Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
@@ -150,7 +150,8 @@ fn error_message(error: JsValue) -> String {
 ///
 /// `JSON.stringify` on a `Map` yields `{}`, so round-tripping through
 /// `js_sys::JSON::stringify` catches the Map regression that plain property
-/// reads would silently pass.
+/// reads would silently pass. Full-width integer metadata is exposed as
+/// BigInt, so the test serializes those values as exact decimal strings.
 fn valuation_object(result: JsValue) -> serde_json::Value {
     assert!(
         result.is_object(),
@@ -160,7 +161,11 @@ fn valuation_object(result: JsValue) -> serde_json::Value {
         !result.is_instance_of::<js_sys::Map>(),
         "pricing bindings must not return an ES2015 Map"
     );
-    let stringified: String = js_sys::JSON::stringify(&result)
+    let replacer = js_sys::Function::new_with_args(
+        "key, value",
+        "return typeof value === 'bigint' ? value.toString() : value;",
+    );
+    let stringified: String = js_sys::JSON::stringify_with_replacer(&result, replacer.as_ref())
         .expect("valuation object must be JSON-stringifiable")
         .into();
     let parsed: serde_json::Value =

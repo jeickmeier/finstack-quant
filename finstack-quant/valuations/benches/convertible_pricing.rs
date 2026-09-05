@@ -109,7 +109,7 @@ fn create_standard_convertible() -> ConvertibleBond {
 
     ConvertibleBond {
         id: "CONVERTIBLE".to_string().into(),
-        notional: Money::new(NOTIONAL, Currency::USD),
+        notional: Money::new(NOTIONAL, Currency::USD).expect("valid money fixture"),
         issue_date: issue_date(),
         maturity: maturity_5y(),
         discount_curve_id: "USD-OIS".into(),
@@ -157,7 +157,7 @@ fn create_zero_coupon_convertible() -> ConvertibleBond {
 
     ConvertibleBond {
         id: "ZERO_COUPON".to_string().into(),
-        notional: Money::new(NOTIONAL, Currency::USD),
+        notional: Money::new(NOTIONAL, Currency::USD).expect("valid money fixture"),
         issue_date: issue_date(),
         maturity: maturity_5y(),
         discount_curve_id: "USD-OIS".into(),

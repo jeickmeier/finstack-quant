@@ -150,7 +150,7 @@ impl Default for TestEquityTrsBuilder {
     fn default() -> Self {
         Self {
             id: "TEST-EQ-TRS-001".into(),
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             spot_id: "SPX-SPOT".into(),
             div_yield_id: Some(finstack_quant_core::types::PriceId::new("SPX-DIV-YIELD")),
             contract_size: 1.0,
@@ -265,7 +265,7 @@ impl Default for TestFIIndexTrsBuilder {
     fn default() -> Self {
         Self {
             id: "TEST-FI-TRS-001".into(),
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             index_id: "HY-INDEX".into(),
             yield_id: Some("HY-INDEX-YIELD".into()),
             duration_id: Some("HY-INDEX-DURATION".into()),

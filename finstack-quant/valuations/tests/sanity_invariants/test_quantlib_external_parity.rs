@@ -129,8 +129,9 @@ fn external_quantlib_parity_vanilla_bond_npv_and_dv01() {
     // days — match the fixture's QuantLib conventions.
     let bond = Bond::fixed(
         "QL-PARITY-BOND",
-        Money::new(fixture.spec.face_amount, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(fixture.spec.coupon_rate),
+        Money::new(fixture.spec.face_amount, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(fixture.spec.coupon_rate)
+            .expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -286,7 +287,7 @@ fn external_quantlib_parity_vanilla_irs_npv_and_dv01() {
 
     let swap = rates_support::usd_irs_swap(
         "QL-PARITY-IRS",
-        Money::new(fixture.spec.notional, Currency::USD),
+        Money::new(fixture.spec.notional, Currency::USD).expect("valid money fixture"),
         fixture.spec.fixed_rate,
         settlement,
         end,
@@ -435,10 +436,10 @@ fn external_quantlib_parity_fx_forward_npv() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .maturity(maturity)
-        .notional(Money::new(
-            fixture.spec.notional_base_currency,
-            Currency::EUR,
-        ))
+        .notional(
+            Money::new(fixture.spec.notional_base_currency, Currency::EUR)
+                .expect("valid money fixture"),
+        )
         .domestic_discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(finstack_quant_core::types::CurveId::new("EUR-OIS"))
         .contract_rate_opt(Some(fixture.spec.strike))

@@ -392,7 +392,7 @@ impl CreditDefaultSwap {
 
         let cds = CreditDefaultSwap::builder()
             .id(InstrumentId::new("CDS-CORP-5Y"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
             .convention(convention)
             .premium(PremiumLegSpec {
@@ -515,7 +515,7 @@ impl CreditDefaultSwap {
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// let cds = CreditDefaultSwap::builder()
     ///     .id("CDS-EXAMPLE".into())
-    ///     .notional(Money::new(10_000_000.0, Currency::USD))
+    ///     .notional(Money::from((10_000_000_i64, Currency::USD)))
     ///     .side(PayReceive::Pay)
     ///     .convention(CdsConvention::IsdaNa)
     ///     .premium(PremiumLegSpec {
@@ -686,7 +686,7 @@ impl CreditDefaultSwap {
                     Money::new(
                         self.notional.amount() * spread * accrual,
                         self.notional.currency(),
-                    ),
+                    )?,
                     finstack_quant_core::cashflow::CFKind::Fixed,
                     accrual,
                     Some(spread),
@@ -763,10 +763,7 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let npv_amount = self.npv_raw_internal(market, as_of)?;
-        Ok(finstack_quant_core::money::Money::new(
-            npv_amount,
-            self.notional.currency(),
-        ))
+        finstack_quant_core::money::Money::new(npv_amount, self.notional.currency())
     }
 
     fn base_value_raw(
@@ -800,8 +797,8 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
-    fn notional(&self) -> Option<finstack_quant_core::money::Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -829,7 +826,11 @@ impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
             PayReceive::Receive => 1.0,
         };
         schedule.update_flows(|cf| {
-            cf.amount = Money::new(cf.amount.amount() * sign, cf.amount.currency());
+            cf.amount = if sign < 0.0 {
+                cf.amount.checked_neg()
+            } else {
+                cf.amount
+            };
         });
 
         Ok(schedule
@@ -849,7 +850,7 @@ mod tests {
     fn new_isda_applies_standard_convention_fields() {
         let cds = CreditDefaultSwap::new_isda(
             InstrumentId::new("CDS-CORP-5Y"),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             PayReceive::Pay,
             CdsConvention::IsdaNa,
             Decimal::try_from(100.0).expect("valid spread_bp"),
@@ -862,7 +863,7 @@ mod tests {
         .expect("ISDA CDS constructor should succeed");
 
         assert_eq!(cds.id, InstrumentId::new("CDS-CORP-5Y"));
-        assert_eq!(cds.notional, Money::new(10_000_000.0, Currency::USD));
+        assert_eq!(cds.notional, Money::from((10_000_000_i64, Currency::USD)));
         assert_eq!(cds.side, PayReceive::Pay);
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.premium.start, date!(2025 - 03 - 20));

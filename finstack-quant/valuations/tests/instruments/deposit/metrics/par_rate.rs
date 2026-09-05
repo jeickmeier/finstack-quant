@@ -131,10 +131,13 @@ fn test_par_rate_zero_for_zero_period() {
         .id(finstack_quant_core::types::InstrumentId::new(
             "DEP-ZERO-PARRATE",
         ))
-        .notional(finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+        )
         .start_date(base)
         .maturity(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

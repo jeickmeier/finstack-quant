@@ -23,8 +23,8 @@ fn test_callable_bond_basic() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CALLABLE",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -56,8 +56,8 @@ fn test_putable_bond_basic() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "PUTABLE",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

@@ -47,7 +47,7 @@ fn create_pool(deal_type: DealType, num_assets: usize) -> AssetPool {
     for i in 0..num_assets {
         let asset = PoolAsset::fixed_rate_bond(
             format!("ASSET-{:03}", i + 1),
-            Money::new(asset_balance, Currency::USD),
+            Money::new(asset_balance, Currency::USD).expect("valid money fixture"),
             0.05 + (i as f64 * 0.001), // Vary rates slightly
             Date::from_calendar_date(2028 + (i % 3) as i32, Month::January, 1).unwrap(),
             DayCount::Act360,
@@ -66,7 +66,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         0.0,
         70.0, // 70% senior
         TrancheSeniority::Senior,
-        Money::new(total_balance * 0.70, Currency::USD),
+        Money::new(total_balance * 0.70, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.035 },
         maturity_date(),
     )
@@ -77,7 +77,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         70.0,
         90.0, // 20% mezzanine
         TrancheSeniority::Mezzanine,
-        Money::new(total_balance * 0.20, Currency::USD),
+        Money::new(total_balance * 0.20, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.06 },
         maturity_date(),
     )
@@ -88,7 +88,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         90.0,
         100.0, // 10% equity
         TrancheSeniority::Equity,
-        Money::new(total_balance * 0.10, Currency::USD),
+        Money::new(total_balance * 0.10, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )

@@ -437,7 +437,7 @@ impl CommodityOption {
         use finstack_quant_models::monte_carlo::TimeGrid;
 
         if as_of > self.expiry {
-            return Ok(Money::new(0.0, self.underlying.currency));
+            return Ok(Money::from((0_i64, self.underlying.currency)));
         }
         if !matches!(self.exercise_style, ExerciseStyle::European) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -455,10 +455,10 @@ impl CommodityOption {
                 self.forward_price(market, as_of)?
             };
             let intrinsic = self.intrinsic_value(underlying);
-            return Ok(Money::new(
+            return Money::new(
                 intrinsic * self.quantity * self.multiplier,
                 self.underlying.currency,
-            ));
+            );
         }
 
         match &mc_params.model {
@@ -476,7 +476,7 @@ impl CommodityOption {
                 Ok(Money::new(
                     unit_price * self.quantity * self.multiplier,
                     self.underlying.currency,
-                ))
+                )?)
             }
             CommodityPricingModel::SchwartzSmith {
                 kappa,
@@ -576,7 +576,7 @@ impl CommodityOption {
                 Ok(Money::new(
                     unit_pv * self.quantity * self.multiplier,
                     self.underlying.currency,
-                ))
+                )?)
             }
         }
     }
@@ -674,7 +674,7 @@ impl Instrument for CommodityOption {
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         // Post-expiry: option is fully settled, value is 0
         if as_of > self.expiry {
-            return Ok(Money::new(0.0, self.underlying.currency));
+            return Ok(Money::from((0_i64, self.underlying.currency)));
         }
 
         let t = self.time_to_expiry(as_of)?;
@@ -686,10 +686,10 @@ impl Instrument for CommodityOption {
                 self.forward_price(market, as_of)?
             };
             let intrinsic = self.intrinsic_value(underlying);
-            return Ok(Money::new(
+            return Money::new(
                 intrinsic * self.quantity * self.multiplier,
                 self.underlying.currency,
-            ));
+            );
         }
 
         let inputs = self.collect_inputs(market, as_of)?;
@@ -776,10 +776,10 @@ impl Instrument for CommodityOption {
             }
         };
 
-        Ok(Money::new(
+        Money::new(
             unit_price * self.quantity * self.multiplier,
             self.underlying.currency,
-        ))
+        )
     }
 
     fn effective_start_date(&self) -> Option<Date> {

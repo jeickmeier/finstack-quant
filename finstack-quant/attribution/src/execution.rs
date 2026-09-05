@@ -28,24 +28,26 @@ fn probe_rounding_currency(
     market_t0: &MarketContext,
     as_of_t0: Date,
     rounding_scale: Option<u32>,
-) -> RoundingCurrencyProbe {
-    if rounding_scale.is_none() {
-        return RoundingCurrencyProbe {
-            currency: None,
-            value: None,
-        };
-    }
+) -> finstack_quant_core::Result<RoundingCurrencyProbe> {
+    Ok({
+        if rounding_scale.is_none() {
+            return Ok(RoundingCurrencyProbe {
+                currency: None,
+                value: None,
+            });
+        }
 
-    match instrument.value(market_t0, as_of_t0) {
-        Ok(value) => RoundingCurrencyProbe {
-            currency: Some(value.currency()),
-            value: Some(value),
-        },
-        Err(_) => RoundingCurrencyProbe {
-            currency: instrument.notional().map(|notional| notional.currency()),
-            value: None,
-        },
-    }
+        match instrument.value(market_t0, as_of_t0) {
+            Ok(value) => RoundingCurrencyProbe {
+                currency: Some(value.currency()),
+                value: Some(value),
+            },
+            Err(_) => RoundingCurrencyProbe {
+                currency: instrument.notional()?.map(|notional| notional.currency()),
+                value: None,
+            },
+        }
+    })
 }
 
 /// Returns the configured target only when the completed attribution needs translation.
@@ -152,7 +154,7 @@ impl AttributionSpec {
             &market_t0,
             self.as_of_t0,
             rounding_scale,
-        );
+        )?;
         let config = self.build_finstack_config(rounding_probe.currency)?;
 
         let strict_validation = self
@@ -442,8 +444,8 @@ mod tests {
     }
 
     impl CashflowScheduleSource for CurrencyTestInstrument {
-        fn notional(&self) -> Option<Money> {
-            Some(Money::new(1_000_000.0, Currency::USD))
+        fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+            Ok(Some(Money::from((1_000_000_i64, Currency::USD))))
         }
 
         fn raw_cashflow_schedule(
@@ -455,7 +457,7 @@ mod tests {
                 Vec::new(),
                 DayCount::Act365F,
                 ScheduleBuildOpts {
-                    notional_hint: self.notional(),
+                    notional_hint: self.notional().expect("valid notional"),
                     meta: CashFlowMeta {
                         representation: CashflowRepresentation::NoResidual,
                         ..Default::default()
@@ -505,7 +507,7 @@ mod tests {
                     "intentional test valuation failure".to_string(),
                 ))
             } else {
-                Ok(Money::new(100.0, self.value_currency))
+                Ok(Money::from((100_i64, self.value_currency)))
             }
         }
 
@@ -553,7 +555,8 @@ mod tests {
         let instrument = CurrencyTestInstrument::successful(Currency::EUR);
         let market = MarketContext::new();
 
-        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), Some(6));
+        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), Some(6))
+            .expect("valid probe_rounding_currency fixture");
         let finstack_config = spec_with_config(config(Some(6), None))
             .build_finstack_config(probe.currency)
             .expect("rounding config should build");
@@ -584,9 +587,10 @@ mod tests {
         let instrument = CurrencyTestInstrument::successful(Currency::EUR);
         let market = MarketContext::new();
 
-        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), None);
+        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), None)
+            .expect("valid probe_rounding_currency fixture");
         let attribution = crate::PnlAttribution::new(
-            Money::new(10.0, Currency::EUR),
+            Money::from((10_i64, Currency::EUR)),
             instrument.id(),
             date!(2025 - 01 - 01),
             date!(2025 - 01 - 02),
@@ -611,7 +615,7 @@ mod tests {
         let instrument = CurrencyTestInstrument::successful(Currency::EUR);
         let instrument_arc: Arc<dyn Instrument> = Arc::new(instrument.clone());
         let market = MarketContext::new();
-        let probe = Money::new(100.0, Currency::EUR);
+        let probe = Money::from((100_i64, Currency::EUR));
         let mut notes = Vec::new();
         let mut num_repricings = 1;
 
@@ -651,7 +655,8 @@ mod tests {
         let instrument = CurrencyTestInstrument::failing();
         let market = MarketContext::new();
 
-        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), Some(6));
+        let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), Some(6))
+            .expect("valid probe_rounding_currency fixture");
 
         assert_eq!(probe.currency, Some(Currency::USD));
         assert_eq!(probe.value, None);

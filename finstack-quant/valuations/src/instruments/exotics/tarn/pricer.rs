@@ -177,19 +177,24 @@ impl Payoff for TarnPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: finstack_quant_core::currency::Currency) -> Money {
-        let mut pv = self.discounted_pv;
-        if self.pathwise {
-            // The maturity settlement event flushes all pending cashflows;
-            // discount any defensive remainder with the last observed bank
-            // factor rather than dropping it.
-            pv += self.pending / self.last_bank;
-        } else if !self.redeemed {
-            if let Some(final_event) = self.events.last() {
-                pv += self.notional * final_event.discount_factor;
+    fn value(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let mut pv = self.discounted_pv;
+            if self.pathwise {
+                // The maturity settlement event flushes all pending cashflows;
+                // discount any defensive remainder with the last observed bank
+                // factor rather than dropping it.
+                pv += self.pending / self.last_bank;
+            } else if !self.redeemed {
+                if let Some(final_event) = self.events.last() {
+                    pv += self.notional * final_event.discount_factor;
+                }
             }
-        }
-        Money::new(pv, currency)
+            Money::new(pv, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -268,7 +273,7 @@ impl TarnPricer {
             finstack_quant_core::Error::Validation("TARN requires coupon dates".to_string())
         })?;
         if as_of >= final_coupon_date {
-            let zero = Money::new(0.0, inst.notional.currency());
+            let zero = Money::from((0_i64, inst.notional.currency()));
             return Ok(MoneyEstimate {
                 mean: zero,
                 stderr: 0.0,
@@ -412,11 +417,7 @@ impl TarnPricer {
         // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
         // component. Settle the (fully seasoned) schedule directly.
         if event_times.is_empty() {
-            return Ok(deterministic_estimate(
-                inst,
-                &events,
-                config.effective_path_count(),
-            ));
+            return deterministic_estimate(inst, &events, config.effective_path_count());
         }
 
         // Final settlement event at maturity (the last payment date): coupons
@@ -482,30 +483,36 @@ impl Default for TarnPricer {
 /// The returned [`MoneyEstimate`] reports the exact PV with zero dispersion.
 /// `num_paths` mirrors what an MC run with this configuration would have
 /// reported, keeping the result shape consistent for callers.
-fn deterministic_estimate(inst: &Tarn, events: &[CouponEvent], num_paths: usize) -> MoneyEstimate {
-    let mut payoff = TarnPayoff::new(
-        inst.fixed_rate,
-        inst.coupon_floor,
-        inst.target_coupon,
-        inst.notional.amount(),
-        Arc::from(events.to_vec()),
-        false,
-    );
-    payoff.settle_all_seasoned();
-    let pv = payoff.value(inst.notional.currency());
-    MoneyEstimate {
-        mean: pv,
-        stderr: 0.0,
-        ci_95: (pv, pv),
-        num_paths,
-        num_simulated_paths: num_paths,
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(pv.amount()),
-        max: Some(pv.amount()),
-    }
+fn deterministic_estimate(
+    inst: &Tarn,
+    events: &[CouponEvent],
+    num_paths: usize,
+) -> finstack_quant_core::Result<MoneyEstimate> {
+    Ok({
+        let mut payoff = TarnPayoff::new(
+            inst.fixed_rate,
+            inst.coupon_floor,
+            inst.target_coupon,
+            inst.notional.amount(),
+            Arc::from(events.to_vec()),
+            false,
+        );
+        payoff.settle_all_seasoned();
+        let pv = payoff.value(inst.notional.currency())?;
+        MoneyEstimate {
+            mean: pv,
+            stderr: 0.0,
+            ci_95: (pv, pv),
+            num_paths,
+            num_simulated_paths: num_paths,
+            std_dev: Some(0.0),
+            median: None,
+            percentile_25: None,
+            percentile_75: None,
+            min: Some(pv.amount()),
+            max: Some(pv.amount()),
+        }
+    })
 }
 
 impl Pricer for TarnPricer {
@@ -590,7 +597,7 @@ mod tests {
             fixed_rate: 0.06,
             coupon_floor: 0.0,
             target_coupon,
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             coupon_dates: vec![
                 date(2025, Month::January, 1),
                 date(2025, Month::July, 1),
@@ -773,7 +780,10 @@ mod tests {
         payoff.on_event(&mut state).expect("valid payoff event");
         payoff.on_event(&mut state).expect("valid payoff event");
 
-        assert!((payoff.value(Currency::USD).amount() - 1_100_000.0).abs() < 1e-8);
+        assert!(
+            (payoff.value(Currency::USD).expect("valid payoff").amount() - 1_100_000.0).abs()
+                < 1e-8
+        );
     }
 
     /// Deterministic-σ PV must match the **independent in-advance** ground

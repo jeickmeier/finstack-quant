@@ -846,7 +846,7 @@ pub(crate) fn attribute_pnl_taylor(
                 &mut attribution.meta.notes,
                 &mut non_finite_detected,
             );
-            let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy);
+            let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy)?;
             // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
             let carry_inputs = TotalReturnCarryInputs {
                 cash_paid: ci,
@@ -1611,7 +1611,7 @@ mod tests {
 
         let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
             "TEST-001",
-            Money::new(1000.0, Currency::USD),
+            Money::from((1000_i64, Currency::USD)),
         ));
 
         let market_t0 = MarketContext::new();
@@ -1644,7 +1644,7 @@ mod tests {
 
         let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
             "TEST-001",
-            Money::new(1000.0, Currency::USD),
+            Money::from((1000_i64, Currency::USD)),
         ));
 
         let market_t0 = MarketContext::new();
@@ -1700,7 +1700,7 @@ mod tests {
         let market_t1 = MarketContext::new().insert(fwd_t1);
 
         let instrument: Arc<dyn Instrument> = Arc::new(
-            TestInstrument::new("FWDI", Money::new(0.0, Currency::USD))
+            TestInstrument::new("FWDI", Money::from((0_i64, Currency::USD)))
                 .with_forward_curves(&["TEST-FWD"]),
         );
 
@@ -1787,7 +1787,7 @@ mod tests {
         fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
             // Price in USD as the EUR notional converted at the market FX rate.
             let usd = market.convert_money(
-                Money::new(self.eur_notional, Currency::EUR),
+                Money::new(self.eur_notional, Currency::EUR).expect("valid money fixture"),
                 Currency::USD,
                 as_of,
             )?;
@@ -1927,7 +1927,7 @@ mod tests {
         let as_of_t1 = date!(2025 - 01 - 16);
 
         let instrument: Arc<dyn Instrument> = Arc::new(
-            TestInstrument::new("NF-001", Money::new(1000.0, Currency::USD))
+            TestInstrument::new("NF-001", Money::from((1000_i64, Currency::USD)))
                 .with_discount_curves(&["USD-OIS"]),
         );
 
@@ -2076,8 +2076,8 @@ mod tests {
     }
 
     impl finstack_quant_cashflows::traits::CashflowScheduleSource for MockInstrument {
-        fn notional(&self) -> Option<Money> {
-            None
+        fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+            Ok(None)
         }
 
         fn raw_cashflow_schedule(
@@ -2206,7 +2206,7 @@ mod tests {
                     notional,
                 } => {
                     let df = market.get_discount(curve)?.df(*tenor);
-                    Ok(Money::new(notional * df, Currency::USD))
+                    Ok(Money::new(notional * df, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::ForwardConvex {
                     curve,
@@ -2214,7 +2214,8 @@ mod tests {
                     scale,
                 } => {
                     let rate = market.get_forward(curve)?.rate(*tenor);
-                    Ok(Money::new(scale * (-rate * tenor).exp(), Currency::USD))
+                    Ok(Money::new(scale * (-rate * tenor).exp(), Currency::USD)
+                        .expect("valid money fixture"))
                 }
                 MockPayoff::VolSum { reads, scale } => {
                     let mut total = 0.0;
@@ -2224,17 +2225,17 @@ mod tests {
                             &surface, *expiry, *strike,
                         );
                     }
-                    Ok(Money::new(scale * total, Currency::USD))
+                    Ok(Money::new(scale * total, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::FxOptional { eur_notional } => {
                     if market.fx().is_some() {
                         market.convert_money(
-                            Money::new(*eur_notional, Currency::EUR),
+                            Money::new(*eur_notional, Currency::EUR).expect("valid money fixture"),
                             Currency::USD,
                             as_of,
                         )
                     } else {
-                        Ok(Money::new(*eur_notional, Currency::USD))
+                        Ok(Money::new(*eur_notional, Currency::USD).expect("valid money fixture"))
                     }
                 }
                 MockPayoff::Spot { id, scale } => {
@@ -2244,7 +2245,7 @@ mod tests {
                         }
                         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
                     };
-                    Ok(Money::new(scale * price, Currency::USD))
+                    Ok(Money::new(scale * price, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::InflationCpi {
                     curve,
@@ -2252,7 +2253,7 @@ mod tests {
                     scale,
                 } => {
                     let cpi = market.get_inflation_curve(*curve)?.cpi(*tenor);
-                    Ok(Money::new(scale * cpi, Currency::USD))
+                    Ok(Money::new(scale * cpi, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::Correlation {
                     curve,
@@ -2262,13 +2263,15 @@ mod tests {
                     let corr = market
                         .get_base_correlation(*curve)?
                         .correlation(*detachment);
-                    Ok(Money::new(scale * corr, Currency::USD))
+                    Ok(Money::new(scale * corr, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::ModelCpr { scale } => {
                     let cpr = self.model_cpr.unwrap_or(0.0);
-                    Ok(Money::new(scale * cpr, Currency::USD))
+                    Ok(Money::new(scale * cpr, Currency::USD).expect("valid money fixture"))
                 }
-                MockPayoff::Constant(value) => Ok(Money::new(*value, Currency::USD)),
+                MockPayoff::Constant(value) => {
+                    Ok(Money::new(*value, Currency::USD).expect("valid money fixture"))
+                }
             }
         }
 
@@ -2711,7 +2714,7 @@ mod tests {
         let as_of_t1 = date!(2025 - 01 - 16);
 
         let instrument: Arc<dyn Instrument> = Arc::new(
-            TestInstrument::new("FAIL-001", Money::new(1000.0, Currency::USD))
+            TestInstrument::new("FAIL-001", Money::from((1000_i64, Currency::USD)))
                 .with_discount_curves(&["USD-OIS"]),
         );
 
@@ -2803,7 +2806,10 @@ mod tests {
         let as_of_t1 = date!(2025 - 02 - 15);
 
         let mut mock = MockInstrument::new("COUPON-001", MockPayoff::Constant(1_000_000.0));
-        mock.coupon = Some((date!(2025 - 02 - 01), Money::new(5_000.0, Currency::USD)));
+        mock.coupon = Some((
+            date!(2025 - 02 - 01),
+            Money::from((5_000_i64, Currency::USD)),
+        ));
         let instrument: Arc<dyn Instrument> = Arc::new(mock);
 
         let result = compute_taylor_result(
@@ -2852,7 +2858,10 @@ mod tests {
             (None, Currency::EUR, "Theta cashflow currency mismatch"),
         ] {
             let mut mock = MockInstrument::new("FAILED-COUPON", MockPayoff::Constant(1_000_000.0));
-            mock.coupon = Some((date!(2025 - 02 - 01), Money::new(5_000.0, coupon_currency)));
+            mock.coupon = Some((
+                date!(2025 - 02 - 01),
+                Money::from((5_000_i64, coupon_currency)),
+            ));
             mock.cashflow_error = cashflow_error;
             let instrument: Arc<dyn Instrument> = Arc::new(mock);
 
@@ -2992,11 +3001,11 @@ mod tests {
         ));
         let market_t0 = MarketContext::new().insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(180.0, Currency::USD)),
+            MarketScalar::Price(Money::from((180_i64, Currency::USD))),
         );
         let market_t1 = MarketContext::new().insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(185.0, Currency::USD)),
+            MarketScalar::Price(Money::from((185_i64, Currency::USD))),
         );
 
         let attribution = crate::attribute_pnl(

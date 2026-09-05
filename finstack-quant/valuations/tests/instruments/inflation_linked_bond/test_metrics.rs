@@ -507,7 +507,7 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
 
     let mut bond = InflationLinkedBond::builder()
         .id(InstrumentId::new("ILB-BEI-NONFLAT"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .real_coupon(rust_decimal::Decimal::try_from(0.04).unwrap())
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Thirty360)

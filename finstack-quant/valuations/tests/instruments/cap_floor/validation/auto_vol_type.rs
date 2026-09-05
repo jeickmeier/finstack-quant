@@ -66,7 +66,7 @@ fn make_caplet(
     CapFloor {
         id: "TEST-AUTO".into(),
         rate_option_type,
-        notional: Money::new(1_000_000.0, Currency::EUR),
+        notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         strike: Decimal::try_from(strike).unwrap(),
         start_date: fixing,
         maturity: payment,

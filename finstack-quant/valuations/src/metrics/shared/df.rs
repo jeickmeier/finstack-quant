@@ -109,7 +109,7 @@ mod tests {
             instrument,
             Arc::new(curves),
             as_of,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
             Arc::new(FinstackConfig::default()),
         )
     }

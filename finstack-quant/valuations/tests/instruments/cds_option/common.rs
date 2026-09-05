@@ -220,7 +220,7 @@ impl CDSOptionBuilder {
             option_type: OptionType::Call,
             expiry_months: 12,
             cds_maturity_months: 60,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             implied_vol: Some(0.30),
             is_index: false,
             index_factor: None,
@@ -287,7 +287,7 @@ impl CDSOptionBuilder {
     }
 
     pub fn notional(mut self, amount: f64, currency: Currency) -> Self {
-        self.notional = Money::new(amount, currency);
+        self.notional = Money::new(amount, currency).expect("valid money fixture");
         self
     }
 

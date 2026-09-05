@@ -21,8 +21,8 @@ impl Bond {
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::with_convention(
             "US912828XG33",
-            Money::new(1_000_000.0, Currency::USD),
-            Rate::from_decimal(0.0425),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Rate::from_decimal(0.0425)?,
             date!(2024 - 01 - 15),
             date!(2034 - 01 - 15),
             crate::instruments::common_impl::parameters::BondConvention::UsTreasury,
@@ -114,13 +114,13 @@ impl Bond {
     /// use time::macros::date;
     ///
     /// // US Corporate bond (default)
-    /// let notional = Money::new(1_000_000.0, Currency::USD);
+    /// let notional = Money::from((1_000_000_i64, Currency::USD));
     /// let issue = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let corp_bond = Bond::fixed(
     ///     "CORP-001",
     ///     notional,
-    ///     finstack_quant_core::types::Rate::from_percent(5.0),
+    ///     finstack_quant_core::types::Rate::from_percent(5.0).expect("valid rate fixture"),
     ///     issue,
     ///     maturity,
     ///     StubKind::None,
@@ -131,7 +131,7 @@ impl Bond {
     ///
     /// // For US Treasury, use with_convention:
     /// // let treasury = Bond::with_convention("UST-001", notional,
-    /// //     finstack_quant_core::types::Rate::from_percent(4.0), issue, maturity,
+    /// //     finstack_quant_core::types::Rate::from_percent(4.0).expect("valid rate fixture"), issue, maturity,
     /// //                                       BondConvention::UsTreasury, "USD-TREASURY").unwrap();
     /// ```
     /// # Errors
@@ -191,13 +191,13 @@ impl Bond {
     /// use finstack_quant_core::currency::Currency;
     /// use time::macros::date;
     ///
-    /// let notional = Money::new(1_000_000.0, Currency::USD);
+    /// let notional = Money::from((1_000_000_i64, Currency::USD));
     /// let issue = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let treasury = Bond::with_convention(
     ///     "UST-5Y",
     ///     notional,
-    ///     finstack_quant_core::types::Rate::from_decimal(0.03),
+    ///     finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
     ///     issue,
     ///     maturity,
     ///     BondConvention::UsTreasury,
@@ -321,7 +321,7 @@ impl Bond {
     /// use time::macros::date;
     ///
     /// // 3M SOFR + 200bps, quarterly payments
-    /// let notional = Money::new(1_000_000.0, Currency::USD);
+    /// let notional = Money::from((1_000_000_i64, Currency::USD));
     /// let issue = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let frn = Bond::floating(
@@ -414,7 +414,7 @@ impl Bond {
     ///
     /// let frn = Bond::floating_with_convention(
     ///     "FRN-US",
-    ///     Money::new(1_000_000.0, Currency::USD),
+    ///     Money::from((1_000_000_i64, Currency::USD)),
     ///     "USD-SOFR-3M",
     ///     finstack_quant_core::types::Bps::new(125),
     ///     date!(2025-01-15),
@@ -494,7 +494,7 @@ impl Bond {
     ///
     /// let zcb = Bond::zero_coupon(
     ///     "ZCB-001",
-    ///     Money::new(1_000_000.0, Currency::USD),
+    ///     Money::from((1_000_000_i64, Currency::USD)),
     ///     date!(2025-01-15),
     ///     date!(2027-01-15),
     ///     "USD-OIS",
@@ -586,7 +586,7 @@ impl Bond {
     ///     },
     /// };
     /// let schedule = CashFlowSchedule::builder()
-    ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
     ///     .fixed_cf(fixed_spec)
     ///     .build(None)?;
     ///
@@ -679,13 +679,13 @@ impl Bond {
                 365 => Tenor::annual(),
                 182 => Tenor::semi_annual(),
                 91 => Tenor::quarterly(),
-                60 => Tenor::new(2, finstack_quant_core::dates::TenorUnit::Months),
+                60 => Tenor::new(2, finstack_quant_core::dates::TenorUnit::Months)?,
                 30 => Tenor::monthly(),
                 7 => Tenor::weekly(),
                 _ => finstack_quant_core::dates::Tenor::new(
                     mode_days as u32,
                     finstack_quant_core::dates::TenorUnit::Days,
-                ),
+                )?,
             }
         };
 
@@ -739,7 +739,7 @@ impl Bond {
     ///
     /// # let bond = Bond::example().unwrap();
     /// # let schedule = CashFlowSchedule::builder()
-    /// #     .principal(Money::new(1_000_000.0, Currency::USD), Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2034, time::Month::January, 1).unwrap())
+    /// #     .principal(Money::from((1_000_000_i64, Currency::USD)), Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2034, time::Month::January, 1).unwrap())
     /// #     .build(None).unwrap();
     /// let bond_with_custom = bond.with_cashflows(schedule);
     /// ```
@@ -920,7 +920,7 @@ impl Bond {
 
         let bond = Self::builder()
             .id(InstrumentId::new("FRN-USD-SOFR-5Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
@@ -976,7 +976,7 @@ impl Bond {
 
         let bond = Self::builder()
             .id(InstrumentId::new("CALLABLE-USD-10Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2034 - 01 - 15))
             .cashflow_spec(cashflow_spec)
@@ -1025,13 +1025,13 @@ impl Bond {
         let cashflow_spec = CashflowSpec::Amortizing {
             base: Box::new(base),
             schedule: AmortizationSpec::LinearTo {
-                final_notional: Money::new(200_000.0, Currency::USD),
+                final_notional: Money::from((200_000_i64, Currency::USD)),
             },
         };
 
         let bond = Self::builder()
             .id(InstrumentId::new("AMORT-USD-5Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
@@ -1112,7 +1112,7 @@ impl Bond {
     /// # Arguments
     ///
     /// * `rate` - Target annualized IRR; accepts anything that converts `Into<Rate>`
-    ///   (e.g. `Rate::from_percent(12.0)`).
+    ///   (e.g. `Rate::from_percent(12.0).expect("valid rate fixture")`).
     ///
     /// # Returns
     ///
@@ -1124,7 +1124,7 @@ impl Bond {
     /// use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_quant_core::types::Rate;
     ///
-    /// let bond = Bond::example().unwrap().min_xirr(Rate::from_percent(12.0));
+    /// let bond = Bond::example().unwrap().min_xirr(Rate::from_percent(12.0).expect("valid rate fixture"));
     /// assert!(bond.return_floor.is_some());
     /// ```
     #[must_use]

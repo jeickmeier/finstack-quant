@@ -43,8 +43,8 @@
 //! let model = FinancialModelSpec::builder("Acme Corp")
 //!     .periods("2025Q1..Q4", Some("2025Q2"))?
 //!     .value("revenue", &[
-//!         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10_000_000.0)),
-//!         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(11_000_000.0)),
+//!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(10_000_000.0)),
+//!         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(11_000_000.0)),
 //!     ])
 //!     .compute("cogs", "revenue * 0.6")?
 //!     .compute("gross_profit", "revenue - cogs")?

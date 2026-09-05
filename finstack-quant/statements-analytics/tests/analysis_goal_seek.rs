@@ -9,7 +9,7 @@ use finstack_quant_statements_analytics::analysis::goal_seek::goal_seek;
 
 #[test]
 fn test_goal_seek_simple_linear() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let mut model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
@@ -38,7 +38,7 @@ fn test_goal_seek_simple_linear() {
 
 #[test]
 fn test_goal_seek_with_update() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let mut model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
@@ -81,8 +81,8 @@ fn test_goal_seek_with_update() {
 
 #[test]
 fn test_goal_seek_interest_coverage() {
-    let q1 = PeriodId::quarter(2025, 1);
-    let q4 = PeriodId::quarter(2025, 4);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
     let mut model = ModelBuilder::new("test")
         .periods("2025Q1..Q4", None)
@@ -124,7 +124,7 @@ fn test_goal_seek_interest_coverage() {
 
 #[test]
 fn test_goal_seek_invalid_target_node() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let mut model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
@@ -148,7 +148,7 @@ fn test_goal_seek_invalid_target_node() {
 
 #[test]
 fn test_goal_seek_invalid_driver_node() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let mut model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
@@ -172,7 +172,7 @@ fn test_goal_seek_invalid_driver_node() {
 
 #[test]
 fn test_goal_seek_with_explicit_bounds() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let mut model = ModelBuilder::new("bounds")
         .periods("2025Q1..Q1", None)
         .expect("valid period")

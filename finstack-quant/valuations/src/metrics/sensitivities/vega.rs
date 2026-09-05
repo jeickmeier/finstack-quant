@@ -333,7 +333,7 @@ mod tests {
             market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(self.raw_value(market)?, Currency::USD))
+            Ok(Money::new(self.raw_value(market)?, Currency::USD).expect("valid money fixture"))
         }
 
         fn base_value_raw(

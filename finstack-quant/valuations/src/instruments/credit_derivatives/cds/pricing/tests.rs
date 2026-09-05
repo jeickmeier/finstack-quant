@@ -27,7 +27,7 @@ fn create_test_cds(
 ) -> CreditDefaultSwap {
     CreditDefaultSwap::new_isda(
         finstack_quant_core::types::InstrumentId::new(id),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         PayReceive::Pay,
         crate::instruments::credit_derivatives::cds::CdsConvention::IsdaNa,
         Decimal::try_from(spread_bp).expect("valid spread_bp"),
@@ -107,11 +107,11 @@ fn premium_leg_scales_linearly_with_notional_when_accrual_on_default_enabled() {
         100.0,
         0.40,
     );
-    cds_unit.notional = Money::new(1.0, Currency::USD);
+    cds_unit.notional = Money::from((1_i64, Currency::USD));
 
     let mut cds_large = cds_unit.clone();
     cds_large.id = finstack_quant_core::types::InstrumentId::new("TEST-CDS-LARGE");
-    cds_large.notional = Money::new(1_000_000.0, Currency::USD);
+    cds_large.notional = Money::from((1000000_i64, Currency::USD));
 
     let pv_unit = pricer
         .pv_premium_leg_raw(&cds_unit, &disc, &credit, as_of)
@@ -311,7 +311,7 @@ fn test_doc_clause_default_when_omitted() {
     // Builder pattern should also work without doc_clause
     let cds_built = CreditDefaultSwap::builder()
         .id(finstack_quant_core::types::InstrumentId::new("CDS-BUILDER"))
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::from((10_000_000_i64, Currency::USD)))
         .side(PayReceive::Pay)
         .convention(crate::instruments::credit_derivatives::cds::CdsConvention::IsdaNa)
         .premium(
@@ -479,10 +479,10 @@ fn test_npv_full_combines_dated_and_market_quote_upfronts() {
 
     let dated_upfront_date = as_of.add_months(6);
     let dated_upfront_amount = 150_000.0;
-    let quote_adjustment = Money::new(25_000.0, Currency::USD);
+    let quote_adjustment = Money::from((25_000_i64, Currency::USD));
     cds.upfront = Some((
         dated_upfront_date,
-        Money::new(dated_upfront_amount, Currency::USD),
+        Money::new(dated_upfront_amount, Currency::USD).expect("valid money fixture"),
     ));
     cds.instrument_pricing_overrides
         .market_quotes

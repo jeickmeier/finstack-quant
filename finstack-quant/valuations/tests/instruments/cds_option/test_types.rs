@@ -24,7 +24,7 @@ fn test_cds_option_construction() {
         CDSOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
         expiry,
         maturity,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
     )
     .expect("valid call params");
     let credit_params = CreditParams::corporate_standard("CORP", "HZ-CORP");

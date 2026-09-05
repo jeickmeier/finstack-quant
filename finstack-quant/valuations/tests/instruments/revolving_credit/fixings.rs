@@ -53,8 +53,8 @@ fn build_seasoned_floating_facility(
 ) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-FIXING-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {
@@ -213,8 +213,8 @@ fn test_fixings_respect_floor() {
     // Build a facility with a 3% floor on the index rate
     let facility = RevolvingCredit::builder()
         .id("RC-FIXING-FLOOR".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(10_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {

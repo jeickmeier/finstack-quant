@@ -77,5 +77,5 @@ pub(crate) fn convert_to_reporting(
     Ok(Some(finstack_quant_core::money::Money::new(
         money.amount() * rate,
         rc,
-    )))
+    )?))
 }

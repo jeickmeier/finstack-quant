@@ -25,8 +25,14 @@ fn test_cross_currency_aggregation_error() {
     use finstack_quant_cashflows::aggregation::aggregate_cashflows_checked;
 
     let flows = vec![
-        (d(2024, 6, 15), Money::new(100.0, Currency::USD)),
-        (d(2024, 9, 15), Money::new(100.0, Currency::EUR)),
+        (
+            d(2024, 6, 15),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            d(2024, 9, 15),
+            Money::new(100.0, Currency::EUR).expect("valid money fixture"),
+        ),
     ];
 
     let result = aggregate_cashflows_checked(&flows, Currency::USD);
@@ -39,8 +45,14 @@ fn test_single_currency_aggregation() {
     use finstack_quant_cashflows::aggregation::aggregate_cashflows_checked;
 
     let flows = vec![
-        (d(2024, 6, 15), Money::new(100.0, Currency::USD)),
-        (d(2024, 9, 15), Money::new(200.0, Currency::USD)),
+        (
+            d(2024, 6, 15),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            d(2024, 9, 15),
+            Money::new(200.0, Currency::USD).expect("valid money fixture"),
+        ),
     ];
 
     let result = aggregate_cashflows_checked(&flows, Currency::USD)
@@ -65,7 +77,7 @@ fn test_all_flows_preserve_currency() {
 
     let issue = d(2024, 1, 15);
     let maturity = d(2029, 1, 15);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let fixed = FixedCouponSpec {
         rate: Decimal::try_from(0.05).expect("valid"), // 5%
@@ -202,7 +214,7 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
     // falls on a Saturday and rolls to Monday 2025-09-08 under MF/usny.
     let issue = d(2025, 3, 6);
     let maturity = d(2025, 9, 6);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let build = |params: ScheduleParams| {
         let mut b = CashFlowSchedule::builder();

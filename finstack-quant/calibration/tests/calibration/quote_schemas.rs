@@ -206,7 +206,8 @@ fn inflation_quote_maturity_and_bump() {
         maturity: d(2029, time::Month::June, 20),
         rate: 0.03,
         index: "US-CPI-U".to_string(),
-        frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years),
+        frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years)
+            .expect("valid tenor fixture"),
         convention: InflationSwapConventionId::new("USD-CPI"),
     };
     assert_eq!(yoy.maturity_date(), Some(d(2029, time::Month::June, 20)));
@@ -222,6 +223,7 @@ fn inflation_quote_maturity_and_bump() {
             assert_eq!(
                 frequency,
                 Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years)
+                    .expect("valid tenor fixture")
             );
         }
         other @ InflationQuote::InflationSwap { .. } => {

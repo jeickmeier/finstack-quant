@@ -479,7 +479,7 @@ impl CompositeSpec {
         let mut inputs = IndexMap::new();
         for leg in &self.legs {
             let instrument = leg.instrument.as_ref().clone().into_boxed()?;
-            let notional = instrument.notional().ok_or_else(|| {
+            let notional = instrument.notional()?.ok_or_else(|| {
                 Error::Validation(format!(
                     "instrument '{}' does not expose a weighting notional",
                     leg.instrument_id
@@ -672,7 +672,7 @@ impl CompositeSpec {
             columns.insert(format!("leg.{}.weight", leg.instrument_id), leg.weight);
             columns.insert(format!("leg.{}.value", leg.instrument_id), value);
             columns.insert(format!("leg.{}.fx_rate", leg.instrument_id), fx_rate);
-            if let Some(notional) = instrument.notional() {
+            if let Some(notional) = instrument.notional()? {
                 let converted = convert_amount(
                     market,
                     notional.amount(),

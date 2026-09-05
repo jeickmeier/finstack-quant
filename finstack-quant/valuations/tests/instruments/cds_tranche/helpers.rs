@@ -186,7 +186,7 @@ pub fn mezzanine_tranche() -> CDSTranche {
     let tranche_params = CDSTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",
         42,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity_5y(),
         500.0, // 5% running coupon
     );
@@ -209,7 +209,7 @@ pub fn equity_tranche() -> CDSTranche {
     let tranche_params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG.42",
         42,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity_5y(),
         1000.0, // 10% running coupon (typical for equity)
     );
@@ -234,7 +234,7 @@ pub fn senior_tranche() -> CDSTranche {
         42,
         7.0,
         10.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity_5y(),
         100.0, // 1% running coupon (typical for senior)
     );
@@ -264,7 +264,7 @@ pub fn custom_tranche(
         42,
         attach_pct,
         detach_pct,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity_5y(),
         running_coupon_bp,
     );

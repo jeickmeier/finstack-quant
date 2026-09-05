@@ -267,7 +267,7 @@ mod tests {
     fn haircut_calculation() {
         let calc = HaircutImCalculator::us_treasuries().expect("registry should load");
 
-        let collateral = Money::new(10_000_000.0, Currency::USD);
+        let collateral = Money::from((10_000_000_i64, Currency::USD));
         let im = calc
             .calculate_for_collateral(
                 collateral,
@@ -286,7 +286,7 @@ mod tests {
     fn fx_addon_applied() {
         let calc = HaircutImCalculator::bcbs_standard().expect("registry should load");
 
-        let collateral = Money::new(10_000_000.0, Currency::USD);
+        let collateral = Money::from((10_000_000_i64, Currency::USD));
 
         let im_no_fx = calc
             .calculate_for_collateral(collateral, &CollateralAssetClass::Cash, false, test_date())
@@ -340,7 +340,7 @@ mod tests {
         }
 
         let instrument = TestMarginable {
-            value: Money::new(10_000_000.0, Currency::USD),
+            value: Money::from((10_000_000_i64, Currency::USD)),
         };
         let context = MarketContext::new();
         let as_of: Date = date!(2025 - 01 - 01);
@@ -428,15 +428,15 @@ mod tests {
         }
 
         let repo = TestRepo {
-            mtm: Money::new(0.0, Currency::USD),
-            exposure_base: Money::new(100_000_000.0, Currency::USD),
+            mtm: Money::from((0_i64, Currency::USD)),
+            exposure_base: Money::from((100_000_000_i64, Currency::USD)),
         };
         let calc = HaircutImCalculator::bcbs_standard().expect("registry should load");
         let result = calc
             .calculate(&repo, &MarketContext::new(), date!(2025 - 01 - 01))
             .expect("haircut IM should calculate from exposure base");
 
-        assert_eq!(result.amount, Money::new(500_000.0, Currency::USD));
+        assert_eq!(result.amount, Money::from((500_000_i64, Currency::USD)));
     }
 
     #[test]

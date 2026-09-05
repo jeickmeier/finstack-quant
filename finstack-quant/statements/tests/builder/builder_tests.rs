@@ -14,8 +14,14 @@ fn test_periods_parsing() {
     let model = builder.build().unwrap();
 
     assert_eq!(model.periods.len(), 4);
-    assert_eq!(model.periods[0].id, PeriodId::quarter(2025, 1));
-    assert_eq!(model.periods[3].id, PeriodId::quarter(2025, 4));
+    assert_eq!(
+        model.periods[0].id,
+        PeriodId::quarter(2025, 1).expect("valid period fixture")
+    );
+    assert_eq!(
+        model.periods[3].id,
+        PeriodId::quarter(2025, 4).expect("valid period fixture")
+    );
 }
 
 #[test]
@@ -81,7 +87,7 @@ fn test_value_node_single_period() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -97,7 +103,10 @@ fn test_value_node_single_period() {
 
     let values = node.values.as_ref().unwrap();
     assert_eq!(values.len(), 1);
-    assert_eq!(values[&PeriodId::quarter(2025, 1)].value(), 100_000.0);
+    assert_eq!(
+        values[&PeriodId::quarter(2025, 1).expect("valid period fixture")].value(),
+        100_000.0
+    );
 }
 
 #[test]
@@ -109,15 +118,15 @@ fn test_value_node_multiple_periods() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(121_000.0),
                 ),
             ],
@@ -129,9 +138,18 @@ fn test_value_node_multiple_periods() {
     let values = node.values.as_ref().unwrap();
 
     assert_eq!(values.len(), 3);
-    assert_eq!(values[&PeriodId::quarter(2025, 1)].value(), 100_000.0);
-    assert_eq!(values[&PeriodId::quarter(2025, 2)].value(), 110_000.0);
-    assert_eq!(values[&PeriodId::quarter(2025, 3)].value(), 121_000.0);
+    assert_eq!(
+        values[&PeriodId::quarter(2025, 1).expect("valid period fixture")].value(),
+        100_000.0
+    );
+    assert_eq!(
+        values[&PeriodId::quarter(2025, 2).expect("valid period fixture")].value(),
+        110_000.0
+    );
+    assert_eq!(
+        values[&PeriodId::quarter(2025, 3).expect("valid period fixture")].value(),
+        121_000.0
+    );
 }
 
 #[test]
@@ -142,8 +160,8 @@ fn test_value_node_with_currency() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
-                AmountOrScalar::amount(1_000_000.0, Currency::USD),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture"),
             )],
         )
         .build()
@@ -151,7 +169,7 @@ fn test_value_node_with_currency() {
 
     let node = model.get_node("revenue").unwrap();
     let values = node.values.as_ref().unwrap();
-    let amount = &values[&PeriodId::quarter(2025, 1)];
+    let amount = &values[&PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
     assert!(amount.is_amount());
     assert_eq!(amount.currency(), Some(Currency::USD));
@@ -167,12 +185,12 @@ fn test_value_node_rejects_mixed_currencies_within_one_node() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    AmountOrScalar::amount(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::amount(100_000.0, Currency::USD).expect("valid amount fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    AmountOrScalar::amount(90_000.0, Currency::EUR),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::amount(90_000.0, Currency::EUR).expect("valid amount fixture"),
                 ),
             ],
         )
@@ -233,11 +251,11 @@ fn test_multiple_nodes() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -293,11 +311,11 @@ fn test_basic_pl_model() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(10_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(11_000_000.0),
                 ),
             ],
@@ -310,11 +328,11 @@ fn test_basic_pl_model() {
             "opex",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(2_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(2_100_000.0),
                 ),
             ],
@@ -362,15 +380,15 @@ fn test_model_with_multiple_currencies() {
         .value(
             "usd_revenue",
             &[(
-                PeriodId::quarter(2025, 1),
-                AmountOrScalar::amount(1_000_000.0, Currency::USD),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture"),
             )],
         )
         .value(
             "eur_revenue",
             &[(
-                PeriodId::quarter(2025, 1),
-                AmountOrScalar::amount(900_000.0, Currency::EUR),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::amount(900_000.0, Currency::EUR).expect("valid amount fixture"),
             )],
         )
         .build()
@@ -383,11 +401,11 @@ fn test_model_with_multiple_currencies() {
     let eur_values = eur_node.values.as_ref().unwrap();
 
     assert_eq!(
-        usd_values[&PeriodId::quarter(2025, 1)].currency(),
+        usd_values[&PeriodId::quarter(2025, 1).expect("valid period fixture")].currency(),
         Some(Currency::USD)
     );
     assert_eq!(
-        eur_values[&PeriodId::quarter(2025, 1)].currency(),
+        eur_values[&PeriodId::quarter(2025, 1).expect("valid period fixture")].currency(),
         Some(Currency::EUR)
     );
 }
@@ -451,8 +469,14 @@ fn test_node_spec_with_values() {
     use indexmap::IndexMap;
 
     let mut values = IndexMap::new();
-    values.insert(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0));
-    values.insert(PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0));
+    values.insert(
+        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        AmountOrScalar::scalar(100.0),
+    );
+    values.insert(
+        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        AmountOrScalar::scalar(110.0),
+    );
 
     let node = NodeSpec::new("revenue", NodeType::Value).with_values(values.clone());
 
@@ -512,7 +536,7 @@ fn test_amount_or_scalar_from_conversions() {
     assert_eq!(scalar.value(), 42.0);
 
     // Test From<Money>
-    let money = Money::new(1000.0, Currency::USD);
+    let money = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let amount: AmountOrScalar = money.into();
     assert!(amount.is_amount());
     assert_eq!(amount.value(), 1000.0);
@@ -530,7 +554,10 @@ fn test_reserved_cs_prefix_rejected_in_value() {
         .unwrap()
         .value(
             "__cs__bad_node",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .build();
 
@@ -551,7 +578,10 @@ fn test_reserved_cs_prefix_in_middle_rejected() {
         .unwrap()
         .value(
             "revenue__cs__hidden",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .build();
 
@@ -584,15 +614,24 @@ fn test_normal_node_ids_accepted() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .value(
             "_single_underscore",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(50.0),
+            )],
         )
         .value(
             "node_with__double_inside",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(25.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(25.0),
+            )],
         )
         .compute("gross_profit", "revenue * 0.4")
         .unwrap()
@@ -608,7 +647,10 @@ fn test_reserved_prefix_rejected_in_mixed_node() {
         .periods("2025Q1..Q2", None)
         .unwrap()
         .mixed("__bad_mixed")
-        .values(&[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))])
+        .values(&[(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(100.0),
+        )])
         .build();
 
     assert!(result.is_err());
@@ -624,7 +666,10 @@ fn from_spec_roundtrip_preserves_complete_model_state() {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .with_meta("source", serde_json::json!({"system": "test"}))
         .build()

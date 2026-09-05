@@ -148,16 +148,11 @@ impl RateExoticHw1fMcPricer {
                     }
                 }
 
-                path_values.push(payoff.value(self.currency).amount());
+                path_values.push(payoff.value(self.currency)?.amount());
             }
         }
 
-        Ok(money_estimate_from_pairs(
-            &path_values,
-            self.config.split(),
-            1.0,
-            self.currency,
-        ))
+        money_estimate_from_pairs(&path_values, self.config.split(), 1.0, self.currency)
     }
 }
 
@@ -176,39 +171,41 @@ pub(crate) fn money_estimate_from_pairs(
     split: SampleSplit,
     scale: f64,
     currency: Currency,
-) -> MoneyEstimate {
-    let multiplicity = split.multiplicity;
-    let mut stats = OnlineStats::new();
-    for (pair_idx, chunk) in path_values.chunks(multiplicity).enumerate() {
-        if !split.is_price(pair_idx * multiplicity) {
-            continue;
+) -> finstack_quant_core::Result<MoneyEstimate> {
+    Ok({
+        let multiplicity = split.multiplicity;
+        let mut stats = OnlineStats::new();
+        for (pair_idx, chunk) in path_values.chunks(multiplicity).enumerate() {
+            if !split.is_price(pair_idx * multiplicity) {
+                continue;
+            }
+            let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
+            stats.update(pair_avg * scale);
         }
-        let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
-        stats.update(pair_avg * scale);
-    }
 
-    let n = stats.count().max(1) as f64;
-    let aggregated_paths = stats.count() * multiplicity;
-    let mean = stats.mean();
-    let stderr = stats.std_dev() / n.sqrt();
-    let lo = mean - 1.96 * stderr;
-    let hi = mean + 1.96 * stderr;
-    MoneyEstimate {
-        mean: finstack_quant_core::money::Money::new(mean, currency),
-        stderr,
-        ci_95: (
-            finstack_quant_core::money::Money::new(lo, currency),
-            finstack_quant_core::money::Money::new(hi, currency),
-        ),
-        num_paths: aggregated_paths,
-        num_simulated_paths: aggregated_paths,
-        std_dev: Some(stats.std_dev()),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: None,
-        max: None,
-    }
+        let n = stats.count().max(1) as f64;
+        let aggregated_paths = stats.count() * multiplicity;
+        let mean = stats.mean();
+        let stderr = stats.std_dev() / n.sqrt();
+        let lo = mean - 1.96 * stderr;
+        let hi = mean + 1.96 * stderr;
+        MoneyEstimate {
+            mean: finstack_quant_core::money::Money::new(mean, currency)?,
+            stderr,
+            ci_95: (
+                finstack_quant_core::money::Money::new(lo, currency)?,
+                finstack_quant_core::money::Money::new(hi, currency)?,
+            ),
+            num_paths: aggregated_paths,
+            num_simulated_paths: aggregated_paths,
+            std_dev: Some(stats.std_dev()),
+            median: None,
+            percentile_25: None,
+            percentile_75: None,
+            min: None,
+            max: None,
+        }
+    })
 }
 
 /// Build a time grid with steps aligned to event dates, returning the step
@@ -281,7 +278,7 @@ mod tests {
             self.paid = 1.0;
             Ok(())
         }
-        fn value(&self, ccy: Currency) -> Money {
+        fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(self.paid, ccy)
         }
         fn reset(&mut self) {
@@ -301,7 +298,7 @@ mod tests {
             self.pv = 1.0 / bank;
             Ok(())
         }
-        fn value(&self, ccy: Currency) -> Money {
+        fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(self.pv, ccy)
         }
         fn reset(&mut self) {

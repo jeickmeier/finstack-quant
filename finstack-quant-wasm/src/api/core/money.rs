@@ -50,7 +50,7 @@ impl JsMoney {
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(amount: f64, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
-        RustMoney::try_new(amount, currency.inner)
+        RustMoney::new(amount, currency.inner)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
@@ -283,8 +283,8 @@ mod tests {
 
     #[test]
     fn sub_different_via_inner() {
-        let a = RustMoney::try_new(10.0, finstack_quant_core::currency::Currency::USD).expect("ok");
-        let b = RustMoney::try_new(5.0, finstack_quant_core::currency::Currency::EUR).expect("ok");
+        let a = RustMoney::new(10.0, finstack_quant_core::currency::Currency::USD).expect("ok");
+        let b = RustMoney::new(5.0, finstack_quant_core::currency::Currency::EUR).expect("ok");
         assert!(a.checked_sub(b).is_err());
     }
 
@@ -293,23 +293,19 @@ mod tests {
 
     #[test]
     fn new_rejects_nan() {
-        assert!(
-            RustMoney::try_new(f64::NAN, finstack_quant_core::currency::Currency::USD).is_err()
-        );
+        assert!(RustMoney::new(f64::NAN, finstack_quant_core::currency::Currency::USD).is_err());
     }
 
     #[test]
     fn new_rejects_infinity() {
         assert!(
-            RustMoney::try_new(f64::INFINITY, finstack_quant_core::currency::Currency::USD)
-                .is_err()
+            RustMoney::new(f64::INFINITY, finstack_quant_core::currency::Currency::USD).is_err()
         );
     }
 
     #[test]
     fn div_scalar_rejects_zero() {
-        let m =
-            RustMoney::try_new(10.0, finstack_quant_core::currency::Currency::USD).expect("valid");
+        let m = RustMoney::new(10.0, finstack_quant_core::currency::Currency::USD).expect("valid");
         assert!(m.checked_div_f64(0.0).is_err());
     }
 

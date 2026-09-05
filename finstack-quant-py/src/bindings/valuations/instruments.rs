@@ -123,7 +123,9 @@ pub(crate) fn rate_from_py(
     obj: &Bound<'_, PyAny>,
     what: &str,
 ) -> PyResult<finstack_quant_core::types::Rate> {
-    rate_decimal_from_py(obj, what).map(finstack_quant_core::types::Rate::from_decimal)
+    rate_decimal_from_py(obj, what).and_then(|value| {
+        finstack_quant_core::types::Rate::from_decimal(value).map_err(crate::errors::core_to_py)
+    })
 }
 
 /// Coerce `float | int | Bps` to a core `Bps` (whole basis points, rounded).

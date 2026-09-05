@@ -16,7 +16,7 @@ pub(super) fn update_cumulative_metrics(
         .cumulative_interest_cash
         .get(instrument_id)
         .copied()
-        .unwrap_or_else(|| Money::new(0.0, currency));
+        .unwrap_or_else(|| Money::from((0_i64, currency)));
     state.cumulative_interest_cash.insert(
         instrument_id.to_string(),
         current_cash.checked_add(breakdown.interest_expense_cash)?,
@@ -26,7 +26,7 @@ pub(super) fn update_cumulative_metrics(
         .cumulative_interest_pik
         .get(instrument_id)
         .copied()
-        .unwrap_or_else(|| Money::new(0.0, currency));
+        .unwrap_or_else(|| Money::from((0_i64, currency)));
     state.cumulative_interest_pik.insert(
         instrument_id.to_string(),
         current_pik.checked_add(breakdown.interest_expense_pik)?,
@@ -36,7 +36,7 @@ pub(super) fn update_cumulative_metrics(
         .cumulative_principal
         .get(instrument_id)
         .copied()
-        .unwrap_or_else(|| Money::new(0.0, currency));
+        .unwrap_or_else(|| Money::from((0_i64, currency)));
     state.cumulative_principal.insert(
         instrument_id.to_string(),
         current_principal.checked_add(breakdown.principal_payment)?,

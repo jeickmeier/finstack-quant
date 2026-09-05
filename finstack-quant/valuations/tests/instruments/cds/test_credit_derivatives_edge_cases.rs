@@ -70,7 +70,7 @@ fn test_recovery01_at_lower_boundary() {
     let recovery = 0.005;
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-LOW-RECOVERY",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp
         base,
         maturity,
@@ -122,7 +122,7 @@ fn test_recovery01_at_upper_boundary() {
     let recovery = 0.95;
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-HIGH-RECOVERY",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         50.0, // 50bp (tight spread for high recovery)
         base,
         maturity,
@@ -168,7 +168,7 @@ fn test_recovery01_symmetry() {
     let recovery = 0.40;
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-STANDARD",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         150.0,
         base,
         maturity,
@@ -214,7 +214,7 @@ fn test_expected_loss_distressed_credit() {
     let recovery = 0.25; // Lower recovery for distressed
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-DISTRESSED",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         2500.0, // 2500bp = 25% (deeply distressed)
         base,
         maturity,
@@ -276,7 +276,7 @@ fn test_par_spread_npv_consistency() {
 
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-CONSISTENCY",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         initial_spread,
         base,
         maturity,
@@ -337,7 +337,7 @@ fn test_jtd_recovery_sensitivity() {
     for &recovery in &recovery_rates {
         let cds = crate::test_support::credit::cds_buy_protection(
             format!("CDS-JTD-{}", (recovery * 100.0) as i32),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
             base,
             maturity,
@@ -408,7 +408,7 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
 
     let cds = crate::test_support::credit::cds_buy_protection(
         "CDS-RECALIB",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         300.0,
         base,
         maturity,

@@ -103,10 +103,10 @@ mod tests {
             .id(finstack_quant_core::types::InstrumentId::new(
                 "TEST-YOY-SWAP",
             ))
-            .notional(finstack_quant_core::money::Money::new(
-                1_000_000.0,
+            .notional(finstack_quant_core::money::Money::from((
+                1_000_000_i64,
                 Currency::USD,
-            ))
+            )))
             .start_date(
                 finstack_quant_core::dates::Date::from_calendar_date(2024, Month::January, 15)
                     .expect("start"),

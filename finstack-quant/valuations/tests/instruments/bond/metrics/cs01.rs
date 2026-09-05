@@ -13,8 +13,8 @@ fn test_cs01_negative_for_long_bond() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CS1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -83,14 +83,14 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
     use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 06);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // `Bond::fixed` carries a 2-business-day settlement, so quote_date != as_of
     // and != the discount-curve base date.
     let mut bond = Bond::fixed(
         "CS01-SETTLE",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2023 - 01 - 06),
         date!(2030 - 01 - 06),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -98,7 +98,7 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
     )
     .unwrap();
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )

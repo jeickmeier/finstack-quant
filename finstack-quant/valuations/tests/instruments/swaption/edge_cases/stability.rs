@@ -146,7 +146,8 @@ fn test_large_notional_scaling() {
     swaption.notional = finstack_quant_core::money::Money::new(
         1_000_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let pv = swaption.value(&market, as_of).unwrap().amount();
     let result = swaption
@@ -179,7 +180,8 @@ fn test_small_notional_scaling() {
     swaption.notional = finstack_quant_core::money::Money::new(
         1_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let pv = swaption.value(&market, as_of).unwrap().amount();
     let result = swaption

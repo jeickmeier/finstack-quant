@@ -734,12 +734,16 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
 
     let mut hierarchy_market = MarketContext::new()
         .insert_surface(surface.clone())
-        .insert_price("SPX", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+        .insert_price(
+            "SPX",
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        );
     hierarchy_market.set_hierarchy(hierarchy);
 
-    let mut direct_market = MarketContext::new()
-        .insert_surface(surface)
-        .insert_price("SPX", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut direct_market = MarketContext::new().insert_surface(surface).insert_price(
+        "SPX",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
 
     let hierarchy_scenario = ScenarioSpec {
         id: "family-collision".into(),

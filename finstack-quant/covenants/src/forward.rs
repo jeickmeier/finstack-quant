@@ -767,7 +767,7 @@ mod tests {
     }
 
     fn q(year: i32, q: u8) -> PeriodId {
-        PeriodId::quarter(year, q)
+        PeriodId::quarter(year, q).expect("valid period fixture")
     }
 
     #[test]

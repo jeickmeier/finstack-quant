@@ -40,7 +40,7 @@ fn test_standard_major_currency_pairs() {
 
     for (base, quote, name, expected_rate) in pairs {
         let fx = FxSpot::new(InstrumentId::new(name), base, quote)
-            .with_notional(Money::new(1_000_000.0, base))
+            .with_notional(Money::new(1_000_000.0, base).expect("valid money fixture"))
             .unwrap();
 
         let pv = fx.value(&market, as_of).unwrap();
@@ -90,10 +90,10 @@ fn test_cross_rate_consistency() {
     let as_of = test_date();
 
     let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR))
+        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
     let gbp_usd = sample_gbpusd()
-        .with_notional(Money::new(1.0, Currency::GBP))
+        .with_notional(Money::new(1.0, Currency::GBP).expect("valid money fixture"))
         .unwrap();
 
     let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount(); // 1.20
@@ -102,7 +102,7 @@ fn test_cross_rate_consistency() {
     let expected_eur_gbp = eur_usd_rate / gbp_usd_rate; // 1.20 / 1.40
 
     let eur_gbp = FxSpot::new(InstrumentId::new("EURGBP"), Currency::EUR, Currency::GBP)
-        .with_notional(Money::new(1.0, Currency::EUR))
+        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
 
     let eur_gbp_rate = eur_gbp.value(&market, as_of).unwrap().amount();
@@ -122,10 +122,10 @@ fn test_inverse_pair_consistency() {
     let as_of = test_date();
 
     let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR))
+        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
     let usd_eur = FxSpot::new(InstrumentId::new("USDEUR"), Currency::USD, Currency::EUR)
-        .with_notional(Money::new(1.0, Currency::USD))
+        .with_notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
         .unwrap();
 
     let eur_usd_rate = eur_usd.value(&market, as_of).unwrap().amount();
@@ -186,14 +186,14 @@ fn test_triangular_arbitrage_absence() {
     let as_of = test_date();
 
     let eur_usd = sample_eurusd()
-        .with_notional(Money::new(1.0, Currency::EUR))
+        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .value(&market, as_of)
         .unwrap()
         .amount();
 
     let usd_jpy = sample_usdjpy()
-        .with_notional(Money::new(1.0, Currency::USD))
+        .with_notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
         .value(&market, as_of)
         .unwrap()
@@ -202,7 +202,7 @@ fn test_triangular_arbitrage_absence() {
     let eur_jpy_implied = eur_usd * usd_jpy;
 
     let eur_jpy = FxSpot::new(InstrumentId::new("EURJPY"), Currency::EUR, Currency::JPY)
-        .with_notional(Money::new(1.0, Currency::EUR))
+        .with_notional(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .value(&market, as_of)
         .unwrap()

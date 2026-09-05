@@ -74,7 +74,7 @@ fn npv_by_date(
         return Err(finstack_quant_core::InputError::TooFewPoints.into());
     }
 
-    let mut total = Money::new(0.0, flows[0].1.currency());
+    let mut total = Money::from((0_i64, flows[0].1.currency()));
     for (date, amount) in flows {
         if *date <= as_of {
             continue;
@@ -95,7 +95,7 @@ fn npv_by_date_at_spread(
         return Err(finstack_quant_core::InputError::TooFewPoints.into());
     }
 
-    let mut total = Money::new(0.0, flows[0].1.currency());
+    let mut total = Money::from((0_i64, flows[0].1.currency()));
     for (date, amount) in flows {
         if *date <= as_of {
             continue;
@@ -195,7 +195,7 @@ impl TermLoanDiscountingPricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         if loan.settlement_date(as_of)? >= loan.maturity {
-            return Ok(Money::new(0.0, loan.currency));
+            return Ok(Money::from((0_i64, loan.currency)));
         }
 
         // Retrieve discount curve and discount the holder-view flows to the
@@ -405,7 +405,7 @@ impl TermLoanDiscountingPricer {
                 _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
             };
             flow.rate = Some(all_in_rate);
-            flow.amount = Money::new(new_amount, flow.amount.currency());
+            flow.amount = Money::new(new_amount, flow.amount.currency())?;
             Ok(())
         })?;
         Ok(())
@@ -522,7 +522,7 @@ mod tests {
         TermLoan::builder()
             .id(InstrumentId::new("TL-FIXING-TEST"))
             .currency(Currency::USD)
-            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .notional_limit(Money::from((10_000_000_i64, Currency::USD)))
             .issue_date(date(2024, 1, 1))
             .maturity(date(2026, 1, 1))
             .rate(RateSpec::Floating(floating_rate))

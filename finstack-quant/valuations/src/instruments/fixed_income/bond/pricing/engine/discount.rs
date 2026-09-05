@@ -174,7 +174,7 @@ impl BondEngine {
         let disc = context.get_discount(bond.discount_curve_id.as_str())?;
         if flows.is_empty() {
             return Ok((
-                Money::new(0.0, bond.notional.currency()),
+                Money::from((0_i64, bond.notional.currency())),
                 if explain.enabled {
                     Some(ExplanationTrace::new("pricing"))
                 } else {
@@ -224,7 +224,7 @@ impl BondEngine {
         }
 
         // Use Kahan compensated summation from finstack-quant-core for numerical stability
-        let total = Money::new(kahan_sum(pv_values), ccy);
+        let total = Money::new(kahan_sum(pv_values), ccy)?;
         Ok((total, trace))
     }
 }

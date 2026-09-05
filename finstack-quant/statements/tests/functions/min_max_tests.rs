@@ -10,15 +10,27 @@ fn test_min_two_args() {
         .value(
             "a",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
             ],
         )
         .value(
             "b",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(80.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(120.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(80.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
             ],
         )
         .compute("minimum", "min(a, b)")
@@ -31,13 +43,23 @@ fn test_min_two_args() {
 
     // Q1: min(100, 80) = 80
     assert_eq!(
-        results.get("minimum", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "minimum",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         80.0
     );
 
     // Q2: min(50, 120) = 50
     assert_eq!(
-        results.get("minimum", &PeriodId::quarter(2025, 2)).unwrap(),
+        results
+            .get(
+                "minimum",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         50.0
     );
 }
@@ -50,15 +72,27 @@ fn test_max_two_args() {
         .value(
             "a",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
             ],
         )
         .value(
             "b",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(80.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(120.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(80.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
             ],
         )
         .compute("maximum", "max(a, b)")
@@ -71,13 +105,23 @@ fn test_max_two_args() {
 
     // Q1: max(100, 80) = 100
     assert_eq!(
-        results.get("maximum", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "maximum",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         100.0
     );
 
     // Q2: max(50, 120) = 120
     assert_eq!(
-        results.get("maximum", &PeriodId::quarter(2025, 2)).unwrap(),
+        results
+            .get(
+                "maximum",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         120.0
     );
 }
@@ -89,15 +133,24 @@ fn test_min_three_args() {
         .unwrap()
         .value(
             "a",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .value(
             "b",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(80.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(80.0),
+            )],
         )
         .value(
             "c",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(120.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(120.0),
+            )],
         )
         .compute("minimum", "min(a, b, c)")
         .unwrap()
@@ -109,7 +162,12 @@ fn test_min_three_args() {
 
     // min(100, 80, 120) = 80
     assert_eq!(
-        results.get("minimum", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "minimum",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         80.0
     );
 }
@@ -121,15 +179,24 @@ fn test_max_three_args() {
         .unwrap()
         .value(
             "a",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .value(
             "b",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(80.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(80.0),
+            )],
         )
         .value(
             "c",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(120.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(120.0),
+            )],
         )
         .compute("maximum", "max(a, b, c)")
         .unwrap()
@@ -141,7 +208,12 @@ fn test_max_three_args() {
 
     // max(100, 80, 120) = 120
     assert_eq!(
-        results.get("maximum", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "maximum",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         120.0
     );
 }
@@ -155,10 +227,13 @@ fn test_min_with_literal() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1500000.0),
                 ),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(800000.0)),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(800000.0),
+                ),
             ],
         )
         .compute("capped_revenue", "min(revenue, 1000000)")
@@ -172,7 +247,10 @@ fn test_min_with_literal() {
     // Q1: min(1500000, 1000000) = 1000000 (capped)
     assert_eq!(
         results
-            .get("capped_revenue", &PeriodId::quarter(2025, 1))
+            .get(
+                "capped_revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
             .unwrap(),
         1000000.0
     );
@@ -180,7 +258,10 @@ fn test_min_with_literal() {
     // Q2: min(800000, 1000000) = 800000 (below cap)
     assert_eq!(
         results
-            .get("capped_revenue", &PeriodId::quarter(2025, 2))
+            .get(
+                "capped_revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
             .unwrap(),
         800000.0
     );
@@ -194,8 +275,14 @@ fn test_max_with_literal() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(80000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(150000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(80000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(150000.0),
+                ),
             ],
         )
         .compute("min_revenue", "max(revenue, 100000)")
@@ -209,7 +296,10 @@ fn test_max_with_literal() {
     // Q1: max(80000, 100000) = 100000 (floor)
     assert_eq!(
         results
-            .get("min_revenue", &PeriodId::quarter(2025, 1))
+            .get(
+                "min_revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
             .unwrap(),
         100000.0
     );
@@ -217,7 +307,10 @@ fn test_max_with_literal() {
     // Q2: max(150000, 100000) = 150000 (above floor)
     assert_eq!(
         results
-            .get("min_revenue", &PeriodId::quarter(2025, 2))
+            .get(
+                "min_revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
             .unwrap(),
         150000.0
     );
@@ -230,7 +323,10 @@ fn test_min_single_arg() {
         .unwrap()
         .value(
             "a",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(42.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(42.0),
+            )],
         )
         .compute("result", "min(a)")
         .unwrap()
@@ -242,7 +338,12 @@ fn test_min_single_arg() {
 
     // min(42) = 42
     assert_eq!(
-        results.get("result", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "result",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         42.0
     );
 }
@@ -254,15 +355,24 @@ fn test_min_max_nested() {
         .unwrap()
         .value(
             "a",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(50.0),
+            )],
         )
         .value(
             "b",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .value(
             "c",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(75.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(75.0),
+            )],
         )
         .compute("result", "max(min(a, b), c)")
         .unwrap()
@@ -274,7 +384,12 @@ fn test_min_max_nested() {
 
     // max(min(50, 100), 75) = max(50, 75) = 75
     assert_eq!(
-        results.get("result", &PeriodId::quarter(2025, 1)).unwrap(),
+        results
+            .get(
+                "result",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
+            .unwrap(),
         75.0
     );
 }

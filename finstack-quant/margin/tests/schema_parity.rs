@@ -52,10 +52,10 @@ fn margin_call_fixture() -> Value {
         "margin_call": MarginCall::vm_delivery(
             date!(2026 - 07 - 30),
             date!(2026 - 07 - 31),
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(1_250_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
-            Money::new(250_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            Money::new(250_000.0, Currency::USD).expect("valid money fixture"),
         ),
     })
 }
@@ -237,10 +237,10 @@ fn synthetic_margin_schema_validates_representative_union_variants() {
     let margin_call = MarginCall::vm_delivery(
         date!(2026 - 07 - 30),
         date!(2026 - 07 - 31),
-        Money::new(1_000_000.0, Currency::USD),
-        Money::new(1_250_000.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
-        Money::new(250_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(250_000.0, Currency::USD).expect("valid money fixture"),
     );
     let fixtures = [
         json!({

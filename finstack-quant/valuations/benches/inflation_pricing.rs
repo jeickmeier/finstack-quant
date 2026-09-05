@@ -116,7 +116,7 @@ fn create_inflation_linked_bond_market() -> MarketContext {
 }
 
 fn standard_notional() -> Money {
-    Money::new(1_000_000.0, Currency::USD)
+    Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")
 }
 
 fn inflation_swap(as_of: Date, maturity: Date, id: &str) -> InflationSwap {
@@ -148,7 +148,7 @@ fn inflation_cap_floor(
         .strike(Decimal::try_from(0.02).expect("valid decimal"))
         .start_date(as_of)
         .maturity(maturity)
-        .frequency(Tenor::new(1, TenorUnit::Years))
+        .frequency(Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"))
         .day_count(DayCount::Act365F)
         .stub(StubKind::None)
         .business_day_convention(BusinessDayConvention::Following)

@@ -358,7 +358,7 @@ fn attribution_schema_rejects_malformed_market_payloads() {
 fn attribution_result_schema_validates_serialized_result_fixture() {
     let schema = read_schema(&schema_root().join("attribution_result.schema.json"));
     let attribution = PnlAttribution::new(
-        Money::new(125.0, Currency::USD),
+        Money::new(125.0, Currency::USD).expect("valid money fixture"),
         "BOND-RESULT-FIXTURE",
         date!(2025 - 01 - 15),
         date!(2025 - 01 - 16),

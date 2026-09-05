@@ -192,10 +192,10 @@ impl FxDigitalOption {
             .strike(1.12)
             .option_type(OptionType::Call)
             .payout_type(DigitalPayoutType::CashOrNothing)
-            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -316,10 +316,10 @@ mod tests {
             .strike(1.12)
             .option_type(OptionType::Call)
             .payout_type(DigitalPayoutType::CashOrNothing)
-            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(time::macros::date!(2027 - 01 - 15))
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -336,7 +336,7 @@ mod tests {
         // The pricer implements the domestic cash-or-nothing digital only:
         // a base (foreign) currency payout would be silently mispriced.
         let result = base_digital_builder()
-            .payout_amount(Money::new(1_000_000.0, Currency::EUR))
+            .payout_amount(Money::from((1_000_000_i64, Currency::EUR)))
             .build();
         assert!(
             result.is_err(),
@@ -350,7 +350,7 @@ mod tests {
             .base_currency(Currency::USD)
             .quote_currency(Currency::USD)
             // notional must match base_currency — set both to USD to get a clean test
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .build();
         assert!(
             result.is_err(),
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn validation_rejects_zero_notional() {
         let result = base_digital_builder()
-            .notional(Money::new(0.0, Currency::EUR))
+            .notional(Money::from((0_i64, Currency::EUR)))
             .build();
         assert!(result.is_err(), "FxDigitalOption must reject zero notional");
     }
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn validation_rejects_negative_notional() {
         let result = base_digital_builder()
-            .notional(Money::new(-100.0, Currency::EUR))
+            .notional(Money::from((-100_i64, Currency::EUR)))
             .build();
         assert!(
             result.is_err(),
@@ -407,7 +407,7 @@ mod tests {
     fn validation_rejects_notional_currency_mismatch() {
         // Notional in USD but base_currency = EUR
         let result = base_digital_builder()
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .build();
         assert!(
             result.is_err(),

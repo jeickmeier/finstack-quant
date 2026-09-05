@@ -292,7 +292,7 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
 
     let expiry = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let params = SwaptionParams::payer(
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.045,
         expiry,
         expiry,

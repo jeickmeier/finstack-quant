@@ -20,7 +20,7 @@ fn getters_and_tag_filters() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -67,7 +67,7 @@ fn validate_unknown_entity_fails() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -96,7 +96,7 @@ fn explicit_position_mutators_keep_lookup_index_in_sync() {
 
     let dep1 = Deposit::builder()
         .id("D1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -105,7 +105,7 @@ fn explicit_position_mutators_keep_lookup_index_in_sync() {
         .unwrap();
     let dep2 = Deposit::builder()
         .id("D2".into())
-        .notional(Money::new(2_000_000.0, Currency::USD))
+        .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -140,7 +140,7 @@ fn set_positions_rejects_duplicate_position_ids() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -171,7 +171,7 @@ fn builder_required_fields_and_dummy_auto_create() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -216,7 +216,7 @@ fn notional_two_lot_deposit_native_pv_is_twice_one_lot() {
 
     let deposit = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

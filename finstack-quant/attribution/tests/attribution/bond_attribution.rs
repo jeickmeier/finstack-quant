@@ -47,8 +47,8 @@ fn test_bond_attribution_parallel() {
 
     let bond = Bond::fixed(
         "US-BOND-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -143,8 +143,8 @@ fn test_bond_attribution_structure() {
 
     let bond = Bond::fixed(
         "US-BOND-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -198,8 +198,8 @@ fn test_parallel_bond_attribution_isolates_funding_when_repo_curve_present() {
 
     let mut bond = Bond::fixed(
         "US-BOND-FUNDING",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2025, Month::January, 15).unwrap(),
         create_date(2030, Month::January, 15).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -262,8 +262,8 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
 
     let mut bond = Bond::fixed(
         "US-BOND-CARRY",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2025, Month::January, 15).unwrap(),
         create_date(2030, Month::January, 15).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -357,8 +357,8 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
 
     let bond = Bond::fixed(
         "US-BOND-LEGACY-CARRY",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2025, Month::January, 15).unwrap(),
         create_date(2030, Month::January, 15).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,

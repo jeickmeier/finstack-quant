@@ -81,7 +81,10 @@ mod tests {
 
     #[test]
     fn test_override_all_periods() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
 
         let mut params = IndexMap::new();
         let overrides = serde_json::json!({
@@ -94,17 +97,23 @@ mod tests {
             apply_override(100.0, &periods, &params).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
-        assert_eq!(results[&PeriodId::quarter(2025, 1)], 120.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 2)], 130.0);
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            120.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+            130.0
+        );
     }
 
     #[test]
     fn test_override_sparse_with_forward_fill() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
-            PeriodId::quarter(2025, 4),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();
@@ -118,15 +127,30 @@ mod tests {
             apply_override(100.0, &periods, &params).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 4);
-        assert_eq!(results[&PeriodId::quarter(2025, 1)], 120.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 2)], 120.0); // Forward fill from Q1
-        assert_eq!(results[&PeriodId::quarter(2025, 3)], 130.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 4)], 130.0); // Forward fill from Q3
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            120.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+            120.0
+        ); // Forward fill from Q1
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 3).expect("valid period fixture")],
+            130.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 4).expect("valid period fixture")],
+            130.0
+        ); // Forward fill from Q3
     }
 
     #[test]
     fn test_override_no_overrides_forward_fill_base() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
 
         let mut params = IndexMap::new();
         let overrides = serde_json::json!({});
@@ -136,13 +160,19 @@ mod tests {
             apply_override(100.0, &periods, &params).expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
-        assert_eq!(results[&PeriodId::quarter(2025, 1)], 100.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 2)], 100.0);
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            100.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+            100.0
+        );
     }
 
     #[test]
     fn test_override_missing_parameter_error() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = IndexMap::new();
 
         let result = apply_override(100.0, &periods, &params);
@@ -151,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_override_rejects_unmatched_period() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         let overrides = serde_json::json!({

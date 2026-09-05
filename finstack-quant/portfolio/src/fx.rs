@@ -55,7 +55,7 @@ pub fn convert_to_base(
     base_currency: Currency,
 ) -> Result<Money> {
     let rate = spot_rate_to_base(amount.currency(), as_of, market, base_currency)?;
-    Ok(Money::new(amount.amount() * rate, base_currency))
+    Ok(Money::new(amount.amount() * rate, base_currency)?)
 }
 
 /// Resolve the spot FX factor from `from_currency` into `base_currency`.
@@ -158,7 +158,7 @@ pub fn convert_to_base_forward(
     Ok(Money::new(
         spot_converted.amount() * (df_from / df_base),
         base_currency,
-    ))
+    )?)
 }
 
 fn discount_factor(
@@ -257,7 +257,7 @@ mod tests {
             .insert_fx(FxMatrix::new(provider));
 
         let converted = convert_to_base_forward(
-            Money::new(100.0, Currency::JPY),
+            Money::from((100_i64, Currency::JPY)),
             as_of,
             payment,
             &market,
@@ -288,7 +288,7 @@ mod tests {
         curves.insert(Currency::USD, CurveId::new("USD-OIS"));
 
         let converted = convert_to_base_forward(
-            Money::new(100.0, Currency::JPY),
+            Money::from((100_i64, Currency::JPY)),
             as_of,
             payment,
             &market,

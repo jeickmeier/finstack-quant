@@ -127,10 +127,13 @@ impl CoverageTest {
                 .tranches
                 .senior_to(context.tranche_id)
                 .iter()
-                .try_fold(Money::new(0.0, tranche_balance.currency()), |acc, t| {
-                    let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
-                    acc.checked_add(bal)
-                })?
+                .try_fold(
+                    Money::from((0_i64, tranche_balance.currency())),
+                    |acc, t| {
+                        let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
+                        acc.checked_add(bal)
+                    },
+                )?
         } else {
             context.tranches.senior_balance(context.tranche_id)
         };
@@ -165,7 +168,7 @@ impl CoverageTest {
                     } else {
                         1.0
                     };
-                    Money::new(current.amount() * factor, current.currency())
+                    Money::new(current.amount() * factor, current.currency())?
                 }
                 Some(current) => current,
                 None => collateral_balance_with_haircuts(
@@ -228,7 +231,7 @@ impl CoverageTest {
                 denominator.amount() - numerator.amount() / required_ratio
             };
             let capped = paydown_needed.max(0.0).min(denominator.amount());
-            Some(Money::new(capped, denominator.currency()))
+            Some(Money::new(capped, denominator.currency())?)
         } else {
             None
         };
@@ -272,7 +275,7 @@ impl CoverageTest {
             tranche_bal.amount() * tranche_rate * accrual_factor
                 + carried_deferred(context, tranche.id.as_str()),
             tranche_bal.currency(),
-        );
+        )?;
 
         let senior_tranches = context.tranches.senior_to(context.tranche_id);
 
@@ -309,7 +312,7 @@ impl CoverageTest {
         }
 
         let senior_interest_due = senior_tranches.iter().try_fold(
-            Money::new(0.0, interest_due.currency()),
+            Money::from((0_i64, interest_due.currency())),
             |acc, t| {
                 let (rate, accrual) = rate_and_accrual(t, context)?;
                 let t_bal = context
@@ -320,7 +323,7 @@ impl CoverageTest {
                 let interest = Money::new(
                     t_bal.amount() * rate * accrual + carried_deferred(context, t.id.as_str()),
                     t_bal.currency(),
-                );
+                )?;
                 acc.checked_add(interest)
             },
         )?;
@@ -389,7 +392,7 @@ impl CoverageTest {
             } else {
                 cash_shortfall
             };
-            Some(Money::new(cure, context.interest_collections.currency()))
+            Some(Money::new(cure, context.interest_collections.currency())?)
         } else {
             None
         };
@@ -594,7 +597,7 @@ fn collateral_balance_with_haircuts(
         });
     }
 
-    let mut total = Money::new(0.0, pool.get_base_currency());
+    let mut total = Money::from((0_i64, pool.get_base_currency()));
     for (index, asset) in pool.assets.iter().enumerate() {
         if performing_only && asset.is_defaulted {
             continue;
@@ -614,7 +617,7 @@ fn collateral_balance_with_haircuts(
             amount *= 1.0 - haircut;
         }
 
-        total = total.checked_add(Money::new(amount, total.currency()))?;
+        total = total.checked_add(Money::new(amount, total.currency())?)?;
     }
 
     Ok(total)
@@ -653,7 +656,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -667,8 +670,8 @@ mod tests {
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -676,8 +679,8 @@ mod tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -701,7 +704,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -715,8 +718,8 @@ mod tests {
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(1_500.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((1_500_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -724,8 +727,8 @@ mod tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -751,7 +754,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -760,7 +763,7 @@ mod tests {
         let mut deferred = HashMap::default();
         deferred.insert(
             "TEST_TRANCHE".to_string(),
-            Money::new(1_250.0, Currency::USD),
+            Money::from((1_250_i64, Currency::USD)),
         );
         let context = TestContext {
             pool: &pool,
@@ -768,8 +771,8 @@ mod tests {
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(1_500.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((1_500_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -777,8 +780,8 @@ mod tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: Some(&deferred),
@@ -809,7 +812,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -819,7 +822,7 @@ mod tests {
         let mut deferred = HashMap::default();
         deferred.insert(
             "TEST_TRANCHE".to_string(),
-            Money::new(1_250.0, Currency::USD),
+            Money::from((1_250_i64, Currency::USD)),
         );
         let context = TestContext {
             pool: &pool,
@@ -827,8 +830,8 @@ mod tests {
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(1_500.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((1_500_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -836,8 +839,8 @@ mod tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: Some(&deferred),
@@ -872,7 +875,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -887,17 +890,19 @@ mod tests {
             tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(cash, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::new(cash, Currency::USD).expect("valid money fixture"),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
-            current_pool_balance: Some(Money::new(collateral, Currency::USD)),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            current_pool_balance: Some(
+                Money::new(collateral, Currency::USD).expect("valid money fixture"),
+            ),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["SENIOR"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -949,7 +954,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -965,17 +970,19 @@ mod tests {
             tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
-            current_pool_balance: Some(Money::new(collateral, Currency::USD)),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            current_pool_balance: Some(
+                Money::new(collateral, Currency::USD).expect("valid money fixture"),
+            ),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["SENIOR"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1023,7 +1030,7 @@ mod tests {
             0.0,
             25.0,
             TrancheSeniority::Senior,
-            Money::new(25_000.0, Currency::USD),
+            Money::from((25_000_i64, Currency::USD)),
             cpn(),
             mat,
         )
@@ -1033,7 +1040,7 @@ mod tests {
             25.0,
             50.0,
             TrancheSeniority::Senior,
-            Money::new(25_000.0, Currency::USD),
+            Money::from((25_000_i64, Currency::USD)),
             cpn(),
             mat,
         )
@@ -1043,7 +1050,7 @@ mod tests {
             50.0,
             75.0,
             TrancheSeniority::Senior,
-            Money::new(25_000.0, Currency::USD),
+            Money::from((25_000_i64, Currency::USD)),
             cpn(),
             mat,
         )
@@ -1053,7 +1060,7 @@ mod tests {
             75.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(25_000.0, Currency::USD),
+            Money::from((25_000_i64, Currency::USD)),
             cpn(),
             mat,
         )
@@ -1115,7 +1122,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
@@ -1129,8 +1136,8 @@ mod tests {
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(100.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((100_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -1138,8 +1145,8 @@ mod tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1188,7 +1195,7 @@ mod haircut_tests {
         for (id, rating) in [("AAA1", CreditRating::AAA), ("CCC1", CreditRating::CCC)] {
             let mut asset = PoolAsset::fixed_rate_bond(
                 id,
-                Money::new(500_000.0, Currency::USD),
+                Money::from((500_000_i64, Currency::USD)),
                 0.07,
                 maturity(),
                 DayCount::Thirty360,
@@ -1205,7 +1212,7 @@ mod haircut_tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(500_000.0, Currency::USD),
+            Money::from((500_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity(),
         )
@@ -1237,7 +1244,7 @@ mod haircut_tests {
         let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
         let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let mut balances = HashMap::default();
-        balances.insert("A".to_string(), Money::new(500_000.0, Currency::USD));
+        balances.insert("A".to_string(), Money::from((500_000_i64, Currency::USD)));
 
         let ratio_with_fees = |fees: f64| {
             let ctx = TestContext {
@@ -1246,17 +1253,17 @@ mod haircut_tests {
                 tranche_id: "A",
                 as_of,
                 period_start: Some(period_start),
-                cash_balance: Money::new(0.0, Currency::USD),
-                interest_collections: Money::new(10_000.0, Currency::USD),
+                cash_balance: Money::from((0_i64, Currency::USD)),
+                interest_collections: Money::from((10_000_i64, Currency::USD)),
                 haircuts: None,
                 par_value_threshold: None,
                 market: Some(&market),
                 tranche_balances: Some(&balances),
                 payable_principal_tranche_ids: None,
                 asset_balances: None,
-                current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
-                senior_fees: Money::new(fees, Currency::USD),
-                restricted_cash: Money::new(0.0, Currency::USD),
+                current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
+                senior_fees: Money::new(fees, Currency::USD).expect("valid money fixture"),
+                restricted_cash: Money::from((0_i64, Currency::USD)),
                 interest_claim_caps: &uncapped_claims(&["A"]),
                 floating_rate_shift: 0.0,
                 deferred_interest: None,
@@ -1304,7 +1311,7 @@ mod haircut_tests {
         // Single senior note, 5% coupon, quarterly.
         let tranches = single_tranche();
         let mut balances = HashMap::default();
-        balances.insert("A".to_string(), Money::new(500_000.0, Currency::USD));
+        balances.insert("A".to_string(), Money::from((500_000_i64, Currency::USD)));
 
         let ctx = TestContext {
             pool: &pool,
@@ -1312,18 +1319,18 @@ mod haircut_tests {
             tranche_id: "A",
             as_of,
             period_start: Some(period_start),
-            cash_balance: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
             // Collections far below what the coupon demands => a hard breach.
-            interest_collections: Money::new(100.0, Currency::USD),
+            interest_collections: Money::from((100_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: Some(&market),
             tranche_balances: Some(&balances),
             payable_principal_tranche_ids: None,
             asset_balances: None,
-            current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1372,7 +1379,7 @@ mod haircut_tests {
             0.0,
             50.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.04 },
             maturity,
         )
@@ -1382,7 +1389,7 @@ mod haircut_tests {
             50.0,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.16 },
             maturity,
         )
@@ -1397,8 +1404,9 @@ mod haircut_tests {
             tranche_id: "B",
             as_of,
             period_start: Some(period_start),
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(collections, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::new(collections, Currency::USD)
+                .expect("valid money fixture"),
             haircuts: None,
             par_value_threshold: None,
             market: None,
@@ -1406,8 +1414,8 @@ mod haircut_tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["B"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1485,7 +1493,7 @@ mod haircut_tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
             floating_coupon,
             maturity(),
         )
@@ -1499,8 +1507,9 @@ mod haircut_tests {
             tranche_id: "A",
             as_of,
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(collections, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::new(collections, Currency::USD)
+                .expect("valid money fixture"),
             haircuts: None,
             par_value_threshold: None,
             market: Some(&market),
@@ -1508,8 +1517,8 @@ mod haircut_tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: None,
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1551,15 +1560,15 @@ mod haircut_tests {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
         // The pool has amortized from 1,000,000 to 400,000.
-        let current = Money::new(400_000.0, Currency::USD);
+        let current = Money::from((400_000_i64, Currency::USD));
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
             tranche_id: "A",
             as_of,
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: Some(&haircuts),
             par_value_threshold: None,
             market: Some(&market),
@@ -1567,8 +1576,8 @@ mod haircut_tests {
             payable_principal_tranche_ids: None,
             asset_balances: None,
             current_pool_balance: Some(current),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1607,17 +1616,17 @@ mod haircut_tests {
             tranche_id: "A",
             as_of,
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: Some(&haircuts),
             par_value_threshold: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: Some(&live_asset_balances),
-            current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1647,17 +1656,17 @@ mod haircut_tests {
             tranche_id: "A",
             as_of,
             period_start: None,
-            cash_balance: Money::new(0.0, Currency::USD),
-            interest_collections: Money::new(0.0, Currency::USD),
+            cash_balance: Money::from((0_i64, Currency::USD)),
+            interest_collections: Money::from((0_i64, Currency::USD)),
             haircuts: None,
             par_value_threshold: None,
             market: Some(&market),
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
-            current_pool_balance: Some(Money::new(400_000.0, Currency::USD)),
-            senior_fees: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
+            current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
+            senior_fees: Money::from((0_i64, Currency::USD)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,

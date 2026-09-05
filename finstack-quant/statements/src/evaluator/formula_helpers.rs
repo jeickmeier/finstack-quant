@@ -194,8 +194,8 @@ mod tests {
     /// invalidation hook in `EvaluationContext::set_value`.
     #[test]
     fn cache_invalidates_on_set_value_within_period() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let current = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let current = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut ctx = make_context_with_history("revenue", &[(p1, 100.0)], current);
 
         ctx.set_value("revenue", 110.0).expect("set initial");
@@ -223,8 +223,8 @@ mod tests {
     /// each clone keep their own cache state distinct.
     #[test]
     fn cache_clone_independence() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let current = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let current = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut original = make_context_with_history("revenue", &[(p1, 100.0)], current);
         original.set_value("revenue", 110.0).expect("set original");
 

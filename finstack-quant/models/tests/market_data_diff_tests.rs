@@ -593,8 +593,8 @@ fn test_fx_shift_zero_baseline_errors() {
 
 #[test]
 fn test_scalar_price_shift() {
-    let price_t0 = Money::new(100.0, Currency::USD);
-    let price_t1 = Money::new(110.0, Currency::USD);
+    let price_t0 = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    let price_t1 = Money::new(110.0, Currency::USD).expect("valid money fixture");
 
     let market_t0 = market_with_price("EQUITY-SPX", MarketScalar::Price(price_t0));
     let market_t1 = market_with_price("EQUITY-SPX", MarketScalar::Price(price_t1));
@@ -646,7 +646,7 @@ fn test_scalar_missing_error() {
 
 #[test]
 fn test_scalar_zero_shift() {
-    let price = Money::new(100.0, Currency::USD);
+    let price = Money::new(100.0, Currency::USD).expect("valid money fixture");
     let market = market_with_price("TEST", MarketScalar::Price(price));
 
     let shift = measure_scalar_shift("TEST", &market, &market).expect("Should measure shift");
@@ -828,7 +828,7 @@ fn test_vol_surface_single_expiry() {
 
 #[test]
 fn test_scalar_neutral_shift() {
-    let price = Money::new(100.0, Currency::USD);
+    let price = Money::new(100.0, Currency::USD).expect("valid money fixture");
     let market_t0 = market_with_price("TEST", MarketScalar::Price(price));
     let market_t1 = market_with_price("TEST", MarketScalar::Price(price));
 

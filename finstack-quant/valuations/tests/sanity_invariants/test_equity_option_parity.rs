@@ -81,7 +81,7 @@ fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {
         option_type,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,

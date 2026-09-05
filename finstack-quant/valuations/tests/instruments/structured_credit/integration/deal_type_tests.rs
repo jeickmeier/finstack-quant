@@ -19,7 +19,7 @@ fn create_minimal_pool(deal_type: DealType) -> AssetPool {
     let mut pool = AssetPool::new("POOL", deal_type, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -33,7 +33,7 @@ fn create_minimal_tranches() -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity_date(),
     )

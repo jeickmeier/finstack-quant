@@ -61,7 +61,7 @@ use finstack_quant_core::Result;
 ///     .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())
 ///     .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())
 ///     .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())
-///     .swap_frequency(Tenor::new(1, TenorUnit::Months))
+///     .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
 ///     .fixed_price(3.50)
 ///     .notional(10000.0)
 ///     .forward_curve_id(CurveId::new("NG-FORWARD"))
@@ -233,7 +233,7 @@ impl CommoditySwaption {
             .swap_end(
                 Date::from_calendar_date(2026, time::Month::June, 30).expect("valid example date"),
             )
-            .swap_frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .swap_frequency(Tenor::monthly())
             .fixed_price(3.50)
             .notional(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
@@ -515,7 +515,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         // Post-expiry: option is fully settled, value is 0
         if as_of > self.expiry {
-            return Ok(Money::new(0.0, self.underlying.currency));
+            return Ok(Money::from((0_i64, self.underlying.currency)));
         }
 
         let inputs = self.black76_inputs(market, as_of)?;
@@ -526,10 +526,10 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
                 OptionType::Call => (inputs.forward - self.fixed_price).max(0.0),
                 OptionType::Put => (self.fixed_price - inputs.forward).max(0.0),
             };
-            return Ok(Money::new(
+            return Money::new(
                 intrinsic * inputs.annuity * self.notional,
                 self.underlying.currency,
-            ));
+            );
         }
 
         // Black-76 on forward swap rate
@@ -542,10 +542,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
             self.option_type,
         );
 
-        Ok(Money::new(
-            unit_price * self.notional,
-            self.underlying.currency,
-        ))
+        Money::new(unit_price * self.notional, self.underlying.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -744,7 +741,7 @@ mod tests {
             .expiry(Date::from_calendar_date(2025, time::Month::June, 15).expect("valid date"))
             .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
             .swap_end(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
-            .swap_frequency(Tenor::new(1, TenorUnit::Months))
+            .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(3.50)
             .notional(10_000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
@@ -859,7 +856,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_zero_frequency_count() {
-        assert!(Tenor::try_new(0, finstack_quant_core::dates::TenorUnit::Months).is_err());
+        assert!(Tenor::new(0, finstack_quant_core::dates::TenorUnit::Months).is_err());
     }
 
     #[test]
@@ -954,7 +951,7 @@ mod tests {
             .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
             .swap_start(Date::from_calendar_date(2025, Month::July, 1).expect("valid date"))
             .swap_end(Date::from_calendar_date(2026, Month::July, 1).expect("valid date"))
-            .swap_frequency(Tenor::new(3, TenorUnit::Months))
+            .swap_frequency(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(4.0)
             .notional(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
@@ -1081,7 +1078,7 @@ mod tests {
             .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
             .swap_start(swap_start)
             .swap_end(swap_end)
-            .swap_frequency(Tenor::new(1, TenorUnit::Months))
+            .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(strike)
             .notional(10_000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
@@ -1114,7 +1111,7 @@ mod tests {
             .side(crate::instruments::PayReceive::Pay)
             .start_date(swap_start)
             .maturity(swap_end)
-            .frequency(Tenor::new(1, TenorUnit::Months))
+            .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("swap");
@@ -1189,7 +1186,7 @@ mod tests {
             .expiry(date(2025, 6, 15))
             .swap_start(date(2025, 7, 1))
             .swap_end(date(2026, 6, 30))
-            .swap_frequency(Tenor::new(1, TenorUnit::Months))
+            .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(fixed_price)
             .notional(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))

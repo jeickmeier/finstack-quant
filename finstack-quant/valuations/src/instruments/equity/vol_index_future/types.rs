@@ -72,7 +72,7 @@ use time::macros::date;
 ///
 /// let future = VolatilityIndexFuture::builder()
 ///     .id(InstrumentId::new("VIX-FUT-2025M03"))
-///     .notional(Money::new(100_000.0, Currency::USD))
+///     .notional(Money::from((100_000_i64, Currency::USD)))
 ///     .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())
 ///     .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())
 ///     .quoted_price(21.50)
@@ -223,7 +223,7 @@ impl VolatilityIndexFuture {
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("VIX-FUT-2025M03"))
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .expiry(date!(2025 - 03 - 19))
             .settlement_date(date!(2025 - 03 - 19))
             .quoted_price(21.50)
@@ -354,8 +354,8 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -367,7 +367,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture 
             Vec::new(),
             finstack_quant_core::dates::DayCount::Act365F, // Standard for vol index futures
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
                     ..Default::default()
@@ -415,7 +415,7 @@ mod tests {
         // Create a future at the forward price (should have zero NPV)
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-ATM"))
-            .notional(Money::new(20_000.0, Currency::USD)) // 1 contract at 20
+            .notional(Money::from((20_000_i64, Currency::USD))) // 1 contract at 20
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .quoted_price(20.0) // At the 3M forward level
@@ -443,7 +443,7 @@ mod tests {
         // Long position entered above today's forward mark
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-LONG"))
-            .notional(Money::new(22_000.0, Currency::USD)) // ~1 contract
+            .notional(Money::from((22_000_i64, Currency::USD))) // ~1 contract
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .quoted_price(22.0) // Entry above the ~20 forward level
@@ -470,7 +470,7 @@ mod tests {
         // Short position with quoted price above forward
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-SHORT"))
-            .notional(Money::new(22_000.0, Currency::USD))
+            .notional(Money::from((22_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .quoted_price(22.0)
@@ -493,7 +493,7 @@ mod tests {
     fn test_delta_vol() {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-DELTA"))
-            .notional(Money::new(20_000.0, Currency::USD)) // 1 contract at 20
+            .notional(Money::from((20_000_i64, Currency::USD))) // 1 contract at 20
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .quoted_price(20.0)

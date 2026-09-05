@@ -35,7 +35,7 @@ fn test_compensated_summation_large_portfolio() {
 
         let deposit = Deposit::builder()
             .id(format!("DEP_{}", i).into())
-            .notional(Money::new(value.abs(), Currency::USD))
+            .notional(Money::new(value.abs(), Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
             .maturity(end_date)
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -103,7 +103,7 @@ fn test_aggregated_metrics_are_finite() {
 
     let deposit = Deposit::builder()
         .id("DEP_NAN".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -177,7 +177,7 @@ fn test_inf_quantity_rejected() {
 
     let deposit = Deposit::builder()
         .id("DEP_INF".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -218,7 +218,7 @@ fn test_nan_quantity_rejected() {
 
     let deposit = Deposit::builder()
         .id("DEP_NAN".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

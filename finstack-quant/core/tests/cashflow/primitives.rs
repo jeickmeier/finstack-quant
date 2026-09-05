@@ -27,7 +27,7 @@ fn valid_cashflow() -> CashFlow {
     CashFlow {
         date: d(2025, 1, 15),
         reset_date: None,
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Fixed,
         accrual_factor: 0.5,
         rate: Some(0.05),
@@ -42,7 +42,7 @@ fn cashflow_fixed_construction() {
     let cf = CashFlow {
         date: d(2025, 1, 15),
         reset_date: None,
-        amount: Money::new(1000.0, Currency::USD),
+        amount: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Fixed,
         accrual_factor: 0.25,
         rate: Some(0.05),
@@ -59,7 +59,7 @@ fn cashflow_fixed_construction() {
 fn cashflow_floating_construction() {
     let payment = d(2025, 1, 10);
     let reset = d(2025, 1, 5);
-    let amount = Money::new(50.0, Currency::USD);
+    let amount = Money::new(50.0, Currency::USD).expect("valid money fixture");
 
     let cf = CashFlow {
         date: payment,
@@ -78,25 +78,22 @@ fn cashflow_floating_construction() {
 
 // Amount Validation Tests
 
-// Note: Money::new() validates that amounts are finite and panics on NaN/Infinity.
+// Money::new validates that amounts are finite and returns an error on NaN/Infinity.
 // These tests verify that behavior at the Money level.
 
 #[test]
-#[should_panic(expected = "finite amount")]
 fn money_new_rejects_nan() {
-    let _ = Money::new(f64::NAN, Currency::USD);
+    assert!(Money::new(f64::NAN, Currency::USD).is_err());
 }
 
 #[test]
-#[should_panic(expected = "finite amount")]
 fn money_new_rejects_positive_infinity() {
-    let _ = Money::new(f64::INFINITY, Currency::USD);
+    assert!(Money::new(f64::INFINITY, Currency::USD).is_err());
 }
 
 #[test]
-#[should_panic(expected = "finite amount")]
 fn money_new_rejects_negative_infinity() {
-    let _ = Money::new(f64::NEG_INFINITY, Currency::USD);
+    assert!(Money::new(f64::NEG_INFINITY, Currency::USD).is_err());
 }
 
 #[test]
@@ -105,7 +102,7 @@ fn cashflow_accepts_zero_amount() {
     // negative-rate environment); previously rejected — fixed per the
     // convention.
     let cf = CashFlow {
-        amount: Money::new(0.0, Currency::USD),
+        amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         ..valid_cashflow()
     };
     assert!(cf.validate().is_ok(), "Zero amount should be accepted");
@@ -115,7 +112,7 @@ fn cashflow_accepts_zero_amount() {
 fn cashflow_accepts_negative_amount() {
     // Negative amounts are valid (represent outflows)
     let cf = CashFlow {
-        amount: Money::new(-100.0, Currency::USD),
+        amount: Money::new(-100.0, Currency::USD).expect("valid money fixture"),
         ..valid_cashflow()
     };
     assert!(cf.validate().is_ok(), "Negative amount should be accepted");
@@ -124,7 +121,7 @@ fn cashflow_accepts_negative_amount() {
 #[test]
 fn cashflow_accepts_large_amount() {
     let cf = CashFlow {
-        amount: Money::new(1e15, Currency::USD),
+        amount: Money::new(1e15, Currency::USD).expect("valid money fixture"),
         ..valid_cashflow()
     };
     assert!(cf.validate().is_ok(), "Large amount should be accepted");
@@ -136,7 +133,7 @@ fn cashflow_accepts_small_but_nonzero_amount() {
     // Very small amounts like 1e-10 round to 0.0 (now still valid).
     // 0.01 is the smallest representable non-zero USD amount.
     let cf = CashFlow {
-        amount: Money::new(0.01, Currency::USD),
+        amount: Money::new(0.01, Currency::USD).expect("valid money fixture"),
         ..valid_cashflow()
     };
     assert!(
@@ -292,7 +289,7 @@ fn cashflow_rejects_reset_date_after_payment() {
     let cf = CashFlow {
         date: payment,
         reset_date: Some(reset),
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
@@ -312,7 +309,7 @@ fn cashflow_accepts_reset_date_before_payment() {
     let cf = CashFlow {
         date: payment,
         reset_date: Some(reset),
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
@@ -331,7 +328,7 @@ fn cashflow_accepts_reset_date_equal_to_payment() {
     let cf = CashFlow {
         date,
         reset_date: Some(date), // Same as payment date
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
@@ -348,7 +345,7 @@ fn cashflow_accepts_no_reset_date() {
     let cf = CashFlow {
         date: d(2025, 1, 15),
         reset_date: None,
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Fixed,
         accrual_factor: 0.25,
         rate: Some(0.05),
@@ -367,7 +364,7 @@ fn cashflow_valid_with_all_fields_populated() {
     let cf = CashFlow {
         date: d(2025, 6, 15),
         reset_date: Some(d(2025, 6, 1)),
-        amount: Money::new(25_000.0, Currency::EUR),
+        amount: Money::new(25_000.0, Currency::EUR).expect("valid money fixture"),
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: Some(0.0325),
@@ -387,7 +384,7 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
     let cf = CashFlow {
         date: d(2025, 1, 15),
         reset_date: Some(d(2025, 1, 20)), // After payment - invalid
-        amount: Money::new(100.0, Currency::USD),
+        amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Fixed,
         accrual_factor: f64::INFINITY, // Invalid
         rate: Some(f64::NAN),          // Also invalid
@@ -404,7 +401,7 @@ fn constructor_defaults_accrual_to_none() {
     let flow = CashFlow::new(
         d(2025, 6, 15),
         None,
-        Money::new(25_000.0, Currency::EUR),
+        Money::new(25_000.0, Currency::EUR).expect("valid money fixture"),
         CFKind::Fixed,
         0.25,
         Some(0.0325),
@@ -433,7 +430,7 @@ fn accrual_metadata_round_trips() {
     let flow = CashFlow::new(
         d(2025, 6, 15),
         Some(d(2025, 3, 13)),
-        Money::new(12_500.0, Currency::USD),
+        Money::new(12_500.0, Currency::USD).expect("valid money fixture"),
         CFKind::FloatReset,
         0.25,
         Some(0.036),

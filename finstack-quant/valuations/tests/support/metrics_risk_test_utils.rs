@@ -33,7 +33,7 @@ pub fn usd_ois_market(as_of: Date) -> Result<MarketContext> {
 /// Convenience helper for constructing fixed-rate USD bonds for tests.
 #[allow(clippy::expect_used)] // Test utility function with known valid inputs
 pub fn standard_bond(id: &str, as_of: Date, maturity: Date) -> Bond {
-    Bond::fixed(id, Money::new(100_000.0, Currency::USD), finstack_quant_core::types::Rate::from_decimal(0.05), as_of, maturity, finstack_quant_core::dates::StubKind::ShortFront, "USD-OIS")
+    Bond::fixed(id, Money::new(100_000.0, Currency::USD).expect("valid money fixture"), finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), as_of, maturity, finstack_quant_core::dates::StubKind::ShortFront, "USD-OIS")
     .expect("standard_bond should build successfully")
 }
 

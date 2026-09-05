@@ -60,7 +60,7 @@ fn vanna_is_reported_per_vol_point() -> finstack_quant_core::Result<()> {
         .barrier_type(BarrierType::UpAndOut)
         .expiry(expiry)
         .monitoring_start_date_opt(Some(as_of))
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .monitoring(Monitoring::Continuous)

@@ -32,7 +32,7 @@
 //! };
 //!
 //! let schedule = CashFlowSchedule::builder()
-//!     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+//!     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
 //!     .fixed_cf(fixed_spec)
 //!     .build(None)?;
 //!

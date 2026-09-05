@@ -58,7 +58,7 @@
 //! let maturity = Date::from_calendar_date(2026, Month::January, 15)?;
 //!
 //! let schedule = CashFlowSchedule::builder()
-//!     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+//!     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
 //!     .fixed_cf(FixedCouponSpec {
 //!         coupon_type: CouponType::Cash,
 //!         rate: dec!(0.05),

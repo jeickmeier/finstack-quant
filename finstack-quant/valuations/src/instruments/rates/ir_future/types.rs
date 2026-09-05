@@ -379,7 +379,7 @@ impl InterestRateFuture {
         use finstack_quant_core::currency::Currency;
         InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-ED-3M-MAR25"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(date!(2025 - 03 - 17))
             .fixing_date_opt(Some(date!(2025 - 03 - 17)))
             .period_start_opt(Some(date!(2025 - 03 - 19)))
@@ -408,7 +408,11 @@ impl InterestRateFuture {
     ///
     /// Interest rate futures quote as 100 minus the rate, i.e., a price of 97.50
     /// implies a 2.50% rate.
-    pub fn implied_rate(&self) -> Rate {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the quoted price produces a non-finite rate.
+    pub fn implied_rate(&self) -> finstack_quant_core::Result<Rate> {
         Rate::from_percent(100.0 - self.quoted_price)
     }
 
@@ -855,10 +859,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        Ok(finstack_quant_core::money::Money::new(
-            pv,
-            self.notional.currency(),
-        ))
+        finstack_quant_core::money::Money::new(pv, self.notional.currency())
     }
 
     fn base_value_raw(
@@ -890,8 +891,8 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -903,7 +904,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
             Vec::new(),
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
                     ..Default::default()
@@ -940,7 +941,7 @@ mod tests {
     fn ir_future_defaults_dates_from_expiry_and_contract_specs() {
         let irf = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-DEFAULT-DATES"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(date!(2025 - 03 - 17))
             .quoted_price(95.50)
             .day_count(DayCount::Act360)
@@ -965,7 +966,7 @@ mod tests {
     fn ir_future_respects_explicit_date_overrides() {
         let irf = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-EXPLICIT-DATES"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(date!(2025 - 03 - 17))
             .fixing_date_opt(Some(date!(2025 - 03 - 18)))
             .period_start_opt(Some(date!(2025 - 03 - 20)))
@@ -1022,7 +1023,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 03);
         let future = InterestRateFuture::builder()
             .id(InstrumentId::new("SR1-PARTIAL-CONVEXITY"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(date!(2025 - 01 - 07))
             .fixing_date_opt(Some(date!(2025 - 01 - 07)))
             .period_start_opt(Some(date!(2025 - 01 - 02)))
@@ -1172,7 +1173,7 @@ mod tests {
     fn ir_future_rejects_pre_curve_or_straddling_projection_period() {
         let future = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-PRE-BASE"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(date!(2025 - 01 - 15))
             .fixing_date_opt(Some(date!(2025 - 01 - 15)))
             .period_start_opt(Some(date!(2025 - 01 - 17)))

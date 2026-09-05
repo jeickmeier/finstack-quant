@@ -129,10 +129,10 @@ macro_rules! impl_future_option_instrument {
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
             ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-                Ok(finstack_quant_core::money::Money::new(
+                finstack_quant_core::money::Money::new(
                     self.npv_raw(market, as_of)?,
                     self.terms.currency,
-                ))
+                )
             }
 
             fn base_value_raw(
@@ -197,11 +197,14 @@ macro_rules! impl_future_option_instrument {
         }
 
         impl finstack_quant_cashflows::CashflowScheduleSource for $ty {
-            fn notional(&self) -> Option<finstack_quant_core::money::Money> {
+            fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
+                Ok({
                 Some(finstack_quant_core::money::Money::new(
                     self.terms.contracts * self.terms.multiplier,
                     self.terms.currency,
-                ))
+                )?)
+
+                })
             }
 
             fn raw_cashflow_schedule(
@@ -216,7 +219,7 @@ macro_rules! impl_future_option_instrument {
                         notional_hint: Some(finstack_quant_core::money::Money::new(
                             self.terms.contracts * self.terms.multiplier,
                             self.terms.currency,
-                        )),
+                        )?),
                         meta: crate::cashflow::builder::CashFlowMeta {
                             representation:
                                 crate::cashflow::builder::CashflowRepresentation::Placeholder,

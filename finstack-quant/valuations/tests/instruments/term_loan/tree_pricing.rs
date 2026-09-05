@@ -20,7 +20,7 @@ fn build_callable_loan(as_of: Date) -> TermLoan {
     TermLoan::builder()
         .id(InstrumentId::new("TL-CALLABLE"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(
@@ -279,7 +279,7 @@ fn call_at_settlement_date_produces_nonzero_pv() {
     let loan = TermLoan::builder()
         .id(InstrumentId::new("TL-CALL-AT-SETTLE"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(
@@ -411,7 +411,7 @@ fn build_floating_callable(as_of: Date) -> TermLoan {
     TermLoan::builder()
         .id(InstrumentId::new("TL-FLOAT-CALLABLE"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {
@@ -556,7 +556,7 @@ fn off_cycle_immediate_par_call_includes_accrued() {
     let mut loan = TermLoan::builder()
         .id(InstrumentId::new("TL-OFFCYCLE-CALL"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })

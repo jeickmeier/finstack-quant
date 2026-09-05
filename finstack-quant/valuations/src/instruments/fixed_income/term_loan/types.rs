@@ -27,7 +27,7 @@
 //! let loan = TermLoan::example().unwrap();
 //!
 //! assert_eq!(loan.currency, Currency::USD);
-//! assert_eq!(loan.notional_limit, Money::new(10_000_000.0, Currency::USD));
+//! assert_eq!(loan.notional_limit, Money::from((10_000_000_i64, Currency::USD)));
 //! # Ok(())
 //! # }
 //! ```
@@ -678,7 +678,7 @@ impl TermLoan {
         TermLoan::builder()
             .id(InstrumentId::new("TERM-LOAN-USD-5Y"))
             .currency(Currency::USD)
-            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .notional_limit(Money::from((10_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 01))
             .maturity(date!(2029 - 01 - 01))
             .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
@@ -735,22 +735,22 @@ impl TermLoan {
         };
 
         let ddtl = DdtlSpec {
-            commitment_limit: Money::new(20_000_000.0, Currency::USD),
+            commitment_limit: Money::from((20_000_000_i64, Currency::USD)),
             availability_start: date!(2024 - 01 - 15),
             availability_end: date!(2025 - 01 - 15),
             draws: vec![
                 super::spec::DrawEvent {
                     date: date!(2024 - 04 - 15),
-                    amount: Money::new(10_000_000.0, Currency::USD),
+                    amount: Money::from((10_000_000_i64, Currency::USD)),
                 },
                 super::spec::DrawEvent {
                     date: date!(2024 - 07 - 15),
-                    amount: Money::new(5_000_000.0, Currency::USD),
+                    amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
             commitment_step_downs: vec![super::spec::CommitmentStepDown {
                 date: date!(2024 - 10 - 15),
-                new_limit: Money::new(15_000_000.0, Currency::USD),
+                new_limit: Money::from((15_000_000_i64, Currency::USD)),
             }],
             usage_fee_bp: 25,
             commitment_fee_bp: 50,
@@ -761,7 +761,7 @@ impl TermLoan {
         TermLoan::builder()
             .id(InstrumentId::new("TL-FLOAT-DDTL-7Y"))
             .currency(Currency::USD)
-            .notional_limit(Money::new(20_000_000.0, Currency::USD))
+            .notional_limit(Money::from((20_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2031 - 01 - 15))
             .rate(RateSpec::Floating(floating_rate))
@@ -820,7 +820,7 @@ impl TermLoan {
         TermLoan::builder()
             .id(InstrumentId::new("TL-CALLABLE-IG-7Y"))
             .currency(Currency::USD)
-            .notional_limit(Money::new(30_000_000.0, Currency::USD))
+            .notional_limit(Money::from((30_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2031 - 01 - 15))
             .rate(RateSpec::Fixed { rate_bp: 450 })
@@ -1112,8 +1112,8 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
-    fn notional(&self) -> Option<finstack_quant_core::money::Money> {
-        Some(self.notional_limit)
+    fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
+        Ok(Some(self.notional_limit))
     }
 
     fn raw_cashflow_schedule(
@@ -1238,7 +1238,7 @@ mod tests {
             discount_curve_id: CurveId::new("USD-CREDIT"),
             credit_curve_id: None,
             currency: Currency::USD,
-            notional_limit: Some(Money::new(5_000_000.0, Currency::USD)),
+            notional_limit: Some(Money::from((5_000_000_i64, Currency::USD))),
             issue,
             maturity,
             rate: RateSpec::Fixed { rate_bp: 550 },
@@ -1269,7 +1269,7 @@ mod tests {
     fn test_term_loan_spec_conversion_ddtl_defaults_notional() {
         let issue = Date::from_calendar_date(2025, Month::March, 1).expect("valid date");
         let maturity = Date::from_calendar_date(2030, Month::March, 1).expect("valid date");
-        let commitment = Money::new(12_000_000.0, Currency::USD);
+        let commitment = Money::from((12_000_000_i64, Currency::USD));
 
         let ddtl = DdtlSpec {
             commitment_limit: commitment,

@@ -95,8 +95,8 @@ proptest! {
 
         let facility = RevolvingCredit::builder()
             .id("TEST".into())
-            .commitment_amount(Money::new(commitment, Currency::USD))
-            .drawn_amount(Money::new(drawn, Currency::USD))
+            .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
             .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -128,8 +128,8 @@ proptest! {
 
         let facility = RevolvingCredit::builder()
             .id("TEST".into())
-            .commitment_amount(Money::new(commitment, Currency::USD))
-            .drawn_amount(Money::new(drawn, Currency::USD))
+            .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
             .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -167,8 +167,8 @@ proptest! {
         // Create facility with a draw event
         let facility = RevolvingCredit::builder()
             .id("TEST".into())
-            .commitment_amount(Money::new(commitment, Currency::USD))
-            .drawn_amount(Money::new(initial_drawn, Currency::USD))
+            .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(initial_drawn, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -178,7 +178,7 @@ proptest! {
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![
                 DrawRepayEvent {
                     date: draw_date,
-                    amount: Money::new(draw_amount, Currency::USD),
+                    amount: Money::new(draw_amount, Currency::USD).expect("valid money fixture"),
                     is_draw: true,
                 },
             ]))
@@ -211,8 +211,8 @@ proptest! {
 
         let facility = RevolvingCredit::builder()
             .id("TEST".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(initial_drawn, Currency::USD))
+            .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(initial_drawn, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -249,8 +249,8 @@ proptest! {
 
         let facility = RevolvingCredit::builder()
             .id("TEST".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -321,8 +321,8 @@ mod deterministic_tests {
     fn test_zero_commitment_invalid() {
         let result = RevolvingCredit::builder()
             .id("ZERO".into())
-            .commitment_amount(Money::new(0.0, Currency::USD))
-            .drawn_amount(Money::new(0.0, Currency::USD))
+            .commitment_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -342,8 +342,8 @@ mod deterministic_tests {
         let commitment = 10_000_000.0;
         let facility = RevolvingCredit::builder()
             .id("FULL".into())
-            .commitment_amount(Money::new(commitment, Currency::USD))
-            .drawn_amount(Money::new(commitment, Currency::USD))
+            .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
+            .drawn_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
             .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

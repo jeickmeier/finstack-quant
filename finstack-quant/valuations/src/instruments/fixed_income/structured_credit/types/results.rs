@@ -105,22 +105,22 @@ mod tests {
             principal_flows: vec![
                 (
                     Date::from_calendar_date(2024, time::Month::June, 30).expect("valid date"),
-                    Money::new(100_000.0, Currency::USD),
+                    Money::from((100_000_i64, Currency::USD)),
                 ),
                 (
                     Date::from_calendar_date(2025, time::Month::June, 30).expect("valid date"),
-                    Money::new(100_000.0, Currency::USD),
+                    Money::from((100_000_i64, Currency::USD)),
                 ),
             ],
             pik_flows: vec![],
             deferred_flows: Vec::new(),
             writedown_flows: vec![],
-            final_balance: Money::new(0.0, Currency::USD),
-            total_interest: Money::new(10_000.0, Currency::USD),
-            total_principal: Money::new(200_000.0, Currency::USD),
-            total_pik: Money::new(0.0, Currency::USD),
-            total_deferred: Money::new(0.0, Currency::USD),
-            total_writedown: Money::new(0.0, Currency::USD),
+            final_balance: Money::from((0_i64, Currency::USD)),
+            total_interest: Money::from((10_000_i64, Currency::USD)),
+            total_principal: Money::from((200_000_i64, Currency::USD)),
+            total_pik: Money::from((0_i64, Currency::USD)),
+            total_deferred: Money::from((0_i64, Currency::USD)),
+            total_writedown: Money::from((0_i64, Currency::USD)),
         };
 
         assert_eq!(cashflows.tranche_id, "AAA");

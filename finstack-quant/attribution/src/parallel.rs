@@ -428,7 +428,7 @@ fn reprice_cross_factor(
 /// let instrument = Arc::new(
 ///     Deposit::builder()
 ///         .id("DEP-1D".into())
-///         .notional(Money::new(1_000_000.0, Currency::USD))
+///         .notional(Money::from((1_000_000_i64, Currency::USD)))
 ///         .start_date(as_of_t0)
 ///         .maturity(as_of_t1)
 ///         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -607,7 +607,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         as_of_t0,
         as_of_t1,
         val_t1.currency(),
-    );
+    )?;
     // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
     for w in &carry_inputs.warnings {
         attribution.meta.notes.push(w.clone());
@@ -927,7 +927,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         }
 
         if !cross_by_pair.is_empty() {
-            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency());
+            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency())?;
             attribution.cross_factor_detail = Some(CrossFactorDetail {
                 total: attribution.cross_factor_pnl,
                 by_pair: cross_by_pair,
@@ -1229,7 +1229,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         }
 
         if !cross_by_pair.is_empty() {
-            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency());
+            attribution.cross_factor_pnl = Money::new(cross_total, val_t1.currency())?;
             attribution.cross_factor_detail = Some(CrossFactorDetail {
                 total: attribution.cross_factor_pnl,
                 by_pair: cross_by_pair,
@@ -1350,7 +1350,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
                     &cascade,
                     credit_factor_detail_options,
                     &step_pnls,
-                );
+                )?;
                 attribution.credit_factor_detail = Some(detail);
             }
             None => {
@@ -1463,7 +1463,10 @@ mod tests {
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
             let rate = market.get_discount("USD-OIS")?.zero(1.0);
             let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
-            Ok(Money::new(1_000_000.0 * rate * hazard, Currency::USD))
+            Ok(
+                Money::new(1_000_000.0 * rate * hazard, Currency::USD)
+                    .expect("valid money fixture"),
+            )
         }
 
         fn price_with_metrics(
@@ -1492,13 +1495,13 @@ mod tests {
         // Create test instrument with different values at T0 and T1
         let _instrument_t0 = Arc::new(TestInstrument::new(
             "TEST-001",
-            Money::new(1000.0, Currency::USD),
+            Money::from((1000_i64, Currency::USD)),
         ));
 
         // Simulate P&L by creating a different value for T1
         // In practice, the same instrument would be repriced with different markets
-        let val_t0 = Money::new(1000.0, Currency::USD);
-        let val_t1 = Money::new(1100.0, Currency::USD);
+        let val_t0 = Money::from((1000_i64, Currency::USD));
+        let val_t1 = Money::from((1100_i64, Currency::USD));
 
         // Create minimal markets
         let _market_t0 = MarketContext::new();

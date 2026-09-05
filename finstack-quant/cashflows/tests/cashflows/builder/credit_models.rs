@@ -518,7 +518,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(500.0, Currency::USD),
+                Money::new(500.0, Currency::USD).expect("valid money fixture"),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -526,13 +526,13 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
             CashFlow::new(
                 recovery_date,
                 None,
-                Money::new(200.0, Currency::USD),
+                Money::new(200.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
             ),
         ],
-        Notional::par(1_000.0, Currency::USD),
+        Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );
@@ -579,7 +579,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(500.0, Currency::USD),
+                Money::new(500.0, Currency::USD).expect("valid money fixture"),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -587,13 +587,13 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
             CashFlow::new(
                 recovery_date,
                 None,
-                Money::new(200.0, Currency::USD),
+                Money::new(200.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
             ),
         ],
-        Notional::par(1_000.0, Currency::USD),
+        Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );

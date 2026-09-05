@@ -236,7 +236,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap();
     }
@@ -247,7 +247,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::ZERO),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap_err();
         assert!(err.to_string().contains("strike must be positive"));
@@ -259,7 +259,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(-5, 3)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .is_err());
     }
@@ -270,7 +270,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2030 - 06 - 21),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap_err();
         assert!(err.to_string().contains("must be before CDS maturity"));
@@ -282,7 +282,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap();
         assert!(params.clone().as_index(1.5).is_err());
@@ -297,7 +297,7 @@ mod tests {
             CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap();
         assert_eq!(
@@ -313,7 +313,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(1070, 1)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap_err();
         assert!(err.to_string().contains("exceeds maximum"));
@@ -325,7 +325,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .unwrap();
         assert_eq!(params.settlement, SettlementType::Cash);

@@ -75,7 +75,7 @@ fn make_deposit(id: &str, curve_id: &str, notional: f64) -> Deposit {
 fn make_deposit_currency(id: &str, curve_id: &str, notional: f64, currency: Currency) -> Deposit {
     Deposit::builder()
         .id(id.into())
-        .notional(Money::new(notional, currency))
+        .notional(Money::new(notional, currency).expect("valid money fixture"))
         .start_date(base_date())
         .maturity(base_date() + time::Duration::days(90))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -515,7 +515,7 @@ impl Instrument for UnresolvableInstrument {
         _market: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        Ok(Money::new(0.0, Currency::USD))
+        Ok(Money::new(0.0, Currency::USD).expect("valid money fixture"))
     }
     fn market_dependencies(
         &self,
@@ -724,10 +724,10 @@ impl DependencyProbeInstrument {
             .fx_required()?
             .rate(FxQuery::new(base, quote, as_of))?
             .rate;
-        Ok(Money::new(
-            self.value.amount() * rate,
-            self.value.currency(),
-        ))
+        Ok(
+            Money::new(self.value.amount() * rate, self.value.currency())
+                .expect("valid money fixture"),
+        )
     }
 }
 
@@ -780,7 +780,7 @@ fn build_dependency_probe_portfolio(position_count: usize) -> (Portfolio, Vec<De
         let instrument_id = format!("PROBE_{index:04}");
         let (instrument, probe) = dependency_probe_instrument(
             instrument_id.clone(),
-            Money::new((index + 1) as f64, Currency::USD),
+            Money::new((index + 1) as f64, Currency::USD).expect("valid money fixture"),
             Some(format!("CURVE_{index:04}")),
             None,
             None,
@@ -1001,7 +1001,7 @@ fn selective_instrument_replacement_with_same_position_id_forces_reprice() {
     let options = selective_pv_options();
     let (base_instrument, _) = dependency_probe_instrument(
         "BASE_INSTRUMENT",
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         Some("CURVE_A".to_string()),
         None,
         None,
@@ -1028,7 +1028,7 @@ fn selective_instrument_replacement_with_same_position_id_forces_reprice() {
 
     let (replacement, replacement_probe) = dependency_probe_instrument(
         "BASE_INSTRUMENT",
-        Money::new(250.0, Currency::USD),
+        Money::new(250.0, Currency::USD).expect("valid money fixture"),
         Some("CURVE_B".to_string()),
         None,
         None,
@@ -1112,21 +1112,21 @@ fn selective_portfolio_shape_change_forces_full_reprice() {
 fn selective_fx_change_reprices_only_fx_dependent_instrument_and_refreshes_all_conversions() {
     let (fx_dependent, fx_probe) = dependency_probe_instrument(
         "FX_DEPENDENT",
-        Money::new(100.0, Currency::EUR),
+        Money::new(100.0, Currency::EUR).expect("valid money fixture"),
         None,
         Some((Currency::EUR, Currency::USD)),
         None,
     );
     let (conversion_only, conversion_probe) = dependency_probe_instrument(
         "CONVERSION_ONLY",
-        Money::new(200.0, Currency::EUR),
+        Money::new(200.0, Currency::EUR).expect("valid money fixture"),
         Some("UNRELATED_STATIC_INPUT".to_string()),
         None,
         None,
     );
     let (triangulated_cross, triangulated_probe) = dependency_probe_instrument(
         "TRIANGULATED_CROSS",
-        Money::new(50.0, Currency::USD),
+        Money::new(50.0, Currency::USD).expect("valid money fixture"),
         None,
         Some((Currency::EUR, Currency::JPY)),
         Some((Currency::EUR, Currency::JPY)),

@@ -166,7 +166,7 @@ let params = CDSOptionParams::call(
     CDSOptionStrike::Spread(Decimal::new(1, 2)),
     date!(2025 - 06 - 20),   // expiry
     date!(2030 - 06 - 20),   // underlying CDS maturity
-    Money::new(10_000_000.0, Currency::USD),
+    Money::new(10_000_000.0, Currency::USD)?,
 )?;
 
 let credit = CreditParams::corporate_standard("CORP", "CORP-HAZARD");

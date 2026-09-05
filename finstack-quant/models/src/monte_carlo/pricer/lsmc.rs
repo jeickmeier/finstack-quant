@@ -488,7 +488,7 @@ impl LsmcPricer {
             num_steps,
         )?;
 
-        Ok(self.summarize_present_values(&values, initial_spot, exercise, currency))
+        self.summarize_present_values(&values, initial_spot, exercise, currency)
     }
 
     /// Generate Monte Carlo paths (serial or parallel depending on config).
@@ -657,7 +657,7 @@ impl LsmcPricer {
         initial_spot: f64,
         exercise: &E,
         currency: Currency,
-    ) -> MoneyEstimate {
+    ) -> finstack_quant_core::Result<MoneyEstimate> {
         let mut stats = OnlineStats::new();
         if self.config.antithetic {
             for pair in path_pvs.chunks_exact(2) {
@@ -967,7 +967,7 @@ impl LsmcPricer {
             },
         );
 
-        Ok(self.summarize_present_values(&values, initial_spot, exercise, currency))
+        self.summarize_present_values(&values, initial_spot, exercise, currency)
     }
 
     /// Convenience: run the full two-pass workflow with disjoint seeds.

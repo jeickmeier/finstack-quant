@@ -37,7 +37,7 @@ fn test_equity_trs_builder_custom_params() {
     // Arrange & Act
     let trs = TestEquityTrsBuilder::new()
         .id("CUSTOM-TRS-001")
-        .notional(Money::new(5_000_000.0, USD))
+        .notional(Money::new(5_000_000.0, USD).expect("valid money fixture"))
         .spread_bp(50.0)
         .side(TrsSide::PayTotalReturn)
         .initial_level(5100.0)
@@ -140,7 +140,7 @@ fn completed_period_remains_valued_until_lagged_payment_date() {
         finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap::builder(
         )
         .id("EQ-TRS-UNPAID".into())
-        .notional(Money::new(1_000_000.0, USD))
+        .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .underlying(
             EquityUnderlyingParams::new("SPX", "SPX-SPOT", USD)
                 .with_dividend_yield(PriceId::new("SPX-DIV-YIELD")),
@@ -221,7 +221,7 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
         .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
 
     let mut trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(1.0, USD))
+        .notional(Money::new(1.0, USD).expect("valid money fixture"))
         .initial_level(100.0)
         .build();
     trs.financing.discount_curve_id = CurveId::new("DISC");
@@ -237,7 +237,7 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
 
     // Gross dividend pass-through offsets the corresponding ex-dividend price
     // drop; counting both as positive return would double count distributions.
-    assert_eq!(tr_pv, Money::new(0.0, USD));
+    assert_eq!(tr_pv, Money::new(0.0, USD).expect("valid money fixture"));
 }
 
 #[test]
@@ -651,11 +651,11 @@ fn test_equity_trs_notional_scaling() {
     let as_of = as_of_date();
 
     let trs_1m = TestEquityTrsBuilder::new()
-        .notional(Money::new(1_000_000.0, USD))
+        .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_10m = TestEquityTrsBuilder::new()
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act

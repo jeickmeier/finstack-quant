@@ -245,7 +245,7 @@ impl FxBarrierOption {
                 Date::from_calendar_date(2024, Month::January, 1).expect("Valid example date"),
             ))
             .observed_barrier_breached_opt(None)
-            .notional(Money::new(1_000_000.0, Currency::EUR)) // Notional in foreign currency (EUR)
+            .notional(Money::from((1_000_000_i64, Currency::EUR))) // Notional in foreign currency (EUR)
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(DayCount::Act365F)
@@ -647,7 +647,7 @@ mod tests {
                 Date::from_calendar_date(2024, Month::January, 1).expect("valid date"),
             )
             .expiry(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(DayCount::Act365F)
@@ -712,7 +712,7 @@ mod tests {
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
             .expiry(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::USD)
             .quote_currency(Currency::USD)
             .day_count(DayCount::Act365F)

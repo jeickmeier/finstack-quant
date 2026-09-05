@@ -78,9 +78,11 @@ impl Payoff for EuropeanCall {
         Some(self.maturity_step)
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let intrinsic = (self.terminal_spot - self.strike).max(0.0);
-        Money::new(intrinsic * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let intrinsic = (self.terminal_spot - self.strike).max(0.0);
+            Money::new(intrinsic * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -142,9 +144,11 @@ impl Payoff for EuropeanPut {
         Some(self.maturity_step)
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let intrinsic = (self.strike - self.terminal_spot).max(0.0);
-        Money::new(intrinsic * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let intrinsic = (self.strike - self.terminal_spot).max(0.0);
+            Money::new(intrinsic * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -220,15 +224,17 @@ impl Payoff for Digital {
         Some(self.maturity_step)
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let condition_met = if self.is_call {
-            self.terminal_spot > self.strike
-        } else {
-            self.terminal_spot < self.strike
-        };
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let condition_met = if self.is_call {
+                self.terminal_spot > self.strike
+            } else {
+                self.terminal_spot < self.strike
+            };
 
-        let payoff = if condition_met { self.payout } else { 0.0 };
-        Money::new(payoff, currency)
+            let payoff = if condition_met { self.payout } else { 0.0 };
+            Money::new(payoff, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -301,10 +307,12 @@ impl Payoff for Forward {
         Some(self.maturity_step)
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let diff = self.terminal_spot - self.forward_price;
-        let payoff = if self.is_long { diff } else { -diff };
-        Money::new(payoff * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let diff = self.terminal_spot - self.forward_price;
+            let payoff = if self.is_long { diff } else { -diff };
+            Money::new(payoff * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -331,7 +339,7 @@ mod tests {
         let mut state = create_terminal_state(10, 110.0);
         call.on_event(&mut state).expect("valid payoff event");
 
-        let value = call.value(Currency::USD);
+        let value = call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 10.0); // max(110 - 100, 0)
         assert_eq!(value.currency(), Currency::USD);
     }
@@ -344,7 +352,7 @@ mod tests {
         let mut state = create_terminal_state(10, 90.0);
         call.on_event(&mut state).expect("valid payoff event");
 
-        let value = call.value(Currency::USD);
+        let value = call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 0.0); // max(90 - 100, 0) = 0
     }
 
@@ -356,7 +364,7 @@ mod tests {
         let mut state = create_terminal_state(10, 90.0);
         put.on_event(&mut state).expect("valid payoff event");
 
-        let value = put.value(Currency::USD);
+        let value = put.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 10.0); // max(100 - 90, 0)
     }
 
@@ -368,7 +376,7 @@ mod tests {
         let mut state = create_terminal_state(10, 110.0);
         digital.on_event(&mut state).expect("valid payoff event");
 
-        let value = digital.value(Currency::USD);
+        let value = digital.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 50.0);
 
         // Reset and test below strike
@@ -376,7 +384,7 @@ mod tests {
         let mut state2 = create_terminal_state(10, 90.0);
         digital.on_event(&mut state2).expect("valid payoff event");
 
-        let value2 = digital.value(Currency::USD);
+        let value2 = digital.value(Currency::USD).expect("valid payoff");
         assert_eq!(value2.amount(), 0.0);
     }
 
@@ -388,7 +396,7 @@ mod tests {
         let mut state = create_terminal_state(10, 90.0);
         digital.on_event(&mut state).expect("valid payoff event");
 
-        let value = digital.value(Currency::USD);
+        let value = digital.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 50.0);
     }
 
@@ -400,7 +408,7 @@ mod tests {
         let mut state = create_terminal_state(10, 110.0);
         forward.on_event(&mut state).expect("valid payoff event");
 
-        let value = forward.value(Currency::USD);
+        let value = forward.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 10.0); // 110 - 100
     }
 
@@ -412,7 +420,7 @@ mod tests {
         let mut state = create_terminal_state(10, 110.0);
         forward.on_event(&mut state).expect("valid payoff event");
 
-        let value = forward.value(Currency::USD);
+        let value = forward.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), -10.0); // -(110 - 100)
     }
 
@@ -435,7 +443,7 @@ mod tests {
         let mut state = create_terminal_state(10, 110.0);
         call.on_event(&mut state).expect("valid payoff event");
 
-        let value = call.value(Currency::USD);
+        let value = call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 100.0); // (110 - 100) * 10
     }
 }

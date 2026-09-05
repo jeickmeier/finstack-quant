@@ -161,7 +161,7 @@ impl<'a> DateProcessor<'a> {
                 state.flows.push(CashFlow::new(
                     d,
                     None,
-                    Money::new(flow_amount, ev.cash.currency()),
+                    Money::new(flow_amount, ev.cash.currency())?,
                     ev.kind,
                     0.0,
                     None,
@@ -194,7 +194,7 @@ impl<'a> DateProcessor<'a> {
             state.flows.push(CashFlow::new(
                 d,
                 None,
-                Money::new(outstanding_f64, self.ctx.ccy),
+                Money::new(outstanding_f64, self.ctx.ccy)?,
                 CFKind::Notional,
                 0.0,
                 None,

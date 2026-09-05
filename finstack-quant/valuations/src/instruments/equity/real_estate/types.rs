@@ -686,11 +686,11 @@ impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
         let mut flows: Vec<(Date, Money)> = self
             .unlevered_flows(as_of)?
             .into_iter()
-            .map(|(date, amount)| (date, Money::new(amount, self.currency)))
-            .collect();
+            .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
-            flows.push((date, Money::new(amount, self.currency)));
+            flows.push((date, Money::new(amount, self.currency)?));
         }
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,

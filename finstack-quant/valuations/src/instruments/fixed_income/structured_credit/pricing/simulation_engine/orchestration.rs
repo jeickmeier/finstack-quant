@@ -60,7 +60,7 @@ fn release_spread_account(
             0.0
         };
         if loss_fraction >= trap {
-            state.spread_account = Money::new(0.0, state.base_currency);
+            state.spread_account = Money::from((0_i64, state.base_currency));
             return Ok(());
         }
     }
@@ -93,7 +93,7 @@ fn release_spread_account(
         let release_date = state.prev_date.unwrap_or(state.closing_date);
         append_residual_principal(state, &id, balance, release_date)?;
     }
-    state.spread_account = Money::new(0.0, state.base_currency);
+    state.spread_account = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
@@ -136,11 +136,11 @@ fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
         let pay = remaining.min(balance);
         state
             .tranche_balances
-            .insert(id.clone(), Money::new(balance - pay, state.base_currency));
+            .insert(id.clone(), Money::new(balance - pay, state.base_currency)?);
         append_residual_principal(
             state,
             &id,
-            Money::new(pay, state.base_currency),
+            Money::new(pay, state.base_currency)?,
             release_date,
         )?;
         remaining -= pay;
@@ -157,12 +157,12 @@ fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
             append_residual_principal(
                 state,
                 &id,
-                Money::new(remaining, state.base_currency),
+                Money::new(remaining, state.base_currency)?,
                 release_date,
             )?;
         }
     }
-    state.reserve_balance = Money::new(0.0, state.base_currency);
+    state.reserve_balance = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
@@ -211,11 +211,11 @@ fn release_principal_funding_account(
         let pay = remaining.min(balance);
         state
             .tranche_balances
-            .insert(id.clone(), Money::new(balance - pay, state.base_currency));
+            .insert(id.clone(), Money::new(balance - pay, state.base_currency)?);
         append_residual_principal(
             state,
             &id,
-            Money::new(pay, state.base_currency),
+            Money::new(pay, state.base_currency)?,
             release_date,
         )?;
         remaining -= pay;
@@ -235,12 +235,12 @@ fn release_principal_funding_account(
             append_residual_principal(
                 state,
                 &id,
-                Money::new(remaining, state.base_currency),
+                Money::new(remaining, state.base_currency)?,
                 release_date,
             )?;
         }
     }
-    state.principal_funding_account = Money::new(0.0, state.base_currency);
+    state.principal_funding_account = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
@@ -316,7 +316,7 @@ pub(crate) fn prepare_deal_simulation(
     // it is layered onto the per-period waterfall inside `simulate_period` using
     // the live collateral WAC (`live_afc_cap_rate`), so the cap tracks pool
     // amortization/prepayment/defaults rather than being frozen at closing.
-    let waterfall = instrument.create_waterfall();
+    let waterfall = instrument.create_waterfall()?;
 
     // Resolve payment calendar - required for structured credit deals.
     // Silent fallback to weekends-only would shift coupons around holidays,
@@ -464,7 +464,7 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 // (`release_principal_funding_account`) cannot double-count or
                 // mis-allocate it across the (now-redeemed) balances.
                 let funding_balance = state.principal_funding_account.amount();
-                state.principal_funding_account = Money::new(0.0, state.base_currency);
+                state.principal_funding_account = Money::from((0_i64, state.base_currency));
                 let mut available_for_redemption =
                     state.pool_outstanding.amount() + pending_recoveries.amount() + funding_balance;
 
@@ -486,7 +486,7 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                         .tranche_balances
                         .get(tranche_id_str)
                         .copied()
-                        .unwrap_or(Money::new(0.0, state.base_currency));
+                        .unwrap_or(Money::from((0_i64, state.base_currency)));
 
                     if balance.amount() <= WRITEDOWN_DE_MINIMIS {
                         continue;
@@ -529,9 +529,9 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                     let interest_paid = redemption_amt.min(interest_claim).max(0.0);
                     let principal_paid = (redemption_amt - interest_paid).max(0.0);
 
-                    let redemption = Money::new(redemption_amt, state.base_currency);
-                    let interest_money = Money::new(interest_paid, state.base_currency);
-                    let principal_money = Money::new(principal_paid, state.base_currency);
+                    let redemption = Money::new(redemption_amt, state.base_currency)?;
+                    let interest_money = Money::new(interest_paid, state.base_currency)?;
+                    let principal_money = Money::new(principal_paid, state.base_currency)?;
 
                     if let Some(res) = state.results.get_mut(tranche_id_str) {
                         res.cashflows.push((pay_date, redemption));
@@ -549,14 +549,14 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                     if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
                         let cured = interest_paid.min(deferred).max(0.0);
                         *def = def
-                            .checked_sub(Money::new(cured, state.base_currency))
-                            .unwrap_or(Money::new(0.0, state.base_currency));
+                            .checked_sub(Money::new(cured, state.base_currency)?)
+                            .unwrap_or(Money::from((0_i64, state.base_currency)));
                     }
                     // Only the principal portion retires notional.
                     if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
                         *bal = bal
                             .checked_sub(principal_money)
-                            .unwrap_or(Money::new(0.0, state.base_currency));
+                            .unwrap_or(Money::from((0_i64, state.base_currency)));
                     }
                 }
 
@@ -571,7 +571,7 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                         .max_by_key(|t| t.payment_priority)
                         .map(|t| t.id.as_str().to_string());
                     if let Some(id) = residual_id {
-                        let residual = Money::new(available_for_redemption, state.base_currency);
+                        let residual = Money::new(available_for_redemption, state.base_currency)?;
                         append_residual_principal(&mut state, &id, residual, pay_date)?;
                     }
                 }
@@ -707,9 +707,9 @@ fn drain_pending_recoveries_at_end(
             let interest_paid = paid.min(deferred).max(0.0);
             let principal_paid = (paid - interest_paid).max(0.0);
 
-            let payment = Money::new(paid, state.base_currency);
-            let interest_money = Money::new(interest_paid, state.base_currency);
-            let principal_money = Money::new(principal_paid, state.base_currency);
+            let payment = Money::new(paid, state.base_currency)?;
+            let interest_money = Money::new(interest_paid, state.base_currency)?;
+            let principal_money = Money::new(principal_paid, state.base_currency)?;
 
             if let Some(res) = state.results.get_mut(tranche_id_str) {
                 res.cashflows.push((release_date, payment));
@@ -726,14 +726,14 @@ fn drain_pending_recoveries_at_end(
                 if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
                     *def = def
                         .checked_sub(interest_money)
-                        .unwrap_or(Money::new(0.0, state.base_currency));
+                        .unwrap_or(Money::from((0_i64, state.base_currency)));
                 }
             }
             if principal_paid > 0.0 {
                 if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
                     *bal = bal
                         .checked_sub(principal_money)
-                        .unwrap_or(Money::new(0.0, state.base_currency));
+                        .unwrap_or(Money::from((0_i64, state.base_currency)));
                 }
             }
         }
@@ -751,7 +751,7 @@ fn drain_pending_recoveries_at_end(
                 .find(|&i| state.tranches.tranches[i].seniority == TrancheSeniority::Equity);
             if let Some(idx) = equity_idx {
                 let tranche_id_str = state.tranches.tranches[idx].id.as_str();
-                let residual = Money::new(available, state.base_currency);
+                let residual = Money::new(available, state.base_currency)?;
                 if let Some(res) = state.results.get_mut(tranche_id_str) {
                     res.cashflows.push((release_date, residual));
                     res.principal_flows.push((release_date, residual));

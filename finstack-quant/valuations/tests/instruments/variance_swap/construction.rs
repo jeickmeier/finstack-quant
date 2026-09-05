@@ -19,7 +19,7 @@ fn test_builder_creates_valid_swap_with_all_required_fields() {
     let swap = VarianceSwap::builder()
         .id(InstrumentId::new("VAR-TEST-001"))
         .underlying_ticker(UNDERLYING_ID.to_string())
-        .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD))
+        .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
         .start_date(start)
         .maturity(end)

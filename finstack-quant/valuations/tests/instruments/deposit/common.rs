@@ -84,7 +84,7 @@ pub fn ctx_with_steep_curve(base: Date, id: &str) -> MarketContext {
 pub fn standard_deposit(base: Date) -> Deposit {
     Deposit::builder()
         .id(InstrumentId::new("DEP-STD"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(
             base.year(),
@@ -113,7 +113,7 @@ impl DepositBuilder {
     pub fn new(base: Date) -> Self {
         Self {
             id: "DEP-TEST".to_string(),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             start_date: base,
             maturity: date(base.year(), (base.month() as u8 + 6).min(12), base.day()),
             day_count: DayCount::Act360,

@@ -32,7 +32,7 @@
 //!     .term(TbaTerm::ThirtyYear)
 //!     .settlement_year(2024)
 //!     .settlement_month(3)
-//!     .notional(Money::new(10_000_000.0, Currency::USD))
+//!     .notional(Money::from((10_000_000_i64, Currency::USD)))
 //!     .trade_price(98.5)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .build()

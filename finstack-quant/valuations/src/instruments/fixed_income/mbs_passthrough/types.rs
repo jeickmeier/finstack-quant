@@ -161,8 +161,8 @@ impl std::fmt::Display for AgencyProgram {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
-    fn notional(&self) -> Option<Money> {
-        Some(self.current_face)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.current_face))
     }
 
     fn raw_cashflow_schedule(
@@ -237,8 +237,8 @@ pub enum PoolType {
 ///     .pool_id("MA1234".into())
 ///     .agency(AgencyProgram::Fnma)
 ///     .pool_type(PoolType::Generic)
-///     .original_face(Money::new(1_000_000.0, Currency::USD))
-///     .current_face(Money::new(950_000.0, Currency::USD))
+///     .original_face(Money::from((1_000_000_i64, Currency::USD)))
+///     .current_face(Money::from((950_000_i64, Currency::USD)))
 ///     .current_factor(0.95)
 ///     .wac(0.045)
 ///     .pass_through_rate(0.04)
@@ -377,8 +377,8 @@ impl AgencyMbsPassthrough {
             .pool_id("MA1234".into())
             .agency(AgencyProgram::Fnma)
             .pool_type(PoolType::Generic)
-            .original_face(Money::new(1_000_000.0, Currency::USD))
-            .current_face(Money::new(950_000.0, Currency::USD))
+            .original_face(Money::from((1_000_000_i64, Currency::USD)))
+            .current_face(Money::from((950_000_i64, Currency::USD)))
             .current_factor(0.95)
             .wac(0.045)
             .pass_through_rate(0.04)

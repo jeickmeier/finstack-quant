@@ -56,7 +56,7 @@ fn create_ust_10y_future() -> BondFuture {
 
     BondFuture::builder()
         .id(InstrumentId::from("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD)) // 10 contracts
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")) // 10 contracts
         .expiry(expiry)
         .delivery_start(delivery_start)
         .delivery_end(delivery_end)
@@ -78,8 +78,8 @@ fn create_ctd_bond() -> Bond {
 
     Bond::fixed(
         InstrumentId::from("US912828XG33"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.035), // 3.5% coupon
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.035).expect("valid rate fixture"), // 3.5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -174,7 +174,8 @@ fn bench_npv(c: &mut Criterion) {
 
     let num_contracts = 10;
     let mut sized_future = future;
-    sized_future.notional = Money::new(num_contracts as f64 * 100_000.0, Currency::USD);
+    sized_future.notional =
+        Money::new(num_contracts as f64 * 100_000.0, Currency::USD).expect("valid money fixture");
 
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{}contracts", num_contracts)),

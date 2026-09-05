@@ -78,7 +78,7 @@ fn test_irs_par_rate_market_standard() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_PAR_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -98,7 +98,7 @@ fn test_irs_par_rate_market_standard() {
     // Rebuild swap at par and assert PV ~ 0
     let par_swap = test_utils::usd_irs_swap(
         "SWAP_PAR_PAR",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         par,
         as_of,
         end,
@@ -128,7 +128,7 @@ fn test_par_rate_discount_ratio_matches_forward_for_new_swap() {
 
     let swap_forward = test_utils::usd_irs_swap(
         "SWAP_PAR_FWD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -200,7 +200,7 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
 
     let mut swap = test_utils::usd_irs_swap(
         "SWAP_PAR_SEASONED",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         start,
         end,
@@ -256,7 +256,7 @@ fn test_irs_annuity_calculation() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_ANNUITY_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -307,7 +307,7 @@ fn test_irs_dv01_market_standard() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_DV01_TEST",
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -407,7 +407,7 @@ fn test_irs_receive_vs_pay_fixed() {
 
     let swap_receive = InterestRateSwap {
         id: "SWAP_RECEIVE".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
@@ -420,7 +420,7 @@ fn test_irs_receive_vs_pay_fixed() {
 
     let swap_pay = InterestRateSwap {
         id: "SWAP_PAY".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
         fixed: fixed_leg,
         float: float_leg,
@@ -500,7 +500,7 @@ fn test_irs_rate_sensitivity() {
 
     let swap = InterestRateSwap {
         id: "SWAP_RATE_SENS".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: fixed_leg,
         float: float_leg,
@@ -562,7 +562,7 @@ fn test_irs_leg_pvs_consistency() {
 
     let swap = InterestRateSwap {
         id: "SWAP_LEG_PVS".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -640,7 +640,7 @@ fn test_daycount_convention_impact_on_annuity() {
     // Swap with ACT/360 fixed leg
     let swap_act360 = InterestRateSwap::builder()
         .id("IRS-ACT360".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -680,7 +680,7 @@ fn test_daycount_convention_impact_on_annuity() {
     // Swap with 30/360 fixed leg (US convention)
     let swap_30360 = InterestRateSwap::builder()
         .id("IRS-30360".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -818,7 +818,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
     // Create ISDA-standard USD swap with explicit fixing calendar
     let swap = InterestRateSwap::builder()
         .id("IRS-5Y-USD-T2-FIXING".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -986,7 +986,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
     // Use fixed rate below forward to create positive floating leg NPV
     let swap_365 = InterestRateSwap::builder()
         .id("IRS-FWD-365".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -1025,7 +1025,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
 
     let swap_360 = InterestRateSwap::builder()
         .id("IRS-FWD-360".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -1121,7 +1121,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
 
     let swap = InterestRateSwap::builder()
         .id("SOFR-OIS-QL-PARITY".into())
-        .notional(Money::new(100_000_000.0, Currency::USD))
+        .notional(Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: curve_id.into(),
@@ -1266,7 +1266,7 @@ fn test_eom_pricer_cashflow_consistency() {
     // Build swap with end_of_month = true (ISDA 2006 §4.18 convention)
     let swap_eom = InterestRateSwap::builder()
         .id("IRS-EOM-TRUE".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -1306,7 +1306,7 @@ fn test_eom_pricer_cashflow_consistency() {
     // Build the same swap with end_of_month = false for comparison
     let swap_no_eom = InterestRateSwap::builder()
         .id("IRS-EOM-FALSE".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -1431,7 +1431,7 @@ fn test_ois_identity_with_eom() {
     // Create OIS swap with EOM convention, no lookback, no spread, no payment delay
     let swap = InterestRateSwap::builder()
         .id("OIS-EOM-IDENTITY".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: disc_id.clone(),

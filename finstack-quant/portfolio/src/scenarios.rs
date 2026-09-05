@@ -440,7 +440,7 @@ fn diff_valuations(
         }
         // Position removed by the scenario: the stressed leg contributes nothing,
         // so the P&L is the negated base value.
-        let zero = Money::new(0.0, base_value.value_base.currency());
+        let zero = Money::from((0_i64, base_value.value_base.currency()));
         by_position.insert(
             position_id.clone(),
             zero.checked_sub(base_value.value_base)?,
@@ -760,7 +760,7 @@ mod tests {
             _as_of: finstack_quant_core::dates::Date,
         ) -> finstack_quant_core::Result<Money> {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            Ok(Money::new(100.0, Currency::USD))
+            Ok(Money::from((100_i64, Currency::USD)))
         }
 
         fn price_with_metrics(
@@ -788,7 +788,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -864,7 +864,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -916,7 +916,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -961,7 +961,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -1094,7 +1094,7 @@ mod tests {
         let drilldown = pnl
             .by_position
             .values()
-            .try_fold(Money::new(0.0, Currency::USD), |acc, delta| {
+            .try_fold(Money::from((0_i64, Currency::USD)), |acc, delta| {
                 acc.checked_add(*delta)
             })
             .expect("all deltas share the base currency");
@@ -1143,7 +1143,7 @@ mod tests {
 
     /// Build a one-position valuation whose only position value is `amount`.
     fn valuation_with(position_id: &str, amount: f64) -> crate::valuation::PortfolioValuation {
-        let value = Money::new(amount, Currency::USD);
+        let value = Money::new(amount, Currency::USD).expect("valid money fixture");
         let position_value = crate::valuation::PositionValue {
             position_id: PositionId::from(position_id),
             entity_id: crate::types::EntityId::from("ENTITY_A"),
@@ -1216,7 +1216,7 @@ mod tests {
     fn diff_valuations_rejects_currency_mismatch() {
         let base = valuation_with("POS_001", 100.0);
         let mut stressed = valuation_with("POS_001", 120.0);
-        let eur = Money::new(120.0, Currency::EUR);
+        let eur = Money::from((120_i64, Currency::EUR));
         if let Some(pv) = stressed.position_values.get_mut("POS_001") {
             pv.value_base = eur;
         }

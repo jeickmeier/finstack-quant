@@ -33,7 +33,7 @@ fn test_fi_index_trs_builder_custom_params() {
     // Arrange & Act
     let trs = TestFIIndexTrsBuilder::new()
         .id("CUSTOM-FI-TRS-001")
-        .notional(Money::new(25_000_000.0, USD))
+        .notional(Money::new(25_000_000.0, USD).expect("valid money fixture"))
         .spread_bp(150.0)
         .side(TrsSide::PayTotalReturn)
         .build();
@@ -88,7 +88,7 @@ fn test_fi_index_trs_with_yield_and_duration() {
 fn test_fi_index_trs_currency_consistency() {
     // Arrange & Act
     let trs = TestFIIndexTrsBuilder::new()
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Assert - Index base currency should match notional currency
@@ -485,11 +485,11 @@ fn test_fi_index_trs_notional_scaling() {
     let as_of = as_of_date();
 
     let trs_5m = TestFIIndexTrsBuilder::new()
-        .notional(Money::new(5_000_000.0, USD))
+        .notional(Money::new(5_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_25m = TestFIIndexTrsBuilder::new()
-        .notional(Money::new(25_000_000.0, USD))
+        .notional(Money::new(25_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -802,10 +802,10 @@ fn test_fi_index_trs_errors_on_price_scalar_for_yield() {
 
     let market = create_market_context().insert_price(
         "BAD-YIELD",
-        MarketScalar::Price(Money::new(
-            100.0,
-            finstack_quant_core::currency::Currency::USD,
-        )),
+        MarketScalar::Price(
+            Money::new(100.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
+        ),
     );
 
     let trs = TestFIIndexTrsBuilder::new()
@@ -835,10 +835,10 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
 
     let market = create_market_context().insert_price(
         "BAD-DURATION",
-        MarketScalar::Price(Money::new(
-            5.0,
-            finstack_quant_core::currency::Currency::USD,
-        )),
+        MarketScalar::Price(
+            Money::new(5.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
+        ),
     );
 
     let trs = TestFIIndexTrsBuilder::new()

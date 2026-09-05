@@ -15,7 +15,7 @@ use time::macros::date;
 fn test_call_constructor() {
     let expiry = date!(2025 - 12 - 31);
     let maturity = date!(2030 - 12 - 31);
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let params = CDSOptionParams::call(
         CDSOptionStrike::Spread(Decimal::new(1, 2)),
@@ -40,7 +40,7 @@ fn test_call_constructor() {
 fn test_put_constructor() {
     let expiry = date!(2025 - 12 - 31);
     let maturity = date!(2030 - 12 - 31);
-    let notional = Money::new(5_000_000.0, Currency::EUR);
+    let notional = Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture");
 
     let params = CDSOptionParams::put(
         CDSOptionStrike::Spread(Decimal::new(15, 3)),
@@ -59,7 +59,7 @@ fn test_put_constructor() {
 fn test_index_option_builder() {
     let expiry = date!(2025 - 12 - 31);
     let maturity = date!(2030 - 12 - 31);
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let params = CDSOptionParams::call(
         CDSOptionStrike::Spread(Decimal::new(1, 2)),
@@ -83,7 +83,7 @@ fn test_underlying_cds_coupon_for_index() {
     // c ≠ K, so this is the field index fixtures must populate.
     let expiry = date!(2025 - 12 - 31);
     let maturity = date!(2030 - 12 - 31);
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let params = CDSOptionParams::call(
         CDSOptionStrike::Spread(Decimal::new(55, 4)),
@@ -104,7 +104,7 @@ fn test_underlying_cds_coupon_for_index() {
 fn test_chained_builders() {
     let expiry = date!(2025 - 06 - 30);
     let maturity = date!(2028 - 06 - 30);
-    let notional = Money::new(20_000_000.0, Currency::GBP);
+    let notional = Money::new(20_000_000.0, Currency::GBP).expect("valid money fixture");
 
     let params = CDSOptionParams::put(
         CDSOptionStrike::Spread(Decimal::new(2, 2)),
@@ -128,7 +128,7 @@ fn test_chained_builders() {
 fn test_various_strikes() {
     let expiry = date!(2026 - 01 - 01);
     let maturity = date!(2031 - 01 - 01);
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Strikes in bp -> decimal: 25bp=0.0025, 50bp=0.005, 100bp=0.01, etc.
     let strikes_decimal = [
@@ -154,7 +154,7 @@ fn test_various_currencies() {
     let maturity = date!(2031 - 01 - 01);
 
     for currency in [Currency::USD, Currency::EUR, Currency::GBP, Currency::JPY] {
-        let notional = Money::new(10_000_000.0, currency);
+        let notional = Money::new(10_000_000.0, currency).expect("valid money fixture");
         let params = CDSOptionParams::call(
             CDSOptionStrike::Spread(Decimal::new(1, 2)),
             expiry,

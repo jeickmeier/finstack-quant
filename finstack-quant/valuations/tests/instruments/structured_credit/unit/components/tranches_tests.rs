@@ -33,7 +33,7 @@ fn test_tranche_creation_basic() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -56,7 +56,7 @@ fn test_tranche_creation_validates_attachment_points() {
         10.0,
         5.0, // detachment < attachment
         TrancheSeniority::Mezzanine,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     );
@@ -73,7 +73,7 @@ fn test_tranche_creation_validates_negative_attachment() {
         -5.0, // Negative attachment
         10.0,
         TrancheSeniority::Senior,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     );
@@ -90,7 +90,7 @@ fn test_tranche_creation_validates_detachment_over_100() {
         90.0,
         105.0, // Over 100%
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity_date(),
     );
@@ -107,7 +107,7 @@ fn test_tranche_fixed_coupon() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(90_000_000.0, Currency::USD),
+        Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -128,7 +128,7 @@ fn test_tranche_floating_coupon() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(90_000_000.0, Currency::USD),
+        Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
             index_id: CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
@@ -171,7 +171,7 @@ fn test_tranche_builder_complete() {
         .id("MEZZANINE")
         .attachment_detachment(10.0, 15.0)
         .seniority(TrancheSeniority::Mezzanine)
-        .balance(Money::new(5_000_000.0, Currency::USD))
+        .balance(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.08 })
         .maturity(maturity_date())
         .rating(CreditRating::BBB)
@@ -212,7 +212,7 @@ fn test_tranche_thickness() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -233,7 +233,7 @@ fn test_tranche_is_first_loss() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.15 },
         maturity_date(),
     )
@@ -244,7 +244,7 @@ fn test_tranche_is_first_loss() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -263,7 +263,7 @@ fn test_tranche_is_impaired() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -285,7 +285,7 @@ fn test_tranche_loss_allocation_no_loss() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -306,7 +306,7 @@ fn test_tranche_loss_allocation_partial_loss() {
         10.0, // 10% attachment
         15.0, // 15% detachment (5% thick)
         TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -327,7 +327,7 @@ fn test_tranche_loss_allocation_full_loss() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
@@ -348,14 +348,16 @@ fn test_tranche_current_balance_after_losses() {
         10.0,
         15.0,
         TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
     )
     .unwrap();
 
     // Act: 12% loss
-    let balance = tranche.current_balance_after_losses(12.0);
+    let balance = tranche
+        .current_balance_after_losses(12.0)
+        .expect("valid balance");
 
     // Assert: Original $50M - $20M loss = $30M
     assert_eq!(balance.amount(), 30_000_000.0);
@@ -370,7 +372,7 @@ fn test_tranche_structure_creation() {
         .id("EQUITY")
         .attachment_detachment(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
-        .balance(Money::new(10_000_000.0, Currency::USD))
+        .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
         .build()
@@ -380,7 +382,7 @@ fn test_tranche_structure_creation() {
         .id("SENIOR")
         .attachment_detachment(10.0, 100.0)
         .seniority(TrancheSeniority::Senior)
-        .balance(Money::new(90_000_000.0, Currency::USD))
+        .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
         .build()
@@ -401,7 +403,7 @@ fn test_tranche_structure_validates_gaps() {
         .id("EQUITY")
         .attachment_detachment(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
-        .balance(Money::new(10_000_000.0, Currency::USD))
+        .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
         .build()
@@ -411,7 +413,7 @@ fn test_tranche_structure_validates_gaps() {
         .id("SENIOR")
         .attachment_detachment(20.0, 100.0) // Gap!
         .seniority(TrancheSeniority::Senior)
-        .balance(Money::new(80_000_000.0, Currency::USD))
+        .balance(Money::new(80_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
         .build()
@@ -431,7 +433,7 @@ fn test_tranche_structure_validates_overlap() {
         .id("T1")
         .attachment_detachment(0.0, 15.0)
         .seniority(TrancheSeniority::Equity)
-        .balance(Money::new(15_000_000.0, Currency::USD))
+        .balance(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
         .build()
@@ -441,7 +443,7 @@ fn test_tranche_structure_validates_overlap() {
         .id("T2")
         .attachment_detachment(10.0, 100.0) // Overlaps with T1!
         .seniority(TrancheSeniority::Senior)
-        .balance(Money::new(85_000_000.0, Currency::USD))
+        .balance(Money::new(85_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
         .build()
@@ -461,7 +463,7 @@ fn test_tranche_structure_validates_reaches_100() {
         .id("INCOMPLETE")
         .attachment_detachment(0.0, 90.0)
         .seniority(TrancheSeniority::Senior)
-        .balance(Money::new(90_000_000.0, Currency::USD))
+        .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
         .build()
@@ -599,7 +601,7 @@ fn create_tranche(id: &str, attach: f64, detach: f64, seniority: TrancheSeniorit
         attach,
         detach,
         seniority,
-        Money::new((detach - attach) * 1_000_000.0, Currency::USD),
+        Money::new((detach - attach) * 1_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -618,7 +620,7 @@ fn create_tranche_with_balance(
         attach,
         detach,
         seniority,
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )

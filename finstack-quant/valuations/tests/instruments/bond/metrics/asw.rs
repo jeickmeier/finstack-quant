@@ -26,8 +26,8 @@ fn simple_discount_curve(id: &str, as_of: time::Date) -> DiscountCurve {
 fn simple_fixed_bond(as_of: time::Date) -> Bond {
     Bond::fixed(
         "ASW-TEST",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -57,7 +57,7 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
         Arc::new(bond.clone()),
         Arc::new(market),
         as_of,
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
 
@@ -142,7 +142,7 @@ fn test_asw_market_tightens_when_price_rises() {
         Arc::new(rich_bond),
         Arc::new(market.clone()),
         as_of,
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
     let asw_rich = *registry
@@ -155,7 +155,7 @@ fn test_asw_market_tightens_when_price_rises() {
         Arc::new(cheap_bond),
         Arc::new(market),
         as_of,
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
     let asw_cheap = *registry
@@ -215,7 +215,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         Arc::new(bond.clone()),
         Arc::new(market),
         as_of,
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
     let asw_mkt = *registry
@@ -295,8 +295,8 @@ fn test_asw_par_metric_rejects_matured_schedule() {
 
     let bond = Bond::fixed(
         "ASW-PAR-METRIC-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -312,7 +312,7 @@ fn test_asw_par_metric_rejects_matured_schedule() {
         Arc::new(bond),
         Arc::new(market),
         as_of,
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
     let err = registry
@@ -333,8 +333,8 @@ fn test_asw_market_metric_rejects_matured_schedule() {
 
     let mut bond = Bond::fixed(
         "ASW-MKT-METRIC-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -352,7 +352,7 @@ fn test_asw_market_metric_rejects_matured_schedule() {
         Arc::new(bond),
         Arc::new(market),
         as_of,
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
     let err = registry
@@ -487,7 +487,7 @@ fn test_asw_market_with_forward_moves_with_dirty_price() {
 fn test_asw_par_forward_returns_zero_for_zero_notional() {
     let as_of = date!(2025 - 01 - 15);
     let mut bond = simple_fixed_bond(as_of);
-    bond.notional = Money::new(0.0, Currency::USD);
+    bond.notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let disc = simple_discount_curve("USD-OIS", as_of);
     let fwd = simple_forward_curve("USD-SOFR-3M", as_of);
@@ -514,8 +514,8 @@ fn test_asw_par_forward_rejects_matured_schedule() {
 
     let bond = Bond::fixed(
         "ASW-PAR-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -551,8 +551,8 @@ fn test_asw_market_forward_rejects_matured_schedule() {
 
     let bond = Bond::fixed(
         "ASW-MKT-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

@@ -389,22 +389,28 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(150.0, Currency::USD)),
+            MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL_IMPL_VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
         .insert_price(
             "BOND_0_PRICE",
-            MarketScalar::Price(Money::new(1_000_000.0, Currency::USD)),
+            MarketScalar::Price(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         )
         .insert_price(
             "BOND_1_PRICE",
-            MarketScalar::Price(Money::new(1_000_000.0, Currency::USD)),
+            MarketScalar::Price(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         )
         .insert_price(
             "BOND_2_PRICE",
-            MarketScalar::Price(Money::new(1_000_000.0, Currency::USD)),
+            MarketScalar::Price(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         )
         .insert_credit_index("CORP-HAZARD", credit_index)
 }
@@ -456,7 +462,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let deposit_id = format!("DEPOSIT_{}", i);
         let deposit = Deposit::builder()
             .id(deposit_id.clone().into())
-            .notional(Money::new(1_000_000.0 * (i + 1) as f64, ccy))
+            .notional(Money::new(1_000_000.0 * (i + 1) as f64, ccy).expect("valid money fixture"))
             .start_date(base)
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)
@@ -494,8 +500,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let bond_id = format!("BOND_{}", i);
         let bond = Bond::fixed(
             bond_id.clone(),
-            Money::new(1_000_000.0, ccy),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(1_000_000.0, ccy).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             base,
             maturity_5y(),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -520,7 +526,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 3. Interest Rate Swaps
     for i in 0..positions_per_common {
         let swap_id = format!("IRS_{}", i);
-        let notional = Money::new(5_000_000.0 * (i + 1) as f64, Currency::USD);
+        let notional =
+            Money::new(5_000_000.0 * (i + 1) as f64, Currency::USD).expect("valid money fixture");
         let swap = rates_support::usd_irs_swap(
             swap_id.clone(),
             notional,
@@ -572,7 +579,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_common {
         let option_id = format!("OPTION_{}", i);
         let contract_size = 100.0;
-        let option_notional = Money::new(contract_size, Currency::USD);
+        let option_notional =
+            Money::new(contract_size, Currency::USD).expect("valid money fixture");
         let option_params =
             EquityOptionParams::new(150.0, maturity_2y(), OptionType::Call, option_notional)
                 .with_exercise_style(ExerciseStyle::European)
@@ -624,7 +632,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         };
         let cds = CreditDefaultSwap {
             id: cds_id.clone().into(),
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             side: if i % 2 == 0 {
                 PayReceive::Pay
             } else {
@@ -693,7 +701,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         };
         let repo = Repo::term(
             repo_id.clone(),
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             collateral,
             0.03,
             base,
@@ -722,7 +730,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let expiry = Date::from_calendar_date(2026, Month::July, 1).unwrap();
         let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
         let params = SwaptionParams::payer(
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,
             expiry,
             expiry,
@@ -758,7 +766,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .id(fx_option_id.clone().into())
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
             .strike(1.15)
             .option_type(OptionType::Call)
             .delta_convention(
@@ -798,7 +806,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             ),
             base + time::Duration::days(365),
             maturity_5y(),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         )
         .expect("valid CDS option params");
         let credit_params = CreditParams::new("CORP", 0.40, "CORP-HAZARD");
@@ -831,7 +839,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let var_swap = VarianceSwap::builder()
             .id(var_swap_id.clone().into())
             .underlying_ticker("AAPL".to_string())
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
             .strike_variance(0.0625)
             .start_date(base)
             .maturity(maturity_2y())
@@ -874,7 +882,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let tranche_params = CDSTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             maturity_5y(),
             500.0,
         );
@@ -918,7 +926,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_exotic.min(2) {
         let ilb_id = format!("TIPS_{}", i);
         let bond_params = InflationLinkedBondParams::new(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.01,
             base,
             maturity_5y(),
@@ -948,7 +956,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let infl_swap_id = format!("INFLSWAP_{}", i);
         let infl_swap = InflationSwap::builder()
             .id(infl_swap_id.clone().into())
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(base)
             .maturity(maturity_5y())
             .fixed_rate(rust_decimal::Decimal::try_from(0.02).expect("valid literal"))
@@ -981,7 +989,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         for j in 0..10 {
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 format!("{}_ASSET_{}", sc_id, j),
-                Money::new(1_000_000.0, Currency::USD),
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.06,
                 maturity_5y(),
                 DayCount::Act360,
@@ -992,7 +1000,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.04 },
             maturity_5y(),
         )
@@ -1060,7 +1068,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         };
         let convertible = ConvertibleBond {
             id: conv_id.clone().into(),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             issue_date: base,
             maturity: maturity_5y(),
             discount_curve_id: "USD-OIS".into(),
@@ -1100,7 +1108,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let deposit_id = format!("DEPOSIT_FILLER_{}", i);
         let deposit = Deposit::builder()
             .id(deposit_id.clone().into())
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(base)
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)

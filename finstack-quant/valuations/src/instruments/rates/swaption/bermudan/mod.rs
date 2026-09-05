@@ -316,7 +316,7 @@ impl BermudanSwaptionPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -332,7 +332,7 @@ impl BermudanSwaptionPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -400,7 +400,12 @@ impl BermudanSwaptionPricer {
         let mut result = ValuationResult::stamped(
             swaption.id.as_str(),
             as_of,
-            Money::new(pv, swaption.notional.currency()),
+            Money::new(pv, swaption.notional.currency()).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(swaption),
+                )
+            })?,
         );
 
         // Record whether cached model was used (1.0 = true, 0.0 = false)
@@ -448,7 +453,7 @@ impl BermudanSwaptionPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -459,7 +464,7 @@ impl BermudanSwaptionPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 

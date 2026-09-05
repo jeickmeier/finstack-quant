@@ -28,10 +28,16 @@ where
 #[test]
 fn test_scenarios_report_and_diagnostics_roundtrip() {
     let mut total_carry = IndexMap::new();
-    total_carry.insert(Currency::USD, Money::new(1250.0, Currency::USD));
+    total_carry.insert(
+        Currency::USD,
+        Money::new(1250.0, Currency::USD).expect("valid money fixture"),
+    );
 
     let mut instrument_carry = IndexMap::new();
-    instrument_carry.insert(Currency::USD, Money::new(500.0, Currency::USD));
+    instrument_carry.insert(
+        Currency::USD,
+        Money::new(500.0, Currency::USD).expect("valid money fixture"),
+    );
 
     assert_roundtrip_value(&RollForwardReport {
         old_date: date!(2025 - 01 - 01),

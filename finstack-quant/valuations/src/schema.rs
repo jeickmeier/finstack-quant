@@ -659,7 +659,7 @@ fn valuation_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     let value = finstack_quant_core::money::Money::new(
         1_012_345.67,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )?;
     // `stamped` records a wall-clock timestamp, which would make the checked-in
     // artifact differ on every regeneration; the example carries a fixed meta.
     let meta = finstack_quant_core::config::ResultsMeta {

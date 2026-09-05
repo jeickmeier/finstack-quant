@@ -250,10 +250,7 @@ impl CmsOptionPricer {
             total_pv += period_pv;
         }
 
-        Ok(Money::new(
-            total_pv * inst.notional.amount(),
-            inst.notional.currency(),
-        ))
+        Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
     }
 
     fn price_internal(

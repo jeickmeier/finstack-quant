@@ -223,7 +223,12 @@ impl BarrierOptionPdePricer {
                     }
                 },
             };
-            return Ok(Money::new(unit * inst.notional.amount(), ccy));
+            return Money::new(unit * inst.notional.amount(), ccy).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(inst),
+                )
+            });
         }
 
         let barrier_level = inst.barrier.amount();
@@ -295,7 +300,12 @@ impl BarrierOptionPdePricer {
             }
         };
 
-        Ok(Money::new(unit_price * inst.notional.amount(), ccy))
+        Money::new(unit_price * inst.notional.amount(), ccy).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(inst),
+            )
+        })
     }
 
     /// Build the barrier-truncated, strike-concentrated spatial grid.
@@ -519,7 +529,10 @@ mod tests {
         MarketContext::new()
             .insert(discount)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Price(Money::new(spot, Currency::USD)))
+            .insert_price(
+                "SPX",
+                MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            )
     }
 
     fn barrier_option(
@@ -534,14 +547,14 @@ mod tests {
             id: InstrumentId::new("BARRIER-PDE-TEST"),
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD),
+            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
             rebate: None,
             rebate_timing: Default::default(),
             option_type,
             barrier_type,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
             use_gobet_miri: false,
             discount_curve_id: "USD_DISC".into(),

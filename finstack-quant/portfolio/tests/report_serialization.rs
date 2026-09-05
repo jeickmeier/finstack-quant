@@ -69,7 +69,7 @@ fn test_cashflow_report_types_roundtrip() {
         instrument_id: "BOND_A".to_string(),
         instrument_type: InstrumentType::Bond,
         date: payment_date,
-        amount: Money::new(12_500.0, Currency::USD),
+        amount: Money::new(12_500.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Fixed,
         reset_date: Some(make_date(10)),
         accrual_factor: 0.25,
@@ -83,7 +83,10 @@ fn test_cashflow_report_types_roundtrip() {
     let mut full_by_date = IndexMap::new();
     let mut per_currency = IndexMap::new();
     let mut per_kind = IndexMap::new();
-    per_kind.insert(CFKind::Fixed, Money::new(12_500.0, Currency::USD));
+    per_kind.insert(
+        CFKind::Fixed,
+        Money::new(12_500.0, Currency::USD).expect("valid money fixture"),
+    );
     per_currency.insert(Currency::USD, per_kind);
     full_by_date.insert(payment_date, per_currency);
 

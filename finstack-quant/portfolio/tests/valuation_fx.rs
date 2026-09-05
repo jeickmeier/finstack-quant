@@ -21,7 +21,7 @@ fn cross_currency_conversion_uses_fx_matrix() {
     // EUR deposit valued with USD base; FX = 1.10 EUR→USD
     let dep = Deposit::builder()
         .id("DEP_EUR".into())
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -89,7 +89,7 @@ fn missing_fx_matrix_errors_for_cross_currency() {
     // EUR deposit, portfolio base USD, but no FX in market
     let dep = Deposit::builder()
         .id("DEP_EUR".into())
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -141,7 +141,7 @@ fn quantity_scaling_and_entity_totals() {
 
     let dep = Deposit::builder()
         .id("DEP_USD".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .quote_rate(rust_decimal::Decimal::try_from(0.05).expect("valid literal")) // Add a 5% rate so deposit has non-zero PV

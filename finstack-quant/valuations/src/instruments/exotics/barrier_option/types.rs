@@ -178,14 +178,14 @@ impl BarrierOption {
             .id(InstrumentId::new("BAR-SPX-UO-CALL"))
             .underlying_ticker("SPX".to_string())
             .strike(4500.0)
-            .barrier(Money::new(5000.0, Currency::USD))
-            .rebate(Money::new(50.0, Currency::USD))
+            .barrier(Money::from((5000_i64, Currency::USD)))
+            .rebate(Money::from((50_i64, Currency::USD)))
             .option_type(crate::instruments::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
             .expiry(date!(2024 - 12 - 20))
             .expiry_fixing_opt(None)
             .observed_barrier_breached_opt(None)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .use_gobet_miri(true) // Enable discrete monitoring correction (recommended)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -344,7 +344,7 @@ mod tests {
             .insert_price("SPX-DIV", MarketScalar::Unitless(0.0))
             .insert_price(
                 "SPX-SPOT",
-                MarketScalar::Price(Money::new(5100.0, Currency::USD)),
+                MarketScalar::Price(Money::from((5100_i64, Currency::USD))),
             );
 
         let err = crate::instruments::common_impl::traits::Instrument::value(

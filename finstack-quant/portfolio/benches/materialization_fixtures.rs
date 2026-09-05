@@ -194,7 +194,10 @@ fn amortizing_bond(index: usize) -> Bond {
             let schedule_date =
                 Date::from_calendar_date(year, month, 1).expect("valid schedule date");
             let remaining = notional_amount * (20 - step) as f64 / 20.0;
-            (schedule_date, Money::new(remaining, Currency::USD))
+            (
+                schedule_date,
+                Money::new(remaining, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect();
     let coupon = 0.03 + (index % 200) as f64 / 100_000.0;
@@ -205,7 +208,7 @@ fn amortizing_bond(index: usize) -> Bond {
     );
     Bond::builder()
         .id(format!("BOND-{index:05}").into())
-        .notional(Money::new(notional_amount, Currency::USD))
+        .notional(Money::new(notional_amount, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(maturity)
         .cashflow_spec(cashflows)
@@ -229,7 +232,7 @@ fn schedule_rich_swap(index: usize) -> CmsSwap {
             day_count: DayCount::Act360,
             forward_curve_id: "USD-SOFR-3M".into(),
         },
-        Money::new(2_000_000.0 + index as f64, Currency::USD),
+        Money::new(2_000_000.0 + index as f64, Currency::USD).expect("valid money fixture"),
         DayCount::Act360,
         IRSConvention::UsdSofr,
         if index % 4 == 1 {

@@ -47,7 +47,7 @@ fn emit_revolving_fee_on(
         Ok(Some(CashFlow::new(
             d,
             None,
-            Money::new(fee_amt, ccy),
+            Money::new(fee_amt, ccy)?,
             kind,
             year_fraction,
             Some(rate),
@@ -226,7 +226,7 @@ pub(in crate::builder) fn emit_fees_on(
                     CashFlow::new(
                         d,
                         None,
-                        Money::new(fee_amt, ccy),
+                        Money::new(fee_amt, ccy)?,
                         CFKind::Fee,
                         yf,
                         Some(rate),
@@ -538,7 +538,8 @@ mod tests {
             dec!(50),
             FeeAccrualBasis::TimeWeightedAverage,
             FeeBase::Undrawn {
-                facility_limit: Money::new(facility_limit, Currency::USD),
+                facility_limit: Money::new(facility_limit, Currency::USD)
+                    .expect("valid money fixture"),
             },
         );
 

@@ -60,7 +60,7 @@ use rust_decimal::Decimal;
 /// # fn main() -> finstack_quant_core::Result<()> {
 /// let trs = FIIndexTotalReturnSwap::builder()
 ///     .id(InstrumentId::new("CORP-TRS"))
-///     .notional(Money::new(10_000_000.0, Currency::USD))
+///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .underlying(
 ///         IndexUnderlyingParams::new("US-CORP", Currency::USD)
 ///             .with_yield("US-CORP-YIELD")
@@ -196,7 +196,7 @@ impl FIIndexTotalReturnSwap {
         );
         Self::builder()
             .id(InstrumentId::new("TRS-US-CORP-1Y"))
-            .notional(Money::new(5_000_000.0, Currency::USD))
+            .notional(Money::from((5_000_000_i64, Currency::USD)))
             .underlying(underlying)
             .financing(financing)
             .schedule(sched)
@@ -359,8 +359,8 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -377,7 +377,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap
 
         let mut flows = Vec::new();
         for date in period_schedule.dates.iter().skip(1) {
-            flows.push((*date, Money::new(0.0, self.notional.currency())));
+            flows.push((*date, Money::from((0_i64, self.notional.currency()))));
         }
 
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
@@ -385,7 +385,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap
             crate::cashflow::primitives::CFKind::Fixed,
             self.financing.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()

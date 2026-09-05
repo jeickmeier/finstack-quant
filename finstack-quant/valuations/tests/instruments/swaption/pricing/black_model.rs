@@ -286,12 +286,12 @@ fn test_notional_scaling() {
 
     // 1M notional
     let mut swaption1 = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
-    swaption1.notional = Money::new(1_000_000.0, Currency::USD);
+    swaption1.notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let pv1 = swaption1.value(&market, as_of).unwrap().amount();
 
     // 10M notional
     let mut swaption10 = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
-    swaption10.notional = Money::new(10_000_000.0, Currency::USD);
+    swaption10.notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let pv10 = swaption10.value(&market, as_of).unwrap().amount();
 
     assert_approx_eq(

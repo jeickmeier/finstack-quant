@@ -41,7 +41,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CDSTran
         42,
         attach_pct,
         detach_pct,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity,
         500.0, // 500bp running coupon
     );

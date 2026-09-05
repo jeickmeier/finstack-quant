@@ -17,7 +17,7 @@ fn test_ndf_builder() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(10_000_000.0, Currency::CNY))
+        .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -40,7 +40,7 @@ fn test_ndf_builder_with_optional_fields() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(10_000_000.0, Currency::CNY))
+        .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id_opt(Some(CurveId::new("CNY-OIS")))
@@ -82,7 +82,7 @@ fn test_ndf_from_trade_date() {
         Currency::USD,
         trade_date,
         Tenor::parse("3M").expect("valid tenor"),
-        Money::new(10_000_000.0, Currency::CNY),
+        Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"),
         7.25,
         "USD-OIS",
         None,
@@ -143,7 +143,7 @@ fn test_ndf_curve_dependencies_with_foreign() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(10_000_000.0, Currency::CNY))
+        .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -176,7 +176,7 @@ fn test_ndf_required_discount_curves() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(10_000_000.0, Currency::CNY))
+        .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -212,7 +212,7 @@ fn test_ndf_common_currencies() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(100_000_000.0, Currency::INR))
+        .notional(Money::new(100_000_000.0, Currency::INR).expect("valid money fixture"))
         .contract_rate(83.0)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -231,7 +231,7 @@ fn test_ndf_common_currencies() {
         .settlement_currency(Currency::USD)
         .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
         .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-        .notional(Money::new(10_000_000.0, Currency::BRL))
+        .notional(Money::new(10_000_000.0, Currency::BRL).expect("valid money fixture"))
         .contract_rate(5.0)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)

@@ -318,8 +318,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = Bond::fixed(
             "TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -388,8 +388,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = Bond::fixed(
             "TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -424,8 +424,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = Bond::fixed(
             "TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -506,8 +506,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "CARRY-TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -563,8 +563,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             id,
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -760,8 +760,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "CREDIT-BE",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -832,8 +832,8 @@ mod tests {
         // Compute with 1M horizon
         let mut bond_1m = Bond::fixed(
             "HORIZON-TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -862,8 +862,8 @@ mod tests {
         // Compute with 6M horizon
         let mut bond_6m = Bond::fixed(
             "HORIZON-TEST",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,

@@ -96,7 +96,13 @@ impl EquityOptionHestonPdePricer {
                 OptionType::Call => (spot - inst.strike).max(0.0),
                 OptionType::Put => (inst.strike - spot).max(0.0),
             };
-            return Ok(Money::new(intrinsic * inst.notional.amount(), ccy));
+            return Money::new(intrinsic * inst.notional.amount(), ccy).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(inst)
+                        .model(ModelKey::PdeAdi2D),
+                )
+            });
         }
 
         // Source production Heston parameters from explicit market scalars.
@@ -160,7 +166,12 @@ impl EquityOptionHestonPdePricer {
         })?;
         let price = solution.interpolate(spot.ln(), v0);
 
-        Ok(Money::new(price * inst.notional.amount(), ccy))
+        Money::new(price * inst.notional.amount(), ccy).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+            )
+        })
     }
 }
 
@@ -235,7 +246,7 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

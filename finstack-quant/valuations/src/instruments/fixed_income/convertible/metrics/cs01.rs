@@ -247,7 +247,7 @@ mod tests {
 
         ConvertibleBond {
             id: "TEST_CB_CS01".to_string().into(),
-            notional: Money::new(1000.0, Currency::USD),
+            notional: Money::from((1000_i64, Currency::USD)),
             issue_date: issue,
             maturity,
             discount_curve_id: "USD-OIS".into(),

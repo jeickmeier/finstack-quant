@@ -93,23 +93,22 @@ test('DiscountCurve uses canonical forward and explicit negative-rate validation
   assert.equal(curve.forwardRate, undefined);
 });
 
-test('ForwardCurve exposes resetLag without changing prior positional arguments', () => {
-  const curve = new core.ForwardCurve(
-    'USD-SOFR',
-    0.25,
-    '2025-01-01',
-    [0, 0.04, 1, 0.045],
-    'act_360',
-    'linear',
-    'flat_forward',
-    undefined,
-    3
-  );
+test('ForwardCurve options expose resetLag', () => {
+  const curve = new core.ForwardCurve({
+    id: 'USD-SOFR',
+    tenor: 0.25,
+    baseDate: '2025-01-01',
+    knots: [0, 0.04, 1, 0.045],
+    dayCount: 'act_360',
+    interp: 'linear',
+    extrapolation: 'flat_forward',
+    resetLag: 3,
+  });
   assert.equal(curve.resetLag, 3);
 });
 
-test('ForwardCurve.fromOptions provides an unambiguous named factory', () => {
-  const curve = core.ForwardCurve.fromOptions({
+test('ForwardCurve options accept typed arrays', () => {
+  const curve = new core.ForwardCurve({
     id: 'USD-SOFR',
     tenor: 0.25,
     baseDate: '2025-01-01',

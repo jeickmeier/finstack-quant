@@ -52,8 +52,8 @@ fn test_bond_basic_pricing() {
 
     let bond = Bond::fixed(
         "PRICE_TEST",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -84,8 +84,8 @@ fn test_bond_price_vs_yield() {
 
     let bond = Bond::fixed(
         "YIELD_TEST",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -115,8 +115,8 @@ fn test_bond_price_coupon_relationship() {
     // Bond with above-market coupon
     let high_coupon = Bond::fixed(
         "HIGH_COUPON",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.08),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.08).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -127,8 +127,8 @@ fn test_bond_price_coupon_relationship() {
     // Bond with below-market coupon
     let low_coupon = Bond::fixed(
         "LOW_COUPON",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.03),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -158,8 +158,8 @@ fn test_bond_price_maturity_relationship() {
 
     let bond_2y = Bond::fixed(
         "2Y",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2027 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -169,8 +169,8 @@ fn test_bond_price_maturity_relationship() {
 
     let bond_10y = Bond::fixed(
         "10Y",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2035 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -213,8 +213,8 @@ fn test_bond_price_zero_coupon() {
 
     let bond = Bond::fixed(
         "ZERO",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -252,8 +252,8 @@ fn test_bond_theta_time_decay() {
 
     let bond = Bond::fixed(
         "THETA_TEST",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -290,7 +290,7 @@ fn test_bond_settlement_date_impact() {
     // No settlement lag
     let bond_t0 = Bond::builder()
         .id("SETTLE_T0".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -309,7 +309,7 @@ fn test_bond_settlement_date_impact() {
     // T+2 settlement
     let bond_t2 = Bond::builder()
         .id("SETTLE_T2".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -348,8 +348,8 @@ fn test_bond_matured_or_near_zero_value() {
 
     let bond = Bond::fixed(
         "MATURED",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -376,8 +376,8 @@ fn test_bond_near_maturity_pricing() {
 
     let bond = Bond::fixed(
         "NEAR_MAT",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -407,8 +407,8 @@ fn test_bond_curve_parallel_shift() {
 
     let bond = Bond::fixed(
         "SHIFT_TEST",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -452,8 +452,8 @@ fn test_bond_price_consistency() {
 
     let bond = Bond::fixed(
         "CONSISTENT",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -480,8 +480,8 @@ fn test_bond_notional_scaling() {
 
     let bond_100 = Bond::fixed(
         "N100",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -491,8 +491,8 @@ fn test_bond_notional_scaling() {
 
     let bond_1000 = Bond::fixed(
         "N1000",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -525,7 +525,7 @@ fn test_bond_different_day_counts() {
     for day_count in day_counts {
         let bond = Bond::builder()
             .id(format!("DC_{:?}", day_count).into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(

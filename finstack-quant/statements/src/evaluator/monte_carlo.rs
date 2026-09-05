@@ -492,7 +492,7 @@ mod tests {
 
     #[test]
     fn aggregate_rejects_non_finite_path_values() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("mc-agg")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -516,7 +516,7 @@ mod tests {
     fn breach_probability_is_order_independent() {
         // Two paths; path 0 breaches in period 1, path 1 never breaches.
         // Expected probability: exactly 0.5 regardless of rayon-reduce order.
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("mc-breach")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -550,7 +550,7 @@ mod tests {
 
     #[test]
     fn accumulator_preserves_warnings_for_valid_paths() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("mc-agg")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -599,7 +599,7 @@ mod tests {
     fn path_data_rows_sorted_regardless_of_push_order() {
         // Rayon merge order is nondeterministic; finish() must emit a
         // canonical (path_id, metric, period) row order either way.
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("mc-sort")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -634,7 +634,7 @@ mod tests {
 
     #[test]
     fn path_data_is_opt_in() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("mc-path-data")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")

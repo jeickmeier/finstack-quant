@@ -33,7 +33,7 @@ fn term_loan_fixed_with_draws_and_fees() {
     let loan = TermLoan::builder()
         .id("TL-001".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 800 })
@@ -47,19 +47,21 @@ fn term_loan_fixed_with_draws_and_fees() {
         .discount_curve_id(CurveId::from("USD-OIS"))
         .amortization(term_loan::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
-        .upfront_fee_opt(Some(Money::new(25_000.0, Currency::USD)))
+        .upfront_fee_opt(Some(
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD),
+            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: Date::from_calendar_date(2026, time::Month::January, 1).unwrap(),
             draws: vec![
                 DrawEvent {
                     date: issue,
-                    amount: Money::new(3_000_000.0, Currency::USD),
+                    amount: Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
                 },
                 DrawEvent {
                     date: Date::from_calendar_date(2025, time::Month::July, 1).unwrap(),
-                    amount: Money::new(2_000_000.0, Currency::USD),
+                    amount: Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
                 },
             ],
             commitment_step_downs: vec![],
@@ -103,7 +105,7 @@ fn term_loan_commitment_fee_step_downs() {
     let loan = TermLoan::builder()
         .id("TL-STEPDOWN".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 700 })
@@ -119,13 +121,13 @@ fn term_loan_commitment_fee_step_downs() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD),
+            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end,
             draws: vec![],
             commitment_step_downs: vec![CommitmentStepDown {
                 date: step_down,
-                new_limit: Money::new(5_000_000.0, Currency::USD),
+                new_limit: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             }],
             usage_fee_bp: 0,
             commitment_fee_bp: 100,
@@ -183,7 +185,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
     let loan = TermLoan::builder()
         .id("TL-WINDOW".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 650 })
@@ -199,7 +201,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD),
+            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end,
             draws: vec![],
@@ -240,7 +242,7 @@ fn term_loan_oid_eir_amortization_schedule() {
     let loan = TermLoan::builder()
         .id("TL-OID-EIR".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 500 })
@@ -256,12 +258,12 @@ fn term_loan_oid_eir_amortization_schedule() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(1_000_000.0, Currency::USD),
+            commitment_limit: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: issue,
             draws: vec![DrawEvent {
                 date: issue,
-                amount: Money::new(1_000_000.0, Currency::USD),
+                amount: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             }],
             commitment_step_downs: vec![],
             usage_fee_bp: 0,
@@ -317,7 +319,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         }],
         cash_sweeps: vec![term_loan::CashSweepEvent {
             date: Date::from_calendar_date(2025, time::Month::October, 1).unwrap(),
-            amount: Money::new(500_000.0, Currency::USD),
+            amount: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         }],
         draw_stop_dates: vec![],
     };
@@ -325,7 +327,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     let loan = TermLoan::builder()
         .id("TL-PIK".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(5_000_000.0, Currency::USD))
+        .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 600 })
@@ -383,7 +385,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let loan = TermLoan::builder()
         .id("TL-FIXED-STEP".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(5_000_000.0, Currency::USD))
+        .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 600 })
@@ -433,7 +435,7 @@ fn term_loan_golden_pv_and_metrics() {
     let loan = TermLoan::builder()
         .id("TL-GOLDEN".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 500 }) // 5%
@@ -515,7 +517,7 @@ fn term_loan_amortizing_outstanding_path() {
     let loan = TermLoan::builder()
         .id("TL-AMORT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 500 })

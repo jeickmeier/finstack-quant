@@ -23,7 +23,12 @@ fn test_sum_with_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // sum should skip NaN and return 10.0 + 20.0 = 30.0
-    let total = results.get("total", &PeriodId::quarter(2025, 1)).unwrap();
+    let total = results
+        .get(
+            "total",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert_eq!(total, 30.0, "sum() should skip NaN values");
 }
 
@@ -47,7 +52,12 @@ fn test_mean_with_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // mean should skip NaN and return (10.0 + 20.0) / 2 = 15.0
-    let average = results.get("average", &PeriodId::quarter(2025, 1)).unwrap();
+    let average = results
+        .get(
+            "average",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert_eq!(average, 15.0, "mean() should skip NaN values");
 }
 
@@ -72,7 +82,10 @@ fn test_all_nan_values() {
 
     // If all values are NaN, sum and mean should return NaN
     let sum = results
-        .get("sum_result", &PeriodId::quarter(2025, 1))
+        .get(
+            "sum_result",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert!(
         sum.is_nan(),
@@ -80,7 +93,10 @@ fn test_all_nan_values() {
     );
 
     let mean = results
-        .get("mean_result", &PeriodId::quarter(2025, 1))
+        .get(
+            "mean_result",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert!(
         mean.is_nan(),
@@ -108,7 +124,12 @@ fn test_coalesce_with_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // coalesce skips NaN values; returns first non-NaN which is 0.0 (value2)
-    let result = results.get("result", &PeriodId::quarter(2025, 1)).unwrap();
+    let result = results
+        .get(
+            "result",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert_eq!(
         result, 0.0,
         "coalesce() should skip NaN but return first non-NaN (including zero)"
@@ -131,7 +152,12 @@ fn test_annualize_with_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // annualize with NaN input should return NaN
-    let annual = results.get("annual", &PeriodId::quarter(2025, 1)).unwrap();
+    let annual = results
+        .get(
+            "annual",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert!(
         annual.is_nan(),
         "annualize() should return NaN when input is NaN"
@@ -147,10 +173,22 @@ fn test_ttm_with_nan() {
         .value(
             "revenue",
             &[
-                (PeriodId::quarter(2024, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2024, 2), AmountOrScalar::scalar(f64::NAN)),
-                (PeriodId::quarter(2024, 3), AmountOrScalar::scalar(150.0)),
-                (PeriodId::quarter(2024, 4), AmountOrScalar::scalar(200.0)),
+                (
+                    PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(f64::NAN),
+                ),
+                (
+                    PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(150.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(200.0),
+                ),
             ],
         )
         .compute("revenue_ttm", "ttm(revenue)")
@@ -168,7 +206,10 @@ fn test_ttm_with_nan() {
     // signal that the metric is not well-defined and should not be
     // consumed downstream.
     let ttm = results
-        .get("revenue_ttm", &PeriodId::quarter(2024, 4))
+        .get(
+            "revenue_ttm",
+            &PeriodId::quarter(2024, 4).expect("valid period fixture"),
+        )
         .unwrap();
     assert!(
         ttm.is_nan(),
@@ -201,7 +242,12 @@ fn test_mixed_operations_with_nan() {
     // sum(a, b) = 10.0 (skips NaN)
     // coalesce(d, c) = 0.0 (d is 0.0 which is non-NaN; coalesce returns first non-NaN)
     // mean(10.0, 0.0) = 5.0
-    let result = results.get("result", &PeriodId::quarter(2025, 1)).unwrap();
+    let result = results
+        .get(
+            "result",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     assert_eq!(
         result, 5.0,
         "Complex operations should handle NaN correctly"

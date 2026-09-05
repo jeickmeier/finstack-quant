@@ -823,7 +823,7 @@
   "properties": {
     "amount": {
       "$ref": "#/$defs/DecimalWire",
-      "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Rounded to the\ncurrency's ISO 4217 minor-unit scale."
+      "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
     },
     "currency": {
       "$ref": "#/$defs/Currency",

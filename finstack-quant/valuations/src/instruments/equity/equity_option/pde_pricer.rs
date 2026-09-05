@@ -89,7 +89,13 @@ impl EquityOptionPdePricer {
                 OptionType::Call => (spot - inst.strike).max(0.0),
                 OptionType::Put => (inst.strike - spot).max(0.0),
             };
-            return Ok(Money::new(intrinsic * inst.notional.amount(), ccy));
+            return Money::new(intrinsic * inst.notional.amount(), ccy).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(inst)
+                        .model(ModelKey::PdeCrankNicolson1D),
+                )
+            });
         }
 
         let is_call = matches!(inst.option_type, OptionType::Call);
@@ -172,7 +178,13 @@ impl EquityOptionPdePricer {
         })?;
         let price = solution.interpolate(spot.ln());
 
-        Ok(Money::new(price * inst.notional.amount(), ccy))
+        Money::new(price * inst.notional.amount(), ccy).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(inst)
+                    .model(ModelKey::PdeCrankNicolson1D),
+            )
+        })
     }
 }
 

@@ -227,8 +227,8 @@ mod tests {
     fn zero_coupon_bond() -> Bond {
         Bond::fixed(
             "ZERO",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.0),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
             date!(2025 - 01 - 15),
             date!(2026 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -247,7 +247,7 @@ mod tests {
     ) -> Bond {
         Bond::builder()
             .id(id.into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(

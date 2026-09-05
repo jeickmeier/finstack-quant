@@ -98,15 +98,15 @@ impl Notional {
     /// use finstack_quant_cashflows::builder::{Notional, AmortizationSpec};
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let notional = Notional::par(1_000_000.0, Currency::USD);
+    /// let notional = Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture");
     /// assert_eq!(notional.initial.amount(), 1_000_000.0);
     /// assert!(matches!(notional.amort, AmortizationSpec::None));
     /// ```
-    pub fn par(amount: f64, currency: Currency) -> Self {
-        Self {
-            initial: Money::new(amount, currency),
+    pub fn par(amount: f64, currency: Currency) -> finstack_quant_core::Result<Self> {
+        Ok(Self {
+            initial: Money::new(amount, currency)?,
             amort: AmortizationSpec::None,
-        }
+        })
     }
 
     /// Convenience accessor for currency.

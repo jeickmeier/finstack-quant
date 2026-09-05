@@ -137,10 +137,12 @@ fn test_contract_size_scales_value_linearly() {
     let spot = 100.0;
 
     let mut call_100 = create_call(as_of, expiry, strike);
-    call_100.notional = finstack_quant_core::money::Money::new(100.0, call_100.notional.currency());
+    call_100.notional = finstack_quant_core::money::Money::new(100.0, call_100.notional.currency())
+        .expect("valid money fixture");
 
     let mut call_200 = create_call(as_of, expiry, strike);
-    call_200.notional = finstack_quant_core::money::Money::new(200.0, call_200.notional.currency());
+    call_200.notional = finstack_quant_core::money::Money::new(200.0, call_200.notional.currency())
+        .expect("valid money fixture");
 
     let market = build_standard_market(as_of, spot, 0.25, 0.05, 0.02);
 

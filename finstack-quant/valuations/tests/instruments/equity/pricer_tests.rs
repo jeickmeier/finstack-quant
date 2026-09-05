@@ -65,7 +65,7 @@ fn test_equity_pricer_from_market_data() {
 
     let market = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(200.0, Currency::USD)),
+        MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
     );
 
     let pricer = EquityPricer;
@@ -87,7 +87,7 @@ fn test_equity_pricer_with_custom_price_id() {
 
     let market = MarketContext::new().insert_price(
         "CUSTOM_PRICE_ID",
-        MarketScalar::Price(Money::new(180.0, Currency::USD)),
+        MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
     );
 
     let pricer = EquityPricer;
@@ -217,8 +217,8 @@ fn test_simple_equity_pricer_type_mismatch() {
     let maturity = Date::from_calendar_date(2029, time::Month::January, 1).unwrap();
     let bond = Bond::fixed(
         "BOND",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

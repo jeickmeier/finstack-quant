@@ -22,8 +22,8 @@ use time::macros::date;
 fn build_callable_credit_bond(as_of: time::Date) -> Bond {
     let mut bond = Bond::fixed(
         "CALL-CREDIT",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         date!(2027 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

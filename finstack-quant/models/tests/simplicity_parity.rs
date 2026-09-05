@@ -2,7 +2,7 @@
 //! by the simplicity audit.
 //!
 //! These tests prove that:
-//! 1. `Money::format_with` + defaults == `format_with_separators`, and that
+//! 1. `Money::format_with` uses the documented grouping defaults, and that
 //!    `format(decimals, show_currency)` matches the corresponding `FormatOpts`.
 //! 2. `DiscountCurveBuilder::validation(ValidationMode::*)` covers the
 //!    market-standard, negative-rate-friendly, and raw validation policies.
@@ -36,24 +36,21 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 // Money formatting parity
 
 #[test]
-fn format_with_default_matches_format_with_separators() {
-    let amt = Money::new(1_042_315.67, Currency::USD);
-    assert_eq!(
-        amt.format_with(FormatOpts::default()),
-        amt.format_with_separators(2)
-    );
+fn format_with_default_groups_digits() {
+    let amt = Money::new(1_042_315.67, Currency::USD).expect("valid money fixture");
+    assert_eq!(amt.format_with(FormatOpts::default()), "USD 1,042,315.67");
 }
 
 #[test]
-fn format_with_no_group_matches_format_two_args() {
-    let amt = Money::new(1_042_315.67, Currency::USD);
+fn format_with_controls_grouping_and_currency() {
+    let amt = Money::new(1_042_315.67, Currency::USD).expect("valid money fixture");
     let via_opts = amt.format_with(FormatOpts {
         decimals: Some(2),
         show_currency: true,
         group: None,
         rounding: Default::default(),
     });
-    assert_eq!(via_opts, amt.format(2, true));
+    assert_eq!(via_opts, "USD 1042315.67");
 
     let no_currency = amt.format_with(FormatOpts {
         decimals: Some(2),
@@ -61,14 +58,13 @@ fn format_with_no_group_matches_format_two_args() {
         group: None,
         rounding: Default::default(),
     });
-    assert_eq!(no_currency, amt.format(2, false));
+    assert_eq!(no_currency, "1042315.67");
 }
 
 #[test]
 fn format_with_handles_negative_amounts() {
-    let amt = Money::new(-1_234.5, Currency::USD);
+    let amt = Money::new(-1_234.5, Currency::USD).expect("valid money fixture");
     assert_eq!(amt.format_with(FormatOpts::default()), "USD -1,234.50");
-    assert_eq!(amt.format_with_separators(2), "USD -1,234.50");
 }
 
 // DiscountCurveBuilder::validation parity
@@ -285,7 +281,7 @@ fn value_checked_matches_value_clamped_on_interior() {
 #[test]
 fn rate_try_from_f64_matches_try_from_decimal_for_valid_inputs() {
     for &x in &[0.0, 0.05, -0.001, 1.5, -0.999_5] {
-        let via_constructor = Rate::try_from_decimal(x).unwrap();
+        let via_constructor = Rate::from_decimal(x).unwrap();
         let via_conversion = Rate::try_from(x).unwrap();
         assert!(
             (via_constructor.as_decimal() - via_conversion.as_decimal()).abs() < 1e-15,
@@ -296,9 +292,9 @@ fn rate_try_from_f64_matches_try_from_decimal_for_valid_inputs() {
 
 #[test]
 fn rate_try_from_decimal_rejects_non_finite() {
-    assert!(Rate::try_from_decimal(f64::NAN).is_err());
-    assert!(Rate::try_from_decimal(f64::INFINITY).is_err());
-    assert!(Rate::try_from_decimal(f64::NEG_INFINITY).is_err());
+    assert!(Rate::from_decimal(f64::NAN).is_err());
+    assert!(Rate::from_decimal(f64::INFINITY).is_err());
+    assert!(Rate::from_decimal(f64::NEG_INFINITY).is_err());
 }
 
 #[test]

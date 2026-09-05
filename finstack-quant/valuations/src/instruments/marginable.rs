@@ -670,7 +670,7 @@ mod tests {
 
         let swap = rates_support::usd_irs_swap(
             "TEST_IRS",
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             0.035,
             start,
             end,
@@ -700,7 +700,7 @@ mod tests {
 
         let swap = rates_support::usd_irs_swap(
             "TEST_IRS_10Y",
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             0.035,
             start,
             end,
@@ -731,7 +731,7 @@ mod tests {
     fn test_irs_simm_uses_repriced_dv01_with_market() {
         let start = test_date();
         let end = Date::from_calendar_date(2034, Month::June, 15).expect("valid date");
-        let notional = Money::new(100_000_000.0, Currency::USD);
+        let notional = Money::from((100_000_000_i64, Currency::USD));
 
         let swap = rates_support::usd_irs_swap(
             "TEST_IRS_REPRICED",
@@ -798,7 +798,7 @@ mod tests {
 
         let mut swap = rates_support::usd_irs_swap(
             "TEST_IRS",
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             0.035,
             start,
             end,

@@ -32,19 +32,19 @@ fn bench_model_building(c: &mut Criterion) {
                     "revenue",
                     &[
                         (
-                            PeriodId::quarter(2025, 1),
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
                             AmountOrScalar::scalar(100_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 2),
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
                             AmountOrScalar::scalar(110_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 3),
+                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
                             AmountOrScalar::scalar(120_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 4),
+                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
                             AmountOrScalar::scalar(130_000.0),
                         ),
                     ],
@@ -64,19 +64,19 @@ fn bench_model_building(c: &mut Criterion) {
                     "revenue",
                     &[
                         (
-                            PeriodId::quarter(2025, 1),
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
                             AmountOrScalar::scalar(100_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 2),
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
                             AmountOrScalar::scalar(110_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 3),
+                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
                             AmountOrScalar::scalar(120_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 4),
+                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
                             AmountOrScalar::scalar(130_000.0),
                         ),
                     ],
@@ -104,19 +104,19 @@ fn bench_model_building(c: &mut Criterion) {
                     "revenue",
                     &[
                         (
-                            PeriodId::quarter(2025, 1),
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
                             AmountOrScalar::scalar(100_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 2),
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
                             AmountOrScalar::scalar(110_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 3),
+                            PeriodId::quarter(2025, 3).expect("valid period fixture"),
                             AmountOrScalar::scalar(120_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 4),
+                            PeriodId::quarter(2025, 4).expect("valid period fixture"),
                             AmountOrScalar::scalar(130_000.0),
                         ),
                     ],
@@ -152,19 +152,19 @@ fn bench_model_evaluation(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -187,19 +187,19 @@ fn bench_model_evaluation(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -230,19 +230,19 @@ fn bench_model_evaluation(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -281,19 +281,19 @@ fn bench_model_evaluation(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -320,7 +320,8 @@ fn bench_model_evaluation(c: &mut Criterion) {
     let mut monthly_values = Vec::new();
     for m in 1..=24 {
         monthly_values.push((
-            PeriodId::month(2025 + (m - 1) / 12, (((m - 1) % 12) + 1) as u8),
+            PeriodId::month(2025 + (m - 1) / 12, (((m - 1) % 12) + 1) as u8)
+                .expect("valid period fixture"),
             AmountOrScalar::scalar(100_000.0 + m as f64 * 1000.0),
         ));
     }
@@ -416,7 +417,7 @@ fn bench_forecast_methods(c: &mut Criterion) {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -438,7 +439,7 @@ fn bench_forecast_methods(c: &mut Criterion) {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -470,7 +471,7 @@ fn bench_forecast_methods(c: &mut Criterion) {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -498,7 +499,7 @@ fn bench_forecast_methods(c: &mut Criterion) {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -563,19 +564,19 @@ fn bench_results_export(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -606,7 +607,8 @@ fn bench_results_export(c: &mut Criterion) {
     let mut monthly_values = Vec::new();
     for m in 1..=24 {
         monthly_values.push((
-            PeriodId::month(2025 + (m - 1) / 12, (((m - 1) % 12) + 1) as u8),
+            PeriodId::month(2025 + (m - 1) / 12, (((m - 1) % 12) + 1) as u8)
+                .expect("valid period fixture"),
             AmountOrScalar::scalar(100_000.0 + m as f64 * 1000.0),
         ));
     }
@@ -649,19 +651,19 @@ fn bench_serialization(c: &mut Criterion) {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -705,11 +707,11 @@ fn bench_end_to_end(c: &mut Criterion) {
                     "revenue",
                     &[
                         (
-                            PeriodId::quarter(2025, 1),
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
                             AmountOrScalar::scalar(1_000_000.0),
                         ),
                         (
-                            PeriodId::quarter(2025, 2),
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
                             AmountOrScalar::scalar(1_100_000.0),
                         ),
                     ],
@@ -759,7 +761,7 @@ fn bench_end_to_end(c: &mut Criterion) {
                 .value(
                     "revenue",
                     &[(
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(1_000_000.0),
                     )],
                 )

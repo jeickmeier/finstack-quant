@@ -48,7 +48,7 @@ use ts_rs::TS;
 ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
 ///     rate: 0.025,
 ///     index: "US-CPI-U".to_string(),
-///     frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years),
+///     frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years).expect("valid tenor fixture"),
 ///     convention: InflationSwapConventionId::new("USD-CPI"),
 /// };
 /// # Ok(())
@@ -214,7 +214,8 @@ mod tests {
             maturity: date!(2029 - 06 - 20),
             rate: 0.025,
             index: "US-CPI-U".to_string(),
-            frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years),
+            frequency: Tenor::new(1, finstack_quant_core::dates::TenorUnit::Years)
+                .expect("valid tenor fixture"),
             convention: InflationSwapConventionId::new("USD-CPI"),
         };
         let value = serde_json::to_value(quote).expect("serialize YoY quote");

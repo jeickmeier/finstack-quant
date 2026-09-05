@@ -584,7 +584,10 @@ mod tests {
             .expect("valid periods")
             .value(
                 "cash",
-                &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                )],
             )
             .build()
             .expect("model should build");
@@ -624,15 +627,27 @@ mod tests {
             .value(
                 "cash",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(250.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(250.0),
+                    ),
                 ],
             )
             .value(
                 "inflows",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(0.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
                 ],
             )
             .build()
@@ -715,7 +730,10 @@ mod tests {
         // Add a beginning-balance node with NO value in Q2.
         results.nodes.insert(
             "cash_beg".to_string(),
-            indexmap::IndexMap::from([(PeriodId::quarter(2025, 1), 100.0)]),
+            indexmap::IndexMap::from([(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                100.0,
+            )]),
         );
 
         let config = CorkscrewConfig {
@@ -753,7 +771,10 @@ mod tests {
             .expect("valid periods")
             .value(
                 "cash",
-                &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                )],
             )
             .build()
             .expect("model should build");
@@ -799,15 +820,27 @@ mod tests {
             .value(
                 "assets",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(110.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(110.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
                 ],
             )
             .value(
                 "liabilities",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
                 ],
             )
             .build()
@@ -858,20 +891,23 @@ mod tests {
             .value(
                 "assets",
                 &[(
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.00),
                 )],
             )
             .value(
                 "liabilities",
                 &[(
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(999_999.98),
                 )],
             )
             .value(
                 "equity",
-                &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0))],
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                )],
             )
             .build()
             .expect("model should build");
@@ -933,22 +969,40 @@ mod tests {
             .value(
                 "inventory",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(130.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(130.0),
+                    ),
                 ],
             )
             .value(
                 "additions",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(0.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(50.0),
+                    ),
                 ],
             )
             .value(
                 "disposals",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(20.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(0.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(20.0),
+                    ),
                 ],
             )
             .build()

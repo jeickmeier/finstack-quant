@@ -36,13 +36,13 @@ fn principal_events_after_maturity_rejected() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let post_maturity = Date::from_calendar_date(2026, Month::February, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Event after maturity should cause build to fail
     let event = PrincipalEvent {
         date: post_maturity,
-        delta: Money::new(100_000.0, Currency::USD), // Draw
-        cash: Money::new(100_000.0, Currency::USD),
+        delta: Money::new(100_000.0, Currency::USD).expect("valid money fixture"), // Draw
+        cash: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -74,13 +74,13 @@ fn principal_events_at_maturity_accepted() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Event exactly at maturity should be allowed
     let event = PrincipalEvent {
         date: maturity,
-        delta: Money::new(500_000.0, Currency::USD), // Partial repay at maturity
-        cash: Money::new(500_000.0, Currency::USD),
+        delta: Money::new(500_000.0, Currency::USD).expect("valid money fixture"), // Partial repay at maturity
+        cash: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -107,13 +107,13 @@ fn principal_events_before_issue_included_and_adjusts_outstanding() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let pre_issue = Date::from_calendar_date(2024, Month::December, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Draw 100k before issue (positive delta increases outstanding)
     let event = PrincipalEvent {
         date: pre_issue,
-        delta: Money::new(100_000.0, Currency::USD),
-        cash: Money::new(100_000.0, Currency::USD),
+        delta: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        cash: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -153,13 +153,13 @@ fn principal_events_at_issue_accepted() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Additional draw at issue (delayed draw term loan pattern)
     let event = PrincipalEvent {
         date: issue,
-        delta: Money::new(500_000.0, Currency::USD), // Additional draw
-        cash: Money::new(500_000.0, Currency::USD),
+        delta: Money::new(500_000.0, Currency::USD).expect("valid money fixture"), // Additional draw
+        cash: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -186,13 +186,13 @@ fn principal_events_currency_mismatch_rejected() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Event in EUR when notional is USD
     let event = PrincipalEvent {
         date: mid_date,
-        delta: Money::new(100_000.0, Currency::EUR), // Wrong currency
-        cash: Money::new(100_000.0, Currency::EUR),
+        delta: Money::new(100_000.0, Currency::EUR).expect("valid money fixture"), // Wrong currency
+        cash: Money::new(100_000.0, Currency::EUR).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -215,12 +215,12 @@ fn principal_event_delta_cash_currency_mismatch_rejected() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let event = PrincipalEvent {
         date: mid_date,
-        delta: Money::new(100_000.0, Currency::USD),
-        cash: Money::new(100_000.0, Currency::EUR), // Mismatch
+        delta: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        cash: Money::new(100_000.0, Currency::EUR).expect("valid money fixture"), // Mismatch
         kind: CFKind::Notional,
     };
 
@@ -247,20 +247,20 @@ fn multiple_principal_events_same_date_accepted() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Two events on same date
     let events = [
         PrincipalEvent {
             date: mid_date,
-            delta: Money::new(200_000.0, Currency::USD), // Draw
-            cash: Money::new(200_000.0, Currency::USD),
+            delta: Money::new(200_000.0, Currency::USD).expect("valid money fixture"), // Draw
+            cash: Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             kind: CFKind::Notional,
         },
         PrincipalEvent {
             date: mid_date,
-            delta: Money::new(-100_000.0, Currency::USD), // Repay
-            cash: Money::new(100_000.0, Currency::USD),
+            delta: Money::new(-100_000.0, Currency::USD).expect("valid money fixture"), // Repay
+            cash: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             kind: CFKind::Amortization,
         },
     ];
@@ -332,13 +332,13 @@ fn principal_event_draw_increases_outstanding() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Draw 500k more (positive delta increases outstanding)
     let event = PrincipalEvent {
         date: mid_date,
-        delta: Money::new(500_000.0, Currency::USD),
-        cash: Money::new(500_000.0, Currency::USD),
+        delta: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+        cash: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Notional,
     };
 
@@ -376,13 +376,13 @@ fn principal_event_repay_effect_on_outstanding() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Add a repayment event (Amortization kind; cash defaults to -delta)
     let event = PrincipalEvent {
         date: mid_date,
-        delta: Money::new(-300_000.0, Currency::USD),
-        cash: Money::new(300_000.0, Currency::USD),
+        delta: Money::new(-300_000.0, Currency::USD).expect("valid money fixture"),
+        cash: Money::new(300_000.0, Currency::USD).expect("valid money fixture"),
         kind: CFKind::Amortization,
     };
 
@@ -446,21 +446,21 @@ fn principal_event_emitted_cashflow_sign_follows_kind() {
     let draw_date = Date::from_calendar_date(2025, Month::April, 15).unwrap();
     let repay_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             draw_date,
-            Money::new(100_000.0, Currency::USD),
-            Some(Money::new(100_000.0, Currency::USD)),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+            Some(Money::new(100_000.0, Currency::USD).expect("valid money fixture")),
             CFKind::Notional,
         )
         .add_principal_event(
             repay_date,
-            Money::new(-50_000.0, Currency::USD),
-            Some(Money::new(50_000.0, Currency::USD)),
+            Money::new(-50_000.0, Currency::USD).expect("valid money fixture"),
+            Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture")),
             CFKind::Amortization,
         );
 
@@ -497,7 +497,7 @@ fn empty_principal_events_accepted() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity);
@@ -530,20 +530,20 @@ fn pre_issue_and_at_issue_events_emit_once_each() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let pre_issue = Date::from_calendar_date(2024, Month::December, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             pre_issue,
-            Money::new(100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             None,
             CFKind::Notional,
         )
         .add_principal_event(
             issue,
-            Money::new(200_000.0, Currency::USD),
+            Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             None,
             CFKind::Notional,
         );
@@ -594,20 +594,20 @@ fn two_pre_issue_events_on_different_dates_emit_once_each() {
     let pre_a = Date::from_calendar_date(2024, Month::November, 15).unwrap();
     let pre_b = Date::from_calendar_date(2024, Month::December, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             pre_a,
-            Money::new(50_000.0, Currency::USD),
+            Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
             None,
             CFKind::Notional,
         )
         .add_principal_event(
             pre_b,
-            Money::new(75_000.0, Currency::USD),
+            Money::new(75_000.0, Currency::USD).expect("valid money fixture"),
             None,
             CFKind::Notional,
         );
@@ -637,20 +637,20 @@ fn pre_issue_event_with_issue_dated_fixed_fee_emits_fee_once() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let pre_issue = Date::from_calendar_date(2024, Month::December, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             pre_issue,
-            Money::new(100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
             None,
             CFKind::Notional,
         )
         .fee(FeeSpec::Fixed {
             date: issue,
-            amount: Money::new(5_000.0, Currency::USD),
+            amount: Money::new(5_000.0, Currency::USD).expect("valid money fixture"),
         });
 
     let schedule = builder.build(None).unwrap();
@@ -671,14 +671,14 @@ fn fixed_fee_before_issue_emitted_once_at_its_date() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let fee_date = Date::from_calendar_date(2024, Month::December, 20).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .fee(FeeSpec::Fixed {
             date: fee_date,
-            amount: Money::new(2_500.0, Currency::USD),
+            amount: Money::new(2_500.0, Currency::USD).expect("valid money fixture"),
         });
 
     let schedule = builder.build(None).unwrap();
@@ -730,7 +730,7 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
 
@@ -773,13 +773,13 @@ fn amortization_event_with_positive_delta_rejected() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             mid_date,
-            Money::new(100_000.0, Currency::USD), // wrong sign for a repayment
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"), // wrong sign for a repayment
             None,
             CFKind::Amortization,
         );
@@ -799,13 +799,13 @@ fn notional_event_with_negative_delta_rejected() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .add_principal_event(
             mid_date,
-            Money::new(-100_000.0, Currency::USD), // wrong sign for a draw
+            Money::new(-100_000.0, Currency::USD).expect("valid money fixture"), // wrong sign for a draw
             None,
             CFKind::Notional,
         );
@@ -898,7 +898,7 @@ fn assert_program_order_independent<F>(
 fn principal_and_amortization_are_order_independent() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let principal = Money::new(1_000_000.0, Currency::USD);
+    let principal = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 };
 
     let mut principal_first = CashFlowSchedule::builder();
@@ -924,7 +924,7 @@ fn full_horizon_coupon_programs_are_order_independent() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let switch = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2027, Month::January, 15).unwrap();
-    let principal = Money::new(1_000_000.0, Currency::USD);
+    let principal = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     assert_program_order_independent(principal, issue, maturity, |builder| {
         let _ = builder.fixed_cf(order_independence_fixed_spec());
@@ -1003,7 +1003,11 @@ fn principal_does_not_clear_the_first_builder_error() {
             step_schedule: vec![(issue, dec!(0.05)), (issue, dec!(0.06))],
             schedule: ScheduleParams::semiannual_30360(),
         })
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity);
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        );
 
     let error = builder.build(None).unwrap_err().to_string();
     assert!(error.contains("strictly increasing"), "{error}");

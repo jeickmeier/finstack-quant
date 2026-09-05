@@ -105,7 +105,7 @@ fn floating_note_tarn(coupon_dates: Vec<Date>) -> Tarn {
         fixed_rate: 0.06,
         coupon_floor: 0.0,
         target_coupon: 1.0e9,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         coupon_dates,
         floating_tenor: Tenor::semi_annual(),
         floating_index_id: CurveId::new("USD-SOFR-6M"),

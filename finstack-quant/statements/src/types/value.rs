@@ -26,8 +26,8 @@ impl AmountOrScalar {
     /// # Arguments
     /// * `value` - Numeric amount
     /// * `currency` - ISO currency of the amount
-    pub fn amount(value: f64, currency: Currency) -> Self {
-        Self::Amount(Money::new(value, currency))
+    pub fn amount(value: f64, currency: Currency) -> finstack_quant_core::Result<Self> {
+        Money::new(value, currency).map(Self::Amount)
     }
 
     /// Create a unitless scalar.
@@ -165,7 +165,8 @@ mod tests {
 
     #[test]
     fn test_amount_value() {
-        let amount = AmountOrScalar::amount(1_000_000.0, Currency::USD);
+        let amount =
+            AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture");
         assert_eq!(amount.value(), 1_000_000.0);
         assert!(amount.is_amount());
         assert!(!amount.is_scalar());
@@ -181,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_from_money() {
-        let money = Money::new(500.0, Currency::EUR);
+        let money = Money::from((500_i64, Currency::EUR));
         let amount: AmountOrScalar = money.into();
         assert_eq!(amount.value(), 500.0);
         assert_eq!(amount.currency(), Some(Currency::EUR));
@@ -189,7 +190,8 @@ mod tests {
 
     #[test]
     fn test_as_money() {
-        let amount = AmountOrScalar::amount(1_000_000.0, Currency::USD);
+        let amount =
+            AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("valid amount fixture");
         let money = amount.as_money().expect("amount should convert to money");
         assert_eq!(money.amount(), 1_000_000.0);
         assert_eq!(money.currency(), Currency::USD);
@@ -201,8 +203,8 @@ mod tests {
     #[test]
     fn test_infer_series_value_type_rejects_mixed_currencies() {
         let values = [
-            AmountOrScalar::amount(100.0, Currency::USD),
-            AmountOrScalar::amount(90.0, Currency::EUR),
+            AmountOrScalar::amount(100.0, Currency::USD).expect("valid amount fixture"),
+            AmountOrScalar::amount(90.0, Currency::EUR).expect("valid amount fixture"),
         ];
 
         let err = infer_series_value_type(values.iter())

@@ -42,7 +42,9 @@ pub fn calibrated_hazard_curve(
         .map(|&(years, spread_bp)| CdsQuote::CdsParSpread {
             id: QuoteId::new(format!("{entity}-CDS-{years}Y")),
             entity: entity.to_string(),
-            pillar: Pillar::Tenor(Tenor::new(years, TenorUnit::Years)),
+            pillar: Pillar::Tenor(
+                Tenor::new(years, TenorUnit::Years).expect("valid tenor fixture"),
+            ),
             spread_bp,
             recovery_rate,
             convention: convention.clone(),
@@ -176,7 +178,7 @@ impl Instrument for TestInstrument {
             // Deterministic exposure to parallel forward moves (test-only stub).
             amt += fwd.rate(1.0) * 1_000_000.0;
         }
-        Ok(Money::new(amt, self.value.currency()))
+        Ok(Money::new(amt, self.value.currency()).expect("valid money fixture"))
     }
 
     fn price_with_metrics(

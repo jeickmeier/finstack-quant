@@ -37,8 +37,8 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
 
     let bond = Bond::fixed(
         "ICW-BOND",
-        Money::new(10_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0425),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0425).expect("valid rate fixture"),
         date!(2024 - 03 - 15),
         date!(2034 - 03 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,

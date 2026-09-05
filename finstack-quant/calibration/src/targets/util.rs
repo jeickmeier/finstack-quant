@@ -96,7 +96,7 @@ pub(crate) fn resolve_equity_forward_inputs(
 
     let fallback_id = format!("{ticker}-DIVS");
     let mut schedules = context.dividends_iter().filter(|(id, schedule)| {
-        schedule.underlying.as_deref() == Some(ticker)
+        schedule.get_underlying() == Some(ticker)
             || id.as_str() == ticker
             || id.as_str() == fallback_id
     });
@@ -113,7 +113,7 @@ pub(crate) fn resolve_equity_forward_inputs(
     schedule.validate()?;
 
     let mut cash_dividends = Vec::new();
-    for event in &schedule.events {
+    for event in schedule.get_events() {
         if event.date <= base_date {
             continue;
         }
@@ -552,7 +552,7 @@ mod tests {
         let schedule = DividendSchedule::builder("SPX-DIVS")
             .underlying("SPX")
             .currency(Currency::USD)
-            .cash(ex_date, Money::new(5.0, Currency::USD))
+            .cash(ex_date, Money::from((5_i64, Currency::USD)))
             .build()
             .expect("dividend schedule");
         let context = MarketContext::new().insert_dividends(schedule);

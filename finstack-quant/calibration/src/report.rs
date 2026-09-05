@@ -313,6 +313,13 @@ pub struct CalibrationReport {
 
 impl CalibrationReport {
     /// Convenience constructor covering the common case of a completed calibration.
+    ///
+    /// # Arguments
+    ///
+    /// * `residuals` - Quote identifiers mapped to signed calibration residuals in each quote's native units; consumed to compute residual diagnostics.
+    /// * `iterations` - Number of solver iterations performed before this report was created.
+    /// * `success` - Whether the caller's calibration success criteria were met; this constructor does not rerun the solver or apply a tolerance gate.
+    /// * `convergence_reason` - Human-readable explanation of convergence or failure stored in the report.
     pub fn new(
         residuals: BTreeMap<String, f64>,
         iterations: usize,

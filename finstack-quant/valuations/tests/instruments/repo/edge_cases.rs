@@ -15,7 +15,7 @@ fn test_very_small_notional() {
 
     let repo = Repo::term(
         "SMALL_NOTIONAL",
-        Money::new(1.0, Currency::USD), // $1
+        Money::new(1.0, Currency::USD).expect("valid money fixture"), // $1
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -35,7 +35,7 @@ fn test_very_large_notional() {
 
     let repo = Repo::term(
         "LARGE_NOTIONAL",
-        Money::new(1_000_000_000_000.0, Currency::USD), // $1 trillion
+        Money::new(1_000_000_000_000.0, Currency::USD).expect("valid money fixture"), // $1 trillion
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -54,7 +54,7 @@ fn test_extremely_high_haircut() {
 
     let repo = Repo::builder()
         .id("EXTREME_HAIRCUT".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -75,7 +75,7 @@ fn test_extremely_high_haircut() {
     // Required collateral = Cash / (1 - haircut) = 1M / (1 - 0.50) = 2M
     assert_money_approx_eq(
         required.unwrap(),
-        Money::new(2_000_000.0, Currency::USD),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
         1.0,
     );
 }
@@ -88,7 +88,7 @@ fn test_very_short_term() {
     let same_day = date(2025, 1, 15);
     let result = Repo::builder()
         .id("SAME_DAY".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(same_day)
@@ -106,7 +106,7 @@ fn test_very_long_term() {
     // 10-year repo
     let repo = Repo::term(
         "LONG_TERM",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 1),
@@ -128,7 +128,7 @@ fn test_zero_rate_repo() {
 
     let repo = Repo::term(
         "ZERO_RATE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.0,
         date(2025, 1, 15),
@@ -141,7 +141,11 @@ fn test_zero_rate_repo() {
     let total = repo.total_repayment().unwrap();
 
     approx_eq(interest.amount(), 0.0, 1e-6, "interest");
-    assert_money_approx_eq(total, Money::new(1_000_000.0, Currency::USD), 0.01);
+    assert_money_approx_eq(
+        total,
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.01,
+    );
 }
 
 #[test]
@@ -151,7 +155,7 @@ fn test_extreme_rate() {
     // 100% annual rate
     let repo = Repo::term(
         "EXTREME_RATE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         1.0,
         date(2025, 1, 15),
@@ -174,7 +178,7 @@ fn test_valuation_far_before_start() {
 
     let repo = Repo::term(
         "FAR_BEFORE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 6, 1),
@@ -197,7 +201,7 @@ fn test_valuation_after_maturity() {
 
     let repo = Repo::term(
         "AFTER_MAT",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -220,7 +224,7 @@ fn test_missing_discount_curve() {
 
     let repo = Repo::term(
         "MISSING_CURVE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -241,14 +245,18 @@ fn test_collateral_with_zero_quantity() {
     let context = create_standard_market_context();
     let market_value = collateral.market_value(&context).unwrap();
 
-    assert_money_approx_eq(market_value, Money::new(0.0, Currency::USD), 1e-6);
+    assert_money_approx_eq(
+        market_value,
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        1e-6,
+    );
 }
 
 #[test]
 fn test_collateral_with_negative_price() {
     let context = create_standard_market_context().insert_price(
         "NEGATIVE_PRICE",
-        MarketScalar::Price(Money::new(-1.0, Currency::USD)),
+        MarketScalar::Price(Money::new(-1.0, Currency::USD).expect("valid money fixture")),
     );
 
     let collateral = CollateralSpec::new("WEIRD_BOND", 1_000_000.0, "NEGATIVE_PRICE");
@@ -266,7 +274,7 @@ fn test_repo_with_multiple_currencies() {
     // GBP repo
     let gbp_repo = Repo::term(
         "GBP_REPO",
-        Money::new(1_000_000.0, Currency::GBP),
+        Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"),
         collateral,
         0.045,
         date(2025, 1, 15),
@@ -294,7 +302,7 @@ fn test_special_collateral_without_rate_adjustment() {
 
     let repo = Repo::term(
         "SPECIAL_NO_ADJ",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -316,7 +324,7 @@ fn test_business_day_conventions() {
     // Following
     let following = Repo::builder()
         .id("FOLLOWING".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral.clone())
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -340,7 +348,7 @@ fn test_business_day_conventions() {
     // Modified Following
     let mod_following = Repo::builder()
         .id("MOD_FOLLOWING".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -369,7 +377,7 @@ fn test_leap_year_date_handling() {
     // Leap day 2024-02-29
     let repo = Repo::term(
         "LEAP_YEAR",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2024, 2, 29),
@@ -390,7 +398,7 @@ fn test_precision_with_small_amounts() {
 
     let repo = Repo::term(
         "SMALL_PRECISION",
-        Money::new(0.01, Currency::USD), // 1 cent
+        Money::new(0.01, Currency::USD).expect("valid money fixture"), // 1 cent
         collateral,
         0.05,
         date(2025, 1, 15),

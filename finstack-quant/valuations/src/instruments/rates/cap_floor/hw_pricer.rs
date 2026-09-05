@@ -315,7 +315,7 @@ impl CapFloorHullWhitePricer {
             return Ok(ValuationResult::stamped(
                 cap_floor.id.as_str(),
                 as_of,
-                Money::new(0.0, cap_floor.notional.currency()),
+                Money::from((0_i64, cap_floor.notional.currency())),
             ));
         }
 
@@ -479,7 +479,9 @@ impl CapFloorHullWhitePricer {
         Ok(ValuationResult::stamped(
             cap_floor.id.as_str(),
             as_of,
-            Money::new(total_pv, cap_floor.notional.currency()),
+            Money::new(total_pv, cap_floor.notional.currency()).map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
+            })?,
         ))
     }
 }
@@ -708,8 +710,8 @@ mod tests {
             Ok(())
         }
 
-        fn value(&self, currency: Currency) -> Money {
-            Money::new(self.discounted_pv, currency)
+        fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(self.discounted_pv, currency).expect("valid money fixture"))
         }
 
         fn reset(&mut self) {
@@ -1035,7 +1037,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "TERM-HW-EXACT",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1113,7 +1115,7 @@ mod tests {
         let mut with_spread = CapFloor::new(
             "TERM-HW-SPREAD",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1163,7 +1165,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "SOFR-HW-SENSITIVITY",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1274,7 +1276,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "SOFR-HW-FULL-COUPON",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 2, 3),
@@ -1368,7 +1370,7 @@ mod tests {
         let mut delayed = CapFloor::new(
             "SOFR-HW-COMPOUNDED",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1427,7 +1429,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "FIXED-UNPAID-HW",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             fixing_date,
             payment_date,
@@ -1475,7 +1477,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "FIXED-RFR-DELAYED",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             accrual_start,
             accrual_end,
@@ -1542,7 +1544,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "SOFR-HW-MC-BENCHMARK",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1642,7 +1644,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "SOFR-HW-SCHEDULE",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),
@@ -1700,7 +1702,7 @@ mod tests {
         let caplet = CapFloor::new(
             "SOFR-HW-PERSISTED-SCHEDULE",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2025, 1, 2),
             date(2025, 4, 2),

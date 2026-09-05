@@ -189,7 +189,7 @@ fn degraded_positions_are_reported_on_portfolio_metrics() {
         "HEALTHY_INST",
         Arc::new(FixedMetricInstrument::new(
             "HEALTHY_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             measures,
         )),
         1.0,
@@ -202,7 +202,7 @@ fn degraded_positions_are_reported_on_portfolio_metrics() {
         "DEGRADED_INST",
         Arc::new(MetricFailingInstrument {
             id: "DEGRADED_INST".to_string(),
-            value: Money::new(100.0, Currency::USD),
+            value: Money::new(100.0, Currency::USD).expect("valid money fixture"),
             attributes: Attributes::new(),
         }),
         1.0,
@@ -269,7 +269,7 @@ fn additive_currency_metrics_aggregate_and_omissions_are_reported() {
         "FX_INST",
         Arc::new(FixedMetricInstrument::new(
             "FX_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             measures,
         )),
         1.0,
@@ -316,7 +316,7 @@ fn m17_aggregate_metrics_rejects_mismatched_base_currency() {
 
     let dep = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -375,7 +375,7 @@ fn m17_aggregate_metrics_rejects_mismatched_as_of() {
 
     let dep = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -433,7 +433,7 @@ fn summable_metrics_scale_with_quantity_and_short_sign() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(FixedMetricInstrument::new(
         "RISKY",
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         measures,
     ));
 

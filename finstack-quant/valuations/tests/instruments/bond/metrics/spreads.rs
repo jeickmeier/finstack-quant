@@ -21,8 +21,8 @@ fn test_z_spread_discount_bond() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "ZSPR1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -59,7 +59,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let base_zero_rate = 0.03_f64;
     let target_z = 0.01_f64;
     let years = DayCount::Act365F
@@ -68,7 +68,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
     let mut bond = Bond::fixed(
         "ZSPR-COMPOUNDING",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.0),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -77,7 +77,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
     .expect("bond");
     bond.cashflow_spec =
         finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::fixed_rate(
-            finstack_quant_core::types::Rate::from_decimal(0.0),
+            finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
             finstack_quant_core::dates::Tenor::annual(),
             DayCount::Act365F,
         )
@@ -136,8 +136,8 @@ fn test_i_spread_uses_quote_date_for_settlement_based_curve() {
     let quote_date = date!(2025 - 01 - 08);
     let mut bond = Bond::fixed(
         "ISPR-QUOTE-DATE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 08),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -173,8 +173,8 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "ASW-DISCOUNT-SIGN",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -232,8 +232,8 @@ fn test_asw_market_uses_configured_forward_curve() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "ASW-FORWARD-CURVE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -298,8 +298,8 @@ fn test_asw_market_falls_back_to_bond_forward_curve_id() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "ASW-BOND-FORWARD-FALLBACK",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -369,8 +369,8 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
     let as_of = date!(2025 - 01 - 01);
     let mut base_bond = Bond::fixed(
         "OAS-CONFIG",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -441,8 +441,8 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "OAS-TREE-CURVE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -517,8 +517,8 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "EMBEDDED-OAS-BASIS",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -586,8 +586,8 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
     let quoted_oas = 0.0065;
     let mut bond = Bond::fixed(
         "EMBEDDED-QUOTE-DATE-BASIS",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 02),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -661,8 +661,8 @@ fn test_callable_bond_vega_is_registered_and_bumps_implied_volatility() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CALLABLE-VEGA",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -719,8 +719,8 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CALLABLE-BDT-OAS-VEGA",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -803,8 +803,8 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CALLABLE-VEGA-BUMP-INVARIANT",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -860,11 +860,11 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
     let as_of = date!(2025 - 01 - 02);
     let quote_date = date!(2025 - 01 - 07);
     let target_oas = 0.0065;
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut bond = Bond::fixed(
         "CALLABLE-BDT-QUOTE-DATE-OAS",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 02),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -945,8 +945,8 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CALLABLE-BDT-VALUE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1005,8 +1005,8 @@ fn test_z_spread_missing_discount_curve_returns_error() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "ZSPR-MISSING-DC",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1020,7 +1020,7 @@ fn test_z_spread_missing_discount_curve_returns_error() {
     let market = finstack_quant_core::market_data::context::MarketContext::new();
 
     // Minimal metric context: base value is arbitrary since Z-spread uses quoted clean price
-    let base_value = Money::new(100.0, Currency::USD);
+    let base_value = Money::new(100.0, Currency::USD).expect("valid money fixture");
     let mut mctx = MetricContext::new(
         Arc::new(bond),
         Arc::new(market),
@@ -1079,13 +1079,13 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
     // Issue one year before so there is a coupon falling exactly on `as_of`.
     let issue_date = date!(2024 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let coupon_rate = 0.05;
 
     let mut bond = Bond::fixed(
         "ZSPR-ON-DATE-COUPON",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         issue_date,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1094,7 +1094,7 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
     .expect("bond should build");
     // Explicit annual day-count to make the on-date coupon unambiguous.
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )
@@ -1180,13 +1180,13 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     // Bond with a coupon exactly on quote_date: tests flows in (as_of, quote_date].
     let issue_date = date!(2024 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let coupon_rate = 0.05;
 
     let mut bond = Bond::fixed(
         "YTM-SETTLE-LAG",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         issue_date,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1194,7 +1194,7 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     )
     .expect("bond should build");
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )
@@ -1265,7 +1265,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     let maturity_ig = date!(2028 - 01 - 01); // shorter IG
     let maturity_hy = date!(2032 - 01 - 01); // medium HY
     let maturity_distressed = date!(2035 - 01 - 01); // longer distressed
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Simple discount curve; Z-spread will be applied as an exponential shift.
     let disc = DiscountCurve::builder("USD-OIS")
@@ -1279,7 +1279,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     let bond_ig = Bond::fixed(
         "ZSPR-CONV-IG",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.03),
+        finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
         as_of,
         maturity_ig,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1289,7 +1289,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     let bond_hy = Bond::fixed(
         "ZSPR-CONV-HY",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity_hy,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1299,7 +1299,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     let bond_distressed = Bond::fixed(
         "ZSPR-CONV-DIST",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.10),
+        finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"),
         as_of,
         maturity_distressed,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1405,12 +1405,12 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
     let as_of = date!(2025 - 01 - 06);
     let issue_date = date!(2023 - 01 - 06);
     let maturity = date!(2030 - 01 - 06);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut bond = Bond::fixed(
         "ZSPR-SETTLE-LAG",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue_date,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1418,7 +1418,7 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
     )
     .expect("bond should build");
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )
@@ -1493,12 +1493,12 @@ fn test_z_spread_negative_denom_returns_err_not_infinity() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut bond = Bond::fixed(
         "ZSPR-NEG-DENOM",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1546,12 +1546,12 @@ fn test_z_spread_solver_non_positive_base_df_returns_err() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
     let as_of = date!(2025 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut bond = Bond::fixed(
         "ZSPR-BAD-DF",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1604,8 +1604,8 @@ fn test_z_spread_on_curve_model_pv_is_zero_with_settlement_lag() {
     let as_of = date!(2025 - 01 - 02);
     let mut bond = Bond::fixed(
         "ZSPR-ONCURVE-T2",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 02),
         finstack_quant_core::dates::StubKind::ShortFront,

@@ -349,7 +349,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(Money::new(10_000_000.0, Currency::EUR))
+            .base_notional(Money::from((10_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.0850))

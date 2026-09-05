@@ -725,12 +725,12 @@ mod zspread_quote_tests {
             Arc::new(deal),
             Arc::new(market),
             as_of,
-            Money::new(95.0, Currency::USD),
+            Money::from((95_i64, Currency::USD)),
             MetricContext::default_config(),
         );
-        context.cashflows = Some(vec![(payment_date, Money::new(100.0, Currency::USD))]);
+        context.cashflows = Some(vec![(payment_date, Money::from((100_i64, Currency::USD)))]);
         context.discount_curve_id = Some(discount_curve_id);
-        context.notional = Some(Money::new(100.0, Currency::USD));
+        context.notional = Some(Money::from((100_i64, Currency::USD)));
         context.computed.insert(MetricId::DirtyPrice, 95.0);
         context
     }

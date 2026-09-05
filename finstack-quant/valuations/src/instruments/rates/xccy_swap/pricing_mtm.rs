@@ -137,7 +137,7 @@ pub(crate) fn pv_mtm_reset(
     let resetting_periods = build_xccy_mtm_periods(resetting_leg)?;
 
     if constant_periods.is_empty() && resetting_periods.is_empty() {
-        return Ok(Money::new(0.0, reporting_currency));
+        return Ok(Money::from((0_i64, reporting_currency)));
     }
 
     let mut pv = NeumaierAccumulator::new();
@@ -348,7 +348,7 @@ pub(crate) fn pv_mtm_reset(
         pv.add(convert(cf_r_final, resetting_leg.currency)?);
     }
 
-    Ok(Money::new(pv.total(), reporting_currency))
+    Money::new(pv.total(), reporting_currency)
 }
 
 /// Enumerate the complete MtM-resetting cashflow stream for `cashflow_schedule`.
@@ -451,7 +451,7 @@ pub(crate) fn mtm_cashflow_schedule(
         Money::new(
             constant_leg.side.initial_principal_sign() * n_c,
             constant_leg.currency,
-        ),
+        )?,
         CFKind::Notional,
         0.0,
         None,
@@ -460,7 +460,7 @@ pub(crate) fn mtm_cashflow_schedule(
     flows.push(CashFlow::new(
         resetting_leg.start,
         None,
-        Money::new(cf_initial_amount, resetting_leg.currency),
+        Money::new(cf_initial_amount, resetting_leg.currency)?,
         CFKind::Notional,
         0.0,
         None,
@@ -486,7 +486,7 @@ pub(crate) fn mtm_cashflow_schedule(
             Money::new(
                 constant_leg.side.coupon_sign() * projected.unsigned_coupon(n_c, spread_c),
                 constant_leg.currency,
-            ),
+            )?,
             CFKind::FloatReset,
             projected.year_fraction,
             Some(all_in),
@@ -537,7 +537,7 @@ pub(crate) fn mtm_cashflow_schedule(
             flows.push(CashFlow::new(
                 period.payment_date,
                 projected_r.fixing_date.or(period.reset_date),
-                Money::new(coupon_amount, resetting_leg.currency),
+                Money::new(coupon_amount, resetting_leg.currency)?,
                 CFKind::FloatReset,
                 projected_r.year_fraction,
                 Some(projected_r.all_in_rate(spread_decimal)),
@@ -552,7 +552,7 @@ pub(crate) fn mtm_cashflow_schedule(
                 flows.push(CashFlow::new(
                     period.accrual_start,
                     None,
-                    Money::new(rebal_amount, resetting_leg.currency),
+                    Money::new(rebal_amount, resetting_leg.currency)?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -570,7 +570,7 @@ pub(crate) fn mtm_cashflow_schedule(
         Money::new(
             constant_leg.side.final_principal_sign() * n_c,
             constant_leg.currency,
-        ),
+        )?,
         CFKind::Notional,
         0.0,
         None,
@@ -579,7 +579,7 @@ pub(crate) fn mtm_cashflow_schedule(
     flows.push(CashFlow::new(
         resetting_leg.end,
         None,
-        Money::new(cf_final_amount, resetting_leg.currency),
+        Money::new(cf_final_amount, resetting_leg.currency)?,
         CFKind::Notional,
         0.0,
         None,
@@ -592,7 +592,7 @@ pub(crate) fn mtm_cashflow_schedule(
             notional_hint: Some(Money::new(
                 resetting_leg.notional.amount(),
                 resetting_leg.currency,
-            )),
+            )?),
             ..Default::default()
         },
     ))

@@ -219,10 +219,7 @@ impl crate::instruments::Instrument for FxFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(
-            self.npv_raw(market, as_of)?,
-            self.quote_currency,
-        ))
+        Money::new(self.npv_raw(market, as_of)?, self.quote_currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {

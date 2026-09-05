@@ -17,8 +17,8 @@ proptest! {
             .periods("2025Q1..Q2", None)
             .unwrap()
             .value("revenue", &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(revenue_q1)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(revenue_q2)),
+                (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(revenue_q1)),
+                (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(revenue_q2)),
             ])
             .compute("cogs", format!("revenue * {}", cogs_multiplier))
             .unwrap()
@@ -37,8 +37,8 @@ proptest! {
 
         // All results should be identical
         for i in 1..results_vec.len() {
-            let period_q1 = PeriodId::quarter(2025, 1);
-            let period_q2 = PeriodId::quarter(2025, 2);
+            let period_q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+            let period_q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
             prop_assert_eq!(
                 results_vec[0].get("revenue", &period_q1),
@@ -69,7 +69,7 @@ proptest! {
         let mut builder = ModelBuilder::new("dag_test")
             .periods("2025Q1..Q1", None)
             .unwrap()
-            .value("base", &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))]);
+            .value("base", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))]);
 
         for i in 1..num_nodes {
             let prev = if i == 1 { "base".to_string() } else { format!("node_{}", i - 1) };
@@ -101,7 +101,7 @@ proptest! {
         let model = ModelBuilder::new("forecast_test")
             .periods("2025Q1..Q4", Some("2025Q1"))
             .unwrap()
-            .value("revenue", &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0))])
+            .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))])
             .forecast("revenue", ForecastSpec::log_normal(mean, std_dev, seed))
             .build()
             .unwrap();
@@ -115,7 +115,7 @@ proptest! {
 
         // Results should be identical
         for q in 2..=4 {
-            let period = PeriodId::quarter(2025, q);
+            let period = PeriodId::quarter(2025, q).expect("valid period fixture");
             prop_assert_eq!(
                 results1.get("revenue", &period),
                 results2.get("revenue", &period),
@@ -133,7 +133,7 @@ proptest! {
         let model = ModelBuilder::new("growth_test")
             .periods("2025Q1..Q4", Some("2025Q1"))
             .unwrap()
-            .value("revenue", &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(base_value))])
+            .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(base_value))])
             .forecast("revenue", ForecastSpec::growth(growth_rate))
             .build()
             .unwrap();
@@ -142,8 +142,8 @@ proptest! {
         let results = evaluator.evaluate(&model).unwrap();
 
         // Verify growth rate is applied correctly
-        let q1_value = results.get("revenue", &PeriodId::quarter(2025, 1)).unwrap();
-        let q2_value = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
+        let q1_value = results.get("revenue", &PeriodId::quarter(2025, 1).expect("valid period fixture")).unwrap();
+        let q2_value = results.get("revenue", &PeriodId::quarter(2025, 2).expect("valid period fixture")).unwrap();
 
         let expected_q2 = q1_value * (1.0 + growth_rate);
         let diff = (q2_value - expected_q2).abs();

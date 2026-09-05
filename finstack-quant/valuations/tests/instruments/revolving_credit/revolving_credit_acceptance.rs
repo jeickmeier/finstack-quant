@@ -54,8 +54,8 @@ fn test_upfront_fee_sign() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-UPFRONT-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(0.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
@@ -63,7 +63,8 @@ fn test_upfront_fee_sign() {
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
-            fees.upfront_fee = Some(Money::new(50_000.0, Currency::USD));
+            fees.upfront_fee =
+                Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture"));
             fees
         })
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -118,8 +119,8 @@ fn test_mid_period_draw_accrual() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-MID-DRAW".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5% annual
@@ -128,7 +129,7 @@ fn test_mid_period_draw_accrual() {
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
             date: draw_date,
-            amount: Money::new(2_000_000.0, Currency::USD),
+            amount: Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
             is_draw: true,
         }]))
         .discount_curve_id("USD-OIS".into())
@@ -192,8 +193,8 @@ fn test_floating_vs_margin_only() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-FLOATING-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
@@ -283,8 +284,8 @@ fn test_reset_frequency_mismatch() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-RESET-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
@@ -385,8 +386,8 @@ fn test_utilization_tier() {
 
     let facility_low_util = RevolvingCredit::builder()
         .id("RC-TIER-LOW".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(3_000_000.0, Currency::USD)) // 30% utilization
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture")) // 30% utilization
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
@@ -405,8 +406,8 @@ fn test_utilization_tier() {
 
     let facility_high_util = RevolvingCredit::builder()
         .id("RC-TIER-HIGH".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(7_000_000.0, Currency::USD)) // 70% utilization
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(7_000_000.0, Currency::USD).expect("valid money fixture")) // 70% utilization
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
@@ -473,8 +474,8 @@ fn test_as_of_filtering() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-ASOF-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

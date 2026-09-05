@@ -53,7 +53,7 @@ fn test_upfront_payment_buyer_payfast() {
     // Creates a CDS (Buy Protection)
     let mut cds = crate::test_support::credit::cds_buy_protection(
         "UPFRONT_BUYER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -67,7 +67,10 @@ fn test_upfront_payment_buyer_payfast() {
 
     // Add Upfront Payment: 500k USD paid by Buyer (me)
     let upfront_amount = 500_000.0;
-    cds.upfront = Some((as_of, Money::new(upfront_amount, Currency::USD)));
+    cds.upfront = Some((
+        as_of,
+        Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),
+    ));
 
     let npv_with_upfront = cds.value_raw(&market, as_of).unwrap();
 
@@ -94,7 +97,7 @@ fn test_upfront_payment_seller_receivefast() {
     // Creates a CDS (Sell Protection)
     let mut cds = crate::test_support::credit::cds_sell_protection(
         "UPFRONT_SELLER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -108,7 +111,10 @@ fn test_upfront_payment_seller_receivefast() {
 
     // Add Upfront Payment: 500k USD paid by Buyer (to ME, the Seller)
     let upfront_amount = 500_000.0;
-    cds.upfront = Some((as_of, Money::new(upfront_amount, Currency::USD)));
+    cds.upfront = Some((
+        as_of,
+        Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),
+    ));
 
     let npv_with_upfront = cds.value_raw(&market, as_of).unwrap();
 
@@ -137,7 +143,7 @@ fn test_upfront_payment_discounted() {
 
     let mut cds = crate::test_support::credit::cds_buy_protection(
         "UPFRONT_DISCOUNTED",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -149,7 +155,10 @@ fn test_upfront_payment_discounted() {
     let base_npv = cds.value_raw(&market, as_of).unwrap();
 
     let upfront_amount = 100_000.0;
-    cds.upfront = Some((payment_date, Money::new(upfront_amount, Currency::USD)));
+    cds.upfront = Some((
+        payment_date,
+        Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),
+    ));
 
     let npv_with_upfront = cds.value_raw(&market, as_of).unwrap();
 
@@ -181,7 +190,7 @@ fn test_upfront_payment_past_is_ignored() {
 
     let mut cds = crate::test_support::credit::cds_buy_protection(
         "UPFRONT_PAST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -193,7 +202,10 @@ fn test_upfront_payment_past_is_ignored() {
     let base_npv = cds.value_raw(&market, as_of).unwrap();
 
     let upfront_amount = 1_000_000.0;
-    cds.upfront = Some((payment_date, Money::new(upfront_amount, Currency::USD)));
+    cds.upfront = Some((
+        payment_date,
+        Money::new(upfront_amount, Currency::USD).expect("valid money fixture"),
+    ));
 
     let npv_with_upfront = cds.value_raw(&market, as_of).unwrap();
 

@@ -221,28 +221,28 @@ pub(crate) struct DcfEvalContext<'a> {
 ///     .value_money(
 ///         "ufcf",
 ///         &[
-///             (PeriodId::quarter(2025, 1), Money::new(1_000_000.0, Currency::USD)),
-///             (PeriodId::quarter(2025, 2), Money::new(1_050_000.0, Currency::USD)),
-///             (PeriodId::quarter(2025, 3), Money::new(1_100_000.0, Currency::USD)),
-///             (PeriodId::quarter(2025, 4), Money::new(1_150_000.0, Currency::USD)),
+///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((1_000_000_i64, Currency::USD))),
+///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), Money::from((1_050_000_i64, Currency::USD))),
+///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((1_100_000_i64, Currency::USD))),
+///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((1_150_000_i64, Currency::USD))),
 ///         ],
 ///     )
 ///     .value(
 ///         "total_debt",
 ///         &[
-///             (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(5_000_000.0)),
+///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
+///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
+///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
+///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
 ///         ],
 ///     )
 ///     .value(
 ///         "cash",
 ///         &[
-///             (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(1_000_000.0)),
+///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
+///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
+///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
+///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
 ///         ],
 ///     )
 ///     .with_meta("currency", serde_json::json!("USD"))
@@ -577,7 +577,7 @@ pub fn dcf_sensitivity(
     entries.sort_by(|lhs, rhs| descending_f64(lhs.swing().abs(), rhs.swing().abs()));
 
     Ok(DcfSensitivityResult {
-        baseline_enterprise_value: Money::new(baseline, currency),
+        baseline_enterprise_value: Money::new(baseline, currency)?,
         entries,
         wacc_down,
         wacc_down_clamped,
@@ -985,9 +985,9 @@ pub(crate) fn evaluate_dcf_from_results_impl(
 
     Ok(CorporateValuationResult {
         equity_value,
-        enterprise_value: Money::new(enterprise_value, currency),
-        net_debt: Money::new(dcf.effective_net_debt(), currency),
-        terminal_value_pv: Money::new(pv_terminal, currency),
+        enterprise_value: Money::new(enterprise_value, currency)?,
+        net_debt: Money::new(dcf.effective_net_debt(), currency)?,
+        terminal_value_pv: Money::new(pv_terminal, currency)?,
         equity_value_per_share,
         diluted_shares,
         dcf_instrument: Some(dcf),
@@ -1131,22 +1131,28 @@ mod tests {
                 "ufcf",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(100_000.0),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
             )
             .value(
                 "total_debt",
-                &[(PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50_000.0))],
+                &[(
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50_000.0),
+                )],
             )
             .value(
                 "cash",
-                &[(PeriodId::quarter(2025, 2), AmountOrScalar::scalar(10_000.0))],
+                &[(
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10_000.0),
+                )],
             )
             .build()
             .expect("valid model");
@@ -1173,11 +1179,11 @@ mod tests {
                 "ufcf",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(100_000.0),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
@@ -1209,9 +1215,18 @@ mod tests {
             .value_money(
                 "ufcf",
                 &[
-                    (PeriodId::annual(2025), Money::new(100.0, Currency::USD)),
-                    (PeriodId::annual(2026), Money::new(110.0, Currency::USD)),
-                    (PeriodId::annual(2027), Money::new(120.0, Currency::USD)),
+                    (
+                        PeriodId::annual(2025),
+                        Money::from((100_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::annual(2026),
+                        Money::from((110_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::annual(2027),
+                        Money::from((120_i64, Currency::USD)),
+                    ),
                 ],
             )
             .with_meta("currency", serde_json::json!("USD"))
@@ -1380,9 +1395,18 @@ mod tests {
             .value_money(
                 "ufcf",
                 &[
-                    (PeriodId::annual(2025), Money::new(100.0, Currency::USD)),
-                    (PeriodId::annual(2026), Money::new(110.0, Currency::USD)),
-                    (PeriodId::annual(2027), Money::new(120.0, Currency::USD)),
+                    (
+                        PeriodId::annual(2025),
+                        Money::from((100_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::annual(2026),
+                        Money::from((110_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::annual(2027),
+                        Money::from((120_i64, Currency::USD)),
+                    ),
                 ],
             )
             .value(

@@ -54,7 +54,7 @@ impl MetricCalculator for YtcCalculator {
         let outstanding = outstanding_before(&out_path, call_date, currency);
 
         // Redemption = outstanding * call price (as percentage of par)
-        let redemption = Money::new(outstanding.amount() * (price_pct / 100.0), currency);
+        let redemption = Money::new(outstanding.amount() * (price_pct / 100.0), currency)?;
 
         // Re-fetch the loan reference (cache write path released the borrow).
         let loan: &TermLoan = context.instrument_as()?;

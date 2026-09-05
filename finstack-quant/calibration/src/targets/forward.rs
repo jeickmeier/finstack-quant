@@ -770,7 +770,7 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(0.0, Currency::USD))
+            Ok(Money::from((0_i64, Currency::USD)))
         }
 
         fn attributes(&self) -> &Attributes {
@@ -832,7 +832,7 @@ mod tests {
                         calendar_id: None,
                         start_date,
                         maturity,
-                        notional: Money::new(1.0, Currency::USD),
+                        notional: Money::from((1_i64, Currency::USD)),
                         day_count: DayCount::Act360,
                     }),
                     maturity,
@@ -940,7 +940,7 @@ mod tests {
                         calendar_id: None,
                         start_date: base_date,
                         maturity,
-                        notional: Money::new(1.0, Currency::USD),
+                        notional: Money::from((1_i64, Currency::USD)),
                         day_count: DayCount::Act360,
                     }),
                     maturity,
@@ -1013,7 +1013,7 @@ mod tests {
                         calendar_id: None,
                         start_date: base_date,
                         maturity,
-                        notional: Money::new(1.0, Currency::USD),
+                        notional: Money::from((1_i64, Currency::USD)),
                         day_count: DayCount::Act360,
                     }),
                     maturity,

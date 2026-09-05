@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let deposit = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD)?)
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(DayCount::Act360)

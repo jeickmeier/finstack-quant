@@ -96,7 +96,7 @@ fn test_clo_json_roundtrip() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -140,7 +140,7 @@ fn test_rmbs_with_overrides_serialization() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -234,7 +234,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     let mut loan = PoolAsset::floating_rate_loan(
         "LOAN1",
-        Money::new(12_000_000.0, Currency::USD),
+        Money::new(12_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         350.0,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -248,7 +248,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     let mut bond = PoolAsset::fixed_rate_bond(
         "BOND1",
-        Money::new(8_000_000.0, Currency::USD),
+        Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
         0.055,
         Date::from_calendar_date(2029, Month::July, 1).unwrap(),
         DayCount::Act365F,
@@ -257,8 +257,10 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     .with_industry("Healthcare")
     .with_obligor("OBLIGOR-2");
     bond.is_defaulted = true;
-    bond.recovery_amount = Some(Money::new(1_000_000.0, Currency::USD));
-    bond.purchase_price = Some(Money::new(7_800_000.0, Currency::USD));
+    bond.recovery_amount =
+        Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
+    bond.purchase_price =
+        Some(Money::new(7_800_000.0, Currency::USD).expect("valid money fixture"));
 
     pool.assets.push(loan);
     pool.assets.push(bond);
@@ -274,12 +276,12 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
             apply_eligibility_criteria: true,
         },
     });
-    pool.collection_account = Money::new(250_000.0, Currency::USD);
-    pool.reserve_account = Money::new(100_000.0, Currency::USD);
-    pool.excess_spread_account = Money::new(75_000.0, Currency::USD);
+    pool.collection_account = Money::new(250_000.0, Currency::USD).expect("valid money fixture");
+    pool.reserve_account = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
+    pool.excess_spread_account = Money::new(75_000.0, Currency::USD).expect("valid money fixture");
     pool.rep_lines = Some(vec![RepLine::new(
         "REP1",
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         0.055,
         Some(180.0),
         Some("SOFR-1M".to_string()),
@@ -296,7 +298,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         legal,
     )
@@ -340,12 +342,13 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(45_000_000.0, Currency::USD),
+        Money::new(45_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(floating_coupon),
         legal,
     )
     .unwrap();
-    senior.target_balance = Some(Money::new(30_000_000.0, Currency::USD));
+    senior.target_balance =
+        Some(Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"));
     senior.rating = Some(CreditRating::AAA);
     senior.attributes = Attributes::new().with_tag("senior");
 
@@ -431,7 +434,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     let swap = crate::test_support::rates::usd_irs_swap(
         InstrumentId::new("HEDGE-SWAP"),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.015,
         closing,
         Date::from_calendar_date(2028, Month::January, 1).unwrap(),
@@ -623,7 +626,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         mat,
         DayCount::Thirty360,
@@ -634,7 +637,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
             0.0,
             80.0,
             TrancheSeniority::Senior,
-            Money::new(800_000.0, Currency::USD),
+            Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.06 },
             mat,
         )
@@ -644,7 +647,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
             80.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(200_000.0, Currency::USD),
+            Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             mat,
         )

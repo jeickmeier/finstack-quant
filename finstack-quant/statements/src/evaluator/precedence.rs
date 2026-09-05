@@ -110,14 +110,21 @@ mod tests {
     #[test]
     fn test_value_precedence() {
         let mut values = IndexMap::new();
-        values.insert(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0));
+        values.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(100.0),
+        );
 
         let node = NodeSpec::new("revenue", NodeType::Mixed)
             .with_values(values)
             .with_formula("revenue * 1.05");
 
-        let source = resolve_node_value(&node, &PeriodId::quarter(2025, 1), true)
-            .expect("test should succeed");
+        let source = resolve_node_value(
+            &node,
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+        )
+        .expect("test should succeed");
 
         // Should use explicit value, not formula
         assert_eq!(source, NodeValueSource::Value(100.0));
@@ -127,8 +134,12 @@ mod tests {
     fn test_formula_fallback() {
         let node = NodeSpec::new("cogs", NodeType::Calculated).with_formula("revenue * 0.6");
 
-        let source = resolve_node_value(&node, &PeriodId::quarter(2025, 1), true)
-            .expect("test should succeed");
+        let source = resolve_node_value(
+            &node,
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+        )
+        .expect("test should succeed");
 
         // Should use formula
         assert!(source.is_formula());
@@ -138,7 +149,11 @@ mod tests {
     fn test_value_node_missing_value_error() {
         let node = NodeSpec::new("revenue", NodeType::Value);
 
-        let result = resolve_node_value(&node, &PeriodId::quarter(2025, 1), true);
+        let result = resolve_node_value(
+            &node,
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+        );
 
         // Should error because no value provided
         assert!(result.is_err());
@@ -148,8 +163,13 @@ mod tests {
     fn test_hidden_value_error_message_is_well_formed() {
         let node = NodeSpec::new("revenue", NodeType::Value);
 
-        let err = resolve_node_value_with_policy(&node, &PeriodId::quarter(2025, 1), true, false)
-            .expect_err("hidden value node must error");
+        let err = resolve_node_value_with_policy(
+            &node,
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+            false,
+        )
+        .expect_err("hidden value node must error");
 
         assert!(
             err.to_string()
@@ -170,8 +190,12 @@ mod tests {
             });
 
         // In forecast period, should prefer forecast over formula
-        let source = resolve_node_value(&node, &PeriodId::quarter(2025, 3), false)
-            .expect("test should succeed");
+        let source = resolve_node_value(
+            &node,
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            false,
+        )
+        .expect("test should succeed");
         assert_eq!(source, NodeValueSource::Forecast);
     }
 
@@ -187,8 +211,12 @@ mod tests {
             });
 
         // In actual period, should use formula (not forecast)
-        let source = resolve_node_value(&node, &PeriodId::quarter(2025, 1), true)
-            .expect("test should succeed");
+        let source = resolve_node_value(
+            &node,
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+        )
+        .expect("test should succeed");
         assert!(source.is_formula());
     }
 }

@@ -54,7 +54,7 @@ impl Pricer for LinearTreeOasPricer {
         Ok(ValuationResult::stamped(
             instrument.id(),
             as_of,
-            Money::new(self.price(instrument, as_of)?, Currency::USD),
+            Money::new(self.price(instrument, as_of)?, Currency::USD).expect("valid test amount"),
         ))
     }
 
@@ -192,19 +192,43 @@ fn treasury_actual_matches_cfr_long_first_coupon_example() {
     let flows = vec![
         (
             date!(1990 - 11 - 15),
-            Money::new(coupon + fractional_coupon, Currency::USD),
+            Money::new(coupon + fractional_coupon, Currency::USD).expect("valid test amount"),
         ),
-        (date!(1991 - 05 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1991 - 11 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1992 - 05 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1992 - 11 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1993 - 05 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1993 - 11 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1994 - 05 - 15), Money::new(coupon, Currency::USD)),
-        (date!(1994 - 11 - 15), Money::new(coupon, Currency::USD)),
+        (
+            date!(1991 - 05 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1991 - 11 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1992 - 05 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1992 - 11 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1993 - 05 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1993 - 11 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1994 - 05 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
+        (
+            date!(1994 - 11 - 15),
+            Money::new(coupon, Currency::USD).expect("valid test amount"),
+        ),
         (
             date!(1995 - 05 - 15),
-            Money::new(100.0 + coupon, Currency::USD),
+            Money::new(100.0 + coupon, Currency::USD).expect("valid test amount"),
         ),
     ];
 
@@ -227,7 +251,7 @@ fn treasury_actual_matches_cfr_long_first_coupon_example() {
 #[test]
 fn treasury_actual_zero_coupon_round_trips() {
     let as_of = date!(2025 - 01 - 01);
-    let flows = vec![(date!(2025 - 09 - 01), Money::new(100.0, Currency::USD))];
+    let flows = vec![(date!(2025 - 09 - 01), Money::from((100_i64, Currency::USD)))];
     let frequency = Tenor::semi_annual();
     let day_count = DayCount::Act365F;
     let expected_yield = 0.05;
@@ -244,10 +268,10 @@ fn treasury_actual_zero_coupon_round_trips() {
     let solved = crate::instruments::fixed_income::bond::pricing::ytm_solver::solve_ytm(
         &flows,
         as_of,
-        Money::new(price, Currency::USD),
+        Money::new(price, Currency::USD).expect("valid test amount"),
         crate::instruments::fixed_income::bond::pricing::ytm_solver::YtmPricingSpec {
             day_count,
-            notional: Money::new(100.0, Currency::USD),
+            notional: Money::from((100_i64, Currency::USD)),
             coupon_rate: 0.0,
             compounding: YieldCompounding::TreasuryActual,
             frequency,
@@ -262,8 +286,8 @@ fn compute_quotes_returns_zeroes_for_effectively_zero_notional() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "QE-NEAR-ZERO-NOTIONAL",
-        Money::new(1e-12, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1e-12, Currency::USD).expect("valid test amount"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -299,8 +323,8 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "QE-ZSPREAD-CALLABLE",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::from((100_i64, Currency::USD)),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -349,8 +373,8 @@ fn quote_engine_ytw_input_uses_callable_workout_inverse() {
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::fixed(
         "QE-YTW-CALLABLE",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::from((100_i64, Currency::USD)),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         as_of,
         date!(2030 - 01 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -405,8 +429,8 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
     let as_of = date!(2025 - 01 - 15);
     let mut bond = Bond::fixed(
         "QE-CUSTOM-TREE-OAS",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0),
+        Money::from((1000_i64, Currency::USD)),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid test rate"),
         as_of,
         date!(2030 - 01 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,

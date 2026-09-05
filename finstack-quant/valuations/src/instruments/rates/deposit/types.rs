@@ -171,7 +171,7 @@ impl Deposit {
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("DEP-USD-6M"))
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 07 - 01))
             .day_count(DayCount::Act360)
@@ -489,8 +489,8 @@ impl Deposit {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -546,7 +546,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
             flows,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
@@ -569,7 +569,7 @@ mod tests {
     fn from_conventions_applies_rate_index_defaults() {
         let deposit = Deposit::from_conventions(ConventionDepositParams {
             id: InstrumentId::new("DEP-USD-SOFR-6M"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             trade_date: date!(2025 - 01 - 02),
             maturity: date!(2025 - 07 - 02),
             quote_rate: 0.045,
@@ -580,7 +580,10 @@ mod tests {
         .expect("deposit conventions constructor should succeed");
 
         assert_eq!(deposit.id, InstrumentId::new("DEP-USD-SOFR-6M"));
-        assert_eq!(deposit.notional, Money::new(1_000_000.0, Currency::USD));
+        assert_eq!(
+            deposit.notional,
+            Money::from((1_000_000_i64, Currency::USD))
+        );
         assert_eq!(deposit.start_date, date!(2025 - 01 - 02));
         assert_eq!(deposit.maturity, date!(2025 - 07 - 02));
         assert_eq!(deposit.day_count, DayCount::Act360);
@@ -601,10 +604,12 @@ mod tests {
     fn cashflow_schedule_marks_initial_exchange_as_notional() {
         let deposit = Deposit::builder()
             .id(InstrumentId::new("DEP-KIND"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2025 - 01 - 02))
             .maturity(date!(2025 - 07 - 02))
-            .quote_rate_rate(finstack_quant_core::types::Rate::from_decimal(0.045))
+            .quote_rate_rate(
+                finstack_quant_core::types::Rate::from_decimal(0.045).expect("valid rate fixture"),
+            )
             .day_count(DayCount::Act360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())

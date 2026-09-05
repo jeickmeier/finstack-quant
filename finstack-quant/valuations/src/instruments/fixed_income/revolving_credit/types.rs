@@ -176,8 +176,8 @@ impl RevolvingCredit {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::{DayCount, Tenor};
         use time::macros::date;
-        let commitment = Money::new(50_000_000.0, Currency::USD);
-        let initial_draw = Money::new(10_000_000.0, Currency::USD);
+        let commitment = Money::from((50_000_000_i64, Currency::USD));
+        let initial_draw = Money::from((10_000_000_i64, Currency::USD));
         let start = date!(2024 - 01 - 01);
         let end = date!(2027 - 01 - 01);
         let base_rate = BaseRateSpec::Floating(FloatingRateSpec {
@@ -202,12 +202,12 @@ impl RevolvingCredit {
         let draw_repay = DrawRepaySpec::Deterministic(vec![
             DrawRepayEvent {
                 date: date!(2024 - 03 - 01),
-                amount: Money::new(5_000_000.0, Currency::USD),
+                amount: Money::from((5_000_000_i64, Currency::USD)),
                 is_draw: true,
             },
             DrawRepayEvent {
                 date: date!(2025 - 06 - 01),
-                amount: Money::new(3_000_000.0, Currency::USD),
+                amount: Money::from((3_000_000_i64, Currency::USD)),
                 is_draw: false,
             },
         ]);
@@ -1109,8 +1109,8 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
 
 // Implement CashflowProvider for standard cashflow interface
 impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
-    fn notional(&self) -> Option<finstack_quant_core::money::Money> {
-        Some(self.commitment_amount)
+    fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
+        Ok(Some(self.commitment_amount))
     }
 
     fn raw_cashflow_schedule(
@@ -1194,12 +1194,12 @@ mod dependency_tests {
         facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![
             DrawRepayEvent {
                 date: date!(2025 - 06 - 01),
-                amount: Money::new(20_000_000.0, Currency::USD),
+                amount: Money::from((20_000_000_i64, Currency::USD)),
                 is_draw: false,
             },
             DrawRepayEvent {
                 date: date!(2025 - 01 - 01),
-                amount: Money::new(20_000_000.0, Currency::USD),
+                amount: Money::from((20_000_000_i64, Currency::USD)),
                 is_draw: true,
             },
         ]);
@@ -1220,7 +1220,7 @@ mod dependency_tests {
         let mut facility = RevolvingCredit::example().expect("example");
         facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
             date: date!(2028 - 01 - 01),
-            amount: Money::new(1_000_000.0, Currency::USD),
+            amount: Money::from((1_000_000_i64, Currency::USD)),
             is_draw: true,
         }]);
         assert!(facility

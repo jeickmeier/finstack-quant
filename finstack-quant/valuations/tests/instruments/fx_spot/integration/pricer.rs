@@ -50,14 +50,14 @@ fn test_pricer_with_various_instruments() {
         Box::new(eurusd_with_notional(1_000_000.0, 1.20)),
         Box::new(
             sample_gbpusd()
-                .with_notional(Money::new(500_000.0, Currency::GBP))
+                .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
                 .unwrap()
                 .with_rate(1.40)
                 .expect("test rate"),
         ),
         Box::new(
             sample_usdjpy()
-                .with_notional(Money::new(100_000.0, Currency::USD))
+                .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
                 .unwrap()
                 .with_rate(110.0)
                 .expect("test rate"),
@@ -112,7 +112,7 @@ fn test_pricer_consistent_with_instrument_value() {
 #[test]
 fn test_pricer_with_fx_matrix() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
     let registry = standard_pricer_registry();
     let market = market_with_fx_matrix(); // EUR/USD = 1.20

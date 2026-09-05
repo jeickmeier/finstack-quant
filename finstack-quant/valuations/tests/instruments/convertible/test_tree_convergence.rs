@@ -66,7 +66,7 @@ fn create_test_convertible() -> ConvertibleBond {
 
     ConvertibleBond {
         id: "CONV-TEST".to_string().into(),
-        notional: Money::new(1000.0, Currency::USD),
+        notional: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
         issue_date: issue,
         maturity,
         settlement_days: None,

@@ -142,7 +142,7 @@ impl MarketContext {
     /// use finstack_quant_core::currency::Currency;
     ///
     /// let ctx = MarketContext::new()
-    ///     .insert_price("AAPL", MarketScalar::Price(Money::new(180.0, Currency::USD)));
+    ///     .insert_price("AAPL", MarketScalar::Price(Money::from((180_i64, Currency::USD))));
     ///
     /// for (id, scalar) in ctx.prices_iter() {
     ///     println!("{}: {:?}", id, scalar);

@@ -20,7 +20,7 @@ pub(crate) fn compute_pv(
 ) -> Result<Money> {
     inst.validate()?;
     if as_of > inst.expiry {
-        return Ok(Money::new(0.0, inst.quote_currency));
+        return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     FxTouchOptionCalculator.npv(inst, curves, as_of)
 }
@@ -58,7 +58,7 @@ impl FxTouchOptionCalculator {
                 (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
                 | (TouchType::NoTouch, false, _) => inst.payout_amount.amount(),
             };
-            return Ok(Money::new(pv, inst.quote_currency));
+            return Money::new(pv, inst.quote_currency);
         }
 
         if inst.observed_touch == Some(true) {
@@ -68,7 +68,7 @@ impl FxTouchOptionCalculator {
                     (-r_d * t).exp() * inst.payout_amount.amount()
                 }
             };
-            return Ok(Money::new(pv, inst.quote_currency));
+            return Money::new(pv, inst.quote_currency);
         }
 
         let price = price_touch(
@@ -85,7 +85,7 @@ impl FxTouchOptionCalculator {
             inst.payout_amount.amount(),
         )?;
 
-        Ok(Money::new(price, inst.quote_currency))
+        Money::new(price, inst.quote_currency)
     }
 
     pub(crate) fn collect_inputs(
@@ -295,7 +295,7 @@ mod tests {
             .barrier_level(1.10)
             .touch_type(crate::instruments::fx::fx_touch_option::TouchType::OneTouch)
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
-            .payout_amount(Money::new(100_000.0, Currency::USD))
+            .payout_amount(Money::from((100_000_i64, Currency::USD)))
             .payout_timing(crate::instruments::fx::fx_touch_option::PayoutTiming::AtExpiry)
             .monitoring_start_date(date!(2024 - 01 - 01))
             .expiry(expiry)
@@ -333,7 +333,7 @@ mod tests {
             .barrier_level(1.10)
             .touch_type(crate::instruments::fx::fx_touch_option::TouchType::NoTouch)
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
-            .payout_amount(Money::new(100_000.0, Currency::USD))
+            .payout_amount(Money::from((100_000_i64, Currency::USD)))
             .payout_timing(timing)
             .monitoring_start_date(date!(2024 - 01 - 01))
             .expiry(expiry)

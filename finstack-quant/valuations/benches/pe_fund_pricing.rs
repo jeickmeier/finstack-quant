@@ -107,7 +107,8 @@ fn make_events(n: usize) -> Vec<FundEvent> {
         let days_offset = (i as i64 * 365 * 3) / contribution_count.max(1) as i64;
         let date = Date::from_calendar_date(2020, Month::January, 1).unwrap()
             + time::Duration::days(days_offset);
-        let amount = Money::new(1_000_000.0 + i as f64 * 100_000.0, currency);
+        let amount =
+            Money::new(1_000_000.0 + i as f64 * 100_000.0, currency).expect("valid money fixture");
         events.push(FundEvent::contribution(date, amount));
     }
 
@@ -116,7 +117,8 @@ fn make_events(n: usize) -> Vec<FundEvent> {
         let days_offset = 365 * 4 + (i as i64 * 365 * 6) / distribution_count.max(1) as i64;
         let date = Date::from_calendar_date(2020, Month::January, 1).unwrap()
             + time::Duration::days(days_offset);
-        let amount = Money::new(2_000_000.0 + i as f64 * 150_000.0, currency);
+        let amount =
+            Money::new(2_000_000.0 + i as f64 * 150_000.0, currency).expect("valid money fixture");
         events.push(FundEvent::distribution(date, amount));
     }
 
@@ -129,14 +131,14 @@ fn make_clawback_events(n: usize) -> Vec<FundEvent> {
     let mut events = Vec::with_capacity(n);
     events.push(FundEvent::contribution(
         Date::from_calendar_date(2020, Month::January, 1).unwrap(),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
     ));
     for i in 0..n.saturating_sub(1) {
         let date = Date::from_calendar_date(2024, Month::January, 1).unwrap()
             + time::Duration::days((i as i64 * 365 * 6) / n.saturating_sub(1).max(1) as i64);
         events.push(FundEvent::distribution(
             date,
-            Money::new(500_000.0, Currency::USD),
+            Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         ));
     }
     events

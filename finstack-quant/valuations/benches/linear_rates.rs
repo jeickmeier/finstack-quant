@@ -107,14 +107,14 @@ fn create_rates_market() -> MarketContext {
         .insert_surface(cap_vol)
         .insert_price(
             "TREASURY_BOND_PRICE",
-            MarketScalar::Price(Money::new(1.02, Currency::USD)),
+            MarketScalar::Price(Money::new(1.02, Currency::USD).expect("valid money fixture")),
         )
 }
 
 fn deposit(id: &str, maturity: Date) -> Deposit {
     Deposit::builder()
         .id(InstrumentId::new(id))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base_date())
         .maturity(maturity)
         .day_count(DayCount::Act360)
@@ -127,7 +127,7 @@ fn deposit(id: &str, maturity: Date) -> Deposit {
 fn fra(id: &str, start: Date, end: Date) -> ForwardRateAgreement {
     ForwardRateAgreement {
         id: InstrumentId::new(id),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -152,7 +152,7 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
     let start = base_date();
     BasisSwap::new(
         id,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -191,7 +191,7 @@ fn interest_rate_cap(id: &str, maturity: Date) -> CapFloor {
     CapFloor {
         id: InstrumentId::new(id),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.04).unwrap(),
         start_date: base_date(),
         maturity,
@@ -221,7 +221,7 @@ fn term_repo() -> Repo {
     let collateral = CollateralSpec::new("TREASURY_BOND", 1_000_000.0, "TREASURY_BOND_PRICE");
     Repo::term(
         "REPO-BENCH",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date_support::date(2025, 1, 15),
@@ -236,7 +236,7 @@ fn ir_future() -> InterestRateFuture {
     let end = date_support::date(2025, 10, 1);
     InterestRateFuture {
         id: InstrumentId::new("IRF-BENCH"),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         expiry: start,
         fixing_date: Some(start),
         period_start: Some(start),

@@ -145,7 +145,10 @@ mod gbm_barrier {
         MarketContext::new()
             .insert(discount)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Price(Money::new(SPOT, Currency::USD)))
+            .insert_price(
+                "SPX",
+                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+            )
             .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
             .insert_price("HESTON_V0", MarketScalar::Unitless(variance))
             .insert_price("HESTON_THETA", MarketScalar::Unitless(variance))
@@ -165,14 +168,14 @@ mod gbm_barrier {
             id: InstrumentId::new("BARRIER-GBM-HESTON-PARITY"),
             underlying_ticker: "SPX".to_string(),
             strike: STRIKE,
-            barrier: Money::new(85.0, Currency::USD),
+            barrier: Money::new(85.0, Currency::USD).expect("valid money fixture"),
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,
             barrier_type: BarrierType::DownAndOut,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
             // false: no extra Gobet-Miri barrier shift. Both pricers still apply
             // the same Brownian-bridge hit correction inside the shared payoff;
@@ -572,7 +575,10 @@ mod asian_geometric {
         MarketContext::new()
             .insert(discount)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Price(Money::new(SPOT, Currency::USD)))
+            .insert_price(
+                "SPX",
+                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+            )
             .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
     }
 
@@ -592,7 +598,7 @@ mod asian_geometric {
             averaging_method: AveragingMethod::Geometric,
             expiry,
             fixing_dates,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
             discount_curve_id: "USD-OIS".into(),
             spot_id: "SPX".into(),

@@ -20,8 +20,7 @@ and this file together.
 ### 1.1 Representation
 
 **Enforced:** `finstack_quant_core::money::Money` stores
-`rust_decimal::Decimal` plus a `Currency`. `Money::new` and
-`Money::try_new` accept `f64`; `Money::amount()` returns `f64`.
+`rust_decimal::Decimal` plus a `Currency`. `Money::new` accepts `f64` and returns `Result`; `Money::amount()` returns `f64`.
 `Money::from_decimal` and `Money::amount_decimal()` provide the lossless
 Decimal path.
 
@@ -35,7 +34,7 @@ Decimal path.
   targets (below), not license for new f64 settlement-grade code.
 - Wrapping an `f64` result in `Money` gives it currency semantics and Decimal
   storage; it does **not** make the preceding calculation Decimal-exact.
-- `Money::new` and `Money::try_new` preserve sub-minor-unit precision. They do
+- `Money::new` preserves sub-minor-unit precision. It does
   not imply ISO-4217 quantization. Currency-scale rounding MUST be requested
   through configuration or applied explicitly when an amount is finalized.
 - Non-finite monetary inputs MUST be rejected.

@@ -229,7 +229,7 @@ impl ForwardRateAgreement {
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("FRA-3X6-USD"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .fixing_date(date!(2024 - 04 - 01))
             .start_date(date!(2024 - 04 - 03))
             .maturity(date!(2024 - 07 - 03))
@@ -490,10 +490,7 @@ impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreemen
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         self.validate()?;
         let pv = self.npv_raw(curves, as_of)?;
-        Ok(finstack_quant_core::money::Money::new(
-            pv,
-            self.notional.currency(),
-        ))
+        finstack_quant_core::money::Money::new(pv, self.notional.currency())
     }
 
     fn base_value_raw(
@@ -524,8 +521,8 @@ impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreemen
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -539,7 +536,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
                 Vec::new(),
                 self.day_count,
                 crate::cashflow::traits::ScheduleBuildOpts {
-                    notional_hint: self.notional(),
+                    notional_hint: self.notional()?,
                     meta: crate::cashflow::builder::CashFlowMeta {
                         representation:
                             crate::cashflow::builder::CashflowRepresentation::NoResidual,
@@ -553,7 +550,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
             let settlement = self.settlement_amount_raw(curves, as_of)?;
             vec![(
                 self.start_date,
-                Money::new(settlement, self.notional.currency()),
+                Money::new(settlement, self.notional.currency())?,
             )]
         };
 
@@ -562,7 +559,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
             crate::cashflow::primitives::CFKind::Fixed,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
@@ -618,7 +615,7 @@ mod tests {
         let ctx = MarketContext::new().insert(disc).insert(fwd);
         let fra = ForwardRateAgreement::builder()
             .id("FRA-3x6".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .fixing_date(fixing)
             .start_date(start)
             .maturity(end)
@@ -682,7 +679,7 @@ mod tests {
 
         let fra = ForwardRateAgreement::builder()
             .id("FRA-TEST".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .fixing_date(fixing)
             .start_date(start)
             .maturity(end)
@@ -753,7 +750,7 @@ mod tests {
         let ctx = MarketContext::new().insert(disc).insert(fwd);
         let fra = ForwardRateAgreement::builder()
             .id("FRA-PRE-BASE".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .fixing_date(fixing)
             .start_date(start)
             .maturity(end)
@@ -802,7 +799,7 @@ mod serde_tests {
     fn from_conventions_applies_rate_index_defaults() {
         let fra = ForwardRateAgreement::from_conventions(ConventionFraParams {
             id: InstrumentId::new("FRA-USD-SOFR-3X6"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             start_date: Date::from_calendar_date(2025, time::Month::April, 3)
                 .expect("valid start date"),
             maturity: Date::from_calendar_date(2025, time::Month::July, 3)
@@ -817,7 +814,7 @@ mod serde_tests {
         .expect("FRA conventions constructor should succeed");
 
         assert_eq!(fra.id, InstrumentId::new("FRA-USD-SOFR-3X6"));
-        assert_eq!(fra.notional, Money::new(1_000_000.0, Currency::USD));
+        assert_eq!(fra.notional, Money::from((1_000_000_i64, Currency::USD)));
         assert_eq!(fra.day_count, DayCount::Act360);
         assert_eq!(fra.reset_lag, 2);
         assert_eq!(fra.discount_curve_id, CurveId::new("USD-OIS"));

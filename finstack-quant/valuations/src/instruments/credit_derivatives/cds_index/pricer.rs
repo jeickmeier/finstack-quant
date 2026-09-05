@@ -76,14 +76,19 @@ struct ResolvedConstituent<'a> {
 }
 
 impl ResolvedConstituent<'_> {
-    fn apply_to_cds(&self, index: &CDSIndex, cds: &mut CreditDefaultSwap) {
+    fn apply_to_cds(
+        &self,
+        index: &CDSIndex,
+        cds: &mut CreditDefaultSwap,
+    ) -> finstack_quant_core::Result<()> {
         cds.id = format!("{}-{:03}", index.id, self.ordinal).into();
         cds.notional = Money::new(
             index.notional.amount() * index.index_factor * self.weight_effective,
             index.notional.currency(),
-        );
+        )?;
         cds.protection.credit_curve_id = self.credit_curve_id.clone();
         cds.protection.recovery_rate = self.recovery_rate;
+        Ok(())
     }
 }
 
@@ -157,7 +162,7 @@ impl CDSIndexPricer {
             as_of,
             |pricer, cds, disc, surv, as_of| {
                 let raw = pricer.npv_full(cds, disc, surv, as_of)?;
-                Ok(Money::new(raw, cds.notional.currency()))
+                Money::new(raw, cds.notional.currency())
             },
         )?;
         if let Some(upfront) = index
@@ -172,7 +177,7 @@ impl CDSIndexPricer {
         }
         // Ensure consistent currency handling even when constituents list is empty.
         if result.total.currency() != currency {
-            result.total = Money::new(result.total.amount(), currency);
+            result.total = Money::new(result.total.amount(), currency)?;
         }
         Ok(result)
     }
@@ -269,7 +274,7 @@ impl CDSIndexPricer {
         };
         match index.pricing {
             IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index);
+                let cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
                 let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
                 let numerator_protection_pv =
@@ -295,13 +300,13 @@ impl CDSIndexPricer {
                 })
             }
             IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index);
+                let mut cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
-                let mut numerator_protection_pv = Money::new(0.0, index.notional.currency());
+                let mut numerator_protection_pv = Money::from((0_i64, index.notional.currency()));
                 let mut denominator = 0.0;
                 let mut constituents_spread_bp = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds);
+                    position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
                     let prot_pv =
                         pricer.pv_protection_leg(&cds, disc.as_ref(), surv.as_ref(), as_of)?;
@@ -395,7 +400,7 @@ impl CDSIndexPricer {
                     .collect::<Vec<_>>();
                 Ok(merge_cashflow_schedules(
                     schedules,
-                    Notional::par(index.notional.amount(), index.notional.currency()),
+                    Notional::par(index.notional.amount(), index.notional.currency())?,
                     index.premium.day_count,
                 ))
             }
@@ -520,19 +525,19 @@ impl CDSIndexPricer {
         let pricer = CDSPricer::with_config(self.cds_config.clone());
         match index.pricing {
             IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index);
+                let cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
                 let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
                 let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 Ok(IndexResult::single_curve(total))
             }
             IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index);
+                let mut cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
                 let mut total = 0.0;
                 let mut constituents = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds);
+                    position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
                     let value = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                     total += value;
@@ -571,26 +576,26 @@ impl CDSIndexPricer {
         let currency = index.notional.currency();
         if as_of >= index.premium.end {
             return Ok(IndexResult {
-                total: Money::new(0.0, currency),
+                total: Money::from((0_i64, currency)),
                 constituents: Vec::new(),
             });
         }
         let pricer = CDSPricer::with_config(self.cds_config.clone());
         match index.pricing {
             IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index);
+                let cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
                 let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
                 let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 Ok(IndexResult::single_curve(total))
             }
             IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index);
+                let mut cds = self.synthetic_cds(index)?;
                 let disc = curves.get_discount(&cds.premium.discount_curve_id)?;
-                let mut total = Money::new(0.0, currency);
+                let mut total = Money::from((0_i64, currency));
                 let mut constituents = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds);
+                    position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
                     let value = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
                     total = total.checked_add(value)?;
@@ -737,7 +742,7 @@ impl CDSIndexPricer {
     ) -> Result<ProjectedIndexFlows> {
         match index.pricing {
             IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index);
+                let cds = self.synthetic_cds(index)?;
                 let surv = curves.get_hazard(&cds.protection.credit_curve_id)?;
                 Ok(ProjectedIndexFlows {
                     single_curve: Some(self.project_cds_flows(&cds, surv.as_ref(), as_of)?),
@@ -745,10 +750,10 @@ impl CDSIndexPricer {
                 })
             }
             IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index);
+                let mut cds = self.synthetic_cds(index)?;
                 let mut constituents = Vec::with_capacity(index.constituents.len());
                 self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds);
+                    position.apply_to_cds(index, &mut cds)?;
                     let surv = curves.get_hazard(position.credit_curve_id)?;
                     constituents.push(ProjectedConstituentFlows {
                         flows: self.project_cds_flows(&cds, surv.as_ref(), as_of)?,
@@ -763,16 +768,16 @@ impl CDSIndexPricer {
         }
     }
 
-    fn synthetic_cds(&self, index: &CDSIndex) -> CreditDefaultSwap {
+    fn synthetic_cds(&self, index: &CDSIndex) -> Result<CreditDefaultSwap> {
         // `to_synthetic_cds()` already applies `index_factor` to notional.
-        let mut cds = index.to_synthetic_cds();
+        let mut cds = index.to_synthetic_cds()?;
         // The index applies its `upfront_payment` override once at the
         // aggregate level in `npv_detailed`; clear it on the synthetic CDS
         // so `CDSPricer::npv_full` does not subtract it a second time.
         cds.instrument_pricing_overrides
             .market_quotes
             .upfront_payment = None;
-        cds
+        Ok(cds)
     }
 
     fn project_cds_flows(
@@ -824,7 +829,7 @@ impl CDSIndexPricer {
                 if projected_premium.abs() > f64::EPSILON {
                     let mut projected_flow = flow;
                     projected_flow.amount =
-                        Money::new(projected_premium * premium_sign, flow.amount.currency());
+                        Money::new(projected_premium * premium_sign, flow.amount.currency())?;
                     projected_flows.push(projected_flow);
                 }
                 if delta_default > 0.0 {
@@ -843,7 +848,7 @@ impl CDSIndexPricer {
                                 * conditional_default
                                 * protection_sign,
                             cds.notional.currency(),
-                        ),
+                        )?,
                         CFKind::DefaultedNotional,
                         0.0,
                         None,
@@ -854,7 +859,7 @@ impl CDSIndexPricer {
             } else if flow.kind == CFKind::Fee {
                 let mut projected_flow = flow;
                 projected_flow.amount =
-                    Money::new(flow.amount.amount() * premium_sign, flow.amount.currency());
+                    Money::new(flow.amount.amount() * premium_sign, flow.amount.currency())?;
                 projected_flows.push(projected_flow);
             }
         }
@@ -1044,7 +1049,7 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let pricer = CDSIndexPricer::new();
-        let upfront = Money::new(125_000.0, Currency::USD);
+        let upfront = Money::from((125_000_i64, Currency::USD));
 
         let mut pay = CDSIndex::example();
         pay.instrument_pricing_overrides
@@ -1110,7 +1115,7 @@ mod tests {
         let discounted_total = schedule
             .get_flows()
             .iter()
-            .try_fold(Money::new(0.0, Currency::USD), |acc, flow| {
+            .try_fold(Money::from((0_i64, Currency::USD)), |acc, flow| {
                 let df = discount.df_between_dates(as_of, flow.date)?;
                 acc.checked_add(flow.amount * df)
             })

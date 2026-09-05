@@ -58,7 +58,11 @@ fn test_collateral_market_value_calculation() {
     let market_value = collateral.market_value(&context).unwrap();
 
     // 1,000,000 * 1.02 = 1,020,000
-    assert_money_approx_eq(market_value, Money::new(1_020_000.0, Currency::USD), 1.0);
+    assert_money_approx_eq(
+        market_value,
+        Money::new(1_020_000.0, Currency::USD).expect("valid money fixture"),
+        1.0,
+    );
 }
 
 #[test]
@@ -68,12 +72,20 @@ fn test_collateral_value_different_prices() {
     // Corporate bond at 98%
     let corp_collateral = corporate_collateral();
     let corp_value = corp_collateral.market_value(&context).unwrap();
-    assert_money_approx_eq(corp_value, Money::new(980_000.0, Currency::USD), 1.0);
+    assert_money_approx_eq(
+        corp_value,
+        Money::new(980_000.0, Currency::USD).expect("valid money fixture"),
+        1.0,
+    );
 
     // Special bond at 105%
     let special = CollateralSpec::new("SPECIAL_BOND", 500_000.0, "SPECIAL_BOND_PRICE");
     let special_value = special.market_value(&context).unwrap();
-    assert_money_approx_eq(special_value, Money::new(525_000.0, Currency::USD), 1.0);
+    assert_money_approx_eq(
+        special_value,
+        Money::new(525_000.0, Currency::USD).expect("valid money fixture"),
+        1.0,
+    );
 }
 
 #[test]
@@ -103,7 +115,7 @@ fn test_required_collateral_with_haircut() {
 
     let repo = Repo::term(
         "HAIRCUT_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -119,7 +131,7 @@ fn test_required_collateral_with_haircut() {
     // 1,000,000 / (1 - 0.02) = 1,020,408.16
     assert_money_approx_eq(
         required.unwrap(),
-        Money::new(1_020_408.16, Currency::USD),
+        Money::new(1_020_408.16, Currency::USD).expect("valid money fixture"),
         1.0,
     );
 }
@@ -130,7 +142,7 @@ fn test_required_collateral_high_haircut() {
 
     let repo = Repo::builder()
         .id("HIGH_HAIRCUT".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -151,7 +163,7 @@ fn test_required_collateral_high_haircut() {
     // 1,000,000 / (1 - 0.20) = 1,250,000
     assert_money_approx_eq(
         required.unwrap(),
-        Money::new(1_250_000.0, Currency::USD),
+        Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
         1.0,
     );
 }
@@ -162,7 +174,7 @@ fn test_required_collateral_zero_haircut() {
 
     let repo = Repo::builder()
         .id("ZERO_HAIRCUT".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -182,7 +194,7 @@ fn test_required_collateral_zero_haircut() {
 
     assert_money_approx_eq(
         required.unwrap(),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         1.0,
     );
 }
@@ -196,7 +208,7 @@ fn test_adequately_collateralized() {
 
     let repo = Repo::term(
         "ADEQUATE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -219,7 +231,7 @@ fn test_undercollateralized() {
 
     let repo = Repo::term(
         "INSUFFICIENT",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -244,7 +256,7 @@ fn test_overcollateralized() {
 
     let repo = Repo::term(
         "OVERCOLLATERALIZED",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -266,7 +278,7 @@ fn test_special_collateral_rate_adjustment_negative() {
 
     let repo = Repo::term(
         "SPECIAL_NEGATIVE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05, // Base 5%
         date(2025, 1, 15),
@@ -287,7 +299,7 @@ fn test_special_collateral_rate_adjustment_positive() {
 
     let repo = Repo::term(
         "SPECIAL_POSITIVE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05, // Base 5%
         date(2025, 1, 15),
@@ -308,7 +320,7 @@ fn test_general_collateral_effective_rate() {
 
     let repo = Repo::term(
         "GENERAL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -330,15 +342,15 @@ fn test_collateral_currency_safety() {
     // Mix EUR and USD
     let context = create_standard_market_context().insert_price(
         "EUR_BOND_PRICE",
-        MarketScalar::Price(Money::new(1.0, Currency::EUR)),
+        MarketScalar::Price(Money::new(1.0, Currency::EUR).expect("valid money fixture")),
     );
 
     let eur_collateral = CollateralSpec::new("EUR_BOND", 1_000_000.0, "EUR_BOND_PRICE");
 
     let repo = Repo::term(
         "CURRENCY_MIX",
-        Money::new(1_000_000.0, Currency::USD), // USD cash
-        eur_collateral,                         // EUR collateral
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"), // USD cash
+        eur_collateral,                                                       // EUR collateral
         0.05,
         date(2025, 1, 15),
         date(2025, 4, 15),

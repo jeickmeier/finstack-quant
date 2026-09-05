@@ -768,7 +768,7 @@ impl ConvertibleBond {
 
         ConvertibleBond::builder()
             .id(InstrumentId::new("CB-TECH-5Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .discount_curve_id(CurveId::new("USD-IG"))
@@ -837,7 +837,7 @@ impl ConvertibleBond {
 
         ConvertibleBond::builder()
             .id(InstrumentId::new("CB-MAND-DECS-3Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .discount_curve_id(CurveId::new("USD-IG"))
@@ -1160,8 +1160,8 @@ fn validate_conversion_date(
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(

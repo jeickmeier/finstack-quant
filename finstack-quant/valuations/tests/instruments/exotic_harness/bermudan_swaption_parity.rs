@@ -49,7 +49,7 @@ impl Payoff for SwaptionProxy {
     fn on_event(&mut self, _s: &mut PathState) -> finstack_quant_core::Result<()> {
         Ok(())
     }
-    fn value(&self, ccy: Currency) -> Money {
+    fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
         Money::new(self.accrued, ccy)
     }
     fn reset(&mut self) {
@@ -58,7 +58,12 @@ impl Payoff for SwaptionProxy {
 }
 
 impl ExerciseBoundaryPayoff for SwaptionProxy {
-    fn intrinsic_at(&self, _idx: usize, short_rate: f64, ccy: Currency) -> Money {
+    fn intrinsic_at(
+        &self,
+        _idx: usize,
+        short_rate: f64,
+        ccy: Currency,
+    ) -> finstack_quant_core::Result<Money> {
         Money::new(
             self.notional * (short_rate - self.strike).max(0.0) * self.dcf,
             ccy,

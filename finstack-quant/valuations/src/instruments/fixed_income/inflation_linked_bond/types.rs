@@ -465,7 +465,7 @@ impl InflationLinkedBond {
         use time::macros::date;
         Self {
             id: InstrumentId::new("TIPS-10Y"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             real_coupon: Decimal::new(25, 3),
             frequency: Tenor::semi_annual(),
             day_count: DayCount::ActActIsma, // US Treasury convention
@@ -557,7 +557,7 @@ impl InflationLinkedBond {
     /// use time::macros::date;
     ///
     /// let params = InflationLinkedBondParams {
-    ///     notional: Money::new(1_000_000.0, Currency::GBP),
+    ///     notional: Money::from((1_000_000_i64, Currency::GBP)),
     ///     real_coupon: Decimal::try_from(0.025).unwrap(),
     ///     frequency: Tenor::semi_annual(),
     ///     day_count: DayCount::ActActIsma,
@@ -897,7 +897,7 @@ impl InflationLinkedBond {
             let base_amount = self.notional.amount() * coupon_rate * year_frac;
             flows.push((
                 period.payment_date,
-                Money::new(base_amount, self.notional.currency()),
+                Money::new(base_amount, self.notional.currency())?,
             ));
         }
 
@@ -954,7 +954,7 @@ impl InflationLinkedBond {
         // 3. Calculate Target Dirty Real Price
         // Price is per 100 notional.
         let target_dirty_price_val = (clean_price / 100.0 * self.notional.amount()) + real_accrued;
-        let target_price = Money::new(target_dirty_price_val, self.notional.currency());
+        let target_price = Money::new(target_dirty_price_val, self.notional.currency())?;
 
         let spec = YtmPricingSpec {
             day_count: self.day_count,
@@ -1126,10 +1126,10 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if as_of > self.maturity {
-            return Ok(finstack_quant_core::money::Money::new(
-                0.0,
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
                 self.notional.currency(),
-            ));
+            )));
         }
         crate::instruments::common_impl::helpers::schedule_pv(
             self,
@@ -1151,8 +1151,8 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -1216,7 +1216,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             self.notional.currency(),
             &coupon_rows,
             &mut detailed_flows,
-        );
+        )?;
 
         let raw_principal_ratio = inflation_source.ratio(self, self.maturity)?;
         let principal_ratio = match self.deflation_protection {
@@ -1299,7 +1299,7 @@ mod tests {
         // At par the real YTM equals the coupon: 4 % Street (semi-annual).
         let mut bond = InflationLinkedBond {
             id: InstrumentId::new("ILB-C8"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             real_coupon: Decimal::try_from(0.04).expect("valid coupon"),
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
@@ -1414,7 +1414,7 @@ mod tests {
         let maturity = d(2034, Month::January, 15);
         let bond = InflationLinkedBond {
             id: InstrumentId::new("ILB-DURATION-DIRTY"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             real_coupon: Decimal::try_from(0.04).expect("valid coupon"),
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
@@ -1511,7 +1511,7 @@ mod tests {
     fn sample_bond(deflation_protection: DeflationProtection) -> InflationLinkedBond {
         InflationLinkedBond {
             id: InstrumentId::new("ILB"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             real_coupon: Decimal::try_from(0.02).expect("valid coupon"),
             frequency: Tenor::annual(),
             day_count: DayCount::Thirty360,

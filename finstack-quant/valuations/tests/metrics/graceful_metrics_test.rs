@@ -19,8 +19,8 @@ fn test_missing_metric_errors_in_strict_mode() {
     // Create a simple bond
     let bond = Bond::fixed(
         "TEST_BOND",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         date!(2024 - 01 - 01),
         date!(2025 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -32,7 +32,7 @@ fn test_missing_metric_errors_in_strict_mode() {
     let market = MarketContext::new();
 
     let as_of = date!(2024 - 06 - 01);
-    let base_value = Money::new(1000.0, Currency::USD);
+    let base_value = Money::new(1000.0, Currency::USD).expect("valid money fixture");
 
     // Create context
     let instrument_arc: Arc<dyn Instrument> = Arc::new(bond);

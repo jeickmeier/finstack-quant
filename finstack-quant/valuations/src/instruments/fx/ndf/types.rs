@@ -115,7 +115,7 @@ impl std::str::FromStr for NdfQuoteConvention {
 ///     .settlement_currency(Currency::USD)
 ///     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
 ///     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
-///     .notional(Money::new(10_000_000.0, Currency::CNY))
+///     .notional(Money::from((10_000_000_i64, Currency::CNY)))
 ///     .contract_rate(7.25)
 ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
 ///     .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -287,7 +287,7 @@ impl std::str::FromStr for NdfFixingSource {
 ///     .settlement_currency(Currency::USD)
 ///     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
 ///     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
-///     .notional(Money::new(10_000_000.0, Currency::CNY))
+///     .notional(Money::from((10_000_000_i64, Currency::CNY)))
 ///     .contract_rate(7.25)
 ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
 ///     .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -515,7 +515,7 @@ impl Ndf {
             .maturity(
                 Date::from_calendar_date(2025, time::Month::March, 15).expect("Valid example date"),
             )
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -552,7 +552,7 @@ impl Ndf {
     ///     .settlement_currency(Currency::USD)
     ///     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
     ///     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
-    ///     .notional(Money::new(10_000_000.0, Currency::CNY))
+    ///     .notional(Money::from((10_000_000_i64, Currency::CNY)))
     ///     .contract_rate(7.25)
     ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
     ///     .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -958,7 +958,7 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
 
         // End-of-day policy: settlement remains live on maturity.
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(Money::new(0.0, self.settlement_currency));
+            return Ok(Money::from((0_i64, self.settlement_currency)));
         }
 
         let settlement_disc = market.get_discount(self.domestic_discount_curve_id.as_str())?;
@@ -1005,7 +1005,7 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         };
 
         let pv = settlement_amount * df_settlement;
-        Ok(Money::new(pv, self.settlement_currency))
+        Money::new(pv, self.settlement_currency)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -1026,7 +1026,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 crate::cashflow::traits::ScheduleBuildOpts {
-                    notional_hint: Some(Money::new(0.0, self.settlement_currency)),
+                    notional_hint: Some(Money::from((0_i64, self.settlement_currency))),
                     meta: crate::cashflow::builder::CashFlowMeta {
                         representation:
                             crate::cashflow::builder::CashflowRepresentation::NoResidual,
@@ -1038,11 +1038,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         let settlement_amount = self.settlement_amount_for_schedule(market, as_of)?;
         let ccy = self.settlement_currency;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
-            vec![(self.maturity, Money::new(settlement_amount, ccy))],
+            vec![(self.maturity, Money::new(settlement_amount, ccy)?)],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(0.0, ccy)),
+                notional_hint: Some(Money::from((0_i64, ccy))),
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()
@@ -1096,7 +1096,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(0.138) // USD per CNY
             .quote_convention(NdfQuoteConvention::SettlementPerBase)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -1208,7 +1208,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -1300,7 +1300,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -1321,7 +1321,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::INR))
+            .notional(Money::from((10_000_000_i64, Currency::INR)))
             .contract_rate(83.50)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -1347,7 +1347,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -1367,7 +1367,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(0.0)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
@@ -1388,7 +1388,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2025, Month::March, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .fixing_rate_opt(Some(f64::INFINITY))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -1422,7 +1422,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(fixing_date)
             .maturity(maturity)
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .fixing_rate_opt(Some(7.30))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -1479,7 +1479,7 @@ mod tests {
             .settlement_currency(Currency::USD)
             .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
             .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
-            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
             .forward_rate_override_opt(Some(7.25))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

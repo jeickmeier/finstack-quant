@@ -19,7 +19,7 @@ const THETA_DAYS_PER_YEAR: f64 = 365.0;
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
     inst.validate()?;
     if crate::instruments::fx::shared::event_has_occurred(inst.expiry, as_of) {
-        return Ok(Money::new(0.0, inst.quote_currency));
+        return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     let (spot, r_d, r_f, sigma, t) = collect_inputs(inst, curves, as_of)?;
     if spot <= 0.0 || inst.strike < 0.0 || inst.notional.amount() <= 0.0 {
@@ -35,10 +35,7 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             OptionType::Call => (spot - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - spot).max(0.0),
         };
-        return Ok(Money::new(
-            intrinsic * inst.notional.amount(),
-            inst.quote_currency,
-        ));
+        return Money::new(intrinsic * inst.notional.amount(), inst.quote_currency);
     }
 
     if !inst.strike.is_finite() {
@@ -52,17 +49,11 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
             OptionType::Call => spot * (-r_f * t).exp(),
             OptionType::Put => 0.0,
         };
-        return Ok(Money::new(
-            unit_price * inst.notional.amount(),
-            inst.quote_currency,
-        ));
+        return Money::new(unit_price * inst.notional.amount(), inst.quote_currency);
     }
 
     let price = bs_price_unchecked(spot, inst.strike, r_d, r_f, sigma, t, inst.option_type);
-    Ok(Money::new(
-        price * inst.notional.amount(),
-        inst.quote_currency,
-    ))
+    Money::new(price * inst.notional.amount(), inst.quote_currency)
 }
 
 fn input_request<'a>(
@@ -342,7 +333,7 @@ mod delegation_tests {
             )
             .expiry(expiry)
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))

@@ -518,7 +518,7 @@ mod tests {
             _ctx: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Money::try_new(100.0, Currency::USD)
+            Money::new(100.0, Currency::USD)
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -600,7 +600,7 @@ mod tests {
         let instrument = Arc::new(MockInstrument::new(InstrumentType::Bond));
         let market = Arc::new(MarketContext::new());
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-        let base_value = Money::try_new(100.0, Currency::USD).unwrap();
+        let base_value = Money::new(100.0, Currency::USD).unwrap();
         MetricContext::new(
             instrument,
             market,

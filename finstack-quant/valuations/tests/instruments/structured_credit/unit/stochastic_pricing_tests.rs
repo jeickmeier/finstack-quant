@@ -33,7 +33,7 @@ fn simple_pool(balance: f64) -> AssetPool {
     if balance > 0.0 {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(balance, Currency::USD),
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
             0.06,
             Date::from_calendar_date(2029, Month::January, 1).unwrap(),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -48,7 +48,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         0.0,
         100.0,
         finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         legal_maturity(),
     )
@@ -186,8 +186,10 @@ fn correlation_constructor_rejects_invalid_matrix() {
 #[test]
 fn current_loss_percentage_respects_defaults_and_recoveries() {
     let mut sc = build_sc("ABS-LOSS", 1_000_000.0);
-    sc.pool.cumulative_defaults = Money::new(100_000.0, Currency::USD);
-    sc.pool.cumulative_recoveries = Money::new(25_000.0, Currency::USD);
+    sc.pool.cumulative_defaults =
+        Money::new(100_000.0, Currency::USD).expect("valid money fixture");
+    sc.pool.cumulative_recoveries =
+        Money::new(25_000.0, Currency::USD).expect("valid money fixture");
 
     let loss_pct = sc.current_loss_percentage().expect("loss percentage");
     // Original balance ≈ current(1M) + defaults(100k) + prepays(0) = 1.1M
@@ -388,7 +390,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
             "missing",
             &market,
             closing_date(),
-            Money::new(1.0, Currency::USD),
+            Money::new(1.0, Currency::USD).expect("valid money fixture"),
         )
         .expect_err("invalid discount margin")
         .to_string(),
@@ -540,7 +542,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     let mut pool = AssetPool::new("POOL-LARGE", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         0.07,
         maturity,
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -551,7 +553,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity,
     )
@@ -668,7 +670,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
     let mut pool = AssetPool::new("POOL-PHILOX", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity,
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -678,7 +680,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity,
     )

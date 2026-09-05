@@ -42,7 +42,7 @@ fn ng_swaption() -> (CommoditySwaption, MarketContext, Date) {
         .expiry(date(2025, 6, 15))
         .swap_start(date(2025, 7, 1))
         .swap_end(date(2026, 6, 30))
-        .swap_frequency(Tenor::new(1, TenorUnit::Months))
+        .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
         .fixed_price(3.50)
         .notional(10_000.0)
         .forward_curve_id(CurveId::new("NG-FORWARD"))

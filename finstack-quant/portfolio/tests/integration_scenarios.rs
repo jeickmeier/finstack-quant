@@ -31,7 +31,7 @@ fn apply_and_revalue_succeeds() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -109,7 +109,7 @@ fn scenario_pnl_reconciles_end_to_end() {
     let build_deposit = |id: &str, notional: f64, days: i64| {
         Deposit::builder()
             .id(id.into())
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
             .maturity(as_of + Duration::days(days))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -215,7 +215,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(as_of + Duration::days(90))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -320,7 +320,7 @@ impl ScenarioFailureInstrument {
                 "earlier scenario valuation failure".to_string(),
             ));
         }
-        Ok(Money::new(flag, Currency::USD))
+        Ok(Money::new(flag, Currency::USD).expect("valid money fixture"))
     }
 }
 

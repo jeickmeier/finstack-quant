@@ -152,7 +152,7 @@ impl ScenarioSet {
     /// use indexmap::IndexMap;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let model = ModelBuilder::new("scenario-model")
     ///     .periods("2025Q1..Q1", None)?
     ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
@@ -242,7 +242,7 @@ impl ScenarioSet {
     /// use indexmap::IndexMap;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let model = ModelBuilder::new("scenario-model")
     ///     .periods("2025Q1..Q1", None)?
     ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
@@ -530,7 +530,7 @@ impl ScenarioResults {
     /// use indexmap::IndexMap;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let model = ModelBuilder::new("scenario-model")
     ///     .periods("2025Q1..Q1", None)?
     ///     .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])

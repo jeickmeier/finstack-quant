@@ -43,8 +43,8 @@
 //!     .expect("valid ISO-4217 currency");
 //!
 //! // Perform arithmetic that refuses to mix currencies
-//! let subtotal = Money::new(49.50, Currency::EUR);
-//! let tax      = Money::new( 9.90, Currency::EUR);
+//! let subtotal = Money::new(49.50, Currency::EUR).expect("valid money fixture");
+//! let tax      = Money::new( 9.90, Currency::EUR).expect("valid money fixture");
 //! let total    = subtotal.checked_add(tax)?;
 //! assert_eq!(format!("{}", total), "EUR 59.40");
 //! # Ok(())

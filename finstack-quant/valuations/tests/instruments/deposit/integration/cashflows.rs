@@ -49,7 +49,7 @@ fn test_cashflow_redemption_amount() {
     let rate = 0.04;
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .quote_rate(rate)
@@ -122,7 +122,7 @@ fn test_cashflow_with_zero_rate() {
     let notional = 1_000_000.0;
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .quote_rate(0.0)
@@ -160,12 +160,12 @@ fn test_cashflow_notional_scales() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep_1m = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .quote_rate(0.03)
         .build();
 
     let dep_2m = DepositBuilder::new(base)
-        .notional(Money::new(2_000_000.0, Currency::USD))
+        .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .quote_rate(0.03)
         .build();
 
@@ -185,7 +185,7 @@ fn test_cashflow_currency_consistency() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .discount_curve_id("EUR-OIS")
         .build();
 

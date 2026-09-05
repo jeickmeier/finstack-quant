@@ -58,7 +58,7 @@ pub enum TrsDividendSettlement {
 /// # fn main() -> finstack_quant_core::Result<()> {
 /// let trs = EquityTotalReturnSwap::builder()
 ///     .id(InstrumentId::new("SPX-TRS"))
-///     .notional(Money::new(10_000_000.0, Currency::USD))
+///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .underlying(
 ///         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
 ///             .with_dividend_yield("SPX-DIV"),
@@ -309,7 +309,7 @@ impl EquityTotalReturnSwap {
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("TRS-SPX-1Y"))
-            .notional(Money::new(5_000_000.0, Currency::USD))
+            .notional(Money::from((5_000_000_i64, Currency::USD)))
             .underlying(EquityUnderlyingParams {
                 ticker: "SPX".to_string(),
                 spot_id: "SPX-SPOT".into(),
@@ -364,7 +364,7 @@ impl EquityTotalReturnSwap {
     /// let spy_trs = EquityTotalReturnSwap::replicate_etf(
     ///     "SPY",
     ///     "SPY-SPOT",
-    ///     Money::new(10_000_000.0, Currency::USD),
+    ///     Money::from((10_000_000_i64, Currency::USD)),
     ///     financing_spec,
     ///     schedule_spec,
     ///     Some("SPY-DIV"),
@@ -624,8 +624,8 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(

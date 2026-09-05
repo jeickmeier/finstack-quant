@@ -55,7 +55,7 @@
 //!         Ok(())
 //!     }
 //!
-//!     fn value(&self, currency: Currency) -> Money {
+//!     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
 //!         Money::new((self.terminal_spot - 100.0).max(0.0), currency)
 //!     }
 //!
@@ -870,7 +870,7 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
 ///         Ok(())
 ///     }
 ///
-///     fn value(&self, currency: Currency) -> Money {
+///     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
 ///         Money::new((self.terminal_spot - self.strike).max(0.0), currency)
 ///     }
 ///
@@ -886,7 +886,7 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
 /// payoff.reset();
 /// payoff.on_event(&mut state).expect("valid payoff state");
 ///
-/// assert_eq!(payoff.value(Currency::USD).amount(), 12.0);
+/// assert_eq!(payoff.value(Currency::USD).expect("valid payoff").amount(), 12.0);
 /// ```
 pub trait Payoff: Send + Sync + Clone {
     /// Process one path event such as a fixing, barrier check, or cashflow date.
@@ -903,7 +903,7 @@ pub trait Payoff: Send + Sync + Clone {
     /// The returned [`Money`] is in payoff-date units. The generic engine
     /// multiplies it by the run-level `discount_factor` after this method
     /// returns.
-    fn value(&self, currency: Currency) -> Money;
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money>;
 
     /// Reset all path-local state before simulating the next path.
     ///

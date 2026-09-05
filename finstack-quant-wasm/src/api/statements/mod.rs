@@ -374,11 +374,13 @@ mod tests {
                 "revenue",
                 &[
                     (
-                        finstack_quant_core::dates::PeriodId::quarter(2025, 1),
+                        finstack_quant_core::dates::PeriodId::quarter(2025, 1)
+                            .expect("valid period fixture"),
                         AmountOrScalar::scalar(100.0),
                     ),
                     (
-                        finstack_quant_core::dates::PeriodId::quarter(2025, 2),
+                        finstack_quant_core::dates::PeriodId::quarter(2025, 2)
+                            .expect("valid period fixture"),
                         AmountOrScalar::scalar(110.0),
                     ),
                 ],
@@ -408,11 +410,13 @@ mod tests {
                 "revenue",
                 &[
                     (
-                        finstack_quant_core::dates::PeriodId::quarter(2025, 1),
+                        finstack_quant_core::dates::PeriodId::quarter(2025, 1)
+                            .expect("valid period fixture"),
                         AmountOrScalar::scalar(100.0),
                     ),
                     (
-                        finstack_quant_core::dates::PeriodId::quarter(2025, 2),
+                        finstack_quant_core::dates::PeriodId::quarter(2025, 2)
+                            .expect("valid period fixture"),
                         AmountOrScalar::scalar(110.0),
                     ),
                 ],

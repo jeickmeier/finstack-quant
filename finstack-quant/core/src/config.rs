@@ -299,8 +299,8 @@ pub struct ToleranceConfig {
     /// Used when comparing interest rates, yields, and other small ratios.
     #[serde(
         default = "default_rate_epsilon",
-        serialize_with = "serialize_positive_f64",
-        deserialize_with = "deserialize_positive_f64"
+        serialize_with = "crate::wire::serialize_positive_f64",
+        deserialize_with = "crate::wire::deserialize_positive_f64"
     )]
     #[cfg_attr(
         feature = "json-schema",
@@ -312,8 +312,8 @@ pub struct ToleranceConfig {
     /// Used for general numerical comparisons where higher tolerance is acceptable.
     #[serde(
         default = "default_generic_epsilon",
-        serialize_with = "serialize_positive_f64",
-        deserialize_with = "deserialize_positive_f64"
+        serialize_with = "crate::wire::serialize_positive_f64",
+        deserialize_with = "crate::wire::deserialize_positive_f64"
     )]
     #[cfg_attr(
         feature = "json-schema",
@@ -353,23 +353,6 @@ impl ToleranceConfig {
             generic_epsilon,
         })
     }
-}
-
-fn serialize_positive_f64<S>(value: &f64, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    crate::wire::PositiveF64Wire::try_from(*value)
-        .map_err(serde::ser::Error::custom)?
-        .serialize(serializer)
-}
-
-fn deserialize_positive_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    crate::wire::PositiveF64Wire::deserialize(deserializer)
-        .map(crate::wire::PositiveF64Wire::into_inner)
 }
 
 /// Default epsilon for rate comparisons: 1e-12.

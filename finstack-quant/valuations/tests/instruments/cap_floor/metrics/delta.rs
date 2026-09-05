@@ -58,7 +58,7 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_TEST".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -88,7 +88,7 @@ fn create_standard_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "FLOOR_TEST".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -156,7 +156,7 @@ fn same_day_caplet_has_zero_stochastic_delta() {
     let caplet = CapFloor::new(
         "SAME-DAY-FIXED-DELTA",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         date!(2024 - 06 - 01),
@@ -394,7 +394,7 @@ fn test_caplet_delta() {
     let caplet = CapFloor {
         id: "CAPLET_TEST".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -454,7 +454,7 @@ fn compounded_sofr_delta_matches_parallel_forward_finite_difference() {
     let mut caplet = CapFloor::new(
         "SOFR-DELTA",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         date!(2025 - 01 - 02),
         date!(2025 - 04 - 02),

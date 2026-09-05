@@ -254,11 +254,11 @@ mod tests {
     #[test]
     fn mc_result_js_from_estimate_maps_fields() {
         let est = MoneyEstimate {
-            mean: Money::new(10.0, Currency::USD),
+            mean: Money::new(10.0, Currency::USD).expect("valid money fixture"),
             stderr: 0.25,
             ci_95: (
-                Money::new(9.0, Currency::USD),
-                Money::new(11.0, Currency::USD),
+                Money::new(9.0, Currency::USD).expect("valid money fixture"),
+                Money::new(11.0, Currency::USD).expect("valid money fixture"),
             ),
             num_paths: 1000,
             num_simulated_paths: 2000,

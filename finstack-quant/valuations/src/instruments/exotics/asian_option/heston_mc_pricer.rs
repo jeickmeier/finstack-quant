@@ -82,7 +82,7 @@ impl AsianOptionHestonMcPricer {
                 crate::instruments::OptionType::Put => (inst.strike - average).max(0.0),
             };
             return Ok((
-                Money::new(intrinsic * inst.notional.amount(), inst.notional.currency()),
+                Money::new(intrinsic * inst.notional.amount(), inst.notional.currency())?,
                 0.0,
             ));
         }

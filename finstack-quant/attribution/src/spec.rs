@@ -471,8 +471,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).expect("Valid test date"),
             create_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -561,8 +561,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).expect("Valid test date"),
             create_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -669,8 +669,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).expect("Valid test date"),
             create_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -743,8 +743,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).expect("Valid test date"),
             create_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -800,7 +800,7 @@ mod tests {
     fn test_attribution_result_envelope_json_envelope_trait() {
         use finstack_quant_core::config::ResultsMeta;
 
-        let total = Money::new(1000.0, Currency::USD);
+        let total = Money::from((1000_i64, Currency::USD));
         let attribution = PnlAttribution::new(
             total,
             "TEST-BOND",

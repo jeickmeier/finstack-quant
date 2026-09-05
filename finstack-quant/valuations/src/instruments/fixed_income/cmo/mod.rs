@@ -45,9 +45,9 @@
 //! // Create a sequential CMO structure. Every fixed-coupon tranche must stay
 //! // at or below the net pass-through coupon (~4.0% here after 50bp of fees).
 //! let tranches = vec![
-//!     CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-//!     CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-//!     CmoTranche::sequential("C", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
+//!     CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+//!     CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+//!     CmoTranche::sequential("C", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
 //! ];
 //!
 //! let cmo = AgencyCmo::builder()
@@ -81,9 +81,9 @@
 //! use time::Month;
 //!
 //! let tranches = vec![
-//!     CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-//!     CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-//!     CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
+//!     CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+//!     CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+//!     CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
 //! ];
 //!
 //! let cmo = AgencyCmo::builder()

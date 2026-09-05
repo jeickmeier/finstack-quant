@@ -13,6 +13,27 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::context::MarketContextState;
 use finstack_quant_core::market_data::dividends::DividendSchedule;
+
+#[test]
+fn dividend_schedule_restoration_uses_validated_builder() {
+    let mut wire = serde_json::json!({
+        "id": "AAPL-DIVS",
+        "underlying": "AAPL",
+        "currency": "USD",
+        "events": [
+            {"date": "2025-06-15", "kind": {"cash": {"amount": "0.25", "currency": "USD"}}},
+            {"date": "2025-03-15", "kind": {"cash": {"amount": "0.24", "currency": "USD"}}}
+        ]
+    });
+    let schedule: DividendSchedule = serde_json::from_value(wire.clone()).expect("valid schedule");
+    assert!(schedule.get_events()[0].date < schedule.get_events()[1].date);
+    let restored: DividendSchedule =
+        serde_json::from_value(serde_json::to_value(&schedule).expect("serialize schedule"))
+            .expect("restore schedule");
+    assert_eq!(restored.get_events(), schedule.get_events());
+    wire["events"][0]["kind"]["cash"]["amount"] = serde_json::json!("-0.25");
+    assert!(serde_json::from_value::<DividendSchedule>(wire).is_err());
+}
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, InflationLag,
@@ -120,8 +141,13 @@ fn market_context_roundtrip() {
         .build()
         .unwrap();
 
-    let dividends =
-        DividendSchedule::new("AAPL-DIVS").add_cash(test_date(), Money::new(1.0, Currency::USD));
+    let dividends = DividendSchedule::builder("AAPL-DIVS")
+        .cash(
+            test_date(),
+            Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        )
+        .build()
+        .expect("valid dividend schedule");
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
@@ -355,8 +381,13 @@ fn semantic_restore_fixture() -> MarketContextState {
         ScalarTimeSeries::new("SERIES", vec![(test_date(), 1.0)], None).expect("time series");
     let inflation_index = InflationIndex::new("US-CPI", vec![(test_date(), 300.0)], Currency::USD)
         .expect("inflation index");
-    let dividends =
-        DividendSchedule::new("EQ-DIVIDENDS").add_cash(test_date(), Money::new(1.0, Currency::USD));
+    let dividends = DividendSchedule::builder("EQ-DIVIDENDS")
+        .cash(
+            test_date(),
+            Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        )
+        .build()
+        .expect("valid dividend schedule");
     let fx_delta_vol = FxDeltaVolSurface::new(
         "EURUSD-DELTA-VOL",
         vec![1.0],
@@ -621,7 +652,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
         .map_collateral("USD-CSA", CurveId::from("A-DISC"));
 
@@ -881,7 +912,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
         .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
 
@@ -1060,4 +1091,28 @@ fn fx_delta_vol_surface_rejects_invalid_data_on_deserialize() {
         .unwrap()
         .insert("expiries".to_string(), serde_json::json!([1.0, 0.5, 2.0]));
     assert!(serde_json::from_value::<FxDeltaVolSurface>(json).is_err());
+}
+
+#[test]
+fn fx_delta_vol_surface_requires_paired_wings_on_deserialize() {
+    use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+    let surface = FxDeltaVolSurface::new(
+        "EURUSD",
+        vec![1.0],
+        vec![0.1],
+        vec![0.01],
+        vec![0.005],
+        Some((vec![0.02], vec![0.01])),
+    )
+    .unwrap();
+    let json = serde_json::to_value(&surface).unwrap();
+    assert!(serde_json::from_value::<FxDeltaVolSurface>(json.clone()).is_ok());
+    for field in ["rr_10d", "bf_10d"] {
+        let mut missing = json.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<FxDeltaVolSurface>(missing).is_err());
+        let mut null = json.clone();
+        null[field] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<FxDeltaVolSurface>(null).is_err());
+    }
 }

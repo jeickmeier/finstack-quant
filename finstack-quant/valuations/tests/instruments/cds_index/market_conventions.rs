@@ -33,7 +33,7 @@ fn test_cdx_na_ig_standard_conventions() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX.NA.IG.42",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -58,7 +58,7 @@ fn test_cdx_na_hy_standard_conventions() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_hy(39, 1, 500.0),
         "CDX.NA.HY.39",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -81,7 +81,7 @@ fn test_itraxx_europe_standard_conventions() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::itraxx_europe(41, 1, 25.0),
         "iTraxx.Europe.41",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -194,7 +194,7 @@ fn test_index_factor_application() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-SEASONED",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -283,7 +283,7 @@ fn test_pricing_with_standard_conventions() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX.NA.IG.42",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -332,7 +332,7 @@ fn test_upfront_affects_dirty_npv_not_leg_pvs() {
         )
         .expect("base metrics");
 
-    let upfront = Money::new(100_000.0, Currency::USD);
+    let upfront = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     idx.instrument_pricing_overrides
         .market_quotes
         .upfront_payment = Some(upfront);
@@ -378,7 +378,7 @@ fn test_fixed_coupon_in_premium_leg() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, fixed_coupon),
         "CDX-COUPON",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,

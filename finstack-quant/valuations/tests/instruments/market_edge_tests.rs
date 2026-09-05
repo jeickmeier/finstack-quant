@@ -77,7 +77,7 @@ mod cds_market_edge {
 
         let mut buyer = crate::test_support::credit::cds_buy_protection(
             "BUYER",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -88,7 +88,7 @@ mod cds_market_edge {
 
         let mut seller = crate::test_support::credit::cds_sell_protection(
             "SELLER",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -108,8 +108,14 @@ mod cds_market_edge {
 
         // Add same upfront
         let upfront = 500_000.0;
-        buyer.upfront = Some((as_of, Money::new(upfront, Currency::USD)));
-        seller.upfront = Some((as_of, Money::new(upfront, Currency::USD)));
+        buyer.upfront = Some((
+            as_of,
+            Money::new(upfront, Currency::USD).expect("valid money fixture"),
+        ));
+        seller.upfront = Some((
+            as_of,
+            Money::new(upfront, Currency::USD).expect("valid money fixture"),
+        ));
 
         let buyer_with = buyer.value_raw(&market, as_of).unwrap();
         let seller_with = seller.value_raw(&market, as_of).unwrap();
@@ -155,7 +161,7 @@ mod cds_market_edge {
 
             let cds = crate::test_support::credit::cds_buy_protection(
                 "AOD_TEST",
-                Money::new(10_000_000.0, Currency::USD),
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 100.0,
                 as_of,
                 end,
@@ -312,7 +318,7 @@ mod bond_market_edge {
         // T+0 settlement
         let bond_t0 = Bond::builder()
             .id("T0_SETTLE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -332,7 +338,7 @@ mod bond_market_edge {
         // T+2 settlement
         let bond_t2 = Bond::builder()
             .id("T2_SETTLE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -395,8 +401,8 @@ mod bond_market_edge {
 
         let mut bond = Bond::fixed(
             "EX_COUPON_TEST",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -468,8 +474,8 @@ mod bond_market_edge {
         // First coupon is July 1, so stub period is Mar 1 - Jul 1 (4 months vs 6 months normal)
         let bond = Bond::fixed(
             "SHORT_STUB",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -513,7 +519,7 @@ mod bond_market_edge {
         // Bond with 30/360
         let bond_30_360 = Bond::builder()
             .id("DC_30_360".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -527,7 +533,7 @@ mod bond_market_edge {
         // Bond with Act/365
         let bond_act_365 = Bond::builder()
             .id("DC_ACT365".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -591,8 +597,8 @@ mod bond_market_edge {
 
         let bond = Bond::fixed(
             "DIRTY_CLEAN",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,

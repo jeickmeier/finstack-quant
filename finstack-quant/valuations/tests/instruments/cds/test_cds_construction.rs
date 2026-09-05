@@ -18,7 +18,7 @@ fn test_date(year: i32, month: Month, day: u8) -> Date {
 
 #[test]
 fn test_buy_protection_constructor() {
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let start = test_date(2025, Month::January, 1);
     let end = test_date(2030, Month::January, 1);
 
@@ -43,7 +43,7 @@ fn test_buy_protection_constructor() {
 
 #[test]
 fn test_sell_protection_constructor() {
-    let notional = Money::new(5_000_000.0, Currency::EUR);
+    let notional = Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture");
     let start = test_date(2025, Month::March, 20);
     let end = test_date(2028, Month::March, 20);
 
@@ -111,7 +111,7 @@ fn test_builder_pattern() {
 
     let cds = CreditDefaultSwap::builder()
         .id("BUILDER_TEST".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
@@ -147,7 +147,7 @@ fn test_recovery_rate_applied() {
 
     let mut cds = test_utils::cds_buy_protection(
         "RECOVERY_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -172,7 +172,7 @@ fn test_different_currencies() {
     for currency in [Currency::USD, Currency::EUR, Currency::GBP, Currency::JPY] {
         let cds = test_utils::cds_buy_protection(
             format!("CDS_{}", currency),
-            Money::new(10_000_000.0, currency),
+            Money::new(10_000_000.0, currency).expect("valid money fixture"),
             100.0,
             start,
             end,
@@ -192,7 +192,7 @@ fn test_maturity_after_start() {
 
     let cds = test_utils::cds_buy_protection(
         "MATURITY_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -212,7 +212,7 @@ fn test_short_tenor_cds() {
 
     let cds = test_utils::cds_buy_protection(
         "SHORT_TENOR",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -233,7 +233,7 @@ fn test_long_tenor_cds() {
 
     let cds = test_utils::cds_buy_protection(
         "LONG_TENOR",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -252,7 +252,7 @@ fn test_premium_leg_spec_fields() {
 
     let cds = test_utils::cds_buy_protection(
         "PREMIUM_SPEC",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -275,7 +275,7 @@ fn test_protection_leg_spec_fields() {
 
     let cds = test_utils::cds_buy_protection(
         "PROTECTION_SPEC",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,

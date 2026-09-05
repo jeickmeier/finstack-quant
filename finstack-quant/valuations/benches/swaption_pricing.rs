@@ -33,7 +33,7 @@ fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
     let swap_end = Date::from_calendar_date(2025 + swap_tenor_years, Month::January, 1).unwrap();
 
     let params = SwaptionParams {
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.04).expect("valid literal"), // 4% strike
         expiry,
         swap_start,

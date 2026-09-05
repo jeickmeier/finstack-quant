@@ -10,8 +10,8 @@ use finstack_quant_statements_analytics::analysis::{ScenarioDefinition, Scenario
 use indexmap::IndexMap;
 
 fn build_simple_model() -> FinancialModelSpec {
-    let period_q1 = PeriodId::quarter(2025, 1);
-    let period_q2 = PeriodId::quarter(2025, 2);
+    let period_q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let period_q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     ModelBuilder::new("scenario_demo")
         .periods("2025Q1..Q2", None)
@@ -34,7 +34,7 @@ fn build_simple_model() -> FinancialModelSpec {
 #[test]
 fn evaluate_all_applies_overrides_and_evaluates() {
     let model = build_simple_model();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     let mut scenarios = IndexMap::new();
 
@@ -97,7 +97,7 @@ fn evaluate_all_applies_overrides_and_evaluates() {
 #[test]
 fn diff_uses_variance_analyzer() {
     let model = build_simple_model();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     let mut scenarios = IndexMap::new();
 
@@ -167,19 +167,19 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -219,19 +219,31 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
         .expect("downside scenario should be present");
 
     assert_eq!(
-        downside.get("revenue", &PeriodId::quarter(2025, 1)),
+        downside.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
     assert_eq!(
-        downside.get("revenue", &PeriodId::quarter(2025, 2)),
+        downside.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
     assert_eq!(
-        downside.get("revenue", &PeriodId::quarter(2025, 3)),
+        downside.get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
         Some(90_000.0)
     );
     assert_eq!(
-        downside.get("revenue", &PeriodId::quarter(2025, 4)),
+        downside.get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        ),
         Some(90_000.0)
     );
 }
@@ -240,8 +252,8 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
 fn comparison_table_emits_null_frac_on_zero_baseline() {
     use finstack_quant_core::table::TableColumnData;
 
-    let period_q1 = PeriodId::quarter(2025, 1);
-    let period_q2 = PeriodId::quarter(2025, 2);
+    let period_q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let period_q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     // Baseline metric is exactly zero in both periods.
     let model = ModelBuilder::new("zero_base")
@@ -301,11 +313,17 @@ fn comparison_table_emits_null_frac_on_zero_baseline() {
 
 #[test]
 fn monetary_scenario_overrides_preserve_and_validate_currency() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = ModelBuilder::new("money-scenario")
         .periods("2025Q1..Q1", None)
         .expect("periods")
-        .value_money("revenue", &[(period, Money::new(100_000.0, Currency::USD))])
+        .value_money(
+            "revenue",
+            &[(
+                period,
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+            )],
+        )
         .build()
         .expect("model");
 
@@ -317,7 +335,7 @@ fn monetary_scenario_overrides_preserve_and_validate_currency() {
                 period_overrides: IndexMap::new(),
                 overrides: IndexMap::from([(
                     "revenue".to_string(),
-                    AmountOrScalar::amount(110_000.0, Currency::USD),
+                    AmountOrScalar::amount(110_000.0, Currency::USD).expect("valid amount fixture"),
                 )]),
             },
         )]),
@@ -339,7 +357,7 @@ fn monetary_scenario_overrides_preserve_and_validate_currency() {
                 period_overrides: IndexMap::new(),
                 overrides: IndexMap::from([(
                     "revenue".to_string(),
-                    AmountOrScalar::amount(110_000.0, Currency::EUR),
+                    AmountOrScalar::amount(110_000.0, Currency::EUR).expect("valid amount fixture"),
                 )]),
             },
         )]),
@@ -353,8 +371,8 @@ fn monetary_scenario_overrides_preserve_and_validate_currency() {
 #[test]
 fn per_period_overrides_apply_to_one_forecast_period_and_win_over_model_wide() {
     let model = build_simple_model();
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     let mut scenarios = IndexMap::new();
     scenarios.insert(
@@ -400,7 +418,10 @@ fn per_period_overrides_apply_to_one_forecast_period_and_win_over_model_wide() {
 
     // A per-period override on a non-forecast period is rejected.
     let mut bad_period = IndexMap::new();
-    bad_period.insert(PeriodId::quarter(2030, 1), AmountOrScalar::scalar(1.0));
+    bad_period.insert(
+        PeriodId::quarter(2030, 1).expect("valid period fixture"),
+        AmountOrScalar::scalar(1.0),
+    );
     let mut bad = IndexMap::new();
     bad.insert("revenue".to_string(), bad_period);
     let mut scenarios = IndexMap::new();

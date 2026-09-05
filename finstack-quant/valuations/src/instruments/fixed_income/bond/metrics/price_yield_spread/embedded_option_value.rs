@@ -181,10 +181,10 @@ mod tests {
 
         Bond::builder()
             .id("CALLABLE_BOND".into())
-            .notional(Money::new(
-                1000.0,
+            .notional(Money::from((
+                1000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -230,10 +230,10 @@ mod tests {
 
         Bond::builder()
             .id("PUTABLE_BOND".into())
-            .notional(Money::new(
-                1000.0,
+            .notional(Money::from((
+                1000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -270,10 +270,10 @@ mod tests {
 
         Bond::builder()
             .id("STRAIGHT_BOND".into())
-            .notional(Money::new(
-                1000.0,
+            .notional(Money::from((
+                1000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(

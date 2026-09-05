@@ -59,7 +59,7 @@ fn test_fra_forward_dependencies_complete() {
 
     let fra = ForwardRateAgreement::builder()
         .id(InstrumentId::new("FRA-FWD-DEPS"))
-        .notional(Money::new(5_000_000.0, Currency::USD))
+        .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .fixing_date(start)
         .start_date(start)
         .maturity(end)
@@ -96,7 +96,7 @@ fn test_missing_forward_curve_fails() {
 
     let fra = ForwardRateAgreement::builder()
         .id(InstrumentId::new("FRA-FWD-MISSING"))
-        .notional(Money::new(5_000_000.0, Currency::USD))
+        .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .fixing_date(start)
         .start_date(start)
         .maturity(end)

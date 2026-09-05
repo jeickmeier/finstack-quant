@@ -162,7 +162,8 @@ mod tests {
         let as_of = date!(2024 - 01 - 15);
         let mut bond = sample_bond();
         // Force a tiny non-zero base PV via a tiny notional.
-        bond.notional = finstack_quant_core::money::Money::new(1e-12, bond.notional.currency());
+        bond.notional = finstack_quant_core::money::Money::new(1e-12, bond.notional.currency())
+            .expect("valid money fixture");
         bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
         let market = market(as_of);
 

@@ -388,7 +388,7 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
         }
     };
 
-    let value_native = position.scale_value(valuation_result.value);
+    let value_native = position.scale_value(valuation_result.value)?;
     let value_base = collapse_to_base(input, value_native)?;
 
     Ok(PositionValue {
@@ -419,7 +419,7 @@ fn raw_position_endpoint(
         )));
     }
     let amount = crate::fx::convert_to_base(
-        Money::new(amount, currency),
+        Money::new(amount, currency)?,
         input.as_of,
         input.market,
         input.portfolio.base_currency,
@@ -490,12 +490,14 @@ fn assemble_valuation(
 
     let by_entity: IndexMap<EntityId, Money> = entity_amounts
         .into_iter()
-        .map(|(entity_id, amounts)| (entity_id, Money::new(neumaier_sum(amounts), base_currency)))
-        .collect();
+        .map(|(entity_id, amounts)| {
+            Money::new(neumaier_sum(amounts), base_currency).map(|money| (entity_id, money))
+        })
+        .collect::<finstack_quant_core::Result<_>>()?;
     let total_base_currency = Money::new(
         neumaier_sum(by_entity.values().map(Money::amount)),
         base_currency,
-    );
+    )?;
     let degraded_positions: Vec<PositionId> = position_values
         .values()
         .filter(|value| !value.risk_metrics_complete)

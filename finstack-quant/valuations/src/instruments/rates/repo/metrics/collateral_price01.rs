@@ -56,7 +56,7 @@ impl MetricCalculator for CollateralPrice01Calculator {
             market_value_id.as_str(),
             current_scalar,
             bumped_price_up,
-        );
+        )?;
         let pv_up = repo.value(&ctx_up, as_of)?.amount();
 
         // Bump collateral price down by 1%
@@ -66,7 +66,7 @@ impl MetricCalculator for CollateralPrice01Calculator {
             market_value_id.as_str(),
             current_scalar,
             bumped_price_down,
-        );
+        )?;
         let pv_down = repo.value(&ctx_down, as_of)?.amount();
 
         // CollateralPrice01 = (PV_up - PV_down) / (2 * 0.01): the central

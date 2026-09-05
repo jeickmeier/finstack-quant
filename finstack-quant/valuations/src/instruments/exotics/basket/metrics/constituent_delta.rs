@@ -80,7 +80,7 @@ fn get_constituent_price_money(
             match scalar {
                 finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => Ok(*money),
                 finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-                    Ok(Money::new(*v, basket.currency))
+                    Ok(Money::new(*v, basket.currency)?)
                 }
             }
         }
@@ -110,7 +110,7 @@ fn bump_and_measure_delta(
                 finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::new(
                     bumped_price,
                     price.currency(),
-                )),
+                )?),
             );
 
             let bumped_basket =
@@ -131,7 +131,7 @@ fn bump_and_measure_delta(
             let new_scalar = match current_scalar {
                 finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
                     finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                        finstack_quant_core::money::Money::new(bumped_price, m.currency()),
+                        finstack_quant_core::money::Money::new(bumped_price, m.currency())?,
                     )
                 }
                 finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
@@ -259,7 +259,7 @@ mod tests {
             .insert(flat_discount("USD-OIS", as_of, 0.02))
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(150.0, Currency::USD)),
+                MarketScalar::Price(Money::from((150_i64, Currency::USD))),
             );
 
         let basket = Basket::example_with_instruments().expect("Basket example is valid");

@@ -40,7 +40,7 @@ explain       = { python = "finstack_quant.core.explain",       status = "missin
 expr          = { python = "finstack_quant.core.expr",          status = "missing", note = "Expression APIs are not yet surfaced as a dedicated Python submodule" }
 market_data   = { python = "finstack_quant.core.market_data",   status = "exists" }
 math          = { python = "finstack_quant.core.math",          status = "exists" }
-money         = { python = "finstack_quant.core.money",         status = "exists" }
+money         = { python = "finstack_quant.core.money",         status = "exists", note = "Rust Money.checked_div/abs/round map to Python numeric protocols; from_decimal_with_config maps to the config-aware constructor. These methods remain outside the opted-in WASM Money subset." }
 prelude       = { python = "finstack_quant.core.prelude",       status = "missing" }
 rating_scales = { python = "finstack_quant.core.rating_scales", status = "exists" }
 serde_guard   = { python = "finstack_quant.core.serde_guard",   status = "missing", note = "Rust-only strict-serde guard helpers; enforcement happens inside (de)serialization, not as a host API." }
@@ -99,7 +99,7 @@ note = "Subset scope: the Rust config module also exposes ConfigExtensions, Curr
 [crates.core.module_symbols.types]
 python_package = "finstack_quant.core.types"
 public = ["Rate", "Bps", "Percentage", "CreditRating", "CurveId", "InstrumentId", "Attributes"]
-note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bps/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with ord + str equality, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM has no CreditRating twin (core subset excludes types)."
+note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_bps/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with ord + str equality, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM exposes Rate, Bps, and Percentage; CreditRating and identifier wrappers remain outside its core types subset."
 
 [crates.core.module_symbols.currency]
 python_package = "finstack_quant.core.currency"
@@ -109,7 +109,7 @@ allow_additional = true # ISO-4217 code constants are generated from the Rust re
 [crates.core.module_symbols.money]
 python_package = "finstack_quant.core.money"
 public = ["Money"]
-note = "Subset scope: the Rust money module's FormatOpts struct is not bound as a type — Python Money.format(decimals, show_currency, group, rounding) maps its fields onto Money::format_with — and the fx submodule types beyond the bound FxMatrix/FxConversionPolicy/FxRateResult/FxQuoteConvention/FxPairConvention helpers (FxProvider, FxConfig, FxQuery, SimpleFxProvider), rounding helpers, and Money::convert(&dyn FxProvider) remain Rust-only; hosts convert via convert_at_rate or MarketContext-level FX. Python Money also accepts str/Decimal amounts, a config= kwarg (try_new_with_config), __abs__/__round__/__float__ and Money / Money -> float."
+note = "Subset scope: the Rust money module's FormatOpts struct is not bound as a type — Python Money.format(decimals, show_currency, group, rounding) maps its fields onto Money::format_with — and the fx submodule types beyond the bound FxMatrix/FxConversionPolicy/FxRateResult/FxQuoteConvention/FxPairConvention helpers (FxProvider, FxConfig, FxQuery, SimpleFxProvider), rounding helpers, and Money::convert(&dyn FxProvider) remain Rust-only; hosts convert via convert_at_rate or MarketContext-level FX. Python Money also accepts str/Decimal amounts, a config= kwarg (new_with_config or from_decimal_with_config), __abs__/__round__/__float__ and Money / Money -> float."
 
 [crates.core.module_symbols.math]
 python_package = "finstack_quant.core.math"
@@ -119,7 +119,7 @@ note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (com
 [crates.core.module_symbols.dates]
 python_package = "finstack_quant.core.dates"
 public = [
-    "DayCount", "DayCountContext", "DayCountContextState", "Thirty360Convention",
+    "DayCount", "DayCountContext", "Thirty360Convention",
     "days_30_360", "days_30e_360_isda",
     "TenorUnit", "Tenor",
     "PeriodKind", "PeriodId", "Period", "PeriodPlan", "FiscalConfig",
@@ -136,7 +136,7 @@ public = [
     "next_equity_option_expiry",
     "create_date", "days_since_epoch", "date_from_epoch_days",
 ]
-note = "Subset scope: the Rust dates::fx (FX spot-lag/settlement date logic) and dates::calendar (calendar registry internals beyond adjust/available_calendars/CalendarMetadata/HolidayCalendar.count_business_days) submodules remain Rust-only; hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec / Schedule.generate wrap the serde ScheduleSpec. Rust-only: ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message), act_act_isma_year_fraction_with_reference_period, CompositeCalendar/Calendar/Rule/WeekendRule construction."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx (FX spot-lag/settlement date logic) and dates::calendar (calendar registry internals beyond adjust/available_calendars/CalendarMetadata/HolidayCalendar.count_business_days) submodules remain Rust-only; hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message), act_act_isma_year_fraction_with_reference_period, CompositeCalendar/Calendar/Rule/WeekendRule construction."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
@@ -2689,7 +2689,6 @@ python_only_market_data = [
 # and the SIFMA operational calendars remain Python/server-side until a
 # concrete browser workflow requires them.
 python_only_dates = [
-    "DayCountContextState",
     "Thirty360Convention",
     "TenorUnit",
     "PeriodKind",

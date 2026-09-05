@@ -537,7 +537,7 @@ impl PathDependentPricer {
             captured_paths,
             currency,
             Some(process.metadata()),
-        );
+        )?;
         if let Some(run) = result.run.as_mut() {
             run.seed = Some(self.config.seed);
         }

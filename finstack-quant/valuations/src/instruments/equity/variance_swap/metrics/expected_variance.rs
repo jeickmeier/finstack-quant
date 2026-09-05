@@ -67,7 +67,7 @@ mod tests {
         let mut swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-EV"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -138,7 +138,7 @@ mod tests {
 
         // 1) The metric, fed through the payoff and discounted, reproduces the PV
         //    exactly: the reported expected variance is the one the swap prices on.
-        let pv_from_metric = swap.payoff(metric).amount() * df;
+        let pv_from_metric = swap.payoff(metric).expect("valid payoff").amount() * df;
         let tol = 1e-6 * pv.amount().abs().max(1.0);
         assert!(
             (pv.amount() - pv_from_metric).abs() <= tol,

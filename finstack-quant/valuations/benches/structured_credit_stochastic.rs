@@ -31,7 +31,7 @@ fn simple_pool(balance: f64) -> AssetPool {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2029, Month::January, 1).unwrap(),
         DayCount::Thirty360,
@@ -45,7 +45,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         legal_maturity(),
     )

@@ -240,7 +240,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         flows.push(CashFlow::new(
             period.payment_date,
             None,
-            Money::new(coupon_amount, irs.notional.currency()),
+            Money::new(coupon_amount, irs.notional.currency())?,
             CFKind::FloatReset,
             accrual_year_fraction,
             Some(all_in_rate),
@@ -314,7 +314,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
                 Money::new(
                     irs.notional.amount() * rate * period.accrual_year_fraction,
                     irs.notional.currency(),
-                ),
+                )?,
                 kind,
                 period.accrual_year_fraction,
                 Some(rate),
@@ -473,7 +473,7 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
             fixed_sched.scale_amounts(fixed_sign)?,
             float_sched.scale_amounts(floating_sign)?,
         ],
-        Notional::par(irs.notional.amount(), irs.notional.currency()),
+        Notional::par(irs.notional.amount(), irs.notional.currency())?,
         irs.fixed.day_count,
     ))
 }
@@ -558,7 +558,7 @@ mod tests {
     fn compounded_irs_spread_uses_holiday_adjusted_accrual_fraction() {
         let as_of = date!(2024 - 12 - 02);
         let mut irs = InterestRateSwap::example_standard().expect("example IRS");
-        irs.notional = Money::new(1_000_000.0, irs.notional.currency());
+        irs.notional = Money::from((1_000_000_i64, irs.notional.currency()));
         irs.float.start = date!(2025 - 01 - 02);
         irs.float.end = date!(2025 - 07 - 04);
         irs.float.frequency = Tenor::semi_annual();
@@ -672,7 +672,7 @@ mod tests {
         let build_swap = |id: &str, compounding: FloatingLegCompounding| {
             InterestRateSwap::builder()
                 .id(InstrumentId::new(id))
-                .notional(Money::new(10_000_000.0, Currency::USD))
+                .notional(Money::from((10_000_000_i64, Currency::USD)))
                 .side(PayReceive::Pay)
                 .fixed(FixedLegSpec {
                     discount_curve_id: disc_id.clone(),

@@ -7,7 +7,7 @@ use time::macros::date;
 
 #[test]
 fn test_pnl_attribution_new() {
-    let total = Money::new(1000.0, Currency::USD);
+    let total = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -24,7 +24,7 @@ fn test_pnl_attribution_new() {
 
 #[test]
 fn test_compute_residual() {
-    let total = Money::new(1000.0, Currency::USD);
+    let total = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -33,9 +33,9 @@ fn test_compute_residual() {
         AttributionMethod::Parallel,
     );
 
-    attr.carry = Money::new(100.0, Currency::USD);
-    attr.rates_curves_pnl = Money::new(500.0, Currency::USD);
-    attr.fx_pnl = Money::new(390.0, Currency::USD);
+    attr.carry = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    attr.rates_curves_pnl = Money::new(500.0, Currency::USD).expect("valid money fixture");
+    attr.fx_pnl = Money::new(390.0, Currency::USD).expect("valid money fixture");
 
     attr.compute_residual()
         .expect("Residual computation should succeed in test");
@@ -46,7 +46,7 @@ fn test_compute_residual() {
 
 #[test]
 fn test_residual_tolerance() {
-    let total = Money::new(10000.0, Currency::USD);
+    let total = Money::new(10000.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -55,7 +55,7 @@ fn test_residual_tolerance() {
         AttributionMethod::Parallel,
     );
 
-    attr.carry = Money::new(9990.0, Currency::USD);
+    attr.carry = Money::new(9990.0, Currency::USD).expect("valid money fixture");
     attr.compute_residual()
         .expect("Residual computation should succeed in test");
 
@@ -66,7 +66,7 @@ fn test_residual_tolerance() {
 
 #[test]
 fn test_currency_validation() {
-    let total = Money::new(1000.0, Currency::USD);
+    let total = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -77,7 +77,7 @@ fn test_currency_validation() {
 
     assert!(attr.validate_currencies().is_ok());
 
-    attr.fx_pnl = Money::new(100.0, Currency::EUR);
+    attr.fx_pnl = Money::new(100.0, Currency::EUR).expect("valid money fixture");
     assert!(attr.validate_currencies().is_err());
 
     let result = attr.compute_residual();
@@ -88,7 +88,7 @@ fn test_currency_validation() {
 
 #[test]
 fn test_zero_total_pnl_with_nonzero_factors() {
-    let total = Money::new(0.0, Currency::USD);
+    let total = Money::new(0.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -97,8 +97,8 @@ fn test_zero_total_pnl_with_nonzero_factors() {
         AttributionMethod::Parallel,
     );
 
-    attr.carry = Money::new(100.0, Currency::USD);
-    attr.rates_curves_pnl = Money::new(-100.0, Currency::USD);
+    attr.carry = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    attr.rates_curves_pnl = Money::new(-100.0, Currency::USD).expect("valid money fixture");
 
     attr.compute_residual()
         .expect("Residual computation should succeed with zero total P&L");
@@ -112,7 +112,7 @@ fn test_zero_total_pnl_with_nonzero_factors() {
 
 #[test]
 fn test_zero_total_pnl_with_nonzero_residual() {
-    let total = Money::new(0.0, Currency::USD);
+    let total = Money::new(0.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -121,8 +121,8 @@ fn test_zero_total_pnl_with_nonzero_residual() {
         AttributionMethod::Parallel,
     );
 
-    attr.carry = Money::new(100.0, Currency::USD);
-    attr.rates_curves_pnl = Money::new(-50.0, Currency::USD);
+    attr.carry = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    attr.rates_curves_pnl = Money::new(-50.0, Currency::USD).expect("valid money fixture");
 
     attr.compute_residual()
         .expect("Residual computation should succeed");
@@ -136,7 +136,7 @@ fn test_zero_total_pnl_with_nonzero_residual() {
 
 #[test]
 fn test_pnl_attribution_json_envelope_trait() {
-    let total = Money::new(1000.0, Currency::USD);
+    let total = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let mut attr = PnlAttribution::new(
         total,
         "BOND-001",
@@ -145,9 +145,9 @@ fn test_pnl_attribution_json_envelope_trait() {
         AttributionMethod::Parallel,
     );
 
-    attr.carry = Money::new(100.0, Currency::USD);
-    attr.rates_curves_pnl = Money::new(500.0, Currency::USD);
-    attr.fx_pnl = Money::new(390.0, Currency::USD);
+    attr.carry = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    attr.rates_curves_pnl = Money::new(500.0, Currency::USD).expect("valid money fixture");
+    attr.fx_pnl = Money::new(390.0, Currency::USD).expect("valid money fixture");
     attr.compute_residual()
         .expect("Residual computation should succeed");
 

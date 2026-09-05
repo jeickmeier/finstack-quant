@@ -40,13 +40,26 @@ iterations: number,
  */
 objective_value: number,
 /**
- * Maximum absolute residual across all instruments.
+ * Maximum absolute residual across all instruments, in the residual
+ * units of the calibrator that produced this report (raw units for a
+ * step report; the largest step `max_residual` for a plan report).
  */
 max_residual: number,
 /**
- * Root mean square error of all residuals.
+ * Root mean square error of all residuals, in the same units as
+ * [`Self::max_residual`].
  */
 rmse: number,
+/**
+ * Plan-level only: maximum `|residual| / step_tolerance` ratio across
+ * every quote of every step. `None` on per-step reports.
+ */
+max_residual_ratio?: number | null,
+/**
+ * Plan-level only: root mean square of `|residual| / step_tolerance`
+ * across every quote of every step. `None` on per-step reports.
+ */
+rmse_ratio?: number | null,
 /**
  * Whether the calibrated market object passed all validation checks.
  */
@@ -103,4 +116,13 @@ worst_quote_id?: string | null,
 /**
  * Signed residual of [`Self::worst_quote_id`].
  */
-worst_quote_residual?: number | null, };
+worst_quote_residual?: number | null,
+/**
+ * Configured tolerance used to determine [`Self::success`] from residuals.
+ *
+ * Set by [`Self::for_type_with_tolerance`]; `None` for reports built via [`Self::new`]
+ * directly (no tolerance gate applied). This is the typed source of truth for the
+ * success-gate tolerance; it is distinct from `solver_config.tolerance()`, which controls
+ * when the numerical root-finder stops.
+ */
+success_tolerance?: number | null, };

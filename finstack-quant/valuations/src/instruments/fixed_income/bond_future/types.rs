@@ -415,7 +415,7 @@ impl BondFutureSpecs {
 /// # fn main() -> finstack_quant_core::Result<()> {
 /// let future = BondFuture::builder()
 ///     .id(InstrumentId::new("TYH5"))
-///     .notional(Money::new(1_000_000.0, Currency::USD))
+///     .notional(Money::from((1_000_000_i64, Currency::USD)))
 ///     .expiry(date!(2025 - 03 - 20))
 ///     .delivery_start(date!(2025 - 03 - 21))
 ///     .delivery_end(date!(2025 - 03 - 31))
@@ -584,7 +584,7 @@ impl BondFuture {
 
         Self::builder()
             .id(InstrumentId::new("TYU5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(expiry)
             .delivery_start(delivery_start)
             .delivery_end(delivery_end)
@@ -785,7 +785,7 @@ impl BondFuture {
         let num_contracts = self.notional.amount() / self.contract_specs.contract_size;
         let total_invoice = invoice_per_contract * num_contracts;
 
-        Ok(Money::new(total_invoice, self.notional.currency()))
+        Money::new(total_invoice, self.notional.currency())
     }
 
     /// Determine the Cheapest-to-Deliver (CTD) bond from the deliverable basket.
@@ -1151,7 +1151,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1178,7 +1178,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1252,7 +1252,7 @@ mod tests {
         // expiry_date >= delivery_start (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date")) // Wrong: same as delivery_end
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1280,7 +1280,7 @@ mod tests {
         // delivery_start >= delivery_end (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date")) // Wrong: after delivery_end
             .delivery_end(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
@@ -1303,7 +1303,7 @@ mod tests {
         // Empty deliverable basket (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1331,7 +1331,7 @@ mod tests {
         // CTD bond not in basket (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1363,7 +1363,7 @@ mod tests {
         // Negative conversion factor (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1391,7 +1391,7 @@ mod tests {
         // Zero conversion factor (invalid)
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1419,7 +1419,7 @@ mod tests {
         // All validations should pass
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1447,7 +1447,7 @@ mod tests {
 
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1472,7 +1472,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1505,7 +1505,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("FVH5"))
-            .notional(Money::new(500_000.0, Currency::USD))
+            .notional(Money::from((500_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1538,7 +1538,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TUH5"))
-            .notional(Money::new(400_000.0, Currency::USD))
+            .notional(Money::from((400_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1571,7 +1571,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("FGBLH5"))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1604,7 +1604,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("GILTH5"))
-            .notional(Money::new(500_000.0, Currency::GBP))
+            .notional(Money::from((500_000_i64, Currency::GBP)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1637,7 +1637,7 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1664,7 +1664,7 @@ mod tests {
         // Invalid: expiry after delivery start
         let result = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 25).expect("Valid date")) // After delivery_start
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1685,8 +1685,8 @@ mod tests {
         let ctd_bond_id = InstrumentId::new("US912828XG33");
         let ctd_bond = Bond::fixed(
             ctd_bond_id.as_str(),
-            Money::new(100_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2020, Month::January, 15).expect("valid date"),
             Date::from_calendar_date(2030, Month::January, 15).expect("valid date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1695,7 +1695,7 @@ mod tests {
         .expect("valid bond");
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
@@ -1806,8 +1806,8 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
 
 // Declare canonical market dependencies for DV01 calculators.
 impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -1838,7 +1838,7 @@ mod instrument_trait_tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1872,7 +1872,7 @@ mod instrument_trait_tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
@@ -1906,7 +1906,7 @@ mod instrument_trait_tests {
 
         let mut future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
             .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))

@@ -33,10 +33,10 @@ use finstack_quant_core::config::FinstackConfig;
 /// use finstack_quant_core::money::Money;
 ///
 /// let vm_params = VmParameters {
-///     threshold: Money::new(10_000_000.0, Currency::USD),
-///     mta: Money::new(500_000.0, Currency::USD),
-///     rounding: Money::new(10_000.0, Currency::USD),
-///     independent_amount: Money::new(0.0, Currency::USD),
+///     threshold: Money::from((10_000_000_i64, Currency::USD)),
+///     mta: Money::from((500_000_i64, Currency::USD)),
+///     rounding: Money::from((10_000_i64, Currency::USD)),
+///     independent_amount: Money::from((0_i64, Currency::USD)),
 ///     frequency: MarginTenor::Daily,
 ///     settlement_lag: 1,
 /// };
@@ -87,18 +87,23 @@ impl VmParameters {
     /// Returns an error if the embedded margin registry cannot be loaded.
     pub fn regulatory_standard(currency: Currency) -> Result<Self> {
         let registry = embedded_registry()?;
-        Ok(Self::from_defaults(currency, &registry.defaults.vm))
+        Self::from_defaults(currency, &registry.defaults.vm)
     }
 
     /// Create VM parameters with a threshold (bilateral thresholds).
+    ///
+    /// # Arguments
+    ///
+    /// * `threshold` - Uncollateralized exposure allowance in major currency units; its currency selects the currency of the default rounding and independent amounts.
+    /// * `mta` - Minimum transfer amount in the threshold currency, below which a margin transfer is not requested.
     #[must_use]
     pub fn with_threshold(threshold: Money, mta: Money) -> Self {
         let currency = threshold.currency();
         Self {
             threshold,
             mta,
-            rounding: Money::new(10_000.0, currency),
-            independent_amount: Money::new(0.0, currency),
+            rounding: Money::from((10000_i64, currency)),
+            independent_amount: Money::from((0_i64, currency)),
             frequency: MarginTenor::Daily,
             settlement_lag: 1,
         }
@@ -162,7 +167,7 @@ impl VmParameters {
         } else {
             exp.signum() * abs_excess
         };
-        Ok(Money::new(signed_excess + ia, currency))
+        Money::new(signed_excess + ia, currency)
     }
 
     /// Calculate the credit support amount (margin to be delivered/returned).
@@ -212,25 +217,25 @@ impl VmParameters {
         let credit_support_amount = required.amount() - current_collateral.amount();
         let mta_amount = self.mta.amount();
         if credit_support_amount.abs() < mta_amount {
-            return Ok(Money::new(0.0, currency));
+            return Ok(Money::from((0_i64, currency)));
         }
 
         let rounded = self.round_transfer_amount(
-            Money::new(credit_support_amount, currency),
+            Money::new(credit_support_amount, currency)?,
             exposure.amount(),
-        );
+        )?;
         Ok(rounded)
     }
 
     /// Round a transfer amount according to ISDA delivery/return elections.
-    fn round_transfer_amount(&self, amount: Money, exposure_amount: f64) -> Money {
+    fn round_transfer_amount(&self, amount: Money, exposure_amount: f64) -> Result<Money> {
         let rounding = self.rounding.amount();
         if rounding <= 0.0 {
-            return amount;
+            return Ok(amount);
         }
         let raw = amount.amount();
         if raw == 0.0 {
-            return amount;
+            return Ok(amount);
         }
 
         let units = raw.abs() / rounding;
@@ -245,10 +250,10 @@ impl VmParameters {
     /// Build from defaults resolved via a `FinstackConfig`.
     pub fn from_finstack_config(cfg: &FinstackConfig, currency: Currency) -> Result<Self> {
         let registry = margin_registry_from_config(cfg)?;
-        Ok(Self::from_defaults(currency, &registry.defaults.vm))
+        Self::from_defaults(currency, &registry.defaults.vm)
     }
 
-    fn from_defaults(currency: Currency, defaults: &crate::registry::VmDefaults) -> Self {
+    fn from_defaults(currency: Currency, defaults: &crate::registry::VmDefaults) -> Result<Self> {
         defaults.to_vm_params(currency)
     }
 }
@@ -275,8 +280,8 @@ impl VmParameters {
 /// let im_params = ImParameters {
 ///     methodology: ImMethodology::Simm,
 ///     mpor_days: 10,
-///     threshold: Money::new(50_000_000.0, Currency::USD),
-///     mta: Money::new(0.0, Currency::USD), // Combined with VM MTA
+///     threshold: Money::from((50_000_000_i64, Currency::USD)),
+///     mta: Money::from((0_i64, Currency::USD)), // Combined with VM MTA
 ///     segregated: true,
 /// };
 /// ```
@@ -331,11 +336,7 @@ impl ImParameters {
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
     pub fn for_methodology(methodology: ImMethodology, currency: Currency) -> Result<Self> {
         let registry = embedded_registry()?;
-        Ok(Self::from_registry_defaults(
-            methodology,
-            currency,
-            registry,
-        ))
+        Self::from_registry_defaults(methodology, currency, registry)
     }
 
     /// Create IM parameters using ISDA SIMM methodology.
@@ -393,11 +394,7 @@ impl ImParameters {
         currency: Currency,
     ) -> Result<Self> {
         let registry = margin_registry_from_config(cfg)?;
-        Ok(Self::from_registry_defaults(
-            methodology,
-            currency,
-            &registry,
-        ))
+        Self::from_registry_defaults(methodology, currency, &registry)
     }
 
     /// Shared construction path for the methodology-keyed constructors.
@@ -409,7 +406,7 @@ impl ImParameters {
         methodology: ImMethodology,
         currency: Currency,
         registry: &crate::registry::MarginRegistry,
-    ) -> Self {
+    ) -> Result<Self> {
         let defaults = match methodology {
             ImMethodology::Simm | ImMethodology::InternalModel => &registry.defaults.im.simm,
             ImMethodology::Schedule => &registry.defaults.im.schedule,
@@ -428,7 +425,7 @@ mod tests {
     fn vm_params_regulatory_standard() {
         let params =
             VmParameters::regulatory_standard(Currency::USD).expect("registry should load");
-        assert_eq!(params.threshold, Money::new(0.0, Currency::USD));
+        assert_eq!(params.threshold, Money::from((0_i64, Currency::USD)));
         assert_eq!(params.frequency, MarginTenor::Daily);
         assert_eq!(params.settlement_lag, 1);
     }
@@ -436,112 +433,112 @@ mod tests {
     #[test]
     fn vm_margin_call_calculation() {
         let params = VmParameters {
-            threshold: Money::new(1_000_000.0, Currency::USD),
-            mta: Money::new(100_000.0, Currency::USD),
-            rounding: Money::new(10_000.0, Currency::USD),
-            independent_amount: Money::new(0.0, Currency::USD),
+            threshold: Money::from((1_000_000_i64, Currency::USD)),
+            mta: Money::from((100_000_i64, Currency::USD)),
+            rounding: Money::from((10_000_i64, Currency::USD)),
+            independent_amount: Money::from((0_i64, Currency::USD)),
             frequency: MarginTenor::Daily,
             settlement_lag: 1,
         };
 
         // Exposure below threshold: no margin call
-        let exposure = Money::new(500_000.0, Currency::USD);
-        let collateral = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((500_000_i64, Currency::USD));
+        let collateral = Money::from((0_i64, Currency::USD));
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(0.0, Currency::USD));
+        assert_eq!(call, Money::from((0_i64, Currency::USD)));
 
         // Exposure above threshold: margin call
-        let exposure = Money::new(2_000_000.0, Currency::USD);
+        let exposure = Money::from((2_000_000_i64, Currency::USD));
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(1_000_000.0, Currency::USD)); // 2M - 1M threshold
+        assert_eq!(call, Money::from((1_000_000_i64, Currency::USD))); // 2M - 1M threshold
 
         // Amount below MTA: no call
-        let exposure = Money::new(1_050_000.0, Currency::USD);
+        let exposure = Money::from((1_050_000_i64, Currency::USD));
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(0.0, Currency::USD)); // 50K < 100K MTA
+        assert_eq!(call, Money::from((0_i64, Currency::USD))); // 50K < 100K MTA
     }
 
     #[test]
     fn vm_margin_call_mta_applies_before_rounding() {
         let params = VmParameters {
-            threshold: Money::new(0.0, Currency::USD),
-            mta: Money::new(150_000.0, Currency::USD),
-            rounding: Money::new(10_000.0, Currency::USD),
-            independent_amount: Money::new(0.0, Currency::USD),
+            threshold: Money::from((0_i64, Currency::USD)),
+            mta: Money::from((150_000_i64, Currency::USD)),
+            rounding: Money::from((10_000_i64, Currency::USD)),
+            independent_amount: Money::from((0_i64, Currency::USD)),
             frequency: MarginTenor::Daily,
             settlement_lag: 1,
         };
 
         // Raw excess 147k is below MTA, so no call should be made even
         // though the rounded amount would reach the 150k threshold.
-        let exposure = Money::new(147_000.0, Currency::USD);
-        let collateral = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((147_000_i64, Currency::USD));
+        let collateral = Money::from((0_i64, Currency::USD));
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(0.0, Currency::USD));
+        assert_eq!(call, Money::from((0_i64, Currency::USD)));
     }
 
     #[test]
     fn vm_margin_call_rounds_delivery_up_and_return_down() {
         let params = VmParameters {
-            threshold: Money::new(0.0, Currency::USD),
-            mta: Money::new(100_000.0, Currency::USD),
-            rounding: Money::new(10_000.0, Currency::USD),
-            independent_amount: Money::new(0.0, Currency::USD),
+            threshold: Money::from((0_i64, Currency::USD)),
+            mta: Money::from((100_000_i64, Currency::USD)),
+            rounding: Money::from((10_000_i64, Currency::USD)),
+            independent_amount: Money::from((0_i64, Currency::USD)),
             frequency: MarginTenor::Daily,
             settlement_lag: 1,
         };
 
         let delivery_to_us = params
             .calculate_margin_call(
-                Money::new(151_001.0, Currency::USD),
-                Money::new(0.0, Currency::USD),
+                Money::from((151_001_i64, Currency::USD)),
+                Money::from((0_i64, Currency::USD)),
             )
             .expect("delivery call should calculate");
-        assert_eq!(delivery_to_us, Money::new(160_000.0, Currency::USD));
+        assert_eq!(delivery_to_us, Money::from((160_000_i64, Currency::USD)));
 
         let return_to_them = params
             .calculate_margin_call(
-                Money::new(0.0, Currency::USD),
-                Money::new(151_001.0, Currency::USD),
+                Money::from((0_i64, Currency::USD)),
+                Money::from((151_001_i64, Currency::USD)),
             )
             .expect("return call should calculate");
-        assert_eq!(return_to_them, Money::new(-150_000.0, Currency::USD));
+        assert_eq!(return_to_them, Money::from((-150_000_i64, Currency::USD)));
 
         let delivery_to_them = params
             .calculate_margin_call(
-                Money::new(-151_001.0, Currency::USD),
-                Money::new(0.0, Currency::USD),
+                Money::from((-151_001_i64, Currency::USD)),
+                Money::from((0_i64, Currency::USD)),
             )
             .expect("negative exposure delivery call should calculate");
-        assert_eq!(delivery_to_them, Money::new(-160_000.0, Currency::USD));
+        assert_eq!(delivery_to_them, Money::from((-160_000_i64, Currency::USD)));
     }
 
     #[test]
     fn vm_margin_call_negative_exposure_bilateral() {
         let params = VmParameters {
-            threshold: Money::new(1_000_000.0, Currency::USD),
-            mta: Money::new(100_000.0, Currency::USD),
-            rounding: Money::new(10_000.0, Currency::USD),
-            independent_amount: Money::new(0.0, Currency::USD),
+            threshold: Money::from((1_000_000_i64, Currency::USD)),
+            mta: Money::from((100_000_i64, Currency::USD)),
+            rounding: Money::from((10_000_i64, Currency::USD)),
+            independent_amount: Money::from((0_i64, Currency::USD)),
             frequency: MarginTenor::Daily,
             settlement_lag: 1,
         };
 
         // We owe the counterparty: symmetric excess applies to |Exposure| − Threshold.
-        let exposure = Money::new(-2_000_000.0, Currency::USD);
-        let collateral = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((-2_000_000_i64, Currency::USD));
+        let collateral = Money::from((0_i64, Currency::USD));
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(-1_000_000.0, Currency::USD)); // −(2M − 1M)
+        assert_eq!(call, Money::from((-1_000_000_i64, Currency::USD))); // −(2M − 1M)
     }
 
     #[test]
@@ -558,6 +555,6 @@ mod tests {
         assert_eq!(params.methodology, ImMethodology::ClearingHouse);
         assert_eq!(params.mpor_days, 5);
         assert!(!params.segregated);
-        assert_eq!(params.threshold, Money::new(0.0, Currency::USD));
+        assert_eq!(params.threshold, Money::from((0_i64, Currency::USD)));
     }
 }

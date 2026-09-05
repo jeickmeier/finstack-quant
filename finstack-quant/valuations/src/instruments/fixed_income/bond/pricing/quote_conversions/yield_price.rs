@@ -813,7 +813,7 @@ fn workout_cashflow_paths(
         };
         path.push((
             candidate.date,
-            Money::new(redemption, bond.notional.currency()),
+            Money::new(redemption, bond.notional.currency())?,
         ));
         paths.push(path);
     }
@@ -881,7 +881,7 @@ fn solve_workout_path_yield(
     solve_ytm(
         &future_flows,
         quote_date,
-        Money::new(residual_target, dirty_price_target.currency()),
+        Money::new(residual_target, dirty_price_target.currency())?,
         YtmPricingSpec {
             day_count: bond.cashflow_spec.day_count(),
             notional: bond.notional,
@@ -1028,7 +1028,7 @@ mod tests {
             }],
             puts: Vec::new(),
         });
-        let flows = vec![(flow_date, Money::new(5.0, Currency::USD))];
+        let flows = vec![(flow_date, Money::from((5_i64, Currency::USD)))];
 
         let dates: Vec<_> = enumerate_exit_paths(&bond, &flows, date!(2026 - 01 - 01))
             .into_iter()
@@ -1106,8 +1106,8 @@ mod tests {
         let exercise_date = date!(2026 - 01 - 01);
         let mut bond = Bond::fixed(
             "MW-WORKOUT",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.10),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.10).expect("valid rate fixture"),
             as_of,
             date!(2027 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1180,8 +1180,8 @@ mod tests {
         let exercise_date = date!(2025 - 12 - 15);
         let mut make_whole_bond = Bond::fixed(
             "MW-QUOTED-WORKOUT",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.10),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.10).expect("valid rate fixture"),
             as_of,
             date!(2027 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1282,8 +1282,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 03);
         let mut bond = Bond::fixed(
             "YTW-ROLLED-MATURITY",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2026 - 01 - 03),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1313,8 +1313,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "YTW-SAME-DAY-EXERCISE",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.10),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.10).expect("valid rate fixture"),
             issue,
             date!(2026 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1364,7 +1364,7 @@ mod tests {
             &market,
             &strict_flows,
             as_of,
-            Money::new(inverted, Currency::USD),
+            Money::new(inverted, Currency::USD).expect("valid money fixture"),
             &schedule,
         )
         .expect("same-day YTW solve");
@@ -1380,8 +1380,8 @@ mod tests {
         let exercise_date = date!(2025 - 12 - 15);
         let mut bullet = Bond::fixed(
             "YTW-RETURN-FLOOR",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.10),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.10).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1451,7 +1451,7 @@ mod tests {
                 CashFlow::new(
                     issue,
                     None,
-                    Money::new(-100.0, Currency::USD),
+                    Money::from((-100_i64, Currency::USD)),
                     CFKind::Notional,
                     0.0,
                     None,
@@ -1459,7 +1459,7 @@ mod tests {
                 CashFlow::new(
                     maturity,
                     None,
-                    Money::new(5.0, Currency::USD),
+                    Money::from((5_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
@@ -1467,13 +1467,13 @@ mod tests {
                 CashFlow::new(
                     maturity,
                     None,
-                    Money::new(100.0, Currency::USD),
+                    Money::from((100_i64, Currency::USD)),
                     CFKind::Notional,
                     0.0,
                     None,
                 ),
             ],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),

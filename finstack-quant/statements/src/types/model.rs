@@ -675,10 +675,22 @@ mod period_timeline_tests {
     #[test]
     fn contiguous_actuals_then_forecasts_is_accepted() {
         let mut model = model_with_periods(vec![
-            period(PeriodId::quarter(2024, 1), true),
-            period(PeriodId::quarter(2024, 2), true),
-            period(PeriodId::quarter(2024, 3), false),
-            period(PeriodId::quarter(2024, 4), false),
+            period(
+                PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                true,
+            ),
+            period(
+                PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                true,
+            ),
+            period(
+                PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                false,
+            ),
+            period(
+                PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                false,
+            ),
         ]);
         model
             .validate_semantics()
@@ -689,10 +701,22 @@ mod period_timeline_tests {
     #[test]
     fn actual_after_forecast_is_rejected() {
         let mut model = model_with_periods(vec![
-            period(PeriodId::quarter(2024, 1), true),
-            period(PeriodId::quarter(2024, 2), false),
-            period(PeriodId::quarter(2024, 3), true),
-            period(PeriodId::quarter(2024, 4), false),
+            period(
+                PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                true,
+            ),
+            period(
+                PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                false,
+            ),
+            period(
+                PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                true,
+            ),
+            period(
+                PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                false,
+            ),
         ]);
         let err = model
             .validate_semantics()
@@ -707,8 +731,14 @@ mod period_timeline_tests {
     #[test]
     fn out_of_order_periods_are_rejected() {
         let mut model = model_with_periods(vec![
-            period(PeriodId::quarter(2024, 2), true),
-            period(PeriodId::quarter(2024, 1), true),
+            period(
+                PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                true,
+            ),
+            period(
+                PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                true,
+            ),
         ]);
         let err = model
             .validate_semantics()
@@ -727,7 +757,10 @@ mod period_timeline_tests {
 
         let mut swap = InterestRateSwap::example_standard().expect("example swap");
         swap.side = PayReceive::Receive;
-        let mut model = model_with_periods(vec![period(PeriodId::quarter(2024, 1), true)]);
+        let mut model = model_with_periods(vec![period(
+            PeriodId::quarter(2024, 1).expect("valid period fixture"),
+            true,
+        )]);
         model.capital_structure = Some(CapitalStructureSpec {
             debt_instruments: vec![DebtInstrumentSpec {
                 id: "IRS-RCV".to_string(),
@@ -753,18 +786,21 @@ mod period_timeline_tests {
     fn bond_plus_sweep_in_priority_of_payments_is_rejected() {
         let bond = Bond::fixed(
             finstack_quant_core::types::InstrumentId::new("BOND-SWEEP"),
-            finstack_quant_core::money::Money::new(
-                1_000_000.0,
+            finstack_quant_core::money::Money::from((
+                1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            )),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
             finstack_quant_core::dates::StubKind::ShortFront,
             finstack_quant_core::types::CurveId::new("USD-OIS"),
         )
         .expect("bond");
-        let mut model = model_with_periods(vec![period(PeriodId::quarter(2025, 1), true)]);
+        let mut model = model_with_periods(vec![period(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            true,
+        )]);
         model.capital_structure = Some(CapitalStructureSpec {
             debt_instruments: vec![DebtInstrumentSpec {
                 id: "BOND-SWEEP".to_string(),
@@ -802,7 +838,10 @@ mod period_timeline_tests {
     #[test]
     fn pay_swap_in_capital_structure_is_accepted() {
         let swap = InterestRateSwap::example_standard().expect("example swap");
-        let mut model = model_with_periods(vec![period(PeriodId::quarter(2024, 1), true)]);
+        let mut model = model_with_periods(vec![period(
+            PeriodId::quarter(2024, 1).expect("valid period fixture"),
+            true,
+        )]);
         model.capital_structure = Some(CapitalStructureSpec {
             debt_instruments: vec![DebtInstrumentSpec {
                 id: "IRS-PAY".to_string(),

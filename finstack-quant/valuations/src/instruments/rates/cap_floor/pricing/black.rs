@@ -77,13 +77,13 @@ pub(crate) fn price_caplet_floorlet(
 
     // Edge case: Option is at or past fixing -> intrinsic value
     if t_fix <= 0.0 {
-        return Ok(Money::new(intrinsic_value(&inputs), ccy));
+        return Money::new(intrinsic_value(&inputs), ccy);
     }
 
     // Edge case: Zero or negative volatility -> intrinsic value
     // This handles the case where vol surface returns 0 or negative due to extrapolation
     if sigma <= 0.0 || !sigma.is_finite() {
-        return Ok(Money::new(intrinsic_value(&inputs), ccy));
+        return Money::new(intrinsic_value(&inputs), ccy);
     }
 
     // Edge case: Non-positive forward rate
@@ -124,7 +124,7 @@ pub(crate) fn price_caplet_floorlet(
         )));
     }
 
-    Ok(Money::new(pv, ccy))
+    Money::new(pv, ccy)
 }
 
 /// Black forward delta (per unit forward).

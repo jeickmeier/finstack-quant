@@ -74,7 +74,7 @@ impl MetricCalculator for YtmCalculator {
         let dirty: Money = if let Some(clean_px) = maybe_clean_px {
             // Compute dirty price at quote_date: clean% × notional + accrued_at_quote
             let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, notional.amount());
-            Money::new(dirty_amt, notional.currency())
+            Money::new(dirty_amt, notional.currency())?
         } else {
             // Fallback: forward-value the model PV (computed at `as_of`) to the
             // quote/settlement date so the solved YTM discounts cashflows from
@@ -89,7 +89,7 @@ impl MetricCalculator for YtmCalculator {
                     quote_ctx.quote_date,
                     context.base_value.amount(),
                 )?;
-            Money::new(pv_at_quote, notional.currency())
+            Money::new(pv_at_quote, notional.currency())?
         };
 
         // Build and cache flows and hints if not already present. Coupon

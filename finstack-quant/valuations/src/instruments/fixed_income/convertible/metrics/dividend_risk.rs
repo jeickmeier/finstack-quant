@@ -47,7 +47,7 @@ impl MetricCalculator for DividendRiskCalculator {
             div_yield_id.as_str(),
             current_scalar,
             q_up_val,
-        );
+        )?;
         let pv_up = convertible.value(&curves_up, as_of)?.amount();
 
         let curves_down = replace_scalar_value(
@@ -55,7 +55,7 @@ impl MetricCalculator for DividendRiskCalculator {
             div_yield_id.as_str(),
             current_scalar,
             q_down_val,
-        );
+        )?;
         let pv_down = convertible.value(&curves_down, as_of)?.amount();
 
         // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).

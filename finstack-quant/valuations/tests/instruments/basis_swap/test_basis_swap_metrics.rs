@@ -62,7 +62,7 @@ fn market() -> MarketContext {
 fn swap() -> BasisSwap {
     BasisSwap::new(
         "BASIS-TEST",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         BasisSwapLeg {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),

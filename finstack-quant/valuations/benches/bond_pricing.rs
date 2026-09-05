@@ -35,8 +35,8 @@ fn create_test_bond(maturity_years: i32) -> Bond {
 
     Bond::fixed(
         format!("BOND-{}Y", maturity_years),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -265,7 +265,7 @@ fn create_floating_note(maturity_years: i32) -> Bond {
     let maturity = Date::from_calendar_date(2025 + maturity_years, Month::January, 1).unwrap();
     let mut bond = Bond::floating(
         format!("FRN-{}Y", maturity_years),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
         150,
         issue,
@@ -481,7 +481,7 @@ fn create_stochastic_hazard_callable(
     let mut bond = if floating_pik {
         let mut bond = Bond::floating(
             format!("FRN-PIK-CALL-{}Y", maturity_years),
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             "USD-SOFR-3M",
             200,
             issue,

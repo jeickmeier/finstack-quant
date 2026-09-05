@@ -364,7 +364,7 @@ mod tests {
         BermudanSwaption::new(
             "BERM-LMM-CAL",
             OptionType::Call,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.03,
             swap_start,
             swap_end,
@@ -483,8 +483,8 @@ mod tests {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let bond = finstack_quant_valuations::instruments::Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2024, Month::January, 1).expect("start"),
             Date::from_calendar_date(2034, Month::January, 1).expect("end"),
             finstack_quant_core::dates::StubKind::ShortFront,

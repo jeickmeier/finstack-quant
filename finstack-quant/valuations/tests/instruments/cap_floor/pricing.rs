@@ -56,7 +56,7 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_TEST".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -86,7 +86,7 @@ fn create_standard_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "FLOOR_TEST".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -289,7 +289,7 @@ fn test_caplet_single_period_pricing() {
     let caplet = CapFloor {
         id: "CAPLET_TEST".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -369,7 +369,7 @@ fn test_zero_notional_cap() {
     let end = date!(2029 - 01 - 01);
 
     let mut cap = create_standard_cap(as_of, end, 0.05);
-    cap.notional = Money::new(0.0, Currency::USD);
+    cap.notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
@@ -432,7 +432,7 @@ fn test_fixing_vs_payment_date_timing() {
     let caplet = CapFloor {
         id: "CAPLET_TIMING".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: fixing_date,
         maturity: payment_date,
@@ -514,7 +514,7 @@ fn test_seasoned_caplet_uses_historical_fixing_after_reset() {
     let caplet = CapFloor {
         id: "CAPLET_SEASONED".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: fixing_date,
         maturity: payment_date,
@@ -575,7 +575,7 @@ fn test_single_period_cap_matches_caplet_with_resolved_lags() {
     let start = date!(2024 - 03 - 01);
     let end = date!(2024 - 06 - 01);
     let strike = 0.05;
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let cap = CapFloor::new(
         "ONE_PERIOD_CAP",
@@ -630,7 +630,7 @@ fn test_caplet_after_payment_date_is_zero() {
     let caplet = CapFloor {
         id: "CAPLET_EXPIRED".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: fixing_date,
         maturity: payment_date,

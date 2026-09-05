@@ -443,7 +443,7 @@ impl McEngine {
             "mc_price completed"
         );
 
-        Ok(MoneyEstimate::from_estimate(estimate.0, currency))
+        MoneyEstimate::from_estimate(estimate.0, currency)
     }
 
     /// Price a payoff and optionally return captured paths.
@@ -557,14 +557,7 @@ impl McEngine {
             capture_enabled,
         )?;
 
-        Ok(
-            self.finalize_captured_result(
-                estimate,
-                collected_paths,
-                currency,
-                Some(process_params),
-            ),
-        )
+        self.finalize_captured_result(estimate, collected_paths, currency, Some(process_params))
     }
 
     /// Assemble a [`MonteCarloResult`] from a raw [`Estimate`] and the paths
@@ -585,7 +578,7 @@ impl McEngine {
         mut collected_paths: Vec<SimulatedPath>,
         currency: Currency,
         process_params: Option<ProcessParams>,
-    ) -> MonteCarloResult {
+    ) -> finstack_quant_core::Result<MonteCarloResult> {
         let capture_enabled = self.config.path_capture.enabled;
         let paths = if capture_enabled {
             let sampling_method = match &self.config.path_capture.capture_mode {
@@ -609,7 +602,7 @@ impl McEngine {
             None
         };
 
-        let money_estimate = MoneyEstimate::from_estimate(estimate, currency);
+        let money_estimate = MoneyEstimate::from_estimate(estimate, currency)?;
         // Stamp the run with its execution policy so results are auditable
         // and replayable. The engine cannot observe the RNG seed (it receives
         // a constructed stream); pricers that derive the stream from a seed
@@ -628,7 +621,7 @@ impl McEngine {
             Some(paths) => MonteCarloResult::with_paths(money_estimate, paths),
             None => MonteCarloResult::new(money_estimate),
         };
-        result.with_run_metadata(run)
+        Ok(result.with_run_metadata(run))
     }
 
     /// Dispatch to serial or parallel path loop and return the aggregate

@@ -66,7 +66,7 @@ fn create_option_market(
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(spot, Currency::USD)),
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(div_yield))
 }

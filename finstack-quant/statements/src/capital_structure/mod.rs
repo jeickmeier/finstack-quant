@@ -44,19 +44,19 @@
 //! let model = ModelBuilder::new("LBO Model")
 //!     .periods("2025Q1..2025Q4", Some("2025Q1"))?
 //!     .value("revenue", &[
-//!         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-//!         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
-//!         (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(120.0)),
-//!         (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(130.0)),
+//!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
+//!         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110.0)),
+//!         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(120.0)),
+//!         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(130.0)),
 //!     ])
 //!     .availability_dates(
 //!         "revenue",
-//!         &[(PeriodId::quarter(2025, 1), issue_date)],
+//!         &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), issue_date)],
 //!     )?
 //!     // Add debt instruments
 //!     .add_bond(
 //!         "BOND-001",
-//!         Money::new(10_000_000.0, Currency::USD),
+//!         Money::from((10_000_000_i64, Currency::USD)),
 //!         0.05, // 5% coupon
 //!         issue_date,
 //!         maturity_date,
@@ -79,7 +79,7 @@
 //!
 //! let mut evaluator = Evaluator::new();
 //! let results = evaluator.evaluate_with_market(&model, &market_ctx, issue_date)?;
-//! let q1_interest = results.get("interest_expense", &PeriodId::quarter(2025, 1));
+//! let q1_interest = results.get("interest_expense", &PeriodId::quarter(2025, 1).expect("valid period fixture"));
 //! # let _ = q1_interest;
 //! # Ok(())
 //! # }

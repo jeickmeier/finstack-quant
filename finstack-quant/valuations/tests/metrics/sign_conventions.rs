@@ -84,7 +84,10 @@ fn create_option_market(
     MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("AAPL", MarketScalar::Price(Money::new(spot, Currency::USD)))
+        .insert_price(
+            "AAPL",
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+        )
         .insert_price("AAPL_DIV", MarketScalar::Unitless(div_yield))
 }
 
@@ -99,7 +102,7 @@ fn test_call_delta_positive() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -148,7 +151,7 @@ fn test_put_delta_negative() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -200,7 +203,7 @@ fn test_theta_negative_for_long_positions() {
             option_type,
             exercise_style: ExerciseStyle::European,
             expiry,
-            notional: Money::new(100.0, Currency::USD),
+            notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
             theta_day_basis: Default::default(),
             settlement: SettlementType::Cash,
@@ -251,8 +254,8 @@ fn test_bond_dv01_negative() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "DV01_TEST",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -298,7 +301,7 @@ fn test_vega_always_positive() {
             option_type,
             exercise_style: ExerciseStyle::European,
             expiry,
-            notional: Money::new(100.0, Currency::USD),
+            notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
             theta_day_basis: Default::default(),
             settlement: SettlementType::Cash,
@@ -356,7 +359,7 @@ fn test_gamma_always_positive() {
             option_type,
             exercise_style: ExerciseStyle::European,
             expiry,
-            notional: Money::new(100.0, Currency::USD),
+            notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
             theta_day_basis: Default::default(),
             settlement: SettlementType::Cash,
@@ -413,7 +416,7 @@ fn test_call_rho_positive() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -460,7 +463,7 @@ fn test_put_rho_negative() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -503,7 +506,7 @@ fn test_cds_cs01_protection_buyer_positive() {
 
     let cds = crate::credit_support::cds_buy_protection(
         "CS01_BUY_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp spread
         as_of,
         date!(2030 - 01 - 01),
@@ -541,7 +544,7 @@ fn test_cds_cs01_protection_seller_negative() {
 
     let cds = crate::credit_support::cds_sell_protection(
         "CS01_SELL_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0, // 200bp spread
         as_of,
         date!(2030 - 01 - 01),
@@ -578,7 +581,7 @@ fn test_cds_cs01_opposite_signs() {
 
     let cds_buy = crate::credit_support::cds_buy_protection(
         "CS01_BUY",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0,
         as_of,
         date!(2030 - 01 - 01),
@@ -589,7 +592,7 @@ fn test_cds_cs01_opposite_signs() {
 
     let cds_sell = crate::credit_support::cds_sell_protection(
         "CS01_SELL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0,
         as_of,
         date!(2030 - 01 - 01),
@@ -664,7 +667,7 @@ fn test_put_call_parity() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -689,7 +692,7 @@ fn test_put_call_parity() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -762,7 +765,7 @@ fn test_put_call_parity_delta_relationship() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -786,7 +789,7 @@ fn test_put_call_parity_delta_relationship() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,

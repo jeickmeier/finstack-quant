@@ -42,7 +42,7 @@ impl CliquetOptionMcPricer {
     )> {
         inst.validate()?;
         if as_of > inst.expiry {
-            return Ok((Money::new(0.0, inst.notional.currency()), None));
+            return Ok((Money::from((0_i64, inst.notional.currency())), None));
         }
         let initial_spot = crate::instruments::common_impl::helpers::scalar_price_amount(
             curves.get_price(&inst.spot_id)?,
@@ -107,7 +107,7 @@ impl CliquetOptionMcPricer {
         // known cashflow from the contract expiry.
         if future_resets.is_empty() {
             if as_of > inst.expiry {
-                return Ok((Money::new(0.0, inst.notional.currency()), None));
+                return Ok((Money::from((0_i64, inst.notional.currency())), None));
             }
             let total_return = match inst.payoff_type {
                 CliquetPayoffType::Additive => locked_sum,
@@ -126,7 +126,7 @@ impl CliquetOptionMcPricer {
                 Money::new(
                     clamped * inst.notional.amount() * df,
                     inst.notional.currency(),
-                ),
+                )?,
                 None,
             ));
         }
@@ -137,7 +137,7 @@ impl CliquetOptionMcPricer {
             .day_count
             .year_fraction(as_of, final_date, DayCountContext::default())?;
         if t <= 0.0 {
-            return Ok((Money::new(0.0, inst.notional.currency()), None));
+            return Ok((Money::from((0_i64, inst.notional.currency())), None));
         }
 
         // Dividend yield from scalar id if provided
@@ -423,7 +423,7 @@ mod tests {
             .local_floor(0.0)
             .global_cap(0.20)
             .global_floor(0.0)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -462,7 +462,7 @@ mod tests {
         let unitless_market = market(as_of);
         let price_market = unitless_market.clone().insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::from((100_i64, Currency::USD))),
         );
 
         let pv_unitless = compute_pv(&option, &unitless_market, as_of).expect("unitless pv");
@@ -514,7 +514,7 @@ mod tests {
 
         let bad_market = market(as_of).insert_price(
             "SPX-DIV",
-            MarketScalar::Price(Money::new(1.0, Currency::USD)),
+            MarketScalar::Price(Money::from((1_i64, Currency::USD))),
         );
         let err = compute_pv(&option, &bad_market, as_of).expect_err("price div should error");
         assert!(err.to_string().contains("unitless scalar"));
@@ -574,7 +574,7 @@ mod tests {
             .local_floor(0.0)
             .global_cap(0.20)
             .global_floor(0.0)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -753,7 +753,7 @@ mod tests {
             .local_floor(local_floor)
             .global_cap(0.50)
             .global_floor(0.0)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -774,7 +774,7 @@ mod tests {
             .local_floor(local_floor)
             .global_cap(0.50)
             .global_floor(0.0)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

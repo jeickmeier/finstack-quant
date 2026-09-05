@@ -84,7 +84,7 @@ fn discount_margin_target_money(
     target_pv: f64,
     currency: finstack_quant_core::currency::Currency,
 ) -> Result<Money> {
-    Money::try_new(target_pv, currency)
+    Money::new(target_pv, currency)
 }
 
 /// Solve the break-even CDR for an already parsed structured-credit deal.

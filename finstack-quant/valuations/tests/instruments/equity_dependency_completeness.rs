@@ -100,7 +100,7 @@ fn test_commodity_option_equity_dependencies_complete() {
     for spot_id in &market_deps.market_scalar_ids {
         market = market.insert_price(
             spot_id,
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         );
     }
 

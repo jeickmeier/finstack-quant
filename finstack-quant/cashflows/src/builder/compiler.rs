@@ -834,7 +834,7 @@ mod tests {
     fn builder_with_full_horizon_fixed(issue: Date, maturity: Date) -> CashFlowBuilder {
         let mut builder = CashFlowBuilder::default();
         let _ = builder.principal(
-            finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD),
+            finstack_quant_core::money::Money::from((1_000_000_i64, Currency::USD)),
             issue,
             maturity,
         );

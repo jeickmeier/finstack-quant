@@ -309,7 +309,7 @@ impl Swaption {
         Self {
             id: InstrumentId::new("SWPN-1Yx5Y-USD"),
             option_type: OptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: Date::from_calendar_date(2027, time::Month::January, 15)
                 .expect("Valid example date"),
             exercise_style: SwaptionExercise::European,
@@ -356,7 +356,7 @@ impl Swaption {
         Self {
             id: InstrumentId::new("SWPN-5NC1-BERM-USD"),
             option_type: OptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: first_exercise,
             exercise_style: SwaptionExercise::Bermudan,
             settlement: SwaptionSettlement::Physical,
@@ -584,7 +584,7 @@ impl Swaption {
             return Ok(None);
         }
         if as_of > self.expiry {
-            return Ok(Some(Money::new(0.0, self.notional.currency())));
+            return Ok(Some(Money::from((0_i64, self.notional.currency()))));
         }
 
         let disc = curves.get_discount(self.get_discount_curve_id().as_ref())?;
@@ -599,7 +599,7 @@ impl Swaption {
         Ok(Some(Money::new(
             intrinsic * annuity * self.notional.amount(),
             self.notional.currency(),
-        )))
+        )?))
     }
 
     /// Helper for common pricing logic
@@ -625,10 +625,7 @@ impl Swaption {
 
         let value = model_fn(forward_rate, strike, volatility, time_to_expiry, annuity);
 
-        Ok(Money::new(
-            value * self.notional.amount(),
-            self.notional.currency(),
-        ))
+        Money::new(value * self.notional.amount(), self.notional.currency())
     }
 
     /// Black (lognormal) model PV.

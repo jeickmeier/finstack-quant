@@ -186,7 +186,7 @@ use time::Month;
 fn six_month_deposit() -> finstack_quant_core::Result<Deposit> {
     Deposit::builder()
         .id(InstrumentId::new("DEP-001"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD)?)
         .start_date(create_date(2025, Month::January, 1)?)
         .maturity(create_date(2025, Month::July, 1)?)
         .day_count(DayCount::Act360)

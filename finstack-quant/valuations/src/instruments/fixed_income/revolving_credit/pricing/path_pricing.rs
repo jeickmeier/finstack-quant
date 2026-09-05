@@ -253,7 +253,7 @@ impl RevolvingCreditPricer {
         }
 
         let result = PathResult {
-            pv: Money::new(total_pv, facility.commitment_amount.currency()),
+            pv: Money::new(total_pv, facility.commitment_amount.currency())?,
             path_data: path_schedule.path_data.clone(),
             cashflows: path_schedule.schedule.clone(),
         };

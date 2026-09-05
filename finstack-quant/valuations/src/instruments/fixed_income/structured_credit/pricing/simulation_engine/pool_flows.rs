@@ -63,11 +63,11 @@ pub(super) fn calculate_pool_flows_with_rates(
 ) -> Result<PoolFlows> {
     let state = request.state;
     let base_currency = state.base_currency;
-    let mut total_interest = Money::new(0.0, base_currency);
-    let mut total_scheduled = Money::new(0.0, base_currency);
-    let mut total_prepay = Money::new(0.0, base_currency);
-    let mut total_default = Money::new(0.0, base_currency);
-    let mut total_recovery = Money::new(0.0, base_currency);
+    let mut total_interest = Money::from((0_i64, base_currency));
+    let mut total_scheduled = Money::from((0_i64, base_currency));
+    let mut total_prepay = Money::from((0_i64, base_currency));
+    let mut total_default = Money::from((0_i64, base_currency));
+    let mut total_recovery = Money::from((0_i64, base_currency));
 
     // Compound the monthly-equivalent SMM/MDR across the payment period.
     // For seasoning-ramped curves (PSA/SDA) on non-monthly frequencies, the
@@ -223,7 +223,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         let interest = Money::new(
             balance * rate * accrual_factor * default_accrual_haircut,
             base_currency,
-        );
+        )?;
         total_interest = total_interest.checked_add(interest)?;
 
         // ── Default FIRST, on the beginning-of-period balance ────────────
@@ -246,8 +246,8 @@ pub(super) fn calculate_pool_flows_with_rates(
             None => request.rates.recovery_rate,
         };
         let recovery_amt = default_amt * asset_recovery_rate;
-        total_default = total_default.checked_add(Money::new(default_amt, base_currency))?;
-        total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_currency))?;
+        total_default = total_default.checked_add(Money::new(default_amt, base_currency)?)?;
+        total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_currency)?)?;
 
         // Mark asset as fully defaulted if default consumed (nearly) all the
         // BOP balance. Relative tolerance 1 - 1e-10 catches floating-point
@@ -264,7 +264,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         // Interest was already computed above (capped at maturity date, with
         // the default haircut applied).
         if request.pay_date >= state.pool_state.maturities[i] {
-            let balloon = Money::new(balance_after_default, base_currency);
+            let balloon = Money::new(balance_after_default, base_currency)?;
             total_scheduled = total_scheduled.checked_add(balloon)?;
             state.pool_state.balances[i] = 0.0;
             continue;
@@ -388,7 +388,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         };
 
         total_scheduled =
-            total_scheduled.checked_add(Money::new(scheduled_principal, base_currency))?;
+            total_scheduled.checked_add(Money::new(scheduled_principal, base_currency)?)?;
 
         // Balance after default and scheduled amortization
         let balance_after_sched = balance_after_default - scheduled_principal;
@@ -399,7 +399,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         // survivor → prepayment on the remainder). `period_smm` was resolved
         // above so the contractual level payment could scale by it.
         let prepay_amt = balance_after_sched * period_smm;
-        total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_currency))?;
+        total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_currency)?)?;
 
         let new_balance = balance_after_sched - prepay_amt;
         state.pool_state.balances[i] = new_balance.max(0.0);

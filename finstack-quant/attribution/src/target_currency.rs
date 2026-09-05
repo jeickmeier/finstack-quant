@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn translate_is_noop_when_target_equals_native() {
-        let total = Money::new(100.0, Currency::USD);
+        let total = Money::from((100_i64, Currency::USD));
         let mut attr = PnlAttribution::new(
             total,
             "TEST",
@@ -210,13 +210,13 @@ mod tests {
             date!(2025 - 01 - 16),
             AttributionMethod::Parallel,
         );
-        attr.carry = Money::new(40.0, Currency::USD);
-        attr.rates_curves_pnl = Money::new(60.0, Currency::USD);
+        attr.carry = Money::from((40_i64, Currency::USD));
+        attr.rates_curves_pnl = Money::from((60_i64, Currency::USD));
         let snapshot = attr.clone();
 
         translate_to_target_currency(
             &mut attr,
-            Money::new(1000.0, Currency::USD),
+            Money::from((1000_i64, Currency::USD)),
             Currency::USD,
             &market(1.0),
             &market(1.0),
@@ -248,8 +248,8 @@ mod tests {
         //   translated_native_pnl = 100 × 1.20 = 120 USD (factor side)
         //   fx_translation_pnl    = 1000 × (1.20 − 1.10) = 100 USD
         //   sum                   = 220 USD ✓
-        let val_t0_native = Money::new(1000.0, Currency::EUR);
-        let native_pnl = Money::new(100.0, Currency::EUR);
+        let val_t0_native = Money::from((1000_i64, Currency::EUR));
+        let native_pnl = Money::from((100_i64, Currency::EUR));
         let mut attr = PnlAttribution::new(
             native_pnl,
             "EUR-BOND",
@@ -257,8 +257,8 @@ mod tests {
             date!(2025 - 01 - 16),
             AttributionMethod::Parallel,
         );
-        attr.rates_curves_pnl = Money::new(80.0, Currency::EUR);
-        attr.carry = Money::new(20.0, Currency::EUR);
+        attr.rates_curves_pnl = Money::from((80_i64, Currency::EUR));
+        attr.carry = Money::from((20_i64, Currency::EUR));
         // Force consistent zero-residual starting point.
         attr.compute_residual().expect("residual");
         translate_and_assert_eur_to_usd(attr, val_t0_native);
@@ -271,19 +271,19 @@ mod tests {
     /// or the recomputed residual is polluted by the full coupon.
     #[test]
     fn translate_preserves_total_return_coupon_addback() {
-        let val_t0_native = Money::new(1000.0, Currency::EUR);
+        let val_t0_native = Money::from((1000_i64, Currency::EUR));
         // Raw MTM = +100 EUR; apply_total_return_carry added a 30 EUR coupon:
         // total = 130, carry = theta 20 + coupon 30 = 50, rates = 80.
         let mut attr = PnlAttribution::new(
-            Money::new(100.0, Currency::EUR),
+            Money::from((100_i64, Currency::EUR)),
             "EUR-BOND-COUPON",
             date!(2025 - 01 - 15),
             date!(2025 - 01 - 16),
             AttributionMethod::Parallel,
         );
-        attr.total_pnl = Money::new(130.0, Currency::EUR);
-        attr.carry = Money::new(50.0, Currency::EUR);
-        attr.rates_curves_pnl = Money::new(80.0, Currency::EUR);
+        attr.total_pnl = Money::from((130_i64, Currency::EUR));
+        attr.carry = Money::from((50_i64, Currency::EUR));
+        attr.rates_curves_pnl = Money::from((80_i64, Currency::EUR));
         attr.compute_residual().expect("residual");
         assert!(
             attr.residual.amount().abs() < 1e-12,
@@ -378,7 +378,7 @@ mod tests {
         use finstack_quant_core::types::IssuerId;
         use std::collections::BTreeMap;
 
-        let eur = |v: f64| Money::new(v, Currency::EUR);
+        let eur = |v: f64| Money::new(v, Currency::EUR).expect("valid money fixture");
         let mut attr = PnlAttribution::new(
             eur(20.0),
             "EUR-BOND",
@@ -421,7 +421,7 @@ mod tests {
 
         translate_to_target_currency(
             &mut attr,
-            Money::new(1000.0, Currency::EUR),
+            Money::from((1000_i64, Currency::EUR)),
             Currency::USD,
             &market(1.10),
             &market(1.20),
@@ -497,20 +497,20 @@ mod tests {
     #[test]
     fn translate_residual_is_zero_after_translation() {
         let mut attr = PnlAttribution::new(
-            Money::new(50.0, Currency::EUR),
+            Money::from((50_i64, Currency::EUR)),
             "TEST",
             date!(2025 - 01 - 15),
             date!(2025 - 01 - 16),
             AttributionMethod::Parallel,
         );
-        attr.rates_curves_pnl = Money::new(30.0, Currency::EUR);
-        attr.carry = Money::new(20.0, Currency::EUR);
+        attr.rates_curves_pnl = Money::from((30_i64, Currency::EUR));
+        attr.carry = Money::from((20_i64, Currency::EUR));
         attr.compute_residual().expect("native residual");
         assert!(attr.residual.amount().abs() < 1e-9);
 
         translate_to_target_currency(
             &mut attr,
-            Money::new(500.0, Currency::EUR),
+            Money::from((500_i64, Currency::EUR)),
             Currency::USD,
             &market(1.10),
             &market(1.10), // no FX move
@@ -531,7 +531,7 @@ mod tests {
         use finstack_quant_core::types::CurveId;
         use indexmap::IndexMap;
 
-        let eur = |v: f64| Money::new(v, Currency::EUR);
+        let eur = |v: f64| Money::new(v, Currency::EUR).expect("valid money fixture");
         let mut attr = PnlAttribution::new(
             eur(80.0),
             "EUR-BOND",
@@ -559,7 +559,7 @@ mod tests {
 
         translate_to_target_currency(
             &mut attr,
-            Money::new(1000.0, Currency::EUR),
+            Money::from((1000_i64, Currency::EUR)),
             Currency::USD,
             &market(1.10),
             &market(1.20),

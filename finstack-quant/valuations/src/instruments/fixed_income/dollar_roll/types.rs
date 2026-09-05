@@ -45,7 +45,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 ///     .agency(AgencyProgram::Fnma)
 ///     .coupon(0.04)
 ///     .term(TbaTerm::ThirtyYear)
-///     .notional(Money::new(10_000_000.0, Currency::USD))
+///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .front_settlement_year(2026)
 ///     .front_settlement_month(3)
 ///     .back_settlement_year(2026)
@@ -242,7 +242,7 @@ impl DollarRoll {
             .agency(AgencyProgram::Fnma)
             .coupon(0.04)
             .term(TbaTerm::ThirtyYear)
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .front_settlement_year(2026)
             .front_settlement_month(3)
             .back_settlement_year(2026)
@@ -392,8 +392,8 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -408,11 +408,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
             vec![
                 (
                     front_date,
-                    Money::new(self.trade_cash_amount(self.front_price), ccy),
+                    Money::new(self.trade_cash_amount(self.front_price), ccy)?,
                 ),
                 (
                     back_date,
-                    Money::new(-self.trade_cash_amount(self.back_price), ccy),
+                    Money::new(-self.trade_cash_amount(self.back_price), ccy)?,
                 ),
             ],
             CFKind::Notional,

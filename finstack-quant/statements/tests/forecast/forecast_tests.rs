@@ -12,11 +12,11 @@ fn test_forward_fill_forecast() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -36,21 +36,33 @@ fn test_forward_fill_forecast() {
 
     // Q1-Q2 are actuals
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
 
     // Q3-Q4 should forward fill from Q2
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 3)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 4)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
 }
@@ -63,7 +75,7 @@ fn test_growth_pct_forecast() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -82,14 +94,32 @@ fn test_growth_pct_forecast() {
 
     // Q1 is actual
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
 
     // Q2-Q4 should grow by 5% per quarter
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     assert!((q2 - 105_000.0).abs() < 1.0);
     assert!((q3 - 110_250.0).abs() < 1.0);
@@ -104,7 +134,7 @@ fn test_growth_pct_negative() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -121,8 +151,18 @@ fn test_growth_pct_negative() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
 
     assert!((q2 - 90_000.0).abs() < 1.0);
     assert!((q3 - 81_000.0).abs() < 1.0);
@@ -136,7 +176,7 @@ fn test_curve_pct_forecast() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -157,14 +197,32 @@ fn test_curve_pct_forecast() {
 
     // Q1 is actual
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
 
     // Q2-Q4 should apply curve rates
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     assert!((q2 - 105_000.0).abs() < 1.0); // 100k * 1.05
     assert!((q3 - 111_300.0).abs() < 1.0); // 105k * 1.06
@@ -179,7 +237,7 @@ fn test_override_forecast() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -203,21 +261,33 @@ fn test_override_forecast() {
 
     // Q1 is actual
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
 
     // Q2 and Q4 have overrides, Q3 forward fills from Q2
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(120_000.0)
     );
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 3)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
         Some(120_000.0)
     ); // Forward fill
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 4)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        ),
         Some(140_000.0)
     );
 }
@@ -231,11 +301,11 @@ fn test_forecast_with_formula_fallback() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -256,11 +326,21 @@ fn test_forecast_with_formula_fallback() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Revenue should be forecasted
-    let q3_revenue = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
+    let q3_revenue = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
     assert!((q3_revenue - 115_500.0).abs() < 1.0);
 
     // COGS should use formula based on forecasted revenue
-    let q3_cogs = results.get("cogs", &PeriodId::quarter(2025, 3)).unwrap();
+    let q3_cogs = results
+        .get(
+            "cogs",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
     assert!((q3_cogs - 69_300.0).abs() < 1.0);
 }
 
@@ -273,11 +353,11 @@ fn test_multiple_periods_with_forecast() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(105_000.0),
                 ),
             ],
@@ -297,20 +377,37 @@ fn test_multiple_periods_with_forecast() {
 
     // Check that all periods are evaluated
     assert!(results
-        .get("revenue", &PeriodId::quarter(2025, 3))
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        )
         .is_some());
     assert!(results
-        .get("revenue", &PeriodId::quarter(2025, 4))
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        )
         .is_some());
     assert!(results
-        .get("revenue", &PeriodId::quarter(2026, 1))
+        .get(
+            "revenue",
+            &PeriodId::quarter(2026, 1).expect("valid period fixture")
+        )
         .is_some());
     assert!(results
-        .get("revenue", &PeriodId::quarter(2026, 4))
+        .get(
+            "revenue",
+            &PeriodId::quarter(2026, 4).expect("valid period fixture")
+        )
         .is_some());
 
     // Verify compounding over longer period
-    let q1_2026 = results.get("revenue", &PeriodId::quarter(2026, 1)).unwrap();
+    let q1_2026 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2026, 1).expect("valid period fixture"),
+        )
+        .unwrap();
     // Q1 2026 should be Q2 2025 (105000) * 1.03^3 = 114736.335
     assert!((q1_2026 - 114_736.335).abs() < 10.0); // Should be growing with 3% compound
 }
@@ -324,11 +421,11 @@ fn test_forecast_pl_model() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(10_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(11_000_000.0),
                 ),
             ],
@@ -346,11 +443,11 @@ fn test_forecast_pl_model() {
             "opex",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(2_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(2_100_000.0),
                 ),
             ],
@@ -373,14 +470,35 @@ fn test_forecast_pl_model() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Check Q3 values (forecast period)
-    let q3_revenue = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q3_cogs = results.get("cogs", &PeriodId::quarter(2025, 3)).unwrap();
-    let q3_opex = results.get("opex", &PeriodId::quarter(2025, 3)).unwrap();
+    let q3_revenue = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3_cogs = results
+        .get(
+            "cogs",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3_opex = results
+        .get(
+            "opex",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
     let q3_gross_profit = results
-        .get("gross_profit", &PeriodId::quarter(2025, 3))
+        .get(
+            "gross_profit",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
         .unwrap();
     let q3_operating_income = results
-        .get("operating_income", &PeriodId::quarter(2025, 3))
+        .get(
+            "operating_income",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
         .unwrap();
 
     assert!((q3_revenue - 11_550_000.0).abs() < 10.0);
@@ -398,7 +516,7 @@ fn test_normal_forecast_deterministic() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -422,7 +540,7 @@ fn test_normal_forecast_deterministic() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -448,12 +566,24 @@ fn test_normal_forecast_deterministic() {
 
     // Same seed should produce identical results
     assert_eq!(
-        results1.get("revenue", &PeriodId::quarter(2025, 2)),
-        results2.get("revenue", &PeriodId::quarter(2025, 2))
+        results1.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
+        results2.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        )
     );
     assert_eq!(
-        results1.get("revenue", &PeriodId::quarter(2025, 3)),
-        results2.get("revenue", &PeriodId::quarter(2025, 3))
+        results1.get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
+        results2.get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        )
     );
 }
 
@@ -465,7 +595,7 @@ fn test_lognormal_forecast_always_positive() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -487,9 +617,33 @@ fn test_lognormal_forecast_always_positive() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // All forecasted values should be positive
-    assert!(results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap() > 0.0);
-    assert!(results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap() > 0.0);
-    assert!(results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap() > 0.0);
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap()
+            > 0.0
+    );
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 3).expect("valid period fixture")
+            )
+            .unwrap()
+            > 0.0
+    );
+    assert!(
+        results
+            .get(
+                "revenue",
+                &PeriodId::quarter(2025, 4).expect("valid period fixture")
+            )
+            .unwrap()
+            > 0.0
+    );
 }
 
 /// As-of visibility: actual periods hidden by `as_of` must be treated as
@@ -508,12 +662,12 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 // Future actual hidden by as_of: must never anchor the forecast.
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(999_000.0),
                 ),
             ],
@@ -538,15 +692,33 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
 
     // Q1 actual is visible at its default period-end availability date.
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
 
     // Q2 (hidden actual) and Q3/Q4 are forecast from the visible Q1 base:
     // 110k, 121k, 133.1k. Anchoring on the hidden 999k would leak look-ahead.
-    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
     assert!((q2 - 110_000.0).abs() < 1.0, "got q2={q2}");
     assert!((q3 - 121_000.0).abs() < 1.0, "got q3={q3}");
     assert!((q4 - 133_100.0).abs() < 1.0, "got q4={q4}");
@@ -558,9 +730,9 @@ fn test_explicit_availability_date_controls_actual_visibility() {
     use finstack_quant_core::market_data::context::MarketContext;
     use time::Month;
 
-    let q4_2024 = PeriodId::quarter(2024, 4);
-    let q1_2025 = PeriodId::quarter(2025, 1);
-    let q2_2025 = PeriodId::quarter(2025, 2);
+    let q4_2024 = PeriodId::quarter(2024, 4).expect("valid period fixture");
+    let q1_2025 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2_2025 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     let release_date = Date::from_calendar_date(2025, Month::May, 15).unwrap();
     let model = ModelBuilder::new("dated-actual")
         .periods("2024Q4..2025Q2", Some("2025Q1"))
@@ -610,7 +782,7 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         .value(
             "a",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -628,7 +800,7 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         .value(
             "b",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -649,8 +821,18 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let a_q2 = results.get("a", &PeriodId::quarter(2025, 2)).unwrap();
-    let b_q2 = results.get("b", &PeriodId::quarter(2025, 2)).unwrap();
+    let a_q2 = results
+        .get(
+            "a",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let b_q2 = results
+        .get(
+            "b",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
     assert_ne!(
         a_q2, b_q2,
         "independent stochastic nodes sharing a seed must not draw identical shocks"
@@ -660,7 +842,12 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
     let mut evaluator2 = Evaluator::new();
     let results2 = evaluator2.evaluate(&model).unwrap();
     assert_eq!(
-        results2.get("a", &PeriodId::quarter(2025, 2)).unwrap(),
+        results2
+            .get(
+                "a",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            )
+            .unwrap(),
         a_q2
     );
 }

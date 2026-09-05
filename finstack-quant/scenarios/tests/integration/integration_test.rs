@@ -75,8 +75,10 @@ fn test_curve_parallel_shock() {
 #[test]
 fn test_equity_price_shock() {
     // Setup market with equity price
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(450.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+    );
 
     // Setup empty model
     let mut model = FinancialModelSpec::new("test", vec![]);

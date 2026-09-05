@@ -67,7 +67,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "USD-EUR",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 equity_leg("USD-LEG", 1.0, 100.0, 1.0),
                 CompositeLegSpec::new(
@@ -154,13 +154,13 @@ mod tests {
         let spec = CompositeSpec::new(
             "NOTIONAL",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 equity_leg("A", 1.0, 100.0, 1.0),
                 equity_leg("B", 2.0, 50.0, -3.0),
             ],
             WeightingMethod::NotionalWeighted {
-                gross_notional: Money::new(300.0, Currency::USD),
+                gross_notional: Money::from((300_i64, Currency::USD)),
             },
             RebalanceRule::Manual,
         );
@@ -183,7 +183,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "DELTA",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 equity_leg("A", 2.0, 100.0, 1.0),
                 equity_leg("B", 4.0, 100.0, -1.0),
@@ -215,7 +215,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "VOL",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             legs,
             WeightingMethod::volatility_weighted("A", 1.0, 3, 3, 252.0),
             RebalanceRule::Manual,
@@ -253,7 +253,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "EXPR",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 equity_leg("A", 1.0, 100.0, 1.0),
                 equity_leg("B", 1.0, 100.0, -1.0),
@@ -302,7 +302,7 @@ mod tests {
         let inner = CompositeSpec::new(
             "INNER",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![a.clone(), equity_leg("B", 1.0, 90.0, -1.0)],
             WeightingMethod::FixedQuantity,
             RebalanceRule::Manual,
@@ -312,7 +312,7 @@ mod tests {
         let outer = CompositeSpec::new(
             "OUTER",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 CompositeLegSpec::new("INNER", InstrumentJson::Composite(Box::new(inner)), 2.0),
                 CompositeLegSpec::new("A", (*a.instrument).clone(), -1.0),

@@ -38,7 +38,6 @@ impl NettingSetMargin {
     ///
     /// Netting-set margin result with total margin computed as
     /// `initial_margin + max(variation_margin, 0)`.
-    #[must_use]
     pub fn new(
         netting_set_id: NettingSetId,
         as_of: Date,
@@ -46,24 +45,26 @@ impl NettingSetMargin {
         variation_margin: Money,
         position_count: usize,
         im_methodology: ImMethodology,
-    ) -> Self {
-        let currency = initial_margin.currency();
-        let total = Money::new(
-            initial_margin.amount() + variation_margin.amount().max(0.0),
-            currency,
-        );
+    ) -> finstack_quant_core::Result<Self> {
+        Ok({
+            let currency = initial_margin.currency();
+            let total = Money::new(
+                initial_margin.amount() + variation_margin.amount().max(0.0),
+                currency,
+            )?;
 
-        Self {
-            netting_set_id,
-            as_of,
-            initial_margin,
-            variation_margin,
-            total_margin: total,
-            position_count,
-            im_methodology,
-            sensitivities: None,
-            im_breakdown: HashMap::default(),
-        }
+            Self {
+                netting_set_id,
+                as_of,
+                initial_margin,
+                variation_margin,
+                total_margin: total,
+                position_count,
+                im_methodology,
+                sensitivities: None,
+                im_breakdown: HashMap::default(),
+            }
+        })
     }
 
     /// Add SIMM breakdown information.
@@ -136,9 +137,9 @@ impl PortfolioMarginResult {
         Self {
             as_of,
             base_currency,
-            total_initial_margin: Money::new(0.0, base_currency),
-            total_variation_margin: Money::new(0.0, base_currency),
-            total_margin: Money::new(0.0, base_currency),
+            total_initial_margin: Money::from((0_i64, base_currency)),
+            total_variation_margin: Money::from((0_i64, base_currency)),
+            total_margin: Money::from((0_i64, base_currency)),
             by_netting_set: HashMap::default(),
             total_positions: 0,
             positions_without_margin: 0,
@@ -152,25 +153,29 @@ impl PortfolioMarginResult {
     ///
     /// * `result` - Completed netting-set result in `self.base_currency`; the
     ///   aggregator converts every netting set before calling this.
-    pub(crate) fn add_netting_set(&mut self, result: NettingSetMargin) {
+    pub(crate) fn add_netting_set(
+        &mut self,
+        result: NettingSetMargin,
+    ) -> finstack_quant_core::Result<()> {
         debug_assert_eq!(result.initial_margin.currency(), self.base_currency);
 
         let im = result.initial_margin.amount();
         let vm = result.variation_margin.amount();
 
         self.total_initial_margin =
-            Money::new(self.total_initial_margin.amount() + im, self.base_currency);
+            Money::new(self.total_initial_margin.amount() + im, self.base_currency)?;
         self.total_variation_margin = Money::new(
             self.total_variation_margin.amount() + vm,
             self.base_currency,
-        );
+        )?;
         self.total_margin = Money::new(
             self.total_margin.amount() + result.total_margin.amount(),
             self.base_currency,
-        );
+        )?;
         self.total_positions += result.position_count;
         self.by_netting_set
             .insert(result.netting_set_id.clone(), result);
+        Ok(())
     }
 
     /// Record a degraded position with the corresponding error message.
@@ -210,11 +215,12 @@ mod tests {
         let result = NettingSetMargin::new(
             id,
             test_date(),
-            Money::new(5_000_000.0, Currency::USD),
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((5_000_000_i64, Currency::USD)),
+            Money::from((1_000_000_i64, Currency::USD)),
             10,
             ImMethodology::Simm,
-        );
+        )
+        .expect("valid new fixture");
 
         assert_eq!(result.initial_margin.amount(), 5_000_000.0);
         assert_eq!(result.variation_margin.amount(), 1_000_000.0);
@@ -230,23 +236,29 @@ mod tests {
         let bilateral = NettingSetMargin::new(
             NettingSetId::bilateral("BANK_A", "CSA_001"),
             test_date(),
-            Money::new(5_000_000.0, Currency::USD),
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((5_000_000_i64, Currency::USD)),
+            Money::from((1_000_000_i64, Currency::USD)),
             10,
             ImMethodology::Simm,
-        );
-        portfolio_result.add_netting_set(bilateral);
+        )
+        .expect("valid new fixture");
+        portfolio_result
+            .add_netting_set(bilateral)
+            .expect("valid add_netting_set fixture");
 
         // Add cleared netting set
         let cleared = NettingSetMargin::new(
             NettingSetId::cleared("LCH"),
             test_date(),
-            Money::new(3_000_000.0, Currency::USD),
-            Money::new(500_000.0, Currency::USD),
+            Money::from((3_000_000_i64, Currency::USD)),
+            Money::from((500_000_i64, Currency::USD)),
             5,
             ImMethodology::ClearingHouse,
-        );
-        portfolio_result.add_netting_set(cleared);
+        )
+        .expect("valid new fixture");
+        portfolio_result
+            .add_netting_set(cleared)
+            .expect("valid add_netting_set fixture");
 
         assert_eq!(portfolio_result.by_netting_set.len(), 2);
         assert_eq!(portfolio_result.total_initial_margin.amount(), 8_000_000.0);

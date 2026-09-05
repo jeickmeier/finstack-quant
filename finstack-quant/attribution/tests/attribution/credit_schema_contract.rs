@@ -39,7 +39,7 @@ fn validate(instance: &Value, schema: &Value) -> Result<(), String> {
 
 fn canonical_envelope() -> AttributionResultEnvelope {
     let attribution = PnlAttribution::new(
-        Money::new(1_000.0, Currency::USD),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
         "BOND-A",
         date!(2024 - 01 - 01),
         date!(2024 - 01 - 02),
@@ -56,29 +56,32 @@ fn attribution_result_with_credit_detail_validates() {
     let mut envelope = canonical_envelope();
     envelope.result.attribution.credit_factor_detail = Some(CreditFactorAttribution {
         model_id: "2024-03-31/abcdef0123456789".to_string(),
-        generic_pnl: Money::new(80.0, Currency::USD),
+        generic_pnl: Money::new(80.0, Currency::USD).expect("valid money fixture"),
         levels: vec![LevelPnl {
             level_name: "rating".to_string(),
-            total: Money::new(40.0, Currency::USD),
-            by_bucket: BTreeMap::from([("IG".to_string(), Money::new(40.0, Currency::USD))]),
+            total: Money::new(40.0, Currency::USD).expect("valid money fixture"),
+            by_bucket: BTreeMap::from([(
+                "IG".to_string(),
+                Money::new(40.0, Currency::USD).expect("valid money fixture"),
+            )]),
         }],
-        adder_pnl_total: Money::new(10.0, Currency::USD),
-        curve_shape_pnl: Money::new(20.0, Currency::USD),
+        adder_pnl_total: Money::new(10.0, Currency::USD).expect("valid money fixture"),
+        curve_shape_pnl: Money::new(20.0, Currency::USD).expect("valid money fixture"),
         adder_pnl_by_issuer: None,
-        adder_magnitude: Some(Money::new(10.0, Currency::USD)),
+        adder_magnitude: Some(Money::new(10.0, Currency::USD).expect("valid money fixture")),
     });
     envelope.result.attribution.credit_carry_decomposition = Some(CreditCarryDecomposition {
         model_id: "2024-03-31/abcdef0123456789".to_string(),
-        rates_carry_total: Money::new(30.0, Currency::USD),
-        credit_carry_total: Money::new(20.0, Currency::USD),
+        rates_carry_total: Money::new(30.0, Currency::USD).expect("valid money fixture"),
+        credit_carry_total: Money::new(20.0, Currency::USD).expect("valid money fixture"),
         credit_by_level: CreditCarryByLevel {
-            generic: Money::new(10.0, Currency::USD),
+            generic: Money::new(10.0, Currency::USD).expect("valid money fixture"),
             levels: vec![LevelCarry {
                 level_name: "rating".to_string(),
-                total: Money::new(8.0, Currency::USD),
+                total: Money::new(8.0, Currency::USD).expect("valid money fixture"),
                 by_bucket: BTreeMap::new(),
             }],
-            adder_total: Money::new(2.0, Currency::USD),
+            adder_total: Money::new(2.0, Currency::USD).expect("valid money fixture"),
             adder_by_issuer: None,
         },
     });

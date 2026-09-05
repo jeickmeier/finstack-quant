@@ -31,15 +31,15 @@ fn date(year: i32, month: u8, day: u8) -> Date {
 }
 
 fn usd(amount: f64) -> Money {
-    Money::new(amount, Currency::USD)
+    Money::new(amount, Currency::USD).expect("valid money fixture")
 }
 
 fn eur(amount: f64) -> Money {
-    Money::new(amount, Currency::EUR)
+    Money::new(amount, Currency::EUR).expect("valid money fixture")
 }
 
 fn gbp(amount: f64) -> Money {
-    Money::new(amount, Currency::GBP)
+    Money::new(amount, Currency::GBP).expect("valid money fixture")
 }
 
 /// Create a minimal market context with discount curve
@@ -772,7 +772,7 @@ fn test_constituent_reference_with_bond_instrument() {
     let bond = Bond::fixed(
         "CORP_BOND",
         usd(1000.0),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         base_date,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1217,7 +1217,7 @@ fn test_basket_with_mixed_constituents_serialization() {
     let bond = Bond::fixed(
         "CORP_BOND",
         usd(1000.0),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date(2025, 1, 1),
         date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1318,7 +1318,7 @@ fn test_constituent_reference_instrument_roundtrip() {
     let bond = Bond::fixed(
         "TEST_BOND",
         usd(1000.0),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date(2025, 1, 1),
         date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -1351,7 +1351,7 @@ fn test_basket_envelope_roundtrip_with_instruments() {
     let bond = Bond::fixed(
         "ENVELOPE_BOND",
         usd(1000.0),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date(2025, 1, 1),
         date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,

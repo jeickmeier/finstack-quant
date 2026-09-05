@@ -22,7 +22,7 @@ fn create_test_cds() -> CreditDefaultSwap {
 
     test_utils::cds_buy_protection(
         "CDS-DETERMINISM-TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0, // 100bp spread
         as_of,
         maturity,
@@ -195,7 +195,7 @@ fn test_cds_different_tenors_determinism() {
     for maturity in maturities {
         let cds = test_utils::cds_buy_protection(
             format!("CDS-{}", maturity),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0, // 100bp spread
             as_of,
             maturity,

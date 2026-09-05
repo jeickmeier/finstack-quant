@@ -72,7 +72,7 @@ impl Instrument for CanonicalPvInstrument {
         _market: &MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(1.0, Currency::USD))
+        Ok(Money::new(1.0, Currency::USD).expect("valid money fixture"))
     }
     fn price_with_metrics(
         &self,
@@ -82,12 +82,14 @@ impl Instrument for CanonicalPvInstrument {
         _options: finstack_quant_valuations::instruments::PricingOptions,
     ) -> finstack_quant_valuations::Result<ValuationResult> {
         assert!(metrics.is_empty());
-        Ok(
-            ValuationResult::stamped(self.id(), as_of, Money::new(777.0, Currency::USD))
-                .with_details(ValuationDetails::Fx(FxValuationDetails {
-                    fx_triangulated: Some(true),
-                })),
+        Ok(ValuationResult::stamped(
+            self.id(),
+            as_of,
+            Money::new(777.0, Currency::USD).expect("valid money fixture"),
         )
+        .with_details(ValuationDetails::Fx(FxValuationDetails {
+            fx_triangulated: Some(true),
+        })))
     }
 }
 
@@ -143,7 +145,7 @@ impl Instrument for ValueOnlyInstrument {
         _curves: &MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(self.value, self.currency))
+        Ok(Money::new(self.value, self.currency).expect("valid money fixture"))
     }
 
     fn price_with_metrics(

@@ -202,22 +202,24 @@ impl Payoff for RangeAccrualPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        // Include both historical and simulated observations
-        let total_in_range = self.past_in_range + self.days_in_range;
-        let total_obs = self.total_past_observations + self.total_observations;
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            // Include both historical and simulated observations
+            let total_in_range = self.past_in_range + self.days_in_range;
+            let total_obs = self.total_past_observations + self.total_observations;
 
-        if total_obs == 0 {
-            return Money::new(0.0, currency);
-        }
+            if total_obs == 0 {
+                return Ok(Money::from((0_i64, currency)));
+            }
 
-        // Compute accrual fraction: total_in_range / total_observations
-        let accrual_fraction = total_in_range as f64 / total_obs as f64;
+            // Compute accrual fraction: total_in_range / total_observations
+            let accrual_fraction = total_in_range as f64 / total_obs as f64;
 
-        // Payoff = coupon_rate * accrual_fraction * notional
-        let payoff = self.coupon_rate * accrual_fraction * self.notional;
+            // Payoff = coupon_rate * accrual_fraction * notional
+            let payoff = self.coupon_rate * accrual_fraction * self.notional;
 
-        Money::new(payoff, currency)
+            Money::new(payoff, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -273,7 +275,7 @@ mod tests {
         state2.set(state_keys::SPOT, 98.0);
         accrual.on_event(&mut state2).expect("valid payoff event");
 
-        let value = accrual.value(Currency::USD);
+        let value = accrual.value(Currency::USD).expect("valid payoff");
         // 2 days in range / 2 total = 1.0 fraction
         // Payoff = 0.08 * 1.0 * 100_000 = 8_000
         assert!((value.amount() - 8_000.0).abs() < 1e-6);
@@ -305,7 +307,7 @@ mod tests {
         state3.set(state_keys::SPOT, 98.0); // In range
         accrual.on_event(&mut state3).expect("valid payoff event");
 
-        let value = accrual.value(Currency::USD);
+        let value = accrual.value(Currency::USD).expect("valid payoff");
         // 2 days in range / 3 total = 2/3 fraction
         // Payoff = 0.08 * (2/3) * 100_000 = 5_333.33...
         assert!((value.amount() - 5_333.333333).abs() < 1.0);
@@ -392,7 +394,7 @@ mod tests {
         state2.set(state_keys::SPOT, 110.0); // Out of range
         accrual.on_event(&mut state2).expect("valid payoff event");
 
-        let value = accrual.value(Currency::USD);
+        let value = accrual.value(Currency::USD).expect("valid payoff");
         // Total: 2 in range (1 past + 1 future) / 4 total (2 past + 2 future) = 0.5 fraction
         // Payoff = 0.08 * 0.5 * 100_000 = 4_000
         assert!((value.amount() - 4_000.0).abs() < 1e-6);

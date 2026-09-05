@@ -560,6 +560,10 @@ pub struct PriceCurveBuilder {
 
 impl PriceCurveBuilder {
     /// Select the level family (signed prices or non-negative vol-index levels).
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - Quote family controlling whether negative levels are accepted when the curve is built.
     pub fn kind(mut self, kind: PriceCurveKind) -> Self {
         self.kind = kind;
         self

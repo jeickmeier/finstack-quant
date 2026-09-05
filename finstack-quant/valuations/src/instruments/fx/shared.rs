@@ -344,7 +344,7 @@ mod tests {
             .insert_fx(fx)
             .insert_price(
                 "EURUSD-SPOT",
-                MarketScalar::Price(Money::new(1.1, Currency::USD)),
+                MarketScalar::Price(Money::new(1.1, Currency::USD).expect("valid money fixture")),
             )
     }
 

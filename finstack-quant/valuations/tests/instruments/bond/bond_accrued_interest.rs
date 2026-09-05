@@ -24,8 +24,8 @@ fn test_accrued_interest_linear_default() {
     // Standard bond with linear accrual (default)
     let bond = Bond::fixed(
         "LINEAR_TEST",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06), // 6% annual, semi-annual payments = 3% per period
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"), // 6% annual, semi-annual payments = 3% per period
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -63,8 +63,8 @@ fn test_accrued_interest_compounded_vs_linear() {
     // Linear accrual bond (default)
     let bond_linear = Bond::fixed(
         "LINEAR",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06), // 6% annual coupon, semi-annual = 3% per period
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"), // 6% annual coupon, semi-annual = 3% per period
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -75,8 +75,8 @@ fn test_accrued_interest_compounded_vs_linear() {
     // Compounded accrual bond
     let mut bond_compounded = Bond::fixed(
         "COMPOUNDED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -137,8 +137,8 @@ fn test_accrued_interest_compounded_zero_coupon() {
     // Zero-coupon bond should have zero accrued regardless of method
     let mut bond = Bond::fixed(
         "ZERO",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0), // Zero coupon
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"), // Zero coupon
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -166,8 +166,8 @@ fn test_accrued_interest_ex_coupon_period() {
     // compensated for the remaining stub from settlement to the coupon date.
     let mut bond = Bond::fixed(
         "EX_COUPON",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -210,8 +210,8 @@ fn test_accrued_interest_just_before_ex_coupon_window_positive() {
     // a full period of positive accrued interest.
     let mut bond = Bond::fixed(
         "CUM_COUPON",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -243,8 +243,8 @@ fn test_accrued_interest_just_before_ex_coupon_window_positive() {
 fn test_accrued_interest_at_coupon_boundaries() {
     let bond = Bond::fixed(
         "BOUNDARY",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04), // 4% annual, semi-annual = 2% per period
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"), // 4% annual, semi-annual = 2% per period
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -284,7 +284,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let year2 = make_date(2027, 1, 1);
     let maturity = make_date(2028, 1, 1);
 
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // StepRemaining schedule encodes remaining outstanding after each date.
     // For a 3-year, 1/3-per-year amortization this means:
@@ -293,9 +293,18 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     // - At maturity: 0 outstanding
     let amort_spec = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (year1, Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD)),
-            (year2, Money::new(1.0 * 1_000_000.0 / 3.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (
+                year1,
+                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                year2,
+                Money::new(1.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                maturity,
+                Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            ),
         ],
     };
     let base_spec =
@@ -440,8 +449,8 @@ fn test_accrual_method_serialization() {
     // Test that accrual method survives JSON roundtrip
     let mut bond = Bond::fixed(
         "SERDE_TEST",
-        Money::new(1000.0, Currency::EUR),
-        finstack_quant_core::types::Rate::from_decimal(0.025),
+        Money::new(1000.0, Currency::EUR).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.025).expect("valid rate fixture"),
         make_date(2025, 1, 1),
         make_date(2035, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -467,8 +476,8 @@ fn test_accrual_method_serialization() {
 fn test_bond_deserialization_defaults_accrual_method_and_call_put_period() {
     let bond = Bond::fixed(
         "CALL_PERIOD_DEFAULT_ACCRUAL",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         make_date(2025, 1, 1),
         make_date(2030, 1, 1),
         finstack_quant_core::dates::StubKind::ShortFront,

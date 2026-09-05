@@ -229,6 +229,11 @@ impl FxDeltaVolSurface {
         rr_10d: Option<&[f64]>,
         bf_10d: Option<&[f64]>,
     ) -> crate::Result<()> {
+        if rr_10d.is_some() != bf_10d.is_some() {
+            return Err(crate::Error::Validation(
+                "rr_10d and bf_10d must both be provided or both omitted".into(),
+            ));
+        }
         // Non-empty
         if expiries.is_empty() || atm_vols.is_empty() {
             return Err(InputError::TooFewPoints.into());

@@ -149,8 +149,8 @@ mod tests {
     fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
         let bond = crate::instruments::Bond::fixed(
             "GENERIC-CTX",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -189,8 +189,8 @@ mod tests {
     fn generic_pricer_raw_path_attaches_context_to_failures() {
         let bond = crate::instruments::Bond::fixed(
             "GENERIC-RAW-CTX",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,

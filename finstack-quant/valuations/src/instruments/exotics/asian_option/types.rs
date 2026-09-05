@@ -245,7 +245,7 @@ impl AsianOption {
             .averaging_method(AveragingMethod::Arithmetic)
             .expiry(date!(2024 - 06 - 30))
             .fixing_dates(fixing_dates)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -487,10 +487,10 @@ mod tests {
         use crate::instruments::common_impl::traits::Instrument;
 
         let mut option = AsianOption::example().expect("example");
-        option.notional = Money::new(0.0, option.notional.currency());
+        option.notional = Money::from((0_i64, option.notional.currency()));
         assert!(option.validate_for_pricing().is_err());
 
-        option.notional = Money::new(100_000.0, option.notional.currency());
+        option.notional = Money::from((100_000_i64, option.notional.currency()));
         option.fixing_dates.swap(0, 1);
         assert!(option.validate_for_pricing().is_err());
 

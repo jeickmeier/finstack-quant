@@ -132,7 +132,7 @@ impl EuropeanPricer {
     /// use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
     /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
     ///
-    /// let pricer = EuropeanPricer::new(25_000).expect("positive path count")
+    /// let pricer = EuropeanPricer::new(25_000)
     ///     .expect("positive path count")
     ///     .with_seed(19)
     ///     .with_parallel(false);

@@ -100,8 +100,8 @@ use time::macros::date;
 // StubKind is explicit: use None for a regular schedule.
 let corp = Bond::fixed(
     "CORP-001",
-    Money::new(1_000_000.0, Currency::USD),
-    Rate::from_percent(5.0),
+    Money::new(1_000_000.0, Currency::USD)?,
+    Rate::from_percent(5.0)?,
     date!(2025 - 01 - 01),
     date!(2030 - 01 - 01),
     StubKind::None,
@@ -111,7 +111,7 @@ let corp = Bond::fixed(
 // Builder: full control over the coupon spec.
 let bond = Bond::builder()
     .id("BOND-001".into())
-    .notional(Money::new(1_000_000.0, Currency::USD))
+    .notional(Money::new(1_000_000.0, Currency::USD)?)
     .issue_date(date!(2025 - 01 - 01))
     .maturity(date!(2030 - 01 - 01))
     .cashflow_spec(CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)?)
@@ -168,7 +168,7 @@ use time::macros::date;
 
 let frn = Bond::floating(
     "FRN-001",
-    Money::new(1_000_000.0, Currency::USD),
+    Money::new(1_000_000.0, Currency::USD)?,
     "USD-SOFR-3M",
     Bps::new(200),
     date!(2025 - 01 - 01),
@@ -215,7 +215,7 @@ let schedule = CallPutSchedule {
 
 let callable = Bond::builder()
     .id("CALLABLE-001".into())
-    .notional(Money::new(1_000_000.0, Currency::USD))
+    .notional(Money::new(1_000_000.0, Currency::USD)?)
     .issue_date(date!(2025 - 01 - 01))
     .maturity(date!(2030 - 01 - 01))
     .cashflow_spec(CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Thirty360)?)
@@ -343,7 +343,7 @@ use time::macros::date;
 let moic_floor = Bond::example()?.min_moic(1.25);
 
 // 12% minimum XIRR floor.
-let xirr_floor = Bond::example()?.min_xirr(Rate::from_percent(12.0));
+let xirr_floor = Bond::example()?.min_xirr(Rate::from_percent(12.0)?);
 
 // NC-2: the floor only binds on calls from 2027-01-01 onward.
 let nc2 = Bond::example()?.with_return_floor(

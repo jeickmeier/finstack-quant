@@ -1268,49 +1268,21 @@ export interface ForwardCurve extends WasmOwned {
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
  * await init();
- * const curve = new core.ForwardCurve(
- *   "USD-SOFR-3M",
- *   0.25,
- *   "2026-01-02",
- *   [0, 0.03, 1, 0.035]
- * );
+ * const curve = new core.ForwardCurve({
+ *   id: "USD-SOFR-3M", tenor: 0.25, baseDate: "2026-01-02",
+ *   knots: [0, 0.03, 1, 0.035]
+ * });
  * console.log(curve.rate(0.5));
  * ```
  */
 export interface ForwardCurveConstructor {
   /**
-   * Construct from an array of `[time, rate]` pairs.
-   *
-   * @returns A `ForwardCurve` handle.
-   * @param id - Curve identifier.
-   * @param tenor - Index tenor in years.
-   * @param baseDate - ISO date string.
-   * @param knots - Flat `[t0, rate0, t1, rate1, …]` array.
-   * @param dayCount - Day-count convention (defaults to curve-ID inference).
-   * @param interp - Interpolation style. When omitted, the Rust builder default (``"linear"``) applies.
-   * @param extrapolation - Extrapolation policy. When omitted, the Rust builder default (``"flat_forward"``) applies.
-   * @param projectionGrid - Optional contractual reset/end boundaries.
-   * @param resetLag - Optional fixing-to-spot lag in business days; omit for Rust curve-ID inference.
-   * @throws Error - Throws a JavaScript exception if `baseDate`, `dayCount`, `interp`, or `extrapolation` is invalid; `knots` has odd length; or canonical curve validation rejects the tenor, reset lag, knots, projection grid, or interpolation inputs.
+   * Construct a forward curve using named inputs and canonical Rust defaults.
+   * @returns The validated forward curve.
+   * @param options - ForwardCurveOptions object: curve id, tenor in years, ISO baseDate, flat time/decimal-rate knots, and optional dayCount, interp, extrapolation, projectionGrid and resetLag. Omitted policies use the Rust builder defaults; arrays and typed arrays are accepted.
+   * @throws Error - Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
    */
-  new (
-    id: string,
-    tenor: number,
-    baseDate: string,
-    knots: NumericArray,
-    dayCount?: string,
-    interp?: string,
-    extrapolation?: string,
-    projectionGrid?: NumericArray,
-    resetLag?: number | null
-  ): ForwardCurve;
-  /**
-   * Construct from a named JavaScript options object.
-   * @returns A `ForwardCurve` handle.
-   * @param options - Named `ForwardCurveOptions` fields used to construct the curve.
-   * @throws Error - Throws a JavaScript exception if `options` does not match `ForwardCurveOptions` or any contained date, convention, knot, tenor, reset-lag, projection-grid, or interpolation input fails canonical curve validation.
-   */
-  fromOptions(options: ForwardCurveOptions): ForwardCurve;
+  new (options: ForwardCurveOptions): ForwardCurve;
 }
 
 /**
@@ -6756,17 +6728,17 @@ export interface ModelCreditNamespace {
    * @param recovery - Recovery rate at default expressed as a fraction from 0 through 1.
    * @param totalDebt - Total debt face value in the firm's monetary units.
    * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param maturity - Calibration horizon in years; must be positive and finite.
    * @param assetValue - Assumed initial firm asset value in monetary units.
    * @param payoutRate - Continuous payout rate on assets, expressed as a decimal.
    * @throws Error - Throws a JavaScript exception if spread, recovery, debt, rate, maturity, asset value, or payout inputs are invalid, if the quote is unattainable or ambiguous, or if the model cannot be serialized to JSON.
+   * @param maturity - Calibration horizon in years; must be positive and finite.
    */
   mertonFromCdsSpreadJson(
     cdsSpreadBp: number,
     recovery: number,
     totalDebt: number,
     riskFreeRate: number,
-    expiry: number,
+    maturity: number,
     assetValue: number,
     payoutRate: number
   ): string;
@@ -7470,10 +7442,10 @@ export interface VolatilityNamespace {
   /**
    * Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
    * @returns Volatility in the target convention (decimal Black vol, or absolute normal vol).
-   * @param vol - Input volatility in the source convention; positive.
-   * @param fromConvention - `"normal"`, `"lognormal"`, or `{ shifted_lognormal: { shift } }` with `shift` in the forward's rate units.
+   * @param vol - Input volatility in the source convention: decimal Black vol for `"lognormal"` / shifted-lognormal, absolute vol in the forward's rate units for `"normal"`. Must be positive.
+   * @param fromConvention - `"normal"`, `"lognormal"`, or `{"shifted_lognormal": {"shift": s}}` (serde form of `VolatilityConvention`).
    * @param toConvention - Target convention in the same encoding.
-   * @param forwardRate - ATM forward rate or price used as both forward and strike.
+   * @param forwardRate - ATM forward rate or price; must satisfy the target convention's domain.
    * @param timeToExpiry - Time to expiry in years (non-negative).
    * @throws Error - Throws a JavaScript exception if a convention cannot be decoded, an input is outside its domain, or the price-matching solver fails to converge.
    */
@@ -7497,7 +7469,7 @@ export interface VolatilityNamespace {
   /**
    * Black implied volatility from SVI parameters at log-moneyness `k = ln(K / F)`.
    * @returns Annualized Black volatility as a decimal.
-   * @param params - SVI parameter object `{ a, b, rho, m, sigma }`; validated on decode.
+   * @param params - SVI parameter object `{a, b, rho, m, sigma}` (validated on decode).
    * @param k - Log-moneyness `ln(K / F)`.
    * @param t - Positive time to expiry in years.
    * @throws Error - Throws a JavaScript exception if `params` fails validation, `t` is not positive, or the total variance at `k` is negative.
@@ -7517,15 +7489,25 @@ export type VolatilityConvention =
  * Gatheral SVI total-variance parameters `w(k) = a + b (rho (k - m) + sqrt((k - m)^2 + sigma^2))`.
  */
 export interface SviParams {
-  /** Overall total-variance level. */
+  /**
+   * Overall total-variance level.
+   */
   a: number;
-  /** Wing slope (non-negative). */
+  /**
+   * Wing slope (non-negative).
+   */
   b: number;
-  /** Rotation / asymmetry in `(-1, 1)`. */
+  /**
+   * Rotation / asymmetry in `(-1, 1)`.
+   */
   rho: number;
-  /** Log-moneyness translation of the minimum-variance point. */
+  /**
+   * Log-moneyness translation of the minimum-variance point.
+   */
   m: number;
-  /** Vertex smoothing (positive). */
+  /**
+   * Vertex smoothing (positive).
+   */
   sigma: number;
 }
 
@@ -7625,17 +7607,29 @@ export interface LiquidityNamespace {
  * `vega`, `rho_r`, `rho_q` are per 1% move; `theta` is per day.
  */
 export interface BsGreeks {
-  /** Spot delta per unit of underlying. */
+  /**
+   * Spot delta per unit of underlying.
+   */
   delta: number;
-  /** Gamma per unit of underlying. */
+  /**
+   * Gamma per unit of underlying.
+   */
   gamma: number;
-  /** Vega per 1% (0.01) move in volatility. */
+  /**
+   * Vega per 1% (0.01) move in volatility.
+   */
   vega: number;
-  /** Theta per day under the `thetaDays` basis. */
+  /**
+   * Theta per day under the `thetaDays` basis.
+   */
   theta: number;
-  /** Rho to the domestic / risk-free rate per 1% move. */
+  /**
+   * Rho to the domestic / risk-free rate per 1% move.
+   */
   rho_r: number;
-  /** Rho to the dividend yield / foreign rate per 1% move. */
+  /**
+   * Rho to the dividend yield / foreign rate per 1% move.
+   */
   rho_q: number;
 }
 
@@ -7643,11 +7637,17 @@ export interface BsGreeks {
  * Undiscounted forward-measure Greeks returned by `black76Greeks` / `bachelierGreeks`.
  */
 export interface ForwardGreeks {
-  /** Forward delta. */
+  /**
+   * First derivative of undiscounted option value with respect to the forward level.
+   */
   delta: number;
-  /** Forward gamma. */
+  /**
+   * Second derivative of undiscounted option value with respect to the forward level.
+   */
   gamma: number;
-  /** Vega per unit (1.0) change in the model volatility. */
+  /**
+   * Vega per unit (1.0) change in the model volatility.
+   */
   vega: number;
 }
 
@@ -7926,7 +7926,7 @@ export interface ModelsNamespace {
    * @param strike - Strike (decimal, same units as `forward`).
    * @param vol - Annualized shifted-lognormal volatility, decimal.
    * @param expiry - Time to expiry in years.
-   * @param shift - Displacement added to forward and strike, in rate units (e.g. `0.03`); both shifted values must be positive.
+   * @param shift - Displacement added to forward and strike, in rate units (e.g. `0.03` for a 3% shift); both shifted values must be positive.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @throws Error - Throws a JavaScript exception if the inputs produce a non-finite price.
    */

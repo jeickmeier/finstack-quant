@@ -54,14 +54,14 @@ pub(crate) fn dividend01_central_diff(
         div_yield_id.as_str(),
         current_scalar,
         q_up_val,
-    );
+    )?;
     let pv_up = instrument.value(&curves_up, as_of)?.amount();
     let curves_down = replace_scalar_value(
         &context.curves,
         div_yield_id.as_str(),
         current_scalar,
         q_down_val,
-    );
+    )?;
     let pv_down = instrument.value(&curves_down, as_of)?.amount();
 
     // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).

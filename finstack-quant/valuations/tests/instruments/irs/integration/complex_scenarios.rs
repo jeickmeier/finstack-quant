@@ -62,7 +62,7 @@ fn build_flat_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketCo
 fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> InterestRateSwap {
     InterestRateSwap {
         id: "IRS_INTEGRATION_TEST".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -174,7 +174,7 @@ fn test_forward_starting_swap() {
 
     let swap = InterestRateSwap {
         id: "FORWARD_START".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -298,7 +298,7 @@ fn test_swap_seasoned() {
 
     let swap = InterestRateSwap {
         id: "SEASONED_SWAP".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),

@@ -157,8 +157,8 @@ fn normalization_fixture() -> Value {
 }
 
 fn representative_statement_result() -> StatementResult {
-    let period = PeriodId::quarter(2025, 1);
-    let usd = Money::new(100_000.0, Currency::USD);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let usd = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     let mut result = StatementResult::default();
     result
         .nodes
@@ -174,13 +174,13 @@ fn representative_statement_result() -> StatementResult {
     );
 
     let breakdown = CashflowBreakdown {
-        interest_expense_cash: Money::new(5_000.0, Currency::USD),
-        interest_income_cash: Some(Money::new(250.0, Currency::USD)),
-        interest_expense_pik: Money::new(500.0, Currency::USD),
-        principal_payment: Money::new(10_000.0, Currency::USD),
-        fees: Money::new(100.0, Currency::USD),
-        debt_balance: Money::new(990_000.0, Currency::USD),
-        accrued_interest: Money::new(1_000.0, Currency::USD),
+        interest_expense_cash: Money::new(5_000.0, Currency::USD).expect("valid money fixture"),
+        interest_income_cash: Some(Money::new(250.0, Currency::USD).expect("valid money fixture")),
+        interest_expense_pik: Money::new(500.0, Currency::USD).expect("valid money fixture"),
+        principal_payment: Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+        fees: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        debt_balance: Money::new(990_000.0, Currency::USD).expect("valid money fixture"),
+        accrued_interest: Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(
@@ -189,9 +189,10 @@ fn representative_statement_result() -> StatementResult {
     );
     cashflows.totals.insert(period, breakdown);
     cashflows.reporting_currency = Some(Currency::USD);
-    cashflows
-        .equity_distribution
-        .insert(period, Money::new(25_000.0, Currency::USD));
+    cashflows.equity_distribution.insert(
+        period,
+        Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
+    );
     result.cs_cashflows = Some(cashflows);
 
     result.check_report = Some(CheckReport {
@@ -300,7 +301,7 @@ fn root_types_generate_typed_schemas() {
 #[test]
 fn capital_structure_warning_uses_typed_canonical_values() {
     let warning = EvalWarning::CapitalStructure {
-        period: PeriodId::quarter(2025, 1),
+        period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
         warning: CapitalStructureWarning::CashflowIgnored {
             cashflow_kind: CFKind::Recovery,
             cashflow_date: Date::from_calendar_date(2025, Month::March, 31)
@@ -327,7 +328,7 @@ fn capital_structure_warning_uses_typed_canonical_values() {
 fn nan_warning_uses_canonical_acronym_spelling() {
     let warning = EvalWarning::NaNPropagated {
         node_id: "ratio".to_string(),
-        period: PeriodId::quarter(2025, 1),
+        period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
     };
     let value = serde_json::to_value(warning).expect("serialize NaN warning");
     assert!(value.get("nan_propagated").is_some());

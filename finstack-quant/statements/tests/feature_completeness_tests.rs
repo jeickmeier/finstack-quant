@@ -10,7 +10,7 @@ fn test_timeseries_forecast_with_trend_detection() {
         .periods("2025Q1..2025Q4", Some("2025Q1"))
         .unwrap()
         .value("sales", &[
-            (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
+            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
         ])
         .forecast("sales", ForecastSpec {
             method: ForecastMethod::TimeSeries,
@@ -26,9 +26,24 @@ fn test_timeseries_forecast_with_trend_detection() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Check that trend was detected and applied
-    let q2_sales = results.get("sales", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3_sales = results.get("sales", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4_sales = results.get("sales", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2_sales = results
+        .get(
+            "sales",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3_sales = results
+        .get(
+            "sales",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4_sales = results
+        .get(
+            "sales",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     // Linear trend should continue
     assert!(q2_sales > 100_000.0, "Q2 should show growth");
@@ -63,7 +78,10 @@ fn test_seasonal_forecast_with_decomposition() {
         .unwrap()
         .value(
             "seasonal_sales",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(115.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(115.0),
+            )],
         )
         .forecast(
             "seasonal_sales",
@@ -85,16 +103,28 @@ fn test_seasonal_forecast_with_decomposition() {
 
     // Q1 is actual, Q2-Q4 are forecast
     let q1 = results
-        .get("seasonal_sales", &PeriodId::quarter(2025, 1))
+        .get(
+            "seasonal_sales",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     let q2 = results
-        .get("seasonal_sales", &PeriodId::quarter(2025, 2))
+        .get(
+            "seasonal_sales",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     let q3 = results
-        .get("seasonal_sales", &PeriodId::quarter(2025, 3))
+        .get(
+            "seasonal_sales",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
         .unwrap();
     let q4 = results
-        .get("seasonal_sales", &PeriodId::quarter(2025, 4))
+        .get(
+            "seasonal_sales",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
         .unwrap();
 
     // Check that seasonal pattern produces variation
@@ -124,8 +154,8 @@ fn test_all_features_integrated() {
         .unwrap()
         // Historical revenue with seasonality
         .value("revenue", &[
-            (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
-            (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(90_000.0)),
+            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
+            (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(90_000.0)),
         ])
         // Seasonal forecast with decomposition
         .forecast("revenue", ForecastSpec {
@@ -139,8 +169,8 @@ fn test_all_features_integrated() {
         })
         // Cost with time-series forecast
         .value("costs", &[
-            (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-            (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(55_000.0)),
+            (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(60_000.0)),
+            (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(55_000.0)),
         ])
         .forecast("costs", ForecastSpec {
             method: ForecastMethod::TimeSeries,
@@ -166,7 +196,7 @@ fn test_all_features_integrated() {
 
     // Verify all features produced meaningful results
     for quarter in 3..=4 {
-        let period = PeriodId::quarter(2025, quarter as u8);
+        let period = PeriodId::quarter(2025, quarter as u8).expect("valid period fixture");
 
         // Seasonal forecast should work
         let revenue = results.get("revenue", &period).unwrap();
@@ -194,9 +224,24 @@ fn test_all_features_integrated() {
     }
 
     // Verify seasonality is preserved in revenue
-    let q2_revenue = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
-    let q3_revenue = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4_revenue = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q2_revenue = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q3_revenue = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4_revenue = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     // Q3 should be peak, Q4 should be trough (based on historical pattern)
     assert!(q3_revenue > q2_revenue, "Q3 should be higher than Q2");

@@ -1080,8 +1080,8 @@ impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
             .flows
             .iter()
             .filter(|(date, _)| *date >= as_of)
-            .map(|(date, amount)| (*date, Money::new(*amount, self.currency)))
-            .collect();
+            .map(|(date, amount)| Money::new(*amount, self.currency).map(|money| (*date, money)))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,

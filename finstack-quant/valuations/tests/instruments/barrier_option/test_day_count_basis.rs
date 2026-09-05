@@ -182,7 +182,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
                 finstack_quant_core::money::Money::new(
                     spot,
                     finstack_quant_core::currency::Currency::USD,
-                ),
+                )
+                .expect("valid money fixture"),
             ),
         )
         .insert_price(
@@ -217,7 +218,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
                 finstack_quant_core::money::Money::new(
                     spot,
                     finstack_quant_core::currency::Currency::USD,
-                ),
+                )
+                .expect("valid money fixture"),
             ),
         )
         .insert_price(

@@ -173,7 +173,7 @@ mod tests {
 
     fn payer_swaption(strike: f64) -> Swaption {
         let params = SwaptionParams::payer(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             strike,
             date!(2025 - 01 - 01),
             date!(2025 - 01 - 01),
@@ -201,7 +201,7 @@ mod tests {
             Arc::new(swaption),
             Arc::new(market),
             as_of,
-            Money::new(target_pv, Currency::USD),
+            Money::new(target_pv, Currency::USD).expect("valid money fixture"),
             MetricContext::default_config(),
         )
     }

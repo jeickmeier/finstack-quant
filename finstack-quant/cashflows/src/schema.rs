@@ -155,10 +155,10 @@ fn fee_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
         })?;
     let fixed = crate::builder::FeeSpec::Fixed {
         date,
-        amount: finstack_quant_core::money::Money::new(
-            25_000.0,
+        amount: finstack_quant_core::money::Money::from((
+            25000_i64,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )),
     };
     serialize_example(&fixed, "fee spec")
 }

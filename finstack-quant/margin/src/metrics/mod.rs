@@ -65,15 +65,15 @@ impl MarginUtilization {
     /// use finstack_quant_margin::metrics::MarginUtilization;
     ///
     /// let util = MarginUtilization::new(
-    ///     Money::new(12_000_000.0, Currency::USD),
-    ///     Money::new(10_000_000.0, Currency::USD),
+    ///     Money::from((12_000_000_i64, Currency::USD)),
+    ///     Money::from((10_000_000_i64, Currency::USD)),
     /// )?;
     /// assert!(util.is_adequate());
     ///
     /// // Cross-currency inputs are rejected rather than silently mixed.
     /// assert!(MarginUtilization::new(
-    ///     Money::new(12_000_000.0, Currency::EUR),
-    ///     Money::new(10_000_000.0, Currency::USD),
+    ///     Money::from((12_000_000_i64, Currency::EUR)),
+    ///     Money::from((10_000_000_i64, Currency::USD)),
     /// )
     /// .is_err());
     /// # Ok::<(), finstack_quant_core::Error>(())
@@ -103,15 +103,14 @@ impl MarginUtilization {
     }
 
     /// Get the shortfall amount (if any).
-    #[must_use]
-    pub fn shortfall(&self) -> Money {
+    pub fn shortfall(&self) -> finstack_quant_core::Result<Money> {
         if self.ratio < 1.0 {
             Money::new(
                 self.required.amount() - self.posted.amount(),
                 self.posted.currency(),
             )
         } else {
-            Money::new(0.0, self.posted.currency())
+            Ok(Money::from((0_i64, self.posted.currency())))
         }
     }
 }
@@ -148,15 +147,15 @@ impl ExcessCollateral {
     /// use finstack_quant_margin::metrics::ExcessCollateral;
     ///
     /// let excess = ExcessCollateral::new(
-    ///     Money::new(105_000_000.0, Currency::USD),
-    ///     Money::new(100_000_000.0, Currency::USD),
+    ///     Money::from((105_000_000_i64, Currency::USD)),
+    ///     Money::from((100_000_000_i64, Currency::USD)),
     /// )?;
     /// assert!(excess.has_excess());
     ///
     /// // Cross-currency inputs are rejected rather than silently mixed.
     /// assert!(ExcessCollateral::new(
-    ///     Money::new(105_000_000.0, Currency::EUR),
-    ///     Money::new(100_000_000.0, Currency::USD),
+    ///     Money::from((105_000_000_i64, Currency::EUR)),
+    ///     Money::from((100_000_000_i64, Currency::USD)),
     /// )
     /// .is_err());
     /// # Ok::<(), finstack_quant_core::Error>(())
@@ -168,7 +167,7 @@ impl ExcessCollateral {
         let excess = Money::new(
             collateral_value.amount() - required_value.amount(),
             currency,
-        );
+        )?;
 
         Ok(Self {
             collateral_value,
@@ -293,30 +292,40 @@ mod tests {
 
     #[test]
     fn margin_utilization() {
-        let posted = Money::new(12_000_000.0, Currency::USD);
-        let required = Money::new(10_000_000.0, Currency::USD);
+        let posted = Money::from((12_000_000_i64, Currency::USD));
+        let required = Money::from((10_000_000_i64, Currency::USD));
         let util = MarginUtilization::new(posted, required).unwrap();
 
         assert!(util.is_adequate());
         assert_eq!(util.ratio, 1.2);
-        assert_eq!(util.shortfall().amount(), 0.0);
+        assert_eq!(
+            util.shortfall()
+                .expect("valid margin shortfall fixture")
+                .amount(),
+            0.0
+        );
     }
 
     #[test]
     fn margin_shortfall() {
-        let posted = Money::new(8_000_000.0, Currency::USD);
-        let required = Money::new(10_000_000.0, Currency::USD);
+        let posted = Money::from((8_000_000_i64, Currency::USD));
+        let required = Money::from((10_000_000_i64, Currency::USD));
         let util = MarginUtilization::new(posted, required).unwrap();
 
         assert!(!util.is_adequate());
         assert_eq!(util.ratio, 0.8);
-        assert_eq!(util.shortfall().amount(), 2_000_000.0);
+        assert_eq!(
+            util.shortfall()
+                .expect("valid margin shortfall fixture")
+                .amount(),
+            2_000_000.0
+        );
     }
 
     #[test]
     fn excess_collateral() {
-        let collateral = Money::new(105_000_000.0, Currency::USD);
-        let required = Money::new(100_000_000.0, Currency::USD);
+        let collateral = Money::from((105_000_000_i64, Currency::USD));
+        let required = Money::from((100_000_000_i64, Currency::USD));
         let excess = ExcessCollateral::new(collateral, required).unwrap();
 
         assert!(excess.has_excess());
@@ -327,7 +336,7 @@ mod tests {
 
     #[test]
     fn margin_funding_cost() {
-        let margin = Money::new(50_000_000.0, Currency::USD);
+        let margin = Money::from((50_000_000_i64, Currency::USD));
         let funding_rate = 0.055; // 5.5%
         let collateral_rate = 0.053; // 5.3%
 
@@ -339,8 +348,8 @@ mod tests {
 
     #[test]
     fn margin_utilization_rejects_currency_mismatch() {
-        let posted = Money::new(12_000_000.0, Currency::EUR);
-        let required = Money::new(10_000_000.0, Currency::USD);
+        let posted = Money::from((12_000_000_i64, Currency::EUR));
+        let required = Money::from((10_000_000_i64, Currency::USD));
 
         let err = MarginUtilization::new(posted, required).unwrap_err();
         assert!(
@@ -351,8 +360,8 @@ mod tests {
 
     #[test]
     fn excess_collateral_rejects_currency_mismatch() {
-        let collateral = Money::new(105_000_000.0, Currency::EUR);
-        let required = Money::new(100_000_000.0, Currency::USD);
+        let collateral = Money::from((105_000_000_i64, Currency::EUR));
+        let required = Money::from((100_000_000_i64, Currency::USD));
 
         let err = ExcessCollateral::new(collateral, required).unwrap_err();
         assert!(
@@ -363,7 +372,7 @@ mod tests {
 
     #[test]
     fn haircut01() {
-        let collateral = Money::new(100_000_000.0, Currency::USD);
+        let collateral = Money::from((100_000_000_i64, Currency::USD));
         let h01 = Haircut01::calculate(collateral, 0.02);
 
         assert_eq!(h01.pv_change.amount(), 10_000.0); // 100M × 0.01%

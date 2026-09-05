@@ -18,8 +18,8 @@ fn test_ytm_par_bond() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "YTM1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -73,7 +73,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Simple, smooth curves suitable for FRN pricing.
     let disc = DiscountCurve::builder("USD-OIS")
@@ -147,7 +147,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Simple downward-sloping discount curve.
     let disc = DiscountCurve::builder("USD-OIS")
@@ -162,8 +162,14 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
     let step_date = date!(2026 - 01 - 01);
     let amort_spec = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (step_date, Money::new(500_000.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (
+                step_date,
+                Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                maturity,
+                Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            ),
         ],
     };
     let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)

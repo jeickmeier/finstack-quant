@@ -51,7 +51,10 @@ fn create_option_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketCo
     MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("AAPL", MarketScalar::Price(Money::new(spot, Currency::USD)))
+        .insert_price(
+            "AAPL",
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+        )
 }
 
 const SPOT_BUMP_PCT: f64 = 0.01;
@@ -174,7 +177,7 @@ fn test_equity_option_instantaneous_analytical_greeks() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -223,7 +226,7 @@ fn test_equity_option_fd_matches_analytical_greeks() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -271,8 +274,8 @@ fn test_bucketed_dv01_sums_to_parallel() {
     // Use large notional ($10M) to ensure bucket DV01s are above Money precision threshold
     let bond = Bond::fixed(
         "BUCKETED_TEST",
-        Money::new(10_000_000.0, Currency::USD), // $10M notional
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"), // $10M notional
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         as_of,
         date!(2035 - 01 - 01), // 10 year bond
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -383,7 +386,7 @@ fn test_bucketed_vega_reports_raw_total_and_residual() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,

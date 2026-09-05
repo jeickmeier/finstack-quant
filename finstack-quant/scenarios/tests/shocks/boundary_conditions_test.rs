@@ -17,8 +17,10 @@ use time::Month;
 #[test]
 fn test_zero_percent_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(400.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {
@@ -59,8 +61,10 @@ fn test_zero_percent_shock() {
 #[test]
 fn test_negative_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {
@@ -101,8 +105,10 @@ fn test_negative_shock() {
 #[test]
 fn test_very_large_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {
@@ -145,8 +151,10 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
     // An exact -100% equity shock models a full wipeout without producing an
     // economically impossible negative post-shock price.
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {
@@ -181,8 +189,10 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
 #[test]
 fn test_shock_beyond_negative_100_percent_on_equity_is_rejected() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {

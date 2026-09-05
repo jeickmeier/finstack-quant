@@ -265,7 +265,7 @@ fn test_financing_annuity_bounded_by_notional_times_tenor() {
     let tenor_years = 1.0;
 
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(notional, USD))
+        .notional(Money::new(notional, USD).expect("valid money fixture"))
         .tenor_months(12)
         .build();
 
@@ -335,11 +335,11 @@ fn test_financing_annuity_scales_with_notional() {
     let as_of = as_of_date();
 
     let trs_1m = TestEquityTrsBuilder::new()
-        .notional(Money::new(1_000_000.0, USD))
+        .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_10m = TestEquityTrsBuilder::new()
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -431,11 +431,11 @@ fn test_ir01_scales_with_notional() {
     let as_of = as_of_date();
 
     let trs_5m = TestEquityTrsBuilder::new()
-        .notional(Money::new(5_000_000.0, USD))
+        .notional(Money::new(5_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_25m = TestEquityTrsBuilder::new()
-        .notional(Money::new(25_000_000.0, USD))
+        .notional(Money::new(25_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -526,7 +526,7 @@ fn test_equity_trs_delta_magnitude_check() {
     let notional = 10_000_000.0;
 
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(notional, USD))
+        .notional(Money::new(notional, USD).expect("valid money fixture"))
         .side(TrsSide::ReceiveTotalReturn)
         .build();
 

@@ -53,7 +53,7 @@ pub fn get_finite_node_value(
 /// * `results` - Evaluated statement results to read from.
 /// * `nodes` - Node identifiers to sum; nodes without a value for `period`
 ///   contribute zero.
-/// * `period` - Period to read.
+/// * `period` - Reporting-period identifier used to select each node's value from the evaluated results.
 pub fn sum_nodes(results: &StatementResult, nodes: &[NodeId], period: &PeriodId) -> f64 {
     nodes
         .iter()

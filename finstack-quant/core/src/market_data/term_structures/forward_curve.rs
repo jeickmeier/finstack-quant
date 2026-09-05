@@ -208,6 +208,11 @@ impl ForwardCurve {
     /// by ~1.4%) and the reset lag. Set [`ForwardCurveBuilder::day_count`] and
     /// [`ForwardCurveBuilder::reset_lag`] explicitly when conventions matter;
     /// each day-count inference is logged at `debug` level.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-data identifier; its text supplies inferred index conventions unless the builder overrides them.
+    /// * `tenor_years` - Positive index accrual tenor in years, such as `0.25` for three months; validated at build time.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();

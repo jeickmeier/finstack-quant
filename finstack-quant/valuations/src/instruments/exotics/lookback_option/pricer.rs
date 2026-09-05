@@ -53,10 +53,10 @@ impl LookbackOptionMcPricer {
         if as_of >= inst.expiry {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return Ok(finstack_quant_core::money::Money::new(
+            return finstack_quant_core::money::Money::new(
                 payoff * inst.notional.amount(),
                 inst.notional.currency(),
-            ));
+            );
         }
 
         let t = inst
@@ -65,10 +65,10 @@ impl LookbackOptionMcPricer {
         if t <= 0.0 {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return Ok(finstack_quant_core::money::Money::new(
+            return finstack_quant_core::money::Money::new(
                 payoff * inst.notional.amount(),
                 inst.notional.currency(),
-            ));
+            );
         }
 
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
@@ -472,7 +472,13 @@ impl Pricer for LookbackOptionAnalyticalPricer {
                 Money::new(
                     payoff * lookback.notional.amount(),
                     lookback.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(lookback),
+                    )
+                })?,
             ));
         }
 
@@ -497,7 +503,13 @@ impl Pricer for LookbackOptionAnalyticalPricer {
                 Money::new(
                     payoff * lookback.notional.amount(),
                     lookback.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(lookback),
+                    )
+                })?,
             ));
         }
 
@@ -586,7 +598,12 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
-        let pv = Money::new(price * lookback.notional.amount(), currency);
+        let pv = Money::new(price * lookback.notional.amount(), currency).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(lookback),
+            )
+        })?;
         Ok(ValuationResult::stamped(lookback.id(), as_of, pv))
     }
 }
@@ -635,7 +652,7 @@ mod tests {
             .insert_surface(surface)
             .insert_price(
                 "SPX-SPOT",
-                MarketScalar::Price(Money::new(spot, Currency::USD)),
+                MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
             )
             .insert_price("SPX-DIV", MarketScalar::Unitless(div_yield))
     }
@@ -648,13 +665,16 @@ mod tests {
             .option_type(OptionType::Call)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(expiry)
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_max_opt(observed_max.map(|value| Money::new(value, Currency::USD)))
+            .observed_max_opt(
+                observed_max
+                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -668,13 +688,16 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(expiry)
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_min_opt(observed_min.map(|value| Money::new(value, Currency::USD)))
+            .observed_min_opt(
+                observed_min
+                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -688,13 +711,16 @@ mod tests {
             .option_type(OptionType::Call)
             .lookback_type(LookbackType::FloatingStrike)
             .expiry(expiry)
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_min_opt(observed_min.map(|value| Money::new(value, Currency::USD)))
+            .observed_min_opt(
+                observed_min
+                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -708,13 +734,16 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FloatingStrike)
             .expiry(expiry)
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_max_opt(observed_max.map(|value| Money::new(value, Currency::USD)))
+            .observed_max_opt(
+                observed_max
+                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -860,7 +889,7 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(date(2025, 1, 1))
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

@@ -175,12 +175,12 @@ pub fn realistic_market(as_of: Date) -> MarketContext {
 
 /// Standard notional for tests
 pub fn standard_notional() -> Money {
-    Money::new(1_000_000.0, Currency::USD)
+    Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")
 }
 
 /// Large notional for sensitivity tests
 pub fn large_notional() -> Money {
-    Money::new(100_000_000.0, Currency::USD)
+    Money::new(100_000_000.0, Currency::USD).expect("valid money fixture")
 }
 
 /// Tolerance for PV checks (0.01 basis point of notional)

@@ -66,7 +66,7 @@ fn build_market(vol: f64) -> MarketContext {
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(SPOT, Currency::USD)),
+            MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("EQ-DIV", MarketScalar::Unitless(DIV_YIELD))
 }
@@ -79,7 +79,7 @@ fn build_option() -> EquityOption {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry: date!(2026 - 01 - 01), // 1Y to expiry from as_of
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,

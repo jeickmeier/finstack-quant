@@ -218,7 +218,7 @@ impl StochasticPricer {
             let output = self.price_path(instrument, context, prepared, shocks, per_name_engine)?;
             collector.record_output(output);
         }
-        Ok(collector.finalize(self, PricingMode::Tree))
+        collector.finalize(self, PricingMode::Tree)
     }
 
     fn price_monte_carlo(
@@ -397,7 +397,7 @@ impl StochasticPricer {
             collector.record_output(output);
         }
 
-        Ok(collector.finalize(self, pricing_mode))
+        collector.finalize(self, pricing_mode)
     }
 
     fn monte_carlo_factor_sets(
@@ -1212,7 +1212,7 @@ impl TrancheScenarioStats {
         currency: finstack_quant_core::currency::Currency,
         num_paths: usize,
         es_confidence: f64,
-    ) -> TranchePricingResult {
+    ) -> Result<TranchePricingResult> {
         let paths = num_paths.max(1) as f64;
         let mean_pv = self.pv_stats.mean();
         let mean_loss = self.loss_stats.mean();
@@ -1221,19 +1221,19 @@ impl TrancheScenarioStats {
         let loss_std = self.loss_stats.population_variance().sqrt();
         let es = expected_shortfall(&mut self.losses, es_confidence);
 
-        TranchePricingResult::new(
+        Ok(TranchePricingResult::new(
             self.tranche_id,
             self.seniority,
-            Money::new(mean_pv, currency),
+            Money::new(mean_pv, currency)?,
         )
         .with_subordination(self.attachment, self.detachment)
         .with_risk_metrics(
-            Money::new(mean_loss, currency),
-            Money::new(loss_std, currency),
-            Money::new(es, currency),
+            Money::new(mean_loss, currency)?,
+            Money::new(loss_std, currency)?,
+            Money::new(es, currency)?,
         )
         .with_average_life(self.wal_sum / paths)
-        .with_credit_duration(self.duration_sum / paths)
+        .with_credit_duration(self.duration_sum / paths))
     }
 }
 
@@ -1303,7 +1303,7 @@ impl ScenarioCollector {
         mut self,
         pricer: &StochasticPricer,
         pricing_mode: PricingMode,
-    ) -> StochasticPricingResult {
+    ) -> Result<StochasticPricingResult> {
         let mean_pv = self.deal_pv_stats.mean();
         let mean_loss = self.deal_loss_stats.mean();
         // Welford population variance avoids catastrophic cancellation when
@@ -1319,13 +1319,13 @@ impl ScenarioCollector {
         let es = expected_shortfall(&mut self.deal_losses, pricer.config.es_confidence);
 
         let mut result = StochasticPricingResult::new(
-            Money::new(mean_pv, self.currency),
-            Money::new(mean_loss, self.currency),
+            Money::new(mean_pv, self.currency)?,
+            Money::new(mean_loss, self.currency)?,
             self.num_paths,
             pricing_mode,
         )
-        .with_unexpected_loss(Money::new(loss_pop_var.sqrt(), self.currency))
-        .with_expected_shortfall(Money::new(es, self.currency), pricer.config.es_confidence);
+        .with_unexpected_loss(Money::new(loss_pop_var.sqrt(), self.currency)?)
+        .with_expected_shortfall(Money::new(es, self.currency)?, pricer.config.es_confidence);
 
         let notional = pricer.config.tree_config.initial_balance;
         if notional > f64::EPSILON {
@@ -1352,9 +1352,9 @@ impl ScenarioCollector {
             .tranche_stats
             .into_iter()
             .map(|stats| stats.finalize(self.currency, self.num_paths, pricer.config.es_confidence))
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
-        result
+        Ok(result)
     }
 }
 
@@ -1451,7 +1451,7 @@ mod tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.06,
             Date::from_calendar_date(2029, Month::January, 1).expect("valid date"),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -1461,7 +1461,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
         )
@@ -1494,10 +1494,10 @@ mod tests {
         let first = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let second = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let principal_flows = vec![
-            (first, Money::new(40.0, Currency::USD)),
-            (second, Money::new(60.0, Currency::USD)),
+            (first, Money::from((40_i64, Currency::USD))),
+            (second, Money::from((60_i64, Currency::USD))),
         ];
-        let zero = Money::new(0.0, Currency::USD);
+        let zero = Money::from((0_i64, Currency::USD));
         let cashflows = TrancheCashflows {
             tranche_id: "A".to_string(),
             cashflows: principal_flows.clone(),
@@ -1509,7 +1509,7 @@ mod tests {
             writedown_flows: Vec::new(),
             final_balance: zero,
             total_interest: zero,
-            total_principal: Money::new(100.0, Currency::USD),
+            total_principal: Money::from((100_i64, Currency::USD)),
             total_pik: zero,
             total_deferred: zero,
             total_writedown: zero,
@@ -1530,7 +1530,7 @@ mod tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.06,
             maturity,
             DayCount::Thirty360,
@@ -1540,7 +1540,7 @@ mod tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -1662,7 +1662,9 @@ mod tests {
             ScenarioTreeConfig::new(12, 2),
         );
         let pricer = StochasticPricer::new(config);
-        let result = collector.finalize(&pricer, PricingMode::Tree);
+        let result = collector
+            .finalize(&pricer, PricingMode::Tree)
+            .expect("valid pricing result");
 
         // True population variance = delta² = 0.0025
         // True std_error of the mean = 0.05 / sqrt(1000) ≈ 0.001581
@@ -1976,7 +1978,7 @@ mod per_name_copula_tests {
         for i in 0..n_assets {
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 format!("L{i}"),
-                Money::new(per_asset, Currency::USD),
+                Money::new(per_asset, Currency::USD).expect("valid money fixture"),
                 0.07,
                 maturity(),
                 DayCount::Thirty360,
@@ -1988,7 +1990,7 @@ mod per_name_copula_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(total * 0.80, Currency::USD),
+                Money::new(total * 0.80, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -1998,7 +2000,7 @@ mod per_name_copula_tests {
                 80.0,
                 92.0,
                 TrancheSeniority::Mezzanine,
-                Money::new(total * 0.12, Currency::USD),
+                Money::new(total * 0.12, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.08 },
                 maturity(),
             )
@@ -2008,7 +2010,7 @@ mod per_name_copula_tests {
                 92.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(total * 0.08, Currency::USD),
+                Money::new(total * 0.08, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )

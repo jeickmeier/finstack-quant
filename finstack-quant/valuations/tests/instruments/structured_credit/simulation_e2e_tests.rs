@@ -66,7 +66,7 @@ fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
         asset_type: AssetType::FirstLienLoan {
             industry: Some("Technology".to_string()),
         },
-        balance: Money::new(balance, Currency::USD),
+        balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
         rate,
         spread_bp: None,
         index_id: None,
@@ -93,7 +93,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             0.0,
             senior / (senior + mezz + equity) * 100.0,
             TrancheSeniority::Senior,
-            Money::new(senior, Currency::USD),
+            Money::new(senior, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
         )
@@ -103,7 +103,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             senior / (senior + mezz + equity) * 100.0,
             (senior + mezz) / (senior + mezz + equity) * 100.0,
             TrancheSeniority::Mezzanine,
-            Money::new(mezz, Currency::USD),
+            Money::new(mezz, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.07 },
             maturity,
         )
@@ -113,7 +113,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             (senior + mezz) / (senior + mezz + equity) * 100.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(equity, Currency::USD),
+            Money::new(equity, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
@@ -917,7 +917,7 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
             asset_type: AssetType::FirstLienLoan {
                 industry: Some("Finance".to_string()),
             },
-            balance: Money::new(20_000_000.0, Currency::USD),
+            balance: Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: *rate,
             spread_bp: None,
             index_id: None,

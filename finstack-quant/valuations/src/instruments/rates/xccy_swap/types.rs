@@ -362,7 +362,7 @@ impl XccySwap {
 
         let usd_leg = XccySwapLeg {
             currency: Currency::USD,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             side: LegSide::Receive,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -382,7 +382,7 @@ impl XccySwap {
 
         let eur_leg = XccySwapLeg {
             currency: Currency::EUR,
-            notional: Money::new(9_200_000.0, Currency::EUR),
+            notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: LegSide::Pay,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
@@ -755,7 +755,7 @@ impl XccySwap {
             flows.push(crate::cashflow::primitives::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
-                Money::new(amount, leg.currency),
+                Money::new(amount, leg.currency)?,
                 crate::cashflow::primitives::CFKind::FloatReset,
                 projected.year_fraction,
                 Some(all_in),
@@ -773,7 +773,7 @@ impl XccySwap {
 
     fn leg_principal_schedule(&self, leg: &XccySwapLeg, anchor: Date) -> Result<CashFlowSchedule> {
         let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, leg.currency), anchor, leg.end);
+        let _ = builder.principal(Money::from((0_i64, leg.currency)), anchor, leg.end);
         // MtmResetting also requires initial AND final exchange; this arm makes the helper non-panicky if accidentally called on an MtM swap. `base_value` dispatches MtmResetting to `pricing_mtm::pv_mtm_reset` before this method is reached.
         if matches!(
             self.notional_exchange,
@@ -782,8 +782,8 @@ impl XccySwap {
             let initial_amount = leg.side.initial_principal_sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
                 leg.start,
-                Money::new(0.0, leg.currency),
-                Some(Money::new(-initial_amount, leg.currency)),
+                Money::from((0_i64, leg.currency)),
+                Some(Money::new(-initial_amount, leg.currency)?),
                 CFKind::Notional,
             );
         }
@@ -797,14 +797,14 @@ impl XccySwap {
             let final_amount = leg.side.final_principal_sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
                 leg.end,
-                Money::new(0.0, leg.currency),
-                Some(Money::new(-final_amount, leg.currency)),
+                Money::from((0_i64, leg.currency)),
+                Some(Money::new(-final_amount, leg.currency)?),
                 CFKind::Notional,
             );
         }
         Ok(builder
             .build(None)?
-            .with_notional(Notional::par(leg.notional.amount(), leg.currency)))
+            .with_notional(Notional::par(leg.notional.amount(), leg.currency)?))
     }
 
     /// Calculate the present value of a leg and convert that PV at valuation-date spot.
@@ -848,7 +848,7 @@ impl XccySwap {
                 | NotionalExchange::MtmResetting { .. }
         ) && leg.end > as_of;
         if !unsettled_coupon && !unsettled_initial && !unsettled_final {
-            return Ok(Money::new(0.0, self.reporting_currency));
+            return Ok(Money::from((0_i64, self.reporting_currency)));
         }
 
         let disc = context.get_discount(&leg.discount_curve_id)?;
@@ -938,7 +938,7 @@ impl XccySwap {
             pv.add(cf_rep);
         }
 
-        Ok(Money::new(pv.total(), self.reporting_currency))
+        Money::new(pv.total(), self.reporting_currency)
     }
 }
 
@@ -1058,7 +1058,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
                     as_of,
                 )?;
             return Ok(schedule
-                .with_notional(Notional::par(0.0, self.reporting_currency))
+                .with_notional(Notional::par(0.0, self.reporting_currency)?)
                 .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected));
         }
 
@@ -1069,7 +1069,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
 
         Ok(merge_cashflow_schedules(
             [leg1_schedule, leg1_principal, leg2_schedule, leg2_principal],
-            Notional::par(0.0, self.reporting_currency),
+            Notional::par(0.0, self.reporting_currency)?,
             self.leg1.day_count,
         )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -1127,7 +1127,7 @@ mod tests {
             "XCCY-CF",
             XccySwapLeg {
                 currency: Currency::USD,
-                notional: Money::new(1_000_000.0, Currency::USD),
+                notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: LegSide::Receive,
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -1146,7 +1146,7 @@ mod tests {
             },
             XccySwapLeg {
                 currency: Currency::EUR,
-                notional: Money::new(900_000.0, Currency::EUR),
+                notional: Money::from((900_000_i64, Currency::EUR)),
                 side: LegSide::Pay,
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1226,7 +1226,7 @@ mod tests {
             "XCCY-NOFX",
             XccySwapLeg {
                 currency: Currency::USD,
-                notional: Money::new(1_000_000.0, Currency::USD),
+                notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: LegSide::Receive,
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -1245,7 +1245,7 @@ mod tests {
             },
             XccySwapLeg {
                 currency: Currency::EUR,
-                notional: Money::new(900_000.0, Currency::EUR),
+                notional: Money::from((900_000_i64, Currency::EUR)),
                 side: LegSide::Pay,
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1347,7 +1347,7 @@ mod tests {
         // contract used by Task 7's PV path.
         let mut swap = XccySwap::example();
         swap.leg2.currency = Currency::USD;
-        swap.leg2.notional = finstack_quant_core::money::Money::new(1.0, Currency::USD);
+        swap.leg2.notional = finstack_quant_core::money::Money::from((1_i64, Currency::USD));
 
         let err = swap
             .partition_legs(ResettingSide::Leg2)
@@ -1370,7 +1370,7 @@ mod tests {
 
         let leg1 = XccySwapLeg {
             currency: Currency::EUR,
-            notional: Money::new(9_200_000.0, Currency::EUR),
+            notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: LegSide::Receive,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1389,7 +1389,7 @@ mod tests {
         };
         let mut leg2 = leg1.clone();
         leg2.currency = Currency::USD;
-        leg2.notional = Money::new(10_000_000.0, Currency::USD);
+        leg2.notional = Money::from((10_000_000_i64, Currency::USD));
         leg2.side = LegSide::Pay;
         leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
         leg2.discount_curve_id = CurveId::new("USD-OIS");
@@ -1419,7 +1419,7 @@ mod tests {
 
         let leg1 = XccySwapLeg {
             currency: Currency::EUR,
-            notional: Money::new(9_200_000.0, Currency::EUR),
+            notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: LegSide::Receive,
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1438,7 +1438,7 @@ mod tests {
         };
         let mut leg2 = leg1.clone();
         leg2.currency = Currency::USD;
-        leg2.notional = Money::new(10_000_000.0, Currency::USD);
+        leg2.notional = Money::from((10_000_000_i64, Currency::USD));
         leg2.side = LegSide::Pay;
         leg2.forward_curve_id = CurveId::new("USD-SOFR-3M");
         leg2.discount_curve_id = CurveId::new("USD-OIS");
@@ -1554,7 +1554,7 @@ mod tests {
         };
         let leg = XccySwapLeg {
             currency: Currency::EUR,
-            notional: Money::new(1_000_000.0, Currency::EUR),
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: LegSide::Pay,
             forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
             discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1633,7 +1633,7 @@ mod tests {
         };
         let mut leg = XccySwapLeg {
             currency: Currency::EUR,
-            notional: Money::new(1_000_000.0, Currency::EUR),
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: LegSide::Pay,
             forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
             discount_curve_id: CurveId::new("EUR-OIS"),
@@ -1669,7 +1669,7 @@ mod tests {
             leg.clone(),
             {
                 leg.currency = Currency::USD;
-                leg.notional = Money::new(1_000_000.0, Currency::USD);
+                leg.notional = Money::from((1_000_000_i64, Currency::USD));
                 leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
                 leg.discount_curve_id = CurveId::new("USD-OIS");
                 leg.compounding = FloatingLegCompounding::Simple;

@@ -28,7 +28,11 @@ fn test_pik_bond() {
     let maturity = date!(2027 - 01 - 01);
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Pik,
             rate: rust_decimal::Decimal::try_from(0.08).expect("valid"),
@@ -81,7 +85,11 @@ fn test_step_up_bond() {
     };
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
             coupon_type: CouponType::Cash,
             initial_rate: Decimal::new(4, 2),

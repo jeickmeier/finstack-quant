@@ -260,7 +260,7 @@ run = [
   "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
   "uv run --no-sync python scripts/check_public_api_input_docs.py",
   "uv run --no-sync python scripts/check_deprecated_annotations.py",
-  "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc",
+  "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast",
 ]
 
 [tasks.rust-test-slow]

@@ -57,8 +57,8 @@ fn context_for_tranche<'a>(
         payable_principal_tranche_ids: None,
         asset_balances: None,
         current_pool_balance: None,
-        senior_fees: Money::new(0.0, Currency::USD),
-        restricted_cash: Money::new(0.0, Currency::USD),
+        senior_fees: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         interest_claim_caps: &UNCAPPED_CLAIMS,
         floating_rate_shift: 0.0,
         deferred_interest: None,
@@ -73,7 +73,7 @@ fn test_oc_test_passing_scenario() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(125_000_000.0, Currency::USD),
+        Money::new(125_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -85,7 +85,7 @@ fn test_oc_test_passing_scenario() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -96,7 +96,7 @@ fn test_oc_test_passing_scenario() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -108,8 +108,8 @@ fn test_oc_test_passing_scenario() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -128,7 +128,7 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -140,7 +140,7 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -150,8 +150,8 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
         &pool,
         &tranches,
         "CLASS_A_1",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let result = CoverageTest::new_oc(1.25)
@@ -169,7 +169,7 @@ fn test_oc_test_failing_scenario() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(120_000_000.0, Currency::USD),
+        Money::new(120_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -181,7 +181,7 @@ fn test_oc_test_failing_scenario() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -192,7 +192,7 @@ fn test_oc_test_failing_scenario() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -204,8 +204,8 @@ fn test_oc_test_failing_scenario() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -224,7 +224,7 @@ fn test_oc_test_with_cash_balance() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(120_000_000.0, Currency::USD),
+        Money::new(120_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -236,7 +236,7 @@ fn test_oc_test_with_cash_balance() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -247,7 +247,7 @@ fn test_oc_test_with_cash_balance() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -259,8 +259,8 @@ fn test_oc_test_with_cash_balance() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(5_000_000.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -278,7 +278,7 @@ fn test_oc_test_cure_amount_calculation() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(115_000_000.0, Currency::USD),
+        Money::new(115_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -290,7 +290,7 @@ fn test_oc_test_cure_amount_calculation() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -301,7 +301,7 @@ fn test_oc_test_cure_amount_calculation() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -313,8 +313,8 @@ fn test_oc_test_cure_amount_calculation() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -342,7 +342,7 @@ fn test_ic_test_passing_scenario() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -353,7 +353,7 @@ fn test_ic_test_passing_scenario() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 }, // 5% = 1.25M quarterly
         maturity_date(),
     )
@@ -365,8 +365,8 @@ fn test_ic_test_passing_scenario() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(1_500_000.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_500_000.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_ic(1.20);
@@ -389,7 +389,7 @@ fn test_ic_test_failing_scenario() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -400,7 +400,7 @@ fn test_ic_test_failing_scenario() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -412,8 +412,8 @@ fn test_ic_test_failing_scenario() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_ic(1.20);
@@ -435,7 +435,7 @@ fn test_ic_test_no_cure_amount() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -446,7 +446,7 @@ fn test_ic_test_no_cure_amount() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -458,8 +458,8 @@ fn test_ic_test_no_cure_amount() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_ic(1.20);
@@ -512,7 +512,7 @@ fn test_oc_test_empty_pool() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -523,7 +523,7 @@ fn test_oc_test_empty_pool() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -535,8 +535,8 @@ fn test_oc_test_empty_pool() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -559,7 +559,7 @@ fn test_ic_test_no_interest_collections() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -570,7 +570,7 @@ fn test_ic_test_no_interest_collections() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -582,8 +582,8 @@ fn test_ic_test_no_interest_collections() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_ic(1.20);
@@ -601,7 +601,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -613,7 +613,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -626,12 +626,12 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(99_999_999.0, Currency::USD),
+        Money::new(99_999_999.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
-    senior.current_balance = Money::new(0.0, Currency::USD);
+    senior.current_balance = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let tranches = TrancheStructure::new(vec![equity, senior]).unwrap();
 
@@ -639,8 +639,8 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
     let test = CoverageTest::new_oc(1.25);
@@ -663,7 +663,7 @@ fn claim_test_tranches() -> TrancheStructure {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(11_111_111.0, Currency::USD),
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
     )
@@ -673,7 +673,7 @@ fn claim_test_tranches() -> TrancheStructure {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )
@@ -695,8 +695,8 @@ fn ic_measures_coverage_of_the_capped_claim() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
     context.interest_claim_caps = &caps;
 
@@ -727,8 +727,8 @@ fn ic_treats_a_tranche_without_interest_recipient_as_owing_nothing() {
         &pool,
         &tranches,
         "SENIOR",
-        Money::new(0.0, Currency::USD),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
     context.interest_claim_caps = &caps;
 

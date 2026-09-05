@@ -19,10 +19,10 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        Ok(finstack_quant_core::money::Money::new(
+        finstack_quant_core::money::Money::new(
             self.base_value_raw_impl(curves, as_of)?,
             self.notional.currency(),
-        ))
+        )
     }
 
     fn base_value_raw(

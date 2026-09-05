@@ -79,7 +79,7 @@ impl BarrierOptionHestonMcPricer {
             && inst.rebate_timing
                 == finstack_quant_models::closed_form::barrier::RebateTiming::AtHit
         {
-            return Ok((Money::new(0.0, inst.notional.currency()), 0.0));
+            return Ok((Money::from((0_i64, inst.notional.currency())), 0.0));
         }
 
         let spot_scalar = market.get_price(&inst.spot_id)?;
@@ -242,5 +242,5 @@ fn price_expired_barrier(
         }
     };
 
-    Ok(Money::new(pv, ccy))
+    Money::new(pv, ccy)
 }

@@ -37,7 +37,7 @@ fn test_pricing_recovery_consistency() {
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
     // 1. Create Facility
-    let commitment = Money::new(10_000_000.0, Currency::USD);
+    let commitment = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let drawn = commitment; // Fully drawn
 
     let facility = RevolvingCredit::builder()
@@ -115,8 +115,8 @@ fn test_floating_rcf_declares_forward_dependency() {
 
     let fixed_facility = RevolvingCredit::builder()
         .id("RCF-FIXED".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -131,8 +131,8 @@ fn test_floating_rcf_declares_forward_dependency() {
 
     let floating_facility = RevolvingCredit::builder()
         .id("RCF-FLOAT".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
@@ -188,8 +188,8 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
 
     let facility = RevolvingCredit::builder()
         .id("RCF-DV01-FWD".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
@@ -278,8 +278,8 @@ fn test_upfront_fee_excluded_after_commitment() {
 
     let facility = RevolvingCredit::builder()
         .id("RCF-UPFRONT-ASOF".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(0.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
@@ -287,7 +287,8 @@ fn test_upfront_fee_excluded_after_commitment() {
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
-            fees.upfront_fee = Some(Money::new(100_000.0, Currency::USD));
+            fees.upfront_fee =
+                Some(Money::new(100_000.0, Currency::USD).expect("valid money fixture"));
             fees
         })
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

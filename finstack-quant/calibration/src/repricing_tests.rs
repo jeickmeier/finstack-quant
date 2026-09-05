@@ -1226,7 +1226,7 @@ fn inflation_curve_swap_repricing() {
         };
         let swap = InflationSwap::builder()
             .id(format!("INF-SWAP-{}", maturity).into())
-            .notional(Money::new(fixtures::STANDARD_NOTIONAL, currency))
+            .notional(Money::new(fixtures::STANDARD_NOTIONAL, currency).expect("valid notional"))
             .start_date(base_date)
             .maturity(maturity)
             .fixed_rate(Decimal::try_from(rate).expect("valid decimal"))

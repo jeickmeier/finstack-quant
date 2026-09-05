@@ -28,7 +28,7 @@ fn create_pool_with_balance(balance: f64) -> AssetPool {
     if balance > 0.0 {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(balance, Currency::USD),
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
             0.06,
             Date::from_calendar_date(2029, Month::January, 1).unwrap(),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -43,7 +43,7 @@ fn create_single_tranche() -> TrancheStructure {
         0.0,
         100.0,
         finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -85,7 +85,9 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
 #[test]
 fn test_example_has_expected_defaults() {
     let sc = StructuredCredit::example();
-    let waterfall = sc.create_waterfall();
+    let waterfall = sc
+        .create_waterfall()
+        .expect("valid create_waterfall fixture");
 
     assert_eq!(sc.tranches.tranches.len(), 1);
     assert_eq!(waterfall.tiers.len(), 3);
@@ -181,8 +183,8 @@ fn test_current_loss_percentage_handles_zero_balance_and_offsets() {
     assert_eq!(sc_zero.current_loss_percentage().unwrap(), 0.0);
 
     let mut pool = create_pool_with_balance(1_000_000.0);
-    pool.cumulative_defaults = Money::new(50_000.0, Currency::USD);
-    pool.cumulative_recoveries = Money::new(10_000.0, Currency::USD);
+    pool.cumulative_defaults = Money::new(50_000.0, Currency::USD).expect("valid money fixture");
+    pool.cumulative_recoveries = Money::new(10_000.0, Currency::USD).expect("valid money fixture");
     let sc = StructuredCredit::new_abs(
         "TEST-LOSS",
         pool,

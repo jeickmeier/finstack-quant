@@ -48,7 +48,7 @@ fn emit_principal_repayment(
     new_flows.push(CashFlow::new(
         d,
         None,
-        Money::new(decimal_to_f64(pay)?, ccy),
+        Money::new(decimal_to_f64(pay)?, ccy)?,
         CFKind::Amortization,
         0.0,
         None,

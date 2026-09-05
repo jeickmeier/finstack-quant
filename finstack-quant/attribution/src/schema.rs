@@ -31,11 +31,11 @@ fn attribution_result_examples() -> finstack_quant_core::Result<Vec<serde_json::
     };
     let as_of_t0 = date(time::Month::January, 1)?;
     let as_of_t1 = date(time::Month::February, 1)?;
-    let zero = Money::new(0.0, Currency::USD);
+    let zero = Money::from((0_i64, Currency::USD));
     let attribution = crate::PnlAttribution {
-        total_pnl: Money::new(12_500.0, Currency::USD),
+        total_pnl: Money::from((12500_i64, Currency::USD)),
         mark_to_market_pnl: None,
-        carry: Money::new(12_500.0, Currency::USD),
+        carry: Money::from((12500_i64, Currency::USD)),
         rates_curves_pnl: zero,
         credit_curves_pnl: zero,
         inflation_curves_pnl: zero,
@@ -116,7 +116,7 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
 
     let deposit = Deposit::builder()
         .id("DEP_3M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .start_date(as_of_t0)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

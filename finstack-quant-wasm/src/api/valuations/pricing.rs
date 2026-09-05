@@ -585,8 +585,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            Rate::from_decimal(0.05),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -669,7 +669,8 @@ mod tests {
             fixed_rate: 0.06,
             coupon_floor: 0.0,
             target_coupon: 1.0,
-            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD),
+            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
             coupon_dates: vec![
                 Date::from_calendar_date(2025, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
@@ -714,7 +715,8 @@ mod tests {
             leverage: 1.0,
             coupon_floor: 0.0,
             coupon_cap: None,
-            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD),
+            notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
             coupon_dates: vec![
                 Date::from_calendar_date(2025, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
@@ -753,7 +755,8 @@ mod tests {
             leverage: 1.5,
             coupon_floor: 0.0,
             coupon_cap: Some(0.10),
-            notional: Money::new(500_000.0, finstack_quant_core::currency::Currency::USD),
+            notional: Money::new(500_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
             coupon_dates: vec![
                 Date::from_calendar_date(2025, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
@@ -805,19 +808,22 @@ mod tests {
             .upper_bound(0.04)
             .bounds_type(BoundsType::Absolute)
             .coupon_rate(0.06)
-            .notional(Money::new(
-                1_000_000.0,
-                finstack_quant_core::currency::Currency::USD,
-            ))
+            .notional(
+                Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .accrual_start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
             .rate_index_id_opt(Some("SOFR".into()))
             .projection_curve_id_opt(Some(CurveId::new("USD-OIS")))
-            .reference_tenor_opt(Some(finstack_quant_core::dates::Tenor::new(
-                6,
-                finstack_quant_core::dates::TenorUnit::Months,
-            )))
+            .reference_tenor_opt(Some(
+                finstack_quant_core::dates::Tenor::new(
+                    6,
+                    finstack_quant_core::dates::TenorUnit::Months,
+                )
+                .expect("valid tenor fixture"),
+            ))
             .spot_id("SOFR-RATE".into())
             .vol_surface_id(CurveId::new("SOFR-VOL"))
             .div_yield_id_opt(None)
@@ -857,11 +863,12 @@ mod tests {
 
         let option = CmsSpreadOption {
             id: InstrumentId::new("CMS-SPREAD-WASM-E2E"),
-            long_cms_tenor: Tenor::new(10, TenorUnit::Years),
-            short_cms_tenor: Tenor::new(2, TenorUnit::Years),
+            long_cms_tenor: Tenor::new(10, TenorUnit::Years).expect("valid tenor fixture"),
+            short_cms_tenor: Tenor::new(2, TenorUnit::Years).expect("valid tenor fixture"),
             strike: 0.005,
             option_type: CmsSpreadOptionType::Call,
-            notional: Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD),
+            notional: Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD)
+                .expect("valid money fixture"),
             expiry_date: Date::from_calendar_date(2026, Month::January, 1).expect("date"),
             payment_date: Date::from_calendar_date(2026, Month::January, 5).expect("date"),
             long_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-10Y"),
@@ -1216,48 +1223,28 @@ mod tests {
             "attributes": {},
             "return_floor": return_floor
         });
-        serde_json::json!({
-            "schema": "finstack_quant.instrument/1",
-            "instrument": { "type": "bond", "spec": spec }
-        })
-        .to_string()
+        let bond = serde_json::from_value(spec).expect("valid return-floor bond fixture");
+        envelope_json(finstack_quant_valuations::instruments::InstrumentJson::Bond(bond))
     }
 
     /// Minimal 5-year flat discount market for the return-floor tests.
     fn return_floor_market_json() -> String {
-        serde_json::json!({
-            "schema_version": 1,
-            "curves": [{
-                "type": "discount",
-                "id": "USD-OIS",
-                "base": "2024-01-01",
-                "day_count": "act_365f",
-                "knot_points": [[0.0, 1.0], [5.0, 0.85]],
-                "interp_style": "monotone_convex",
-                "extrapolation": "flat_forward",
-                "min_forward_rate": null,
-                "allow_non_monotonic": false,
-                "min_forward_tenor": 1e-6
-            }],
-            "fx": null,
-            "surfaces": [],
-            "prices": {},
-            "series": [],
-            "inflation_indices": [],
-            "dividends": [],
-            "credit_indices": [],
-            "fx_delta_vol_surfaces": [],
-            "vol_cubes": [],
-            "collateral": {},
-            "hierarchy": null
-        })
-        .to_string()
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::math::interp::InterpStyle;
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(time::macros::date!(2024 - 01 - 01))
+            .knots([(0.0, 1.0), (5.0, 0.85)])
+            .interp(InterpStyle::MonotoneConvex)
+            .build()
+            .expect("valid discount curve");
+        serde_json::to_string(&MarketContext::new().insert(curve)).expect("serialize market")
     }
 
     #[test]
     fn return_floor_bond_moic_floor_validates_and_prices() {
         // Smoke test: a bond with a 1.25× MOIC return-floor spec round-trips
-        // through the JSON validator and prices successfully via the discounting
+        // through the JSON validator and prices successfully via the rates tree
         // model — no new Rust binding code is required; return_floor is already a
         // serde field on the core Bond type.
         let floor_spec = serde_json::json!({
@@ -1288,7 +1275,7 @@ mod tests {
             &inst,
             &market,
             "2024-01-01",
-            "discounting",
+            "tree",
             metrics,
             None,
             None,
@@ -1332,7 +1319,7 @@ mod tests {
             &inst,
             &market,
             "2024-01-01",
-            "discounting",
+            "tree",
             metrics,
             None,
             None,

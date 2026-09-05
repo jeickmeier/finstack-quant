@@ -106,7 +106,8 @@ fn test_very_high_coupon() {
 fn test_very_small_notional() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.notional = finstack_quant_core::money::Money::new(1.0, Currency::USD); // $1 notional
+    ilb.notional =
+        finstack_quant_core::money::Money::new(1.0, Currency::USD).expect("valid money fixture"); // $1 notional
 
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);
@@ -123,7 +124,8 @@ fn test_very_small_notional() {
 fn test_very_large_notional() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.notional = finstack_quant_core::money::Money::new(1_000_000_000_000.0, Currency::USD); // $1T
+    ilb.notional = finstack_quant_core::money::Money::new(1_000_000_000_000.0, Currency::USD)
+        .expect("valid money fixture"); // $1T
 
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);

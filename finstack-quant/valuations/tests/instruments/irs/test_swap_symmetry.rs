@@ -60,7 +60,7 @@ proptest! {
 
         let swap_pay = test_utils::usd_irs_swap(
             "PAY-FIXED",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             fixed_rate,
             start,
             end,
@@ -70,7 +70,7 @@ proptest! {
 
         let swap_rec = test_utils::usd_irs_swap(
             "RECEIVE-FIXED",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             fixed_rate,
             start,
             end,
@@ -111,7 +111,7 @@ proptest! {
         // First, find the par rate for this maturity
         let temp_swap = test_utils::usd_irs_swap(
             "PAR-FINDER",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             0.04, // temporary rate
             start,
             end,
@@ -130,7 +130,7 @@ proptest! {
         // Create swaps at par rate
         let swap_pay = test_utils::usd_irs_swap(
             "PAY-AT-PAR",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             par_rate,
             start,
             end,
@@ -140,7 +140,7 @@ proptest! {
 
         let swap_rec = test_utils::usd_irs_swap(
             "REC-AT-PAR",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             par_rate,
             start,
             end,
@@ -173,7 +173,7 @@ proptest! {
 
         let swap = test_utils::usd_irs_swap(
             "ANNUITY-TEST",
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             fixed_rate,
             start,
             end,

@@ -24,7 +24,7 @@
 //! use finstack_quant_core::types::{CurveId, Rate, Percentage};
 //!
 //! let curve_id = CurveId::from("USD-OIS");
-//! let rate = Rate::from_percent(5.0);
+//! let rate = Rate::from_percent(5.0).expect("valid rate fixture");
 //! let pct = Percentage::new(25.0).expect("finite percentage");
 //! assert_eq!(curve_id.as_str(), "USD-OIS");
 //! assert_eq!(rate.as_decimal(), 0.05);

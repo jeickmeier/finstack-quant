@@ -189,7 +189,7 @@ mod tests {
         let maturity = as_of + time::Duration::days(5 * 365);
         Bond::builder()
             .id("BULLET".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -208,7 +208,7 @@ mod tests {
         let call_date = as_of + time::Duration::days(2 * 365);
         let mut bond = Bond::builder()
             .id("CALLABLE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -293,7 +293,8 @@ mod tests {
             Ok(ValuationResult::stamped(
                 instrument.id(),
                 as_of,
-                Money::new(self.price(instrument, market, as_of), Currency::USD),
+                Money::new(self.price(instrument, market, as_of), Currency::USD)
+                    .expect("valid money fixture"),
             ))
         }
 
@@ -330,7 +331,7 @@ mod tests {
         let call_date = as_of + time::Duration::days(2 * 365);
         let mut bond = Bond::builder()
             .id("CALLABLE-QUOTED-LAG".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -423,7 +424,7 @@ mod tests {
         let call_date = as_of + time::Duration::days(2 * 365);
         let mut bond = Bond::builder()
             .id("CALLABLE-OAS-LAG".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -503,7 +504,7 @@ mod tests {
         overrides.model_config.hazard_volatility = Some(0.01);
         let mut bond = Bond::builder()
             .id("CALLABLE-OAS-AFTER-FINAL-CASH".into())
-            .notional(Money::new(1_000.0, Currency::USD))
+            .notional(Money::from((1_000_i64, Currency::USD)))
             .issue_date(as_of - time::Duration::days(365))
             .maturity(maturity)
             .cashflow_spec(
@@ -662,7 +663,7 @@ mod tests {
             Arc::new(bond.clone()),
             Arc::new(market),
             as_of,
-            Money::new(900.0, Currency::USD),
+            Money::from((900_i64, Currency::USD)),
             MetricContext::default_config(),
         );
         context.set_pricer_dispatch(PricingDispatch::registered(

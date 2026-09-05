@@ -116,7 +116,8 @@ fn test_coupon_amounts_reflect_inflation_adjustment() {
     ilb.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
     ilb.real_coupon = rust_decimal::Decimal::try_from(0.01).expect("valid decimal"); // 1% real coupon
     ilb.frequency = Tenor::annual();
     ilb.issue_date = d(2024, 1, 1);
@@ -168,7 +169,8 @@ fn test_principal_repayment_inflation_adjusted() {
     ilb.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2026, 1, 2);
 

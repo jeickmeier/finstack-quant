@@ -166,17 +166,22 @@ impl Payoff for SnowballPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: finstack_quant_core::currency::Currency) -> Money {
-        let mut pv = self.discounted_pv;
-        if self.pathwise {
-            // The maturity settlement event flushes all pending cashflows;
-            // discount any defensive remainder with the last observed bank
-            // factor rather than dropping it.
-            pv += self.pending / self.last_bank;
-        } else if let Some(final_event) = self.events.last() {
-            pv += self.notional * final_event.discount_factor;
-        }
-        Money::new(pv, currency)
+    fn value(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let mut pv = self.discounted_pv;
+            if self.pathwise {
+                // The maturity settlement event flushes all pending cashflows;
+                // discount any defensive remainder with the last observed bank
+                // factor rather than dropping it.
+                pv += self.pending / self.last_bank;
+            } else if let Some(final_event) = self.events.last() {
+                pv += self.notional * final_event.discount_factor;
+            }
+            Money::new(pv, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -223,7 +228,7 @@ impl SnowballDiscountingPricer {
             finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
         })?;
         if as_of >= final_coupon_date {
-            return Ok(Money::new(0.0, inst.notional.currency()));
+            return Ok(Money::from((0_i64, inst.notional.currency())));
         }
         if as_of > first_coupon_date {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -245,7 +250,7 @@ impl SnowballDiscountingPricer {
         )?;
         let events = coupon_events(inst, market, as_of, &term_forward, 0.0)?;
         if events.is_empty() {
-            return Ok(Money::new(0.0, inst.notional.currency()));
+            return Ok(Money::from((0_i64, inst.notional.currency())));
         }
 
         let mut pv = 0.0;
@@ -279,7 +284,7 @@ impl SnowballDiscountingPricer {
         })?;
         let redemption_df = relative_df_discount_curve(discount_curve.as_ref(), as_of, maturity)?;
         pv += inst.notional.amount() * redemption_df;
-        Ok(Money::new(pv, inst.notional.currency()))
+        Money::new(pv, inst.notional.currency())
     }
 }
 
@@ -396,7 +401,7 @@ impl SnowballHw1fMcPricer {
             finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
         })?;
         if as_of >= final_coupon_date {
-            let zero = Money::new(0.0, inst.notional.currency());
+            let zero = Money::from((0_i64, inst.notional.currency()));
             return Ok(MoneyEstimate {
                 mean: zero,
                 stderr: 0.0,
@@ -439,7 +444,7 @@ impl SnowballHw1fMcPricer {
 
         let events = coupon_events(inst, market, as_of, &term_forward, r0)?;
         if events.is_empty() {
-            let zero = Money::new(0.0, inst.notional.currency());
+            let zero = Money::from((0_i64, inst.notional.currency()));
             return Ok(MoneyEstimate {
                 mean: zero,
                 stderr: 0.0,
@@ -470,12 +475,12 @@ impl SnowballHw1fMcPricer {
         // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
         // component. Settle the (fully seasoned) schedule directly.
         if event_times.is_empty() {
-            return Ok(deterministic_estimate(
+            return deterministic_estimate(
                 spec,
                 inst.notional,
                 &events,
                 config.effective_path_count(),
-            ));
+            );
         }
 
         // Final settlement event at maturity (the last payment date): coupons
@@ -729,23 +734,25 @@ fn deterministic_estimate(
     notional: Money,
     events: &[CouponEvent],
     num_paths: usize,
-) -> MoneyEstimate {
-    let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
-    payoff.settle_seasoned_prefix();
-    let pv = payoff.value(notional.currency());
-    MoneyEstimate {
-        mean: pv,
-        stderr: 0.0,
-        ci_95: (pv, pv),
-        num_paths,
-        num_simulated_paths: num_paths,
-        std_dev: Some(0.0),
-        median: None,
-        percentile_25: None,
-        percentile_75: None,
-        min: Some(pv.amount()),
-        max: Some(pv.amount()),
-    }
+) -> finstack_quant_core::Result<MoneyEstimate> {
+    Ok({
+        let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
+        payoff.settle_seasoned_prefix();
+        let pv = payoff.value(notional.currency())?;
+        MoneyEstimate {
+            mean: pv,
+            stderr: 0.0,
+            ci_95: (pv, pv),
+            num_paths,
+            num_simulated_paths: num_paths,
+            std_dev: Some(0.0),
+            median: None,
+            percentile_25: None,
+            percentile_75: None,
+            min: Some(pv.amount()),
+            max: Some(pv.amount()),
+        }
+    })
 }
 
 #[cfg(test)]
@@ -772,7 +779,7 @@ mod tests {
             leverage: 1.0,
             coupon_floor: 0.0,
             coupon_cap: None,
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             coupon_dates: vec![
                 date(2025, Month::January, 1),
                 date(2025, Month::July, 1),

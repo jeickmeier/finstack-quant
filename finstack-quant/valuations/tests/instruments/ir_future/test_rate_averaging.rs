@@ -32,7 +32,7 @@ fn overnight_future(
 ) -> InterestRateFuture {
     InterestRateFuture::builder()
         .id(id.into())
-        .notional(Money::new(1_000_000.0, currency))
+        .notional(Money::new(1_000_000.0, currency).expect("valid money fixture"))
         .expiry(end)
         .fixing_date(end)
         .period_start(start)

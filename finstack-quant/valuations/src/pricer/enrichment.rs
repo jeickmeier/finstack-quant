@@ -195,7 +195,7 @@ mod tests {
             Ok(ValuationResult::stamped(
                 instrument.id(),
                 as_of,
-                Money::new(321.0, Currency::USD),
+                Money::from((321_i64, Currency::USD)),
             ))
         }
     }
@@ -213,8 +213,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = Bond::fixed(
             "SPREAD-DISPATCH",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.04),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
             date!(2020 - 01 - 15),
             date!(2030 - 01 - 15),
             StubKind::ShortFront,

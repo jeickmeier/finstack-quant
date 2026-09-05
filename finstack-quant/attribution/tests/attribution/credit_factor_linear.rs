@@ -122,13 +122,13 @@ fn make_model() -> CreditFactorModel {
 #[test]
 fn metrics_based_no_model_matches_existing_credit_total() {
     let mut attribution = PnlAttribution::new(
-        Money::new(1_000.0, Currency::USD),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
         "NO-MODEL",
         create_date(2025, Month::January, 15).unwrap(),
         create_date(2025, Month::January, 16).unwrap(),
         AttributionMethod::MetricsBased,
     );
-    attribution.credit_curves_pnl = Money::new(-250.5, Currency::USD);
+    attribution.credit_curves_pnl = Money::new(-250.5, Currency::USD).expect("valid money fixture");
     let json = serde_json::to_string(&attribution).expect("serialize attribution");
     let parsed: PnlAttribution = serde_json::from_str(&json).expect("deserialize attribution");
     assert!(parsed.credit_factor_detail.is_none());
@@ -153,8 +153,8 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
     // Build a fixed-rate bond that has a credit curve dependency.
     let mut bond = Bond::fixed(
         "BOND-ISSUER-A",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05_f64),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05_f64).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -325,8 +325,8 @@ fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
 
     let mut bond = Bond::fixed(
         "BOND-ISSUER-A",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05_f64),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05_f64).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,

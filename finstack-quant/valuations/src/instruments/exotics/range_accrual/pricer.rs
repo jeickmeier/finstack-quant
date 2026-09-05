@@ -136,7 +136,7 @@ impl RangeAccrualMcPricer {
             .payment_date
             .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
         if final_date <= as_of {
-            return Ok(Money::new(0.0, inst.notional.currency()));
+            return Ok(Money::from((0_i64, inst.notional.currency())));
         }
         inst.validate()?;
         if inst.rate_index_id.is_some() {
@@ -287,7 +287,7 @@ fn compute_known_value(
             let discount_factor = curves
                 .get_discount(inst.discount_curve_id.as_str())?
                 .df_between_dates(as_of, payment_date)?;
-            Ok(Money::new(fv * discount_factor, inst.notional.currency()))
+            Ok(Money::new(fv * discount_factor, inst.notional.currency())?)
         }
         _ => Err(finstack_quant_core::Error::Validation(format!(
             "RangeAccrual '{}' is fully observed but historical fixing counts are missing or invalid",
@@ -384,7 +384,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         .payment_date
         .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
     if final_date <= as_of {
-        return Ok(Money::new(0.0, inst.notional.currency()));
+        return Ok(Money::from((0_i64, inst.notional.currency())));
     }
     inst.validate()?;
     validate_historical_observations(inst, as_of)?;
@@ -432,7 +432,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     // Count observations and track past/future split
     let n_total_obs = inst.observation_dates.len();
     if n_total_obs == 0 {
-        return Ok(Money::new(0.0, inst.notional.currency()));
+        return Ok(Money::from((0_i64, inst.notional.currency())));
     }
 
     // Count future observations
@@ -539,7 +539,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     // Total observations across full life of instrument
     let total_obs_count = total_past_obs + future_obs_count;
     if total_obs_count == 0 {
-        return Ok(Money::new(0.0, inst.notional.currency()));
+        return Ok(Money::from((0_i64, inst.notional.currency())));
     }
 
     // Expected total days in range = known past + expected future
@@ -555,7 +555,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         * expected_fraction;
     let pv = fv * discount_factor;
 
-    Ok(Money::new(pv, inst.notional.currency()))
+    Money::new(pv, inst.notional.currency())
 }
 
 #[cfg(test)]
@@ -695,7 +695,7 @@ mod tests {
             .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
         let price_div_market = market(as_of).insert_price(
             "SPX-DIV",
-            MarketScalar::Price(Money::new(2.0, Currency::USD)),
+            MarketScalar::Price(Money::from((2_i64, Currency::USD))),
         );
 
         assert!(npv_analytic(&inst, &no_div_market, as_of).is_err());
@@ -791,10 +791,13 @@ mod tests {
         let mut rate_linked = RangeAccrual::example();
         rate_linked.rate_index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
         rate_linked.projection_curve_id = Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));
-        rate_linked.reference_tenor = Some(finstack_quant_core::dates::Tenor::new(
-            3,
-            finstack_quant_core::dates::TenorUnit::Months,
-        ));
+        rate_linked.reference_tenor = Some(
+            finstack_quant_core::dates::Tenor::new(
+                3,
+                finstack_quant_core::dates::TenorUnit::Months,
+            )
+            .expect("valid tenor fixture"),
+        );
 
         let direct = rate_linked
             .value(&market(as_of), as_of)

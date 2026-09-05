@@ -15,7 +15,7 @@ fn test_overnight_repo_factory() {
 
     let repo = Repo::overnight(
         "REPO_ON_001",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         start_date,
@@ -44,7 +44,7 @@ fn test_term_repo_factory() {
 
     let repo = Repo::term(
         "REPO_TERM_001",
-        Money::new(2_000_000.0, Currency::USD),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.045,
         start_date,
@@ -72,7 +72,7 @@ fn test_open_repo_factory() {
 
     let repo = Repo::open(
         "REPO_OPEN_001",
-        Money::new(1_500_000.0, Currency::USD),
+        Money::new(1_500_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         start_date,
@@ -92,7 +92,7 @@ fn test_builder_with_all_fields() {
 
     let repo = RepoBuilder::new()
         .id("REPO_FULL".into())
-        .cash_amount(Money::new(5_000_000.0, Currency::USD))
+        .cash_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.055).expect("valid decimal"))
         .start_date(date(2025, 1, 10))
@@ -138,7 +138,7 @@ fn test_builder_minimal_fields() {
 
     let repo = RepoBuilder::new()
         .id("MINIMAL".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -164,7 +164,7 @@ fn test_builder_minimal_fields() {
 fn test_builder_missing_required_field_fails() {
     let result = RepoBuilder::new()
         .id("INCOMPLETE".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         // Missing collateral, rate, dates, etc.
         .build();
 
@@ -177,7 +177,7 @@ fn test_validation_maturity_before_start() {
 
     let result = RepoBuilder::new()
         .id("INVALID_DATES".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 4, 15))
@@ -195,7 +195,7 @@ fn test_validation_same_day_maturity() {
 
     let result = RepoBuilder::new()
         .id("SAME_DAY".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(same_date)
@@ -212,7 +212,7 @@ fn test_validation_negative_rate() {
 
     let result = RepoBuilder::new()
         .id("NEGATIVE_RATE".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(-0.01).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -229,7 +229,7 @@ fn test_validation_negative_haircut() {
 
     let result = RepoBuilder::new()
         .id("NEGATIVE_HAIRCUT".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -247,7 +247,7 @@ fn test_validation_zero_or_negative_cash() {
 
     let result = RepoBuilder::new()
         .id("ZERO_CASH".into())
-        .cash_amount(Money::new(0.0, Currency::USD))
+        .cash_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -267,7 +267,7 @@ fn test_overnight_repo_business_day_adjustment() {
 
     let repo = Repo::overnight(
         "REPO_WEEKEND",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         friday,
@@ -313,7 +313,7 @@ fn test_attributes_tagging() {
 
     let repo = RepoBuilder::new()
         .id("TAGGED".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))

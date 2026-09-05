@@ -398,7 +398,7 @@ mod tests {
     fn ytm_solves_for_an_act_act_icma_bond_settling_off_a_coupon_date() {
         // Semi-annual Jan/Jul coupons; settlement deliberately mid-period.
         let as_of = Date::from_calendar_date(2025, Month::March, 17).expect("valid date");
-        let notional = Money::new(1000.0, Currency::USD);
+        let notional = Money::from((1000_i64, Currency::USD));
         let coupon_rate = 0.0425;
         let mut cashflows = vec![];
         for (year, month) in [
@@ -409,12 +409,12 @@ mod tests {
         ] {
             cashflows.push((
                 Date::from_calendar_date(year, month, 15).expect("valid date"),
-                Money::new(21.25, Currency::USD),
+                Money::new(21.25, Currency::USD).expect("valid money fixture"),
             ));
         }
         cashflows.push((
             Date::from_calendar_date(2027, Month::July, 15).expect("valid date"),
-            Money::new(1021.25, Currency::USD),
+            Money::new(1021.25, Currency::USD).expect("valid money fixture"),
         ));
 
         let ytm = solve_ytm(
@@ -441,16 +441,16 @@ mod tests {
     fn test_ytm_solver_par_bond() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let _maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
-        let notional = Money::new(1000.0, Currency::USD);
+        let notional = Money::from((1000_i64, Currency::USD));
         let coupon_rate = 0.05;
         let mut cashflows = vec![];
         for year in 1..=5 {
             let date =
                 Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
             if year < 5 {
-                cashflows.push((date, Money::new(50.0, Currency::USD)));
+                cashflows.push((date, Money::from((50_i64, Currency::USD))));
             } else {
-                cashflows.push((date, Money::new(1050.0, Currency::USD)));
+                cashflows.push((date, Money::from((1050_i64, Currency::USD))));
             }
         }
         let solver = YtmSolver::new();
@@ -484,9 +484,12 @@ mod tests {
             let date =
                 Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
             let amt = if year < 5 { 50.0 } else { 1050.0 };
-            cashflows.push((date, Money::new(amt, Currency::USD)));
+            cashflows.push((
+                date,
+                Money::new(amt, Currency::USD).expect("valid money fixture"),
+            ));
         }
-        let notional = Money::new(1000.0, Currency::USD);
+        let notional = Money::from((1000_i64, Currency::USD));
 
         // A target far above the largest attainable price: the sum of the
         // undiscounted cashflows is 1250, so a $5,000,000 target can only be
@@ -495,7 +498,7 @@ mod tests {
         let result = solver.solve(
             &cashflows,
             as_of,
-            Money::new(5_000_000.0, Currency::USD),
+            Money::from((5_000_000_i64, Currency::USD)),
             YtmPricingSpec {
                 day_count: DayCount::Act365F,
                 notional,
@@ -524,9 +527,12 @@ mod tests {
             let date =
                 Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
             let amt = if year < 5 { 50.0 } else { 1050.0 };
-            cashflows.push((date, Money::new(amt, Currency::USD)));
+            cashflows.push((
+                date,
+                Money::new(amt, Currency::USD).expect("valid money fixture"),
+            ));
         }
-        let notional = Money::new(1000.0, Currency::USD);
+        let notional = Money::from((1000_i64, Currency::USD));
 
         // One iteration is far too few for Brent to reach a 1e-15 residual.
         let solver = YtmSolver::with_config(YtmSolverConfig {
@@ -537,7 +543,7 @@ mod tests {
         let result = solver.solve(
             &cashflows,
             as_of,
-            Money::new(950.0, Currency::USD),
+            Money::from((950_i64, Currency::USD)),
             YtmPricingSpec {
                 day_count: DayCount::Act365F,
                 notional,
@@ -563,8 +569,8 @@ mod tests {
     fn test_zcb_ytm_honors_street_compounding() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
-        let cashflows = vec![(maturity, Money::new(1000.0, Currency::USD))];
-        let target_price = Money::new(900.0, Currency::USD);
+        let cashflows = vec![(maturity, Money::from((1000_i64, Currency::USD)))];
+        let target_price = Money::from((900_i64, Currency::USD));
         let solver = YtmSolver::new();
 
         let ytm = solver
@@ -574,7 +580,7 @@ mod tests {
                 target_price,
                 YtmPricingSpec {
                     day_count: DayCount::Act365F,
-                    notional: Money::new(1000.0, Currency::USD),
+                    notional: Money::from((1000_i64, Currency::USD)),
                     coupon_rate: 0.0,
                     compounding: YieldCompounding::Street,
                     frequency: Tenor::semi_annual(),
@@ -592,8 +598,8 @@ mod tests {
     fn test_zcb_ytm_honors_moosmuller_simple_first_period() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
-        let cashflows = vec![(maturity, Money::new(1000.0, Currency::USD))];
-        let target_price = Money::new(900.0, Currency::USD);
+        let cashflows = vec![(maturity, Money::from((1000_i64, Currency::USD)))];
+        let target_price = Money::from((900_i64, Currency::USD));
         let solver = YtmSolver::new();
 
         let ytm = solver
@@ -603,7 +609,7 @@ mod tests {
                 target_price,
                 YtmPricingSpec {
                     day_count: DayCount::Act365F,
-                    notional: Money::new(1000.0, Currency::USD),
+                    notional: Money::from((1000_i64, Currency::USD)),
                     coupon_rate: 0.0,
                     compounding: YieldCompounding::Moosmuller,
                     frequency: Tenor::annual(),

@@ -199,7 +199,7 @@ fn build_fx_call_option(expiry: Date, strike: f64, notional: f64) -> FxOption {
         )
         .expiry(expiry)
         .day_count(DayCount::Act365F)
-        .notional(Money::new(notional, Currency::EUR))
+        .notional(Money::new(notional, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))

@@ -261,7 +261,7 @@ impl TestOptionBuilder {
             option_type: self.option_type,
             exercise_style: self.exercise_style,
             expiry: self.expiry,
-            notional: Money::new(self.notional_amount, self.currency),
+            notional: Money::new(self.notional_amount, self.currency).expect("valid money fixture"),
             day_count: self.day_count,
             theta_day_basis: Default::default(),
             settlement: self.settlement,

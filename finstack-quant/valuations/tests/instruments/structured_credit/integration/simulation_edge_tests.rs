@@ -39,7 +39,7 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         asset_type: AssetType::FirstLienLoan {
             industry: Some("Test".to_string()),
         },
-        balance: Money::new(balance, Currency::USD),
+        balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
         rate,
         spread_bp: None,
         index_id: None,
@@ -66,7 +66,7 @@ fn single_tranche_high_coupon(balance: f64) -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.20 }, // 20% -- binds against pool
         legal_maturity(),
     )
@@ -82,7 +82,7 @@ fn single_tranche(balance: f64) -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         legal_maturity(),
     )

@@ -497,7 +497,7 @@ mod tests {
         let quote = MarketQuote::Rates(crate::quotes::rates::RateQuote::Deposit {
             id: QuoteId::new("DEP-1M"),
             index: IndexId::new("USD-SOFR"),
-            pillar: Pillar::Tenor(Tenor::new(1, TenorUnit::Months)),
+            pillar: Pillar::Tenor(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),
             rate: 0.05,
         });
         let quotes = vec![quote];

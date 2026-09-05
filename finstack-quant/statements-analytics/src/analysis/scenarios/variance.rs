@@ -35,7 +35,7 @@
 //!     "management_case",
 //!     "bank_case",
 //!     vec!["revenue", "ebitda"],
-//!     vec![PeriodId::quarter(2025, 1)],
+//!     vec![PeriodId::quarter(2025, 1).expect("valid period fixture")],
 //! );
 //!
 //! let report = analyzer.compute(&config)?;
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn baseline_vs_baseline_yields_zero_variance() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let baseline =
             make_results(&[("revenue", period, 100_000.0), ("ebitda", period, 60_000.0)]);
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn handles_negative_variance_and_pct() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let baseline = make_results(&[("revenue", period, 100.0)]);
         let comparison = make_results(&[("revenue", period, 95.0)]);
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn pct_variance_is_none_when_baseline_is_zero() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let baseline = make_results(&[("revenue", period, 0.0)]);
         let comparison = make_results(&[("revenue", period, 10.0)]);
@@ -533,7 +533,7 @@ mod tests {
 
     #[test]
     fn bridge_decomposition_reports_unexplained_residual() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let baseline = make_results(&[
             ("ebitda", period, 100.0),
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn bridge_decomposition_produces_expected_contributions() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let baseline = make_results(&[
             ("ebitda", period, 100.0),

@@ -40,8 +40,8 @@ fn build_hazard_curve(id: &str, as_of: Date, hazard_rate: f64) -> HazardCurve {
 fn build_test_bond(as_of: Date) -> Bond {
     let mut bond = Bond::fixed(
         "CROSS-GAMMA-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

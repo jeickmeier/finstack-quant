@@ -231,8 +231,10 @@ impl Payoff for IndexedSpotCall {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        Money::new((self.last - self.strike).max(0.0), currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            Money::new((self.last - self.strike).max(0.0), currency).expect("valid money fixture")
+        })
     }
 
     fn reset(&mut self) {

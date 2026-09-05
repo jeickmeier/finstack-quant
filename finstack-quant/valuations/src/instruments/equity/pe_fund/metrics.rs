@@ -51,7 +51,7 @@ impl MetricCalculator for LpIrrCalculator {
         let ledger = pe.run_waterfall()?;
 
         let mut flows: Vec<(Date, Money)> = ledger
-            .lp_cashflows()
+            .lp_cashflows()?
             .into_iter()
             .filter(|(d, _)| *d <= context.as_of)
             .collect();
@@ -282,11 +282,11 @@ mod tests {
         let flows = vec![
             (
                 test_date(2020, 1, 1),
-                Money::new(-1000000.0, test_currency()),
+                Money::from((-1000000_i64, test_currency())),
             ), // Contribution
             (
                 test_date(2025, 1, 1),
-                Money::new(2000000.0, test_currency()),
+                Money::from((2000000_i64, test_currency())),
             ), // Distribution
         ];
 
@@ -319,8 +319,14 @@ mod tests {
         let start = test_date(2020, 1, 1);
         let end = test_date(2026, 1, 1);
         let flows = vec![
-            (start, Money::new(-contribution, test_currency())),
-            (end, Money::new(distribution, test_currency())),
+            (
+                start,
+                Money::new(-contribution, test_currency()).expect("valid money fixture"),
+            ),
+            (
+                end,
+                Money::new(distribution, test_currency()).expect("valid money fixture"),
+            ),
         ];
 
         let irr = calculate_irr(&flows, DayCount::Act365F).expect("IRR should solve");
@@ -366,11 +372,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 1, 1),
-                Money::new(2000000.0, test_currency()),
+                Money::from((2000000_i64, test_currency())),
             ),
         ];
 
@@ -379,7 +385,7 @@ mod tests {
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // Fully realized fund: holder-view residual value is ~0, so the net
         // LP MOIC is realized distributions / paid-in = 2x.
-        let base_value = Money::new(0.0, test_currency());
+        let base_value = Money::from((0_i64, test_currency()));
         let mut context = MetricContext::new(
             std::sync::Arc::new(pe),
             std::sync::Arc::new(curves),
@@ -395,7 +401,7 @@ mod tests {
 
         // With residual value, MOIC includes it (net LP MOIC == TVPI):
         // (2.0M realized + 0.5M residual) / 1.0M paid-in = 2.5x.
-        context.set_base_value(Money::new(500_000.0, test_currency()));
+        context.set_base_value(Money::from((500_000_i64, test_currency())));
         let moic_with_residual = MoicLpCalculator
             .calculate(&mut context)
             .expect("should succeed");
@@ -420,11 +426,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 1, 1),
-                Money::new(2000000.0, test_currency()),
+                Money::from((2000000_i64, test_currency())),
             ),
         ];
 
@@ -432,7 +438,7 @@ mod tests {
 
         let curves = finstack_quant_core::market_data::context::MarketContext::new();
         // base_value ≈ 0 for a fully realized fund under holder-view PV.
-        let base_value = Money::new(0.0, test_currency());
+        let base_value = Money::from((0_i64, test_currency()));
         let mut context = MetricContext::new(
             std::sync::Arc::new(pe),
             std::sync::Arc::new(curves),

@@ -24,7 +24,7 @@ fn build_yoy(side: PayReceive, fixed_rate: f64, notional: f64) -> YoYInflationSw
     let maturity = Date::from_calendar_date(2030, Month::January, 15).unwrap();
     YoYInflationSwap::builder()
         .id(InstrumentId::new("YOY-TEST"))
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(start)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(fixed_rate).expect("valid decimal"))

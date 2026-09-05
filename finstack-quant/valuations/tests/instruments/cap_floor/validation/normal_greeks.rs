@@ -61,7 +61,7 @@ fn create_normal_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_NORMAL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -91,7 +91,7 @@ fn create_normal_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "FLOOR_NORMAL".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -248,7 +248,7 @@ fn normal_delta_matches_finite_difference() {
     let caplet = CapFloor {
         id: "CAPLET_NORMAL_FD".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -319,7 +319,7 @@ fn normal_vega_matches_finite_difference() {
     let caplet = CapFloor {
         id: "CAPLET_NORMAL_VEGA_FD".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -403,7 +403,7 @@ fn normal_greeks_with_negative_forward() {
     let cap = CapFloor {
         id: "CAP_NEG_FWD".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.0).expect("valid decimal"),
         start_date: start,
         maturity: end,

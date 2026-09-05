@@ -132,7 +132,7 @@ fn execute_waterfall_core(
     mut workspace: Option<&mut WaterfallWorkspace>,
 ) -> Result<WaterfallDistribution> {
     let mut remaining = context.available_cash;
-    let mut total_diverted = Money::new(0.0, waterfall.base_currency);
+    let mut total_diverted = Money::from((0_i64, waterfall.base_currency));
     let mut had_diversions = false;
     let mut diversion_reason = None;
 
@@ -225,7 +225,7 @@ fn execute_waterfall_core(
                 }
             }
         }
-        Money::new(binding_cure, waterfall.base_currency)
+        Money::new(binding_cure, waterfall.base_currency)?
     };
     if diversion_active {
         had_diversions = true;
@@ -293,7 +293,7 @@ fn execute_waterfall_core(
         // cash to cure the OC/IC breach, not the entire tier's allocation.
         let effective_remaining = if tier_diverted && cure_remaining.amount() > 0.0 {
             let capped = remaining.amount().min(cure_remaining.amount());
-            Money::new(capped, waterfall.base_currency)
+            Money::new(capped, waterfall.base_currency)?
         } else {
             remaining
         };
@@ -328,7 +328,7 @@ fn execute_waterfall_core(
             total_diverted = total_diverted.checked_add(tier_cash)?;
             cure_remaining = cure_remaining
                 .checked_sub(tier_cash)
-                .unwrap_or(Money::new(0.0, waterfall.base_currency));
+                .unwrap_or(Money::from((0_i64, waterfall.base_currency)));
 
             // A partial diversion redirects only the cure amount; remaining
             // cash still belongs to the divertible tier's own recipients.
@@ -522,7 +522,7 @@ fn allocate_sequential(
     principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
     let base_currency = ctx.base_currency;
-    let mut tier_total = Money::new(0.0, base_currency);
+    let mut tier_total = Money::from((0_i64, base_currency));
 
     for recipient in recipients {
         if available.amount() <= 0.0 {
@@ -563,7 +563,7 @@ fn allocate_sequential(
 
         let shortfall = requested
             .checked_sub(paid)
-            .unwrap_or(Money::new(0.0, base_currency));
+            .unwrap_or(Money::from((0_i64, base_currency)));
 
         use std::collections::hash_map::Entry;
         match output.distributions.entry(recipient.recipient_type.clone()) {
@@ -653,10 +653,10 @@ fn allocate_pro_rata(
 ) -> Result<Money> {
     let base_currency = ctx.base_currency;
     if recipients.is_empty() {
-        return Ok(Money::new(0.0, base_currency));
+        return Ok(Money::from((0_i64, base_currency)));
     }
 
-    let mut total_requested = Money::new(0.0, base_currency);
+    let mut total_requested = Money::from((0_i64, base_currency));
     let mut recipient_requests = Vec::with_capacity(recipients.len());
 
     for recipient in recipients {
@@ -712,10 +712,10 @@ fn allocate_pro_rata(
 
     let final_units = water_fill_allocation(tier_available_units, &weights, &caps);
 
-    let mut tier_total = Money::new(0.0, base_currency);
+    let mut tier_total = Money::from((0_i64, base_currency));
 
     for (idx, (recipient, requested)) in recipient_requests.iter().enumerate() {
-        let allocated = Money::new(final_units[idx] as f64 / scale, base_currency);
+        let allocated = Money::new(final_units[idx] as f64 / scale, base_currency)?;
 
         // `water_fill_allocation` never allocates above a recipient's cap
         // (`requested`); the `min` is retained as a defensive floor.
@@ -734,7 +734,7 @@ fn allocate_pro_rata(
 
         let shortfall = requested
             .checked_sub(paid)
-            .unwrap_or(Money::new(0.0, base_currency));
+            .unwrap_or(Money::from((0_i64, base_currency)));
 
         use std::collections::hash_map::Entry;
         match output.distributions.entry(recipient.recipient_type.clone()) {
@@ -1072,7 +1072,7 @@ pub(crate) fn senior_fee_accrual(
     inputs: SeniorFeeInputs<'_>,
 ) -> Result<Money> {
     let empty_in_period: HashMap<String, Money> = HashMap::default();
-    let mut total = Money::new(0.0, waterfall.base_currency);
+    let mut total = Money::from((0_i64, waterfall.base_currency));
     for tier in waterfall
         .tiers
         .iter()
@@ -1239,7 +1239,7 @@ fn record_in_period_principal(
     if let PaymentCalculation::TranchePrincipal { tranche_id, .. } = calculation {
         let entry = principal_paid_in_period
             .entry(tranche_id.clone())
-            .or_insert(Money::new(0.0, base_currency));
+            .or_insert(Money::from((0_i64, base_currency)));
         *entry = entry.checked_add(paid)?;
     }
     Ok(())
@@ -1394,9 +1394,9 @@ fn calculate_payment_amount(
             // scheduled target (toward zero) to de-leverage the structure;
             // the scheduled target only applies to the tier's regular pass.
             let target = if diverted {
-                Money::new(0.0, base_currency)
+                Money::from((0_i64, base_currency))
             } else {
-                target_balance.unwrap_or(Money::new(0.0, base_currency))
+                target_balance.unwrap_or(Money::from((0_i64, base_currency)))
             };
             let needed = (current.amount() - paid_this_period - target.amount()).max(0.0);
             (needed, *rounding)
@@ -1409,7 +1409,7 @@ fn calculate_payment_amount(
             // dynamically from SimulationState, not stored in the waterfall definition.
             let shortfall = target_balance
                 .checked_sub(reserve_balance)
-                .unwrap_or(Money::new(0.0, base_currency));
+                .unwrap_or(Money::from((0_i64, base_currency)));
             (shortfall.amount().max(0.0).min(available.amount()), None)
         }
     };
@@ -1424,9 +1424,9 @@ fn calculate_payment_amount(
             RoundingConvention::Floor => (val * scale).floor() / scale,
             RoundingConvention::Ceiling => (val * scale).ceil() / scale,
         };
-        Ok(Money::new(rounded_val, base_currency))
+        Ok(Money::new(rounded_val, base_currency)?)
     } else {
-        Ok(Money::new(raw_amount, base_currency))
+        Ok(Money::new(raw_amount, base_currency)?)
     }
 }
 
@@ -1448,7 +1448,7 @@ mod market_standards_tests {
 
         let _start = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid date");
         let _end = Date::from_calendar_date(2025, time::Month::April, 1).expect("Valid date"); // 3 months
-        let _pool_bal = Money::new(1_000_000.0, Currency::USD);
+        let _pool_bal = Money::from((1_000_000_i64, Currency::USD));
 
         // 30/360: 3 full months = 90 days. 90/360 = 0.25
         // Fee = 1M * 1% * 0.25 = 2500
@@ -1514,7 +1514,7 @@ mod ic_diversion_tests {
                 asset_type: AssetType::FirstLienLoan {
                     industry: Some("Technology".into()),
                 },
-                balance: Money::new(500_000_000.0, currency),
+                balance: Money::from((500_000_000_i64, currency)),
                 rate: 0.08,
                 spread_bp: Some(400.0),
                 index_id: None,
@@ -1539,7 +1539,7 @@ mod ic_diversion_tests {
             0.0,
             76.9,
             TrancheSeniority::Senior,
-            Money::new(100_000_000.0, currency),
+            Money::from((100_000_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -1549,7 +1549,7 @@ mod ic_diversion_tests {
             76.9,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(30_000_000.0, currency),
+            Money::from((30_000_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.08 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -1572,7 +1572,7 @@ mod ic_diversion_tests {
                     .add_recipient(Recipient::tranche_principal(
                         "class_a_prin",
                         "CLASS_A",
-                        Some(Money::new(95_000_000.0, currency)),
+                        Some(Money::from((95_000_000_i64, currency))),
                     )),
             )
             // Junior principal tier (CLASS_B) — divertible: on a coverage
@@ -1614,20 +1614,20 @@ mod ic_diversion_tests {
         // Plenty of cash to distribute, but interest collections far below the
         // interest due on the tranches => IC test breaches.
         let context = WaterfallContext {
-            available_cash: Money::new(20_000_000.0, currency),
-            interest_collections: Money::new(100_000.0, currency),
-            principal_collections: Money::new(19_900_000.0, currency),
+            available_cash: Money::from((20_000_000_i64, currency)),
+            interest_collections: Money::from((100_000_i64, currency)),
+            principal_collections: Money::from((19_900_000_i64, currency)),
             payment_date,
             period_start,
             valuation_date: period_start,
-            pool_balance: Money::new(500_000_000.0, currency),
+            pool_balance: Money::from((500_000_000_i64, currency)),
             market: &market,
             tranche_balances: None,
             asset_balances: None,
             deferred_interest: None,
-            reserve_balance: Money::new(0.0, currency),
-            restricted_cash: Money::new(0.0, Currency::USD),
-            recovery_proceeds: Money::new(0.0, currency),
+            reserve_balance: Money::from((0_i64, currency)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
+            recovery_proceeds: Money::from((0_i64, currency)),
             floating_rate_shift: 0.0,
         };
 
@@ -1743,7 +1743,7 @@ mod ic_diversion_tests {
                 },
                 // Collateral deliberately below the tranche par stack so both
                 // OC ratios breach their triggers.
-                balance: Money::new(118_000_000.0, currency),
+                balance: Money::from((118_000_000_i64, currency)),
                 rate: 0.08,
                 spread_bp: Some(400.0),
                 index_id: None,
@@ -1767,7 +1767,7 @@ mod ic_diversion_tests {
             0.0,
             77.0,
             TrancheSeniority::Senior,
-            Money::new(100_000_000.0, currency),
+            Money::from((100_000_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -1777,7 +1777,7 @@ mod ic_diversion_tests {
             77.0,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(30_000_000.0, currency),
+            Money::from((30_000_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.08 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -1797,7 +1797,7 @@ mod ic_diversion_tests {
                     .add_recipient(Recipient::tranche_principal(
                         "class_a_prin",
                         "CLASS_A",
-                        Some(Money::new(99_000_000.0, currency)),
+                        Some(Money::from((99_000_000_i64, currency))),
                     )),
             )
             .add_tier(
@@ -1841,20 +1841,20 @@ mod ic_diversion_tests {
         let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
 
         let context = WaterfallContext {
-            available_cash: Money::new(40_000_000.0, currency),
-            interest_collections: Money::new(20_000_000.0, currency),
-            principal_collections: Money::new(20_000_000.0, currency),
+            available_cash: Money::from((40_000_000_i64, currency)),
+            interest_collections: Money::from((20_000_000_i64, currency)),
+            principal_collections: Money::from((20_000_000_i64, currency)),
             payment_date,
             period_start,
             valuation_date: period_start,
-            pool_balance: Money::new(118_000_000.0, currency),
+            pool_balance: Money::from((118_000_000_i64, currency)),
             market: &market,
             tranche_balances: None,
             asset_balances: None,
             deferred_interest: None,
-            reserve_balance: Money::new(0.0, currency),
-            restricted_cash: Money::new(0.0, Currency::USD),
-            recovery_proceeds: Money::new(0.0, currency),
+            reserve_balance: Money::from((0_i64, currency)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
+            recovery_proceeds: Money::from((0_i64, currency)),
             floating_rate_shift: 0.0,
         };
 
@@ -1927,7 +1927,7 @@ mod ic_diversion_tests {
                 },
                 // Collateral below the tranche stack so the OC test breaches
                 // and the junior tier diverts to the senior principal tier.
-                balance: Money::new(20_000_000.0, currency),
+                balance: Money::from((20_000_000_i64, currency)),
                 rate: 0.08,
                 spread_bp: Some(400.0),
                 index_id: None,
@@ -1953,7 +1953,7 @@ mod ic_diversion_tests {
             0.0,
             10.0,
             TrancheSeniority::Senior,
-            Money::new(class_a_balance, currency),
+            Money::new(class_a_balance, currency).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -1963,7 +1963,7 @@ mod ic_diversion_tests {
             10.0,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(27_000_000.0, currency),
+            Money::from((27_000_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.08 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         )
@@ -2019,20 +2019,20 @@ mod ic_diversion_tests {
         let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
 
         let context = WaterfallContext {
-            available_cash: Money::new(10_000_000.0, currency),
-            interest_collections: Money::new(1_000_000.0, currency),
-            principal_collections: Money::new(9_000_000.0, currency),
+            available_cash: Money::from((10_000_000_i64, currency)),
+            interest_collections: Money::from((1_000_000_i64, currency)),
+            principal_collections: Money::from((9_000_000_i64, currency)),
             payment_date,
             period_start,
             valuation_date: period_start,
-            pool_balance: Money::new(20_000_000.0, currency),
+            pool_balance: Money::from((20_000_000_i64, currency)),
             market: &market,
             tranche_balances: None,
             asset_balances: None,
             deferred_interest: None,
-            reserve_balance: Money::new(0.0, currency),
-            restricted_cash: Money::new(0.0, Currency::USD),
-            recovery_proceeds: Money::new(0.0, currency),
+            reserve_balance: Money::from((0_i64, currency)),
+            restricted_cash: Money::from((0_i64, Currency::USD)),
+            recovery_proceeds: Money::from((0_i64, currency)),
             floating_rate_shift: 0.0,
         };
 
@@ -2070,7 +2070,7 @@ mod ic_diversion_tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, currency),
+            Money::from((100_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).expect("date"),
         )
@@ -2089,7 +2089,7 @@ mod ic_diversion_tests {
                         .add_recipient(Recipient::fixed_fee(
                             "junior_fee_recipient",
                             "junior_manager",
-                            Money::new(amount, currency),
+                            Money::new(amount, currency).expect("valid money fixture"),
                         )),
                 );
             }
@@ -2111,20 +2111,20 @@ mod ic_diversion_tests {
                 &tranches,
                 &pool,
                 WaterfallContext {
-                    available_cash: Money::new(2_000.0, currency),
-                    interest_collections: Money::new(2_000.0, currency),
-                    principal_collections: Money::new(0.0, currency),
+                    available_cash: Money::from((2_000_i64, currency)),
+                    interest_collections: Money::from((2_000_i64, currency)),
+                    principal_collections: Money::from((0_i64, currency)),
                     payment_date,
                     period_start,
                     valuation_date: period_start,
-                    pool_balance: Money::new(100_000.0, currency),
+                    pool_balance: Money::from((100_000_i64, currency)),
                     market: &market,
                     tranche_balances: None,
                     asset_balances: None,
                     deferred_interest: None,
-                    reserve_balance: Money::new(0.0, currency),
-                    restricted_cash: Money::new(0.0, Currency::USD),
-                    recovery_proceeds: Money::new(0.0, currency),
+                    reserve_balance: Money::from((0_i64, currency)),
+                    restricted_cash: Money::from((0_i64, Currency::USD)),
+                    recovery_proceeds: Money::from((0_i64, currency)),
                     floating_rate_shift: 0.0,
                 },
             )
@@ -2156,7 +2156,7 @@ mod ic_diversion_tests {
             0.0,
             50.0,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, currency),
+            Money::from((100_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.04 },
             maturity,
         )
@@ -2166,7 +2166,7 @@ mod ic_diversion_tests {
             50.0,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(100_000.0, currency),
+            Money::from((100_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.16 },
             maturity,
         )
@@ -2190,12 +2190,12 @@ mod ic_diversion_tests {
                     .add_recipient(Recipient::tranche_principal(
                         "b_principal",
                         "CLASS_B",
-                        Some(Money::new(100_000.0, currency)),
+                        Some(Money::from((100_000_i64, currency))),
                     ))
                     .add_recipient(Recipient::tranche_principal(
                         "a_principal",
                         "CLASS_A",
-                        Some(Money::new(100_000.0, currency)),
+                        Some(Money::from((100_000_i64, currency))),
                     )),
             )
             .add_coverage_trigger(CoverageTrigger {
@@ -2214,20 +2214,20 @@ mod ic_diversion_tests {
             &tranches,
             &pool,
             WaterfallContext {
-                available_cash: Money::new(104_500.0, currency),
-                interest_collections: Money::new(4_500.0, currency),
-                principal_collections: Money::new(100_000.0, currency),
+                available_cash: Money::from((104_500_i64, currency)),
+                interest_collections: Money::from((4_500_i64, currency)),
+                principal_collections: Money::from((100_000_i64, currency)),
                 payment_date,
                 period_start,
                 valuation_date: period_start,
-                pool_balance: Money::new(200_000.0, currency),
+                pool_balance: Money::from((200_000_i64, currency)),
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
                 deferred_interest: None,
-                reserve_balance: Money::new(0.0, currency),
-                restricted_cash: Money::new(0.0, Currency::USD),
-                recovery_proceeds: Money::new(0.0, currency),
+                reserve_balance: Money::from((0_i64, currency)),
+                restricted_cash: Money::from((0_i64, Currency::USD)),
+                recovery_proceeds: Money::from((0_i64, currency)),
                 floating_rate_shift: 0.0,
             },
         )
@@ -2261,7 +2261,7 @@ mod ic_diversion_tests {
             0.0,
             95.2,
             TrancheSeniority::Senior,
-            Money::new(100_000.0, currency),
+            Money::from((100_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.04 },
             maturity,
         )
@@ -2271,7 +2271,7 @@ mod ic_diversion_tests {
             95.2,
             100.0,
             TrancheSeniority::Subordinated,
-            Money::new(5_000.0, currency),
+            Money::from((5_000_i64, currency)),
             TrancheCoupon::Fixed { rate: 0.16 },
             maturity,
         )
@@ -2293,12 +2293,12 @@ mod ic_diversion_tests {
                     .add_recipient(Recipient::tranche_principal(
                         "b_principal",
                         "CLASS_B",
-                        Some(Money::new(5_000.0, currency)),
+                        Some(Money::from((5_000_i64, currency))),
                     ))
                     .add_recipient(Recipient::tranche_principal(
                         "a_principal",
                         "CLASS_A",
-                        Some(Money::new(100_000.0, currency)),
+                        Some(Money::from((100_000_i64, currency))),
                     )),
             )
             .add_coverage_trigger(CoverageTrigger {
@@ -2317,20 +2317,20 @@ mod ic_diversion_tests {
             &tranches,
             &pool,
             WaterfallContext {
-                available_cash: Money::new(20_900.0, currency),
-                interest_collections: Money::new(900.0, currency),
-                principal_collections: Money::new(20_000.0, currency),
+                available_cash: Money::from((20_900_i64, currency)),
+                interest_collections: Money::from((900_i64, currency)),
+                principal_collections: Money::from((20_000_i64, currency)),
                 payment_date,
                 period_start,
                 valuation_date: period_start,
-                pool_balance: Money::new(105_000.0, currency),
+                pool_balance: Money::from((105_000_i64, currency)),
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
                 deferred_interest: None,
-                reserve_balance: Money::new(0.0, currency),
-                restricted_cash: Money::new(0.0, Currency::USD),
-                recovery_proceeds: Money::new(0.0, currency),
+                reserve_balance: Money::from((0_i64, currency)),
+                restricted_cash: Money::from((0_i64, Currency::USD)),
+                recovery_proceeds: Money::from((0_i64, currency)),
                 floating_rate_shift: 0.0,
             },
         )
@@ -2393,7 +2393,7 @@ mod water_fill_tests {
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::new(1_000_000.0, ccy),
+            Money::from((1_000_000_i64, ccy)),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("date"),
         )
@@ -2418,20 +2418,20 @@ mod water_fill_tests {
             &tranches,
             &AssetPool::new("POOL", DealType::Clo, ccy),
             WaterfallContext {
-                available_cash: Money::new(300_000.0, ccy),
-                interest_collections: Money::new(300_000.0, ccy),
-                principal_collections: Money::new(0.0, ccy),
+                available_cash: Money::from((300_000_i64, ccy)),
+                interest_collections: Money::from((300_000_i64, ccy)),
+                principal_collections: Money::from((0_i64, ccy)),
                 payment_date,
                 period_start,
                 valuation_date: period_start,
-                pool_balance: Money::new(1_000_000.0, ccy),
+                pool_balance: Money::from((1_000_000_i64, ccy)),
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
                 deferred_interest: None,
-                reserve_balance: Money::new(0.0, ccy),
-                restricted_cash: Money::new(0.0, ccy),
-                recovery_proceeds: Money::new(0.0, ccy),
+                reserve_balance: Money::from((0_i64, ccy)),
+                restricted_cash: Money::from((0_i64, ccy)),
+                recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
             },
         )
@@ -2448,7 +2448,7 @@ mod water_fill_tests {
             .principal_distributions
             .get(&key)
             .copied()
-            .unwrap_or(Money::new(0.0, ccy))
+            .unwrap_or(Money::from((0_i64, ccy)))
             .amount();
 
         // A quarter's interest on 1,000,000 at 5% is ~12,500; the rest of the

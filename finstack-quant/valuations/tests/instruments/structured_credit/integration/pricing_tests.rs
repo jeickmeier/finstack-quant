@@ -28,14 +28,14 @@ fn create_simple_pool() -> AssetPool {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2029, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A2",
-        Money::new(3_000_000.0, Currency::USD),
+        Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2028, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -48,7 +48,7 @@ fn create_simple_clo_pool() -> AssetPool {
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "L1",
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             Date::from_calendar_date(2029, Month::January, 1).unwrap(),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -58,7 +58,7 @@ fn create_simple_clo_pool() -> AssetPool {
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "L2",
-            Money::new(3_000_000.0, Currency::USD),
+            Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
             0.08,
             Date::from_calendar_date(2028, Month::January, 1).unwrap(),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -72,7 +72,7 @@ fn create_simple_cmbs_pool() -> AssetPool {
     let mut pool = AssetPool::new("CMBS_POOL", DealType::Cmbs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "CMBS-LOAN-1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -86,7 +86,7 @@ fn create_simple_tranches() -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(8_000_000.0, Currency::USD),
+        Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.035 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
@@ -463,8 +463,10 @@ fn test_structured_credit_registry_exposes_cmbs_dscr() {
         "USD-OIS",
     )
     .with_payment_calendar("nyse");
-    sc.credit_factors.annual_noi = Some(Money::new(1_250_000.0, Currency::USD));
-    sc.credit_factors.annual_debt_service = Some(Money::new(1_000_000.0, Currency::USD));
+    sc.credit_factors.annual_noi =
+        Some(Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"));
+    sc.credit_factors.annual_debt_service =
+        Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
 
@@ -609,7 +611,7 @@ fn test_structured_credit_pool_balance_cleanup() {
     let mut pool = AssetPool::new("SMALL_POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(50.0, Currency::USD), // Below cleanup threshold
+        Money::new(50.0, Currency::USD).expect("valid money fixture"), // Below cleanup threshold
         0.06,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,

@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn convert_money_same_currency_is_identity() {
         let ctx = MarketContext::new();
-        let amount = Money::new(1_000.0, Currency::USD);
+        let amount = Money::from((1_000_i64, Currency::USD));
         let out = ctx
             .convert_money(amount, Currency::USD, date!(2025 - 01 - 15))
             .expect("same-ccy conversion should not consult FX");
@@ -422,7 +422,7 @@ mod tests {
             .set_quote(Currency::EUR, Currency::USD, 1.1)
             .expect("valid rate");
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
-        let eur = Money::new(1_000.0, Currency::EUR);
+        let eur = Money::from((1_000_i64, Currency::EUR));
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
             .expect("EUR->USD should succeed");
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn convert_money_missing_matrix_returns_not_found() {
         let ctx = MarketContext::new();
-        let eur = Money::new(1_000.0, Currency::EUR);
+        let eur = Money::from((1_000_i64, Currency::EUR));
         let err = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
             .unwrap_err();

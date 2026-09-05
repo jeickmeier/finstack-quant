@@ -94,7 +94,7 @@ fn tranche_upfront_frac(
         .series(40)
         .attach_pct(attach_pct)
         .detach_pct(detach_pct)
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .maturity(maturity)
         .running_coupon_bp(running_coupon_bp)
         .frequency(Tenor::quarterly())

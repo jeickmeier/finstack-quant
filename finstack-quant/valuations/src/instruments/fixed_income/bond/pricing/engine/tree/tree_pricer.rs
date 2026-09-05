@@ -1037,7 +1037,7 @@ mod tests {
         let as_of = maturity;
         let bullet = Bond::builder()
             .id("ROLLED_MATURITY_TREE".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(

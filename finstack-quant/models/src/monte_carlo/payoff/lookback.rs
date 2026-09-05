@@ -157,12 +157,14 @@ impl Payoff for Lookback {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let intrinsic = match self.direction {
-            LookbackDirection::Call => (self.extreme_spot - self.strike).max(0.0),
-            LookbackDirection::Put => (self.strike - self.extreme_spot).max(0.0),
-        };
-        Money::new(intrinsic * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let intrinsic = match self.direction {
+                LookbackDirection::Call => (self.extreme_spot - self.strike).max(0.0),
+                LookbackDirection::Put => (self.strike - self.extreme_spot).max(0.0),
+            };
+            Money::new(intrinsic * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -250,12 +252,14 @@ impl Payoff for FloatingStrikeLookbackCall {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        // Floor at zero for defensive coding: while mathematically S_T >= S_min,
-        // floating-point edge cases (e.g., pathological reset states) could produce
-        // negative values without this guard.
-        let payoff = (self.terminal_spot - self.min_spot).max(0.0);
-        Money::new(payoff * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            // Floor at zero for defensive coding: while mathematically S_T >= S_min,
+            // floating-point edge cases (e.g., pathological reset states) could produce
+            // negative values without this guard.
+            let payoff = (self.terminal_spot - self.min_spot).max(0.0);
+            Money::new(payoff * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -344,11 +348,13 @@ impl Payoff for FloatingStrikeLookbackPut {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        // Floor at zero for defensive coding: while mathematically S_max >= S_T,
-        // floating-point edge cases could produce negative values without this guard.
-        let payoff = (self.max_spot - self.terminal_spot).max(0.0);
-        Money::new(payoff * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            // Floor at zero for defensive coding: while mathematically S_max >= S_T,
+            // floating-point edge cases could produce negative values without this guard.
+            let payoff = (self.max_spot - self.terminal_spot).max(0.0);
+            Money::new(payoff * self.notional, currency)?
+        })
     }
 
     fn reset(&mut self) {
@@ -397,7 +403,7 @@ mod tests {
             .on_event(&mut create_state(10, 110.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // max(120 - 100, 0) = 20
         assert_eq!(value.amount(), 20.0);
         assert_eq!(lookback.extreme_spot, 120.0);
@@ -418,7 +424,7 @@ mod tests {
             .on_event(&mut create_state(10, 90.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // max(100 - 80, 0) = 20
         assert_eq!(value.amount(), 20.0);
         assert_eq!(lookback.extreme_spot, 80.0);
@@ -439,7 +445,7 @@ mod tests {
             .on_event(&mut create_state(10, 110.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // max(120 - 150, 0) = 0
         assert_eq!(value.amount(), 0.0);
     }
@@ -459,7 +465,7 @@ mod tests {
             .on_event(&mut create_state(10, 90.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // max(50 - 80, 0) = 0
         assert_eq!(value.amount(), 0.0);
     }
@@ -514,10 +520,16 @@ mod tests {
             .expect("valid payoff event");
 
         // Call: (120 - 100) * 2.5 = 50
-        assert_eq!(call.value(Currency::USD).amount(), 50.0);
+        assert_eq!(
+            call.value(Currency::USD).expect("valid payoff").amount(),
+            50.0
+        );
 
         // Put: (100 - 80) * 2.5 = 50
-        assert_eq!(put.value(Currency::USD).amount(), 50.0);
+        assert_eq!(
+            put.value(Currency::USD).expect("valid payoff").amount(),
+            50.0
+        );
     }
 
     #[test]
@@ -535,7 +547,7 @@ mod tests {
             .on_event(&mut create_state(10, 110.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // 110 - 90 = 20
         assert_eq!(value.amount(), 20.0);
     }
@@ -555,7 +567,7 @@ mod tests {
             .on_event(&mut create_state(10, 105.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // S_max - S_T = 120 - 105 = 15
         assert_eq!(value.amount(), 15.0);
     }
@@ -575,7 +587,7 @@ mod tests {
             .on_event(&mut create_state(10, 110.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // (130 - 110) * 2.5 = 50
         assert_eq!(value.amount(), 50.0);
     }
@@ -613,7 +625,7 @@ mod tests {
             .on_event(&mut create_state(10, 110.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // S_T - S_min = 110 - 80 = 30 (uses historical min)
         assert_eq!(value.amount(), 30.0);
 
@@ -638,7 +650,7 @@ mod tests {
             .on_event(&mut create_state(10, 95.0))
             .expect("valid payoff event");
 
-        let value = lookback.value(Currency::USD);
+        let value = lookback.value(Currency::USD).expect("valid payoff");
         // S_max - S_T = 150 - 95 = 55 (uses historical max)
         assert_eq!(value.amount(), 55.0);
 
@@ -658,7 +670,7 @@ mod tests {
             .expect("valid payoff event");
 
         // max(130, 110) - 100 = 30
-        let value = call.value(Currency::USD);
+        let value = call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 30.0);
 
         // Reset preserves initial extremum
@@ -673,7 +685,7 @@ mod tests {
             .expect("valid payoff event");
 
         // 100 - min(70, 90) = 30
-        let value = put.value(Currency::USD);
+        let value = put.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 30.0);
 
         put.reset();

@@ -46,14 +46,14 @@ fn create_benchmark_market() -> MarketContext {
 
 /// Create a bond instrument for benchmarking
 fn create_benchmark_bond(base_date: Date) -> Bond {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let coupon_rate = 0.05;
     let maturity_date = base_date + time::Duration::days(365 * 5);
 
     Bond::fixed(
         "BOND-5Y",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         base_date,
         maturity_date,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -176,12 +176,12 @@ fn bench_metrics_portfolio(c: &mut Criterion) {
     let bonds: Vec<Bond> = maturities
         .iter()
         .map(|years| {
-            let notional = Money::new(1_000_000.0, Currency::USD);
+            let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
             let maturity_date = base_date + time::Duration::days(365 * years);
             Bond::fixed(
                 format!("BOND-{}Y", years),
                 notional,
-                finstack_quant_core::types::Rate::from_decimal(0.05),
+                finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
                 base_date,
                 maturity_date,
                 finstack_quant_core::dates::StubKind::ShortFront,

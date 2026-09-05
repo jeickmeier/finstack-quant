@@ -161,7 +161,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(0.0, quanto.quote_currency),
+                Money::from((0_i64, quanto.quote_currency)),
             ));
         }
 
@@ -188,7 +188,12 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(intrinsic_unit * scale, quanto.quote_currency),
+                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(quanto),
+                    )
+                })?,
             ));
         }
 
@@ -219,7 +224,12 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(intrinsic_unit * scale, quanto.quote_currency),
+                Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(quanto),
+                    )
+                })?,
             ));
         }
 
@@ -251,7 +261,12 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         let scale = payoff_scale(quanto).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
-        let pv = Money::new(price * scale, quanto.quote_currency);
+        let pv = Money::new(price * scale, quanto.quote_currency).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(quanto),
+            )
+        })?;
         Ok(ValuationResult::stamped(quanto.id(), as_of, pv))
     }
 }
@@ -324,17 +339,17 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "NKY-SPOT",
-                MarketScalar::Price(Money::new(34000.0, Currency::JPY)),
+                MarketScalar::Price(Money::from((34000_i64, Currency::JPY))),
             )
             .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(0.0068));
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-DISC"))
             .underlying_ticker("NKY".to_string())
-            .equity_strike(Money::new(35000.0, Currency::JPY))
+            .equity_strike(Money::from((35000_i64, Currency::JPY)))
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
             .quote_currency(Currency::USD)
             .correlation(-0.2)
@@ -426,16 +441,16 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "NKY-SPOT",
-                MarketScalar::Price(Money::new(36_000.0, Currency::JPY)),
+                MarketScalar::Price(Money::from((36_000_i64, Currency::JPY))),
             );
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-EXPIRY"))
             .underlying_ticker("NKY".to_string())
-            .equity_strike(Money::new(35_000.0, Currency::JPY))
+            .equity_strike(Money::from((35_000_i64, Currency::JPY)))
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::JPY)
             .quote_currency(Currency::USD)
             .correlation(-0.2)
@@ -529,17 +544,17 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(100.0, Currency::EUR)),
+                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
             )
             .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-ATM"))
             .underlying_ticker("AAPL".to_string())
-            .equity_strike(Money::new(100.0, Currency::EUR))
+            .equity_strike(Money::from((100_i64, Currency::EUR)))
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .correlation(-0.5)

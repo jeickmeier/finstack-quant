@@ -16,8 +16,8 @@ fn test_duration_zero_coupon() {
     let maturity = date!(2030 - 01 - 01);
     let mut bond = Bond::fixed(
         "DUR1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -60,8 +60,8 @@ fn test_yield_duration_convexity_act_act_isma() {
     let maturity = date!(2030 - 01 - 15);
     let mut bond = Bond::fixed(
         "DUR-ISMA",
-        Money::new(100.0, Currency::GBP),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(100.0, Currency::GBP).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -112,8 +112,8 @@ fn test_modified_duration_matches_macaulay_over_yield() {
     let maturity = date!(2030 - 01 - 01);
     let bond = Bond::fixed(
         "DUR2",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -156,8 +156,8 @@ fn test_convexity_matches_numerical_second_derivative() {
     let maturity = date!(2030 - 01 - 01);
     let bond = Bond::fixed(
         "CONV1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -214,8 +214,8 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
     use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     let mut bond = Bond::fixed(
         "CALLABLE-RISK",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -443,8 +443,8 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
 
     let mut callable = Bond::fixed(
         "CALLABLE-NOQUOTE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2032 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

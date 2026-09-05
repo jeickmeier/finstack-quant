@@ -31,7 +31,6 @@ __all__ = [
     # day-count
     "DayCount",
     "DayCountContext",
-    "DayCountContextState",
     "Thirty360Convention",
     "days_30_360",
     "days_30e_360_isda",
@@ -578,7 +577,7 @@ class DayCountContext:
     --------
     >>> from finstack_quant.core.dates import DayCountContext
     >>> context = DayCountContext("usny", "3M", 252)
-    >>> (context.calendar_id, context.frequency.months, context.bus_basis, context.to_state().calendar_id)
+    >>> (context.calendar_id, context.frequency.months, context.bus_basis, context.calendar_id)
     ('usny', 3, 252, 'usny')
 
     """
@@ -671,233 +670,6 @@ class DayCountContext:
 
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
-    @property
-    def calendar_id(self) -> Optional[str]:
-        """
-        Optional calendar identifier.
-
-        Returns
-        -------
-        str | None
-            Optional calendar identifier.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def frequency(self) -> Optional[Tenor]:
-        """
-        Optional coupon frequency.
-
-        Returns
-        -------
-        Tenor | None
-            Optional coupon frequency.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def bus_basis(self) -> Optional[int]:
-        """
-        Optional custom business-day divisor.
-
-        Returns
-        -------
-        int | None
-            Optional custom business-day divisor.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
-        """
-        Optional reference coupon period as ``(start, end)`` dates.
-
-        Returns
-        -------
-        tuple[datetime.date, datetime.date] | None
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
-    def end_is_termination_date(self) -> bool:
-        """
-        Whether the accrual end is the instrument termination date.
-
-        Returns
-        -------
-        bool
-            Whether the accrual end is the instrument termination date.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def to_state(self) -> DayCountContextState:
-        """
-        Convert to a serializable state snapshot.
-
-        Returns
-        -------
-        DayCountContextState
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def __repr__(self) -> str: ...
-
-class DayCountContextState:
-    """
-    Serializable snapshot of :class:`DayCountContext` for persistence.
-
-    Takes the same parameters as :class:`DayCountContext` and validates them
-    the same way. Equality is structural; instances round-trip through
-    :meth:`to_json` / :meth:`from_json` and ``pickle``.
-
-    Parameters
-    ----------
-    calendar_id : str | None
-        Registered calendar id.
-    frequency : Tenor | str | None
-        Coupon frequency (``Tenor`` or ``"6M"``).
-    bus_basis : int | None
-        Custom business-day divisor.
-    coupon_period : tuple[datetime.date | str, datetime.date | str] | None
-        Reference coupon period ``(start, end)``; ``start`` must precede ``end``.
-    end_is_termination_date : bool
-        Whether the accrual end is the instrument termination date.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.dates import DayCountContextState, Tenor
-    >>> state = DayCountContextState("usny", Tenor.quarterly(), 252)
-    >>> (state.calendar_id, state.to_context().frequency.months)
-    ('usny', 3)
-
-    """
-
-    def __init__(
-        self,
-        calendar_id: Optional[str] = None,
-        frequency: Union[Tenor, str, None] = None,
-        bus_basis: Optional[int] = None,
-        coupon_period: Optional[tuple[datetime.date | str, datetime.date | str]] = None,
-        end_is_termination_date: bool = False,
-    ) -> None:
-        """
-        Create a day-count context snapshot for year-fraction calculations.
-
-        Parameters
-        ----------
-        calendar_id : str | None
-            Registered calendar id; not resolved until a calculation runs.
-        frequency : Tenor | str | None
-            Coupon frequency (``Tenor`` or tenor string).
-        bus_basis : int | None
-            Custom business-day divisor for Bus/252.
-        coupon_period : tuple[datetime.date | str, datetime.date | str] | None
-            Reference coupon period ``(start, end)``.
-        end_is_termination_date : bool
-            Whether the accrual end is the instrument termination date.
-
-        Raises
-        ------
-        ValueError
-            If *coupon_period* is inverted (validated in Rust) or
-            *frequency* does not parse.
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to the canonical JSON wire form (strict field names).
-
-        Returns
-        -------
-        str
-            JSON object with ``calendar_id``, ``frequency``, ``bus_basis``,
-            ``coupon_period`` and ``end_is_termination_date``.
-
-        Raises
-        ------
-        ValueError
-            If the state cannot be serialized.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import DayCountContextState
-        >>> DayCountContextState.from_json(DayCountContextState(bus_basis=250).to_json()).bus_basis
-        250
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> DayCountContextState:
-        """
-        Deserialize from the canonical JSON wire form.
-
-        Parameters
-        ----------
-        json : str
-            JSON produced by :meth:`to_json`.
-
-        Returns
-        -------
-        DayCountContextState
-            The reconstructed snapshot.
-
-        Raises
-        ------
-        ValueError
-            If *json* is malformed, has unknown fields, or carries an
-            inverted ``coupon_period``.
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import DayCountContextState
-        >>> DayCountContextState.from_json(DayCountContextState(bus_basis=250).to_json()).bus_basis
-        250
-
-        """
-        ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-    def to_context(self) -> DayCountContext:
-        """
-        Reconstruct a live :class:`DayCountContext` from this state.
-
-        Returns
-        -------
-        DayCountContext
-            New runtime context with every snapshot field copied; calendar
-            resolution remains deferred until a calculation needs it.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-        ...
-
     @property
     def calendar_id(self) -> Optional[str]:
         """
@@ -3344,81 +3116,6 @@ class Schedule:
         ...
 
     @staticmethod
-    def generate(
-        start: datetime.date | str,
-        end: datetime.date | str,
-        *,
-        frequency: Union[Tenor, str] = "6M",
-        stub: Union[StubKind, str] = "short_front",
-        convention: Union[BusinessDayConvention, str] = "modified_following",
-        calendar: Union[HolidayCalendar, str, None] = None,
-        eom: bool = False,
-        payment_lag: int = 0,
-        fixing_lag: Optional[int] = None,
-        imm: bool = False,
-        cds_imm: bool = False,
-        error_policy: Union[ScheduleErrorPolicy, str] = "strict",
-    ) -> Schedule:
-        """
-        Build a schedule in one call from keyword options.
-
-        Parameters
-        ----------
-        start : datetime.date | str
-            First accrual date.
-        end : datetime.date | str
-            Final accrual date; must not precede *start*.
-        frequency : Tenor | str
-            Roll frequency.
-        stub : StubKind | str
-            Stub rule (``"none"``, ``"short_front"``, ``"short_back"``,
-            ``"long_front"``, ``"long_back"``).
-        convention : BusinessDayConvention | str
-            Business-day convention for payment dates; only applied when
-            *calendar* is set.
-        calendar : HolidayCalendar | str | None
-            Holiday calendar object or id (``"usny"``, ``"nyse+gblo"``);
-            ``None`` leaves dates unadjusted.
-        eom : bool
-            End-of-month roll rule.
-        payment_lag : int
-            Business days after each adjusted period end for the payment date.
-        fixing_lag : int | None
-            T-minus business days from each accrual start for the fixing
-            date; ``None`` produces no fixing dates.
-        imm : bool
-            Roll on standard IMM dates (third Wednesday).
-        cds_imm : bool
-            Roll on CDS IMM dates (20th); mutually exclusive with *imm*.
-        error_policy : ScheduleErrorPolicy | str
-            Recoverable-error policy.
-
-        Returns
-        -------
-        Schedule
-            The generated schedule.
-
-        Raises
-        ------
-        ValueError
-            If dates, tenor, stub, convention or policy are invalid, both IMM
-            modes are set, or a lag is negative / needs a calendar.
-        KeyError
-            If *calendar* names an unknown calendar.
-        TypeError
-            If an unknown option keyword is passed.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.generate("2025-01-15", "2026-01-15", frequency="6M", calendar="usny")
-        >>> [d.isoformat() for d in schedule.payment_dates]
-        ['2025-07-15', '2026-01-15']
-
-        """
-        ...
-
-    @staticmethod
     def from_spec(spec: Union[dict, str]) -> Schedule:
         """
         Build a schedule from a serialized ``ScheduleSpec``.
@@ -3579,7 +3276,7 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> frame = Schedule.generate("2025-01-15", "2026-01-15", frequency="6M").to_dataframe()
+        >>> frame = Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build().to_dataframe()
         >>> list(frame.columns)
         ['period_start', 'period_end', 'payment_date', 'fixing_date']
         """
@@ -3603,7 +3300,7 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.generate("2025-01-15", "2025-07-15", frequency="3M")
+        >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
         >>> Schedule.from_json(schedule.to_json()) == schedule
         True
         """
@@ -3631,7 +3328,7 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.generate("2025-01-15", "2025-07-15", frequency="3M")
+        >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
         >>> Schedule.from_json(schedule.to_json()) == schedule
         True
 

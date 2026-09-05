@@ -319,7 +319,7 @@ mod tests {
         // Valid FRN that references the "USD-SOFR-3M" projection curve.
         let bond = crate::instruments::Bond::floating(
             "DM-UNIT-MISSING-FWD",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             "USD-SOFR-3M",
             200,
             as_of,
@@ -343,7 +343,7 @@ mod tests {
             Arc::new(bond),
             market,
             as_of,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             MetricContext::default_config(),
         );
 

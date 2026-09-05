@@ -85,7 +85,7 @@ impl EquityOptionHestonMcPricer {
                     (inst.strike - spot).max(0.0)
                 }
             };
-            return Ok((Money::new(intrinsic * inst.notional.amount(), ccy), 0.0));
+            return Ok((Money::new(intrinsic * inst.notional.amount(), ccy)?, 0.0));
         }
 
         // Heston parameters: **Audit P3b** — use the strict resolver so a
@@ -276,7 +276,7 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

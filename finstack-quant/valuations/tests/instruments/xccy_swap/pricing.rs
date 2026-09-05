@@ -213,7 +213,7 @@ fn rejects_negative_notional() {
     let maturity = d(2026, 1, 2);
 
     let mut leg_usd = leg_usd_receive(base, maturity);
-    leg_usd.notional = Money::new(-1_000_000.0, Currency::USD);
+    leg_usd.notional = Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let swap = XccySwap::new(
         "XCCY-NEG-NOTIONAL",
@@ -237,7 +237,7 @@ fn rejects_zero_notional() {
     let maturity = d(2026, 1, 2);
 
     let mut leg_usd = leg_usd_receive(base, maturity);
-    leg_usd.notional = Money::new(0.0, Currency::USD);
+    leg_usd.notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let swap = XccySwap::new(
         "XCCY-ZERO-NOTIONAL",

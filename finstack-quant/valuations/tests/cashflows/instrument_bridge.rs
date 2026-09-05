@@ -87,7 +87,7 @@ fn bond_future_exposes_cashflow_provider_bridge() {
 
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("valid date"))
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("valid date"))
         .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
@@ -152,7 +152,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
     };
     let swap = BasisSwap::new(
         "BASIS-BRIDGE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         primary_leg,
         reference_leg,
     )
@@ -174,7 +174,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
     let end = Date::from_calendar_date(2026, Month::January, 2).expect("valid date");
     let leg1 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::USD,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Receive,
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         discount_curve_id: CurveId::new("USD-OIS"),
@@ -193,7 +193,7 @@ fn xccy_swap_exposes_cashflow_provider_bridge() {
     };
     let leg2 = finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::EUR,
-        notional: Money::new(900_000.0, Currency::EUR),
+        notional: Money::new(900_000.0, Currency::EUR).expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Pay,
         forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
         discount_curve_id: CurveId::new("EUR-OIS"),
@@ -225,10 +225,13 @@ fn cms_swap_exposes_cashflow_provider_bridge() {
 fn yoy_inflation_swap_exposes_cashflow_provider_bridge() {
     let swap = YoYInflationSwap::builder()
         .id("YOY-BRIDGE".into())
-        .notional(finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+        )
         .start_date(
             finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
                 .expect("valid date"),

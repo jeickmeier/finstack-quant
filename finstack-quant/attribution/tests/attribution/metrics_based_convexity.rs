@@ -51,7 +51,7 @@ fn test_valuation_result_supports_convexity_metric() {
     let val_t0_first = ValuationResult::stamped_with_meta(
         "TEST-BOND",
         t0,
-        Money::new(1_050_000.0, Currency::USD),
+        Money::new(1_050_000.0, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures_first_order.clone());
@@ -63,7 +63,7 @@ fn test_valuation_result_supports_convexity_metric() {
     let val_t0_second = ValuationResult::stamped_with_meta(
         "TEST-BOND",
         t0,
-        Money::new(1_050_000.0, Currency::USD),
+        Money::new(1_050_000.0, Currency::USD).expect("valid money fixture"),
         meta,
     )
     .with_measures(measures_with_convexity);
@@ -115,7 +115,7 @@ fn test_second_order_metrics_available() {
 fn test_valuation_result_supports_all_second_order_metrics() {
     // Test that ValuationResult can store all second-order metrics
     let as_of = date!(2025 - 01 - 15);
-    let value = Money::new(1_000_000.0, Currency::USD);
+    let value = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut measures = IndexMap::new();
 
@@ -218,8 +218,11 @@ fn test_metrics_based_convexity_reduces_residual() {
     .unwrap();
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("METRICS-CONVEXITY", Money::new(1_000_000.0, Currency::USD))
-            .with_discount_curves(&["USD-OIS"]),
+        TestInstrument::new(
+            "METRICS-CONVEXITY",
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        )
+        .with_discount_curves(&["USD-OIS"]),
     );
 
     let p0 = 1_000_000.0;
@@ -243,7 +246,7 @@ fn test_metrics_based_convexity_reduces_residual() {
     let val_t0_first = ValuationResult::stamped_with_meta(
         "METRICS-CONVEXITY",
         as_of_t0,
-        Money::new(p0, Currency::USD),
+        Money::new(p0, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures_first.clone());
@@ -251,7 +254,7 @@ fn test_metrics_based_convexity_reduces_residual() {
     let val_t1_first = ValuationResult::stamped_with_meta(
         "METRICS-CONVEXITY",
         as_of_t1,
-        Money::new(p0 + total_pnl, Currency::USD),
+        Money::new(p0 + total_pnl, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures_first);
@@ -259,7 +262,7 @@ fn test_metrics_based_convexity_reduces_residual() {
     let val_t0_second = ValuationResult::stamped_with_meta(
         "METRICS-CONVEXITY",
         as_of_t0,
-        Money::new(p0, Currency::USD),
+        Money::new(p0, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures_second.clone());
@@ -267,7 +270,7 @@ fn test_metrics_based_convexity_reduces_residual() {
     let val_t1_second = ValuationResult::stamped_with_meta(
         "METRICS-CONVEXITY",
         as_of_t1,
-        Money::new(p0 + total_pnl, Currency::USD),
+        Money::new(p0 + total_pnl, Currency::USD).expect("valid money fixture"),
         meta,
     )
     .with_measures(measures_second);
@@ -347,8 +350,11 @@ fn test_metrics_based_ir_convexity_uses_dollar_convention() {
     .unwrap();
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("METRICS-IRCONVEXITY", Money::new(1_000.0, Currency::USD))
-            .with_discount_curves(&["USD-OIS"]),
+        TestInstrument::new(
+            "METRICS-IRCONVEXITY",
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        )
+        .with_discount_curves(&["USD-OIS"]),
     );
 
     // Near-par swap: tiny PV, real dollar gamma. The old P₀-scaled formula
@@ -370,14 +376,14 @@ fn test_metrics_based_ir_convexity_uses_dollar_convention() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "METRICS-IRCONVEXITY",
         as_of_t0,
-        Money::new(p0, Currency::USD),
+        Money::new(p0, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures.clone());
     let val_t1 = ValuationResult::stamped_with_meta(
         "METRICS-IRCONVEXITY",
         as_of_t1,
-        Money::new(p0 + total_pnl, Currency::USD),
+        Money::new(p0 + total_pnl, Currency::USD).expect("valid money fixture"),
         meta,
     )
     .with_measures(measures);

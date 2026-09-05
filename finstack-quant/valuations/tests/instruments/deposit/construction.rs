@@ -19,7 +19,7 @@ fn test_basic_construction() {
     // Execute
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-001"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
@@ -46,7 +46,7 @@ fn test_construction_with_quote_rate() {
     // Execute
     let mut dep = Deposit::builder()
         .id(InstrumentId::new("DEP-002"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
@@ -77,7 +77,7 @@ fn test_construction_with_different_day_counts() {
     for day_count in day_counts {
         let dep = Deposit::builder()
             .id(InstrumentId::new("DEP-DC"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(base)
             .maturity(date(2025, 7, 1))
             .day_count(day_count)
@@ -99,7 +99,7 @@ fn test_construction_with_different_currencies() {
     for ccy in currencies {
         let dep = Deposit::builder()
             .id(InstrumentId::new("DEP-CCY"))
-            .notional(Money::new(1_000_000.0, ccy))
+            .notional(Money::new(1_000_000.0, ccy).expect("valid money fixture"))
             .start_date(base)
             .maturity(date(2025, 7, 1))
             .day_count(DayCount::Act360)
@@ -144,7 +144,7 @@ fn test_construction_with_large_notional() {
 
     // Execute
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000_000.0, Currency::USD).expect("valid money fixture"))
         .build();
 
     // Validate
@@ -158,7 +158,7 @@ fn test_construction_with_small_notional() {
 
     // Execute
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000.0, Currency::USD))
+        .notional(Money::new(1_000.0, Currency::USD).expect("valid money fixture"))
         .build();
 
     // Validate
@@ -172,7 +172,7 @@ fn test_builder_pattern_ergonomics() {
 
     let dep = DepositBuilder::new(base)
         .id("DEP-FLUENT")
-        .notional(Money::new(5_000_000.0, Currency::EUR))
+        .notional(Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture"))
         .start_date(date(2025, 2, 1))
         .maturity(date(2025, 8, 1))
         .day_count(DayCount::Act365F)

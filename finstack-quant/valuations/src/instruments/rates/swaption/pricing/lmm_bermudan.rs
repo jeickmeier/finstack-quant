@@ -327,12 +327,7 @@ pub fn price_bermudan_lmm(
     // `V(0) = P(0, T_N) · E^{T_N}[ payoff / P(t, T_N) ]` then recovers the
     // present value with a single multiplication by the constant
     // `discount_factor_terminal = P(0, T_N)`.
-    Ok(money_estimate_from_pairs(
-        &cashflow,
-        split,
-        discount_factor_terminal,
-        currency,
-    ))
+    money_estimate_from_pairs(&cashflow, split, discount_factor_terminal, currency)
 }
 
 /// Build a time grid with steps aligned to exercise dates.

@@ -45,7 +45,7 @@ pub(crate) fn resolve_lifecycle_value(
     }
     let currency = inst.notional.currency();
     if !exercise.exercised || as_of > exercise.settlement_date {
-        return Ok(Some(Money::new(0.0, currency)));
+        return Ok(Some(Money::from((0_i64, currency))));
     }
 
     let discount_curve = market.get_discount(inst.discount_curve_id.as_str())?;
@@ -103,7 +103,7 @@ pub(crate) fn resolve_lifecycle_value(
     Ok(Some(Money::new(
         unit_value * inst.notional.amount(),
         currency,
-    )))
+    )?))
 }
 
 /// Collected market inputs for equity option pricing.

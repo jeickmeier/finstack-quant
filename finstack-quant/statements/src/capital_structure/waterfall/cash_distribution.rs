@@ -68,7 +68,7 @@ where
                 },
             });
             let currency = field(s).currency();
-            *field(s) = Money::new(0.0, currency);
+            *field(s) = Money::from((0_i64, currency));
         }
     }
     let mut ranks: Vec<u32> = staged.iter().map(|s| s.class_rank).collect();
@@ -91,7 +91,7 @@ where
                 continue;
             }
             let currency = field(s).currency();
-            *field(s) = Money::try_new(allocated, currency)?;
+            *field(s) = Money::new(allocated, currency)?;
         }
     }
     Ok(())
@@ -109,7 +109,7 @@ pub(super) fn allocate_pro_rata(planned: &[f64], remaining_cash: &mut Money) -> 
         return Ok(vec![0.0; planned.len()]);
     }
     if remaining_cash.amount() >= total_planned {
-        *remaining_cash = Money::try_new(
+        *remaining_cash = Money::new(
             remaining_cash.amount() - total_planned,
             remaining_cash.currency(),
         )?;
@@ -130,7 +130,7 @@ pub(super) fn allocate_pro_rata(planned: &[f64], remaining_cash: &mut Money) -> 
             allocations.push((cash_before * (*planned_value / total_planned)).min(*planned_value));
         }
     }
-    *remaining_cash = Money::new(0.0, remaining_cash.currency());
+    *remaining_cash = Money::from((0_i64, remaining_cash.currency()));
     Ok(allocations)
 }
 

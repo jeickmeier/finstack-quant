@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 fn test_results_serialization() {
     // Create a StatementResult object
     let mut results = StatementResult::new();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     results.nodes.insert(
         "revenue".to_string(),
@@ -52,35 +52,41 @@ fn test_results_serialization() {
 #[test]
 fn test_capital_structure_cashflows_serialization() {
     let mut cashflows = CapitalStructureCashflows::new();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     // Add breakdown for an instrument
     let breakdown = CashflowBreakdown {
         interest_expense_cash: finstack_quant_core::money::Money::new(
             5_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         principal_payment: finstack_quant_core::money::Money::new(
             10_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         debt_balance: finstack_quant_core::money::Money::new(
             100_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         fees: finstack_quant_core::money::Money::new(
             500.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         accrued_interest: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
     };
 
     let mut period_map = IndexMap::new();
@@ -137,11 +143,11 @@ fn test_model_spec_full_serialization() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -331,11 +337,11 @@ fn test_model_with_results_serialization() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -368,8 +374,8 @@ fn test_model_with_results_serialization() {
     assert_eq!(deserialized_model.nodes.len(), 3);
 
     // Verify results
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     assert_eq!(deserialized_results.get("revenue", &q1), Some(100_000.0));
     assert_eq!(deserialized_results.get("revenue", &q2), Some(110_000.0));
@@ -391,12 +397,12 @@ fn test_node_spec_with_currency_serialization() {
     let mut node = NodeSpec::new("cash", NodeType::Value);
     let mut values = IndexMap::new();
     values.insert(
-        PeriodId::quarter(2025, 1),
-        AmountOrScalar::amount(50_000.0, Currency::USD),
+        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        AmountOrScalar::amount(50_000.0, Currency::USD).expect("valid amount fixture"),
     );
     values.insert(
-        PeriodId::quarter(2025, 2),
-        AmountOrScalar::amount(55_000.0, Currency::USD),
+        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        AmountOrScalar::amount(55_000.0, Currency::USD).expect("valid amount fixture"),
     );
     node.values = Some(values);
 
@@ -413,7 +419,9 @@ fn test_node_spec_with_currency_serialization() {
     assert!(matches!(deserialized.node_type, NodeType::Value));
 
     let values = deserialized.values.as_ref().unwrap();
-    let q1_value = values.get(&PeriodId::quarter(2025, 1)).unwrap();
+    let q1_value = values
+        .get(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
+        .unwrap();
     assert_eq!(q1_value.value(), 50_000.0);
     assert_eq!(q1_value.currency(), Some(Currency::USD));
 
@@ -441,7 +449,7 @@ fn test_empty_results_serialization() {
 fn test_results_to_json_file() {
     // Test that Results can be saved to and loaded from a JSON file
     let mut results = StatementResult::new();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     results.nodes.insert(
         "revenue".to_string(),
@@ -470,28 +478,34 @@ fn test_capital_structure_json_roundtrip() {
         interest_expense_cash: finstack_quant_core::money::Money::new(
             5_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         principal_payment: finstack_quant_core::money::Money::new(
             10_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         debt_balance: finstack_quant_core::money::Money::new(
             100_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         fees: finstack_quant_core::money::Money::new(
             500.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         accrued_interest: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
     };
 
     let json = serde_json::to_string(&breakdown).expect("Failed to serialize");

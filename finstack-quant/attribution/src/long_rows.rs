@@ -55,7 +55,7 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let attribution = PnlAttribution::new(
-//!     Money::new(500.0, Currency::USD),
+//!     Money::from((500_i64, Currency::USD)),
 //!     "AAPL",
 //!     create_date(2025, Month::January, 15)?,
 //!     create_date(2025, Month::January, 16)?,
@@ -572,7 +572,7 @@ mod tests {
     use time::Month;
 
     fn usd(amount: f64) -> Money {
-        Money::new(amount, Currency::USD)
+        Money::new(amount, Currency::USD).expect("valid money fixture")
     }
 
     fn base_attribution() -> PnlAttribution {

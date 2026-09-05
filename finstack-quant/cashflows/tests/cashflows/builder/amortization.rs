@@ -6,7 +6,7 @@ use finstack_quant_core::money::Money;
 
 #[test]
 fn test_notional_par() {
-    let notional = Notional::par(1_000_000.0, Currency::USD);
+    let notional = Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture");
 
     assert_eq!(notional.initial.amount(), 1_000_000.0);
     assert_eq!(notional.initial.currency(), Currency::USD);
@@ -15,14 +15,14 @@ fn test_notional_par() {
 
 #[test]
 fn test_notional_currency() {
-    let notional = Notional::par(500_000.0, Currency::EUR);
+    let notional = Notional::par(500_000.0, Currency::EUR).expect("valid notional fixture");
     assert_eq!(notional.currency(), Currency::EUR);
 }
 
 #[test]
 fn test_amortization_spec_none_validation() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::None,
     };
 
@@ -33,9 +33,9 @@ fn test_amortization_spec_none_validation() {
 #[test]
 fn test_amortization_spec_linear_to_validation_ok() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::LinearTo {
-            final_notional: Money::new(500_000.0, Currency::USD),
+            final_notional: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         },
     };
 
@@ -46,9 +46,9 @@ fn test_amortization_spec_linear_to_validation_ok() {
 #[test]
 fn test_amortization_spec_linear_to_validation_currency_mismatch() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::LinearTo {
-            final_notional: Money::new(500_000.0, Currency::EUR), // Different currency
+            final_notional: Money::new(500_000.0, Currency::EUR).expect("valid money fixture"), // Different currency
         },
     };
 
@@ -59,9 +59,9 @@ fn test_amortization_spec_linear_to_validation_currency_mismatch() {
 #[test]
 fn test_amortization_spec_linear_to_validation_final_exceeds_initial() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::LinearTo {
-            final_notional: Money::new(1_500_000.0, Currency::USD), // Exceeds initial
+            final_notional: Money::new(1_500_000.0, Currency::USD).expect("valid money fixture"), // Exceeds initial
         },
     };
 
@@ -75,11 +75,17 @@ fn test_amortization_spec_step_remaining_validation_ok() {
     let date2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
 
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining {
             schedule: vec![
-                (date1, Money::new(750_000.0, Currency::USD)),
-                (date2, Money::new(500_000.0, Currency::USD)),
+                (
+                    date1,
+                    Money::new(750_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    date2,
+                    Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+                ),
             ],
         },
     };
@@ -95,11 +101,17 @@ fn test_amortization_spec_step_remaining_validation_unsorted_dates_rejected() {
 
     // Intentionally unsorted input (later date first)
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining {
             schedule: vec![
-                (date2, Money::new(500_000.0, Currency::USD)),
-                (date1, Money::new(750_000.0, Currency::USD)),
+                (
+                    date2,
+                    Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    date1,
+                    Money::new(750_000.0, Currency::USD).expect("valid money fixture"),
+                ),
             ],
         },
     };
@@ -114,11 +126,17 @@ fn test_amortization_spec_step_remaining_validation_duplicate_dates_rejected() {
 
     // Duplicate same date
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining {
             schedule: vec![
-                (date1, Money::new(800_000.0, Currency::USD)),
-                (date1, Money::new(700_000.0, Currency::USD)),
+                (
+                    date1,
+                    Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    date1,
+                    Money::new(700_000.0, Currency::USD).expect("valid money fixture"),
+                ),
             ],
         },
     };
@@ -132,10 +150,13 @@ fn test_amortization_spec_step_remaining_validation_currency_mismatch() {
     let date1 = Date::from_calendar_date(2025, time::Month::March, 1).unwrap();
 
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining {
             schedule: vec![
-                (date1, Money::new(750_000.0, Currency::EUR)), // Different currency
+                (
+                    date1,
+                    Money::new(750_000.0, Currency::EUR).expect("valid money fixture"),
+                ), // Different currency
             ],
         },
     };
@@ -150,11 +171,17 @@ fn test_amortization_spec_step_remaining_validation_increasing() {
     let date2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
 
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining {
             schedule: vec![
-                (date1, Money::new(500_000.0, Currency::USD)),
-                (date2, Money::new(750_000.0, Currency::USD)), // Increasing - invalid
+                (
+                    date1,
+                    Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    date2,
+                    Money::new(750_000.0, Currency::USD).expect("valid money fixture"),
+                ), // Increasing - invalid
             ],
         },
     };
@@ -166,7 +193,7 @@ fn test_amortization_spec_step_remaining_validation_increasing() {
 #[test]
 fn test_amortization_spec_percent_per_period_validation() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.05 },
     };
 
@@ -179,9 +206,12 @@ fn test_amortization_spec_custom_principal_validation_ok() {
     let date1 = Date::from_calendar_date(2025, time::Month::March, 1).unwrap();
 
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::CustomPrincipal {
-            items: vec![(date1, Money::new(100_000.0, Currency::USD))],
+            items: vec![(
+                date1,
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+            )],
         },
     };
 
@@ -194,10 +224,13 @@ fn test_amortization_spec_custom_principal_validation_currency_mismatch() {
     let date1 = Date::from_calendar_date(2025, time::Month::March, 1).unwrap();
 
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::CustomPrincipal {
             items: vec![
-                (date1, Money::new(100_000.0, Currency::EUR)), // Different currency
+                (
+                    date1,
+                    Money::new(100_000.0, Currency::EUR).expect("valid money fixture"),
+                ), // Different currency
             ],
         },
     };
@@ -217,7 +250,7 @@ fn test_amortization_spec_default() {
 #[test]
 fn test_amortization_spec_percent_nan_rejected() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: f64::NAN },
     };
 
@@ -228,7 +261,7 @@ fn test_amortization_spec_percent_nan_rejected() {
 #[test]
 fn test_amortization_spec_percent_infinity_rejected() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: f64::INFINITY },
     };
 
@@ -239,7 +272,7 @@ fn test_amortization_spec_percent_infinity_rejected() {
 #[test]
 fn test_amortization_spec_percent_neg_infinity_rejected() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod {
             pct: f64::NEG_INFINITY,
         },
@@ -255,7 +288,7 @@ fn test_amortization_spec_percent_neg_infinity_rejected() {
 #[test]
 fn test_amortization_spec_percent_negative_rejected() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: -0.05 },
     };
 
@@ -266,7 +299,7 @@ fn test_amortization_spec_percent_negative_rejected() {
 #[test]
 fn test_amortization_spec_percent_over_100_rejected() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: 1.5 },
     };
 
@@ -277,7 +310,7 @@ fn test_amortization_spec_percent_over_100_rejected() {
 #[test]
 fn test_amortization_spec_percent_zero_ok() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.0 },
     };
 
@@ -288,7 +321,7 @@ fn test_amortization_spec_percent_zero_ok() {
 #[test]
 fn test_amortization_spec_percent_100_ok() {
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::PercentOfOriginalPerPeriod { pct: 1.0 },
     };
 
@@ -303,7 +336,7 @@ fn test_amortization_spec_percent_100_ok() {
 fn test_amortization_spec_step_remaining_empty_ok() {
     // Empty schedule means no amortization events - should be valid
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::StepRemaining { schedule: vec![] },
     };
 
@@ -318,7 +351,7 @@ fn test_amortization_spec_step_remaining_empty_ok() {
 fn test_amortization_spec_custom_principal_empty_ok() {
     // Empty custom principal means no exchanges - should be valid
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::CustomPrincipal { items: vec![] },
     };
 
@@ -333,9 +366,9 @@ fn test_amortization_spec_custom_principal_empty_ok() {
 fn test_amortization_spec_linear_to_zero_ok() {
     // Full amortization to zero is a valid scenario (e.g., fully amortizing loan)
     let notional = Notional {
-        initial: Money::new(1_000_000.0, Currency::USD),
+        initial: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         amort: AmortizationSpec::LinearTo {
-            final_notional: Money::new(0.0, Currency::USD),
+            final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         },
     };
 
@@ -385,13 +418,13 @@ mod computation {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
             .principal(init, issue, maturity)
             .amortization(AmortizationSpec::LinearTo {
-                final_notional: Money::new(0.0, Currency::USD),
+                final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             })
             .fixed_cf(standard_fixed_spec());
 
@@ -437,13 +470,16 @@ mod computation {
     fn custom_principal_on_issue_date_is_emitted_once() {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2025, Month::April, 15).unwrap();
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
             .principal(init, issue, maturity)
             .amortization(AmortizationSpec::CustomPrincipal {
-                items: vec![(issue, Money::new(100_000.0, Currency::USD))],
+                items: vec![(
+                    issue,
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+                )],
             })
             .fixed_cf(standard_fixed_spec());
 
@@ -486,7 +522,7 @@ mod computation {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
@@ -548,7 +584,7 @@ mod computation {
         let q3 = Date::from_calendar_date(2025, Month::October, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
@@ -599,14 +635,14 @@ mod computation {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         // Test with full amortization to zero
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
             .principal(init, issue, maturity)
             .amortization(AmortizationSpec::LinearTo {
-                final_notional: Money::new(0.0, Currency::USD),
+                final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             })
             .fixed_cf(standard_fixed_spec());
 
@@ -651,8 +687,8 @@ mod computation {
     fn custom_principal_at_maturity_emits_requested_amortization_and_residual_notional() {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-        let init = Money::new(1_000_000.0, Currency::USD);
-        let custom_payment = Money::new(250_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
+        let custom_payment = Money::new(250_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder.principal(init, issue, maturity).amortization(
@@ -701,14 +737,20 @@ mod computation {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let pay_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         let mut builder = CashFlowSchedule::builder();
         let _ = builder.principal(init, issue, maturity).amortization(
             AmortizationSpec::CustomPrincipal {
                 items: vec![
-                    (pay_date, Money::new(100_000.0, Currency::USD)),
-                    (pay_date, Money::new(-100_000.0, Currency::USD)),
+                    (
+                        pay_date,
+                        Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+                    ),
+                    (
+                        pay_date,
+                        Money::new(-100_000.0, Currency::USD).expect("valid money fixture"),
+                    ),
                 ],
             },
         );
@@ -731,12 +773,18 @@ mod computation {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let q2 = Date::from_calendar_date(2025, Month::July, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         // Step down to 800K mid-life, then a final 200K target at maturity.
         let schedule_pairs = vec![
-            (q2, Money::new(800_000.0, Currency::USD)),
-            (maturity, Money::new(200_000.0, Currency::USD)),
+            (
+                q2,
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                maturity,
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         ];
 
         let mut builder = CashFlowSchedule::builder();
@@ -799,7 +847,7 @@ mod computation {
     fn percent_per_period_at_maturity_emits_scheduled_amortization_and_residual_notional() {
         let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         // 10% of original per quarter: 100K on each of 4 quarterly dates,
         // leaving 600K residual at maturity.
@@ -856,14 +904,26 @@ mod computation {
         let q2_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
         let q3_date = Date::from_calendar_date(2025, Month::October, 15).unwrap();
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
         // Step schedule: 1M -> 800K -> 500K -> 200K -> 0
         let schedule_pairs = vec![
-            (q1_date, Money::new(800_000.0, Currency::USD)),
-            (q2_date, Money::new(500_000.0, Currency::USD)),
-            (q3_date, Money::new(200_000.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (
+                q1_date,
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                q2_date,
+                Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                q3_date,
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                maturity,
+                Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            ),
         ];
 
         let mut builder = CashFlowSchedule::builder();
@@ -917,12 +977,12 @@ mod computation {
         let mut spec = standard_fixed_spec();
         spec.schedule.payment_lag_days = 2;
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+        let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
             .principal(init, issue, maturity)
             .amortization(AmortizationSpec::LinearTo {
-                final_notional: Money::new(0.0, Currency::USD),
+                final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             })
             .fixed_cf(spec);
 

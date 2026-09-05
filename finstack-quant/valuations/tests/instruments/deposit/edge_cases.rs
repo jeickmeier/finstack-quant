@@ -17,7 +17,7 @@ fn test_zero_period_deposit() {
     let base = date(2025, 1, 1);
     let result = Deposit::builder()
         .id(InstrumentId::new("DEP-ZERO-PERIOD"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(base)
         .day_count(DayCount::Act360)
@@ -77,7 +77,7 @@ fn test_very_small_notional() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(0.01, Currency::USD))
+        .notional(Money::new(0.01, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .build();
@@ -97,7 +97,7 @@ fn test_very_large_notional() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .build();
@@ -262,7 +262,7 @@ fn test_missing_quote_rate_defaults_to_zero() {
 
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-NO-QUOTE"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
@@ -344,14 +344,14 @@ fn test_multiple_currencies_independent() {
     let ctx_eur = ctx_with_standard_disc(base, "EUR-OIS");
 
     let dep_usd = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .discount_curve_id("USD-OIS")
         .build();
 
     let dep_eur = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .discount_curve_id("EUR-OIS")
@@ -391,7 +391,7 @@ fn test_business_day_convention_adjustment_causes_effective_date_crossover() {
     // Construction rejects dates that cross after business-day adjustments.
     let result = Deposit::builder()
         .id(InstrumentId::new("DEP-CROSSOVER"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(date(2025, 1, 3)) // Friday - trade date
         .maturity(date(2025, 1, 6)) // Monday - just 1 business day after Friday
         .day_count(DayCount::Act360)

@@ -20,7 +20,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
             0.0,
             100.0,
             finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
-            Money::new(100.0, currency),
+            Money::new(100.0, currency).expect("valid money fixture"),
             finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCoupon::Fixed {
                 rate: 0.05,
             },
@@ -48,20 +48,20 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
         .expect("build waterfall");
 
     let context = WaterfallContext {
-        available_cash: Money::new(1_000_000.0, currency),
-        interest_collections: Money::new(0.0, currency),
-        principal_collections: Money::new(1_000_000.0, currency),
+        available_cash: Money::new(1_000_000.0, currency).expect("valid money fixture"),
+        interest_collections: Money::new(0.0, currency).expect("valid money fixture"),
+        principal_collections: Money::new(1_000_000.0, currency).expect("valid money fixture"),
         payment_date: Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
         period_start: Date::from_calendar_date(2023, time::Month::October, 1).unwrap(),
         valuation_date: Date::from_calendar_date(2023, time::Month::October, 1).unwrap(),
-        pool_balance: Money::new(1_000_000.0, currency),
+        pool_balance: Money::new(1_000_000.0, currency).expect("valid money fixture"),
         market: &market,
         tranche_balances: None,
         asset_balances: None,
         deferred_interest: None,
-        reserve_balance: Money::new(0.0, currency),
-        restricted_cash: Money::new(0.0, Currency::USD),
-        recovery_proceeds: Money::new(0.0, currency),
+        reserve_balance: Money::new(0.0, currency).expect("valid money fixture"),
+        restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        recovery_proceeds: Money::new(0.0, currency).expect("valid money fixture"),
         floating_rate_shift: 0.0,
     };
 

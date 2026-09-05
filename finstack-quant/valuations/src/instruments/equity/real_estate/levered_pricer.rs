@@ -29,7 +29,7 @@ pub(crate) fn compute_pv(
         }
         financing_pv += pv.amount();
     }
-    Ok(Money::new(asset_pv.amount() - financing_pv, inst.currency))
+    Money::new(asset_pv.amount() - financing_pv, inst.currency)
 }
 
 pub(crate) fn validate_currency(inst: &LeveredRealEstateEquity) -> finstack_quant_core::Result<()> {
@@ -84,7 +84,7 @@ pub(crate) fn outstanding_before(
     target: Date,
     currency: Currency,
 ) -> Money {
-    let mut last = Money::new(0.0, currency);
+    let mut last = Money::from((0_i64, currency));
     for (d, amt) in out_path {
         if *d < target {
             last = *amt;
@@ -171,5 +171,5 @@ pub(crate) fn financing_payoff_at_exit(
         let payoff = outstanding_before(&out_path, exit, inst.currency);
         payoff_amt += payoff.amount().abs();
     }
-    Ok(Money::new(payoff_amt, inst.currency))
+    Money::new(payoff_amt, inst.currency)
 }

@@ -77,7 +77,7 @@ fn test_implied_vol_round_trips_pricing_vol() {
     let mut caplet = CapFloor {
         id: "CAPLET_RT".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -152,7 +152,7 @@ fn test_implied_vol_fails_without_market_price_override() {
     let caplet = CapFloor {
         id: "CAPLET_TEST".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -214,7 +214,7 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
     let mut caplet = CapFloor::new(
         "SOFR-IV-ROUNDTRIP",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         start,
         end,
@@ -267,7 +267,7 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
     let mut caplet = CapFloor::new(
         "NORMAL-IV-NEGATIVE",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.0,
         date!(2024 - 07 - 02),
         date!(2024 - 10 - 02),
@@ -311,7 +311,7 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
     let mut caplet = CapFloor::new(
         "SHIFTED-IV",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.0,
         date!(2024 - 07 - 02),
         date!(2024 - 10 - 02),
@@ -355,7 +355,7 @@ fn same_day_caplet_does_not_synthesize_option_time() {
     let mut caplet = CapFloor::new(
         "SAME-DAY-IV",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         date!(2024 - 06 - 01),
@@ -395,7 +395,7 @@ fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
     let mut caplet = CapFloor::new(
         "AUTO-IV-NEGATIVE",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.0,
         date!(2024 - 07 - 02),
         date!(2024 - 10 - 02),

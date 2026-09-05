@@ -31,7 +31,7 @@ fn flat_eur_market(as_of: time::Date) -> MarketContext {
 fn bund_style_bond(issue: time::Date, maturity: time::Date) -> Bond {
     Bond::builder()
         .id("BUND-MOO".into())
-        .notional(Money::new(100.0, Currency::EUR))
+        .notional(Money::new(100.0, Currency::EUR).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(

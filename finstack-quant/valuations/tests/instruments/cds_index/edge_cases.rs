@@ -154,7 +154,7 @@ fn test_constituents_weights_dont_sum_to_one() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-BAD-WEIGHTS",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -187,7 +187,7 @@ fn test_negative_weights() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-NEG-WEIGHTS",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -214,7 +214,7 @@ fn test_recovery_rate_zero() {
     let idx = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-ZERO-REC",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -249,7 +249,7 @@ fn test_recovery_rate_one() {
     let idx = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-FULL-REC",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -284,7 +284,7 @@ fn test_index_factor_zero() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-ZERO-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -317,7 +317,7 @@ fn test_index_factor_greater_than_one() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-BIG-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -348,7 +348,7 @@ fn test_par_spread_rejects_invalid_index_factor() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-PAR-BAD-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -378,7 +378,7 @@ fn test_empty_constituents_list() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-EMPTY",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -408,7 +408,7 @@ fn test_missing_constituent_hazard_curve() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-MISSING-CONST",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -438,7 +438,8 @@ fn test_upfront_payment_larger_than_npv() {
     let mut idx = standard_single_curve_index("CDX-BIG-UPFRONT", start, end, 10_000_000.0);
     idx.instrument_pricing_overrides
         .market_quotes
-        .upfront_payment = Some(Money::new(10_000_000.0, Currency::USD));
+        .upfront_payment =
+        Some(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"));
 
     let ctx = standard_market_context(as_of);
     let result = idx.value(&ctx, as_of);
@@ -456,7 +457,8 @@ fn test_negative_upfront_payment() {
     let mut idx = standard_single_curve_index("CDX-NEG-UPFRONT", start, end, 10_000_000.0);
     idx.instrument_pricing_overrides
         .market_quotes
-        .upfront_payment = Some(Money::new(-100_000.0, Currency::USD));
+        .upfront_payment =
+        Some(Money::new(-100_000.0, Currency::USD).expect("valid money fixture"));
 
     let ctx = standard_market_context(as_of);
     let result = idx.value(&ctx, as_of);

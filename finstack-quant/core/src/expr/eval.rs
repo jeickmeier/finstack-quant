@@ -7,7 +7,7 @@
 //!
 //! # Evaluation Strategy
 //!
-//! - **Simple mode**: Direct recursive evaluation (no planning)
+//! - **Planning**: Eager compilation or a lazily cached DAG plan
 //! - **DAG mode**: Topological order execution with sub-expression dedup
 //! - **Scratch buffers**: Reused to minimize allocations
 //! - **Deterministic**: Identical results across runs
@@ -23,22 +23,8 @@ use std::vec::Vec;
 
 /// Options controlling expression evaluation strategy.
 ///
-/// Allows callers to override the execution plan for a single evaluation.
-/// Useful for scenario analysis where different plans may be beneficial.
-///
-/// # Fields
-///
-/// - `plan`: Internal optional pre-built execution plan, exposed through
-///   [`EvalOpts::has_plan`]. **Not part of the wire format** — the field is
-///   `#[serde(skip)]` so a deserialized `EvalOpts` can never inject an
-///   arbitrary execution plan that `eval()` would execute in place of the
-///   compiled AST; plans can only be attached in-process.
-/// - `max_arena_bytes`: Maximum scratch arena allocation in bytes
-///
-/// # Serde
-///
-/// Deserialization is strict (`deny_unknown_fields`): unknown fields —
-/// including `plan`, which older versions serialized — are rejected.
+/// Limits scratch arena allocation while the compiled expression owns its plan.
+/// Deserialization rejects unknown fields, including execution-plan overrides.
 ///
 /// # Examples
 ///
@@ -56,15 +42,6 @@ use std::vec::Vec;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvalOpts {
-    /// Optional pre-built execution plan to follow. If not provided, the
-    /// evaluator will either use the internal plan (if present) or fallback to
-    /// a minimal evaluation path for the expression.
-    ///
-    /// Skipped by serde: the plan (with its internal `DagNode` topology) is
-    /// not wire format, and a deserialized `EvalOpts` must not be able to
-    /// inject a plan that `eval()` executes instead of the compiled AST.
-    #[serde(skip)]
-    pub(crate) plan: Option<ExecutionPlan>,
     /// Maximum arena allocation in bytes. Defaults to 1 GB.
     /// Set to 0 to disable the check.
     #[serde(default = "default_max_arena_bytes")]
@@ -78,16 +55,8 @@ fn default_max_arena_bytes() -> usize {
 impl Default for EvalOpts {
     fn default() -> Self {
         Self {
-            plan: None,
             max_arena_bytes: default_max_arena_bytes(),
         }
-    }
-}
-
-impl EvalOpts {
-    /// Return whether an explicit execution plan is attached.
-    pub fn has_plan(&self) -> bool {
-        self.plan.is_some()
     }
 }
 
@@ -276,13 +245,11 @@ impl CompiledExpr {
         cols: &[&[f64]],
         opts: EvalOpts,
     ) -> crate::Result<EvaluationResult> {
-        // Decide on execution plan preference: opts > self > lazy-cached auto-build.
+        // Decide on execution plan preference: self > lazy-cached auto-build.
         // Use references to avoid cloning ExecutionPlan (which contains Vec<DagNode>
         // with recursive Expr trees). Only build a new owned plan when none exists.
         let owned_plan;
-        let plan_to_use: &ExecutionPlan = if let Some(ref plan) = opts.plan {
-            plan
-        } else if let Some(ref plan) = self.plan {
+        let plan_to_use: &ExecutionPlan = if let Some(ref plan) = self.plan {
             plan
         } else if let Some(plan) = self.lazy_plan.get() {
             plan
@@ -400,7 +367,7 @@ impl CompiledExpr {
         };
 
         // Stamp the metadata carried by the execution plan (set by the caller
-        // via `with_planning` or `EvalOpts.plan`); auto-built plans carry the
+        // via `with_planning`); auto-built plans carry the
         // default-config snapshot. The evaluator does not record
         // timings/cache/parallel.
         let meta = plan_to_use.meta.clone();
@@ -717,8 +684,8 @@ impl CompiledExpr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FinstackConfig;
-    use crate::expr::{BinOp, Expr, Function, SimpleContext, UnaryOp};
+
+    use crate::expr::{BinOp, Expr, SimpleContext, UnaryOp};
 
     fn sample_context() -> (SimpleContext, Vec<Vec<f64>>) {
         let ctx = SimpleContext::new(["x", "y"]).expect("unique columns");
@@ -750,33 +717,6 @@ mod tests {
     }
 
     #[test]
-    fn eval_allows_external_plan_override() {
-        let (ctx, data) = sample_context();
-        let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
-        let expr = Expr::call(Function::Diff, vec![Expr::column("x"), Expr::literal(1.0)]);
-        let meta = crate::config::results_meta(&FinstackConfig::default());
-        let compiled = CompiledExpr::with_planning(expr, meta).unwrap();
-        let external_plan = compiled.plan.clone();
-
-        let result = compiled
-            .eval(
-                &ctx,
-                &cols,
-                EvalOpts {
-                    plan: external_plan,
-                    max_arena_bytes: default_max_arena_bytes(),
-                },
-            )
-            .unwrap()
-            .values;
-
-        assert!(result[0].is_nan());
-        assert!((result[1] - 0.3).abs() < 1e-12);
-        assert!((result[2] - 2.5).abs() < 1e-12);
-        assert!((result[3] - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
     fn arena_rejects_oversized_allocation() {
         let ast = Expr::bin_op(BinOp::Add, Expr::column("x"), Expr::column("y"));
         let expr = CompiledExpr::new(ast);
@@ -787,7 +727,6 @@ mod tests {
 
         let opts = EvalOpts {
             max_arena_bytes: 100,
-            ..EvalOpts::default()
         };
         let result = expr.eval(&ctx, &cols, opts);
         assert!(result.is_err());
@@ -817,10 +756,7 @@ mod tests {
         let col = vec![1.0, 2.0, 3.0];
         let cols: Vec<&[f64]> = vec![&col];
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
-        let opts = EvalOpts {
-            max_arena_bytes: 0,
-            ..EvalOpts::default()
-        };
+        let opts = EvalOpts { max_arena_bytes: 0 };
         let result = expr.eval(&ctx, &cols, opts);
         assert!(result.is_ok());
     }

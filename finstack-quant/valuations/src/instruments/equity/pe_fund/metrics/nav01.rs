@@ -29,23 +29,28 @@ const NAV_BUMP_PCT: f64 = 0.01;
 
 /// Return a copy of the fund with all distribution/proceeds events and the
 /// stated `unrealized_nav` scaled by `1 + bump`.
-fn scaled_fund(fund: &PrivateMarketsFund, bump: f64) -> PrivateMarketsFund {
-    let mut scaled = fund.clone();
-    for event in &mut scaled.events {
-        if matches!(
-            event.kind,
-            FundEventKind::Distribution | FundEventKind::Proceeds
-        ) {
-            event.amount = Money::new(
-                event.amount.amount() * (1.0 + bump),
-                event.amount.currency(),
-            );
+fn scaled_fund(
+    fund: &PrivateMarketsFund,
+    bump: f64,
+) -> finstack_quant_core::Result<PrivateMarketsFund> {
+    Ok({
+        let mut scaled = fund.clone();
+        for event in &mut scaled.events {
+            if matches!(
+                event.kind,
+                FundEventKind::Distribution | FundEventKind::Proceeds
+            ) {
+                event.amount = Money::new(
+                    event.amount.amount() * (1.0 + bump),
+                    event.amount.currency(),
+                )?;
+            }
         }
-    }
-    if let Some(nav) = scaled.unrealized_nav {
-        scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency()));
-    }
-    scaled
+        if let Some(nav) = scaled.unrealized_nav {
+            scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency())?);
+        }
+        scaled
+    })
 }
 
 /// NAV01 calculator for PrivateMarketsFund.
@@ -56,10 +61,10 @@ impl MetricCalculator for Nav01Calculator {
         let fund: &PrivateMarketsFund = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let pv_up = scaled_fund(fund, NAV_BUMP_PCT)
+        let pv_up = scaled_fund(fund, NAV_BUMP_PCT)?
             .value(context.curves.as_ref(), as_of)?
             .amount();
-        let pv_down = scaled_fund(fund, -NAV_BUMP_PCT)
+        let pv_down = scaled_fund(fund, -NAV_BUMP_PCT)?
             .value(context.curves.as_ref(), as_of)?
             .amount();
 

@@ -32,11 +32,11 @@ fn test_export_to_table_long() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -73,11 +73,11 @@ fn test_export_to_table_wide() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -124,7 +124,7 @@ fn test_export_complete_pl_model() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             )],
         )
@@ -139,7 +139,10 @@ fn test_export_complete_pl_model() {
         .unwrap()
         .value(
             "opex",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(20_000.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(20_000.0),
+            )],
         )
         .forecast(
             "opex",
@@ -186,19 +189,19 @@ fn test_export_with_multiple_periods() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(120_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(130_000.0),
                 ),
             ],
@@ -237,11 +240,11 @@ fn test_export_with_builtin_metrics() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -249,8 +252,14 @@ fn test_export_with_builtin_metrics() {
         .value(
             "cogs",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
             ],
         )
         .compute("gross_profit", "revenue - cogs")
@@ -295,10 +304,22 @@ fn test_export_preserves_period_order() {
         .value(
             "value",
             &[
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(4.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(2.0)),
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(3.0)),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(4.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(3.0),
+                ),
             ],
         )
         .build()

@@ -117,7 +117,7 @@ fn pv_per_scale_unit(pv_base: f64, scale: f64) -> f64 {
 /// `|instrument.notional().amount()|`, or an error under `NotionalWeight`.
 fn require_deal_notional_abs(instrument: &dyn Instrument, id: &str) -> Result<f64> {
     instrument
-        .notional()
+        .notional()?
         .map(|m| m.amount().abs())
         .ok_or_else(|| {
             Error::invalid_input(format!(

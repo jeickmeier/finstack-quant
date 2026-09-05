@@ -104,7 +104,7 @@ pub fn create_quarterly_autocallable(
         final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
         participation_rate: 1.0,
         cap_level: 1.5, // 150% cap
-        notional: Money::new(100_000.0, Currency::USD),
+        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         day_count,
         discount_curve_id: CurveId::new(DISC_ID),
         spot_id: SPOT_ID.into(),
@@ -142,7 +142,7 @@ pub fn build_market_with_day_count(
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD)),
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
 }

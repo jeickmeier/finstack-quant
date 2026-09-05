@@ -167,7 +167,7 @@ fn money_from_expr(
     currency: finstack_quant_core::currency::Currency,
     expr: &str,
 ) -> Result<Money> {
-    Money::try_new(amount, currency).map_err(|e| {
+    Money::new(amount, currency).map_err(|e| {
         crate::error::Error::capital_structure(format!(
             "waterfall input '{expr}' produced the amount {amount}, which is not a \
              representable {currency} value: {e}"
@@ -220,7 +220,7 @@ fn size_named_prepay(
             .max(0.0)
     })?;
     for (s, allocated) in staged.iter_mut().zip(allocations) {
-        *field(s) = Money::try_new(allocated, currency)?;
+        *field(s) = Money::new(allocated, currency)?;
     }
     Ok(())
 }
@@ -402,7 +402,7 @@ pub fn execute_waterfall(
             &mut warnings,
         )?
     } else {
-        Money::new(0.0, cash_currency)
+        Money::from((0_i64, cash_currency))
     };
     let available_cash = {
         let available_cash_node = &waterfall_spec.available_cash_node;
@@ -502,7 +502,7 @@ pub fn execute_waterfall(
         // carried principal shortfalls can push the claim above the balance;
         // paying more principal than is owed would destroy cash that should
         // have flowed to equity).
-        let scheduled_principal = Money::try_new(
+        let scheduled_principal = Money::new(
             staged_breakdown
                 .principal_payment
                 .amount()
@@ -516,12 +516,12 @@ pub fn execute_waterfall(
             breakdown: staged_breakdown,
             opening_balance,
             net_new_funding,
-            sweep_principal: Money::new(0.0, currency),
-            mandatory_principal: Money::new(0.0, currency),
-            voluntary_principal: Money::new(0.0, currency),
+            sweep_principal: Money::from((0_i64, currency)),
+            mandatory_principal: Money::from((0_i64, currency)),
+            voluntary_principal: Money::from((0_i64, currency)),
             class_rank,
             scheduled_principal,
-            toggled_pik_moved: Money::new(0.0, currency),
+            toggled_pik_moved: Money::from((0_i64, currency)),
         });
     }
 
@@ -533,7 +533,7 @@ pub fn execute_waterfall(
     // rank ahead of the Sweep rung. When no ECF sweep is configured,
     // `sweep_amount` is zero.
     let mut remaining_sweep = if equity_priority < extra_principal_priority {
-        Money::new(0.0, sweep_amount.currency())
+        Money::from((0_i64, sweep_amount.currency()))
     } else {
         sweep_amount
     };
@@ -554,7 +554,7 @@ pub fn execute_waterfall(
     })?;
     for (s, allocated) in staged.iter_mut().zip(sweep_allocations) {
         let currency = s.breakdown.interest_expense_cash.currency();
-        s.sweep_principal = Money::try_new(allocated, currency)?;
+        s.sweep_principal = Money::new(allocated, currency)?;
     }
 
     size_named_prepay(
@@ -594,7 +594,7 @@ pub fn execute_waterfall(
             let moved = s.breakdown.interest_expense_cash;
             s.toggled_pik_moved = moved;
             s.breakdown.interest_expense_pik += moved;
-            s.breakdown.interest_expense_cash = Money::new(0.0, currency);
+            s.breakdown.interest_expense_cash = Money::from((0_i64, currency));
         }
     }
 
@@ -649,7 +649,7 @@ pub fn execute_waterfall(
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
                         s.scheduled_principal =
-                            Money::try_new(allocated, s.scheduled_principal.currency())?;
+                            Money::new(allocated, s.scheduled_principal.currency())?;
                     }
                 }
                 PaymentPriority::MandatoryPrepayment => {
@@ -658,7 +658,7 @@ pub fn execute_waterfall(
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
                         s.mandatory_principal =
-                            Money::try_new(allocated, s.mandatory_principal.currency())?;
+                            Money::new(allocated, s.mandatory_principal.currency())?;
                     }
                 }
                 PaymentPriority::Sweep => {
@@ -666,8 +666,7 @@ pub fn execute_waterfall(
                         s.sweep_principal.amount().max(0.0)
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
-                        s.sweep_principal =
-                            Money::try_new(allocated, s.sweep_principal.currency())?;
+                        s.sweep_principal = Money::new(allocated, s.sweep_principal.currency())?;
                     }
                 }
                 PaymentPriority::VoluntaryPrepayment => {
@@ -676,7 +675,7 @@ pub fn execute_waterfall(
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
                         s.voluntary_principal =
-                            Money::try_new(allocated, s.voluntary_principal.currency())?;
+                            Money::new(allocated, s.voluntary_principal.currency())?;
                     }
                 }
                 PaymentPriority::Equity => {}
@@ -695,7 +694,7 @@ pub fn execute_waterfall(
                 let currency = s.breakdown.interest_expense_cash.currency();
                 shortfalls.insert(
                     s.instrument_id.clone(),
-                    Money::try_new(unpaid_interest, currency)?,
+                    Money::new(unpaid_interest, currency)?,
                 );
                 warnings.push(EvalWarning::CapitalStructure {
                     period: *_period_id,
@@ -718,7 +717,7 @@ pub fn execute_waterfall(
                 let currency = s.breakdown.fees.currency();
                 shortfalls.insert(
                     format!("fees::{}", s.instrument_id),
-                    Money::try_new(unpaid_fees, currency)?,
+                    Money::new(unpaid_fees, currency)?,
                 );
                 warnings.push(EvalWarning::CapitalStructure {
                     period: *_period_id,
@@ -742,7 +741,7 @@ pub fn execute_waterfall(
                 let currency = s.scheduled_principal.currency();
                 shortfalls.insert(
                     format!("principal::{}", s.instrument_id),
-                    Money::try_new(unpaid_principal, currency)?,
+                    Money::new(unpaid_principal, currency)?,
                 );
                 warnings.push(EvalWarning::CapitalStructure {
                     period: *_period_id,
@@ -817,7 +816,7 @@ pub fn execute_waterfall(
             .checked_add(voluntary_principal)?;
         let desired = scheduled_principal.checked_add(extra_principal)?;
         let principal_payment = if desired.amount() > payable_balance {
-            Money::try_new(payable_balance, currency)?
+            Money::new(payable_balance, currency)?
         } else {
             desired
         };
@@ -842,9 +841,9 @@ pub fn execute_waterfall(
         // agnostic fallback; modelers in JPY should override via explicit
         // rounding upstream.
         let post_sweep_balance = if post_pay_amount.abs() < 0.005 {
-            Money::new(0.0, currency)
+            Money::from((0_i64, currency))
         } else {
-            Money::try_new(post_pay_amount, currency)?
+            Money::new(post_pay_amount, currency)?
         };
         let fully_paid = post_sweep_balance.amount() == 0.0;
 
@@ -858,7 +857,7 @@ pub fn execute_waterfall(
                 .cumulative_toggled_pik
                 .get(instrument_id.as_str())
                 .copied()
-                .unwrap_or_else(|| Money::new(0.0, currency));
+                .unwrap_or_else(|| Money::from((0_i64, currency)));
             state.cumulative_toggled_pik.insert(
                 instrument_id.clone(),
                 current.checked_add(toggled_pik_moved)?,
@@ -876,7 +875,7 @@ pub fn execute_waterfall(
         // accrual has been capitalized into principal) or when the debt was
         // fully paid off and there is no remaining balance to accrue on.
         if fully_paid || pik_capitalized_this_step {
-            breakdown.accrued_interest = Money::new(0.0, currency);
+            breakdown.accrued_interest = Money::from((0_i64, currency));
         }
 
         // Unpaid interest from the available-cash cap accrues and is carried as
@@ -960,7 +959,7 @@ mod tests {
 
     #[test]
     fn test_execute_waterfall_applies_ecf_sweep_and_updates_state() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[
@@ -972,13 +971,14 @@ mod tests {
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut tl_breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        tl_breakdown.principal_payment = Money::new(100_000.0, Currency::USD);
+        tl_breakdown.principal_payment = Money::from((100_000_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), tl_breakdown);
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::from((10_000_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1042,18 +1042,18 @@ mod tests {
     /// downstream shortfall warnings that never mention the negative pool.
     #[test]
     fn negative_available_cash_is_warned_before_flooring() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", -500.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1095,20 +1095,20 @@ mod tests {
     /// sum exactly to the available pool when claims exceed it.
     #[test]
     fn capped_waterfall_conserves_available_cash_identity() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 260.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
-        breakdown.principal_payment = Money::new(200.0, Currency::USD);
-        breakdown.fees = Money::new(50.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
+        breakdown.principal_payment = Money::from((200_i64, Currency::USD));
+        breakdown.fees = Money::from((50_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1157,19 +1157,19 @@ mod tests {
     /// warnings — no diagnostic pointing at the broken formula.
     #[test]
     fn available_cash_node_rejects_non_finite_value() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         // `0 / 0` is NaN under the DSL's documented division-by-zero policy.
         let context = build_context(period, &[("cash", 0.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1203,7 +1203,7 @@ mod tests {
     /// `cs.*` debt service in that formula double-pays interest / principal.
     #[test]
     fn available_cash_node_rejects_cs_debt_service_formula() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[("ebitda", 1_000_000.0), ("cash_available", 500_000.0)],
@@ -1211,13 +1211,13 @@ mod tests {
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let stack = vec![
             PaymentPriority::Fees,
@@ -1262,18 +1262,18 @@ mod tests {
     /// panics beyond it, which would abort evaluation from ordinary model data.
     #[test]
     fn available_cash_node_rejects_amount_beyond_decimal_range() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 1e30)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1305,19 +1305,21 @@ mod tests {
 
     #[test]
     fn period_close_rejects_computed_balance_beyond_decimal_range() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 0.0)]);
         let contractual_flows = IndexMap::from([(
             "TL-1".to_string(),
             CashflowBreakdown::with_currency(Currency::USD),
         )]);
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(6e28, Currency::USD));
-        state
-            .period_new_funding
-            .insert("TL-1".to_string(), Money::new(6e28, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::new(6e28, Currency::USD).expect("valid money fixture"),
+        );
+        state.period_new_funding.insert(
+            "TL-1".to_string(),
+            Money::new(6e28, Currency::USD).expect("valid money fixture"),
+        );
         let waterfall = WaterfallSpec {
             available_cash_node: "cash".into(),
             ..Default::default()
@@ -1349,18 +1351,18 @@ mod tests {
     /// value, so the bad arithmetic inside it left no trace at all.
     #[test]
     fn inline_expression_warnings_are_not_dropped() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 500.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1406,20 +1408,20 @@ mod tests {
     /// `CashflowBreakdown`'s fields are `pub`, so this is reachable input.
     #[test]
     fn inconsistent_breakdown_currency_errors_rather_than_panicking() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 1_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         // A caller-built breakdown with one leg in the wrong currency.
-        breakdown.interest_expense_pik = Money::new(50.0, Currency::EUR);
+        breakdown.interest_expense_pik = Money::from((50_i64, Currency::EUR));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         // A firing PIK toggle reaches `interest_expense_pik += moved` in Step
         // 4b, where `Money`'s asserting `AddAssign` aborts on the mismatch.
@@ -1459,18 +1461,18 @@ mod tests {
     /// evaluate `NaN < threshold` as false (i.e. "PIK not triggered").
     #[test]
     fn pik_liquidity_metric_rejects_non_finite_value() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("liquidity", 0.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1506,18 +1508,18 @@ mod tests {
 
     #[test]
     fn test_ecf_sweep_deducts_fees_before_sweep_percentage() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("ebitda", 1_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.fees = Money::new(100.0, Currency::USD);
+        breakdown.fees = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1560,7 +1562,7 @@ mod tests {
 
     #[test]
     fn test_pik_toggle_updates_state() {
-        let period = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = build_context(period, &[("liquidity", 50.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
@@ -1570,9 +1572,10 @@ mod tests {
         );
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-PIK".to_string(), Money::new(5_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-PIK".to_string(),
+            Money::from((5_000_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1621,17 +1624,18 @@ mod tests {
 
     #[test]
     fn test_pik_hysteresis_holds_pik_active_for_min_periods() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut tl_breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        tl_breakdown.interest_expense_cash = Money::new(10_000.0, Currency::USD);
+        tl_breakdown.interest_expense_cash = Money::from((10_000_i64, Currency::USD));
         contractual_flows.insert("TL-PIK".to_string(), tl_breakdown);
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-PIK".to_string(), Money::new(5_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-PIK".to_string(),
+            Money::from((5_000_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1725,7 +1729,7 @@ mod tests {
 
     #[test]
     fn test_execute_waterfall_conserves_sweep_across_multiple_instruments() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[
@@ -1746,12 +1750,14 @@ mod tests {
         );
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(200_000.0, Currency::USD));
-        state
-            .opening_balances
-            .insert("TL-2".to_string(), Money::new(300_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::from((200_000_i64, Currency::USD)),
+        );
+        state.opening_balances.insert(
+            "TL-2".to_string(),
+            Money::from((300_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1799,18 +1805,18 @@ mod tests {
 
     #[test]
     fn test_priority_of_payments_changes_pik_sweep_order() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("ebitda", 2_100.0), ("liquidity", 50.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut sweep_first_state = CapitalStructureState::new();
         sweep_first_state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(1_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((1_000_i64, Currency::USD)));
         let mut interest_first_state = sweep_first_state.clone();
 
         let sweep_first = WaterfallSpec {
@@ -1878,20 +1884,20 @@ mod tests {
 
     #[test]
     fn test_available_cash_caps_scheduled_payments_by_priority() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash_available", 150.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.fees = Money::new(20.0, Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
-        breakdown.principal_payment = Money::new(200.0, Currency::USD);
+        breakdown.fees = Money::from((20_i64, Currency::USD));
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
+        breakdown.principal_payment = Money::from((200_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(1_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((1_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1929,20 +1935,20 @@ mod tests {
     // equity` came out < available cash. This asserts strict conservation.
     #[test]
     fn test_over_amortization_conserves_available_cash() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let available = 1_000.0;
         let context = build_context(period, &[("cash_available", available)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
         // Scheduled principal (300) exceeds the opening balance (200).
-        breakdown.principal_payment = Money::new(300.0, Currency::USD);
+        breakdown.principal_payment = Money::from((300_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(200.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((200_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -1986,13 +1992,13 @@ mod tests {
     // `opening - principal` (no draw term), wiping the draw to zero.
     #[test]
     fn test_revolver_in_period_draw_preserved_at_close() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
         // In-period repayment of 30k against a freshly-drawn balance.
-        breakdown.principal_payment = Money::new(30_000.0, Currency::USD);
+        breakdown.principal_payment = Money::from((30_000_i64, Currency::USD));
         contractual_flows.insert("REVOLVER".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
@@ -2000,10 +2006,11 @@ mod tests {
         // period (net new funding recorded by the contractual pass).
         state
             .opening_balances
-            .insert("REVOLVER".to_string(), Money::new(0.0, Currency::USD));
-        state
-            .period_new_funding
-            .insert("REVOLVER".to_string(), Money::new(100_000.0, Currency::USD));
+            .insert("REVOLVER".to_string(), Money::from((0_i64, Currency::USD)));
+        state.period_new_funding.insert(
+            "REVOLVER".to_string(),
+            Money::from((100_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2039,18 +2046,18 @@ mod tests {
 
     #[test]
     fn test_sweep_before_amortization_does_not_produce_negative_balance() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("ebitda", 5_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.principal_payment = Money::new(300.0, Currency::USD);
+        breakdown.principal_payment = Money::from((300_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(500.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((500_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2093,7 +2100,7 @@ mod tests {
 
     #[test]
     fn test_ecf_defaults_cash_interest_from_contractual_flows() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[("ebitda", 1_000.0), ("taxes", 100.0), ("capex", 50.0)],
@@ -2101,13 +2108,13 @@ mod tests {
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(200.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((200_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2146,7 +2153,7 @@ mod tests {
 
     #[test]
     fn test_ecf_negative_cash_interest_does_not_reduce_ecf() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[("ebitda", 1_000.0), ("taxes", 100.0), ("capex", 50.0)],
@@ -2154,13 +2161,13 @@ mod tests {
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(-200.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((-200_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2201,18 +2208,18 @@ mod tests {
 
     #[test]
     fn test_scheduled_amortization_exceeding_balance_is_clamped() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.principal_payment = Money::new(300.0, Currency::USD);
+        breakdown.principal_payment = Money::from((300_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(200.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((200_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2254,17 +2261,17 @@ mod tests {
     /// next period's interest category.
     #[test]
     fn test_cash_shortfall_accrues_and_carries_forward() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(1_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((1_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2354,17 +2361,17 @@ mod tests {
 
     #[test]
     fn test_principal_shortfall_carries_forward_as_amortization_claim() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.principal_payment = Money::new(100.0, Currency::USD);
+        breakdown.principal_payment = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(1_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((1_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2444,20 +2451,20 @@ mod tests {
     /// Conservation: fees + cash interest + principal + equity == available cash.
     #[test]
     fn test_equity_distribution_conserves_available_cash() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash_available", 1_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.fees = Money::new(20.0, Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
-        breakdown.principal_payment = Money::new(200.0, Currency::USD);
+        breakdown.fees = Money::from((20_i64, Currency::USD));
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
+        breakdown.principal_payment = Money::from((200_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(5_000.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((5_000_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2503,18 +2510,19 @@ mod tests {
     /// cash and the full contractual coupon capitalizes.
     #[test]
     fn test_pik_coupon_never_consumes_cash_without_prepayment_priority() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash_available", 50.0), ("liquidity", 10.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::new(100.0, Currency::USD);
+        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
         contractual_flows.insert("TL-PIK".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-PIK".to_string(), Money::new(1_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-PIK".to_string(),
+            Money::from((1_000_i64, Currency::USD)),
+        );
 
         // No MandatoryPrepayment/VoluntaryPrepayment/Sweep in the stack.
         // (Amortization is listed because `available_cash_node` is set; it caps
@@ -2578,18 +2586,18 @@ mod tests {
 
     #[test]
     fn test_sweep_plus_amortization_exceeding_balance_is_clamped() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("ebitda", 10_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.principal_payment = Money::new(500.0, Currency::USD);
+        breakdown.principal_payment = Money::from((500_i64, Currency::USD));
         contractual_flows.insert("TL-1".to_string(), breakdown);
 
         let mut state = CapitalStructureState::new();
         state
             .opening_balances
-            .insert("TL-1".to_string(), Money::new(400.0, Currency::USD));
+            .insert("TL-1".to_string(), Money::from((400_i64, Currency::USD)));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2637,24 +2645,26 @@ mod tests {
 
     #[test]
     fn payment_classes_pay_senior_interest_before_junior() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash_available", 50_000.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
         let mut first_lien = CashflowBreakdown::with_currency(Currency::USD);
-        first_lien.interest_expense_cash = Money::new(50_000.0, Currency::USD);
+        first_lien.interest_expense_cash = Money::from((50_000_i64, Currency::USD));
         contractual_flows.insert("1L".to_string(), first_lien);
         let mut second_lien = CashflowBreakdown::with_currency(Currency::USD);
-        second_lien.interest_expense_cash = Money::new(50_000.0, Currency::USD);
+        second_lien.interest_expense_cash = Money::from((50_000_i64, Currency::USD));
         contractual_flows.insert("2L".to_string(), second_lien);
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("1L".to_string(), Money::new(1_000_000.0, Currency::USD));
-        state
-            .opening_balances
-            .insert("2L".to_string(), Money::new(1_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "1L".to_string(),
+            Money::from((1_000_000_i64, Currency::USD)),
+        );
+        state.opening_balances.insert(
+            "2L".to_string(),
+            Money::from((1_000_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -2717,7 +2727,7 @@ mod tests {
 
     #[test]
     fn mandatory_and_sweep_rungs_apply_independently() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
             &[
@@ -2734,9 +2744,10 @@ mod tests {
         );
 
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(10_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::from((10_000_000_i64, Currency::USD)),
+        );
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![

@@ -9,7 +9,7 @@
 //! use finstack_quant_core::prelude::*;
 //!
 //! let usd = Currency::USD;
-//! let amount = Money::new(100.0, usd);
+//! let amount = Money::from((100_i64, usd));
 //! let date = create_date(2025, time::Month::January, 15)?;
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```

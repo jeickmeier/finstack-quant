@@ -77,7 +77,7 @@ fn create_selective_benchmark_portfolio(
         let instrument_id = format!("SELECTIVE_DEPOSIT_{index:05}");
         let deposit = Deposit::builder()
             .id(instrument_id.clone().into())
-            .notional(Money::new(100_000.0, currency))
+            .notional(Money::new(100_000.0, currency).expect("valid money fixture"))
             .start_date(base_date())
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)

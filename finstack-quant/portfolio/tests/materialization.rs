@@ -27,7 +27,9 @@ use time::macros::date;
 fn deposit_envelope(index: usize) -> InstrumentEnvelope {
     let deposit = Deposit::builder()
         .id(format!("DEP-{index}").into())
-        .notional(Money::new(1_000_000.0 + index as f64, Currency::USD))
+        .notional(
+            Money::new(1_000_000.0 + index as f64, Currency::USD).expect("valid money fixture"),
+        )
         .start_date(date!(2025 - 01 - 01))
         .maturity(date!(2025 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -745,7 +747,7 @@ impl Instrument for NonSerializableInstrument {
         _curves: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(0.0, Currency::USD))
+        Ok(Money::new(0.0, Currency::USD).expect("valid money fixture"))
     }
 }
 

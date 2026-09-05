@@ -199,7 +199,7 @@ impl PyTenor {
                 "Tenor(count: int) requires a unit (TenorUnit or 'D'/'W'/'M'/'Y')",
             )
         })?;
-        Tenor::try_new(count, extract_tenor_unit(unit)?)
+        Tenor::new(count, extract_tenor_unit(unit)?)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

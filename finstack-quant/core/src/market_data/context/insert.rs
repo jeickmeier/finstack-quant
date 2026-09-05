@@ -421,7 +421,7 @@ impl MarketContext {
         schedule: impl Into<Arc<DividendSchedule>>,
     ) -> &mut Self {
         let arc_schedule = schedule.into();
-        let id = arc_schedule.id.to_owned();
+        let id = arc_schedule.get_id().to_owned();
         Arc::make_mut(&mut self.dividends).insert(id, arc_schedule);
         self
     }

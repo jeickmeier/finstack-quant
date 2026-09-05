@@ -200,12 +200,14 @@ pub fn build_cds_tranche_instrument(
     }
 
     // `upfront_pct` is expressed as a decimal fraction (e.g. -0.025 means -2.5% of tranche notional).
-    let upfront_payment = (upfront_pct.abs() > 0.0).then(|| {
-        (
-            spot,
-            Money::new(notional_amt * upfront_pct, convention_key.currency),
-        )
-    });
+    let upfront_payment = (upfront_pct.abs() > 0.0)
+        .then(|| {
+            Ok::<_, finstack_quant_core::Error>((
+                spot,
+                Money::new(notional_amt * upfront_pct, convention_key.currency)?,
+            ))
+        })
+        .transpose()?;
 
     let (effective_date, maturity_date, standard_imm_dates) = if overrides.use_imm_dates {
         // CDS-style effective date (prior IMM) and IMM-aligned maturity.
@@ -225,7 +227,7 @@ pub fn build_cds_tranche_instrument(
         series,
         attach_pct: attachment * 100.0, // Params expect percent
         detach_pct: detachment * 100.0, // Params expect percent
-        notional: Money::new(notional_amt, convention_key.currency),
+        notional: Money::new(notional_amt, convention_key.currency)?,
         maturity: maturity_date,
         running_coupon_bp: running_spread_bp,
         accumulated_loss: 0.0,

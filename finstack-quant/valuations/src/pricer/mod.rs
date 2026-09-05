@@ -169,7 +169,7 @@ mod tests {
             Ok(ValuationResult::stamped(
                 "dummy",
                 as_of,
-                Money::new(0.0, Currency::USD),
+                Money::from((0_i64, Currency::USD)),
             ))
         }
     }

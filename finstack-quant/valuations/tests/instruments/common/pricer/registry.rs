@@ -240,8 +240,8 @@ fn test_registry_price_with_unknown_pricer() {
     // Create a simple bond
     let bond = Bond::fixed(
         "TEST_BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -473,8 +473,8 @@ fn test_expect_inst_type_mismatch() {
     // Create a bond but try to expect it as IRS
     let bond = Bond::fixed(
         "TEST_BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -501,8 +501,8 @@ fn test_expect_inst_type_mismatch() {
 fn test_expect_inst_success() {
     let bond = Bond::fixed(
         "TEST_BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

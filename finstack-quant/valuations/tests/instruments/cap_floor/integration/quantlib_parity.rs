@@ -65,7 +65,7 @@ fn test_quantlib_parity_atm_cap() {
     let cap = CapFloor {
         id: "ATM_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -121,7 +121,7 @@ fn test_quantlib_parity_cap_floor_parity() {
     let cap = CapFloor {
         id: "CAP_PARITY".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -149,7 +149,7 @@ fn test_quantlib_parity_cap_floor_parity() {
     let floor = CapFloor {
         id: "FLOOR_PARITY".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -210,7 +210,7 @@ fn test_quantlib_parity_vol_sensitivity() {
     let cap = CapFloor {
         id: "CAP_VEGA".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -283,7 +283,7 @@ fn test_quantlib_parity_caplet_pricing() {
     let caplet = CapFloor {
         id: "CAPLET".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -338,7 +338,7 @@ fn test_quantlib_parity_moneyness() {
     let itm_cap = CapFloor {
         id: "ITM_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.03).expect("valid decimal"), // ITM (forward = 5%)
         start_date: as_of,
         maturity: end,
@@ -366,7 +366,7 @@ fn test_quantlib_parity_moneyness() {
     let atm_cap = CapFloor {
         id: "ATM_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -394,7 +394,7 @@ fn test_quantlib_parity_moneyness() {
     let otm_cap = CapFloor {
         id: "OTM_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.07).expect("valid decimal"), // OTM (forward = 5%)
         start_date: as_of,
         maturity: end,
@@ -457,7 +457,7 @@ fn test_quantlib_parity_delta_sign() {
     let cap = CapFloor {
         id: "CAP_DELTA".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -485,7 +485,7 @@ fn test_quantlib_parity_delta_sign() {
     let floor = CapFloor {
         id: "FLOOR_DELTA".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -564,7 +564,7 @@ fn test_quantlib_parity_gamma_positive() {
     let cap = CapFloor {
         id: "CAP_GAMMA".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -592,7 +592,7 @@ fn test_quantlib_parity_gamma_positive() {
     let floor = CapFloor {
         id: "FLOOR_GAMMA".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -668,7 +668,7 @@ fn test_quantlib_parity_time_to_maturity() {
     let short_cap = CapFloor {
         id: "SHORT_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: date!(2025 - 01 - 01), // 1Y
@@ -696,7 +696,7 @@ fn test_quantlib_parity_time_to_maturity() {
     let long_cap = CapFloor {
         id: "LONG_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: date!(2034 - 01 - 01), // 10Y
@@ -752,7 +752,7 @@ fn test_quantlib_parity_zero_vol_itm() {
     let cap = CapFloor {
         id: "CAP_ZERO_VOL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.03).expect("valid decimal"), // Deep ITM (forward = 5%)
         start_date: as_of,
         maturity: end,
@@ -808,7 +808,7 @@ fn test_quantlib_parity_frequency_impact() {
     let quarterly_cap = CapFloor {
         id: "QUARTERLY_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -836,7 +836,7 @@ fn test_quantlib_parity_frequency_impact() {
     let annual_cap = CapFloor {
         id: "ANNUAL_CAP".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,

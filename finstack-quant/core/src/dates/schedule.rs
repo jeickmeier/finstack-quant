@@ -1182,6 +1182,34 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
 }
 
 impl ScheduleSpec {
+    /// Create a persisted specification using the canonical builder defaults.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - First unadjusted accrual date, included in the schedule.
+    /// * `end` - Last unadjusted accrual date; must be on or after start.
+    ///
+    /// # Errors
+    ///
+    /// Returns InvalidDateRange if start is after end.
+    pub fn new(start: Date, end: Date) -> crate::Result<Self> {
+        let builder = ScheduleBuilder::new(start, end)?;
+        Ok(Self {
+            start: builder.start,
+            end: builder.end,
+            frequency: builder.frequency,
+            stub: builder.stub,
+            business_day_convention: builder.conv,
+            calendar_id: builder.deferred_calendar_id,
+            end_of_month: builder.eom,
+            imm_mode: builder.imm_mode,
+            cds_imm_mode: builder.cds_imm_mode,
+            error_policy: builder.error_policy,
+            payment_lag_business_days: builder.payment_lag_business_days,
+            fixing_lag_business_days: builder.fixing_lag_business_days,
+        })
+    }
+
     /// Reconstruct a [`Schedule`] using the persisted configuration.
     ///
     /// This applies the same scheduling rules as [`ScheduleBuilder`], including

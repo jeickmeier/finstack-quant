@@ -104,13 +104,15 @@ fn test_dv01_scales_with_notional() {
     swaption1.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let mut swaption10 = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     swaption10.notional = finstack_quant_core::money::Money::new(
         10_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let dv01_1 = swaption1
         .price_with_metrics(

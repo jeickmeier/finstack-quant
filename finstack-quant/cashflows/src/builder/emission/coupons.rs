@@ -44,17 +44,18 @@ pub fn emit_inflation_coupons(
     ccy: Currency,
     coupons: &[(Date, f64, f64, f64)],
     out_flows: &mut Vec<CashFlow>,
-) {
+) -> finstack_quant_core::Result<()> {
     for &(date, amount, accrual_factor, real_coupon_rate) in coupons {
         out_flows.push(CashFlow::new(
             date,
             None,
-            Money::new(amount, ccy),
+            Money::new(amount, ccy)?,
             CFKind::InflationCoupon,
             accrual_factor,
             Some(real_coupon_rate),
         ));
     }
+    Ok(())
 }
 
 // Shared f64 ↔ Decimal conversion helpers live in the parent `emission` module
@@ -297,13 +298,20 @@ pub(crate) fn emit_fixed_coupons_on(
             if cash_pct_f64 > 0.0 {
                 let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
                 out_flows.push(
-                    CashFlow::new(d, None, Money::new(cash_amt, ccy), kind, yf, Some(rate_f64))
-                        .with_accrual(CashFlowAccrual {
-                            start: accrual_start,
-                            end: accrual_end,
-                            day_count: spec.schedule.day_count,
-                            projected_index_rate: None,
-                        }),
+                    CashFlow::new(
+                        d,
+                        None,
+                        Money::new(cash_amt, ccy)?,
+                        kind,
+                        yf,
+                        Some(rate_f64),
+                    )
+                    .with_accrual(CashFlowAccrual {
+                        start: accrual_start,
+                        end: accrual_end,
+                        day_count: spec.schedule.day_count,
+                        projected_index_rate: None,
+                    }),
                 );
             }
 
@@ -600,7 +608,7 @@ pub(crate) fn emit_float_coupons_on(
                     CashFlow::new(
                         d,
                         Some(reset_date),
-                        Money::new(cash_amt, ccy),
+                        Money::new(cash_amt, ccy)?,
                         CFKind::FloatReset,
                         yf,
                         Some(total_rate),
@@ -659,7 +667,8 @@ mod tests {
                 ),
             ],
             &mut flows,
-        );
+        )
+        .expect("valid inflation coupons fixture");
 
         assert_eq!(flows.len(), 2);
         assert_eq!(flows[0].kind, CFKind::InflationCoupon);

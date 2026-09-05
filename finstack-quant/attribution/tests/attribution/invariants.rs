@@ -99,7 +99,7 @@ impl Instrument for ScaledInstrument {
 
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         let base = self.inner.value(market, as_of)?;
-        Ok(Money::new(base.amount() * self.scale, base.currency()))
+        Ok(Money::new(base.amount() * self.scale, base.currency()).expect("valid money fixture"))
     }
 
     fn price_with_metrics(
@@ -205,8 +205,8 @@ fn test_zero_market_change_identity() {
 
     let bond = Bond::fixed(
         "ZERO-CHANGE-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -277,8 +277,8 @@ fn test_rates_pnl_sign_convention() {
 
     let bond = Bond::fixed(
         "SIGN-CONVENTION-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -331,8 +331,8 @@ fn test_rates_pnl_positive_when_rates_decrease() {
 
     let bond = Bond::fixed(
         "RATES-DOWN-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -386,8 +386,8 @@ fn test_long_short_net_zero_invariant() {
 
     let bond = Bond::fixed(
         "LONG-SHORT-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -455,8 +455,8 @@ fn test_portfolio_additivity_invariant() {
 
     let bond_a = Bond::fixed(
         "PORTFOLIO-BOND-A",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         issue,
         create_date(2029, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -466,8 +466,8 @@ fn test_portfolio_additivity_invariant() {
 
     let bond_b = Bond::fixed(
         "PORTFOLIO-BOND-B",
-        Money::new(2_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         create_date(2032, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -565,8 +565,8 @@ proptest! {
 
         let bond = Bond::fixed(
             "PROP-CARRY-TEST",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -636,8 +636,8 @@ proptest! {
             let id = format!("PROP-MATURITY-{}Y", years);
             let bond = Bond::fixed(
                 id.as_str(),
-                Money::new(1_000_000.0, Currency::USD),
-                finstack_quant_core::types::Rate::from_decimal(0.05),
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
                 issue,
                 maturity,
                 finstack_quant_core::dates::StubKind::ShortFront,
@@ -675,8 +675,8 @@ proptest! {
 
         let bond = Bond::fixed(
             "PROP-SCALING-TEST",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -733,8 +733,8 @@ fn test_small_notional_edge_case() {
     // Very small notional
     let bond = Bond::fixed(
         "SMALL-NOTIONAL-TEST",
-        Money::new(100.0, Currency::USD), // $100 notional
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"), // $100 notional
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -790,8 +790,8 @@ fn test_large_notional_edge_case() {
     // Very large notional
     let bond = Bond::fixed(
         "LARGE-NOTIONAL-TEST",
-        Money::new(1_000_000_000.0, Currency::USD), // $1B notional
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000_000.0, Currency::USD).expect("valid money fixture"), // $1B notional
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -857,8 +857,8 @@ fn test_extreme_rate_levels() {
 
     let bond = Bond::fixed(
         "EXTREME-RATES-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -943,8 +943,8 @@ fn test_near_maturity_edge_case() {
 
     let bond = Bond::fixed(
         "NEAR-MATURITY-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

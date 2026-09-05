@@ -253,7 +253,8 @@ mod time_basis_tests {
             .map(|y| {
                 (
                     Date::from_calendar_date(2024 + y, Month::January, 1).expect("date"),
-                    Money::new(if y == 10 { 1_050_000.0 } else { 50_000.0 }, Currency::USD),
+                    Money::new(if y == 10 { 1_050_000.0 } else { 50_000.0 }, Currency::USD)
+                        .expect("valid money fixture"),
                 )
             })
             .collect()
@@ -302,7 +303,7 @@ mod time_basis_tests {
         };
 
         let p0 = pv_at(0.0);
-        let pv = Money::new(p0, Currency::USD);
+        let pv = Money::new(p0, Currency::USD).expect("valid money fixture");
         let d = calculate_tranche_duration(&cf, &disc, as_of(), pv).expect("duration");
         let c = calculate_tranche_convexity(&cf, &disc, as_of()).expect("convexity");
 

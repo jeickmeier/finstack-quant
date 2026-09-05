@@ -106,10 +106,7 @@ pub(crate) fn quoted_dirty_from_clean_px(
         settlement,
         &loan.accrual_config(),
     )?;
-    Ok(Money::new(
-        px / 100.0 * outstanding.amount() + accrued,
-        loan.currency,
-    ))
+    Money::new(px / 100.0 * outstanding.amount() + accrued, loan.currency)
 }
 
 /// Resolve the target purchase price for quote-derived term-loan yield metrics.
@@ -138,7 +135,7 @@ pub(super) fn target_price_from_quote_or_model(
         Ok(Money::new(
             base_value.amount() / settle_df,
             base_value.currency(),
-        ))
+        )?)
     }
 }
 
@@ -368,7 +365,7 @@ pub(super) fn outstanding_before(
     target: Date,
     currency: finstack_quant_core::currency::Currency,
 ) -> Money {
-    let mut last = Money::new(0.0, currency);
+    let mut last = Money::from((0_i64, currency));
     for (d, amt) in out_path {
         if *d < target {
             last = *amt;

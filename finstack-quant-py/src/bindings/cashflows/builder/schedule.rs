@@ -272,7 +272,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
             flows.push(CashFlow::new(
                 extract_date(date)?,
                 reset,
-                Money::new(amount, currency),
+                Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
                 extract_cf_kind(&kinds[i])?,
                 accrual_factor,
                 rate,

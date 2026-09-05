@@ -72,15 +72,7 @@ impl MetricCalculator for WalCalculator {
                             CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
                         )
                     })
-                    .map(|flow| {
-                        (
-                            flow.date,
-                            finstack_quant_core::money::Money::new(
-                                flow.amount.amount().abs(),
-                                flow.amount.currency(),
-                            ),
-                        )
-                    }),
+                    .map(|flow| (flow.date, flow.amount.abs())),
                 context.as_of,
             );
         }
@@ -145,7 +137,7 @@ mod tests {
             _ctx: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(0.0, Currency::USD))
+            Ok(Money::from((0_i64, Currency::USD)))
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -176,7 +168,7 @@ mod tests {
             attrs: Attributes::new(),
         }) as Arc<dyn Instrument>;
         let curves = Arc::new(MarketContext::new());
-        let base_value = Money::new(0.0, Currency::USD);
+        let base_value = Money::from((0_i64, Currency::USD));
 
         let mut context = MetricContext::new(
             instrument,
@@ -189,7 +181,7 @@ mod tests {
             CashFlow::new(
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 None,
-                Money::new(10.0, Currency::USD),
+                Money::from((10_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.0,
                 None,
@@ -197,7 +189,7 @@ mod tests {
             CashFlow::new(
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 None,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -205,7 +197,7 @@ mod tests {
             CashFlow::new(
                 Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
                 None,
-                Money::new(50.0, Currency::USD),
+                Money::from((50_i64, Currency::USD)),
                 CFKind::PrePayment,
                 0.0,
                 None,
@@ -230,7 +222,7 @@ mod tests {
             attrs: Attributes::new(),
         }) as Arc<dyn Instrument>;
         let curves = Arc::new(MarketContext::new());
-        let base_value = Money::new(0.0, Currency::USD);
+        let base_value = Money::from((0_i64, Currency::USD));
 
         let mut context = MetricContext::new(
             instrument,
@@ -243,7 +235,7 @@ mod tests {
             CashFlow::new(
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 None,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -253,7 +245,7 @@ mod tests {
             CashFlow::new(
                 Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
                 None,
-                Money::new(-500.0, Currency::USD),
+                Money::from((-500_i64, Currency::USD)),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -273,10 +265,10 @@ mod tests {
         let first = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let second = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
         let principal_flows = vec![
-            (first, Money::new(40.0, Currency::USD)),
-            (second, Money::new(60.0, Currency::USD)),
+            (first, Money::from((40_i64, Currency::USD))),
+            (second, Money::from((60_i64, Currency::USD))),
         ];
-        let zero = Money::new(0.0, Currency::USD);
+        let zero = Money::from((0_i64, Currency::USD));
         let tranche = TrancheCashflows {
             tranche_id: "A".to_string(),
             cashflows: principal_flows.clone(),
@@ -288,7 +280,7 @@ mod tests {
             writedown_flows: Vec::new(),
             final_balance: zero,
             total_interest: zero,
-            total_principal: Money::new(100.0, Currency::USD),
+            total_principal: Money::from((100_i64, Currency::USD)),
             total_pik: zero,
             total_deferred: zero,
             total_writedown: zero,
@@ -300,7 +292,7 @@ mod tests {
                     CashFlow::new(*date, None, *amount, CFKind::Amortization, 0.0, None)
                 })
                 .collect(),
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Thirty360,
             CashFlowMeta::default(),
         );

@@ -74,7 +74,12 @@ impl Pricer for BondPricer {
         let mut result = ValuationResult::stamped(
             bond.id(),
             as_of,
-            Money::new(outcome.amount, bond.notional.currency()),
+            Money::new(outcome.amount, bond.notional.currency()).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(bond),
+                )
+            })?,
         );
         if let Some(lsmc) = outcome.lsmc {
             attach_mc_diagnostics(&mut result, &lsmc.estimate);

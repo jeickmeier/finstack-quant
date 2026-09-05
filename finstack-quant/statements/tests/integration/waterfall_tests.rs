@@ -31,11 +31,11 @@ fn test_ecf_sweep_basic() {
             "cash",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000_000.0),
                 ),
             ],
@@ -44,11 +44,11 @@ fn test_ecf_sweep_basic() {
             "ebitda",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
@@ -57,11 +57,11 @@ fn test_ecf_sweep_basic() {
             "taxes",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
@@ -70,11 +70,11 @@ fn test_ecf_sweep_basic() {
             "capex",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
             ],
@@ -85,7 +85,9 @@ fn test_ecf_sweep_basic() {
                 TermLoan::builder()
                     .id("TL-001".into())
                     .currency(Currency::USD)
-                    .notional_limit(Money::new(10_000_000.0, Currency::USD))
+                    .notional_limit(
+                        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                    )
                     .issue_date(issue)
                     .maturity(maturity)
                     .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -145,9 +147,17 @@ fn test_ecf_sweep_basic() {
         .expect("evaluation should succeed");
 
     // Verify that EBITDA values are present
-    assert!(results.get("ebitda", &PeriodId::quarter(2025, 1)).is_some());
+    assert!(results
+        .get(
+            "ebitda",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        )
+        .is_some());
     assert_eq!(
-        results.get("ebitda", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "ebitda",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(1_000_000.0)
     );
 }
@@ -205,7 +215,7 @@ mod period_flow_waterfall_integration {
             Date::from_calendar_date(year, month(q + 1), 1).expect("valid date")
         };
         Period {
-            id: PeriodId::quarter(year, q),
+            id: PeriodId::quarter(year, q).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -237,7 +247,7 @@ mod period_flow_waterfall_integration {
     fn schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
         CashFlowSchedule::from_parts(
             flows,
-            Notional::par(notional, Currency::USD),
+            Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue_date),
@@ -271,7 +281,7 @@ mod period_flow_waterfall_integration {
             flows.push(CashFlow::new(
                 Date::from_calendar_date(year, month, 15).expect("valid date"),
                 None,
-                Money::new(-notional * rate_q, Currency::USD),
+                Money::new(-notional * rate_q, Currency::USD).expect("valid money fixture"),
                 CFKind::Fixed,
                 0.25,
                 Some(rate_q * 4.0),
@@ -302,9 +312,10 @@ mod period_flow_waterfall_integration {
 
         let market_ctx = MarketContext::new();
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-PIK".to_string(), Money::new(notional, Currency::USD));
+        state.opening_balances.insert(
+            "TL-PIK".to_string(),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
+        );
         state
             .residual_schedules
             .insert("TL-PIK".to_string(), instrument.schedule.clone());
@@ -324,7 +335,7 @@ mod period_flow_waterfall_integration {
                 .cumulative_toggled_pik
                 .get("TL-PIK")
                 .copied()
-                .unwrap_or_else(|| Money::new(0.0, Currency::USD));
+                .unwrap_or_else(|| Money::new(0.0, Currency::USD).expect("valid money fixture"));
 
             let residual = state.residual_schedules.get("TL-PIK");
             let (breakdown, _, _, warnings) = calculate_period_flows(
@@ -400,7 +411,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-20_000.0, Currency::USD),
+                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Fixed,
                         0.25,
                         Some(0.08),
@@ -408,7 +419,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::May, 15).expect("valid date"),
                         None,
-                        Money::new(-20_000.0, Currency::USD),
+                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Fixed,
                         0.25,
                         Some(0.08),
@@ -443,9 +454,10 @@ mod period_flow_waterfall_integration {
 
         let market_ctx = MarketContext::new();
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(notional, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
+        );
         state
             .residual_schedules
             .insert("TL-1".to_string(), instrument.schedule.clone());
@@ -454,8 +466,8 @@ mod period_flow_waterfall_integration {
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &q1,
-            Money::new(notional, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
             &market_ctx,
             issue,
             residual,
@@ -499,7 +511,7 @@ mod period_flow_waterfall_integration {
             &instrument,
             &q2,
             opening,
-            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
             &market_ctx,
             issue,
             residual,
@@ -529,7 +541,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-10_000.0, Currency::USD),
+                        Money::new(-10_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Fixed,
                         0.25,
                         Some(0.04),
@@ -537,7 +549,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
-                        Money::new(50_000.0, Currency::USD),
+                        Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Amortization,
                         0.0,
                         None,
@@ -550,16 +562,17 @@ mod period_flow_waterfall_integration {
 
         let market_ctx = MarketContext::new();
         let mut state = CapitalStructureState::new();
-        state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::new(1_000_000.0, Currency::USD));
+        state.opening_balances.insert(
+            "TL-1".to_string(),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        );
 
         let opening = state.opening_balances["TL-1"];
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             opening,
-            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
             &market_ctx,
             issue,
             None,
@@ -625,7 +638,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         issue,
                         None,
-                        Money::new(-1_000_000.0, Currency::USD),
+                        Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Notional,
                         0.0,
                         None,
@@ -633,7 +646,7 @@ mod period_flow_waterfall_integration {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
                         None,
-                        Money::new(-20_000.0, Currency::USD),
+                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
                         CFKind::Fixed,
                         0.25,
                         Some(0.08),
@@ -657,9 +670,9 @@ mod period_flow_waterfall_integration {
         )
         .expect("aggregation");
 
-        let q1 = PeriodId::quarter(2025, 1);
-        let q2 = PeriodId::quarter(2025, 2);
-        let q3 = PeriodId::quarter(2025, 3);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
         for pre in [q1, q2] {
             assert_eq!(
                 cashflows

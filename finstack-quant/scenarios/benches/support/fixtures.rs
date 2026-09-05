@@ -186,9 +186,18 @@ pub fn full_market() -> MarketContext {
         )
         .insert(hazard_ig)
         .insert(hazard_hy)
-        .insert_price("SPY", MarketScalar::Price(Money::new(450.0, Currency::USD)))
-        .insert_price("QQQ", MarketScalar::Price(Money::new(380.0, Currency::USD)))
-        .insert_price("EWU", MarketScalar::Price(Money::new(32.0, Currency::USD)))
+        .insert_price(
+            "SPY",
+            MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+        )
+        .insert_price(
+            "QQQ",
+            MarketScalar::Price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
+        )
+        .insert_price(
+            "EWU",
+            MarketScalar::Price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
+        )
 }
 
 /// `n` hazard curves under `Credit/USD/*`, plus one shared discount curve.
@@ -288,8 +297,8 @@ pub fn sample_bond(id: &str, maturity_year_offset: i32) -> Bond {
         Date::from_calendar_date(2025 + maturity_year_offset, Month::January, 1).unwrap();
     let mut bond = Bond::fixed(
         id,
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         AS_OF,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

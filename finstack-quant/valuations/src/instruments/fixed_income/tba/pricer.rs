@@ -55,7 +55,7 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
         .original_face(Money::new(
             tba.notional.amount() / factor,
             tba.notional.currency(),
-        ))
+        )?)
         .current_face(tba.notional)
         .current_factor(factor)
         .wac(wac)
@@ -93,7 +93,7 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba, as_of: Date) -> Result<Agenc
 pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) -> Result<Money> {
     let settlement_date = tba.get_settlement_date()?;
     if as_of >= settlement_date {
-        return Ok(Money::new(0.0, tba.notional.currency()));
+        return Ok(Money::from((0_i64, tba.notional.currency())));
     }
     let assumed_pool = resolve_assumed_pool(tba, as_of)?;
 
@@ -115,7 +115,7 @@ pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) ->
     // Positive if pool is worth more than we're paying
     let value = pool_pv.amount() - trade_pv;
 
-    Ok(Money::new(value, tba.notional.currency()))
+    Money::new(value, tba.notional.currency())
 }
 
 #[cfg(test)]

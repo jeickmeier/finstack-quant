@@ -23,15 +23,15 @@ fn test_corkscrew_extension_with_valid_config() {
             "cash",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(115_000.0),
                 ),
             ],
@@ -40,17 +40,35 @@ fn test_corkscrew_extension_with_valid_config() {
         .value(
             "cash_inflows",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(15_000.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(10_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(15_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10_000.0),
+                ),
             ],
         )
         .value(
             "cash_outflows",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(-5_000.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(-5_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(-5_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(-5_000.0),
+                ),
             ],
         )
         .build()
@@ -89,19 +107,25 @@ fn test_corkscrew_with_multiple_accounts() {
         .value(
             "cash",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(55_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(55_000.0),
+                ),
             ],
         )
         .value(
             "debt",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(190_000.0),
                 ),
             ],
@@ -148,15 +172,27 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
             .value(
                 "additions",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(50.0),
+                    ),
                 ],
             )
             .value(
                 "disposals",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(20.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(0.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(20.0),
+                    ),
                 ],
             ),
         "inventory",
@@ -170,8 +206,8 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     let end = results.get_node("inventory_end").expect("inventory_end");
     assert_eq!(end[&q1], 100.0);
     assert_eq!(end[&q2], 130.0);
@@ -242,27 +278,27 @@ fn test_scorecard_extension_with_valid_config() {
             "total_debt",
             &[
                 (
-                    PeriodId::quarter(2024, 1),
+                    PeriodId::quarter(2024, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(300_000.0),
                 ),
                 (
-                    PeriodId::quarter(2024, 2),
+                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(310_000.0),
                 ),
                 (
-                    PeriodId::quarter(2024, 3),
+                    PeriodId::quarter(2024, 3).expect("valid period fixture"),
                     AmountOrScalar::scalar(320_000.0),
                 ),
                 (
-                    PeriodId::quarter(2024, 4),
+                    PeriodId::quarter(2024, 4).expect("valid period fixture"),
                     AmountOrScalar::scalar(330_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(340_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(350_000.0),
                 ),
             ],
@@ -270,23 +306,59 @@ fn test_scorecard_extension_with_valid_config() {
         .value(
             "ebitda",
             &[
-                (PeriodId::quarter(2024, 1), AmountOrScalar::scalar(25_000.0)),
-                (PeriodId::quarter(2024, 2), AmountOrScalar::scalar(26_000.0)),
-                (PeriodId::quarter(2024, 3), AmountOrScalar::scalar(27_000.0)),
-                (PeriodId::quarter(2024, 4), AmountOrScalar::scalar(28_000.0)),
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(29_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(30_000.0)),
+                (
+                    PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(25_000.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(26_000.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(27_000.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(28_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(29_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(30_000.0),
+                ),
             ],
         )
         .value(
             "interest_expense",
             &[
-                (PeriodId::quarter(2024, 1), AmountOrScalar::scalar(5_000.0)),
-                (PeriodId::quarter(2024, 2), AmountOrScalar::scalar(5_100.0)),
-                (PeriodId::quarter(2024, 3), AmountOrScalar::scalar(5_200.0)),
-                (PeriodId::quarter(2024, 4), AmountOrScalar::scalar(5_300.0)),
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5_400.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(5_500.0)),
+                (
+                    PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_000.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_100.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_200.0),
+                ),
+                (
+                    PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_300.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_400.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5_500.0),
+                ),
             ],
         )
         .build()
@@ -353,19 +425,43 @@ fn test_scorecard_moodys_rating_scale() {
         .value(
             "debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(100.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
             ],
         )
         .value(
             "equity",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(50.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(50.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50.0),
+                ),
             ],
         )
         .build()
@@ -408,7 +504,10 @@ fn test_scorecard_fitch_rating_scale() {
         .unwrap()
         .value(
             "value",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .build()
         .unwrap();
@@ -446,19 +545,43 @@ fn test_scorecard_with_minimum_rating_warning() {
         .value(
             "debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(600.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(600.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(600.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(600.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(600.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(600.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(600.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(600.0),
+                ),
             ],
         )
         .value(
             "ebitda",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(100.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
             ],
         )
         .build()
@@ -506,19 +629,43 @@ fn test_scorecard_multiple_metrics_weighted() {
         .value(
             "metric1",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.5)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(1.5)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(1.5)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(1.5)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.5),
+                ),
             ],
         )
         .value(
             "metric2",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(2.5)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(2.5)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(2.5)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(2.5)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.5),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(2.5),
+                ),
             ],
         )
         .build()
@@ -577,7 +724,10 @@ fn test_scorecard_metric_evaluation_error_handling() {
         .unwrap()
         .value(
             "value",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         .build()
         .unwrap();
@@ -619,23 +769,41 @@ fn two_metric_model() -> (
         .value(
             "debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(150.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(150.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(150.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(150.0),
+                ),
             ],
         )
         .value(
             "ebitda",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
                 // EBITDA collapses to zero → debt/ebitda = inf (non-finite).
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "coverage",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(5.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(5.0),
+                ),
             ],
         )
         .build()

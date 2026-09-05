@@ -218,7 +218,7 @@ pub(crate) fn raw_pv_in_base(
         return Ok(amount);
     }
     Ok(
-        crate::fx::convert_to_base(Money::new(amount, currency), as_of, market, base_currency)?
+        crate::fx::convert_to_base(Money::new(amount, currency)?, as_of, market, base_currency)?
             .amount(),
     )
 }

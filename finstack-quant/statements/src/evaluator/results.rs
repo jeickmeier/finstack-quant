@@ -32,15 +32,15 @@ use crate::types::FinancialModelSpec;
 /// let model = ModelBuilder::new("demo")
 ///     .periods("2025Q1..Q2", None)?
 ///     .value("revenue", &[
-///         (PeriodId::quarter(2025, 1), 100_000.0.into()),
-///         (PeriodId::quarter(2025, 2), 105_000.0.into()),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 100_000.0.into()),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 105_000.0.into()),
 ///     ])
 ///     .compute("gross_profit", "revenue * 0.6")?
 ///     .build()?;
 ///
 /// let mut evaluator = Evaluator::new();
 /// let result = evaluator.evaluate(&model)?;
-/// assert!(result.get("gross_profit", &PeriodId::quarter(2025, 1)).is_some());
+/// assert!(result.get("gross_profit", &PeriodId::quarter(2025, 1).expect("valid period fixture")).is_some());
 /// # Ok(())
 /// # }
 /// ```
@@ -329,7 +329,7 @@ impl StatementResult {
 /// The evaluator deliberately stores non-finite results (e.g. a division by
 /// zero) and surfaces them as warnings rather than aborting. `Money::new`
 /// asserts finiteness and would panic on those cells, so this uses
-/// `Money::try_new` and returns a `NonFiniteValue` warning per skipped cell
+/// `Money::new` and returns a `NonFiniteValue` warning per skipped cell
 /// instead. Returns the money map and the warnings for the skipped cells.
 fn monetary_map_skipping_nonfinite(
     period_map: &IndexMap<PeriodId, f64>,
@@ -339,7 +339,7 @@ fn monetary_map_skipping_nonfinite(
     let mut money_map = IndexMap::with_capacity(period_map.len());
     let mut skipped = Vec::new();
     for (period_id, &v) in period_map {
-        match Money::try_new(v, currency) {
+        match Money::new(v, currency) {
             Ok(money) => {
                 money_map.insert(*period_id, money);
             }

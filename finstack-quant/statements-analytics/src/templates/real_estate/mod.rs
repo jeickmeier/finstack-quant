@@ -102,7 +102,7 @@ fn sum_expr_or_zero(nodes: &[&str]) -> String {
 /// use finstack_quant_statements_analytics::templates::real_estate::add_noi_buildup;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let builder = ModelBuilder::new("property")
 ///     .periods("2025Q1..Q1", None)?
 ///     .value("rent", &[(period, AmountOrScalar::scalar(100.0))])
@@ -174,7 +174,7 @@ pub fn add_noi_buildup(
 /// use finstack_quant_statements_analytics::templates::real_estate::add_ncf_buildup;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let builder = ModelBuilder::new("property")
 ///     .periods("2025Q1..Q1", None)?
 ///     .value("noi", &[(period, AmountOrScalar::scalar(60.0))])
@@ -395,8 +395,8 @@ impl LeaseSpec {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let lease = LeaseSpec {
     ///     node_id: "tenant_a".to_string(),
-    ///     start: PeriodId::quarter(2025, 1),
-    ///     end: Some(PeriodId::quarter(2025, 4)),
+    ///     start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    ///     end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
     ///     base_rent: 25_000.0,
     ///     growth_rate: 0.0,
     ///     growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -536,8 +536,8 @@ fn apply_free_window(is_free: &mut [bool], start_idx: usize, len: u32) -> Result
 /// let builder = ModelBuilder::new("property").periods("2025Q1..Q4", None)?;
 /// let lease = LeaseSpec {
 ///     node_id: "tenant_a".to_string(),
-///     start: PeriodId::quarter(2025, 1),
-///     end: Some(PeriodId::quarter(2025, 4)),
+///     start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+///     end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
 ///     base_rent: 25_000.0,
 ///     growth_rate: 0.0,
 ///     growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -945,7 +945,7 @@ impl Default for PropertyTemplateNodes {
 /// };
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let builder = ModelBuilder::new("property")
 ///     .periods("2025Q1..Q4", None)?
 ///     .value("parking_income", &[(period, AmountOrScalar::scalar(5_000.0))])
@@ -953,8 +953,8 @@ impl Default for PropertyTemplateNodes {
 ///     .value("capex", &[(period, AmountOrScalar::scalar(10_000.0))]);
 /// let lease = LeaseSpec {
 ///     node_id: "tenant_a".to_string(),
-///     start: PeriodId::quarter(2025, 1),
-///     end: Some(PeriodId::quarter(2025, 4)),
+///     start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+///     end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
 ///     base_rent: 25_000.0,
 ///     growth_rate: 0.0,
 ///     growth_convention: LeaseGrowthConvention::PerPeriod,

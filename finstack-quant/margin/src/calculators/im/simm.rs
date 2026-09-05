@@ -968,7 +968,7 @@ impl SimmCalculator {
     /// sensitivities.add_ir_delta(Currency::USD, "5Y", 50_000.0);
     ///
     /// let (total, breakdown) =
-    ///     calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD);
+    ///     calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD).expect("valid sensitivity fixture");
     ///
     /// assert!(total >= 0.0);
     /// assert!(breakdown.contains_key("IR_Delta"));
@@ -983,7 +983,7 @@ impl SimmCalculator {
         &self,
         sensitivities: &SimmSensitivities,
         currency: Currency,
-    ) -> (f64, HashMap<String, Money>) {
+    ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>)> {
         let mut breakdown = HashMap::default();
         let mut risk_class_margins = HashMap::default();
 
@@ -991,7 +991,7 @@ impl SimmCalculator {
         if !sensitivities.ir_delta.is_empty() {
             let ir_margin = self.calculate_ir_delta_multi_currency(&sensitivities.ir_delta);
             if ir_margin > 0.0 {
-                breakdown.insert("IR_Delta".to_string(), Money::new(ir_margin, currency));
+                breakdown.insert("IR_Delta".to_string(), Money::new(ir_margin, currency)?);
                 risk_class_margins.insert(SimmRiskClass::InterestRate, ir_margin);
             }
         }
@@ -1000,7 +1000,7 @@ impl SimmCalculator {
         if !sensitivities.ir_vega.is_empty() {
             let ir_vega_margin = self.calculate_ir_vega_multi_currency(&sensitivities.ir_vega);
             if ir_vega_margin > 0.0 {
-                breakdown.insert("IR_Vega".to_string(), Money::new(ir_vega_margin, currency));
+                breakdown.insert("IR_Vega".to_string(), Money::new(ir_vega_margin, currency)?);
                 *risk_class_margins
                     .entry(SimmRiskClass::InterestRate)
                     .or_insert(0.0) += ir_vega_margin;
@@ -1014,7 +1014,7 @@ impl SimmCalculator {
             if credit_margin > 0.0 {
                 breakdown.insert(
                     "Credit_Qualifying_Delta".to_string(),
-                    Money::new(credit_margin, currency),
+                    Money::new(credit_margin, currency)?,
                 );
                 risk_class_margins.insert(SimmRiskClass::CreditQualifying, credit_margin);
             }
@@ -1027,7 +1027,7 @@ impl SimmCalculator {
             if credit_vega_margin > 0.0 {
                 breakdown.insert(
                     "Credit_Qualifying_Vega".to_string(),
-                    Money::new(credit_vega_margin, currency),
+                    Money::new(credit_vega_margin, currency)?,
                 );
                 *risk_class_margins
                     .entry(SimmRiskClass::CreditQualifying)
@@ -1045,7 +1045,7 @@ impl SimmCalculator {
             if credit_margin > 0.0 {
                 breakdown.insert(
                     "Credit_NonQualifying_Delta".to_string(),
-                    Money::new(credit_margin, currency),
+                    Money::new(credit_margin, currency)?,
                 );
                 risk_class_margins.insert(SimmRiskClass::CreditNonQualifying, credit_margin);
             }
@@ -1061,7 +1061,7 @@ impl SimmCalculator {
             if credit_vega_margin > 0.0 {
                 breakdown.insert(
                     "Credit_NonQualifying_Vega".to_string(),
-                    Money::new(credit_vega_margin, currency),
+                    Money::new(credit_vega_margin, currency)?,
                 );
                 *risk_class_margins
                     .entry(SimmRiskClass::CreditNonQualifying)
@@ -1076,7 +1076,7 @@ impl SimmCalculator {
             if equity_margin > 0.0 {
                 breakdown.insert(
                     "Equity_Delta".to_string(),
-                    Money::new(equity_margin, currency),
+                    Money::new(equity_margin, currency)?,
                 );
                 risk_class_margins.insert(SimmRiskClass::Equity, equity_margin);
             }
@@ -1089,7 +1089,7 @@ impl SimmCalculator {
             if equity_vega_margin > 0.0 {
                 breakdown.insert(
                     "Equity_Vega".to_string(),
-                    Money::new(equity_vega_margin, currency),
+                    Money::new(equity_vega_margin, currency)?,
                 );
                 *risk_class_margins
                     .entry(SimmRiskClass::Equity)
@@ -1102,7 +1102,7 @@ impl SimmCalculator {
         if !sensitivities.fx_delta.is_empty() {
             let fx_margin = self.calculate_fx_delta_bucketed(&sensitivities.fx_delta);
             if fx_margin > 0.0 {
-                breakdown.insert("FX_Delta".to_string(), Money::new(fx_margin, currency));
+                breakdown.insert("FX_Delta".to_string(), Money::new(fx_margin, currency)?);
                 risk_class_margins.insert(SimmRiskClass::Fx, fx_margin);
             }
         }
@@ -1112,7 +1112,7 @@ impl SimmCalculator {
         if total_fx_vega.abs() > 0.0 {
             let fx_vega_margin = self.calculate_fx_vega(total_fx_vega);
             if fx_vega_margin > 0.0 {
-                breakdown.insert("FX_Vega".to_string(), Money::new(fx_vega_margin, currency));
+                breakdown.insert("FX_Vega".to_string(), Money::new(fx_vega_margin, currency)?);
                 *risk_class_margins.entry(SimmRiskClass::Fx).or_insert(0.0) += fx_vega_margin;
             }
         }
@@ -1123,7 +1123,7 @@ impl SimmCalculator {
             if commodity_margin > 0.0 {
                 breakdown.insert(
                     "Commodity_Delta".to_string(),
-                    Money::new(commodity_margin, currency),
+                    Money::new(commodity_margin, currency)?,
                 );
                 risk_class_margins.insert(SimmRiskClass::Commodity, commodity_margin);
             }
@@ -1136,7 +1136,7 @@ impl SimmCalculator {
             if commodity_vega_margin > 0.0 {
                 breakdown.insert(
                     "Commodity_Vega".to_string(),
-                    Money::new(commodity_vega_margin, currency),
+                    Money::new(commodity_vega_margin, currency)?,
                 );
                 *risk_class_margins
                     .entry(SimmRiskClass::Commodity)
@@ -1191,7 +1191,7 @@ impl SimmCalculator {
         let curvature_addon = if !sensitivities.curvature.is_empty() {
             let cm = self.calculate_curvature(&sensitivities.curvature);
             if cm > 0.0 {
-                breakdown.insert("Curvature".to_string(), Money::new(cm, currency));
+                breakdown.insert("Curvature".to_string(), Money::new(cm, currency)?);
             }
             cm
         } else {
@@ -1205,7 +1205,7 @@ impl SimmCalculator {
         };
         let total_im = correlated_total + curvature_addon;
 
-        (total_im, breakdown)
+        Ok((total_im, breakdown))
     }
 
     /// Calculate SIMM from explicit sensitivities and return a full [`ImResult`].
@@ -1236,9 +1236,10 @@ impl SimmCalculator {
         as_of: Date,
     ) -> Result<ImResult> {
         sensitivities.validate()?;
-        let (amount, breakdown) = self.calculate_from_sensitivities_parts(sensitivities, currency);
+        let (amount, breakdown) =
+            self.calculate_from_sensitivities_parts(sensitivities, currency)?;
         Ok(ImResult::with_breakdown(
-            Money::new(amount, currency),
+            Money::new(amount, currency)?,
             ImMethodology::Simm,
             as_of,
             self.mpor_days(),
@@ -1275,7 +1276,7 @@ impl ImCalculator for SimmCalculator {
         let sensitivities = instrument.simm_sensitivities(context, as_of)?;
         sensitivities.validate()?;
         let (total_im, breakdown) =
-            self.calculate_from_sensitivities_parts(&sensitivities, currency);
+            self.calculate_from_sensitivities_parts(&sensitivities, currency)?;
 
         debug!(
             instrument = instrument.id(),
@@ -1285,7 +1286,7 @@ impl ImCalculator for SimmCalculator {
         );
 
         Ok(ImResult::with_breakdown(
-            Money::new(total_im, currency),
+            Money::new(total_im, currency)?,
             ImMethodology::Simm,
             as_of,
             self.mpor_days(),
@@ -1448,7 +1449,9 @@ mod tests {
         sens.add_ir_delta(Currency::USD, "5Y", 100_000.0);
         sens.add_equity_delta("AAPL", 100_000.0);
 
-        let (total_im, breakdown) = calc.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (total_im, breakdown) = calc
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         let ir_margin = breakdown
             .get("IR_Delta")
@@ -1504,7 +1507,9 @@ mod tests {
         sensitivities.add_ir_vega(Currency::USD, "5Y", 500_000.0);
         sensitivities.add_ir_vega(Currency::EUR, "5Y", 500_000.0);
 
-        let (_, breakdown) = calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD);
+        let (_, breakdown) = calc
+            .calculate_from_sensitivities_parts(&sensitivities, Currency::USD)
+            .expect("valid sensitivity fixture");
         let ir_vega_margin = breakdown
             .get("IR_Vega")
             .expect("M-15: IR vega margin should be present")
@@ -1638,12 +1643,14 @@ mod tests {
         sensitivities.add_fx_delta(Currency::EUR, 80_000.0);
 
         let instrument = MarginableTestInstrument::new(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             sensitivities.clone(),
         );
         let market = MarketContext::new();
 
-        let expected = calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD);
+        let expected = calc
+            .calculate_from_sensitivities_parts(&sensitivities, Currency::USD)
+            .expect("valid sensitivity fixture");
         let actual = calc
             .calculate(&instrument, &market, as_of)
             .expect("SIMM calculation should succeed");
@@ -1837,7 +1844,9 @@ mod tests {
         sens.add_credit_qualifying_delta(SimmCreditSector::Sovereign, "GOVT_A", "5Y", 50_000.0);
         sens.add_credit_qualifying_delta(SimmCreditSector::Financial, "BANK_A", "5Y", 50_000.0);
 
-        let (total_im, breakdown) = calc.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (total_im, breakdown) = calc
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
         assert!(total_im > 0.0, "total IM should be positive");
         assert!(
             breakdown.contains_key("Credit_Qualifying_Delta"),
@@ -1880,8 +1889,12 @@ mod tests {
         bumped.params.cq_vega_weight = base.params.cq_vega_weight * 2.0;
 
         let sens = credit_commodity_vega_sensitivities();
-        let (baseline, _) = base.calculate_from_sensitivities_parts(&sens, Currency::USD);
-        let (with_bump, _) = bumped.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (baseline, _) = base
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
+        let (with_bump, _) = bumped
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         assert!(baseline > 0.0, "baseline margin must be positive");
         assert_ne!(
@@ -1900,8 +1913,12 @@ mod tests {
         bumped.params.cnq_vega_weight = base.params.cnq_vega_weight * 2.0;
 
         let sens = credit_commodity_vega_sensitivities();
-        let (baseline, _) = base.calculate_from_sensitivities_parts(&sens, Currency::USD);
-        let (with_bump, _) = bumped.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (baseline, _) = base
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
+        let (with_bump, _) = bumped
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         assert!(baseline > 0.0, "baseline margin must be positive");
         assert_ne!(
@@ -1920,8 +1937,12 @@ mod tests {
         bumped.params.commodity_vega_weight = base.params.commodity_vega_weight * 2.0;
 
         let sens = credit_commodity_vega_sensitivities();
-        let (baseline, _) = base.calculate_from_sensitivities_parts(&sens, Currency::USD);
-        let (with_bump, _) = bumped.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (baseline, _) = base
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
+        let (with_bump, _) = bumped
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         assert!(baseline > 0.0, "baseline margin must be positive");
         assert_ne!(
@@ -1938,26 +1959,31 @@ mod tests {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
         let mut anchor = SimmSensitivities::new(Currency::USD);
         anchor.add_ir_delta(Currency::USD, "5Y", 10_000.0);
-        let (baseline, _) = calc.calculate_from_sensitivities_parts(&anchor, Currency::USD);
+        let (baseline, _) = calc
+            .calculate_from_sensitivities_parts(&anchor, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         let mut with_cq = anchor.clone();
         with_cq.add_credit_qualifying_vega(SimmCreditSector::Financial, "BANK_A", "5Y", 25_000.0);
-        let (cq_total, cq_breakdown) =
-            calc.calculate_from_sensitivities_parts(&with_cq, Currency::USD);
+        let (cq_total, cq_breakdown) = calc
+            .calculate_from_sensitivities_parts(&with_cq, Currency::USD)
+            .expect("valid sensitivity fixture");
         assert_ne!(baseline, cq_total, "CQ vega must change total IM");
         assert!(cq_breakdown.contains_key("Credit_Qualifying_Vega"));
 
         let mut with_cnq = anchor.clone();
         with_cnq.add_credit_non_qualifying_vega("RMBS_A", "5Y", 15_000.0);
-        let (cnq_total, cnq_breakdown) =
-            calc.calculate_from_sensitivities_parts(&with_cnq, Currency::USD);
+        let (cnq_total, cnq_breakdown) = calc
+            .calculate_from_sensitivities_parts(&with_cnq, Currency::USD)
+            .expect("valid sensitivity fixture");
         assert_ne!(baseline, cnq_total, "CNQ vega must change total IM");
         assert!(cnq_breakdown.contains_key("Credit_NonQualifying_Vega"));
 
         let mut with_commodity = anchor.clone();
         with_commodity.add_commodity_vega("Crude", 20_000.0);
-        let (commodity_total, commodity_breakdown) =
-            calc.calculate_from_sensitivities_parts(&with_commodity, Currency::USD);
+        let (commodity_total, commodity_breakdown) = calc
+            .calculate_from_sensitivities_parts(&with_commodity, Currency::USD)
+            .expect("valid sensitivity fixture");
         assert_ne!(
             baseline, commodity_total,
             "commodity vega must change total IM"
@@ -1976,9 +2002,12 @@ mod tests {
         zeroed.add_credit_non_qualifying_vega("RMBS_A", "5Y", 0.0);
         zeroed.add_commodity_vega("Crude", 0.0);
 
-        let (baseline, _) = calc.calculate_from_sensitivities_parts(&anchor, Currency::USD);
-        let (with_zero, breakdown) =
-            calc.calculate_from_sensitivities_parts(&zeroed, Currency::USD);
+        let (baseline, _) = calc
+            .calculate_from_sensitivities_parts(&anchor, Currency::USD)
+            .expect("valid sensitivity fixture");
+        let (with_zero, breakdown) = calc
+            .calculate_from_sensitivities_parts(&zeroed, Currency::USD)
+            .expect("valid sensitivity fixture");
 
         assert_eq!(baseline, with_zero, "zero vega must not move the margin");
         assert!(!breakdown.contains_key("Credit_Qualifying_Vega"));

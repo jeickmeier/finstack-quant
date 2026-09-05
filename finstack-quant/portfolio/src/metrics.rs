@@ -712,7 +712,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -773,9 +773,9 @@ mod tests {
         let position_value = PositionValue {
             position_id: PositionId::from("EUR_POS".to_string()),
             entity_id: EntityId::from("ENTITY".to_string()),
-            value_native: Money::new(3.33, Currency::EUR),
+            value_native: Money::new(3.33, Currency::EUR).expect("valid money fixture"),
             // Quantized during valuation: 3.33 * 1.08 = 3.5964 -> 3.60 USD.
-            value_base: Money::new(3.60, Currency::USD),
+            value_base: Money::new(3.60, Currency::USD).expect("valid money fixture"),
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,
@@ -804,8 +804,8 @@ mod tests {
         let position_value = PositionValue {
             position_id: PositionId::from("EUR_POS".to_string()),
             entity_id: EntityId::from("ENTITY".to_string()),
-            value_native: Money::new(100.0, Currency::EUR),
-            value_base: Money::new(108.0, Currency::USD),
+            value_native: Money::from((100_i64, Currency::EUR)),
+            value_base: Money::from((108_i64, Currency::USD)),
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,
@@ -830,16 +830,19 @@ mod tests {
         {
             let position_id = PositionId::from(position_id.to_string());
             let measures = IndexMap::from([(MetricId::Dv01, 1.0)]);
-            let valuation_result =
-                ValuationResult::stamped(position_id.as_str(), as_of, Money::new(0.0, currency))
-                    .with_measures(measures);
+            let valuation_result = ValuationResult::stamped(
+                position_id.as_str(),
+                as_of,
+                Money::from((0_i64, currency)),
+            )
+            .with_measures(measures);
             position_values.insert(
                 position_id.clone(),
                 PositionValue {
                     position_id,
                     entity_id: entity_id.clone(),
-                    value_native: Money::new(0.0, currency),
-                    value_base: Money::new(0.0, Currency::USD),
+                    value_native: Money::from((0_i64, currency)),
+                    value_base: Money::from((0_i64, Currency::USD)),
                     metric_scale: 1.0,
                     risk_metrics_complete: true,
                     risk_error: None,
@@ -850,7 +853,7 @@ mod tests {
         let valuation = PortfolioValuation {
             as_of,
             position_values,
-            total_base_currency: Money::new(0.0, Currency::USD),
+            total_base_currency: Money::from((0_i64, Currency::USD)),
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: FxConversionPolicy::CashflowDate,

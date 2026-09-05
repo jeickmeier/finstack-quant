@@ -191,7 +191,7 @@ impl CDSTranchePricer {
             };
         }
 
-        Ok(Money::new(net_pv, tranche.notional.currency()))
+        Money::new(net_pv, tranche.notional.currency())
     }
 
     /// Build the projected premium/default schedule for the tranche.
@@ -370,7 +370,7 @@ impl CDSTranchePricer {
                     cashflow: CashFlow::new(
                         payment_date,
                         None,
-                        Money::new(premium_amount * premium_sign, tranche.notional.currency()),
+                        Money::new(premium_amount * premium_sign, tranche.notional.currency())?,
                         CFKind::Fixed,
                         accrual_period,
                         Some(coupon),
@@ -388,7 +388,7 @@ impl CDSTranchePricer {
                         Money::new(
                             default_amount * protection_sign,
                             tranche.notional.currency(),
-                        ),
+                        )?,
                         CFKind::DefaultedNotional,
                         0.0,
                         None,
@@ -426,7 +426,7 @@ impl CDSTranchePricer {
                 cashflow: CashFlow::new(
                     date,
                     None,
-                    Money::new(amount.amount() * premium_sign, amount.currency()),
+                    Money::new(amount.amount() * premium_sign, amount.currency())?,
                     CFKind::Fee,
                     0.0,
                     None,

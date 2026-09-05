@@ -37,7 +37,7 @@ fn build_floating_loan(
     TermLoan::builder()
         .id("TL-DM-TEST".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {
@@ -237,7 +237,7 @@ fn solve_dm_at_clean_price(margin_bp: i64, clean_px: f64) -> f64 {
     let loan = TermLoan::builder()
         .id("TL-DM-PAR-PIN".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {

@@ -167,8 +167,8 @@ impl Payoff for DummyPayoff {
     fn on_event(&mut self, _state: &mut PathState) -> finstack_quant_core::Result<()> {
         Ok(())
     }
-    fn value(&self, currency: Currency) -> Money {
-        Money::new(100.0, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok(Money::from((100_i64, currency)))
     }
     fn reset(&mut self) {}
 }
@@ -187,7 +187,7 @@ impl Payoff for PathStartPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         Money::new(self.start_uniform.unwrap_or(-1.0), currency)
     }
 
@@ -210,7 +210,7 @@ impl Payoff for CapturedValuePayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         Money::new(self.value.unwrap_or_default(), currency)
     }
 
@@ -232,7 +232,7 @@ impl Payoff for InitialCashflowPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         Money::new(self.value, currency)
     }
 
@@ -248,8 +248,8 @@ impl Payoff for RecurringCashflowPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        Money::new(0.0, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok(Money::from((0_i64, currency)))
     }
 
     fn reset(&mut self) {}
@@ -771,7 +771,7 @@ impl Payoff for OverflowAfterDiscountPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         Money::new(1.0e20, currency)
     }
 
@@ -1266,7 +1266,8 @@ fn test_estimate_num_simulated_paths_defaults_and_propagates() {
     assert_eq!(est_anti.num_paths, 10_000);
     assert_eq!(est_anti.num_simulated_paths, 20_000);
 
-    let money_est = MoneyEstimate::from_estimate(est_anti, Currency::USD);
+    let money_est = MoneyEstimate::from_estimate(est_anti, Currency::USD)
+        .expect("valid money estimate fixture");
     assert_eq!(money_est.num_paths, 10_000);
     assert_eq!(money_est.num_simulated_paths, 20_000);
 }
@@ -1514,9 +1515,11 @@ mod correlation_regression {
                 }
                 Ok(())
             }
-            fn value(&self, currency: Currency) -> Money {
-                let payoff = (self.s0 - self.s1 - self.strike).max(0.0);
-                Money::new(payoff, currency)
+            fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+                Ok({
+                    let payoff = (self.s0 - self.s1 - self.strike).max(0.0);
+                    Money::new(payoff, currency)?
+                })
             }
             fn reset(&mut self) {
                 self.s0 = 0.0;

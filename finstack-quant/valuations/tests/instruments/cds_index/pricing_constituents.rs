@@ -189,7 +189,7 @@ fn test_constituents_unequal_weights() {
     let idx = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-UNEQUAL",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -219,7 +219,7 @@ fn test_constituents_index_factor_application() {
     let idx = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -444,21 +444,17 @@ fn test_constituents_detailed_additive_metrics() {
     }
 
     let npv = idx.npv_detailed(&ctx, as_of).unwrap();
-    let npv_sum = npv
-        .constituents
-        .iter()
-        .fold(Money::new(0.0, npv.total.currency()), |acc, c| {
-            acc.checked_add(c.value).unwrap()
-        });
+    let npv_sum = npv.constituents.iter().fold(
+        Money::new(0.0, npv.total.currency()).expect("valid money fixture"),
+        |acc, c| acc.checked_add(c.value).unwrap(),
+    );
     assert_money_approx_eq(npv.total, npv_sum, 1e-6, "NPV total equals sum");
 
     let pv_prot = idx.pv_protection_leg_detailed(&ctx, as_of).unwrap();
-    let pv_prot_sum = pv_prot
-        .constituents
-        .iter()
-        .fold(Money::new(0.0, pv_prot.total.currency()), |acc, c| {
-            acc.checked_add(c.value).unwrap()
-        });
+    let pv_prot_sum = pv_prot.constituents.iter().fold(
+        Money::new(0.0, pv_prot.total.currency()).expect("valid money fixture"),
+        |acc, c| acc.checked_add(c.value).unwrap(),
+    );
     assert_money_approx_eq(
         pv_prot.total,
         pv_prot_sum,
@@ -467,12 +463,10 @@ fn test_constituents_detailed_additive_metrics() {
     );
 
     let pv_prem = idx.pv_premium_leg_detailed(&ctx, as_of).unwrap();
-    let pv_prem_sum = pv_prem
-        .constituents
-        .iter()
-        .fold(Money::new(0.0, pv_prem.total.currency()), |acc, c| {
-            acc.checked_add(c.value).unwrap()
-        });
+    let pv_prem_sum = pv_prem.constituents.iter().fold(
+        Money::new(0.0, pv_prem.total.currency()).expect("valid money fixture"),
+        |acc, c| acc.checked_add(c.value).unwrap(),
+    );
     assert_money_approx_eq(
         pv_prem.total,
         pv_prem_sum,

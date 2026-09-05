@@ -100,7 +100,7 @@ fn test_parse_cs_invalid_format() {
 /// Test context with capital structure cashflows
 #[test]
 fn test_context_get_cs_value_interest_total() {
-    let period_id = PeriodId::quarter(2025, 1);
+    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let node_to_column = IndexMap::new();
     let historical = IndexMap::new();
 
@@ -116,28 +116,34 @@ fn test_context_get_cs_value_interest_total() {
         interest_expense_cash: finstack_quant_core::money::Money::new(
             50_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         principal_payment: finstack_quant_core::money::Money::new(
             100_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         debt_balance: finstack_quant_core::money::Money::new(
             1_000_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         fees: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         accrued_interest: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
     };
     cs_cashflows.totals.insert(period_id, breakdown);
 
@@ -150,7 +156,7 @@ fn test_context_get_cs_value_interest_total() {
 
 #[test]
 fn test_context_get_cs_value_principal_instrument() {
-    let period_id = PeriodId::quarter(2025, 1);
+    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let node_to_column = IndexMap::new();
     let historical = IndexMap::new();
 
@@ -167,7 +173,8 @@ fn test_context_get_cs_value_principal_instrument() {
         principal_payment: finstack_quant_core::money::Money::new(
             25_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         ..finstack_quant_statements::capital_structure::CashflowBreakdown::with_currency(
             finstack_quant_core::currency::Currency::USD,
         )
@@ -188,7 +195,7 @@ fn test_context_get_cs_value_principal_instrument() {
 
 #[test]
 fn test_context_get_cs_value_no_cs_error() {
-    let period_id = PeriodId::quarter(2025, 1);
+    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let node_to_column = IndexMap::new();
     let historical = IndexMap::new();
 
@@ -209,7 +216,7 @@ fn test_context_get_cs_value_no_cs_error() {
 
 #[test]
 fn test_context_get_cs_value_invalid_component() {
-    let period_id = PeriodId::quarter(2025, 1);
+    let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let node_to_column = IndexMap::new();
     let historical = IndexMap::new();
 
@@ -240,11 +247,11 @@ fn test_evaluate_model_with_cs_mock() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
@@ -253,11 +260,11 @@ fn test_evaluate_model_with_cs_mock() {
             "cogs",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(600_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(650_000.0),
                 ),
             ],
@@ -285,13 +292,13 @@ fn test_model_with_bond_builder() {
         .value(
             "revenue",
             &[(
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(1_000_000.0),
             )],
         )
         .add_bond(
             "BOND-001",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             issue_date,
             maturity_date,
@@ -404,8 +411,8 @@ fn test_aggregate_period_flows() {
 
     let bond = Bond::fixed(
         InstrumentId::new("BOND-001"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -442,8 +449,8 @@ fn test_build_instrument_from_spec_bond_variant() {
 
     let bond = Bond::fixed(
         InstrumentId::new("BOND-002"),
-        Money::new(2_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -474,7 +481,7 @@ fn test_build_instrument_from_spec_swap_variant() {
 
     let swap = crate::rates_support::usd_irs_swap(
         InstrumentId::new("SWAP-002"),
-        Money::new(3_000_000.0, Currency::USD),
+        Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
         0.045,
         start,
         maturity,
@@ -512,34 +519,40 @@ fn test_capital_structure_cashflows_accessors() {
     };
 
     let mut cs = CapitalStructureCashflows::new();
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
     let breakdown = CashflowBreakdown {
         interest_expense_cash: finstack_quant_core::money::Money::new(
             10_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         interest_income_cash: None,
         interest_expense_pik: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         principal_payment: finstack_quant_core::money::Money::new(
             25_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         debt_balance: finstack_quant_core::money::Money::new(
             500_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         fees: finstack_quant_core::money::Money::new(
             1_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         accrued_interest: finstack_quant_core::money::Money::new(
             0.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
     };
 
     let mut instrument_map = indexmap::IndexMap::new();

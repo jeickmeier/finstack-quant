@@ -41,14 +41,14 @@ fn create_bond_market(as_of: Date) -> MarketContext {
 /// Helper to create a test bond instrument
 fn create_test_bond(as_of: Date) -> Bond {
     let currency = Currency::try_from("USD").unwrap();
-    let notional = Money::new(1_000_000.0, currency);
+    let notional = Money::new(1_000_000.0, currency).expect("valid money fixture");
     let issue_date = as_of;
     let maturity_date = issue_date + time::Duration::days(5 * 365);
 
     Bond::fixed(
         "TEST-BOND-001",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         issue_date,
         maturity_date,
         finstack_quant_core::dates::StubKind::ShortFront,

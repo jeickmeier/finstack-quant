@@ -267,7 +267,7 @@ impl MarketContext {
     /// use finstack_quant_core::currency::Currency;
     ///
     /// let ctx = MarketContext::new()
-    ///     .insert_price("AAPL", MarketScalar::Price(Money::new(180.0, Currency::USD)));
+    ///     .insert_price("AAPL", MarketScalar::Price(Money::from((180_i64, Currency::USD))));
     /// if let MarketScalar::Price(price) = ctx.get_price("AAPL").expect("Price should exist") {
     ///     assert_eq!(price.currency(), Currency::USD);
     /// }

@@ -38,7 +38,7 @@
 //! // Create a 5-year USD payer swap (pay fixed, receive floating)
 //! let swap = InterestRateSwap::builder()
 //!     .id(InstrumentId::new("IRS-5Y-USD"))
-//!     .notional(Money::new(10_000_000.0, Currency::USD))
+//!     .notional(Money::from((10_000_000_i64, Currency::USD)))
 //!     .side(PayReceive::Pay)
 //!     .fixed(FixedLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),

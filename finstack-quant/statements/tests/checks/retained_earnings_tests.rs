@@ -10,7 +10,7 @@ use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 
 fn q(quarter: u8) -> PeriodId {
-    PeriodId::quarter(2025, quarter)
+    PeriodId::quarter(2025, quarter).expect("valid period fixture")
 }
 
 #[test]

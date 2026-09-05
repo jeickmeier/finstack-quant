@@ -13,7 +13,7 @@ fn model_with_nodes(nodes: &[&str]) -> String {
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    let q1 = PeriodId::quarter(2024, 1);
+    let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
     let mut builder = ModelBuilder::new("test")
         .periods("2024Q1..Q1", None)
         .unwrap();
@@ -57,8 +57,8 @@ fn evaluate_model_produces_computed_nodes() {
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    let q1 = PeriodId::quarter(2024, 1);
-    let q2 = PeriodId::quarter(2024, 2);
+    let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2024, 2).expect("valid period fixture");
     let model = ModelBuilder::new("demo")
         .periods("2024Q1..Q2", None)
         .unwrap()

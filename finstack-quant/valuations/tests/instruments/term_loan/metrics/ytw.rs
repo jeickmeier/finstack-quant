@@ -23,7 +23,7 @@ fn test_ytw_is_minimum_of_ytm_and_ytc() {
     let mut loan = TermLoan::builder()
         .id("TL-YTW-001".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2029 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -89,7 +89,7 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
     let mut loan = TermLoan::builder()
         .id("TL-YTW-AMORT-CALL".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -160,17 +160,17 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
 fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
     let as_of = date!(2025 - 01 - 01);
     let ddtl = DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2025 - 12 - 31),
         draws: vec![
             DrawEvent {
                 date: date!(2025 - 03 - 15),
-                amount: Money::new(6_000_000.0, Currency::USD),
+                amount: Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"),
             },
             DrawEvent {
                 date: date!(2025 - 09 - 15),
-                amount: Money::new(4_000_000.0, Currency::USD),
+                amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
         commitment_step_downs: vec![],
@@ -183,7 +183,7 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
     let loan = TermLoan::builder()
         .id("TL-YTW-DDTL-FUNDING".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -235,7 +235,7 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
     let mut loan = TermLoan::builder()
         .id("TL-YTW-STANDING-CALL".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2024 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -300,7 +300,7 @@ fn test_ytw_uses_quoted_clean_price_when_present() {
     let mut loan = TermLoan::builder()
         .id("TL-YTW-QUOTE".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2029 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })

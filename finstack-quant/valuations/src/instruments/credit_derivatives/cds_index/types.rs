@@ -248,7 +248,7 @@ impl CDSIndex {
             index_name: "CDX.NA.IG".to_string(),
             series: 42,
             version: 1,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             index_factor: 1.0,
             side: PayReceive::Pay,
             convention,
@@ -291,7 +291,7 @@ impl CDSIndex {
     /// let idx = CDSIndex::from_preset(
     ///     &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
     ///     "CDX-IG-42",
-    ///     Money::new(10_000_000.0, Currency::USD),
+    ///     Money::from((10_000_000_i64, Currency::USD)),
     ///     PayReceive::Pay,
     ///     start, end,
     ///     0.40,
@@ -430,28 +430,30 @@ impl CDSIndex {
     /// the surviving notional. Pricing this synthetic CDS directly therefore
     /// produces the same dollar leg PVs as `IndexPricing::SingleCurve` mode
     /// on the index itself.
-    pub fn to_synthetic_cds(&self) -> CreditDefaultSwap {
-        CreditDefaultSwap {
-            id: self.id.to_owned(),
-            notional: Money::new(
-                self.notional.amount() * self.index_factor,
-                self.notional.currency(),
-            ),
-            side: self.side,
-            convention: self.convention,
-            premium: self.premium_with_standard_defaults(),
-            protection: self.protection_with_standard_defaults(),
-            instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
-            metric_pricing_overrides: self.metric_pricing_overrides.clone(),
-            scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
-            valuation_convention:
-                crate::instruments::credit_derivatives::cds::CdsValuationConvention::default(),
-            upfront: None,
-            doc_clause: None,
-            protection_effective_date: None,
-            margin_spec: self.margin_spec.clone(),
-            attributes: self.attributes.clone(),
-        }
+    pub fn to_synthetic_cds(&self) -> finstack_quant_core::Result<CreditDefaultSwap> {
+        Ok({
+            CreditDefaultSwap {
+                id: self.id.to_owned(),
+                notional: Money::new(
+                    self.notional.amount() * self.index_factor,
+                    self.notional.currency(),
+                )?,
+                side: self.side,
+                convention: self.convention,
+                premium: self.premium_with_standard_defaults(),
+                protection: self.protection_with_standard_defaults(),
+                instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
+                metric_pricing_overrides: self.metric_pricing_overrides.clone(),
+                scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
+                valuation_convention:
+                    crate::instruments::credit_derivatives::cds::CdsValuationConvention::default(),
+                upfront: None,
+                doc_clause: None,
+                protection_effective_date: None,
+                margin_spec: self.margin_spec.clone(),
+                attributes: self.attributes.clone(),
+            }
+        })
     }
 
     /// Configure equal-weight constituents by credit parameter set per name.
@@ -653,8 +655,8 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(

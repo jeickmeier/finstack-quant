@@ -529,7 +529,7 @@ mod tests {
     fn test_bond(base_date: Date) -> crate::Result<Arc<dyn Instrument>> {
         let bond = Bond::builder()
             .id("TEST-BOND".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(730))
             .cashflow_spec(
@@ -830,7 +830,7 @@ mod tests {
         days: i64,
     ) -> HorizonResult {
         let attribution = PnlAttribution::new(
-            Money::new(pnl_amount, pnl_currency),
+            Money::new(pnl_amount, pnl_currency).expect("valid money fixture"),
             "TEST",
             date!(2025 - 01 - 15),
             date!(2025 - 01 - 15) + time::Duration::days(days),
@@ -838,8 +838,10 @@ mod tests {
         );
         HorizonResult {
             attribution,
-            initial_value: Money::new(initial_amount, initial_currency),
-            terminal_value: Money::new(initial_amount + pnl_amount, initial_currency),
+            initial_value: Money::new(initial_amount, initial_currency)
+                .expect("valid money fixture"),
+            terminal_value: Money::new(initial_amount + pnl_amount, initial_currency)
+                .expect("valid money fixture"),
             horizon_days: Some(days),
             scenario_report: empty_report(),
         }

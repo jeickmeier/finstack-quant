@@ -30,20 +30,20 @@ fn test_dcf_evaluation_gordon_growth() {
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(110_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(120_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(120_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(130_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
@@ -72,7 +72,13 @@ fn test_dcf_rejects_scalar_ufcf_node() {
     let model = ModelBuilder::new("scalar-ufcf")
         .periods("2025Q1..Q1", None)
         .expect("periods")
-        .value_scalar("ufcf", &[(PeriodId::quarter(2025, 1), 100_000.0)])
+        .value_scalar(
+            "ufcf",
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                100_000.0,
+            )],
+        )
         .with_meta("currency", serde_json::json!("USD"))
         .build()
         .expect("model");
@@ -103,18 +109,18 @@ fn test_cs_cashflows_populated_on_statement_result() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
         )
         .add_bond(
             "BOND-001",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             issue,
             maturity,
@@ -152,8 +158,8 @@ fn test_cs_cashflows_populated_on_statement_result() {
     );
 
     // Should have totals for both periods
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     assert!(cs.totals.contains_key(&q1), "totals should contain Q1 2025");
     assert!(cs.totals.contains_key(&q2), "totals should contain Q2 2025");
 
@@ -177,20 +183,20 @@ fn test_dcf_with_market_context() {
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
@@ -264,20 +270,20 @@ fn test_dcf_excludes_historical_periods_from_explicit_flows() {
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(110_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(120_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(120_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(130_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
@@ -318,39 +324,63 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(110_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(120_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(120_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(130_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
         .value(
             "total_debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(40.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(10.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(40.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10.0),
+                ),
             ],
         )
         .value(
             "cash",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .with_meta("currency", serde_json::json!("USD"))
@@ -389,7 +419,10 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
         (result.net_debt.amount() - 100.0).abs() < 1e-9,
         "auto net debt should come from the latest balance sheet before as-of"
     );
-    assert_eq!(last_available_period.id, PeriodId::quarter(2025, 2));
+    assert_eq!(
+        last_available_period.id,
+        PeriodId::quarter(2025, 2).expect("valid period fixture")
+    );
 }
 
 #[test]
@@ -401,39 +434,63 @@ fn test_dcf_forecast_only_uses_first_forecast_boundary_for_net_debt() {
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(110_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(120_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(120_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(130_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
         .value(
             "total_debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(75.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(40.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(10.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(75.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(40.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10.0),
+                ),
             ],
         )
         .value(
             "cash",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .with_meta("currency", serde_json::json!("USD"))
@@ -475,20 +532,20 @@ fn make_simple_dcf_model() -> finstack_quant_statements::types::FinancialModelSp
             "ufcf",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(110_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(120_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(120_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(130_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(130_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
@@ -574,9 +631,18 @@ fn annual_gordon_terminal_value_unchanged() {
         .value_money(
             "ufcf",
             &[
-                (PeriodId::annual(2025), Money::new(400_000.0, Currency::USD)),
-                (PeriodId::annual(2026), Money::new(440_000.0, Currency::USD)),
-                (PeriodId::annual(2027), Money::new(480_000.0, Currency::USD)),
+                (
+                    PeriodId::annual(2025),
+                    Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    PeriodId::annual(2026),
+                    Money::new(440_000.0, Currency::USD).expect("valid money fixture"),
+                ),
+                (
+                    PeriodId::annual(2027),
+                    Money::new(480_000.0, Currency::USD).expect("valid money fixture"),
+                ),
             ],
         )
         .with_meta("currency", serde_json::json!("USD"))
@@ -722,28 +788,34 @@ fn evaluate_dcf_with_market_uses_curve_for_cs_interest() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(1_000_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(1_100_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(1_100_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(1_200_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(1_200_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(1_300_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(1_300_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
-        .availability_dates("revenue", &[(PeriodId::quarter(2025, 1), as_of)])
+        .availability_dates(
+            "revenue",
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                as_of,
+            )],
+        )
         .expect("availability")
         .add_bond(
             "BOND-001",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             as_of,
             Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),

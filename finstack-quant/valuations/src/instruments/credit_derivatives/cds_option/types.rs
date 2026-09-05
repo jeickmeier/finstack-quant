@@ -458,7 +458,7 @@ impl CDSOption {
             super::strike::CDSOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
             date!(2025 - 06 - 20),
             date!(2030 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )?;
         let credit_params =
             crate::instruments::common_impl::parameters::CreditParams::corporate_standard(
@@ -808,7 +808,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::from_str_exact("0.0058395400").expect("valid strike")),
             date!(2026 - 06 - 26),
             date!(2031 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("valid option params");
         let credit_params = CreditParams::corporate_standard("IBM", "IBM-USD-SENIOR");
@@ -845,7 +845,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::from_str_exact("0.005").expect("valid strike")),
             date!(2026 - 06 - 26),
             date!(2031 - 06 - 20),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("valid option params")
         .as_index(1.0)

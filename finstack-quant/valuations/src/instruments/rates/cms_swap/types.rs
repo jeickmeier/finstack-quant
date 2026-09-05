@@ -434,7 +434,7 @@ impl CmsSwap {
 
         CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-10Y-USD"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .cms_tenor(10.0)
             .cms_fixing_dates(fixing_dates)
@@ -489,7 +489,7 @@ impl CmsSwap {
                 CashFlow::new(
                     payment_date,
                     Some(fixing_date),
-                    Money::new(signed_amount, self.notional.currency()),
+                    Money::new(signed_amount, self.notional.currency())?,
                     CFKind::FloatReset,
                     accrual_fraction,
                     Some(coupon_rate),
@@ -540,7 +540,7 @@ impl CmsSwap {
                         CashFlow::new(
                             payment_date,
                             None,
-                            Money::new(signed, self.notional.currency()),
+                            Money::new(signed, self.notional.currency())?,
                             CFKind::Fixed,
                             accrual,
                             Some(*rate),
@@ -595,7 +595,7 @@ impl CmsSwap {
                         CashFlow::new(
                             payment_date,
                             Some(prev_date),
-                            Money::new(signed, self.notional.currency()),
+                            Money::new(signed, self.notional.currency())?,
                             CFKind::FloatReset,
                             accrual,
                             Some(fwd_rate + spread),
@@ -704,8 +704,8 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -874,7 +874,7 @@ mod tests {
         let pay = date(2026, 4, 1);
         let mut builder = CmsSwap::builder()
             .id(InstrumentId::new("CMS-RECON"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             // Receive CMS so base_value = pv_cms − pv_funding
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
@@ -1009,7 +1009,7 @@ mod tests {
         let pay = date(2025, 3, 1);
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-SEASONED-FLOWS"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![fixing])
@@ -1071,7 +1071,7 @@ mod tests {
         let pay = date(2025, 3, 1);
         let swap = CmsSwap::builder()
             .id(InstrumentId::new("CMS-FUNDING-SEASONED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![reset])
@@ -1115,7 +1115,7 @@ mod tests {
     fn builder_rejects_misaligned_cms_leg_vectors() {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-CMS"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![date(2026, 3, 20), date(2026, 6, 20)])
@@ -1143,7 +1143,7 @@ mod tests {
     fn builder_rejects_misaligned_funding_leg_vectors() {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-FUNDING"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .cms_tenor(10.0)
             .cms_fixing_dates(vec![date(2026, 3, 20)])

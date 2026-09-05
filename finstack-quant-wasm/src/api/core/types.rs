@@ -43,7 +43,7 @@ impl JsRate {
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(decimal: f64) -> Result<JsRate, JsValue> {
-        RustRate::try_from_decimal(decimal)
+        RustRate::from_decimal(decimal)
             .map(|inner| JsRate { inner })
             .map_err(to_js_err)
     }
@@ -61,7 +61,7 @@ impl JsRate {
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
     pub fn from_percent(pct: f64) -> Result<JsRate, JsValue> {
-        RustRate::try_from_percent(pct)
+        RustRate::from_percent(pct)
             .map(|inner| JsRate { inner })
             .map_err(to_js_err)
     }
@@ -286,12 +286,12 @@ mod tests {
 
     #[test]
     fn rate_rejects_nan() {
-        assert!(RustRate::try_from_decimal(f64::NAN).is_err());
+        assert!(RustRate::from_decimal(f64::NAN).is_err());
     }
 
     #[test]
     fn rate_rejects_infinity() {
-        assert!(RustRate::try_from_decimal(f64::INFINITY).is_err());
+        assert!(RustRate::from_decimal(f64::INFINITY).is_err());
     }
 
     #[test]

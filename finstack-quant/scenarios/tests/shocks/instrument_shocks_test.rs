@@ -24,7 +24,10 @@ fn test_instrument_type_price_shock_matching() {
         Box::new(
             Bond::builder()
                 .id("BOND1".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
                 .cashflow_spec(
@@ -45,7 +48,10 @@ fn test_instrument_type_price_shock_matching() {
         Box::new(
             Bond::builder()
                 .id("BOND2".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
                 .cashflow_spec(
@@ -126,7 +132,10 @@ fn test_instrument_type_spread_shock_matching() {
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("BOND1".into())
-            .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+            .notional(
+                finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
             .cashflow_spec(
@@ -217,10 +226,10 @@ fn test_instrument_spread_shock_moves_bond_pv() {
 
     let bond = Bond::builder()
         .id("BOND1".into())
-        .notional(finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD)
+                .expect("valid money fixture"),
+        )
         .issue_date(base_date)
         .maturity(base_date + time::Duration::days(1825))
         .cashflow_spec(
@@ -294,7 +303,10 @@ fn test_instrument_attr_price_shock_matching() {
         Box::new(
             Bond::builder()
                 .id("ENERGY_BBB".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
                 .cashflow_spec(
@@ -319,7 +331,10 @@ fn test_instrument_attr_price_shock_matching() {
         Box::new(
             Bond::builder()
                 .id("TECH_AA".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
                 .cashflow_spec(
@@ -391,7 +406,10 @@ fn test_instrument_attr_price_shock_no_matches() {
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("ENERGY_BBB".into())
-            .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+            .notional(
+                finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
             .cashflow_spec(
@@ -486,7 +504,10 @@ fn test_instrument_shock_no_matching_types() {
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("BOND1".into())
-            .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+            .notional(
+                finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
             .cashflow_spec(
@@ -580,7 +601,10 @@ fn test_instrument_shock_multiple_types() {
         Box::new(
             Bond::builder()
                 .id("BOND1".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
                 .cashflow_spec(
@@ -601,7 +625,10 @@ fn test_instrument_shock_multiple_types() {
         Box::new(
             Bond::builder()
                 .id("BOND2".into())
-                .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+                .notional(
+                    finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                        .expect("valid money fixture"),
+                )
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
                 .cashflow_spec(
@@ -697,7 +724,10 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("TAGONLY".into())
-            .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+            .notional(
+                finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
             .cashflow_spec(

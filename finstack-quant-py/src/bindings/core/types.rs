@@ -97,7 +97,7 @@ impl PyRate {
         let decimal: f64 = value
             .extract()
             .map_err(|_| PyTypeError::new_err("Rate value must be a float or a str quote"))?;
-        Rate::try_from_decimal(decimal)
+        Rate::from_decimal(decimal)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -106,7 +106,7 @@ impl PyRate {
     #[classmethod]
     #[pyo3(text_signature = "(cls, percent)")]
     fn from_percent(_cls: &Bound<'_, PyType>, percent: f64) -> PyResult<Self> {
-        Rate::try_from_percent(percent)
+        Rate::from_percent(percent)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

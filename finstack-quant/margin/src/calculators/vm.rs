@@ -42,7 +42,7 @@ impl VmResult {
         if self.delivery_amount.amount() > 0.0 {
             self.delivery_amount
         } else {
-            Money::new(-self.return_amount.amount(), self.return_amount.currency())
+            self.return_amount.checked_neg()
         }
     }
 
@@ -80,8 +80,8 @@ impl VmResult {
 /// let csa = CsaSpec::usd_regulatory()?;
 /// let calc = VmCalculator::new(csa);
 ///
-/// let exposure = Money::new(5_000_000.0, Currency::USD);
-/// let posted = Money::new(3_000_000.0, Currency::USD);
+/// let exposure = Money::from((5_000_000_i64, Currency::USD));
+/// let posted = Money::from((3_000_000_i64, Currency::USD));
 /// let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid");
 ///
 /// let result = calc.calculate(exposure, posted, as_of)?;
@@ -173,22 +173,25 @@ impl VmCalculator {
         let (delivery, ret) = match net_call.amount().total_cmp(&0.0) {
             std::cmp::Ordering::Greater => {
                 if exp >= 0.0 {
-                    (net_call, Money::new(0.0, currency))
+                    (net_call, Money::from((0_i64, currency)))
                 } else {
-                    (Money::new(0.0, currency), net_call)
+                    (Money::from((0_i64, currency)), net_call)
                 }
             }
             std::cmp::Ordering::Less => {
-                let abs_amt = Money::new(net_call.amount().abs(), currency);
+                let abs_amt = Money::new(net_call.amount().abs(), currency)?;
                 // Negative credit support: return excess collateral when exposure ≥ 0;
                 // post margin to counterparty when exposure < 0 (bilateral netting).
                 if exp >= 0.0 {
-                    (Money::new(0.0, currency), abs_amt)
+                    (Money::from((0_i64, currency)), abs_amt)
                 } else {
-                    (abs_amt, Money::new(0.0, currency))
+                    (abs_amt, Money::from((0_i64, currency)))
                 }
             }
-            std::cmp::Ordering::Equal => (Money::new(0.0, currency), Money::new(0.0, currency)),
+            std::cmp::Ordering::Equal => (
+                Money::from((0_i64, currency)),
+                Money::from((0_i64, currency)),
+            ),
         };
 
         // Calculate settlement date
@@ -347,8 +350,8 @@ mod tests {
             base_currency: Currency::USD,
             calendar_id: "usny".to_string(),
             vm_params: VmParameters::with_threshold(
-                Money::new(1_000_000.0, Currency::USD),
-                Money::new(100_000.0, Currency::USD),
+                Money::from((1_000_000_i64, Currency::USD)),
+                Money::from((100_000_i64, Currency::USD)),
             ),
             im_params: None,
             eligible_collateral: EligibleCollateralSchedule::default(),
@@ -367,8 +370,8 @@ mod tests {
         let csa = CsaSpec::usd_regulatory().expect("registry should load");
         let calc = VmCalculator::new(csa);
 
-        let exposure = Money::new(5_000_000.0, Currency::USD);
-        let posted = Money::new(3_000_000.0, Currency::USD);
+        let exposure = Money::from((5_000_000_i64, Currency::USD));
+        let posted = Money::from((3_000_000_i64, Currency::USD));
         let result = calc
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
@@ -383,8 +386,8 @@ mod tests {
         let csa = CsaSpec::usd_regulatory().expect("registry should load");
         let calc = VmCalculator::new(csa);
 
-        let exposure = Money::new(-2_000_000.0, Currency::USD);
-        let posted = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((-2_000_000_i64, Currency::USD));
+        let posted = Money::from((0_i64, Currency::USD));
         let result = calc
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
@@ -399,8 +402,8 @@ mod tests {
         let calc = VmCalculator::new(csa);
 
         // Exposure below threshold: no margin call
-        let exposure = Money::new(500_000.0, Currency::USD);
-        let posted = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((500_000_i64, Currency::USD));
+        let posted = Money::from((0_i64, Currency::USD));
         let result = calc
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
@@ -415,8 +418,8 @@ mod tests {
         let calc = VmCalculator::new(csa);
 
         // Exposure dropped, have excess collateral
-        let exposure = Money::new(1_000_000.0, Currency::USD);
-        let posted = Money::new(3_000_000.0, Currency::USD);
+        let exposure = Money::from((1_000_000_i64, Currency::USD));
+        let posted = Money::from((3_000_000_i64, Currency::USD));
         let result = calc
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
@@ -431,8 +434,8 @@ mod tests {
         let csa = CsaSpec::usd_regulatory().expect("registry should load"); // MTA = 500K
         let calc = VmCalculator::new(csa);
 
-        let exposure = Money::new(300_000.0, Currency::USD);
-        let posted = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((300_000_i64, Currency::USD));
+        let posted = Money::from((0_i64, Currency::USD));
         let result = calc
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
@@ -447,8 +450,8 @@ mod tests {
         let calc = VmCalculator::new(csa.clone());
         let as_of = test_date(2025, 1, 15);
 
-        let exposure = Money::new(2_000_000.0, Currency::USD);
-        let posted = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((2_000_000_i64, Currency::USD));
+        let posted = Money::from((0_i64, Currency::USD));
 
         let params_call = csa
             .vm_params
@@ -460,8 +463,8 @@ mod tests {
         assert_eq!(result.return_amount.amount(), 0.0);
 
         // Now flip to a return scenario
-        let exposure = Money::new(500_000.0, Currency::USD);
-        let posted = Money::new(3_000_000.0, Currency::USD);
+        let exposure = Money::from((500_000_i64, Currency::USD));
+        let posted = Money::from((3_000_000_i64, Currency::USD));
 
         let params_call = csa
             .vm_params
@@ -472,7 +475,7 @@ mod tests {
         assert_eq!(result.delivery_amount.amount(), 0.0);
         assert_eq!(
             result.return_amount,
-            Money::new(params_call.amount().abs(), Currency::USD)
+            Money::new(params_call.amount().abs(), Currency::USD).expect("valid money fixture")
         );
     }
 
@@ -484,20 +487,20 @@ mod tests {
         let exposures = vec![
             (
                 test_date(2025, 1, 15),
-                Money::new(1_000_000.0, Currency::USD),
+                Money::from((1_000_000_i64, Currency::USD)),
             ),
             (
                 test_date(2025, 1, 16),
-                Money::new(2_000_000.0, Currency::USD),
+                Money::from((2_000_000_i64, Currency::USD)),
             ),
             (
                 test_date(2025, 1, 17),
-                Money::new(1_500_000.0, Currency::USD),
+                Money::from((1_500_000_i64, Currency::USD)),
             ),
         ];
 
         let calls = calc
-            .generate_margin_calls(&exposures, Money::new(0.0, Currency::USD))
+            .generate_margin_calls(&exposures, Money::from((0_i64, Currency::USD)))
             .expect("margin calls ok");
 
         // Three calls: 2 deliveries (1M, then 1M more), then 1 return (0.5M excess)
@@ -515,20 +518,20 @@ mod tests {
         let exposures = vec![
             (
                 test_date(2025, 1, 15),
-                Money::new(-2_000_000.0, Currency::USD),
+                Money::from((-2_000_000_i64, Currency::USD)),
             ),
             (
                 test_date(2025, 1, 16),
-                Money::new(-2_000_000.0, Currency::USD),
+                Money::from((-2_000_000_i64, Currency::USD)),
             ),
             (
                 test_date(2025, 1, 17),
-                Money::new(-2_000_000.0, Currency::USD),
+                Money::from((-2_000_000_i64, Currency::USD)),
             ),
         ];
 
         let calls = calc
-            .generate_margin_calls(&exposures, Money::new(0.0, Currency::USD))
+            .generate_margin_calls(&exposures, Money::from((0_i64, Currency::USD)))
             .expect("margin calls ok");
 
         assert_eq!(
@@ -537,7 +540,7 @@ mod tests {
             "persistent deficit should not be called repeatedly"
         );
         assert_eq!(calls[0].call_type, MarginCallType::VariationMarginDelivery);
-        assert_eq!(calls[0].amount, Money::new(2_000_000.0, Currency::USD));
+        assert_eq!(calls[0].amount, Money::from((2_000_000_i64, Currency::USD)));
     }
 
     #[test]
@@ -557,8 +560,8 @@ mod tests {
         let csa = CsaSpec::usd_regulatory().expect("registry should load"); // settlement_lag = 1
         let calc = VmCalculator::new(csa);
         let friday = test_date(2025, 1, 10);
-        let exposure = Money::new(1_000_000.0, Currency::USD);
-        let posted = Money::new(0.0, Currency::USD);
+        let exposure = Money::from((1_000_000_i64, Currency::USD));
+        let posted = Money::from((0_i64, Currency::USD));
 
         let result = calc.calculate(exposure, posted, friday).expect("calc ok");
         // T+1 business day from Friday should be Monday.

@@ -47,8 +47,8 @@
 //! let as_of = date!(2025-01-15);
 //! let bond = Bond::with_convention(
 //!     "CORP-001",
-//!     Money::new(1_000_000.0, Currency::USD),
-//!     Rate::from_decimal(0.05),
+//!     Money::from((1_000_000_i64, Currency::USD)),
+//!     Rate::from_decimal(0.05).expect("valid rate fixture"),
 //!     date!(2024-01-15),
 //!     date!(2034-01-15),
 //!     BondConvention::UsCorporate,

@@ -114,9 +114,12 @@ mod tests {
         measures.insert(MetricId::Convexity, 125.5);
         measures.insert(MetricId::Ytm, 0.0425);
 
-        let result =
-            ValuationResult::stamped("BOND-001", jan15(), Money::new(1_042_315.67, Currency::USD))
-                .with_measures(measures);
+        let result = ValuationResult::stamped(
+            "BOND-001",
+            jan15(),
+            Money::new(1_042_315.67, Currency::USD).expect("valid money fixture"),
+        )
+        .with_measures(measures);
 
         let row = result.to_row();
 
@@ -140,7 +143,7 @@ mod tests {
             3.0,
         );
         measures.insert(MetricId::custom("bucketed_dv01::USD_x2dOIS::5y"), 4.0);
-        let rows = ValuationResult::stamped("L", jan15(), Money::new(1.0, Currency::USD))
+        let rows = ValuationResult::stamped("L", jan15(), Money::from((1_i64, Currency::USD)))
             .with_measures(measures)
             .to_long_rows();
 
@@ -186,7 +189,7 @@ mod tests {
         measures.insert(MetricId::Convexity, 12.3);
 
         let result =
-            ValuationResult::stamped("BOND-ORDER", jan15(), Money::new(1.0, Currency::USD))
+            ValuationResult::stamped("BOND-ORDER", jan15(), Money::from((1_i64, Currency::USD)))
                 .with_measures(measures);
 
         let row = result.to_row();
@@ -202,7 +205,7 @@ mod tests {
         let row = ValuationResult::stamped(
             "BOND-SERDE",
             jan15(),
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
         )
         .with_measures(measures)
         .to_row();

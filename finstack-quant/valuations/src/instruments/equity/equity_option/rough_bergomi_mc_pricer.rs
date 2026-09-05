@@ -335,7 +335,13 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                 Money::new(
                     intrinsic * equity_option.notional.amount(),
                     equity_option.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                    )
+                })?,
             ));
         }
 
@@ -453,7 +459,12 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         // terminal payoffs; discount the path mean (and stderr) to present
         // value, matching the Heston and rough-Heston MC pricers.
         let df = (-r * t).exp();
-        let pv = Money::new(mean_pv * df, ccy);
+        let pv = Money::new(mean_pv * df, ccy).map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(equity_option),
+            )
+        })?;
         let mut result = crate::results::ValuationResult::stamped(equity_option.id(), as_of, pv);
         let stderr = stderr_undisc * df;
         if stderr > 0.0 {

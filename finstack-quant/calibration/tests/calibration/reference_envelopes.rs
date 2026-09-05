@@ -363,7 +363,7 @@ fn example_11_equity_spots_and_dividends_support_lookup() {
         .expect("AAPL dividend schedule present in source_market.dividends");
     // The schedule should have at least one dividend entry.
     assert!(
-        !aapl_divs.events.is_empty(),
+        !aapl_divs.get_events().is_empty(),
         "AAPL dividend schedule should be non-empty"
     );
 }

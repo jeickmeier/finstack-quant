@@ -14,7 +14,7 @@ fn fixed_fee_recipient(id: &str) -> Recipient {
         id,
         RecipientType::ServiceProvider("Trustee".to_string()),
         PaymentCalculation::FixedAmount {
-            amount: Money::new(1.0, Currency::USD),
+            amount: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             rounding: None,
         },
     )

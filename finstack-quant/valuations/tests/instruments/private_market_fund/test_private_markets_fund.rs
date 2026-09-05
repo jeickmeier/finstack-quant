@@ -28,11 +28,11 @@ fn simple_2x_scenario() -> (WaterfallSpec, Vec<FundEvent>) {
     let events = vec![
         FundEvent::contribution(
             test_date(2020, 1, 1),
-            Money::new(1000000.0, test_currency()),
+            Money::new(1000000.0, test_currency()).expect("valid money fixture"),
         ),
         FundEvent::distribution(
             test_date(2025, 1, 1),
-            Money::new(2000000.0, test_currency()),
+            Money::new(2000000.0, test_currency()).expect("valid money fixture"),
         ),
     ];
 
@@ -159,8 +159,14 @@ fn test_currency_mismatch_error() {
         .unwrap();
 
     let mixed_currency_events = vec![
-        FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000000.0, Currency::USD)),
-        FundEvent::distribution(test_date(2025, 1, 1), Money::new(1500000.0, Currency::EUR)), // Different currency
+        FundEvent::contribution(
+            test_date(2020, 1, 1),
+            Money::new(1000000.0, Currency::USD).expect("valid money fixture"),
+        ),
+        FundEvent::distribution(
+            test_date(2025, 1, 1),
+            Money::new(1500000.0, Currency::EUR).expect("valid money fixture"),
+        ), // Different currency
     ];
 
     let pe = PrivateMarketsFund::new("TEST", Currency::USD, spec, mixed_currency_events);
@@ -180,18 +186,24 @@ fn test_american_vs_european_style() {
     // Identical deal-tagged events can be aggregated by the European style or
     // evaluated independently by the American style.
     let events = vec![
-        FundEvent::contribution(test_date(2020, 1, 1), Money::new(500000.0, test_currency()))
-            .with_deal_id("Deal_A"),
-        FundEvent::contribution(test_date(2020, 1, 1), Money::new(500000.0, test_currency()))
-            .with_deal_id("Deal_B"),
+        FundEvent::contribution(
+            test_date(2020, 1, 1),
+            Money::new(500000.0, test_currency()).expect("valid money fixture"),
+        )
+        .with_deal_id("Deal_A"),
+        FundEvent::contribution(
+            test_date(2020, 1, 1),
+            Money::new(500000.0, test_currency()).expect("valid money fixture"),
+        )
+        .with_deal_id("Deal_B"),
         FundEvent::proceeds(
             test_date(2023, 1, 1),
-            Money::new(200000.0, test_currency()),
+            Money::new(200000.0, test_currency()).expect("valid money fixture"),
             "Deal_A",
         ),
         FundEvent::proceeds(
             test_date(2025, 1, 1),
-            Money::new(1800000.0, test_currency()),
+            Money::new(1800000.0, test_currency()).expect("valid money fixture"),
             "Deal_B",
         ),
     ];
@@ -342,7 +354,7 @@ fn test_lp_cashflows_via_ledger() {
     let pe = PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events);
 
     let ledger = pe.run_waterfall().unwrap();
-    let lp_flows = ledger.lp_cashflows();
+    let lp_flows = ledger.lp_cashflows().expect("valid lp_cashflows fixture");
     assert!(
         !lp_flows.is_empty(),
         "Should extract LP cashflows from ledger"
@@ -409,11 +421,11 @@ fn test_multi_tier_waterfall() {
     let events = vec![
         FundEvent::contribution(
             test_date(2020, 1, 1),
-            Money::new(1000000.0, test_currency()),
+            Money::new(1000000.0, test_currency()).expect("valid money fixture"),
         ),
         FundEvent::distribution(
             test_date(2025, 1, 1),
-            Money::new(3000000.0, test_currency()),
+            Money::new(3000000.0, test_currency()).expect("valid money fixture"),
         ), // 3x return
     ];
 

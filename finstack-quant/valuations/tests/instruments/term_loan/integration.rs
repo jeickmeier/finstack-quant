@@ -30,7 +30,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
     TermLoan::builder()
         .id("TL-METRICS".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(term_loan::RateSpec::Fixed { rate_bp: 600 }) // 6%
@@ -183,7 +183,7 @@ fn test_floating_rate_term_loan_yield_and_dm() {
     let loan = TermLoan::builder()
         .id("TL-FLOAT-DM".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {

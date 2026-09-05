@@ -149,8 +149,8 @@ mod tests {
             .pool_id("TEST-POOL".into())
             .agency(AgencyProgram::Fnma)
             .pool_type(PoolType::Generic)
-            .original_face(Money::new(1_000_000.0, Currency::USD))
-            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .original_face(Money::from((1_000_000_i64, Currency::USD)))
+            .current_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_factor(1.0)
             .wac(0.045)
             .pass_through_rate(0.04)
@@ -190,7 +190,7 @@ mod tests {
             Arc::new(mbs),
             Arc::new(market),
             as_of,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
             MetricContext::default_config(),
         );
         let mut ctx = ctx;

@@ -27,7 +27,7 @@ use std::hint::black_box;
 
 /// Build a small forecast model that exercises the Monte Carlo path loop.
 fn build_mc_model() -> FinancialModelSpec {
-    let actual_q = PeriodId::quarter(2024, 4);
+    let actual_q = PeriodId::quarter(2024, 4).expect("valid period fixture");
     let mut params = IndexMap::new();
     params.insert("mean".into(), serde_json::json!(0.05));
     params.insert("std_dev".into(), serde_json::json!(0.02));
@@ -86,7 +86,8 @@ fn bench_monte_carlo_scaling(c: &mut Criterion) {
 fn build_rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec {
     let revenue_values: Vec<(PeriodId, AmountOrScalar)> = (0..n_periods)
         .map(|i| {
-            let period = PeriodId::quarter(2020 + (i / 4) as i32, ((i % 4) + 1) as u8);
+            let period = PeriodId::quarter(2020 + (i / 4) as i32, ((i % 4) + 1) as u8)
+                .expect("valid period fixture");
             (period, AmountOrScalar::scalar(100.0 + i as f64))
         })
         .collect();
@@ -148,7 +149,8 @@ fn build_large_lbo_model(n_nodes: usize, n_months: usize) -> FinancialModelSpec 
 
     let revenue_values: Vec<(PeriodId, AmountOrScalar)> = (0..n_months)
         .map(|i| {
-            let period = PeriodId::month(2024 + (i / 12) as i32, ((i % 12) + 1) as u8);
+            let period = PeriodId::month(2024 + (i / 12) as i32, ((i % 12) + 1) as u8)
+                .expect("valid period fixture");
             (
                 period,
                 AmountOrScalar::scalar(1_000_000.0 + i as f64 * 1_000.0),

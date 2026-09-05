@@ -18,8 +18,8 @@ fn test_utilization_fee_above_threshold() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-UTIL-FEE".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(8_000_000.0, Currency::USD)) // 80% > threshold
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% > threshold
         .commitment_date(as_of)
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

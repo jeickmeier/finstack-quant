@@ -508,7 +508,7 @@ mod tests {
     #[test]
     fn conservative_calculation() {
         let calc = ClearingHouseImCalculator::lch_swapclear();
-        let notional = Money::new(100_000_000.0, Currency::USD);
+        let notional = Money::from((100_000_000_i64, Currency::USD));
         let im = calc.calculate_conservative(notional);
 
         // LCH SwapClear ~2%
@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn ice_clear_credit_calculation() {
         let calc = ClearingHouseImCalculator::ice_clear_credit();
-        let notional = Money::new(50_000_000.0, Currency::USD);
+        let notional = Money::from((50_000_000_i64, Currency::USD));
         let im = calc.calculate_conservative(notional);
 
         // ICE Clear Credit ~10%
@@ -566,11 +566,11 @@ mod tests {
     fn uses_ccp_input_source_when_available() {
         let calc = ClearingHouseImCalculator::lch_swapclear().with_input_source(Arc::new(
             TestInputSource {
-                amount: Money::new(3_000_000.0, Currency::USD),
+                amount: Money::from((3_000_000_i64, Currency::USD)),
                 mpor_days: 7,
             },
         ));
-        let notional = Money::new(100_000_000.0, Currency::USD);
+        let notional = Money::from((100_000_000_i64, Currency::USD));
         let fallback = calc.calculate_conservative(notional);
 
         let fake_inst = TestInstrument::new(notional);
@@ -586,7 +586,7 @@ mod tests {
     #[test]
     fn fails_closed_without_external_source_or_exposure_base() {
         let calc = ClearingHouseImCalculator::lch_swapclear();
-        let instrument = TestInstrument::new(Money::new(0.0, Currency::USD));
+        let instrument = TestInstrument::new(Money::from((0_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
 
@@ -607,7 +607,7 @@ mod tests {
         // conservative rate. That number is a proxy, not SPAN/VaR — the result
         // must say so.
         let calc = ClearingHouseImCalculator::lch_swapclear();
-        let notional = Money::new(100_000_000.0, Currency::USD);
+        let notional = Money::from((100_000_000_i64, Currency::USD));
         let mut inst = TestInstrument::new(notional);
         inst.exposure_base = Some(notional);
         let market = MarketContext::new();
@@ -625,11 +625,11 @@ mod tests {
     fn external_source_amount_is_not_marked_as_approximation() {
         let calc = ClearingHouseImCalculator::lch_swapclear().with_input_source(Arc::new(
             TestInputSource {
-                amount: Money::new(3_000_000.0, Currency::USD),
+                amount: Money::from((3_000_000_i64, Currency::USD)),
                 mpor_days: 7,
             },
         ));
-        let inst = TestInstrument::new(Money::new(100_000_000.0, Currency::USD));
+        let inst = TestInstrument::new(Money::from((100_000_000_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
 

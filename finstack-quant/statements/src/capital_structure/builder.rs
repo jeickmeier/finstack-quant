@@ -182,7 +182,7 @@ impl<State> ModelBuilder<State> {
     /// let builder = ModelBuilder::new("cs-model")
     ///     .add_bond(
     ///         "BOND-001",
-    ///         Money::new(10_000_000.0, Currency::USD),
+    ///         Money::from((10_000_000_i64, Currency::USD)),
     ///         0.05, // 5% coupon
     ///         issue_date,
     ///         maturity_date,
@@ -212,7 +212,7 @@ impl<State> ModelBuilder<State> {
         let bond = Bond::fixed(
             InstrumentId::new(&id_str),
             notional,
-            Rate::try_from_decimal(coupon_rate)?,
+            Rate::from_decimal(coupon_rate)?,
             issue_date,
             maturity_date,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -260,8 +260,8 @@ impl<State> ModelBuilder<State> {
     /// let builder = ModelBuilder::new("cs-model")
     ///     .add_bond_with_convention(
     ///         "BUND-001",
-    ///         Money::new(10_000_000.0, Currency::EUR),
-    ///         Rate::from_decimal(0.03),
+    ///         Money::from((10_000_000_i64, Currency::EUR)),
+    ///         Rate::from_decimal(0.03).expect("valid rate fixture"),
     ///         date!(2025-01-15),
     ///         date!(2030-01-15),
     ///         BondConvention::GermanBund,
@@ -334,7 +334,7 @@ impl<State> ModelBuilder<State> {
     /// let builder = ModelBuilder::new("cs-model")
     ///     .add_swap(
     ///         "SWAP-001",
-    ///         Money::new(5_000_000.0, Currency::USD),
+    ///         Money::from((5_000_000_i64, Currency::USD)),
     ///         0.04,
     ///         date!(2025-01-15),
     ///         date!(2030-01-15),

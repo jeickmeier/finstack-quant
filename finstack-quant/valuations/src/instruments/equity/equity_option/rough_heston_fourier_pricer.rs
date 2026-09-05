@@ -119,7 +119,13 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
                 Money::new(
                     intrinsic * equity_option.notional.amount(),
                     equity_option.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                    )
+                })?,
             ));
         }
 
@@ -142,7 +148,13 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
         let pv = Money::new(
             price * equity_option.notional.amount(),
             equity_option.notional.currency(),
-        );
+        )
+        .map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(equity_option),
+            )
+        })?;
         Ok(crate::results::ValuationResult::stamped(
             equity_option.id(),
             as_of,
@@ -203,7 +215,7 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

@@ -11,11 +11,11 @@ fn test_mixed_builder_basic() {
         .mixed("revenue")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -45,7 +45,7 @@ fn test_mixed_builder_with_name() {
         .mixed("revenue")
         .name("Total Revenue")
         .values(&[(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             AmountOrScalar::scalar(100_000.0),
         )])
         .build()
@@ -65,11 +65,11 @@ fn test_mixed_builder_evaluation() {
         .mixed("revenue")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -87,17 +87,33 @@ fn test_mixed_builder_evaluation() {
 
     // Q1-Q2: Should use explicit values (Value precedence)
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
 
     // Q3-Q4: Should use forecast (110k * 1.05 = 115.5k, then 121.275k)
-    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
-    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    let q3 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
+        )
+        .unwrap();
+    let q4 = results
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        )
+        .unwrap();
 
     assert!((q3 - 115_500.0).abs() < 1.0);
     assert!((q4 - 121_275.0).abs() < 1.0);
@@ -112,14 +128,29 @@ fn test_mixed_builder_formula_fallback() {
         .value(
             "base",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
-                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(120.0)),
-                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(130.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(110.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    AmountOrScalar::scalar(120.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    AmountOrScalar::scalar(130.0),
+                ),
             ],
         )
         .mixed("derived")
-        .values(&[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50.0))])
+        .values(&[(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(50.0),
+        )])
         .formula("base * 0.5")
         .unwrap()
         .build()
@@ -132,21 +163,33 @@ fn test_mixed_builder_formula_fallback() {
 
     // Q1: Use explicit value
     assert_eq!(
-        results.get("derived", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "derived",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(50.0)
     );
 
     // Q2-Q4: Use formula (base * 0.5)
     assert_eq!(
-        results.get("derived", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "derived",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(55.0)
     );
     assert_eq!(
-        results.get("derived", &PeriodId::quarter(2025, 3)),
+        results.get(
+            "derived",
+            &PeriodId::quarter(2025, 3).expect("valid period fixture")
+        ),
         Some(60.0)
     );
     assert_eq!(
-        results.get("derived", &PeriodId::quarter(2025, 4)),
+        results.get(
+            "derived",
+            &PeriodId::quarter(2025, 4).expect("valid period fixture")
+        ),
         Some(65.0)
     );
 }
@@ -169,7 +212,10 @@ fn test_mixed_builder_minimal() {
         .periods("2025Q1..Q2", None)
         .unwrap()
         .mixed("revenue")
-        .values(&[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))])
+        .values(&[(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(100.0),
+        )])
         .build()
         .unwrap()
         .build()

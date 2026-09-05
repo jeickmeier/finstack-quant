@@ -57,7 +57,7 @@ fn create_pool() -> AssetPool {
             asset_type: AssetType::FirstLienLoan {
                 industry: Some(format!("Industry_{}", i % 5)),
             },
-            balance: Money::new(25_000_000.0, Currency::USD),
+            balance: Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: Some(400.0),
             index_id: Some("SOFR-3M".to_string()),
@@ -84,7 +84,7 @@ fn create_tranches() -> TrancheStructure {
         0.0,
         70.0,
         TrancheSeniority::Senior,
-        Money::new(175_000_000.0, Currency::USD),
+        Money::new(175_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity(),
     )
@@ -95,7 +95,7 @@ fn create_tranches() -> TrancheStructure {
         70.0,
         90.0,
         TrancheSeniority::Mezzanine,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.07 },
         maturity(),
     )
@@ -106,7 +106,7 @@ fn create_tranches() -> TrancheStructure {
         90.0,
         100.0,
         TrancheSeniority::Equity,
-        Money::new(25_000_000.0, Currency::USD),
+        Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.0 },
         maturity(),
     )

@@ -161,7 +161,7 @@ mod tests {
     fn test_bond_builder_minimal() {
         let bond = Bond::builder()
             .id("BOND_MIN".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -184,8 +184,8 @@ mod tests {
     fn test_bond_fixed_factory() {
         let bond = Bond::fixed(
             "BOND_FIXED",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.04),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -220,8 +220,8 @@ mod tests {
             };
             let bond = Bond::fixed(
                 format!("BOND-{stub}"),
-                Money::new(100.0, Currency::USD),
-                finstack_quant_core::types::Rate::from_decimal(0.04),
+                Money::from((100_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
                 issue,
                 date!(2030 - 01 - 15),
                 stub,
@@ -239,8 +239,8 @@ mod tests {
     fn test_bond_with_convention_us_treasury() {
         let bond = Bond::with_convention(
             "UST-10Y",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.03),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2035 - 01 - 01),
             BondConvention::UsTreasury,
@@ -276,8 +276,8 @@ mod tests {
     fn test_bond_with_convention_uk_gilt() {
         let bond = Bond::with_convention(
             "GILT-10Y",
-            Money::new(1000.0, Currency::GBP),
-            finstack_quant_core::types::Rate::from_decimal(0.025),
+            Money::from((1000_i64, Currency::GBP)),
+            finstack_quant_core::types::Rate::from_decimal(0.025).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2035 - 01 - 01),
             BondConvention::UkGilt,
@@ -307,8 +307,8 @@ mod tests {
     fn test_bond_with_convention_sets_end_of_month() {
         let bond = Bond::with_convention(
             "EOM-UST",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.03),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
             date!(2025 - 01 - 31),
             date!(2030 - 01 - 31),
             BondConvention::UsTreasury,
@@ -332,7 +332,7 @@ mod tests {
 
         let bond = Bond::builder()
             .id("BOND_OVERRIDE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -364,7 +364,7 @@ mod tests {
 
         let bond = Bond::builder()
             .id("BOND_SETTLE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -396,7 +396,7 @@ mod tests {
 
         let bond = Bond::builder()
             .id("BOND_ATTRS".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -420,7 +420,7 @@ mod tests {
     fn test_bond_zero_coupon() {
         let bond = Bond::builder()
             .id("ZERO_COUPON".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -445,7 +445,7 @@ mod tests {
     fn test_bond_high_frequency() {
         let bond = Bond::builder()
             .id("MONTHLY".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2027 - 01 - 01))
             .cashflow_spec(
@@ -490,7 +490,7 @@ mod tests {
 
         let bond = Bond::builder()
             .id("BOND_CAL".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(CashflowSpec::Fixed(spec))
@@ -541,7 +541,7 @@ mod tests {
 
         let bond_short_front = Bond::builder()
             .id("STUB_SHORT_FRONT".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 15))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(CashflowSpec::Fixed(spec_short))
@@ -581,7 +581,7 @@ mod tests {
 
         let bond_long_back = Bond::builder()
             .id("STUB_LONG_BACK".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 02 - 15))
             .cashflow_spec(CashflowSpec::Fixed(spec_long))
@@ -609,7 +609,7 @@ mod tests {
         for (ccy, code) in currencies {
             let bond = Bond::builder()
                 .id(format!("BOND_{}", code).into())
-                .notional(Money::new(1000.0, ccy))
+                .notional(Money::from((1000_i64, ccy)))
                 .issue_date(date!(2025 - 01 - 01))
                 .maturity(date!(2030 - 01 - 01))
                 .cashflow_spec(
@@ -630,8 +630,8 @@ mod tests {
     fn test_bond_instrument_trait() {
         let bond = Bond::fixed(
             "TRAIT_TEST",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -649,8 +649,8 @@ mod tests {
     fn test_bond_clone_and_equality() {
         let bond1 = Bond::fixed(
             "CLONE_TEST",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -672,8 +672,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "SHORT_TERM",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.03),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -693,8 +693,8 @@ mod tests {
 
         let bond = Bond::fixed(
             "LONG_TERM",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.045),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.045).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -719,7 +719,7 @@ mod tests {
         // Premium bond (price > 100)
         let premium = Bond::builder()
             .id("PREMIUM".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -745,7 +745,7 @@ mod tests {
         // Discount bond (price < 100)
         let discount = Bond::builder()
             .id("DISCOUNT".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -771,7 +771,7 @@ mod tests {
         // Par bond (price = 100)
         let par = Bond::builder()
             .id("PAR".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(
@@ -799,7 +799,7 @@ mod tests {
         let maturity = date!(2030 - 06 - 15);
         let bond = Bond::builder()
             .id("NO_ISSUE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .maturity(maturity)
             .cashflow_spec(
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
@@ -822,7 +822,7 @@ mod tests {
     fn test_bond_builder_explicit_issue_date_takes_precedence() {
         let bond = Bond::builder()
             .id("EXPLICIT_ISSUE".into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::from((1000_i64, Currency::USD)))
             .issue_date(date!(2024 - 03 - 01))
             .maturity(date!(2030 - 06 - 15))
             .cashflow_spec(
@@ -845,7 +845,7 @@ mod tests {
     fn build_test_bond(overrides: InstrumentPricingOverrides) -> Bond {
         Bond::builder()
             .id("BOND_QUOTE".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
             .cashflow_spec(

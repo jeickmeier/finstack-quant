@@ -23,7 +23,10 @@ fn test_npv_before_start_uses_forward_variance_and_discounting() {
     // Assert. Discounting is date-based (`df_between_dates`), correct even
     // when the curve base date differs from `as_of`.
     let forward_var = 0.22_f64.powi(2);
-    let undiscounted = swap.payoff(forward_var).amount();
+    let undiscounted = swap
+        .payoff(forward_var)
+        .expect("valid variance payoff")
+        .amount();
     let df = ctx
         .get_discount(DISC_ID)
         .unwrap()
@@ -131,7 +134,11 @@ fn test_npv_mid_period_blends_realized_and_forward_components() {
         .unwrap()
         .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let expected = swap.payoff(expected_var).amount() * df;
+    let expected = swap
+        .payoff(expected_var)
+        .expect("valid variance payoff")
+        .amount()
+        * df;
 
     assert!((pv.amount() - expected).abs() < LOOSE_EPSILON);
 }
@@ -173,7 +180,10 @@ fn test_npv_mid_period_discounting_reduces_value() {
     let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
     let weight = swap.time_elapsed_fraction(as_of);
     let expected_var = realized * weight + forward * (1.0 - weight);
-    let undiscounted = swap.payoff(expected_var).amount();
+    let undiscounted = swap
+        .payoff(expected_var)
+        .expect("valid variance payoff")
+        .amount();
 
     // Assert
     assert!(
@@ -241,7 +251,7 @@ fn test_npv_at_maturity_recovers_realized_payoff() {
         252.0,
     )
     .expect("CloseToClose should succeed");
-    let expected = swap.payoff(realized);
+    let expected = swap.payoff(realized).expect("valid variance payoff");
 
     assert!((pv.amount() - expected.amount()).abs() < LOOSE_EPSILON);
 }

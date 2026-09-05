@@ -48,8 +48,10 @@ fn test_empty_operations_list() {
 #[test]
 fn test_multiple_operations_same_target_last_wins() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     // Apply two shocks to the same equity
@@ -445,8 +447,10 @@ fn test_time_roll_with_apply_shocks_false() {
 #[test]
 fn test_time_roll_with_apply_shocks_true() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(100.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {

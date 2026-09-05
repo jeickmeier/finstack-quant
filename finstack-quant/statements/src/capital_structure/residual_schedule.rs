@@ -107,7 +107,7 @@ pub(crate) fn rebuild_residual_interest(
             }
         };
         let sign = if cf.amount.amount() < 0.0 { -1.0 } else { 1.0 };
-        cf.amount = Money::try_new(
+        cf.amount = Money::new(
             sign * new_outstanding.amount() * rate * cf.accrual_factor,
             cf.amount.currency(),
         )
@@ -142,7 +142,7 @@ mod tests {
     fn schedule(flows: Vec<CashFlow>, notional: f64, issue: Date) -> CashFlowSchedule {
         CashFlowSchedule::from_parts(
             flows,
-            Notional::par(notional, Currency::USD),
+            Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
@@ -163,7 +163,7 @@ mod tests {
                 CashFlow::new(
                     q1_coupon,
                     None,
-                    Money::new(-20_000.0, Currency::USD),
+                    Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
@@ -171,7 +171,7 @@ mod tests {
                 CashFlow::new(
                     q2_coupon,
                     None,
-                    Money::new(-20_000.0, Currency::USD),
+                    Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
@@ -181,9 +181,12 @@ mod tests {
             issue,
         );
 
-        let rebuilt =
-            rebuild_residual_interest(&original, Money::new(500_000.0, Currency::USD), from_date)
-                .expect("rebuild");
+        let rebuilt = rebuild_residual_interest(
+            &original,
+            Money::from((500_000_i64, Currency::USD)),
+            from_date,
+        )
+        .expect("rebuild");
 
         assert!(
             rebuilt.get_flows().iter().all(|cf| cf.date != q1_coupon),
@@ -214,7 +217,7 @@ mod tests {
                 CashFlow::new(
                     issue,
                     None,
-                    Money::new(-1_000_000.0, Currency::USD),
+                    Money::from((-1_000_000_i64, Currency::USD)),
                     CFKind::Notional,
                     0.0,
                     None,
@@ -222,7 +225,7 @@ mod tests {
                 CashFlow::new(
                     q2_coupon,
                     None,
-                    Money::new(-20_000.0, Currency::USD),
+                    Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -232,9 +235,12 @@ mod tests {
             issue,
         );
 
-        let rebuilt =
-            rebuild_residual_interest(&original, Money::new(500_000.0, Currency::USD), from_date)
-                .expect("rebuild with inferred rate");
+        let rebuilt = rebuild_residual_interest(
+            &original,
+            Money::from((500_000_i64, Currency::USD)),
+            from_date,
+        )
+        .expect("rebuild with inferred rate");
 
         let q2 = rebuilt
             .get_flows()
@@ -261,7 +267,7 @@ mod tests {
                 vec![CashFlow::new(
                     coupon_date,
                     None,
-                    Money::new(-1.0, Currency::USD),
+                    Money::from((-1_i64, Currency::USD)),
                     CFKind::Fixed,
                     1.0,
                     Some(rate),
@@ -269,9 +275,12 @@ mod tests {
                 1.0,
                 issue,
             );
-            let error =
-                rebuild_residual_interest(&original, Money::new(6e28, Currency::USD), from_date)
-                    .expect_err("unrepresentable rebuilt interest must return an error");
+            let error = rebuild_residual_interest(
+                &original,
+                Money::new(6e28, Currency::USD).expect("valid money fixture"),
+                from_date,
+            )
+            .expect_err("unrepresentable rebuilt interest must return an error");
             assert!(error.to_string().contains("cannot rebuild Fixed interest"));
             assert_eq!(original.get_flows()[0].amount.amount(), -1.0);
         }
@@ -288,7 +297,7 @@ mod tests {
                 CashFlow::new(
                     q2,
                     None,
-                    Money::new(-20_000.0, Currency::USD),
+                    Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
@@ -296,7 +305,7 @@ mod tests {
                 CashFlow::new(
                     q2,
                     None,
-                    Money::new(100_000.0, Currency::USD),
+                    Money::from((100_000_i64, Currency::USD)),
                     CFKind::Amortization,
                     0.0,
                     None,
@@ -306,9 +315,12 @@ mod tests {
             issue,
         );
 
-        let rebuilt =
-            rebuild_residual_interest(&original, Money::new(500_000.0, Currency::USD), from_date)
-                .expect("rebuild");
+        let rebuilt = rebuild_residual_interest(
+            &original,
+            Money::from((500_000_i64, Currency::USD)),
+            from_date,
+        )
+        .expect("rebuild");
 
         let amort = rebuilt
             .get_flows()

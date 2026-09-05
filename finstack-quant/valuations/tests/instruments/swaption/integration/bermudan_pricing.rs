@@ -49,7 +49,7 @@ fn test_bermudan_swaption(
     let mut swaption = BermudanSwaption::new(
         "TEST-BERM",
         OptionType::Call,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike,
         swap_start,
         swap_end,

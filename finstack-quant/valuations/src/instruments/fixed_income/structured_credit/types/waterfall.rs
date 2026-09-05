@@ -722,7 +722,7 @@ pub struct WaterfallDistribution {
 
 impl WaterfallDistribution {
     fn zero_usd() -> Money {
-        Money::new(0.0, finstack_quant_core::currency::Currency::USD)
+        Money::from((0_i64, finstack_quant_core::currency::Currency::USD))
     }
 }
 

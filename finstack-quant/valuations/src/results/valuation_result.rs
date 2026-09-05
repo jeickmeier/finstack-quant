@@ -177,7 +177,7 @@ pub struct MonteCarloValuationDetails {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let as_of = create_date(2025, Month::January, 15)?;
-/// let pv = Money::new(1_000_000.0, Currency::USD);
+/// let pv = Money::from((1_000_000_i64, Currency::USD));
 ///
 /// let result = ValuationResult::stamped("BOND-001", as_of, pv);
 ///
@@ -201,7 +201,7 @@ pub struct MonteCarloValuationDetails {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let as_of = create_date(2025, Month::January, 15)?;
-/// let pv = Money::new(1_000_000.0, Currency::USD);
+/// let pv = Money::from((1_000_000_i64, Currency::USD));
 ///
 /// let mut measures: IndexMap<MetricId, f64> = IndexMap::new();
 /// measures.insert(MetricId::custom("ytm"), 0.0475);
@@ -229,7 +229,7 @@ pub struct MonteCarloValuationDetails {
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let as_of = create_date(2025, Month::January, 15)?;
-/// let pv = Money::new(1_000_000.0, Currency::USD);
+/// let pv = Money::from((1_000_000_i64, Currency::USD));
 ///
 /// let covenant = CovenantReport {
 ///     covenant_type: "dscr".to_string(),
@@ -286,7 +286,7 @@ pub struct ValuationResult {
     /// # use time::Month;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// # let result = ValuationResult::stamped("BOND-001", as_of, pv);
     /// // PV is always in result.value, not in measures
     /// let pv_money = result.value;  // Money type
@@ -372,7 +372,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let as_of = create_date(2025, Month::January, 15)?;
-    /// let pv = Money::new(1_000_000.0, Currency::USD);
+    /// let pv = Money::from((1_000_000_i64, Currency::USD));
     ///
     /// let result = ValuationResult::stamped("BOND-001", as_of, pv);
     ///
@@ -434,7 +434,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let as_of = create_date(2025, Month::January, 15)?;
-    /// let pv = Money::new(1_000_000.0, Currency::USD);
+    /// let pv = Money::from((1_000_000_i64, Currency::USD));
     ///
     /// // Pre-construct metadata once for batch pricing
     /// let config = FinstackConfig::default();
@@ -490,7 +490,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     ///
     /// let trace = ExplanationTrace::new("bond_pricing");
     /// // Add trace entries using TraceEntry variants (see explain module for available types)
@@ -534,7 +534,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// let mut measures = IndexMap::new();
     /// measures.insert(MetricId::custom("ytm"), 0.0475);
     /// measures.insert(MetricId::custom("modified_duration"), 4.25);
@@ -676,7 +676,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// let mut covenants = IndexMap::new();
     /// covenants.insert("dscr".to_string(), CovenantReport {
     ///     covenant_type: "dscr".to_string(),
@@ -727,7 +727,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
     ///     .with_covenant("dscr", CovenantReport {
     ///         covenant_type: "dscr".to_string(),
@@ -784,7 +784,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
     ///     .with_covenant("dscr", CovenantReport {
     ///         covenant_type: "dscr".to_string(),
@@ -829,7 +829,7 @@ impl ValuationResult {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let as_of = create_date(2025, Month::January, 15)?;
-    /// # let pv = Money::new(1_000_000.0, Currency::USD);
+    /// # let pv = Money::from((1_000_000_i64, Currency::USD));
     /// let result = ValuationResult::stamped("LOAN-001", as_of, pv)
     ///     .with_covenant("dscr", CovenantReport {
     ///         covenant_type: "dscr".to_string(),
@@ -882,9 +882,12 @@ mod tests {
         measures.insert(MetricId::Dv01, 1.0);
         measures.insert(MetricId::composite(&MetricId::Pv01, &["USD-OIS"]), 2.0);
         measures.insert(MetricId::custom("pv01::EUR_x2dOIS"), 3.0);
-        let result =
-            ValuationResult::stamped("K", date!(2025 - 01 - 15), Money::new(0.0, Currency::USD))
-                .with_measures(measures);
+        let result = ValuationResult::stamped(
+            "K",
+            date!(2025 - 01 - 15),
+            Money::from((0_i64, Currency::USD)),
+        )
+        .with_measures(measures);
 
         assert_eq!(result.metric_str_decoded("dv01"), Some(1.0));
         assert_eq!(result.metric_str_decoded("pv01::USD-OIS"), Some(2.0));
@@ -911,7 +914,7 @@ mod tests {
         let result = ValuationResult::stamped(
             "TEST",
             date!(2025 - 01 - 02),
-            Money::new(1.0, Currency::USD),
+            Money::from((1_i64, Currency::USD)),
         )
         .with_measures(measures);
 
@@ -940,7 +943,7 @@ mod tests {
         let result = ValuationResult::stamped(
             "SERIES",
             date!(2025 - 01 - 02),
-            Money::new(1.0, Currency::USD),
+            Money::from((1_i64, Currency::USD)),
         )
         .with_measures(measures);
 
@@ -963,7 +966,7 @@ mod tests {
         let result = ValuationResult::stamped(
             "LEGACY-SERIES",
             date!(2025 - 01 - 02),
-            Money::new(1.0, Currency::USD),
+            Money::from((1_i64, Currency::USD)),
         )
         .with_measures(measures);
 
@@ -987,7 +990,7 @@ mod tests {
         let result = ValuationResult::stamped(
             "TRANSITIVE-LEGACY-SERIES",
             date!(2025 - 01 - 02),
-            Money::new(1.0, Currency::USD),
+            Money::from((1_i64, Currency::USD)),
         )
         .with_measures(measures);
 
@@ -1004,7 +1007,7 @@ mod tests {
     #[test]
     fn stamped_with_config_round_trips_metadata_fields() {
         let as_of = date!(2025 - 01 - 15);
-        let pv = Money::new(1.0, Currency::USD);
+        let pv = Money::from((1_i64, Currency::USD));
         let cfg = FinstackConfig::default();
         let stamped = ValuationResult::stamped_with_config("CFG-1", as_of, pv, &cfg);
         assert_eq!(stamped.instrument_id, "CFG-1");
@@ -1017,7 +1020,7 @@ mod tests {
     #[test]
     fn serde_roundtrip_keeps_covenant_and_explanation() {
         let as_of = date!(2025 - 02 - 01);
-        let pv = Money::new(10.0, Currency::EUR);
+        let pv = Money::from((10_i64, Currency::EUR));
         let mut covenants = IndexMap::new();
         covenants.insert(
             "dscr".to_string(),

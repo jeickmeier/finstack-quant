@@ -38,7 +38,7 @@ fn test_bond_with_custom_cashflows() {
     let step1_date = Date::from_calendar_date(2026, Month::January, 15).expect("Valid test date");
 
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
             coupon_type: CouponType::Cash,
             initial_rate: Decimal::new(3, 2),
@@ -101,7 +101,7 @@ fn test_bond_builder_with_custom_cashflows() {
 
     // Build custom cashflow with PIK toggle
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Split {
                 cash_pct: Decimal::try_from(0.5).expect("valid"),
@@ -133,7 +133,7 @@ fn test_bond_builder_with_custom_cashflows() {
     // Use builder pattern (default cashflow_spec since custom_cashflows overrides)
     let bond = Bond::builder()
         .id("PIK_TOGGLE_BOND".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
@@ -166,7 +166,7 @@ fn test_bond_with_cashflows_method() {
     // Create a traditional bond first (builder)
     let mut bond = Bond::builder()
         .id(InstrumentId::new("REGULAR_BOND"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -185,7 +185,7 @@ fn test_bond_with_cashflows_method() {
 
     // Build a custom schedule separately
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.055).expect("valid"),
@@ -220,7 +220,7 @@ fn test_custom_cashflows_override_regular_generation() {
     // Create bond with regular specs (builder)
     let regular_bond = Bond::builder()
         .id(InstrumentId::new("TEST"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -239,7 +239,7 @@ fn test_custom_cashflows_override_regular_generation() {
 
     // Same bond with custom cashflows
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid"),
@@ -290,7 +290,7 @@ fn test_custom_cashflows_override_regular_generation() {
 fn test_bond_floating_value() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::from((1_000_000_i64, Currency::USD));
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
@@ -333,7 +333,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::from((1_000_000_i64, Currency::USD));
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
@@ -425,7 +425,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::from((1_000_000_i64, Currency::USD));
 
     // Amortizing bond with annual 5% coupon, 1/3 principal returned each year.
     // StepRemaining schedule specifies remaining balance AFTER each date.
@@ -435,9 +435,15 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     let step2 = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
     let amort_spec = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (step1, Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD)), // 2/3 remaining
-            (step2, Money::new(1_000_000.0 / 3.0, Currency::USD)),       // 1/3 remaining
-            (maturity, Money::new(0.0, Currency::USD)),                  // 0 remaining
+            (
+                step1,
+                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 2/3 remaining
+            (
+                step2,
+                Money::new(1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 1/3 remaining
+            (maturity, Money::from((0_i64, Currency::USD))), // 0 remaining
         ],
     };
     let base_spec =
@@ -531,7 +537,7 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
     // Create FRN
     let frn = Bond::floating(
         "FRN-BUILDER-TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1_000_000_i64, Currency::USD)),
         "USD-SOFR",
         100,
         issue,
@@ -599,8 +605,8 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
     let step1 = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
     let amort_spec = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (step1, Money::new(500_000.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (step1, Money::from((500_000_i64, Currency::USD))),
+            (maturity, Money::from((0_i64, Currency::USD))),
         ],
     };
     let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
@@ -609,7 +615,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
 
     let bond = Bond::builder()
         .id("AMORT-TEST".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
@@ -698,7 +704,7 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date");
 
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::from((1_000_000_i64, Currency::USD));
 
     // Common discount curve: flat-ish, just needs to be decreasing
     let disc_curve = DiscountCurve::builder("USD-OIS")
@@ -733,10 +739,13 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         schedule: vec![
             (
                 amort_step1,
-                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD), // 2/3 remaining
+                Money::new(2.0 * 1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"), // 2/3 remaining
             ),
-            (amort_step2, Money::new(1_000_000.0 / 3.0, Currency::USD)), // 1/3 remaining
-            (maturity, Money::new(0.0, Currency::USD)),                  // 0 remaining
+            (
+                amort_step2,
+                Money::new(1_000_000.0 / 3.0, Currency::USD).expect("valid money fixture"),
+            ), // 1/3 remaining
+            (maturity, Money::from((0_i64, Currency::USD))), // 0 remaining
         ],
     };
     let amort_base_spec =
@@ -787,7 +796,7 @@ fn bond_maturing_before_issue_is_rejected_by_validation() {
 
     let mut bond = Bond::builder()
         .id(InstrumentId::new("INVERTED_TERM"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
@@ -815,7 +824,7 @@ fn bond_maturing_after_issue_validates() {
 
     let bond = Bond::builder()
         .id(InstrumentId::new("NORMAL_TERM"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
@@ -839,7 +848,7 @@ fn bond_floating_usd_uses_us_corporate_settlement() {
     let (issue, maturity) = floating_test_dates();
     let bond = Bond::floating(
         "FRN-USD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1000000_i64, Currency::USD)),
         "USD-SOFR-3M",
         100,
         issue,
@@ -865,7 +874,7 @@ fn bond_floating_eur_uses_eur_corporate_settlement() {
     let (issue, maturity) = floating_test_dates();
     let bond = Bond::floating(
         "FRN-EUR",
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::from((1000000_i64, Currency::EUR)),
         "EUR-EURIBOR-3M",
         100,
         issue,
@@ -891,7 +900,7 @@ fn bond_floating_gbp_uses_uk_gilt_t1_not_t2() {
     let (issue, maturity) = floating_test_dates();
     let bond = Bond::floating(
         "FRN-GBP",
-        Money::new(1_000_000.0, Currency::GBP),
+        Money::from((1000000_i64, Currency::GBP)),
         "GBP-SONIA",
         100,
         issue,
@@ -916,7 +925,7 @@ fn bond_floating_unmapped_currency_requires_convention() {
     let (issue, maturity) = floating_test_dates();
     let err = Bond::floating(
         "FRN-CHF",
-        Money::new(1_000_000.0, Currency::CHF),
+        Money::from((1000000_i64, Currency::CHF)),
         "CHF-SARON",
         100,
         issue,

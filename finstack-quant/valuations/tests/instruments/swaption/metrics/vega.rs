@@ -175,13 +175,15 @@ fn test_vega_scales_with_notional() {
     swaption1.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let mut swaption5 = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     swaption5.notional = finstack_quant_core::money::Money::new(
         5_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let vega1 = swaption1
         .price_with_metrics(

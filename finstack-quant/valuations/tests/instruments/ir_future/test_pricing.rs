@@ -248,7 +248,7 @@ fn test_different_currency() {
     let market = build_standard_market(as_of, 0.03);
 
     let mut future = create_standard_future(start, end);
-    future.notional = Money::new(1_000_000.0, Currency::EUR);
+    future.notional = Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture");
 
     let pv = future.value(&market, as_of).unwrap();
     assert_eq!(pv.currency(), Currency::EUR);

@@ -104,7 +104,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
     // Apply the quoted basis to the base leg; the quote leg is flat.
     let leg1 = XccySwapLeg {
         currency: conv.base_currency,
-        notional: Money::new(base_notional, conv.base_currency),
+        notional: Money::new(base_notional, conv.base_currency)?,
         side: LegSide::Receive,
         forward_curve_id: CurveId::new(foreign_forward),
         discount_curve_id: CurveId::new(foreign_discount),
@@ -125,7 +125,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
 
     let leg2 = XccySwapLeg {
         currency: conv.quote_currency,
-        notional: Money::new(quote_notional, conv.quote_currency),
+        notional: Money::new(quote_notional, conv.quote_currency)?,
         side: LegSide::Pay,
         forward_curve_id: CurveId::new(domestic_forward),
         discount_curve_id: CurveId::new(domestic_discount),

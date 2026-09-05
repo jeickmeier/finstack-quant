@@ -52,7 +52,7 @@ fn pool(balance: f64) -> AssetPool {
     let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
-        Money::new(balance, Currency::USD),
+        Money::new(balance, Currency::USD).expect("valid money fixture"),
         0.06,
         legal_maturity(),
         DayCount::Thirty360,
@@ -90,7 +90,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             0.0,
             80.0,
             TrancheSeniority::Senior,
-            Money::new(800_000.0, Currency::USD),
+            Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
             senior_coupon,
             legal_maturity(),
         )
@@ -100,7 +100,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             80.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(200_000.0, Currency::USD),
+            Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             legal_maturity(),
         )

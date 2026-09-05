@@ -29,7 +29,7 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
     let mut swaption = BermudanSwaption::new(
         "BERM-LSMC-BENCH",
         OptionType::Call,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.03,
         swap_start,
         swap_end,

@@ -237,10 +237,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: finstack_quant_core::types::IndexId::new("USD-SOFR-OIS"),
-            pillar: crate::quotes::ids::Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: crate::quotes::ids::Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: None,
         };

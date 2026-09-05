@@ -183,12 +183,7 @@ impl OtcMarginSpec {
                     "collateral schedule 'bcbs_standard' not found in registry".to_string(),
                 )
             })?;
-        Ok(Self::build_cleared(
-            ccp.into(),
-            currency,
-            registry,
-            eligible_collateral,
-        ))
+        Self::build_cleared(ccp.into(), currency, registry, eligible_collateral)
     }
 
     /// Shared construction path for `cleared` and `cleared_from_config`.
@@ -201,9 +196,9 @@ impl OtcMarginSpec {
         currency: Currency,
         registry: &crate::registry::MarginRegistry,
         eligible_collateral: super::collateral::EligibleCollateralSchedule,
-    ) -> Self {
-        let mut vm_params = registry.defaults.vm.to_vm_params(currency);
-        vm_params.rounding = Money::new(registry.defaults.cleared_settlement.rounding, currency);
+    ) -> Result<Self> {
+        let mut vm_params = registry.defaults.vm.to_vm_params(currency)?;
+        vm_params.rounding = Money::new(registry.defaults.cleared_settlement.rounding, currency)?;
         vm_params.settlement_lag = registry.defaults.cleared_settlement.settlement_lag;
 
         let csa = CsaSpec {
@@ -216,7 +211,7 @@ impl OtcMarginSpec {
                     .defaults
                     .im
                     .cleared
-                    .to_im_params(ImMethodology::ClearingHouse, currency),
+                    .to_im_params(ImMethodology::ClearingHouse, currency)?,
             ),
             eligible_collateral,
             call_timing: registry.defaults.timing.ccp.clone(),
@@ -226,14 +221,14 @@ impl OtcMarginSpec {
             )),
         };
 
-        Self {
+        Ok(Self {
             csa,
             clearing_status: ClearingStatus::Cleared { ccp: ccp_name },
             im_methodology: ImMethodology::ClearingHouse,
             simm_credit_classification: None,
             vm_frequency: MarginTenor::Daily,
             settlement_lag: registry.defaults.cleared_settlement.settlement_lag,
-        }
+        })
     }
 
     /// Create a USD bilateral spec with standard regulatory terms.
@@ -266,12 +261,7 @@ impl OtcMarginSpec {
                 cfg,
                 "bcbs_standard",
             )?;
-        Ok(Self::build_cleared(
-            ccp.into(),
-            currency,
-            &registry,
-            eligible_collateral,
-        ))
+        Self::build_cleared(ccp.into(), currency, &registry, eligible_collateral)
     }
 
     /// Attach an explicit SIMM credit risk-class and sector assignment.
@@ -369,7 +359,10 @@ mod tests {
     #[test]
     fn csa_thresholds() {
         let spec = OtcMarginSpec::cleared("CME", Currency::EUR).expect("registry should load");
-        assert_eq!(spec.csa.vm_params.threshold, Money::new(0.0, Currency::EUR));
+        assert_eq!(
+            spec.csa.vm_params.threshold,
+            Money::from((0_i64, Currency::EUR))
+        );
     }
 
     #[test]

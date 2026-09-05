@@ -160,6 +160,10 @@ impl DieboldLi {
     ///
     /// where X is the N x 3 NS loading matrix (fixed given lambda and tenors).
     ///
+    /// # Arguments
+    ///
+    /// * `panel` - Validated yield observations by date and tenor, with decimal yields and tenors in years; at least three tenors are required. The extracted factors replace this model's stored factor history.
+    ///
     /// # Errors
     /// - Panel has fewer than 3 tenors (underdetermined system)
     /// - OLS system is singular
@@ -362,6 +366,10 @@ impl DieboldLi {
     ///
     /// Confidence bands are computed from the h-step forecast error
     /// covariance: Sigma_h = sum_{j=0}^{h-1} Phi^j * Q * (Phi^j)'.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Positive number of observation intervals after the last fitted date; uses the frequency of the input yield panel, not calendar days.
     ///
     /// # Errors
     /// - VAR not yet fitted

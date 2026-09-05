@@ -84,7 +84,8 @@ pub(crate) fn money_from_py(
             )));
         };
         let ccy = crate::bindings::module_utils::parse_currency(code)?;
-        return Ok(finstack_quant_core::money::Money::new(amount, ccy));
+        return finstack_quant_core::money::Money::new(amount, ccy)
+            .map_err(crate::errors::core_to_py);
     }
     Err(pyo3::exceptions::PyTypeError::new_err(format!(
         "{what}: expected finstack_quant.core.money.Money or a float amount, got {}",

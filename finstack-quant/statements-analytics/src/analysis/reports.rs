@@ -12,13 +12,13 @@
 //! # Examples
 //!
 //! ```no_run
-//! use finstack_quant_statements_analytics::analysis::{Report, PLSummaryReport};
+//! use finstack_quant_statements_analytics::analysis::PLSummaryReport;
 //! use finstack_quant_statements::evaluator::StatementResult;
 //! use finstack_quant_core::dates::PeriodId;
 //!
 //! # let results: StatementResult = unimplemented!("evaluate a model to obtain StatementResult");
 //! let line_items = vec!["revenue", "cogs"];
-//! let periods = vec![PeriodId::quarter(2025, 1)];
+//! let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 //! let report = PLSummaryReport::new(&results, line_items, periods);
 //! println!("{report}");
 //! ```
@@ -221,10 +221,10 @@ impl Default for TableBuilder {
 /// ```rust
 /// # use finstack_quant_statements::builder::ModelBuilder;
 /// # use finstack_quant_statements::evaluator::Evaluator;
-/// # use finstack_quant_statements_analytics::analysis::{Report, PLSummaryReport};
+/// # use finstack_quant_statements_analytics::analysis::PLSummaryReport;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # let period = PeriodId::quarter(2025, 1);
+/// # let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// # let model = ModelBuilder::new("demo")
 /// #     .periods("2025Q1..Q2", None)?
 /// #     .compute("revenue", "100000")?
@@ -418,7 +418,7 @@ pub struct CreditAssessmentPoint {
 /// # use finstack_quant_core::dates::PeriodId;
 /// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
 /// # let results = StatementResult::new();
-/// let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4));
+/// let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4).expect("valid period fixture"));
 /// assert_eq!(assessment.period, "2025Q4");
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -482,10 +482,10 @@ impl CreditAssessment {
 /// ```rust
 /// # use finstack_quant_statements::builder::ModelBuilder;
 /// # use finstack_quant_statements::evaluator::Evaluator;
-/// # use finstack_quant_statements_analytics::analysis::{Report, CreditAssessmentReport};
+/// # use finstack_quant_statements_analytics::analysis::CreditAssessmentReport;
 /// # use finstack_quant_core::dates::PeriodId;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// # let period = PeriodId::quarter(2025, 1);
+/// # let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// # let model = ModelBuilder::new("demo")
 /// #     .periods("2025Q1..Q2", None)?
 /// #     .compute("revenue", "100000")?
@@ -588,8 +588,8 @@ mod tests {
 
     #[test]
     fn pl_summary_renders_dash_for_missing_values() {
-        let q1 = PeriodId::quarter(2025, 1);
-        let q2 = PeriodId::quarter(2025, 2);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         let mut results = StatementResult::new();
         // revenue only exists in Q1; Q2 is missing (not zero).
@@ -624,22 +624,31 @@ mod tests {
                 .nodes
                 .entry("ebitda".to_string())
                 .or_default()
-                .insert(PeriodId::quarter(2025, quarter), ebitda);
+                .insert(
+                    PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+                    ebitda,
+                );
         }
         for (quarter, interest) in [(1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0)] {
             results
                 .nodes
                 .entry("interest_expense".to_string())
                 .or_default()
-                .insert(PeriodId::quarter(2025, quarter), interest);
+                .insert(
+                    PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+                    interest,
+                );
         }
         results
             .nodes
             .entry("total_debt".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 4), 300.0);
+            .insert(
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                300.0,
+            );
 
-        let period = PeriodId::quarter(2025, 4);
+        let period = PeriodId::quarter(2025, 4).expect("valid period fixture");
         let assessment = CreditAssessment::compute(&results, period);
 
         assert_eq!(assessment.period, period.to_string());
@@ -656,27 +665,46 @@ mod tests {
                 .nodes
                 .entry("ebitda".to_string())
                 .or_default()
-                .insert(PeriodId::quarter(2025, quarter), ebitda);
+                .insert(
+                    PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+                    ebitda,
+                );
         }
         results
             .nodes
             .entry("total_debt".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 4), 300.0);
+            .insert(
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                300.0,
+            );
 
-        let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4));
+        let assessment = CreditAssessment::compute(
+            &results,
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        );
 
         let q4 = assessment
             .series
             .iter()
-            .find(|p| p.period == PeriodId::quarter(2025, 4).to_string())
+            .find(|p| {
+                p.period
+                    == PeriodId::quarter(2025, 4)
+                        .expect("valid period fixture")
+                        .to_string()
+            })
             .expect("Q4 point present");
         assert_eq!(q4.leverage_ratio, Some(3.0));
 
         let q1 = assessment
             .series
             .iter()
-            .find(|p| p.period == PeriodId::quarter(2025, 1).to_string())
+            .find(|p| {
+                p.period
+                    == PeriodId::quarter(2025, 1)
+                        .expect("valid period fixture")
+                        .to_string()
+            })
             .expect("Q1 point present");
         assert_eq!(q1.leverage_ratio, None);
     }
@@ -689,35 +717,56 @@ mod tests {
                 .nodes
                 .entry("ebitda".to_string())
                 .or_default()
-                .insert(PeriodId::quarter(2025, quarter), ebitda);
+                .insert(
+                    PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+                    ebitda,
+                );
         }
         results
             .nodes
             .entry("interest_expense".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 1), 1.0);
+            .insert(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                1.0,
+            );
         results
             .nodes
             .entry("interest_expense".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 2), 2.0);
+            .insert(
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                2.0,
+            );
         results
             .nodes
             .entry("interest_expense".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 3), 3.0);
+            .insert(
+                PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                3.0,
+            );
         results
             .nodes
             .entry("interest_expense".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 4), 4.0);
+            .insert(
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                4.0,
+            );
         results
             .nodes
             .entry("total_debt".to_string())
             .or_default()
-            .insert(PeriodId::quarter(2025, 4), 300.0);
+            .insert(
+                PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                300.0,
+            );
 
-        let report = CreditAssessmentReport::new(&results, PeriodId::quarter(2025, 4));
+        let report = CreditAssessmentReport::new(
+            &results,
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
+        );
 
         assert_eq!(report.calculate_leverage_ratio(), Some(3.0));
         assert_eq!(report.calculate_interest_coverage(), Some(10.0));

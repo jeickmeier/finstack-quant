@@ -201,7 +201,7 @@ fn single_curve_cms(
         payment_dates: vec![payment],
         accrual_fractions: vec![1.0],
         option_type,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         swap_convention: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),

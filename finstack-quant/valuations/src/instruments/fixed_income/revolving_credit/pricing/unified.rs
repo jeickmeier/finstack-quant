@@ -219,8 +219,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-RECOVERY-NODBL".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             // Zero coupon isolates the principal leg.
@@ -291,8 +291,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-SEASONED".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
@@ -358,8 +358,8 @@ mod tests {
 
         let result = RevolvingCredit::builder()
             .id("RC-COMMIT-EVENT".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -368,7 +368,7 @@ mod tests {
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
                 date: start,
-                amount: Money::new(400_000.0, Currency::USD),
+                amount: Money::from((400_000_i64, Currency::USD)),
                 is_draw: true,
             }]))
             .discount_curve_id("USD-OIS".into())
@@ -393,8 +393,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-SOBOL".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -579,8 +579,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-PATHS".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -646,8 +646,8 @@ mod tests {
 
         let result = RevolvingCredit::builder()
             .id("RC-ONE-PATH".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -690,8 +690,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-ZEROVOL".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -811,8 +811,8 @@ mod tests {
         let make_facility = || {
             RevolvingCredit::builder()
                 .id("RC-DETERMINISM".into())
-                .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(400_000.0, Currency::USD))
+                .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+                .drawn_amount(Money::from((400_000_i64, Currency::USD)))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -906,8 +906,8 @@ mod tests {
         let make_facility = |id: &str, mc_config: Option<McConfig>| {
             RevolvingCredit::builder()
                 .id(id.into())
-                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+                .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
+                .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })

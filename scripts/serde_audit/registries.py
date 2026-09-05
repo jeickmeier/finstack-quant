@@ -52,6 +52,15 @@ ONE_WAY_EXCEPTIONS = (
         (
             "PositionEsContributionView",
             "ParametricEsDecompositionView",
+        ),
+        "binding-view",
+        "Round-trippable factor-risk output; no published JSON schema.",
+        frozenset({"JsonSchema"}),
+    ),
+    *_exception(
+        "models",
+        "src/factor/risk/views.rs",
+        (
             "PositionVarContributionView",
             "ParametricVarDecompositionView",
             "PositionBudgetEntryView",
@@ -91,6 +100,7 @@ ONE_WAY_EXCEPTIONS = (
         ("CreditAssessmentPoint", "CreditAssessment"),
         "analysis-report",
         "Computed statement-analysis report; source statement results are canonical.",
+        frozenset({"JsonSchema"}),
     ),
     *_exception(
         "calibration",
@@ -98,6 +108,7 @@ ONE_WAY_EXCEPTIONS = (
         ("CalibrationValidationReport", "DependencyGraph", "DependencyNode"),
         "validation-report",
         "Transient calibration validation view, regenerated from the input envelope.",
+        frozenset({"JsonSchema"}),
     ),
 )
 
@@ -356,15 +367,21 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "src/capital_structure/waterfall/mod.rs",
         ("WaterfallPeriodResult",),
     ),
-    *_runtime_exception(
+    *_exception(
         "statements-analytics",
         "src/analysis/valuation/corporate.rs",
         ("CorporateValuationResult", "DcfSensitivityResult"),
+        "runtime-result",
+        "Round-trippable valuation output; no published JSON schema.",
+        frozenset({"JsonSchema"}),
     ),
-    *_runtime_exception(
+    *_exception(
         "statements-analytics",
         "src/analysis/valuation/lbo.rs",
         ("LboResult",),
+        "runtime-result",
+        "Round-trippable valuation output; no published JSON schema.",
+        frozenset({"JsonSchema"}),
     ),
     *_runtime_exception(
         "valuations",

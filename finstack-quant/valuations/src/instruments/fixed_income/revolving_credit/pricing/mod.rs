@@ -43,8 +43,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-DET".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -99,8 +99,8 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-STOCH".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

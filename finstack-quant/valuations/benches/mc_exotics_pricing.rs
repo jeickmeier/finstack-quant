@@ -71,7 +71,7 @@ fn asian_option(mc_paths: usize) -> AsianOption {
         strike: 100.0,
         option_type: OptionType::Call,
         expiry,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         averaging_method: AveragingMethod::Arithmetic,
         fixing_dates: vec![
             Date::from_calendar_date(2025, Month::July, 1).unwrap(),
@@ -98,7 +98,7 @@ fn lookback_option(mc_paths: usize) -> LookbackOption {
         .option_type(OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(expiry)
-        .notional(Money::new(1.0, Currency::USD))
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .spot_id("SPOT".into())
@@ -134,7 +134,7 @@ fn autocallable_note(mc_paths: usize) -> Autocallable {
         final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
         participation_rate: 1.0,
         cap_level: 1.5,
-        notional: Money::new(100_000.0, Currency::USD),
+        notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         discount_curve_id: CurveId::new("USD-OIS"),
         spot_id: "SPOT".into(),
@@ -211,7 +211,7 @@ fn make_cliquet(as_of: Date, n_resets: usize) -> CliquetOption {
         .local_floor(0.0)
         .global_cap(0.20)
         .global_floor(0.0)
-        .notional(Money::new(100_000.0, Currency::USD))
+        .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .spot_id("SPOT".into())

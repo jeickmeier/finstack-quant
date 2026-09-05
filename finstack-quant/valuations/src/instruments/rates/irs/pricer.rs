@@ -289,7 +289,7 @@ pub(crate) fn compute_pv(
     as_of: Date,
 ) -> Result<Money> {
     let npv_val = compute_pv_raw(irs, context, as_of)?;
-    Ok(Money::new(npv_val, irs.notional.currency()))
+    Money::new(npv_val, irs.notional.currency())
 }
 
 /// Compute the raw Net Present Value (f64) without rounding.
@@ -432,7 +432,7 @@ mod tests {
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SEASONED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -520,7 +520,7 @@ mod tests {
 
         let swap_no_lookback = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -608,7 +608,7 @@ mod tests {
         // Create swap with an explicitly specified but non-existent fixing calendar
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-MISSING-CAL"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -691,7 +691,7 @@ mod tests {
         // Create swap with NO fixing_calendar_id (defaults should be applied)
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-CALENDAR"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -779,7 +779,7 @@ mod tests {
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -852,7 +852,7 @@ mod tests {
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -945,7 +945,7 @@ mod tests {
 
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-SEASONED"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
@@ -1034,7 +1034,7 @@ mod tests {
         // These are the conditions under which the identity is exact.
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-IDENTITY-TEST"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {

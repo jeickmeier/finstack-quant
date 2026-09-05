@@ -33,7 +33,7 @@ pub(crate) fn compute_pv(
 ) -> Result<Money> {
     inst.validate()?;
     if as_of > inst.expiry {
-        return Ok(Money::new(0.0, inst.quote_currency));
+        return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     FxDigitalOptionCalculator::default().npv(inst, curves, as_of)
 }
@@ -69,10 +69,10 @@ impl FxDigitalOptionCalculator {
                     DigitalPayoutType::AssetOrNothing => Ok(Money::new(
                         spot * inst.notional.amount(),
                         inst.quote_currency,
-                    )),
+                    )?),
                 }
             } else {
-                Ok(Money::new(0.0, inst.quote_currency))
+                Ok(Money::from((0_i64, inst.quote_currency)))
             };
         }
 
@@ -89,7 +89,7 @@ impl FxDigitalOptionCalculator {
             inst.notional.amount(),
         );
 
-        Ok(Money::new(price, inst.quote_currency))
+        Money::new(price, inst.quote_currency)
     }
 
     pub(crate) fn compute_greeks(
@@ -501,10 +501,10 @@ mod tests {
             .payout_type(
                 crate::instruments::fx::fx_digital_option::DigitalPayoutType::CashOrNothing,
             )
-            .payout_amount(Money::new(100_000.0, Currency::USD))
+            .payout_amount(Money::from((100_000_i64, Currency::USD)))
             .expiry(expiry)
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))

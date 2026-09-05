@@ -193,7 +193,7 @@ impl PyPeriodId {
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, month)")]
     fn month(_cls: &Bound<'_, PyType>, year: i32, month: u8) -> PyResult<Self> {
-        PeriodId::try_month(year, month)
+        PeriodId::month(year, month)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -202,7 +202,7 @@ impl PyPeriodId {
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, quarter)")]
     fn quarter(_cls: &Bound<'_, PyType>, year: i32, quarter: u8) -> PyResult<Self> {
-        PeriodId::try_quarter(year, quarter)
+        PeriodId::quarter(year, quarter)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -218,7 +218,7 @@ impl PyPeriodId {
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, half)")]
     fn half(_cls: &Bound<'_, PyType>, year: i32, half: u8) -> PyResult<Self> {
-        PeriodId::try_half(year, half)
+        PeriodId::half(year, half)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -227,7 +227,7 @@ impl PyPeriodId {
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, week)")]
     fn week(_cls: &Bound<'_, PyType>, year: i32, week: u8) -> PyResult<Self> {
-        PeriodId::try_week(year, week)
+        PeriodId::week(year, week)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -236,7 +236,7 @@ impl PyPeriodId {
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, ordinal)")]
     fn day(_cls: &Bound<'_, PyType>, year: i32, ordinal: u16) -> PyResult<Self> {
-        PeriodId::try_day(year, ordinal)
+        PeriodId::day(year, ordinal)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

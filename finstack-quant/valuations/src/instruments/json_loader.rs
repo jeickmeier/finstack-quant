@@ -947,8 +947,8 @@ mod tests {
     fn test_bond_json_roundtrip() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2024, Month::January, 1).expect("Valid test date"),
             Date::from_calendar_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -975,8 +975,8 @@ mod tests {
     fn test_envelope_roundtrip() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2024, Month::January, 1).expect("Valid test date"),
             Date::from_calendar_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1048,8 +1048,8 @@ mod tests {
     fn test_envelope_from_value_rejects_bare_tagged_instrument() {
         let bond = Bond::fixed(
             "TEST-BARE",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2024, Month::January, 1).expect("Valid test date"),
             Date::from_calendar_date(2034, Month::January, 1).expect("Valid test date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1069,8 +1069,8 @@ mod tests {
     fn strict_instrument_loader_requires_envelope_and_reports_schema_failures() {
         let bond = Bond::fixed(
             "STRICT-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             Date::from_calendar_date(2024, Month::January, 1).expect("valid date"),
             Date::from_calendar_date(2034, Month::January, 1).expect("valid date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1282,7 +1282,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(Date::from_calendar_date(2024, Month::January, 3).expect("Valid test date"))
             .far_date(Date::from_calendar_date(2024, Month::July, 3).expect("Valid test date"))
-            .base_notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id("USD-OIS".into())
             .foreign_discount_curve_id("EUR-OIS".into())
             .near_rate_opt(Some(1.10))
@@ -1347,7 +1347,7 @@ mod tests {
 
         let swap = BasisSwap::new(
             "BASIS-TEST",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -1375,7 +1375,7 @@ mod tests {
     #[test]
     fn test_fx_spot_roundtrip() {
         let fx_spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_notional(Money::new(1_000_000.0, Currency::EUR))
+            .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .expect("FxSpot notional should be valid")
             .with_rate(1.10)
             .expect("FxSpot rate should be valid")
@@ -1474,7 +1474,7 @@ mod tests {
         };
         let swap = BasisSwap::new(
             "BASIS-DEFAULTS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             primary_leg,
             reference_leg,
         )
@@ -1507,7 +1507,7 @@ mod tests {
         let option = CapFloor::new(
             InstrumentId::new("IROPT-DEFAULTS"),
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.03,
             Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date"),
             Date::from_calendar_date(2028, Month::January, 1).expect("Valid test date"),
@@ -1552,7 +1552,7 @@ mod tests {
 
         let repo = Repo::term(
             "REPO-DEFAULTS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             CollateralSpec::new("UST-10Y", 1000.0, "UST_10Y_PRICE"),
             0.0525,
             Date::from_calendar_date(2025, Month::January, 2).expect("Valid test date"),

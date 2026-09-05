@@ -21,8 +21,8 @@ fn bond_json() -> String {
 
     let bond = Bond::fixed(
         "WASM-ATTR-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2024 - 01 - 15),
         date!(2029 - 01 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,

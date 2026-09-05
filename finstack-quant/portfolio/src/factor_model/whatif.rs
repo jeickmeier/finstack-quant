@@ -897,8 +897,8 @@ mod tests {
             .expect("model");
         let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
             "BOND-ISSUER-B",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1187,11 +1187,11 @@ mod tests {
                 call_counter.fetch_add(1, Ordering::SeqCst);
             }
             if let Some(amount) = self.reported_value_override {
-                return Ok(Money::new(amount, self.currency));
+                return Ok(Money::new(amount, self.currency).expect("valid money fixture"));
             }
             let pv = self.raw_offset
                 + market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
-            Ok(Money::new(pv, self.currency))
+            Ok(Money::new(pv, self.currency).expect("valid money fixture"))
         }
 
         fn base_value_raw(

@@ -177,23 +177,26 @@ pub(crate) fn apply_curve_shape_residual(
     step_pnls: &mut [Money],
     steps: &[CreditCascadeStep],
     credit_total: Money,
-) {
-    debug_assert_eq!(step_pnls.len(), steps.len());
-    let parallel_sum: f64 = step_pnls
-        .iter()
-        .zip(steps.iter())
-        .filter(|(_, step)| !matches!(step.kind, CreditStepKind::CurveShape))
-        .map(|(pnl, _)| pnl.amount())
-        .sum();
-    let curve_shape = Money::new(
-        credit_total.amount() - parallel_sum,
-        credit_total.currency(),
-    );
-    for (pnl, step) in step_pnls.iter_mut().zip(steps.iter()) {
-        if matches!(step.kind, CreditStepKind::CurveShape) {
-            *pnl = curve_shape;
+) -> finstack_quant_core::Result<()> {
+    let _: () = {
+        debug_assert_eq!(step_pnls.len(), steps.len());
+        let parallel_sum: f64 = step_pnls
+            .iter()
+            .zip(steps.iter())
+            .filter(|(_, step)| !matches!(step.kind, CreditStepKind::CurveShape))
+            .map(|(pnl, _)| pnl.amount())
+            .sum();
+        let curve_shape = Money::new(
+            credit_total.amount() - parallel_sum,
+            credit_total.currency(),
+        )?;
+        for (pnl, step) in step_pnls.iter_mut().zip(steps.iter()) {
+            if matches!(step.kind, CreditStepKind::CurveShape) {
+                *pnl = curve_shape;
+            }
         }
-    }
+    };
+    Ok(())
 }
 
 /// Plan a credit cascade for one instrument.
@@ -548,131 +551,140 @@ pub(crate) fn build_credit_factor_attribution(
     cascade: &CreditCascade,
     options: &super::credit_factor::CreditFactorDetailOptions,
     step_pnls: &[finstack_quant_core::money::Money],
-) -> super::types::CreditFactorAttribution {
-    use super::credit_factor::credit_factor_model_id;
-    use super::types::{CreditFactorAttribution, LevelPnl};
+) -> finstack_quant_core::Result<super::types::CreditFactorAttribution> {
+    Ok({
+        use super::credit_factor::credit_factor_model_id;
+        use super::types::{CreditFactorAttribution, LevelPnl};
 
-    // Release-safe shape check: a silent zip truncation
-    // would break the detail-sum invariant with no signal in release builds.
-    if step_pnls.len() != cascade.steps.len() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            step_pnls = step_pnls.len(),
-            steps = cascade.steps.len(),
-            "credit cascade step P&L count does not match planned steps; \
-             the shorter length is used and the detail sum may not reconcile"
-        );
-    }
-    debug_assert_eq!(step_pnls.len(), cascade.steps.len());
-    let ccy = step_pnls
-        .first()
-        .map(|m| m.currency())
-        .unwrap_or(finstack_quant_core::currency::Currency::USD);
-    if step_pnls.is_empty() {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            "credit cascade produced no step P&Ls; emitting an all-zero detail (USD)"
-        );
-    }
+        // Release-safe shape check: a silent zip truncation
+        // would break the detail-sum invariant with no signal in release builds.
+        if step_pnls.len() != cascade.steps.len() {
+            tracing::warn!(
+                issuer_id = %cascade.issuer_id,
+                step_pnls = step_pnls.len(),
+                steps = cascade.steps.len(),
+                "credit cascade step P&L count does not match planned steps; \
+                 the shorter length is used and the detail sum may not reconcile"
+            );
+        }
+        debug_assert_eq!(step_pnls.len(), cascade.steps.len());
+        let ccy = step_pnls
+            .first()
+            .map(|m| m.currency())
+            .unwrap_or(finstack_quant_core::currency::Currency::USD);
+        if step_pnls.is_empty() {
+            tracing::warn!(
+                issuer_id = %cascade.issuer_id,
+                "credit cascade produced no step P&Ls; emitting an all-zero detail (USD)"
+            );
+        }
 
-    // Resolve issuer's bucket path for per-bucket detail (single-instrument
-    // scope: each level has at most one populated bucket).
-    let issuer_row = model
-        .issuer_betas
-        .iter()
-        .find(|r| r.issuer_id == cascade.issuer_id);
+        // Resolve issuer's bucket path for per-bucket detail (single-instrument
+        // scope: each level has at most one populated bucket).
+        let issuer_row = model
+            .issuer_betas
+            .iter()
+            .find(|r| r.issuer_id == cascade.issuer_id);
 
-    let mut generic_pnl = finstack_quant_core::money::Money::new(0.0, ccy);
-    let mut adder_pnl = finstack_quant_core::money::Money::new(0.0, ccy);
-    let mut curve_shape_pnl = finstack_quant_core::money::Money::new(0.0, ccy);
-    let mut level_pnls: BTreeMap<usize, finstack_quant_core::money::Money> = BTreeMap::new();
+        let mut generic_pnl = finstack_quant_core::money::Money::from((0_i64, ccy));
+        let mut adder_pnl = finstack_quant_core::money::Money::from((0_i64, ccy));
+        let mut curve_shape_pnl = finstack_quant_core::money::Money::from((0_i64, ccy));
+        let mut level_pnls: BTreeMap<usize, finstack_quant_core::money::Money> = BTreeMap::new();
 
-    for (step, pnl) in cascade.steps.iter().zip(step_pnls.iter()) {
-        match step.kind {
-            CreditStepKind::Generic => generic_pnl = *pnl,
-            CreditStepKind::Adder => adder_pnl = *pnl,
-            CreditStepKind::CurveShape => curve_shape_pnl = *pnl,
-            CreditStepKind::Level(k) => {
-                level_pnls.insert(k, *pnl);
+        for (step, pnl) in cascade.steps.iter().zip(step_pnls.iter()) {
+            match step.kind {
+                CreditStepKind::Generic => generic_pnl = *pnl,
+                CreditStepKind::Adder => adder_pnl = *pnl,
+                CreditStepKind::CurveShape => curve_shape_pnl = *pnl,
+                CreditStepKind::Level(k) => {
+                    level_pnls.insert(k, *pnl);
+                }
             }
         }
-    }
 
-    let mut levels: Vec<LevelPnl> = Vec::with_capacity(cascade.level_names.len());
-    for (k, level_name) in cascade.level_names.iter().enumerate() {
-        let total = level_pnls
-            .get(&k)
-            .copied()
-            .unwrap_or_else(|| finstack_quant_core::money::Money::new(0.0, ccy));
-        let by_bucket = issuer_row
-            .map(|row| {
-                single_issuer_by_bucket(model, row, k, total, options.include_per_bucket_breakdown)
-            })
-            .unwrap_or_default();
-        levels.push(LevelPnl {
-            level_name: level_name.clone(),
-            total,
-            by_bucket,
-        });
-    }
+        let mut levels: Vec<LevelPnl> = Vec::with_capacity(cascade.level_names.len());
+        for (k, level_name) in cascade.level_names.iter().enumerate() {
+            let total = level_pnls
+                .get(&k)
+                .copied()
+                .unwrap_or_else(|| finstack_quant_core::money::Money::from((0_i64, ccy)));
+            let by_bucket = issuer_row
+                .map(|row| {
+                    single_issuer_by_bucket(
+                        model,
+                        row,
+                        k,
+                        total,
+                        options.include_per_bucket_breakdown,
+                    )
+                })
+                .unwrap_or_default();
+            levels.push(LevelPnl {
+                level_name: level_name.clone(),
+                total,
+                by_bucket,
+            });
+        }
 
-    let adder_pnl_by_issuer = optional_single_issuer_adder(
-        &cascade.issuer_id,
-        adder_pnl,
-        options.include_per_issuer_adder,
-    );
-
-    // Diagnostic: surface the adder magnitude and warn when it dominates the
-    // credit P&L. The adder is now the *parallel* issuer-idiosyncratic move
-    // only — non-parallel curve-shape risk lands in `curve_shape_pnl` — so a
-    // large |adder| genuinely signals a large idiosyncratic spread move.
-    let adder_abs = adder_pnl.amount().abs();
-    let curve_shape_abs = curve_shape_pnl.amount().abs();
-    let total_credit_abs = generic_pnl.amount().abs()
-        + levels.iter().map(|l| l.total.amount().abs()).sum::<f64>()
-        + adder_abs
-        + curve_shape_abs;
-    if total_credit_abs > 0.0 && adder_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            adder_pnl = adder_pnl.amount(),
-            adder_abs = adder_abs,
-            total_credit_abs = total_credit_abs,
-            ratio = adder_abs / total_credit_abs,
-            threshold = ADDER_MAGNITUDE_WARN_RATIO,
-            "credit cascade per-issuer adder magnitude exceeds {:.0}% of total \
-             credit P&L — the issuer's idiosyncratic parallel spread move is large",
-            ADDER_MAGNITUDE_WARN_RATIO * 100.0
+        let adder_pnl_by_issuer = optional_single_issuer_adder(
+            &cascade.issuer_id,
+            adder_pnl,
+            options.include_per_issuer_adder,
         );
-    }
-    // A large curve-shape component means the hazard curve moved
-    // non-parallel (steepening / twist) — surfaced as its own signal.
-    if total_credit_abs > 0.0 && curve_shape_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs {
-        tracing::warn!(
-            issuer_id = %cascade.issuer_id,
-            curve_shape_pnl = curve_shape_pnl.amount(),
-            curve_shape_abs = curve_shape_abs,
-            total_credit_abs = total_credit_abs,
-            ratio = curve_shape_abs / total_credit_abs,
-            threshold = ADDER_MAGNITUDE_WARN_RATIO,
-            "credit cascade curve-shape magnitude exceeds {:.0}% of total credit \
-             P&L — non-parallel hazard move and/or higher-order (spread \
-             convexity) effects the parallel CS01 steps cannot capture; on the \
-             linear (metrics-based / Taylor) wire this fires for large parallel \
-             moves too",
-            ADDER_MAGNITUDE_WARN_RATIO * 100.0
-        );
-    }
 
-    CreditFactorAttribution {
-        model_id: credit_factor_model_id(model),
-        generic_pnl,
-        levels,
-        adder_pnl_total: adder_pnl,
-        curve_shape_pnl,
-        adder_pnl_by_issuer,
-        adder_magnitude: Some(finstack_quant_core::money::Money::new(adder_abs, ccy)),
-    }
+        // Diagnostic: surface the adder magnitude and warn when it dominates the
+        // credit P&L. The adder is now the *parallel* issuer-idiosyncratic move
+        // only — non-parallel curve-shape risk lands in `curve_shape_pnl` — so a
+        // large |adder| genuinely signals a large idiosyncratic spread move.
+        let adder_abs = adder_pnl.amount().abs();
+        let curve_shape_abs = curve_shape_pnl.amount().abs();
+        let total_credit_abs = generic_pnl.amount().abs()
+            + levels.iter().map(|l| l.total.amount().abs()).sum::<f64>()
+            + adder_abs
+            + curve_shape_abs;
+        if total_credit_abs > 0.0 && adder_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs {
+            tracing::warn!(
+                issuer_id = %cascade.issuer_id,
+                adder_pnl = adder_pnl.amount(),
+                adder_abs = adder_abs,
+                total_credit_abs = total_credit_abs,
+                ratio = adder_abs / total_credit_abs,
+                threshold = ADDER_MAGNITUDE_WARN_RATIO,
+                "credit cascade per-issuer adder magnitude exceeds {:.0}% of total \
+                 credit P&L — the issuer's idiosyncratic parallel spread move is large",
+                ADDER_MAGNITUDE_WARN_RATIO * 100.0
+            );
+        }
+        // A large curve-shape component means the hazard curve moved
+        // non-parallel (steepening / twist) — surfaced as its own signal.
+        if total_credit_abs > 0.0 && curve_shape_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs
+        {
+            tracing::warn!(
+                issuer_id = %cascade.issuer_id,
+                curve_shape_pnl = curve_shape_pnl.amount(),
+                curve_shape_abs = curve_shape_abs,
+                total_credit_abs = total_credit_abs,
+                ratio = curve_shape_abs / total_credit_abs,
+                threshold = ADDER_MAGNITUDE_WARN_RATIO,
+                "credit cascade curve-shape magnitude exceeds {:.0}% of total credit \
+                 P&L — non-parallel hazard move and/or higher-order (spread \
+                 convexity) effects the parallel CS01 steps cannot capture; on the \
+                 linear (metrics-based / Taylor) wire this fires for large parallel \
+                 moves too",
+                ADDER_MAGNITUDE_WARN_RATIO * 100.0
+            );
+        }
+
+        CreditFactorAttribution {
+            model_id: credit_factor_model_id(model),
+            generic_pnl,
+            levels,
+            adder_pnl_total: adder_pnl,
+            curve_shape_pnl,
+            adder_pnl_by_issuer,
+            adder_magnitude: Some(finstack_quant_core::money::Money::new(adder_abs, ccy)?),
+        }
+    })
 }
 
 #[cfg(test)]
@@ -796,8 +808,8 @@ mod tests {
     fn canonical_credit_bond(curve_id: CurveId) -> Arc<dyn Instrument> {
         let mut bond = Bond::fixed(
             "BOND-ISSUER-B",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).unwrap(),
             create_date(2030, Month::January, 1).unwrap(),
             finstack_quant_core::dates::StubKind::ShortFront,

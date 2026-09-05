@@ -696,7 +696,7 @@ mod tests {
     use finstack_quant_statements::types::AmountOrScalar;
 
     fn test_model_json() -> String {
-        let q1 = PeriodId::quarter(2024, 1);
+        let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test_model")
             .periods("2024Q1..Q2", None)
             .expect("periods")
@@ -705,7 +705,7 @@ mod tests {
                 &[
                     (q1, AmountOrScalar::scalar(100_000.0)),
                     (
-                        PeriodId::quarter(2024, 2),
+                        PeriodId::quarter(2024, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
@@ -714,7 +714,10 @@ mod tests {
                 "cogs",
                 &[
                     (q1, AmountOrScalar::scalar(40_000.0)),
-                    (PeriodId::quarter(2024, 2), AmountOrScalar::scalar(44_000.0)),
+                    (
+                        PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(44_000.0),
+                    ),
                 ],
             )
             .compute("gross_profit", "revenue - cogs")
@@ -790,7 +793,7 @@ mod tests {
             parameters: vec![
                 finstack_quant_statements_analytics::analysis::ParameterSpec {
                     node_id: "revenue".to_string(),
-                    period_id: PeriodId::quarter(2024, 1),
+                    period_id: PeriodId::quarter(2024, 1).expect("valid period fixture"),
                     base_value: 100_000.0,
                     perturbations: vec![-0.1, 0.0, 0.1],
                 },
@@ -816,7 +819,7 @@ mod tests {
             parameters: vec![
                 finstack_quant_statements_analytics::analysis::ParameterSpec {
                     node_id: "revenue".to_string(),
-                    period_id: PeriodId::quarter(2024, 1),
+                    period_id: PeriodId::quarter(2024, 1).expect("valid period fixture"),
                     base_value: 100_000.0,
                     perturbations: vec![-0.1, 0.1],
                 },
@@ -848,7 +851,7 @@ mod tests {
             baseline_label: "base".to_string(),
             comparison_label: "comp".to_string(),
             metrics: vec!["revenue".to_string(), "gross_profit".to_string()],
-            periods: vec![PeriodId::quarter(2024, 1)],
+            periods: vec![PeriodId::quarter(2024, 1).expect("valid period fixture")],
         };
         // `run_variance` returns a `JsValue`; assert the report it serializes.
         let analyzer = finstack_quant_statements_analytics::analysis::VarianceAnalyzer::new(

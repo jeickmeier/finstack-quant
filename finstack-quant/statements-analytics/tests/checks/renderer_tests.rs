@@ -19,7 +19,7 @@ fn sample_report() -> CheckReport {
             check_id: "balance_sheet_articulation".into(),
             severity: Severity::Error,
             message: "Balance sheet does not articulate: imbalance = 50.00".into(),
-            period: Some(PeriodId::quarter(2025, 1)),
+            period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
             materiality: Some(Materiality {
                 absolute: 50.0,
                 relative_pct: 2.5,
@@ -42,7 +42,7 @@ fn sample_report() -> CheckReport {
             check_id: "leverage_range".into(),
             severity: Severity::Warning,
             message: "Debt/EBITDA 7.00x in 2025Q2 outside Warning range".into(),
-            period: Some(PeriodId::quarter(2025, 2)),
+            period: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
             materiality: None,
             nodes: vec![NodeId::new("debt"), NodeId::new("ebitda")],
         }],

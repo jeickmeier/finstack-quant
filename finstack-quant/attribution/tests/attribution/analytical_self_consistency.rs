@@ -164,8 +164,8 @@ fn run_analytical_parity_test(tc: &AnalyticalParityTestCase) {
 
     let bond = Bond::fixed(
         "PARITY-TEST-BOND",
-        Money::new(tc.notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(tc.coupon_rate),
+        Money::new(tc.notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(tc.coupon_rate).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -308,8 +308,8 @@ fn test_attribution_method_metadata() {
 
     let bond = Bond::fixed(
         "METADATA-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -363,8 +363,8 @@ fn test_convexity_benefit_symmetric_moves() {
 
     let bond = Bond::fixed(
         "CONVEXITY-BENEFIT-TEST",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

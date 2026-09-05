@@ -178,25 +178,34 @@ mod tests {
     #[test]
     fn test_forward_fill() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
         let results = forward_fill(100.0, &periods).expect("forward_fill should succeed");
 
         assert_eq!(results.len(), 3);
-        assert_eq!(results[&PeriodId::quarter(2025, 1)], 100.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 2)], 100.0);
-        assert_eq!(results[&PeriodId::quarter(2025, 3)], 100.0);
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            100.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+            100.0
+        );
+        assert_eq!(
+            results[&PeriodId::quarter(2025, 3).expect("valid period fixture")],
+            100.0
+        );
     }
 
     #[test]
     fn test_growth_pct() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();
@@ -205,26 +214,38 @@ mod tests {
         let results = growth_pct(100.0, &periods, &params).expect("growth_pct should succeed");
 
         assert_eq!(results.len(), 3);
-        assert!((results[&PeriodId::quarter(2025, 1)] - 105.0).abs() < 0.01);
-        assert!((results[&PeriodId::quarter(2025, 2)] - 110.25).abs() < 0.01);
-        assert!((results[&PeriodId::quarter(2025, 3)] - 115.7625).abs() < 0.01);
+        assert!(
+            (results[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 105.0).abs()
+                < 0.01
+        );
+        assert!(
+            (results[&PeriodId::quarter(2025, 2).expect("valid period fixture")] - 110.25).abs()
+                < 0.01
+        );
+        assert!(
+            (results[&PeriodId::quarter(2025, 3).expect("valid period fixture")] - 115.7625).abs()
+                < 0.01
+        );
     }
 
     #[test]
     fn test_growth_pct_negative() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         params.insert("rate".to_string(), serde_json::json!(-0.1)); // -10% decline
 
         let results = growth_pct(100.0, &periods, &params).expect("growth_pct should succeed");
 
-        assert!((results[&PeriodId::quarter(2025, 1)] - 90.0).abs() < 0.01);
+        assert!(
+            (results[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 90.0).abs()
+                < 0.01
+        );
     }
 
     #[test]
     fn test_growth_pct_missing_rate_error() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = IndexMap::new();
 
         let result = growth_pct(100.0, &periods, &params);
@@ -234,9 +255,9 @@ mod tests {
     #[test]
     fn test_curve_pct() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();
@@ -245,17 +266,26 @@ mod tests {
         let results = curve_pct(100.0, &periods, &params).expect("curve_pct should succeed");
 
         assert_eq!(results.len(), 3);
-        assert!((results[&PeriodId::quarter(2025, 1)] - 105.0).abs() < 0.01);
-        assert!((results[&PeriodId::quarter(2025, 2)] - 111.3).abs() < 0.01);
-        assert!((results[&PeriodId::quarter(2025, 3)] - 116.865).abs() < 0.01);
+        assert!(
+            (results[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 105.0).abs()
+                < 0.01
+        );
+        assert!(
+            (results[&PeriodId::quarter(2025, 2).expect("valid period fixture")] - 111.3).abs()
+                < 0.01
+        );
+        assert!(
+            (results[&PeriodId::quarter(2025, 3).expect("valid period fixture")] - 116.865).abs()
+                < 0.01
+        );
     }
 
     #[test]
     fn test_curve_pct_length_mismatch_error() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();
@@ -267,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_curve_pct_missing_curve_error() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = IndexMap::new();
 
         let result = curve_pct(100.0, &periods, &params);
@@ -276,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_curve_pct_rejects_non_finite_output() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         params.insert("curve".to_string(), serde_json::json!([1.0]));
@@ -292,7 +322,9 @@ mod tests {
         // With rate=100, starting at 1e10: 1e10 * 101^150 > f64::MAX (1.8e308)
         // After 100 periods we're at ~1e210, need ~50 more to overflow
         let periods: Vec<_> = (0..200)
-            .map(|i| PeriodId::quarter(2025 + i / 4, ((i % 4) as u8) + 1))
+            .map(|i| {
+                PeriodId::quarter(2025 + i / 4, ((i % 4) as u8) + 1).expect("valid period fixture")
+            })
             .collect();
 
         let mut params = IndexMap::new();
@@ -305,12 +337,15 @@ mod tests {
     /// High growth rates (>100% per period) should warn but still succeed.
     #[test]
     fn test_growth_pct_high_rate_no_error() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         params.insert("rate".to_string(), serde_json::json!(1.5)); // 150% per period
 
         let result = growth_pct(100.0, &periods, &params).expect("150% growth should succeed");
-        assert!((result[&PeriodId::quarter(2025, 1)] - 250.0).abs() < 0.01);
+        assert!(
+            (result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 250.0).abs()
+                < 0.01
+        );
     }
 }

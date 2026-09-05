@@ -13,8 +13,8 @@ fn test_clean_price_from_quoted() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "CLEAN1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -49,8 +49,8 @@ fn model_price_metrics_are_settlement_anchored() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "MODEL-CLEAN-DIRTY",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

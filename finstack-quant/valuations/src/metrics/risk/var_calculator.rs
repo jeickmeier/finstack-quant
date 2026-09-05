@@ -727,7 +727,7 @@ fn calculate_var_taylor_approximation(
             &mut spot_cache,
             &mut skipped,
         )?;
-        let pnl_money = Money::new(pnl_local, sensitivities.currency);
+        let pnl_money = Money::new(pnl_local, sensitivities.currency)?;
         // Convert P&L using the scenario-shifted market's FX rates, not the
         // base market's: when a scenario shocks FX, the reporting-currency
         // value of the P&L must reflect the shifted rates. This mirrors the
@@ -1166,7 +1166,7 @@ fn calculate_portfolio_var_taylor(
             )?;
             skipped.merge(sens_skipped);
             let term = convert_money_to_reporting(
-                Money::new(pnl_local, sens.currency),
+                Money::new(pnl_local, sens.currency)?,
                 reporting_currency,
                 conversion_market,
                 as_of,
@@ -1306,7 +1306,9 @@ mod tests {
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
             match market.get_price(&self.price_id)? {
                 MarketScalar::Price(m) => Ok(*m),
-                MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)),
+                MarketScalar::Unitless(v) => {
+                    Ok(Money::new(*v, self.currency).expect("valid money fixture"))
+                }
             }
         }
     }
@@ -1368,11 +1370,11 @@ mod tests {
         let base_market = MarketContext::new()
             .insert_price(
                 "USD-INST",
-                MarketScalar::Price(Money::new(100.0, Currency::USD)),
+                MarketScalar::Price(Money::from((100_i64, Currency::USD))),
             )
             .insert_price(
                 "EUR-INST",
-                MarketScalar::Price(Money::new(100.0, Currency::EUR)),
+                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
             );
 
         let scenario = MarketScenario::new(
@@ -1425,11 +1427,11 @@ mod tests {
         let base_market = MarketContext::new()
             .insert_price(
                 "USD-INST",
-                MarketScalar::Price(Money::new(100.0, Currency::USD)),
+                MarketScalar::Price(Money::from((100_i64, Currency::USD))),
             )
             .insert_price(
                 "EUR-INST",
-                MarketScalar::Price(Money::new(100.0, Currency::EUR)),
+                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
             )
             .insert_fx(fx);
 
@@ -1701,7 +1703,7 @@ mod tests {
             &bond,
             &MarketContext::new(),
             as_of,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             &PricingDispatch::InstrumentDefault,
         ) else {
             panic!("Taylor sensitivity build should fail on missing market inputs")
@@ -1831,7 +1833,7 @@ mod tests {
             )
             .expiry(expiry)
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -2185,7 +2187,7 @@ mod tests {
         );
 
         // A local P&L of 10 EUR, as produced by `taylor_pnl_for_scenario`.
-        let local_pnl = Money::new(10.0, Currency::EUR);
+        let local_pnl = Money::from((10_i64, Currency::EUR));
 
         // Base-market conversion (the OLD, buggy behavior) would give 20 USD.
         let base_converted = convert_money_to_reporting(

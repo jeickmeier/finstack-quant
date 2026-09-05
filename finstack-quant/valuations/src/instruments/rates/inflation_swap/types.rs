@@ -132,7 +132,7 @@ impl InflationSwap {
         use time::Month;
         InflationSwap::builder()
             .id(InstrumentId::new("INFLSWAP-USD-5Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
             )
@@ -515,10 +515,10 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let payment_date = self.adjusted_payment_date(self.maturity)?;
         if as_of >= payment_date {
-            return Ok(finstack_quant_core::money::Money::new(
-                0.0,
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
                 self.notional.currency(),
-            ));
+            )));
         }
 
         let pv_fixed = self.pv_fixed_leg(curves, as_of)?;
@@ -557,8 +557,8 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -585,7 +585,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         let fixed_flow = CashFlow::new(
             payment_date,
             None,
-            Money::new(fixed_signed, ccy),
+            Money::new(fixed_signed, ccy)?,
             CFKind::Fixed,
             accrual_factor,
             Some(fixed_rate),
@@ -599,7 +599,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         let inflation_flow = CashFlow::new(
             payment_date,
             Some(self.start_date),
-            Money::new(inflation_signed, ccy),
+            Money::new(inflation_signed, ccy)?,
             CFKind::InflationCoupon,
             accrual_factor,
             inflation_rate,
@@ -724,7 +724,7 @@ impl YoYInflationSwap {
 
         YoYInflationSwap::builder()
             .id(InstrumentId::new("YOYSWAP-USD-5Y"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
             )
@@ -980,7 +980,7 @@ impl YoYInflationSwap {
             let fixed_flow = CashFlow::new(
                 pay,
                 None,
-                Money::new(fixed_signed, self.notional.currency()),
+                Money::new(fixed_signed, self.notional.currency())?,
                 CFKind::Fixed,
                 accrual,
                 Some(fixed_rate),
@@ -994,7 +994,7 @@ impl YoYInflationSwap {
             let inflation_flow = CashFlow::new(
                 pay,
                 Some(start),
-                Money::new(inflation_signed, self.notional.currency()),
+                Money::new(inflation_signed, self.notional.currency())?,
                 CFKind::InflationCoupon,
                 accrual,
                 Some(inflation_rate),
@@ -1035,10 +1035,7 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        Ok(finstack_quant_core::money::Money::new(
-            pv,
-            self.notional.currency(),
-        ))
+        finstack_quant_core::money::Money::new(pv, self.notional.currency())
     }
 
     fn base_value_raw(
@@ -1065,8 +1062,8 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -1137,7 +1134,7 @@ mod tests {
     fn sample_swap(start_date: Date, maturity: Date) -> InflationSwap {
         InflationSwap::builder()
             .id(InstrumentId::new("INFL-SWAP"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(start_date)
             .maturity(maturity)
             .fixed_rate(Decimal::ZERO)
@@ -1183,7 +1180,7 @@ mod tests {
             .insert(sample_inflation_curve(as_of));
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CURVE-ONLY"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(d(2027, Month::January, 1))
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -1243,7 +1240,7 @@ mod tests {
             .insert_inflation_index("US-CPI", flat_historical_index());
         let swap = InflationSwap::builder()
             .id(InstrumentId::new("INFL-CF"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(maturity)
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -1310,7 +1307,7 @@ mod tests {
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-REBASE"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(maturity)
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -1382,7 +1379,7 @@ mod tests {
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-LOOKAHEAD"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(maturity)
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -1419,7 +1416,7 @@ mod tests {
             .insert_inflation_index("US-CPI", flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CF"))
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(d(2027, Month::January, 1))
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))

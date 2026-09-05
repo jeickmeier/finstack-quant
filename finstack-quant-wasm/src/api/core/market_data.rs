@@ -380,67 +380,17 @@ impl JsForwardCurve {
             .map_err(to_js_err)
     }
 
-    /// Construct from an array of `[time, rate]` pairs.
+    /// Construct a forward curve from named options.
     ///
     /// # Arguments
-    /// * `id` - Curve identifier.
-    /// * `tenor` - Index tenor in years.
-    /// * `baseDate` - ISO date string.
-    /// * `knots` - Flat `[t0, rate0, t1, rate1, …]` array.
-    /// * `dayCount` - Day-count convention (defaults to curve-ID inference).
-    /// * `interp` - Interpolation style. When omitted, the Rust builder
-    ///   default (``"linear"``) applies.
-    /// * `extrapolation` - Extrapolation policy. When omitted, the Rust
-    ///   builder default (``"flat_forward"``) applies.
-    /// * `projectionGrid` - Optional contractual reset/end boundaries.
-    /// * `resetLag` - Optional fixing-to-spot lag in business days; omit for
-    ///   Rust curve-ID inference.
+    ///
+    /// * `options` - ForwardCurveOptions object: curve id, tenor in years, ISO baseDate, flat time/decimal-rate knots, and optional dayCount, interp, extrapolation, projectionGrid and resetLag. Omitted policies use the Rust builder defaults; arrays and typed arrays are accepted.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if `baseDate`, `dayCount`, `interp`, or
-    /// `extrapolation` is invalid; `knots` has odd length; or canonical curve
-    /// validation rejects the tenor, reset lag, knots, projection grid, or
-    /// interpolation inputs.
+    /// Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
     #[wasm_bindgen(constructor)]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "preserves existing positional constructor arguments and appends projectionGrid compatibly"
-    )]
-    pub fn new(
-        id: &str,
-        tenor: f64,
-        base_date: &str,
-        knots: &[f64],
-        day_count: Option<String>,
-        interp: Option<String>,
-        extrapolation: Option<String>,
-        projection_grid: Option<Vec<f64>>,
-        reset_lag: Option<i32>,
-    ) -> Result<JsForwardCurve, JsValue> {
-        Self::build(ForwardCurveOptions {
-            id: id.to_string(),
-            tenor,
-            base_date: base_date.to_string(),
-            knots: knots.to_vec(),
-            day_count,
-            interp,
-            extrapolation,
-            projection_grid,
-            reset_lag,
-        })
-    }
-
-    /// Construct from a named JavaScript options object.
-    /// @param options - Named `ForwardCurveOptions` fields used to construct the curve.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if `options` does not match
-    /// `ForwardCurveOptions` or any contained date, convention, knot, tenor, reset-lag,
-    /// projection-grid, or interpolation input fails canonical curve validation.
-    #[wasm_bindgen(js_name = fromOptions)]
-    pub fn from_options(options: JsValue) -> Result<JsForwardCurve, JsValue> {
+    pub fn new(options: JsValue) -> Result<JsForwardCurve, JsValue> {
         let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
         Self::build(options)
     }
@@ -1160,17 +1110,17 @@ mod tests {
 
     #[test]
     fn forward_curve_new_and_accessors() {
-        let curve = JsForwardCurve::new(
-            "USD-3M",
-            0.25,
-            "2024-01-15",
-            &[0.5, 0.04, 1.0, 0.045, 2.0, 0.05],
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        let curve = JsForwardCurve::build(ForwardCurveOptions {
+            id: "USD-3M".into(),
+            tenor: 0.25,
+            base_date: "2024-01-15".into(),
+            knots: vec![0.5, 0.04, 1.0, 0.045, 2.0, 0.05],
+            day_count: None,
+            interp: None,
+            extrapolation: None,
+            projection_grid: None,
+            reset_lag: None,
+        })
         .expect("forward curve");
         assert_eq!(curve.id(), "USD-3M");
         assert_eq!(curve.base_date(), "2024-01-15");

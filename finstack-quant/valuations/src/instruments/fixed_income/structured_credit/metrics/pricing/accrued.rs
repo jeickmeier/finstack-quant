@@ -158,7 +158,7 @@ mod tests {
             Arc::new(StructuredCredit::example()) as Arc<dyn Instrument>,
             Arc::new(MarketContext::new()),
             as_of,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
             MetricContext::default_config(),
         )
     }
@@ -188,15 +188,18 @@ mod tests {
         // No per-tranche detail, exactly like the deal-level registry path.
         ctx.detailed_tranche_cashflows = None;
         ctx.cashflows = Some(vec![
-            (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
+            (date!(2025 - 01 - 01), Money::from((0_i64, Currency::USD))),
             // A COMBINED payment: 3,000 principal + 90 interest.
-            (date!(2025 - 04 - 01), Money::new(3_090.0, Currency::USD)),
+            (
+                date!(2025 - 04 - 01),
+                Money::from((3_090_i64, Currency::USD)),
+            ),
         ]);
         ctx.tagged_cashflows = Some(vec![
             CashFlow::new(
                 date!(2025 - 01 - 01),
                 None,
-                Money::new(0.0, Currency::USD),
+                Money::from((0_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
@@ -204,7 +207,7 @@ mod tests {
             CashFlow::new(
                 date!(2025 - 04 - 01),
                 None,
-                Money::new(90.0, Currency::USD),
+                Money::from((90_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
@@ -212,7 +215,7 @@ mod tests {
             CashFlow::new(
                 date!(2025 - 04 - 01),
                 None,
-                Money::new(3_000.0, Currency::USD),
+                Money::from((3_000_i64, Currency::USD)),
                 CFKind::Notional,
                 0.25,
                 None,
@@ -240,9 +243,9 @@ mod tests {
     fn accrued_from_aggregated_cashflows_does_not_fabricate() {
         let mut ctx = context(date!(2025 - 02 - 15));
         ctx.cashflows = Some(vec![
-            (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
-            (date!(2025 - 04 - 01), Money::new(90.0, Currency::USD)),
-            (date!(2025 - 07 - 01), Money::new(90.0, Currency::USD)),
+            (date!(2025 - 01 - 01), Money::from((0_i64, Currency::USD))),
+            (date!(2025 - 04 - 01), Money::from((90_i64, Currency::USD))),
+            (date!(2025 - 07 - 01), Money::from((90_i64, Currency::USD))),
         ]);
         ctx.day_count = Some(DayCount::Act360);
 
@@ -259,27 +262,27 @@ mod tests {
     fn detailed_interest_flows_take_priority_over_aggregated_flows() {
         let mut ctx = context(date!(2025 - 02 - 15));
         ctx.cashflows = Some(vec![
-            (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
-            (date!(2025 - 04 - 01), Money::new(120.0, Currency::USD)),
+            (date!(2025 - 01 - 01), Money::from((0_i64, Currency::USD))),
+            (date!(2025 - 04 - 01), Money::from((120_i64, Currency::USD))),
         ]);
         ctx.detailed_tranche_cashflows = Some(TrancheCashflows {
             tranche_id: "A".to_string(),
             cashflows: vec![],
             detailed_flows: vec![],
             interest_flows: vec![
-                (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
-                (date!(2025 - 04 - 01), Money::new(30.0, Currency::USD)),
+                (date!(2025 - 01 - 01), Money::from((0_i64, Currency::USD))),
+                (date!(2025 - 04 - 01), Money::from((30_i64, Currency::USD))),
             ],
             principal_flows: vec![],
             pik_flows: vec![],
             deferred_flows: Vec::new(),
             writedown_flows: vec![],
-            final_balance: Money::new(0.0, Currency::USD),
-            total_interest: Money::new(30.0, Currency::USD),
-            total_principal: Money::new(0.0, Currency::USD),
-            total_pik: Money::new(0.0, Currency::USD),
-            total_deferred: Money::new(0.0, Currency::USD),
-            total_writedown: Money::new(0.0, Currency::USD),
+            final_balance: Money::from((0_i64, Currency::USD)),
+            total_interest: Money::from((30_i64, Currency::USD)),
+            total_principal: Money::from((0_i64, Currency::USD)),
+            total_pik: Money::from((0_i64, Currency::USD)),
+            total_deferred: Money::from((0_i64, Currency::USD)),
+            total_writedown: Money::from((0_i64, Currency::USD)),
         });
         ctx.day_count = Some(DayCount::Act360);
 
@@ -295,9 +298,9 @@ mod tests {
     fn accrued_outside_window_without_interest_flows_is_zero() {
         let mut ctx = context(date!(2025 - 08 - 01));
         ctx.cashflows = Some(vec![
-            (date!(2025 - 01 - 01), Money::new(0.0, Currency::USD)),
-            (date!(2025 - 04 - 01), Money::new(90.0, Currency::USD)),
-            (date!(2025 - 07 - 01), Money::new(90.0, Currency::USD)),
+            (date!(2025 - 01 - 01), Money::from((0_i64, Currency::USD))),
+            (date!(2025 - 04 - 01), Money::from((90_i64, Currency::USD))),
+            (date!(2025 - 07 - 01), Money::from((90_i64, Currency::USD))),
         ]);
 
         assert_eq!(

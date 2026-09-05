@@ -32,7 +32,7 @@ fn test_builder_pattern_creates_valid_option() {
         )
         .expiry(date!(2025 - 01 - 01))
         .day_count(DayCount::Act365F)
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -56,7 +56,7 @@ fn test_european_call_convenience_constructor() {
         Currency::USD,
         1.20,
         date!(2025 - 01 - 01),
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         CurveId::new("EURUSD-VOL"),
     )
     .unwrap();
@@ -78,7 +78,7 @@ fn test_european_put_convenience_constructor() {
         Currency::USD,
         1.20,
         date!(2025 - 01 - 01),
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         CurveId::new("EURUSD-VOL"),
     )
     .unwrap();
@@ -106,7 +106,7 @@ fn test_builder_with_underlying_params() {
         )
         .expiry(date!(2025 - 01 - 01))
         .day_count(DayCount::Act365F)
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(underlying_params.domestic_discount_curve_id.clone())
         .foreign_discount_curve_id(underlying_params.foreign_discount_curve_id.clone())
         .vol_surface_id(CurveId::new("EURUSD-VOL"))

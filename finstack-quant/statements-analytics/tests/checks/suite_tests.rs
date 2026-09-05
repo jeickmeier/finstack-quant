@@ -12,7 +12,7 @@ use finstack_quant_statements_analytics::analysis::checks::{
 };
 
 fn q(quarter: u8) -> PeriodId {
-    PeriodId::quarter(2025, quarter)
+    PeriodId::quarter(2025, quarter).expect("valid period fixture")
 }
 
 fn s(v: f64) -> AmountOrScalar {

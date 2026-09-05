@@ -61,7 +61,7 @@ fn materialization_examples() -> Result<Vec<Value>> {
 
     let deposit = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .start_date(as_of)
         .maturity(maturity)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

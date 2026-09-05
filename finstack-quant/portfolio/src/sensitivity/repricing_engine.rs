@@ -434,7 +434,7 @@ mod tests {
             } else {
                 self.raw_value(market, as_of)?
             };
-            Ok(Money::new(amount, self.currency))
+            Ok(Money::new(amount, self.currency).expect("valid money fixture"))
         }
 
         fn base_value_raw(&self, market: &MarketContext, as_of: Date) -> Result<f64> {

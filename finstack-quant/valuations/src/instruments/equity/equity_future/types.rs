@@ -445,10 +445,7 @@ impl crate::instruments::Instrument for EquityFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(
-            self.npv_raw(market, as_of)?,
-            self.terms.currency,
-        ))
+        Money::new(self.npv_raw(market, as_of)?, self.terms.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -633,7 +630,7 @@ mod tests {
             .insert_price("SX5E-SPOT", MarketScalar::Unitless(100.0))
             .insert_price(
                 "SX5E-DIV",
-                MarketScalar::Price(Money::new(0.02, Currency::EUR)),
+                MarketScalar::Price(Money::new(0.02, Currency::EUR).expect("valid money fixture")),
             );
 
         let error = future

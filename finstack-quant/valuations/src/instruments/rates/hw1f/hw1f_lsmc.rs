@@ -210,7 +210,7 @@ impl RateExoticHw1fLsmcPricer {
                             let flat = path_cursor * n_ex + next_exercise;
                             exercise_short_rates[flat] = r;
                             exercise_values[flat] = payoff
-                                .intrinsic_at(next_exercise, r, self.currency)
+                                .intrinsic_at(next_exercise, r, self.currency)?
                                 .amount();
                             exercise_banks[flat] = bank;
                             exercise_inactive[flat] = payoff.is_path_inactive();
@@ -220,11 +220,11 @@ impl RateExoticHw1fLsmcPricer {
                     }
                 }
 
-                let full_value = payoff.value(self.currency).amount();
+                let full_value = payoff.value(self.currency)?.amount();
                 deterministic_pv[path_cursor] = full_value;
                 for ex in 0..n_ex {
                     pre_exercise_pv[path_cursor * n_ex + ex] =
-                        full_value - payoff.value_after(ex, self.currency).amount();
+                        full_value - payoff.value_after(ex, self.currency)?.amount();
                 }
                 path_cursor += 1;
             }
@@ -349,12 +349,7 @@ impl RateExoticHw1fLsmcPricer {
         // the pair variance rather than understating it. Pairs occupy
         // consecutive `path_cursor` slots and never straddle the train/price
         // split (the split is by raw-stream parity).
-        Ok(money_estimate_from_pairs(
-            &cashflow,
-            split,
-            1.0,
-            self.currency,
-        ))
+        money_estimate_from_pairs(&cashflow, split, 1.0, self.currency)
     }
 
     fn validate_inputs(&self) -> Result<()> {
@@ -438,7 +433,7 @@ mod tests {
             self.bank_at_last_event = s.get_key(StateKey::BankAccount).unwrap_or(1.0);
             Ok(())
         }
-        fn value(&self, ccy: Currency) -> Money {
+        fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(self.notional / self.bank_at_last_event, ccy)
         }
         fn reset(&mut self) {
@@ -446,7 +441,12 @@ mod tests {
         }
     }
     impl ExerciseBoundaryPayoff for ParPayoff {
-        fn intrinsic_at(&self, _i: usize, _r: f64, ccy: Currency) -> Money {
+        fn intrinsic_at(
+            &self,
+            _i: usize,
+            _r: f64,
+            ccy: Currency,
+        ) -> finstack_quant_core::Result<Money> {
             Money::new(self.notional, ccy)
         }
         fn continuation_basis(&self, _i: usize, t: f64, r: f64) -> Vec<f64> {
@@ -510,7 +510,7 @@ mod tests {
             self.event_idx += 1;
             Ok(())
         }
-        fn value(&self, ccy: Currency) -> Money {
+        fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(
                 self.coupon / self.bank_at_coupon + self.notional / self.bank_at_maturity,
                 ccy,
@@ -523,13 +523,18 @@ mod tests {
         }
     }
     impl ExerciseBoundaryPayoff for CouponThenBulletPayoff {
-        fn intrinsic_at(&self, _i: usize, _r: f64, ccy: Currency) -> Money {
+        fn intrinsic_at(
+            &self,
+            _i: usize,
+            _r: f64,
+            ccy: Currency,
+        ) -> finstack_quant_core::Result<Money> {
             Money::new(self.notional, ccy)
         }
         fn continuation_basis(&self, _i: usize, t: f64, r: f64) -> Vec<f64> {
             standard_basis(t, r)
         }
-        fn value_after(&self, _i: usize, ccy: Currency) -> Money {
+        fn value_after(&self, _i: usize, ccy: Currency) -> finstack_quant_core::Result<Money> {
             Money::new(self.notional / self.bank_at_maturity, ccy)
         }
     }

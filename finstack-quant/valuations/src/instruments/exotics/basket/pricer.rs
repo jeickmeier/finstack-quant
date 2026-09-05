@@ -78,7 +78,7 @@ impl BasketCalculator {
         // Apply expense ratio drag to per-share value
         let expense_drag = self.calculate_expense_drag(basket, per_share, as_of)?;
         let per_share_after_fees = per_share - expense_drag;
-        Ok(Money::new(per_share_after_fees, basket.currency))
+        Money::new(per_share_after_fees, basket.currency)
     }
 
     /// Calculate total basket value (gross, without per-share division).
@@ -111,7 +111,7 @@ impl BasketCalculator {
             total += c.amount();
         }
         let expense_drag = self.calculate_expense_drag(basket, total, as_of)?;
-        Ok(Money::new(total - expense_drag, basket.currency))
+        Money::new(total - expense_drag, basket.currency)
     }
 
     /// Calculate Net Asset Value per share using an explicit AUM.
@@ -140,7 +140,7 @@ impl BasketCalculator {
         } else {
             total.amount()
         };
-        Ok(Money::new(nav_value, basket.currency))
+        Money::new(nav_value, basket.currency)
     }
 
     /// Calculate total basket value using an explicit AUM for weight-based constituents.
@@ -192,7 +192,7 @@ impl BasketCalculator {
             sum
         };
         let expense_drag = self.calculate_expense_drag(basket, total, as_of)?;
-        Ok(Money::new(total - expense_drag, basket.currency))
+        Money::new(total - expense_drag, basket.currency)
     }
 
     /// Value a single constituent based on the given mode.
@@ -250,7 +250,7 @@ impl BasketCalculator {
                     )?;
                     base_value * units
                 } else if let Some(a) = aum {
-                    Money::new(a * constituent.weight, basket.currency)
+                    Money::new(a * constituent.weight, basket.currency)?
                 } else if let Some(s) = shares {
                     // Weight-only contribution scaled by shares × price
                     let raw_value = self.get_constituent_price(
@@ -304,7 +304,7 @@ impl BasketCalculator {
                     }
                     finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
                         // For unitless scalars, use the basket currency by default
-                        Ok(Money::new(*v, basket.currency))
+                        Ok(Money::new(*v, basket.currency)?)
                     }
                 }
             }
@@ -369,7 +369,7 @@ impl BasketCalculator {
             ))?
             .rate;
 
-        Ok(Money::new(money.amount() * rate, target))
+        Money::new(money.amount() * rate, target)
     }
 }
 
@@ -409,7 +409,7 @@ mod tests {
             // Zero expense ratio so the assertion isolates the weight-sum fix.
             expense_ratio: 0.0,
             currency: Currency::USD,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::from((1_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -428,7 +428,7 @@ mod tests {
         let calc = BasketCalculator::with_defaults();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
-        let aum = Money::new(1_000_000.0, Currency::USD);
+        let aum = Money::from((1_000_000_i64, Currency::USD));
 
         // Weights sum to 0.5 — only half the AUM is invested.
         let basket = weight_based_basket(&[0.3, 0.2]);
@@ -450,7 +450,7 @@ mod tests {
         let calc = BasketCalculator::with_defaults();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
-        let aum = Money::new(1_000_000.0, Currency::USD);
+        let aum = Money::from((1_000_000_i64, Currency::USD));
 
         let basket = weight_based_basket(&[0.7, 0.5]); // sums to 1.2
         let value = calc
@@ -471,7 +471,7 @@ mod tests {
         let calc = BasketCalculator::with_defaults();
         let context = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
-        let aum = Money::new(1_000_000.0, Currency::USD);
+        let aum = Money::from((1_000_000_i64, Currency::USD));
 
         let basket = weight_based_basket(&[0.6, 0.4]); // sums to 1.0
         let value = calc

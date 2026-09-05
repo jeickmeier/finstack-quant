@@ -379,7 +379,7 @@ impl CapFloor {
         Self::new(
             InstrumentId::new("IRCAP-USD-5Y-3PCT"),
             RateOptionType::Cap,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.03,
             start,
             maturity,
@@ -622,7 +622,7 @@ impl CapFloor {
     /// let floor = CapFloor::new(
     ///     InstrumentId::new("EUR-FLOOR-001"),
     ///     RateOptionType::Floor,
-    ///     Money::new(1_000_000.0, Currency::EUR),
+    ///     Money::from((1_000_000_i64, Currency::EUR)),
     ///     0.02,
     ///     create_date(2026, Month::January, 1)?,
     ///     create_date(2027, Month::January, 1)?,
@@ -828,10 +828,10 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
         };
         let discount = curves.get_discount(self.discount_curve_id.clone())?;
         let discount_factor = discount.df_between_dates(as_of, payment_date)?;
-        Ok(Money::new(
+        Money::new(
             option_value.amount() - premium.amount() * discount_factor,
             option_value.currency(),
-        ))
+        )
     }
 
     fn market_dependencies(
@@ -939,7 +939,7 @@ mod tests {
         let start_date = date(2024, 3, 1);
         let end_date = date(2025, 3, 1);
         let strike = 0.045;
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let ctx = test_market_context(base_date);
 
@@ -1046,7 +1046,7 @@ mod tests {
         let base_date = date(2024, 1, 1);
         let start_date = date(2024, 3, 1);
         let end_date = date(2025, 3, 1);
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let ctx = test_market_context(base_date);
 
@@ -1112,7 +1112,7 @@ mod tests {
         let base_date = date(2024, 1, 1);
         let start_date = date(2024, 3, 1);
         let end_date = date(2025, 3, 1);
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let mut ctx = test_market_context(base_date);
         let neg_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
@@ -1211,7 +1211,7 @@ mod tests {
         let instrument_with_unknown_index = CapFloor::new(
             "CAP-LAG-UNKNOWN",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1231,7 +1231,7 @@ mod tests {
         let instrument_with_convention = CapFloor::new(
             "CAP-LAG-CONVENTION",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1252,7 +1252,7 @@ mod tests {
         let cap = CapFloor::new(
             "CAP-EXPIRY",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1278,7 +1278,7 @@ mod tests {
         let mut cap = CapFloor::new(
             "RFR-CAP-EXPIRY",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1324,7 +1324,7 @@ mod tests {
         let mut cap = CapFloor::new(
             "CAP-WITH-PREMIUM",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1336,7 +1336,7 @@ mod tests {
         )
         .expect("valid cap");
         let gross = cap.value(&market, as_of).expect("gross value");
-        cap.premium = Some((payment_date, Money::new(25_000.0, Currency::USD)));
+        cap.premium = Some((payment_date, Money::from((25_000_i64, Currency::USD))));
         let net = cap.value(&market, as_of).expect("net value");
         let discount = market
             .get_discount(CurveId::new("TEST-DISC"))
@@ -1355,7 +1355,7 @@ mod tests {
         let mut cap = CapFloor::new(
             "CAP-PREMIUM-CONTRACT",
             RateOptionType::Cap,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date(2024, 3, 1),
             date(2025, 3, 1),
@@ -1367,11 +1367,11 @@ mod tests {
         )
         .expect("valid cap");
         let gross = cap.value(&market, as_of).expect("gross value");
-        cap.premium = Some((as_of, Money::new(25_000.0, Currency::USD)));
+        cap.premium = Some((as_of, Money::from((25_000_i64, Currency::USD))));
         let settled = cap.value(&market, as_of).expect("settled premium value");
         assert_eq!(settled, gross);
 
-        cap.premium = Some((date(2024, 2, 1), Money::new(25_000.0, Currency::EUR)));
+        cap.premium = Some((date(2024, 2, 1), Money::from((25_000_i64, Currency::EUR))));
         let error = cap
             .value(&market, as_of)
             .expect_err("premium currency mismatch must fail");

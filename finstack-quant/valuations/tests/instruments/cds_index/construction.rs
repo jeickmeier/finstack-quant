@@ -51,7 +51,7 @@ fn test_construction_with_index_factor() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-FACTOR",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -174,7 +174,7 @@ fn test_weight_sum_validation() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-WEIGHTS",
-        Money::new(TEST_NOTIONAL, Currency::USD),
+        Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -238,7 +238,9 @@ fn test_to_synthetic_cds_conversion() {
     let end = date!(2030 - 01 - 01);
 
     let idx = standard_single_curve_index("CDX-SYNTH", start, end, 10_000_000.0);
-    let cds = idx.to_synthetic_cds();
+    let cds = idx
+        .to_synthetic_cds()
+        .expect("valid to_synthetic_cds fixture");
 
     assert_eq!(cds.id, idx.id);
     assert_eq!(cds.notional, idx.notional);
@@ -310,7 +312,7 @@ fn test_multiple_index_types_construction() {
         let idx = CDSIndex::from_preset(
             &params,
             format!("{}-TEST", name),
-            Money::new(TEST_NOTIONAL, Currency::USD),
+            Money::new(TEST_NOTIONAL, Currency::USD).expect("valid money fixture"),
             PayReceive::Pay,
             start,
             end,

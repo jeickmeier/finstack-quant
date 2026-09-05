@@ -53,8 +53,8 @@ fn test_modified_macaulay_duration_relationship() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "DUR_REL",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -100,7 +100,7 @@ fn test_yield_dv01_duration_price_relationship() {
 
     let bond = Bond::builder()
         .id("DV01_REL".into())
-        .notional(Money::new(100.0, Currency::USD))
+        .notional(Money::new(100.0, Currency::USD).expect("valid money fixture"))
         .cashflow_spec(
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),

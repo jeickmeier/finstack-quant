@@ -244,6 +244,10 @@ impl DiscountCurve {
     /// Continuously-compounded zero rate.
     ///
     /// Formula: `r_cc = -ln(DF) / t`
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years on the curve's day-count basis; zero returns a zero rate.
     #[must_use]
     #[inline]
     pub fn zero(&self, t: f64) -> f64 {

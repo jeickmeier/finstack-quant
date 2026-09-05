@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn zero_frequency_is_rejected_without_iteration() {
-        let error = Tenor::try_new(0, TenorUnit::Days).expect_err("zero tenor");
+        let error = Tenor::new(0, TenorUnit::Days).expect_err("zero tenor");
         assert!(error.to_string().contains("count must be positive"));
     }
 

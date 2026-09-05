@@ -78,16 +78,16 @@ pub(crate) fn generate_cashflows(
                     super::spec::OidPolicy::WithheldPct(bp) => {
                         let pct = f64::from(*bp) * 1e-4;
                         cash_inflow =
-                            Money::new(ev.amount.amount() * (1.0 - pct), ev.amount.currency());
+                            Money::new(ev.amount.amount() * (1.0 - pct), ev.amount.currency())?;
                     }
                     super::spec::OidPolicy::WithheldAmount(m) => {
                         cash_inflow = ev
                             .amount
-                            .checked_sub(Money::new(m.amount() * draw_share, m.currency()))?;
+                            .checked_sub(Money::new(m.amount() * draw_share, m.currency())?)?;
                     }
                     super::spec::OidPolicy::SeparatePct(bp) => {
                         let pct = f64::from(*bp) * 1e-4;
-                        let fee_amt = Money::new(ev.amount.amount() * pct, ev.amount.currency());
+                        let fee_amt = Money::new(ev.amount.amount() * pct, ev.amount.currency())?;
                         if fee_amt.amount() > 0.0 {
                             fees.push(FeeSpec::Fixed {
                                 date: ev.date,
@@ -96,7 +96,7 @@ pub(crate) fn generate_cashflows(
                         }
                     }
                     super::spec::OidPolicy::SeparateAmount(m) => {
-                        let fee_amt = Money::new(m.amount() * draw_share, m.currency());
+                        let fee_amt = Money::new(m.amount() * draw_share, m.currency())?;
                         if fee_amt.amount() > 0.0 {
                             fees.push(FeeSpec::Fixed {
                                 date: ev.date,
@@ -139,7 +139,7 @@ pub(crate) fn generate_cashflows(
             if sweep.amount.amount() > 0.0 {
                 principal_events.push(PrincipalEvent {
                     date: sweep.date,
-                    delta: Money::new(-sweep.amount.amount(), sweep.amount.currency()),
+                    delta: Money::new(-sweep.amount.amount(), sweep.amount.currency())?,
                     cash: sweep.amount,
                     kind: CFKind::Amortization,
                 });
@@ -151,7 +151,7 @@ pub(crate) fn generate_cashflows(
             if amt.amount() > 0.0 {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
-                    delta: Money::new(-amt.amount(), amt.currency()),
+                    delta: Money::new(-amt.amount(), amt.currency())?,
                     cash: *amt,
                     kind: CFKind::Amortization,
                 });
@@ -193,7 +193,7 @@ pub(crate) fn generate_cashflows(
             for (dt, amt) in items {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
-                    delta: Money::new(-amt.amount(), amt.currency()),
+                    delta: Money::new(-amt.amount(), amt.currency())?,
                     cash: *amt,
                     kind: CFKind::Amortization,
                 });
@@ -217,10 +217,10 @@ pub(crate) fn generate_cashflows(
                     next_event += 1;
                 }
                 let amort_amount = (running_balance * pct).min(running_balance);
-                let pay = Money::new(amort_amount, loan.currency);
+                let pay = Money::new(amort_amount, loan.currency)?;
                 principal_events.push(PrincipalEvent {
                     date: d,
-                    delta: Money::new(-pay.amount(), pay.currency()),
+                    delta: Money::new(-pay.amount(), pay.currency())?,
                     cash: pay,
                     kind: CFKind::Amortization,
                 });
@@ -248,10 +248,10 @@ pub(crate) fn generate_cashflows(
             let pct = f64::from(*bp) * 1e-4;
             let flat_payment = original_notional * pct;
             for d in coupon_dates.iter().copied().skip(1) {
-                let pay = Money::new(flat_payment, loan.currency);
+                let pay = Money::new(flat_payment, loan.currency)?;
                 principal_events.push(PrincipalEvent {
                     date: d,
-                    delta: Money::new(-pay.amount(), pay.currency()),
+                    delta: Money::new(-pay.amount(), pay.currency())?,
                     cash: pay,
                     kind: CFKind::Amortization,
                 });
@@ -274,10 +274,10 @@ pub(crate) fn generate_cashflows(
                 // dates fall in the amortization window.
                 let per_step = loan.notional_limit.amount() / (steps.len() as f64);
                 for d in steps {
-                    let pay = Money::new(per_step, loan.currency);
+                    let pay = Money::new(per_step, loan.currency)?;
                     principal_events.push(PrincipalEvent {
                         date: d,
-                        delta: Money::new(-pay.amount(), pay.currency()),
+                        delta: Money::new(-pay.amount(), pay.currency())?,
                         cash: pay,
                         kind: CFKind::Amortization,
                     });
@@ -304,8 +304,8 @@ pub(crate) fn generate_cashflows(
                     let requested = (-event.delta.amount()).max(0.0);
                     let capped = requested.min(running.max(0.0));
                     if (capped - requested).abs() > 1e-10 {
-                        event.delta = Money::new(-capped, event.delta.currency());
-                        event.cash = Money::new(capped, event.cash.currency());
+                        event.delta = Money::new(-capped, event.delta.currency())?;
+                        event.cash = Money::new(capped, event.cash.currency())?;
                     }
                     running -= capped;
                 }
@@ -317,7 +317,7 @@ pub(crate) fn generate_cashflows(
     let mut builder = CashFlowBuilder::default();
     let _ = builder
         .principal(
-            Money::new(0.0, loan.currency),
+            Money::from((0_i64, loan.currency)),
             loan.issue_date,
             loan.maturity,
         )
@@ -607,7 +607,7 @@ fn build_commitment_fee_flows(
 
     let out_path = schedule.outstanding_by_date()?;
     let outstanding_at = |target: Date| -> Money {
-        let mut last = Money::new(0.0, loan.currency);
+        let mut last = Money::from((0_i64, loan.currency));
         for (d, amt) in &out_path {
             if *d <= target {
                 last = *amt;
@@ -649,7 +649,7 @@ fn build_commitment_fee_flows(
                 flows.push(CashFlow::new(
                     d,
                     None,
-                    Money::new(fee_amt, loan.currency),
+                    Money::new(fee_amt, loan.currency)?,
                     CFKind::CommitmentFee,
                     0.0,
                     Some(fee_rate),
@@ -782,8 +782,8 @@ pub(crate) fn build_oid_eir_schedule(
 
         periods.push(OidEirPeriod {
             date: *date,
-            oid_amortization: Money::new(oid_amortization, loan.currency),
-            closing_balance: Money::new(closing_balance, loan.currency),
+            oid_amortization: Money::new(oid_amortization, loan.currency)?,
+            closing_balance: Money::new(closing_balance, loan.currency)?,
         });
 
         opening_balance = closing_balance;

@@ -58,7 +58,7 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             asset_type: AssetType::FirstLienLoan {
                 industry: Some("Technology".to_string()),
             },
-            balance: Money::new(balance_each, Currency::USD),
+            balance: Money::new(balance_each, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: None,
             index_id: None,
@@ -86,7 +86,7 @@ fn build_tranches(senior: f64, mezz: f64, equity: f64) -> TrancheStructure {
             0.0,
             senior / total * 100.0,
             TrancheSeniority::Senior,
-            Money::new(senior, Currency::USD),
+            Money::new(senior, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity_5y(),
         )
@@ -96,7 +96,7 @@ fn build_tranches(senior: f64, mezz: f64, equity: f64) -> TrancheStructure {
             senior / total * 100.0,
             (senior + mezz) / total * 100.0,
             TrancheSeniority::Mezzanine,
-            Money::new(mezz, Currency::USD),
+            Money::new(mezz, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.07 },
             maturity_5y(),
         )
@@ -106,7 +106,7 @@ fn build_tranches(senior: f64, mezz: f64, equity: f64) -> TrancheStructure {
             (senior + mezz) / total * 100.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(equity, Currency::USD),
+            Money::new(equity, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity_5y(),
         )
@@ -401,7 +401,7 @@ mod afc_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             maturity(),
             DayCount::Thirty360,
@@ -412,7 +412,7 @@ mod afc_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.06 },
                 maturity(),
             )
@@ -422,7 +422,7 @@ mod afc_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -495,7 +495,7 @@ mod afc_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -506,7 +506,7 @@ mod afc_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.058 },
                 maturity(),
             )
@@ -516,7 +516,7 @@ mod afc_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -608,7 +608,7 @@ mod excess_spread_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.08,
             maturity(),
             DayCount::Thirty360,
@@ -619,7 +619,7 @@ mod excess_spread_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -629,7 +629,7 @@ mod excess_spread_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -665,7 +665,7 @@ mod excess_spread_tests {
     fn trap_retains_spread_and_reduces_equity() {
         let baseline = equity_cash(&deal(None));
         let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD),
+            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
             trap_loss_pct: Some(0.01),
         })));
         assert!(
@@ -682,11 +682,11 @@ mod excess_spread_tests {
         // released case must leave equity strictly better off than the trapped
         // case (by roughly the retained account balance).
         let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD),
+            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
             trap_loss_pct: Some(0.01),
         })));
         let released = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD),
+            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
             trap_loss_pct: None,
         })));
         assert!(
@@ -758,7 +758,7 @@ mod excess_spread_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -769,7 +769,7 @@ mod excess_spread_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Floating(floating_senior_spec()),
                 maturity(),
             )
@@ -779,7 +779,7 @@ mod excess_spread_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -796,7 +796,8 @@ mod excess_spread_tests {
             sc.waterfall_rules = Some(WaterfallRules {
                 afc: None,
                 excess_spread: Some(ExcessSpreadSpec {
-                    target_balance: Money::new(1_000_000.0, Currency::USD),
+                    target_balance: Money::new(1_000_000.0, Currency::USD)
+                        .expect("valid money fixture"),
                     trap_loss_pct: None,
                 }),
                 step_down: None,
@@ -891,7 +892,7 @@ mod step_down_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -902,7 +903,7 @@ mod step_down_tests {
                 0.0,
                 70.0,
                 TrancheSeniority::Senior,
-                Money::new(700_000.0, Currency::USD),
+                Money::new(700_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -912,7 +913,7 @@ mod step_down_tests {
                 70.0,
                 90.0,
                 TrancheSeniority::Mezzanine,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -922,7 +923,7 @@ mod step_down_tests {
                 90.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(100_000.0, Currency::USD),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -1135,7 +1136,7 @@ mod shifting_interest_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -1146,7 +1147,7 @@ mod shifting_interest_tests {
                 0.0,
                 70.0,
                 TrancheSeniority::Senior,
-                Money::new(700_000.0, Currency::USD),
+                Money::new(700_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -1156,7 +1157,7 @@ mod shifting_interest_tests {
                 70.0,
                 90.0,
                 TrancheSeniority::Mezzanine,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -1166,7 +1167,7 @@ mod shifting_interest_tests {
                 90.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(100_000.0, Currency::USD),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -1237,7 +1238,7 @@ mod shifting_interest_tests {
         pool.assets.push(PoolAsset {
             id: InstrumentId::new("M1"),
             asset_type: AssetType::SingleFamilyMortgage { ltv: Some(0.8) },
-            balance: Money::new(1_000_000.0, Currency::USD),
+            balance: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.06,
             spread_bp: None,
             index_id: None,
@@ -1260,7 +1261,7 @@ mod shifting_interest_tests {
                 0.0,
                 70.0,
                 TrancheSeniority::Senior,
-                Money::new(700_000.0, Currency::USD),
+                Money::new(700_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -1270,7 +1271,7 @@ mod shifting_interest_tests {
                 70.0,
                 90.0,
                 TrancheSeniority::Mezzanine,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -1280,7 +1281,7 @@ mod shifting_interest_tests {
                 90.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(100_000.0, Currency::USD),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -1338,7 +1339,7 @@ mod shifting_interest_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -1349,7 +1350,7 @@ mod shifting_interest_tests {
                 0.0,
                 60.0,
                 TrancheSeniority::Senior,
-                Money::new(600_000.0, Currency::USD),
+                Money::new(600_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -1359,7 +1360,7 @@ mod shifting_interest_tests {
                 60.0,
                 80.0,
                 TrancheSeniority::Mezzanine,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -1369,7 +1370,7 @@ mod shifting_interest_tests {
                 80.0,
                 90.0,
                 TrancheSeniority::Subordinated,
-                Money::new(100_000.0, Currency::USD),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.06 },
                 maturity(),
             )
@@ -1379,7 +1380,7 @@ mod shifting_interest_tests {
                 90.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(100_000.0, Currency::USD),
+                Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -1483,7 +1484,7 @@ mod early_amortization_tests {
         let mut pool = AssetPool::new("POOL", DealType::Card, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.10,
             maturity(),
             DayCount::Thirty360,
@@ -1499,7 +1500,7 @@ mod early_amortization_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -1509,7 +1510,7 @@ mod early_amortization_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -1610,7 +1611,7 @@ mod controlled_accumulation_tests {
         let mut pool = AssetPool::new("POOL", DealType::Card, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.10,
             maturity(),
             DayCount::Thirty360,
@@ -1621,7 +1622,7 @@ mod controlled_accumulation_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.04 },
                 maturity(),
             )
@@ -1631,7 +1632,7 @@ mod controlled_accumulation_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )

@@ -103,9 +103,12 @@ pub struct CreditEnhancement {
 impl Default for CreditEnhancement {
     fn default() -> Self {
         Self {
-            subordination: Money::new(0.0, finstack_quant_core::currency::Currency::USD),
-            overcollateralization: Money::new(0.0, finstack_quant_core::currency::Currency::USD),
-            reserve_account: Money::new(0.0, finstack_quant_core::currency::Currency::USD),
+            subordination: Money::from((0_i64, finstack_quant_core::currency::Currency::USD)),
+            overcollateralization: Money::from((
+                0_i64,
+                finstack_quant_core::currency::Currency::USD,
+            )),
+            reserve_account: Money::from((0_i64, finstack_quant_core::currency::Currency::USD)),
             excess_spread: 0.0,
             cash_trap_active: false,
         }
@@ -352,7 +355,7 @@ impl Tranche {
             credit_enhancement: CreditEnhancement::default(),
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
-            deferred_interest: Money::new(0.0, original_balance.currency()),
+            deferred_interest: Money::from((0_i64, original_balance.currency())),
             pik_enabled: false,
             is_revolving: false,
             can_reinvest: false,
@@ -413,7 +416,7 @@ impl Tranche {
     pub fn loss_allocation(&self, cumulative_loss_pct: f64) -> Money {
         if cumulative_loss_pct <= self.attachment_point {
             // Losses have not reached this tranche's subordination
-            Money::new(0.0, self.original_balance.currency())
+            Money::from((0_i64, self.original_balance.currency()))
         } else if cumulative_loss_pct >= self.detachment_point {
             // Tranche fully impaired — written down to zero
             self.original_balance
@@ -433,7 +436,10 @@ impl Tranche {
     ///
     /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
     ///   performing pool balance, in `[0, 100]` (for example, `12.0` means 12%).
-    pub fn current_balance_after_losses(&self, cumulative_loss_pct: f64) -> Money {
+    pub fn current_balance_after_losses(
+        &self,
+        cumulative_loss_pct: f64,
+    ) -> finstack_quant_core::Result<Money> {
         let loss_amount = self.loss_allocation(cumulative_loss_pct);
         Money::new(
             (self.current_balance.amount() - loss_amount.amount()).max(0.0),
@@ -689,7 +695,7 @@ impl TrancheStructure {
         Self::assign_priorities(&mut tranches);
 
         let total_size = tranches.iter().try_fold(
-            Money::new(0.0, tranches[0].original_balance.currency()),
+            Money::from((0_i64, tranches[0].original_balance.currency())),
             |acc, t| acc.checked_add(t.original_balance),
         )?;
 
@@ -852,10 +858,11 @@ impl TrancheStructure {
     pub fn senior_balance(&self, tranche_id: &str) -> Money {
         self.senior_to(tranche_id)
             .iter()
-            .try_fold(Money::new(0.0, self.total_size.currency()), |acc, t| {
-                acc.checked_add(t.current_balance)
-            })
-            .unwrap_or_else(|_| Money::new(0.0, self.total_size.currency()))
+            .try_fold(
+                Money::from((0_i64, self.total_size.currency())),
+                |acc, t| acc.checked_add(t.current_balance),
+            )
+            .unwrap_or_else(|_| Money::from((0_i64, self.total_size.currency())))
     }
 
     /// Calculate tranche subordination amount
@@ -866,12 +873,13 @@ impl TrancheStructure {
             self.tranches
                 .iter()
                 .filter(|t| t.payment_priority > target.payment_priority)
-                .try_fold(Money::new(0.0, self.total_size.currency()), |acc, t| {
-                    acc.checked_add(t.current_balance)
-                })
-                .unwrap_or_else(|_| Money::new(0.0, self.total_size.currency()))
+                .try_fold(
+                    Money::from((0_i64, self.total_size.currency())),
+                    |acc, t| acc.checked_add(t.current_balance),
+                )
+                .unwrap_or_else(|_| Money::from((0_i64, self.total_size.currency())))
         } else {
-            Money::new(0.0, self.total_size.currency())
+            Money::from((0_i64, self.total_size.currency()))
         }
     }
 }
@@ -893,7 +901,7 @@ mod tests {
             0.0,
             10.0,
             TrancheSeniority::Equity,
-            Money::new(100_000_000.0, Currency::USD),
+            Money::from((100_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.12 },
             test_date(),
         )
@@ -912,7 +920,7 @@ mod tests {
             10.0,
             15.0,
             TrancheSeniority::Mezzanine,
-            Money::new(50_000_000.0, Currency::USD),
+            Money::from((50_000_000_i64, Currency::USD)),
             TrancheCoupon::Fixed { rate: 0.08 },
             test_date(),
         )
@@ -938,7 +946,7 @@ mod tests {
             .id("EQUITY")
             .attachment_detachment(0.0, 10.0)
             .seniority(TrancheSeniority::Equity)
-            .balance(Money::new(100_000_000.0, Currency::USD))
+            .balance(Money::from((100_000_000_i64, Currency::USD)))
             .coupon(TrancheCoupon::Fixed { rate: 0.12 })
             .maturity(test_date())
             .build()
@@ -948,7 +956,7 @@ mod tests {
             .id("SENIOR")
             .attachment_detachment(10.0, 100.0)
             .seniority(TrancheSeniority::Senior)
-            .balance(Money::new(900_000_000.0, Currency::USD))
+            .balance(Money::from((900_000_000_i64, Currency::USD)))
             .coupon(TrancheCoupon::Floating(
                 crate::cashflow::builder::FloatingRateSpec {
                     index_id: CurveId::new("SOFR-3M".to_string()),

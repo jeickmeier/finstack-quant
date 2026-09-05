@@ -62,7 +62,7 @@ fn sofr_ois_versus_sofr_3m_prices() {
     let as_of = d(2025, 1, 2);
     let swap = BasisSwap::new(
         "SOFR-OIS-3M",
-        Money::new(10_000_000.0, USD),
+        Money::new(10_000_000.0, USD).expect("valid money fixture"),
         term_leg(
             "USD-SOFR-OIS",
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },

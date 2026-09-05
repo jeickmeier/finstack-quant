@@ -392,10 +392,7 @@ impl CmsReplicationPricer {
             total_pv += period_pv * accrual_fraction;
         }
 
-        Ok(Money::new(
-            total_pv * inst.notional.amount(),
-            inst.notional.currency(),
-        ))
+        Money::new(total_pv * inst.notional.amount(), inst.notional.currency())
     }
 }
 

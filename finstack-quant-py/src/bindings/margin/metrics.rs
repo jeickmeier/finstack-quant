@@ -19,7 +19,7 @@ fn money(amount: f64, currency: &str) -> PyResult<Money> {
             "amount must be finite, got {amount}"
         )));
     }
-    Money::try_new(amount, ccy).map_err(core_to_py)
+    Money::new(amount, ccy).map_err(core_to_py)
 }
 
 /// Margin utilization result (ratio of posted to required margin).
@@ -93,8 +93,8 @@ impl PyMarginUtilization {
     }
 
     /// Shortfall amount (zero when adequate).
-    fn shortfall(&self) -> f64 {
-        self.inner.shortfall().amount()
+    fn shortfall(&self) -> PyResult<f64> {
+        Ok(self.inner.shortfall().map_err(core_to_py)?.amount())
     }
 
     /// Export the result as a single-row pandas ``DataFrame``.
@@ -111,7 +111,10 @@ impl PyMarginUtilization {
         data.set_item("posted", vec![self.inner.posted.amount()])?;
         data.set_item("required", vec![self.inner.required.amount()])?;
         data.set_item("ratio", vec![self.inner.ratio])?;
-        data.set_item("shortfall", vec![self.inner.shortfall().amount()])?;
+        data.set_item(
+            "shortfall",
+            vec![self.inner.shortfall().map_err(core_to_py)?.amount()],
+        )?;
         data.set_item("is_adequate", vec![self.inner.is_adequate()])?;
         data.set_item("currency", vec![self.inner.posted.currency().to_string()])?;
         dict_to_dataframe(py, &data, None)

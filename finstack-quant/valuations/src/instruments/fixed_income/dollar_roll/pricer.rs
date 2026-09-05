@@ -36,7 +36,7 @@ pub(crate) fn price_dollar_roll(
     //   roll_value = back_value - front_value
     let value = back_value.amount() - front_value.amount();
 
-    Ok(Money::new(value, roll.notional.currency()))
+    Money::new(value, roll.notional.currency())
 }
 
 #[cfg(test)]

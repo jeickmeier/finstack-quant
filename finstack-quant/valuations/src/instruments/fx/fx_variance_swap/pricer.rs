@@ -24,7 +24,7 @@ pub(crate) fn compute_pv(
     inst.validate()?;
     let settlement_date = inst.effective_settlement_date()?;
     if as_of > settlement_date {
-        return Ok(Money::new(0.0, inst.notional.currency()));
+        return Ok(Money::from((0_i64, inst.notional.currency())));
     }
     inst.validate_as_of(context, as_of)?;
 
@@ -39,7 +39,7 @@ pub(crate) fn compute_pv(
             let (open, high, low, close) =
                 get_historical_ohlc_with_dates(inst, context, as_of, &obs_dates)?;
             if close.is_empty() {
-                return Ok(Money::new(0.0, inst.notional.currency()));
+                return Ok(Money::from((0_i64, inst.notional.currency())));
             }
             finstack_quant_core::math::stats::realized_variance_ohlc(
                 &open,
@@ -52,7 +52,7 @@ pub(crate) fn compute_pv(
         } else {
             let prices = get_historical_prices_with_dates(inst, context, as_of, &obs_dates)?;
             if prices.is_empty() {
-                return Ok(Money::new(0.0, inst.notional.currency()));
+                return Ok(Money::from((0_i64, inst.notional.currency())));
             }
             realized_variance(
                 &prices,
@@ -61,12 +61,12 @@ pub(crate) fn compute_pv(
             )?
         };
         let df = dom.df_between_dates(as_of, settlement_date)?;
-        return Ok(inst.payoff(realized_var) * df);
+        return Ok(inst.payoff(realized_var)? * df);
     }
 
     if as_of < inst.start_date {
         let forward_var = remaining_forward_variance(inst, context, as_of)?;
-        let undiscounted = inst.payoff(forward_var);
+        let undiscounted = inst.payoff(forward_var)?;
         // Date-based discounting: `df_between_dates` resolves the year fraction
         // on the curve's own time axis. Feeding `df()` an instrument-day-count
         // year fraction mis-discounts whenever the instrument and curve
@@ -76,7 +76,7 @@ pub(crate) fn compute_pv(
     }
 
     let expected_var = seasoned_expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
-    let undiscounted = inst.payoff(expected_var);
+    let undiscounted = inst.payoff(expected_var)?;
     // Date-based discounting (see the pre-start branch above): `df_between_dates`
     // resolves the year fraction on the curve's own time axis.
     let df = dom.df_between_dates(as_of, settlement_date)?;
@@ -508,7 +508,7 @@ mod tests {
         let mut swap = FxVarianceSwap::example();
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);
-        swap.observation_frequency = Tenor::new(2, TenorUnit::Days);
+        swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");
 
         let dates = observation_dates(&swap).expect("observation schedule");
         assert_eq!(annualization_factor(&swap), 126.0);
@@ -518,7 +518,7 @@ mod tests {
             .iter()
             .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday)));
 
-        swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks);
+        swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 26.0);
     }
 
@@ -544,7 +544,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_id("EURUSD".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -617,7 +617,7 @@ mod tests {
         let df = dom
             .df_between_dates(as_of, swap.maturity)
             .expect("date-based df");
-        let expected_pv = swap.payoff(expected_var) * df;
+        let expected_pv = swap.payoff(expected_var).expect("valid payoff") * df;
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -627,7 +627,7 @@ mod tests {
         );
 
         let count_var = realized * count_w + forward * (1.0 - count_w);
-        let count_pv = swap.payoff(count_var) * df;
+        let count_pv = swap.payoff(count_var).expect("valid payoff") * df;
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "FX seasoned MTM must differ from observation-count weighting"
@@ -727,7 +727,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_id("EURUSD".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -887,7 +887,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_id("EURUSD".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -911,7 +911,7 @@ mod tests {
         let df_correct = dom
             .df_between_dates(as_of, maturity)
             .expect("date-based df");
-        let expected_pv = swap.payoff(forward) * df_correct;
+        let expected_pv = swap.payoff(forward).expect("valid payoff") * df_correct;
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
             "terminal PV must use date-based discounting: pv={} expected={}",

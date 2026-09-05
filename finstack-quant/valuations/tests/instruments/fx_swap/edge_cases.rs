@@ -21,7 +21,7 @@ fn test_zero_notional() {
         .quote_currency(Currency::USD)
         .near_date(dates.near_date)
         .far_date(dates.far_date_1y)
-        .base_notional(Money::new(0.0, Currency::EUR))
+        .base_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id("USD-OIS".into())
         .foreign_discount_curve_id("EUR-OIS".into())
         .build();
@@ -62,7 +62,7 @@ fn test_far_before_near() {
         .quote_currency(Currency::USD)
         .near_date(dates.far_date_1y)
         .far_date(dates.near_date)
-        .base_notional(Money::new(1_000_000.0, Currency::EUR))
+        .base_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id("USD-OIS".into())
         .foreign_discount_curve_id("EUR-OIS".into())
         .build()
@@ -183,7 +183,7 @@ fn test_currency_mismatch_notional() {
         .quote_currency(Currency::USD)
         .near_date(dates.near_date)
         .far_date(dates.far_date_1y)
-        .base_notional(Money::new(1_000_000.0, Currency::GBP)) // Wrong currency!
+        .base_notional(Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture")) // Wrong currency!
         .domestic_discount_curve_id("USD-OIS".into())
         .foreign_discount_curve_id("EUR-OIS".into())
         .build()
@@ -287,7 +287,7 @@ fn test_negative_contract_rates() {
         .quote_currency(Currency::USD)
         .near_date(dates.near_date)
         .far_date(dates.far_date_1y)
-        .base_notional(Money::new(1_000_000.0, Currency::EUR))
+        .base_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id("USD-OIS".into())
         .foreign_discount_curve_id("EUR-OIS".into())
         .near_rate(1.10)

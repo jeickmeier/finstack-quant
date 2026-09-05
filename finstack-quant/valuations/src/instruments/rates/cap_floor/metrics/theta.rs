@@ -95,7 +95,7 @@ mod tests {
         let mut option = CapFloor::new(
             "RFR-THETA-FIXING",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.05,
             date!(2024 - 01 - 03),
             date!(2024 - 04 - 03),
@@ -135,7 +135,7 @@ mod tests {
         let option = CapFloor::new(
             "PAID-THETA",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.05,
             date!(2025 - 01 - 02),
             date!(2025 - 04 - 02),
@@ -159,7 +159,7 @@ mod tests {
         let mut option = CapFloor::new(
             "DELAYED-THETA",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.05,
             date!(2025 - 01 - 02),
             date!(2025 - 04 - 02),

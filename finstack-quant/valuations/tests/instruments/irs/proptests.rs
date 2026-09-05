@@ -93,7 +93,7 @@ proptest! {
         // Create two receiver swaps with different fixed rates
         let irs_low = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-LOW"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -129,7 +129,7 @@ proptest! {
 
         let irs_high = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-HIGH"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -195,7 +195,7 @@ proptest! {
 
         let payer = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-PAYER"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .side(PayReceive::Pay)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -231,7 +231,7 @@ proptest! {
 
         let receiver = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-RECEIVER"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -324,7 +324,7 @@ proptest! {
 
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-EXTREME"))
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .side(PayReceive::Pay)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),

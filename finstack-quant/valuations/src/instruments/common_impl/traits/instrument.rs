@@ -36,8 +36,8 @@ use super::pricing_options::PricingOptions;
 /// # let maturity = create_date(2030, Month::January, 15)?;
 /// let bond = Bond::fixed(
 ///     "BOND-001",
-///     Money::new(1_000_000.0, Currency::USD),
-///     Rate::from_percent(5.0),
+///     Money::from((1_000_000_i64, Currency::USD)),
+///     Rate::from_percent(5.0).expect("valid rate fixture"),
 ///     issue,
 ///     maturity,
 ///     finstack_quant_core::dates::StubKind::None,
@@ -77,8 +77,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # let maturity = create_date(2030, Month::January, 15)?;
     /// let bond = Bond::fixed(
     ///     "US-TREASURY-5Y-001",
-    ///     Money::new(1_000_000.0, Currency::USD),
-    ///     Rate::from_percent(5.0),
+    ///     Money::from((1_000_000_i64, Currency::USD)),
+    ///     Rate::from_percent(5.0).expect("valid rate fixture"),
     ///     issue,
     ///     maturity,
     ///     finstack_quant_core::dates::StubKind::None,
@@ -116,8 +116,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let issue = create_date(2025, Month::January, 15)?;
     /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::new(1_000_000.0, Currency::USD),
-    ///     Rate::from_percent(5.0), issue, maturity,
+    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
+    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
     ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
     ///
     /// assert_eq!(bond.key(), InstrumentType::Bond);
@@ -149,8 +149,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let issue = create_date(2025, Month::January, 15)?;
     /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::new(1_000_000.0, Currency::USD),
-    ///     Rate::from_percent(5.0), issue, maturity,
+    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
+    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
     ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
     ///
     /// let instrument: &dyn Instrument = &bond;
@@ -339,8 +339,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let issue = create_date(2025, Month::January, 15)?;
     /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::new(1_000_000.0, Currency::USD),
-    ///     Rate::from_percent(5.0), issue, maturity,
+    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
+    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
     ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
     ///
     /// let instrument: Box<dyn Instrument> = Box::new(bond);
@@ -450,8 +450,8 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let issue = create_date(2025, Month::January, 15)?;
     /// # let maturity = create_date(2030, Month::January, 15)?;
-    /// let bond = Bond::fixed("BOND-001", Money::new(1_000_000.0, Currency::USD),
-    ///     Rate::from_percent(5.0), issue, maturity,
+    /// let bond = Bond::fixed("BOND-001", Money::from((1_000_000_i64, Currency::USD)),
+    ///     Rate::from_percent(5.0).expect("valid rate fixture"), issue, maturity,
     ///     finstack_quant_core::dates::StubKind::None, "USD-OIS")?;
     ///
     /// let market = MarketContext::new();
@@ -538,7 +538,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
         let effective_as_of = lifecycle.effective_as_of(market, as_of);
         let base = self.base_value(market, effective_as_of)?;
-        Ok(lifecycle.apply_value(base))
+        lifecycle.apply_value(base)
     }
 
     /// Compute the base present value as raw f64, before scenario adjustments.

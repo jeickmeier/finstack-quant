@@ -21,7 +21,7 @@ fn test_par_loan_pricing() {
     let loan = TermLoan::builder()
         .id("TL-PAR".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
@@ -60,7 +60,7 @@ fn test_discount_pricing() {
     let loan = TermLoan::builder()
         .id("TL-DISCOUNT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 300 }) // 3%
@@ -100,7 +100,7 @@ fn test_premium_pricing() {
     let loan = TermLoan::builder()
         .id("TL-PREMIUM".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 700 }) // 7%
@@ -139,5 +139,8 @@ fn expired_term_loan_prices_at_zero_without_market_history() {
     let value = loan
         .value(&MarketContext::new(), date!(2030 - 01 - 01))
         .expect("expired loan should price without curves or historical fixings");
-    assert_eq!(value, Money::new(0.0, Currency::USD));
+    assert_eq!(
+        value,
+        Money::new(0.0, Currency::USD).expect("valid money fixture")
+    );
 }

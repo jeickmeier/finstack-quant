@@ -246,8 +246,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let mut bond = Bond::fixed(
             "CVX-NEAR-ZERO",
-            Money::new(1e-12, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(1e-12, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,

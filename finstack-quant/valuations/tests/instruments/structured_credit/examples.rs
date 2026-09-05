@@ -39,7 +39,8 @@ mod tests {
 
         // Step 3: Customize as needed for this specific deal
         let mut custom_config = config;
-        custom_config.fees.trustee_fee_annual = Money::new(75_000.0, Currency::USD); // Higher fee
+        custom_config.fees.trustee_fee_annual =
+            Money::new(75_000.0, Currency::USD).expect("valid money fixture"); // Higher fee
         custom_config.fees.senior_mgmt_fee_bp = 35.0; // 35bps instead of default 40bps
         custom_config.default_assumptions.base_cdr_annual = 0.025; // 2.5% CDR assumption
 
@@ -83,7 +84,7 @@ mod tests {
         // Create floating rate loans with explicit spreads
         let loan1 = PoolAsset::floating_rate_loan(
             "LOAN001",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             425.0, // SOFR + 425bps
             maturity,
@@ -95,7 +96,7 @@ mod tests {
 
         let loan2 = PoolAsset::floating_rate_loan(
             "LOAN002",
-            Money::new(15_000_000.0, Currency::USD),
+            Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             475.0, // SOFR + 475bps
             maturity,
@@ -108,7 +109,7 @@ mod tests {
         // Create fixed rate bond (no separate spread)
         let bond1 = PoolAsset::fixed_rate_bond(
             "BOND001",
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.09, // 9% fixed
             maturity,
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -152,7 +153,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "ASSET_AAA",
-                Money::new(50_000_000.0, Currency::USD),
+                Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 200.0,
                 maturity,
@@ -164,7 +165,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "ASSET_A",
-                Money::new(100_000_000.0, Currency::USD),
+                Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 350.0,
                 maturity,
@@ -176,7 +177,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "ASSET_BB",
-                Money::new(150_000_000.0, Currency::USD),
+                Money::new(150_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 450.0,
                 maturity,
@@ -188,7 +189,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "ASSET_B",
-                Money::new(200_000_000.0, Currency::USD),
+                Money::new(200_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 550.0,
                 maturity,
@@ -242,19 +243,19 @@ mod tests {
         let cashflows = vec![
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(20_000_000.0, Currency::USD),
+                Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // 1 year
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(30_000_000.0, Currency::USD),
+                Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // 2 years
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(30_000_000.0, Currency::USD),
+                Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // 3 years
             (
                 Date::from_calendar_date(2029, Month::January, 1).unwrap(),
-                Money::new(20_000_000.0, Currency::USD),
+                Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // 4 years
         ];
 
@@ -314,7 +315,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "LOAN_TECH_001",
-                Money::new(15_000_000.0, Currency::USD),
+                Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 425.0,
                 maturity,
@@ -328,7 +329,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "LOAN_HEALTH_001",
-                Money::new(20_000_000.0, Currency::USD),
+                Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 450.0,
                 maturity,
@@ -342,7 +343,7 @@ mod tests {
         pool.assets.push(
             PoolAsset::floating_rate_loan(
                 "LOAN_CONSUMER_001",
-                Money::new(15_000_000.0, Currency::USD),
+                Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
                 "SOFR-3M",
                 500.0,
                 maturity,
@@ -439,23 +440,23 @@ mod tests {
         let amortizing_cashflows = vec![
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(25_000_000.0, Currency::USD),
+                Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // Year 1: 25%
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(30_000_000.0, Currency::USD),
+                Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // Year 2: 30%
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(25_000_000.0, Currency::USD),
+                Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // Year 3: 25%
             (
                 Date::from_calendar_date(2029, Month::January, 1).unwrap(),
-                Money::new(15_000_000.0, Currency::USD),
+                Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // Year 4: 15%
             (
                 Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-                Money::new(5_000_000.0, Currency::USD),
+                Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             ), // Year 5: 5%
         ];
 

@@ -48,16 +48,16 @@ use indexmap::IndexMap;
 /// use time::Month;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let flows = vec![(Date::from_calendar_date(2025, Month::March, 15).expect("date"), Money::new(100.0, Currency::USD))];
+/// let flows = vec![(Date::from_calendar_date(2025, Month::March, 15).expect("date"), Money::from((100_i64, Currency::USD)))];
 /// let periods = vec![Period {
-///     id: PeriodId::quarter(2025, 1),
+///     id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     start: Date::from_calendar_date(2025, Month::January, 1).expect("date"),
 ///     end: Date::from_calendar_date(2025, Month::April, 1).expect("date"),
 ///     is_actual: true,
 /// }];
 /// let agg: PeriodAggregation = aggregate_by_period(&flows, &periods)?;
 /// assert_eq!(agg.rows().len(), 1);
-/// assert!(agg.contains_key(&PeriodId::quarter(2025, 1)));
+/// assert!(agg.contains_key(&PeriodId::quarter(2025, 1).expect("valid period fixture")));
 /// # Ok(())
 /// # }
 /// ```
@@ -240,7 +240,7 @@ fn aggregate_by_period_sorted(
         for (&ccy, acc) in &per_currency {
             // try_new errors loudly on non-finite or Decimal-overflow totals
             // instead of panicking inside Money::new (same policy as PV paths).
-            result.insert(ccy, Money::try_new(acc.total(), ccy)?);
+            result.insert(ccy, Money::new(acc.total(), ccy)?);
         }
         out.insert(p.id, result);
     }
@@ -291,17 +291,17 @@ fn aggregate_by_period_sorted(
 ///
 /// let flows = vec![(
 ///     Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-///     Money::new(100.0, Currency::USD),
+///     Money::from((100_i64, Currency::USD)),
 /// )];
 /// let periods = vec![Period {
-///     id: PeriodId::quarter(2025, 1),
+///     id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     start: Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
 ///     end: Date::from_calendar_date(2025, Month::April, 1).expect("valid date"),
 ///     is_actual: true,
 /// }];
 ///
 /// let aggregated = aggregate_by_period(&flows, &periods)?;
-/// assert!(aggregated.contains_key(&PeriodId::quarter(2025, 1)));
+/// assert!(aggregated.contains_key(&PeriodId::quarter(2025, 1).expect("valid period fixture")));
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn aggregate_by_period(
@@ -354,7 +354,7 @@ use finstack_quant_core::market_data::traits::{Discounting, Survival};
 ///
 /// let flows = vec![(
 ///     Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
-///     Money::new(25.0, Currency::USD),
+///     Money::from((25_i64, Currency::USD)),
 /// )];
 ///
 /// let total =
@@ -375,7 +375,7 @@ pub fn aggregate_cashflows_checked(
         }
         acc.add(m.amount());
     }
-    Ok(Money::new(acc.total(), target))
+    Money::new(acc.total(), target)
 }
 
 /// Shared implementation for PV aggregation across plain and credit-adjusted variants.
@@ -426,7 +426,7 @@ where
 
         result_buf.clear();
         for (&ccy, acc) in &per_currency {
-            result_buf.insert(ccy, Money::try_new(acc.total(), ccy)?);
+            result_buf.insert(ccy, Money::new(acc.total(), ccy)?);
         }
         out.insert(p.id, result_buf.clone());
     }
@@ -465,7 +465,7 @@ fn pv_by_period_precomputed(
         if !per_currency.is_empty() {
             result_buf.clear();
             for (&ccy, acc) in &per_currency {
-                result_buf.insert(ccy, Money::try_new(acc.total(), ccy)?);
+                result_buf.insert(ccy, Money::new(acc.total(), ccy)?);
             }
             out.insert(p.id, result_buf.clone());
         }
@@ -1290,10 +1290,18 @@ mod period_contract_tests {
 
     #[test]
     fn aggregate_by_period_rejects_unsorted_periods() {
-        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let flows = vec![(d(2025, 3, 15), Money::from((100_i64, Currency::USD)))];
         let periods = vec![
-            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
-            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
+            period(
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                d(2025, 4, 1),
+                d(2025, 7, 1),
+            ),
+            period(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                d(2025, 1, 1),
+                d(2025, 4, 1),
+            ),
         ];
         let err = aggregate_by_period(&flows, &periods).expect_err("unsorted periods rejected");
         assert!(format!("{err}").contains("sorted"), "got: {err}");
@@ -1301,10 +1309,18 @@ mod period_contract_tests {
 
     #[test]
     fn aggregate_by_period_rejects_overlapping_periods() {
-        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let flows = vec![(d(2025, 3, 15), Money::from((100_i64, Currency::USD)))];
         let periods = vec![
-            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 5, 1)),
-            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
+            period(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                d(2025, 1, 1),
+                d(2025, 5, 1),
+            ),
+            period(
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                d(2025, 4, 1),
+                d(2025, 7, 1),
+            ),
         ];
         let err = aggregate_by_period(&flows, &periods).expect_err("overlapping periods rejected");
         assert!(format!("{err}").contains("non-overlapping"), "got: {err}");
@@ -1312,10 +1328,18 @@ mod period_contract_tests {
 
     #[test]
     fn aggregate_by_period_rejects_duplicate_period_ids() {
-        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let flows = vec![(d(2025, 3, 15), Money::from((100_i64, Currency::USD)))];
         let periods = vec![
-            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
-            period(PeriodId::quarter(2025, 1), d(2025, 4, 1), d(2025, 7, 1)),
+            period(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                d(2025, 1, 1),
+                d(2025, 4, 1),
+            ),
+            period(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                d(2025, 4, 1),
+                d(2025, 7, 1),
+            ),
         ];
         let err = aggregate_by_period(&flows, &periods).expect_err("duplicate ids rejected");
         assert!(format!("{err}").contains("duplicate"), "got: {err}");
@@ -1326,18 +1350,20 @@ mod period_contract_tests {
         // Two currencies through aggregate_by_period: per-currency map outputs
         // are separate and no cross-currency summation occurs.
         let flows = vec![
-            (d(2025, 2, 1), Money::new(100.0, Currency::USD)),
-            (d(2025, 2, 15), Money::new(70.0, Currency::EUR)),
-            (d(2025, 3, 1), Money::new(50.0, Currency::USD)),
+            (d(2025, 2, 1), Money::from((100_i64, Currency::USD))),
+            (d(2025, 2, 15), Money::from((70_i64, Currency::EUR))),
+            (d(2025, 3, 1), Money::from((50_i64, Currency::USD))),
         ];
         let periods = vec![period(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             d(2025, 1, 1),
             d(2025, 4, 1),
         )];
 
         let out = aggregate_by_period(&flows, &periods).expect("aggregation succeeds");
-        let q1 = out.get(&PeriodId::quarter(2025, 1)).expect("Q1 present");
+        let q1 = out
+            .get(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
+            .expect("Q1 present");
         assert_eq!(q1.len(), 2, "one entry per currency");
         assert!((q1[&Currency::USD].amount() - 150.0).abs() < 1e-12);
         assert!((q1[&Currency::EUR].amount() - 70.0).abs() < 1e-12);
@@ -1350,15 +1376,29 @@ mod period_contract_tests {
         // A flow exactly on a period boundary belongs to the NEXT period
         // (half-open [start, end) convention).
         let boundary = d(2025, 4, 1);
-        let flows = vec![(boundary, Money::new(100.0, Currency::USD))];
+        let flows = vec![(boundary, Money::from((100_i64, Currency::USD)))];
         let periods = vec![
-            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
-            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
+            period(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                d(2025, 1, 1),
+                d(2025, 4, 1),
+            ),
+            period(
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                d(2025, 4, 1),
+                d(2025, 7, 1),
+            ),
         ];
 
         let out = aggregate_by_period(&flows, &periods).expect("aggregation succeeds");
-        assert!(!out.contains_key(&PeriodId::quarter(2025, 1)));
-        assert!((out[&PeriodId::quarter(2025, 2)][&Currency::USD].amount() - 100.0).abs() < 1e-12);
+        assert!(!out.contains_key(&PeriodId::quarter(2025, 1).expect("valid period fixture")));
+        assert!(
+            (out[&PeriodId::quarter(2025, 2).expect("valid period fixture")][&Currency::USD]
+                .amount()
+                - 100.0)
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]
@@ -1367,7 +1407,7 @@ mod period_contract_tests {
         let flows = vec![CashFlow::new(
             d(2025, 6, 1),
             None,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             CFKind::Fixed,
             0.5,
             None,
@@ -1397,7 +1437,7 @@ mod period_contract_tests {
             CashFlow::new(
                 d(2025, 2, 1),
                 None,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
@@ -1405,7 +1445,7 @@ mod period_contract_tests {
             CashFlow::new(
                 base,
                 None,
-                Money::new(50.0, Currency::USD),
+                Money::from((50_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
@@ -1413,7 +1453,7 @@ mod period_contract_tests {
             CashFlow::new(
                 d(2025, 6, 1),
                 None,
-                Money::new(200.0, Currency::USD),
+                Money::from((200_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
@@ -1492,7 +1532,7 @@ mod credit_pv_tests {
 
     fn make_period(base: Date, end: Date) -> Period {
         Period {
-            id: PeriodId::quarter(base.year(), 1),
+            id: PeriodId::quarter(base.year(), 1).expect("valid period fixture"),
             start: base,
             end,
             is_actual: false,
@@ -1503,7 +1543,7 @@ mod credit_pv_tests {
         CashFlow::new(
             date,
             None,
-            Money::new(amount, Currency::USD),
+            Money::new(amount, Currency::USD).expect("valid money fixture"),
             kind,
             0.0,
             None,
@@ -1550,7 +1590,8 @@ mod credit_pv_tests {
         )
         .expect("integrated timing prices");
 
-        let pv = out[&PeriodId::quarter(2025, 1)][&Currency::USD].amount();
+        let pv = out[&PeriodId::quarter(2025, 1).expect("valid period fixture")][&Currency::USD]
+            .amount();
         let expected = 50_000.0 * 0.95;
         assert!(
             (pv - expected).abs() < 1e-9,
@@ -1579,7 +1620,8 @@ mod credit_pv_tests {
         )
         .expect("payment-date timing prices");
 
-        let pv = out[&PeriodId::quarter(2025, 1)][&Currency::USD].amount();
+        let pv = out[&PeriodId::quarter(2025, 1).expect("valid period fixture")][&Currency::USD]
+            .amount();
         let expected = 100_000.0 * (0.95 + 0.40 * 0.05);
         assert!(
             (pv - expected).abs() < 1e-9,
@@ -1612,7 +1654,8 @@ mod credit_pv_tests {
         )
         .expect("negative draws must not corrupt integrated recovery");
 
-        let pv = out[&PeriodId::quarter(2025, 1)][&Currency::USD].amount();
+        let pv = out[&PeriodId::quarter(2025, 1).expect("valid period fixture")][&Currency::USD]
+            .amount();
         let t1 = 151.0 / 365.0; // 2025-01-01 → 2025-06-01
         let t2 = 334.0 / 365.0; // 2025-01-01 → 2025-12-01
         let sp1 = 1.0 - 0.1 * t1;
@@ -1633,8 +1676,14 @@ mod credit_pv_tests {
         let base = d(2025, 1, 1);
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let flows: Vec<crate::DatedFlow> = vec![
-            (d(2025, 3, 1), Money::new(7.0e28, Currency::USD)),
-            (d(2025, 6, 1), Money::new(7.0e28, Currency::USD)),
+            (
+                d(2025, 3, 1),
+                Money::new(7.0e28, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                d(2025, 6, 1),
+                Money::new(7.0e28, Currency::USD).expect("valid money fixture"),
+            ),
         ];
 
         let res = aggregate_by_period(&flows, &periods);
@@ -1648,7 +1697,7 @@ mod credit_pv_tests {
             CashFlow::new(
                 d(2025, 6, 1),
                 None,
-                Money::new(100_000.0, Currency::USD),
+                Money::from((100_000_i64, Currency::USD)),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -1656,7 +1705,7 @@ mod credit_pv_tests {
             CashFlow::new(
                 d(2025, 12, 1),
                 None,
-                Money::new(900_000.0, Currency::USD),
+                Money::from((900_000_i64, Currency::USD)),
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -1695,7 +1744,7 @@ mod credit_pv_tests {
             CashFlow::new(
                 d(2025, 6, 1),
                 None,
-                Money::new(100_000.0, Currency::USD),
+                Money::from((100_000_i64, Currency::USD)),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -1703,7 +1752,7 @@ mod credit_pv_tests {
             CashFlow::new(
                 d(2025, 12, 1),
                 None,
-                Money::new(900_000.0, Currency::USD),
+                Money::from((900_000_i64, Currency::USD)),
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -2002,7 +2051,7 @@ mod credit_pv_tests {
     fn recovery_timing_integrated_uses_matching_pv_after_skipped_flows() {
         let base = d(2025, 1, 1);
         let periods = vec![Period {
-            id: PeriodId::quarter(2025, 3),
+            id: PeriodId::quarter(2025, 3).expect("valid period fixture"),
             start: d(2025, 7, 1),
             end: d(2026, 1, 1),
             is_actual: false,

@@ -148,8 +148,8 @@ fn make_model() -> CreditFactorModel {
 fn build_bond_with_issuer() -> Bond {
     let mut bond = Bond::fixed(
         "BOND-ISSUER-A",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05_f64),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05_f64).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -573,18 +573,22 @@ fn bare_money_carry_detail_is_rejected() {
     use finstack_quant_core::dates::create_date;
 
     let mut attr = PnlAttribution::new(
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         "STRICT-SOURCE-LINE",
         create_date(2025, time::Month::January, 1).unwrap(),
         create_date(2025, time::Month::January, 2).unwrap(),
         AttributionMethod::Parallel,
     );
-    attr.carry = Money::new(30.0, Currency::USD);
+    attr.carry = Money::new(30.0, Currency::USD).expect("valid money fixture");
     attr.carry_detail = Some(CarryDetail {
-        total: Money::new(30.0, Currency::USD),
-        coupon_income: Some(SourceLine::scalar(Money::new(25.0, Currency::USD))),
+        total: Money::new(30.0, Currency::USD).expect("valid money fixture"),
+        coupon_income: Some(SourceLine::scalar(
+            Money::new(25.0, Currency::USD).expect("valid money fixture"),
+        )),
         pull_to_par: None,
-        roll_down: Some(SourceLine::scalar(Money::new(5.0, Currency::USD))),
+        roll_down: Some(SourceLine::scalar(
+            Money::new(5.0, Currency::USD).expect("valid money fixture"),
+        )),
         funding_cost: None,
     });
 

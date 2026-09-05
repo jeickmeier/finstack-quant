@@ -77,7 +77,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
 
     let swap1 = InflationSwapBuilder::new()
         .id("ZCINF-FL1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -91,7 +91,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
 
     let swap2 = InflationSwapBuilder::new()
         .id("ZCINF-FL2".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -123,7 +123,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
 
     let swap1 = InflationSwapBuilder::new()
         .id("ZCINF-IL1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -137,7 +137,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
 
     let swap2 = InflationSwapBuilder::new()
         .id("ZCINF-IL2".into())
-        .notional(Money::new(5_000_000.0, Currency::USD))
+        .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))

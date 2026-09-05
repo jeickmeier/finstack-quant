@@ -345,10 +345,7 @@ impl AsianOptionMcPricer {
                 crate::instruments::OptionType::Call => (average - inst.strike).max(0.0),
                 crate::instruments::OptionType::Put => (inst.strike - average).max(0.0),
             };
-            return Ok(Money::new(
-                intrinsic * inst.notional.amount(),
-                inst.notional.currency(),
-            ));
+            return Money::new(intrinsic * inst.notional.amount(), inst.notional.currency());
         }
 
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
@@ -573,7 +570,7 @@ impl AsianOptionMcPricer {
                     control_analytical,
                     n,
                 );
-                MoneyEstimate::from_estimate(adj, inst.notional.currency()).mean
+                MoneyEstimate::from_estimate(adj, inst.notional.currency())?.mean
             }
             (
                 crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
@@ -681,7 +678,7 @@ impl AsianOptionMcPricer {
                     control_analytical,
                     n,
                 );
-                MoneyEstimate::from_estimate(adj, inst.notional.currency()).mean
+                MoneyEstimate::from_estimate(adj, inst.notional.currency())?.mean
             }
             // Geometric averaging (no CV needed) or fallback path
             _ => {
@@ -858,7 +855,13 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
                 Money::new(
                     intrinsic * asian.notional.amount(),
                     asian.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(asian),
+                    )
+                })?,
             ));
         }
 
@@ -900,7 +903,14 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        let pv = Money::new(price * asian.notional.amount(), asian.notional.currency());
+        let pv = Money::new(price * asian.notional.amount(), asian.notional.currency()).map_err(
+            |error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(asian),
+                )
+            },
+        )?;
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
 }
@@ -995,7 +1005,13 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 Money::new(
                     intrinsic * asian.notional.amount(),
                     asian.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(asian),
+                    )
+                })?,
             ));
         }
 
@@ -1014,7 +1030,13 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 Money::new(
                     payoff * df_expiry * asian.notional.amount(),
                     asian.notional.currency(),
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(asian),
+                    )
+                })?,
             ));
         }
 
@@ -1142,7 +1164,14 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
             unscaled * scale
         };
 
-        let pv = Money::new(price * asian.notional.amount(), asian.notional.currency());
+        let pv = Money::new(price * asian.notional.amount(), asian.notional.currency()).map_err(
+            |error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(asian),
+                )
+            },
+        )?;
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
 }
@@ -1223,7 +1252,7 @@ mod tests {
             .averaging_method(averaging)
             .expiry(expiry)
             .fixing_dates(fixing_dates)
-            .notional(Money::new(1.0, Currency::USD))
+            .notional(Money::from((1_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -1291,7 +1320,9 @@ mod tests {
         .expect("valid schedule");
         // And it must stay close to the uniform-grid Kemna-Vorst benchmark.
         let kv = geometric_asian_call(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
-        let expected_money = Money::new(expected, Currency::USD).amount();
+        let expected_money = Money::new(expected, Currency::USD)
+            .expect("valid money fixture")
+            .amount();
 
         assert!((pv - expected_money).abs() < 1e-12);
         assert!((pv - kv).abs() < 0.05, "pv {pv} far from Kemna-Vorst {kv}");
@@ -1345,7 +1376,9 @@ mod tests {
         )
         .expect("valid schedule");
         let kv = geometric_asian_put(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
-        let expected_money = Money::new(expected, Currency::USD).amount();
+        let expected_money = Money::new(expected, Currency::USD)
+            .expect("valid money fixture")
+            .amount();
 
         assert!((pv - expected_money).abs() < 1e-12);
         // With only 2 fixings the calendar schedule (≈0.41y, 1y) deviates
@@ -1392,7 +1425,9 @@ mod tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction"));
-        let expected_money = Money::new(payoff * df, Currency::USD).amount();
+        let expected_money = Money::new(payoff * df, Currency::USD)
+            .expect("valid money fixture")
+            .amount();
 
         assert!((pv - expected_money).abs() < 1e-12);
     }
@@ -1603,7 +1638,9 @@ mod tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction"));
-        let expected = Money::new(payoff * df, Currency::USD).amount();
+        let expected = Money::new(payoff * df, Currency::USD)
+            .expect("valid money fixture")
+            .amount();
 
         assert!((pv - expected).abs() < 1e-12);
     }
@@ -1671,6 +1708,7 @@ mod tests {
             (expected_avg - option.strike).max(0.0) * df_expiry,
             Currency::USD,
         )
+        .expect("valid money fixture")
         .amount();
 
         assert!((pv - expected).abs() < 1e-12);
@@ -1729,7 +1767,7 @@ mod tests {
 
         let market = market(as_of, 80.0, 0.20, 0.05, 0.0).insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(125.0, Currency::USD)),
+            MarketScalar::Price(Money::from((125_i64, Currency::USD))),
         );
 
         let err = AsianOptionMcPricer::new()

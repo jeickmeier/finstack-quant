@@ -124,7 +124,7 @@ fn create_equity_market() -> MarketContext {
         .insert_surface(vix_volvol)
         .insert_price(
             "SPX",
-            MarketScalar::Price(Money::new(5000.0, Currency::USD)),
+            MarketScalar::Price(Money::new(5000.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0))
         // TRS tests use `SPX-DIV-YIELD`; variance forward variance uses `SPX-DIVYIELD`.
@@ -141,7 +141,7 @@ fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
     let start = base + time::Duration::days(2);
     let end = start + time::Duration::days(365 * tenor_years as i64);
 
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let underlying = EquityUnderlyingParams::new("SPX-TRS", "SPX-SPOT", notional.currency())
         .with_contract_size(1.0)
         .with_dividend_yield(PriceId::new("SPX-DIV-YIELD"));
@@ -201,7 +201,7 @@ fn variance_swap(months: i64) -> VarianceSwap {
     VarianceSwap::builder()
         .id(InstrumentId::new(format!("VAR-{months}M")))
         .underlying_ticker("SPX".to_string())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .strike_variance(0.04)
         .start_date(start)
         .maturity(maturity)
@@ -300,7 +300,7 @@ fn bench_vol_index_future_pv(c: &mut Criterion) {
         let expiry = as_of + time::Duration::days(months * 30);
         let fut = VolatilityIndexFuture::builder()
             .id(InstrumentId::new(format!("VIX-FUT-{label}")))
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
             .expiry(expiry)
             .settlement_date(expiry)
             .quoted_price(18.5)

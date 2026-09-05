@@ -133,7 +133,8 @@ impl PoolAsset {
                 .instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price
-                .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency())),
+                .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency()))
+                .transpose()?,
             acquisition_date: Some(bond.issue_date),
             day_count,
             smm_override: None,
@@ -167,7 +168,7 @@ impl PoolAsset {
     ///
     /// let asset = PoolAsset::floating_rate_loan(
     ///     "LOAN001",
-    ///     Money::new(10_000_000.0, Currency::USD),
+    ///     Money::from((10_000_000_i64, Currency::USD)),
     ///     "SOFR-3M",
     ///     450.0,  // 450bps spread
     ///     maturity_date,
@@ -503,7 +504,7 @@ impl RepLine {
 impl AssetPool {
     /// Create new asset pool
     pub fn new(id: impl Into<InstrumentId>, deal_type: DealType, base_currency: Currency) -> Self {
-        let zero_money = Money::new(0.0, base_currency);
+        let zero_money = Money::from((0_i64, base_currency));
         Self {
             id: id.into(),
             deal_type,
@@ -536,7 +537,7 @@ impl AssetPool {
     pub fn total_balance(&self) -> finstack_quant_core::Result<Money> {
         self.assets
             .iter()
-            .try_fold(Money::new(0.0, self.base_currency), |acc, asset| {
+            .try_fold(Money::from((0_i64, self.base_currency)), |acc, asset| {
                 self.validate_asset_currency(asset)?;
                 acc.checked_add(asset.balance)
             })
@@ -545,7 +546,7 @@ impl AssetPool {
     /// Total pool balance excluding defaulted assets
     pub fn performing_balance(&self) -> finstack_quant_core::Result<Money> {
         self.assets.iter().filter(|a| !a.is_defaulted).try_fold(
-            Money::new(0.0, self.base_currency),
+            Money::from((0_i64, self.base_currency)),
             |acc, asset| {
                 self.validate_asset_currency(asset)?;
                 acc.checked_add(asset.balance)
@@ -840,7 +841,7 @@ mod market_standards_tests {
         // Asset A: Act365F (Standard) -> 1.0 years
         let asset_a = PoolAsset::fixed_rate_bond(
             "A",
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             0.05,
             maturity,
             DayCount::Act365F,
@@ -849,7 +850,7 @@ mod market_standards_tests {
         // Asset B: Thirty360 -> 1.0 years (360/360)
         let asset_b = PoolAsset::fixed_rate_bond(
             "B",
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             0.05,
             maturity,
             DayCount::Thirty360,

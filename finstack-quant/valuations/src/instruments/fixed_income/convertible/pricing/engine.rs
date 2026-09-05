@@ -296,7 +296,7 @@ fn price_convertible_bond_with_inputs(
     as_of: Date,
 ) -> Result<Money> {
     if as_of > bond.maturity {
-        return Ok(Money::new(0.0, bond.notional.currency()));
+        return Ok(Money::from((0_i64, bond.notional.currency())));
     }
 
     if inputs.time_to_maturity <= 0.0 {
@@ -338,7 +338,7 @@ fn price_convertible_bond_with_inputs(
             redemption_value
         };
 
-        return Ok(Money::new(payoff, bond.notional.currency()));
+        return Money::new(payoff, bond.notional.currency());
     }
 
     let steps = match tree_type {
@@ -370,7 +370,7 @@ fn price_convertible_bond_with_inputs(
 
     let (pv_amount, _) = engine.price(initial_vars, tree_type)?;
 
-    Ok(Money::new(pv_amount, bond.notional.currency()))
+    Money::new(pv_amount, bond.notional.currency())
 }
 
 /// Main pricing function for convertible bonds
@@ -394,7 +394,7 @@ pub fn price_convertible_bond(
     bond.validate_for_pricing()?;
     validate_tree_type(tree_type)?;
     if as_of > bond.maturity {
-        return Ok(Money::new(0.0, bond.notional.currency()));
+        return Ok(Money::from((0_i64, bond.notional.currency())));
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
     price_convertible_bond_with_inputs(bond, market_context, &inputs, tree_type, as_of)
@@ -472,22 +472,22 @@ pub fn calculate_convertible_greeks(
     // ---- Delta & Gamma: bump equity spot (central differences) ----
     let h_spot = bump_pct * inputs.spot;
     if h_spot > 0.0 {
-        let bump_scalar = |amount: f64| -> MarketScalar {
-            match &inputs.spot_scalar {
+        let bump_scalar = |amount: f64| -> finstack_quant_core::Result<MarketScalar> {
+            Ok(match &inputs.spot_scalar {
                 MarketScalar::Price(money) => MarketScalar::Price(
-                    finstack_quant_core::money::Money::new(amount, money.currency()),
+                    finstack_quant_core::money::Money::new(amount, money.currency())?,
                 ),
                 MarketScalar::Unitless(_) => MarketScalar::Unitless(amount),
-            }
+            })
         };
 
         let market_up = market_context.clone().insert_price(
             inputs.resolved_ids.spot_id.as_str(),
-            bump_scalar(inputs.spot + h_spot),
+            bump_scalar(inputs.spot + h_spot)?,
         );
         let market_down = market_context.clone().insert_price(
             inputs.resolved_ids.spot_id.as_str(),
-            bump_scalar(inputs.spot - h_spot),
+            bump_scalar(inputs.spot - h_spot)?,
         );
 
         let price_up = price_convertible_bond(bond, &market_up, tree_type, as_of)?.amount();

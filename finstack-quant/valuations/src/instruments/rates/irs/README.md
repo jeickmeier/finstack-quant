@@ -125,7 +125,7 @@ let end = date!(2029 - 01 - 02);
 
 let swap = InterestRateSwap::builder()
     .id(InstrumentId::new("IRS-5Y-USD"))
-    .notional(Money::new(10_000_000.0, Currency::USD))
+    .notional(Money::new(10_000_000.0, Currency::USD)?)
     .side(PayReceive::Pay)
     .fixed(FixedLegSpec {
         discount_curve_id: CurveId::new("USD-OIS"),

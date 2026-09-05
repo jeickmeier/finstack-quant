@@ -293,27 +293,29 @@ impl Payoff for BarrierOptionPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        if self.is_active() {
-            // Standard vanilla payoff
-            let intrinsic = match self.option_type {
-                OptionKind::Call => (self.terminal_spot - self.strike).max(0.0),
-                OptionKind::Put => (self.strike - self.terminal_spot).max(0.0),
-            };
-            Money::new(intrinsic * self.notional, currency)
-        } else {
-            // Rebate payment. With at-hit timing configured and an actual
-            // hit (knock-out), compound the rebate forward from τ to
-            // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
-            // never touched the barrier has no hit time and pays at expiry.
-            let mut rebate_amount = self.rebate.unwrap_or(0.0);
-            if let Some(rate) = self.rebate_at_hit_rate {
-                if self.barrier_hit {
-                    rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            if self.is_active() {
+                // Standard vanilla payoff
+                let intrinsic = match self.option_type {
+                    OptionKind::Call => (self.terminal_spot - self.strike).max(0.0),
+                    OptionKind::Put => (self.strike - self.terminal_spot).max(0.0),
+                };
+                Money::new(intrinsic * self.notional, currency)?
+            } else {
+                // Rebate payment. With at-hit timing configured and an actual
+                // hit (knock-out), compound the rebate forward from τ to
+                // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
+                // never touched the barrier has no hit time and pays at expiry.
+                let mut rebate_amount = self.rebate.unwrap_or(0.0);
+                if let Some(rate) = self.rebate_at_hit_rate {
+                    if self.barrier_hit {
+                        rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
+                    }
                 }
+                Money::new(rebate_amount * self.notional, currency)?
             }
-            Money::new(rebate_amount * self.notional, currency)
-        }
+        })
     }
 
     fn reset(&mut self) {
@@ -419,7 +421,7 @@ mod tests {
         }
 
         let expected = rebate * (rate * (1.0 - 0.4)).exp();
-        let value = payoff.value(Currency::USD).amount();
+        let value = payoff.value(Currency::USD).expect("valid payoff").amount();
         assert!(
             (value - expected).abs() < 1e-10,
             "at-hit rebate should compound forward: got {value}, expected {expected}"
@@ -447,7 +449,15 @@ mod tests {
                 .on_event(&mut create_path_state(step, step as f64 * 0.1, spot, 0.5))
                 .expect("valid payoff event");
         }
-        assert!((payoff_expiry.value(Currency::USD).amount() - rebate).abs() < 1e-10);
+        assert!(
+            (payoff_expiry
+                .value(Currency::USD)
+                .expect("valid payoff")
+                .amount()
+                - rebate)
+                .abs()
+                < 1e-10
+        );
     }
 
     /// A knock-in that never touches the barrier pays its rebate at expiry
@@ -478,7 +488,9 @@ mod tests {
                 .on_event(&mut create_path_state(step, step as f64 * 0.1, 100.0, 0.5))
                 .expect("valid payoff event");
         }
-        assert!((payoff.value(Currency::USD).amount() - rebate).abs() < 1e-10);
+        assert!(
+            (payoff.value(Currency::USD).expect("valid payoff").amount() - rebate).abs() < 1e-10
+        );
     }
 
     #[test]
@@ -506,7 +518,7 @@ mod tests {
         }
 
         // Should get put payoff (100 - 90 = 10)
-        let value = barrier_put.value(Currency::USD);
+        let value = barrier_put.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 10.0);
     }
 
@@ -535,7 +547,7 @@ mod tests {
         barrier_call.on_event(&mut s3).expect("valid payoff event");
 
         // Should get rebate
-        let value = barrier_call.value(Currency::USD);
+        let value = barrier_call.value(Currency::USD).expect("valid payoff");
         assert_eq!(value.amount(), 5.0);
     }
 
@@ -585,8 +597,8 @@ mod tests {
         feed(&mut p_low);
         feed(&mut p_high);
 
-        let v_low = p_low.value(Currency::USD).amount();
-        let v_high = p_high.value(Currency::USD).amount();
+        let v_low = p_low.value(Currency::USD).expect("valid payoff").amount();
+        let v_high = p_high.value(Currency::USD).expect("valid payoff").amount();
         assert_eq!(
             v_low, v_high,
             "payoff must use sqrt(variance) from PathState when present, \
@@ -637,8 +649,8 @@ mod tests {
         feed(&mut p_low);
         feed(&mut p_high);
 
-        let v_low = p_low.value(Currency::USD).amount();
-        let v_high = p_high.value(Currency::USD).amount();
+        let v_low = p_low.value(Currency::USD).expect("valid payoff").amount();
+        let v_high = p_high.value(Currency::USD).expect("valid payoff").amount();
         // At least one of the two must differ — for a near-barrier path the
         // Gobet-Miri adjustment is very sensitive to sigma, so the payoff
         // should not be identical when the flat sigma is the only input.
@@ -700,7 +712,7 @@ mod tests {
         }
 
         // The option is knocked out: value must be 0 (no rebate).
-        let value = payoff.value(Currency::USD).amount();
+        let value = payoff.value(Currency::USD).expect("valid payoff").amount();
         assert_eq!(
             value, 0.0,
             "a down-and-out path closing below the true barrier must knock \
@@ -739,7 +751,10 @@ mod tests {
             .on_event(&mut observation)
             .expect("contractual observation should be valid");
 
-        assert_eq!(payoff.value(Currency::USD).amount(), 10.0);
+        assert_eq!(
+            payoff.value(Currency::USD).expect("valid payoff").amount(),
+            10.0
+        );
         assert!(!payoff.needs_uniform_random());
     }
 
@@ -766,6 +781,12 @@ mod tests {
         let mut s2 = create_path_state(2, 1.0, 90.0, 0.65);
         barrier_call.on_event(&mut s2).expect("valid payoff event");
 
-        assert_eq!(barrier_call.value(Currency::USD).amount(), 0.0);
+        assert_eq!(
+            barrier_call
+                .value(Currency::USD)
+                .expect("valid payoff")
+                .amount(),
+            0.0
+        );
     }
 }

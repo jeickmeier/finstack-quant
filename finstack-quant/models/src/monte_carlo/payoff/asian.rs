@@ -225,10 +225,12 @@ impl Payoff for AsianCall {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let average = self.compute_average();
-        let intrinsic = (average - self.strike).max(0.0);
-        Money::new(intrinsic * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let average = self.compute_average();
+            let intrinsic = (average - self.strike).max(0.0);
+            Money::new(intrinsic * self.notional, currency)?
+        })
     }
 
     /// The last contracted fixing step: the engine validates that the time
@@ -417,10 +419,12 @@ impl Payoff for AsianPut {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let average = self.compute_average();
-        let intrinsic = (self.strike - average).max(0.0);
-        Money::new(intrinsic * self.notional, currency)
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let average = self.compute_average();
+            let intrinsic = (self.strike - average).max(0.0);
+            Money::new(intrinsic * self.notional, currency)?
+        })
     }
 
     /// The last contracted fixing step: the engine validates that the time
@@ -551,8 +555,14 @@ mod tests {
             }
             assert_eq!(call.num_fixings_seen, 3);
             assert_eq!(put.num_fixings_seen, 3);
-            assert_eq!(call.value(Currency::USD).amount(), 10.0);
-            assert_eq!(put.value(Currency::USD).amount(), 10.0);
+            assert_eq!(
+                call.value(Currency::USD).expect("valid payoff").amount(),
+                10.0
+            );
+            assert_eq!(
+                put.value(Currency::USD).expect("valid payoff").amount(),
+                10.0
+            );
         }
     }
 
@@ -570,7 +580,7 @@ mod tests {
         asian.on_event(&mut s1).expect("valid payoff event");
         asian.on_event(&mut s2).expect("valid payoff event");
 
-        let value = asian.value(Currency::USD);
+        let value = asian.value(Currency::USD).expect("valid payoff");
         // Average = 100, strike = 100, payoff = 0
         assert_eq!(value.amount(), 0.0);
     }
@@ -589,7 +599,7 @@ mod tests {
         let mut s3 = create_state(10, 120.0);
         asian.on_event(&mut s3).expect("valid payoff event");
 
-        let value = asian.value(Currency::USD);
+        let value = asian.value(Currency::USD).expect("valid payoff");
         // max(110 - 100, 0) = 10
         assert_eq!(value.amount(), 10.0);
     }
@@ -608,7 +618,7 @@ mod tests {
         let mut s6 = create_state(10, 125.0);
         asian.on_event(&mut s6).expect("valid payoff event");
 
-        let value = asian.value(Currency::USD);
+        let value = asian.value(Currency::USD).expect("valid payoff");
         let expected_avg = (80.0 * 100.0 * 125.0_f64).powf(1.0 / 3.0);
         let expected_payoff = (expected_avg - 100.0).max(0.0);
         assert!((value.amount() - expected_payoff).abs() < 0.01);
@@ -628,7 +638,7 @@ mod tests {
         let mut s9 = create_state(10, 100.0);
         asian.on_event(&mut s9).expect("valid payoff event");
 
-        let value = asian.value(Currency::USD);
+        let value = asian.value(Currency::USD).expect("valid payoff");
         // max(100 - 95, 0) = 5
         assert_eq!(value.amount(), 5.0);
     }

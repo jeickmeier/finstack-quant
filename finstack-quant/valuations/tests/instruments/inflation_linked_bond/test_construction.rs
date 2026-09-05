@@ -20,7 +20,7 @@ use rust_decimal::Decimal;
 #[test]
 fn test_tips_creation_via_helper() {
     // Arrange
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 15);
     let maturity = d(2030, 1, 15);
 
@@ -51,7 +51,7 @@ fn test_tips_creation_via_helper() {
 #[test]
 fn test_uk_linker_creation_via_helper() {
     // Arrange
-    let notional = Money::new(1_000_000.0, Currency::GBP);
+    let notional = Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture");
     let issue = d(2020, 3, 22);
     let maturity = d(2040, 3, 22);
     let base_date = d(2019, 7, 1);
@@ -215,7 +215,7 @@ fn test_deflation_protection_from_str() {
 #[test]
 fn test_parameter_struct_tips() {
     // Arrange
-    let notional = Money::new(100_000.0, Currency::USD);
+    let notional = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2025, 1, 1);
 
@@ -239,7 +239,7 @@ fn test_parameter_struct_tips() {
 #[test]
 fn test_parameter_struct_uk_linker() {
     // Arrange
-    let notional = Money::new(100_000.0, Currency::GBP);
+    let notional = Money::new(100_000.0, Currency::GBP).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 
@@ -274,7 +274,7 @@ fn test_various_currencies() {
         (Currency::CAD, 140.0),
         (Currency::JPY, 100.0),
     ] {
-        let notional = Money::new(1_000_000.0, ccy);
+        let notional = Money::new(1_000_000.0, ccy).expect("valid money fixture");
         let params = InflationLinkedBondParams::new(
             notional,
             0.01,
@@ -300,7 +300,7 @@ fn test_various_currencies() {
 #[test]
 fn test_various_frequencies() {
     // Arrange
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 
@@ -326,7 +326,7 @@ fn test_various_frequencies() {
 #[test]
 fn test_various_day_count_conventions() {
     // Arrange
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 
@@ -372,7 +372,7 @@ fn test_quoted_clean_price() {
 
 #[test]
 fn test_ilb_params_rejects_nan_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 
@@ -385,7 +385,7 @@ fn test_ilb_params_rejects_nan_coupon() {
 
 #[test]
 fn test_ilb_params_rejects_infinite_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 
@@ -398,7 +398,7 @@ fn test_ilb_params_rejects_infinite_coupon() {
 
 #[test]
 fn test_ilb_params_accepts_zero_coupon() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let issue = d(2020, 1, 1);
     let maturity = d(2030, 1, 1);
 

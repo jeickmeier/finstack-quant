@@ -91,7 +91,7 @@ pub struct Ready;
 /// let model = FinancialModelSpec::builder("test_model")
 ///     .periods("2025Q1..Q4", None)?
 ///     .value("revenue", &[
-///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0)),
 ///     ])
 ///     .build()?;
 /// # Ok(())
@@ -349,8 +349,8 @@ impl ModelBuilder<Ready> {
     /// let model = ModelBuilder::new("test")
     ///     .periods("2025Q1..Q2", None)?
     ///     .value("revenue", &[
-    ///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
-    ///         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110_000.0)),
+    ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
+    ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
     ///     ])
     ///     .build()?;
     /// # Ok(())
@@ -399,8 +399,8 @@ impl ModelBuilder<Ready> {
     /// let model = ModelBuilder::new("test")
     ///     .periods("2025Q1..Q2", None)?
     ///     .value_money("revenue", &[
-    ///         (PeriodId::quarter(2025, 1), Money::new(100_000.0, Currency::USD)),
-    ///         (PeriodId::quarter(2025, 2), Money::new(110_000.0, Currency::USD)),
+    ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((100_000_i64, Currency::USD))),
+    ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), Money::from((110_000_i64, Currency::USD))),
     ///     ])
     ///     .build()?;
     /// # Ok(())
@@ -460,8 +460,8 @@ impl ModelBuilder<Ready> {
     /// let model = ModelBuilder::new("test")
     ///     .periods("2025Q1..Q2", None)?
     ///     .value_scalar("gross_margin_pct", &[
-    ///         (PeriodId::quarter(2025, 1), 0.35),
-    ///         (PeriodId::quarter(2025, 2), 0.37),
+    ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 0.35),
+    ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 0.37),
     ///     ])
     ///     .build()?;
     /// # Ok(())
@@ -649,8 +649,8 @@ impl ModelBuilder<Ready> {
     ///     .periods("2025Q1..Q4", Some("2025Q2"))?
     ///     .mixed("revenue")
     ///         .values(&[
-    ///             (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
-    ///             (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110_000.0)),
+    ///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
+    ///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
     ///         ])
     ///         .forecast(ForecastSpec {
     ///             method: ForecastMethod::GrowthPct,
@@ -693,8 +693,8 @@ impl ModelBuilder<Ready> {
     /// let model = ModelBuilder::new("test")
     ///     .periods("2025Q1..Q4", Some("2025Q2"))?
     ///     .value("revenue", &[
-    ///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
-    ///         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110_000.0)),
+    ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
+    ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
     ///     ])
     ///     .forecast("revenue", ForecastSpec {
     ///         method: ForecastMethod::GrowthPct,
@@ -776,7 +776,7 @@ impl ModelBuilder<Ready> {
     /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     /// let model = ModelBuilder::new("test")
     ///     .periods("2025Q1..Q4", Some("2025Q2"))?
-    ///     .value("revenue", &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1500000.0))])
+    ///     .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1500000.0))])
     ///     .compute("bonus", "revenue * 0.01")?
     ///     .where_clause("revenue > 1000000")  // Only compute bonus if revenue > 1M
     ///     .build()?;
@@ -1083,7 +1083,7 @@ impl MixedNodeBuilder {
     /// let builder = ModelBuilder::new("demo")
     ///     .periods("2025Q1..Q2", None)?
     ///     .mixed("revenue")
-    ///     .values(&[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))])
+    ///     .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))])
     ///     .build()?;
     /// # Ok(())
     /// # }
@@ -1141,7 +1141,7 @@ impl MixedNodeBuilder {
     /// let builder = ModelBuilder::new("demo")
     ///     .periods("2025Q1..Q2", None)?
     ///     .mixed("revenue")
-    ///     .values(&[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))])
+    ///     .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100.0))])
     ///     .formula("lag(revenue, 1)")?
     ///     .build()?;
     /// # Ok(())
@@ -1238,7 +1238,7 @@ impl MixedNodeBuilder {
     /// let model = ModelBuilder::new("demo")
     ///     .periods("2025Q1..Q2", None)?
     ///     .mixed("revenue")
-    ///         .values(&[(PeriodId::quarter(2025, 1), 100.0.into())])
+    ///         .values(&[(PeriodId::quarter(2025, 1).expect("valid period fixture"), 100.0.into())])
     ///         .forecast(ForecastSpec::forward_fill())
     ///         .formula("lag(revenue, 1)")?
     ///         .build()?
@@ -1284,7 +1284,7 @@ mod tests {
 
     #[test]
     fn test_formula_references_require_exact_node_ids() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("alias-test")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -1306,7 +1306,7 @@ mod tests {
 
     #[test]
     fn test_build_rejects_cross_currency_addition() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let result = ModelBuilder::new("dimension-test")
             .periods("2025Q1..Q1", None)
             .expect("valid periods")
@@ -1314,20 +1314,20 @@ mod tests {
                 "usd_revenue",
                 &[(
                     period,
-                    finstack_quant_core::money::Money::new(
-                        100.0,
+                    finstack_quant_core::money::Money::from((
+                        100_i64,
                         finstack_quant_core::currency::Currency::USD,
-                    ),
+                    )),
                 )],
             )
             .value_money(
                 "eur_cost",
                 &[(
                     period,
-                    finstack_quant_core::money::Money::new(
-                        40.0,
+                    finstack_quant_core::money::Money::from((
+                        40_i64,
                         finstack_quant_core::currency::Currency::EUR,
-                    ),
+                    )),
                 )],
             )
             .compute("bad_total", "usd_revenue + eur_cost")

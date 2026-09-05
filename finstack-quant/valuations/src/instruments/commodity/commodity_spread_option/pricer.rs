@@ -50,7 +50,7 @@ pub(crate) fn compute_pv(
 
     // Post-expiry: option is fully settled
     if as_of > inst.expiry {
-        return Ok(Money::new(0.0, inst.currency));
+        return Ok(Money::from((0_i64, inst.currency)));
     }
 
     let t = inst.time_to_expiry(as_of)?;
@@ -67,12 +67,12 @@ pub(crate) fn compute_pv(
             OptionType::Call => (f1 - f2 - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - (f1 - f2)).max(0.0),
         };
-        return Ok(Money::new(intrinsic * inst.notional * df, inst.currency));
+        return Money::new(intrinsic * inst.notional * df, inst.currency);
     }
 
     let unit_price = kirk_price(inst, market, f1, f2, t, df)?;
 
-    Ok(Money::new(unit_price * inst.notional, inst.currency))
+    Money::new(unit_price * inst.notional, inst.currency)
 }
 
 /// Kirk's approximation for spread option pricing.

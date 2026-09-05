@@ -15,7 +15,7 @@
 //! let mut model = ModelBuilder::new("goal_seek_test")
 //!     .periods("2025Q1..Q4", None)?
 //!     .value("revenue", &[
-//!         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
+//!         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
 //!     ])
 //!     .forecast("revenue", ForecastSpec::growth(0.05))
 //!     .compute("interest_expense", "10000.0")?
@@ -24,7 +24,7 @@
 //!     .build()?;
 //!
 //! // Solve for Q4 revenue that achieves 2.0x interest coverage
-//! let target_period = PeriodId::quarter(2025, 4);
+//! let target_period = PeriodId::quarter(2025, 4).expect("valid period fixture");
 //! let solved_revenue = goal_seek(
 //!     &mut model,
 //!     "interest_coverage",
@@ -86,7 +86,7 @@ use std::cell::RefCell;
 /// # fn main() -> Result<()> {
 /// let mut model = ModelBuilder::new("example")
 ///     .periods("2025Q1..Q1", None)?
-///     .value("revenue", &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0))])
+///     .value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0))])
 ///     .compute("profit_margin", "0.15")?
 ///     .compute("net_income", "revenue * profit_margin")?
 ///     .build()?;
@@ -94,12 +94,12 @@ use std::cell::RefCell;
 /// // Verify model evaluates correctly first
 /// let mut evaluator = Evaluator::new();
 /// let results = evaluator.evaluate(&model)?;
-/// let initial_net_income = results.get("net_income", &PeriodId::quarter(2025, 1)).unwrap();
+/// let initial_net_income = results.get("net_income", &PeriodId::quarter(2025, 1).expect("valid period fixture")).unwrap();
 /// assert!((initial_net_income - 15_000.0).abs() < 0.01);
 ///
 /// // Solve for the revenue that achieves $18,000 of net income. Explicit bounds
 /// // give the root-finder a bracket that is guaranteed to contain the solution.
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let solved = goal_seek(
 ///     &mut model,
 ///     "net_income",

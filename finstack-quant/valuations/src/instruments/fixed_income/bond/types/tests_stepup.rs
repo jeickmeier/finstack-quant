@@ -22,7 +22,7 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
 
     let frn = Bond::floating(
         "FRN-CFKIND-TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1_000_000_i64, Currency::USD)),
         "USD-LIBOR-3M",
         200,
         issue,
@@ -92,7 +92,7 @@ fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
     let maturity = Date::from_calendar_date(2027, Month::January, 15).expect("valid");
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid"),
@@ -178,7 +178,7 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
     let maturity = Date::from_calendar_date(2027, Month::January, 15).expect("valid");
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.06).expect("valid"),
@@ -261,11 +261,11 @@ fn bond_price_merton_mc_api() {
     // Use Corporate convention (30/360) to avoid ActActIsma frequency requirement
     let bond = Bond::with_convention(
         "CORP-TEST",
-        finstack_quant_core::money::Money::new(
-            1_000_000.0,
+        finstack_quant_core::money::Money::from((
+            1000000_i64,
             finstack_quant_core::currency::Currency::USD,
-        ),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        )),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid test rate"),
         time::macros::date!(2024 - 01 - 15),
         time::macros::date!(2034 - 01 - 15),
         crate::instruments::common_impl::parameters::BondConvention::UsCorporate,
@@ -304,13 +304,13 @@ fn bond_price_merton_mc_rejects_amortizing() {
     let base = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("spec");
     let amort = AmortizationSpec::StepRemaining {
         schedule: vec![
-            (step1, Money::new(500_000.0, Currency::USD)),
-            (maturity, Money::new(0.0, Currency::USD)),
+            (step1, Money::from((500000_i64, Currency::USD))),
+            (maturity, Money::from((0_i64, Currency::USD))),
         ],
     };
     let bond = Bond::builder()
         .id("AMORT-MERTON".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(base, amort))
@@ -345,7 +345,7 @@ fn build_step_up_bond_schedule(
 ) -> (Bond, crate::cashflow::builder::CashFlowSchedule) {
     let bond = Bond::builder()
         .id("STEP-UP-TEST".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -392,7 +392,7 @@ fn step_up_no_steps_equals_fixed_rate() {
     // Build equivalent fixed-rate bond
     let fixed_bond = Bond::builder()
         .id("FIXED-EQUIV".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -570,7 +570,7 @@ fn step_up_serde_roundtrip() {
 
     let bond = Bond::builder()
         .id("SERDE-STEP-UP".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::from((1000000_i64, Currency::USD)))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(spec)

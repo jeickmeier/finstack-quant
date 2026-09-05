@@ -404,7 +404,7 @@ impl EquityOption {
             "SPX",
             4500.0,
             date!(2024 - 06 - 21),
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             market_data,
         )
     }
@@ -904,7 +904,7 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new(DISC_ID))
@@ -980,7 +980,7 @@ mod tests {
             "SPX",
             100.0,
             expiry,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             market_data,
         )
         .expect("custom market-data constructor should succeed");
@@ -991,7 +991,7 @@ mod tests {
         assert_eq!(option.option_type, OptionType::Call);
         assert_eq!(option.exercise_style, ExerciseStyle::European);
         assert_eq!(option.expiry, expiry);
-        assert_eq!(option.notional, Money::new(100.0, Currency::USD));
+        assert_eq!(option.notional, Money::from((100_i64, Currency::USD)));
         assert_eq!(option.discount_curve_id, CurveId::new(DISC_ID));
         assert_eq!(option.spot_id.as_str(), SPOT_ID);
         assert_eq!(option.vol_surface_id, CurveId::new(VOL_ID));
@@ -1114,7 +1114,7 @@ mod tests {
         let expiry = date(2025, 1, 3);
         let as_of = expiry;
         let mut option = base_option(expiry);
-        option.notional = Money::new(50.0, Currency::USD);
+        option.notional = Money::from((50_i64, Currency::USD));
         option.exercise = Some(EquityOptionExercise::new(expiry, 120.0, expiry, true));
         let curves = build_market_context(as_of, 120.0, 0.25, 0.01, 0.0);
 
@@ -1293,7 +1293,10 @@ mod tests {
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.25))
             .insert_price(SPOT_ID, MarketScalar::Unitless(100.0))
             // Wrong type: Price instead of Unitless
-            .insert_price(DIV_ID, MarketScalar::Price(Money::new(0.02, Currency::USD)));
+            .insert_price(
+                DIV_ID,
+                MarketScalar::Price(Money::new(0.02, Currency::USD).expect("valid money fixture")),
+            );
 
         // Pricing should fail with a validation error about wrong scalar type
         let result = option.value(&curves, as_of);

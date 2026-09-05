@@ -76,30 +76,12 @@ fn date_to_period_id(
     frequency: PeriodKind,
     fiscal_config: Option<FiscalConfig>,
 ) -> PeriodId {
-    let (year, month, _day) = date.to_calendar_date();
-    match frequency {
-        PeriodKind::Daily => PeriodId::day(year, date.ordinal()),
-        PeriodKind::Weekly => {
-            let (iso_year, iso_week, _weekday) = date.to_iso_week_date();
-            PeriodId::week(iso_year, iso_week)
+    if frequency == PeriodKind::Annual {
+        if let Some(config) = fiscal_config {
+            return PeriodId::annual(date.fiscal_year(config));
         }
-        PeriodKind::Monthly => PeriodId::month(year, month as u8),
-        PeriodKind::Quarterly => {
-            let q = date.quarter();
-            PeriodId::quarter(year, q)
-        }
-        PeriodKind::SemiAnnual => {
-            let h = if (month as u8) <= 6 { 1 } else { 2 };
-            PeriodId::half(year, h)
-        }
-        PeriodKind::Annual => match fiscal_config {
-            Some(config) => {
-                let fy = date.fiscal_year(config);
-                PeriodId::annual(fy)
-            }
-            None => PeriodId::annual(year),
-        },
     }
+    PeriodId::from_date(date, frequency)
 }
 
 /// Group daily returns by period, compounding within each period.
@@ -375,17 +357,35 @@ mod tests {
         let returns = vec![0.01, 0.02, -0.01, 0.03];
         let grouped = group_by_period(&dates, &returns, PeriodKind::Monthly, None);
         assert_eq!(grouped.len(), 2);
-        assert_eq!(grouped[0].0, PeriodId::month(2025, 1));
-        assert_eq!(grouped[1].0, PeriodId::month(2025, 2));
+        assert_eq!(
+            grouped[0].0,
+            PeriodId::month(2025, 1).expect("valid period fixture")
+        );
+        assert_eq!(
+            grouped[1].0,
+            PeriodId::month(2025, 2).expect("valid period fixture")
+        );
     }
 
     #[test]
     fn period_stats_from_grouped_basic() {
         let grouped = vec![
-            (PeriodId::month(2025, 1), 0.05),
-            (PeriodId::month(2025, 2), -0.02),
-            (PeriodId::month(2025, 3), 0.03),
-            (PeriodId::month(2025, 4), 0.01),
+            (
+                PeriodId::month(2025, 1).expect("valid period fixture"),
+                0.05,
+            ),
+            (
+                PeriodId::month(2025, 2).expect("valid period fixture"),
+                -0.02,
+            ),
+            (
+                PeriodId::month(2025, 3).expect("valid period fixture"),
+                0.03,
+            ),
+            (
+                PeriodId::month(2025, 4).expect("valid period fixture"),
+                0.01,
+            ),
         ];
         let stats = period_stats_from_grouped(&grouped);
         assert!((stats.best - 0.05).abs() < 1e-12);
@@ -402,9 +402,18 @@ mod tests {
     #[test]
     fn period_stats_from_grouped_all_winning_reports_full_kelly() {
         let grouped = vec![
-            (PeriodId::month(2025, 1), 0.02),
-            (PeriodId::month(2025, 2), 0.01),
-            (PeriodId::month(2025, 3), 0.03),
+            (
+                PeriodId::month(2025, 1).expect("valid period fixture"),
+                0.02,
+            ),
+            (
+                PeriodId::month(2025, 2).expect("valid period fixture"),
+                0.01,
+            ),
+            (
+                PeriodId::month(2025, 3).expect("valid period fixture"),
+                0.03,
+            ),
         ];
         let stats = period_stats_from_grouped(&grouped);
         assert!(stats.payoff_ratio.is_infinite());

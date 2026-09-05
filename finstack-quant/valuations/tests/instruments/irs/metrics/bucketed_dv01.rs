@@ -59,7 +59,7 @@ fn build_flat_forward_curve(rate: f64, base_date: Date, id: &str) -> ForwardCurv
 fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
     InterestRateSwap {
         id: "IRS_BUCKETED_DV01_TEST".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),

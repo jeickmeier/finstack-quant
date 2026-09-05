@@ -405,7 +405,7 @@ mod tests {
             CDSOptionStrike::Spread(Decimal::try_from(strike_spread).expect("valid strike")),
             as_of().add_months(6),
             as_of().add_months(66),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("params")
         .as_index(1.0)
@@ -727,7 +727,7 @@ mod tests {
             CDSOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
             as_of().add_months(6),
             as_of().add_months(66),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("params")
         .as_index(0.99)

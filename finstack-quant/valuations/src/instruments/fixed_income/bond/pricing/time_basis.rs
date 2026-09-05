@@ -91,7 +91,7 @@ mod tests {
         let maturity = date!(2030 - 01 - 01);
         let bond_365 = crate::instruments::fixed_income::bond::Bond::builder()
             .id("B365".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -110,7 +110,7 @@ mod tests {
 
         let bond_360 = crate::instruments::fixed_income::bond::Bond::builder()
             .id("B360".into())
-            .notional(Money::new(100.0, Currency::USD))
+            .notional(Money::from((100_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(

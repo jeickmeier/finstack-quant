@@ -116,7 +116,7 @@ fn quantlib_parity_fra_at_market_valuation() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_3x6".into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -163,7 +163,7 @@ fn quantlib_parity_fra_off_market_valuation() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_3x6".into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -224,7 +224,7 @@ fn quantlib_parity_fra_implied_rate() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_3x6".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -286,7 +286,7 @@ fn quantlib_parity_fra_settlement_adjustment() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_3x6".into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -359,7 +359,7 @@ fn quantlib_parity_fra_buy_sell_symmetry() {
     // Receive fixed (buy protection against rising rates)
     let fra_receive = ForwardRateAgreement {
         id: "FRA_RECEIVE".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -381,7 +381,7 @@ fn quantlib_parity_fra_buy_sell_symmetry() {
     // Pay fixed (sell protection)
     let fra_pay = ForwardRateAgreement {
         id: "FRA_PAY".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -429,7 +429,7 @@ fn quantlib_parity_fra_standard_tenor_3x6() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_3x6".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -467,7 +467,7 @@ fn quantlib_parity_fra_standard_tenor_6x9() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_6x9".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -505,7 +505,7 @@ fn quantlib_parity_fra_standard_tenor_6x12() {
 
     let fra = ForwardRateAgreement {
         id: "FRA_6x12".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -548,7 +548,7 @@ fn quantlib_parity_fra_dv01_sign_convention() {
 
     let fra_receive = ForwardRateAgreement {
         id: "FRA_RECEIVE".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -569,7 +569,7 @@ fn quantlib_parity_fra_dv01_sign_convention() {
 
     let fra_pay = ForwardRateAgreement {
         id: "FRA_PAY".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -639,7 +639,7 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
 
     let fra_360 = ForwardRateAgreement {
         id: "FRA_ACT360".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,
@@ -660,7 +660,7 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
 
     let fra_365 = ForwardRateAgreement {
         id: "FRA_ACT365".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(start),
         start_date: start,
         maturity: end,

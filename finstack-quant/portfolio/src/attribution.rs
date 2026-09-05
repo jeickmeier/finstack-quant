@@ -307,40 +307,57 @@ impl FactorAccumulator {
         self,
         base_currency: Currency,
         by_position: IndexMap<PositionId, PnlAttribution>,
-    ) -> PortfolioAttribution {
-        PortfolioAttribution {
-            total_pnl: Money::new(self.total(FactorBucket::TotalPnl), base_currency),
-            carry: Money::new(self.total(FactorBucket::Carry), base_currency),
-            rates_curves_pnl: Money::new(self.total(FactorBucket::RatesCurvesPnl), base_currency),
-            credit_curves_pnl: Money::new(self.total(FactorBucket::CreditCurvesPnl), base_currency),
-            inflation_curves_pnl: Money::new(
-                self.total(FactorBucket::InflationCurvesPnl),
-                base_currency,
-            ),
-            correlations_pnl: Money::new(self.total(FactorBucket::CorrelationsPnl), base_currency),
-            fx_pnl: Money::new(self.total(FactorBucket::FxPnl), base_currency),
-            fx_translation_pnl: Money::new(
-                self.total(FactorBucket::FxTranslationPnl),
-                base_currency,
-            ),
-            cross_factor_pnl: Money::new(self.total(FactorBucket::CrossFactorPnl), base_currency),
-            vol_pnl: Money::new(self.total(FactorBucket::VolPnl), base_currency),
-            model_params_pnl: Money::new(self.total(FactorBucket::ModelParamsPnl), base_currency),
-            market_scalars_pnl: Money::new(
-                self.total(FactorBucket::MarketScalarsPnl),
-                base_currency,
-            ),
-            residual: Money::new(self.total(FactorBucket::Residual), base_currency),
-            by_position,
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
-            result_invalid: self.result_invalid,
-        }
+    ) -> finstack_quant_core::Result<PortfolioAttribution> {
+        Ok({
+            PortfolioAttribution {
+                total_pnl: Money::new(self.total(FactorBucket::TotalPnl), base_currency)?,
+                carry: Money::new(self.total(FactorBucket::Carry), base_currency)?,
+                rates_curves_pnl: Money::new(
+                    self.total(FactorBucket::RatesCurvesPnl),
+                    base_currency,
+                )?,
+                credit_curves_pnl: Money::new(
+                    self.total(FactorBucket::CreditCurvesPnl),
+                    base_currency,
+                )?,
+                inflation_curves_pnl: Money::new(
+                    self.total(FactorBucket::InflationCurvesPnl),
+                    base_currency,
+                )?,
+                correlations_pnl: Money::new(
+                    self.total(FactorBucket::CorrelationsPnl),
+                    base_currency,
+                )?,
+                fx_pnl: Money::new(self.total(FactorBucket::FxPnl), base_currency)?,
+                fx_translation_pnl: Money::new(
+                    self.total(FactorBucket::FxTranslationPnl),
+                    base_currency,
+                )?,
+                cross_factor_pnl: Money::new(
+                    self.total(FactorBucket::CrossFactorPnl),
+                    base_currency,
+                )?,
+                vol_pnl: Money::new(self.total(FactorBucket::VolPnl), base_currency)?,
+                model_params_pnl: Money::new(
+                    self.total(FactorBucket::ModelParamsPnl),
+                    base_currency,
+                )?,
+                market_scalars_pnl: Money::new(
+                    self.total(FactorBucket::MarketScalarsPnl),
+                    base_currency,
+                )?,
+                residual: Money::new(self.total(FactorBucket::Residual), base_currency)?,
+                by_position,
+                rates_detail: None,
+                credit_detail: None,
+                inflation_detail: None,
+                correlations_detail: None,
+                fx_detail: None,
+                vol_detail: None,
+                scalars_detail: None,
+                result_invalid: self.result_invalid,
+            }
+        })
     }
 }
 
@@ -364,14 +381,14 @@ fn attribute_composite_primitives(
 ) -> Result<PnlAttribution> {
     let reporting_currency = composite.spec.reporting_currency;
     let mut aggregate = PnlAttribution::new(
-        Money::new(0.0, reporting_currency),
+        Money::from((0_i64, reporting_currency)),
         composite.id(),
         as_of_t0,
         as_of_t1,
         method.clone(),
     );
-    aggregate.mark_to_market_pnl = Some(Money::new(0.0, reporting_currency));
-    aggregate.residual = Money::new(0.0, reporting_currency);
+    aggregate.mark_to_market_pnl = Some(Money::from((0_i64, reporting_currency)));
+    aggregate.residual = Money::from((0_i64, reporting_currency));
 
     for exposure in composite.flatten_primitives().map_err(Error::Core)? {
         let definition = exposure.instrument_definition().ok_or_else(|| {
@@ -434,7 +451,7 @@ fn attribute_composite_primitives(
             as_of_t1,
             reporting_currency,
         )?;
-        add_primitive_attribution(&mut aggregate, primitive);
+        add_primitive_attribution(&mut aggregate, primitive)?;
     }
 
     aggregate.meta.notes.push(
@@ -456,56 +473,59 @@ fn translate_primitive_attribution(
 ) -> Result<()> {
     let native_currency = attribution.total_pnl.currency();
     let rate_t0 = crate::fx::convert_to_base(
-        Money::new(1.0, native_currency),
+        Money::from((1_i64, native_currency)),
         as_of_t0,
         market_t0,
         reporting_currency,
     )?
     .amount();
     let rate_t1 = crate::fx::convert_to_base(
-        Money::new(1.0, native_currency),
+        Money::from((1_i64, native_currency)),
         as_of_t1,
         market_t1,
         reporting_currency,
     )?
     .amount();
     let principal_translation = opening_value * (rate_t1 - rate_t0);
-    attribution.total_pnl = translated(attribution.total_pnl, rate_t1, reporting_currency);
+    attribution.total_pnl = translated(attribution.total_pnl, rate_t1, reporting_currency)?;
     attribution.total_pnl = Money::new(
         attribution.total_pnl.amount() + principal_translation,
         reporting_currency,
-    );
-    attribution.mark_to_market_pnl = attribution.mark_to_market_pnl.map(|value| {
-        Money::new(
-            value.amount() * rate_t1 + principal_translation,
-            reporting_currency,
-        )
-    });
-    attribution.carry = translated(attribution.carry, rate_t1, reporting_currency);
+    )?;
+    attribution.mark_to_market_pnl = attribution
+        .mark_to_market_pnl
+        .map(|value| {
+            Money::new(
+                value.amount() * rate_t1 + principal_translation,
+                reporting_currency,
+            )
+        })
+        .transpose()?;
+    attribution.carry = translated(attribution.carry, rate_t1, reporting_currency)?;
     attribution.rates_curves_pnl =
-        translated(attribution.rates_curves_pnl, rate_t1, reporting_currency);
+        translated(attribution.rates_curves_pnl, rate_t1, reporting_currency)?;
     attribution.credit_curves_pnl =
-        translated(attribution.credit_curves_pnl, rate_t1, reporting_currency);
+        translated(attribution.credit_curves_pnl, rate_t1, reporting_currency)?;
     attribution.inflation_curves_pnl = translated(
         attribution.inflation_curves_pnl,
         rate_t1,
         reporting_currency,
-    );
+    )?;
     attribution.correlations_pnl =
-        translated(attribution.correlations_pnl, rate_t1, reporting_currency);
-    attribution.fx_pnl = translated(attribution.fx_pnl, rate_t1, reporting_currency);
-    attribution.vol_pnl = translated(attribution.vol_pnl, rate_t1, reporting_currency);
+        translated(attribution.correlations_pnl, rate_t1, reporting_currency)?;
+    attribution.fx_pnl = translated(attribution.fx_pnl, rate_t1, reporting_currency)?;
+    attribution.vol_pnl = translated(attribution.vol_pnl, rate_t1, reporting_currency)?;
     attribution.cross_factor_pnl =
-        translated(attribution.cross_factor_pnl, rate_t1, reporting_currency);
+        translated(attribution.cross_factor_pnl, rate_t1, reporting_currency)?;
     attribution.model_params_pnl =
-        translated(attribution.model_params_pnl, rate_t1, reporting_currency);
+        translated(attribution.model_params_pnl, rate_t1, reporting_currency)?;
     attribution.market_scalars_pnl =
-        translated(attribution.market_scalars_pnl, rate_t1, reporting_currency);
+        translated(attribution.market_scalars_pnl, rate_t1, reporting_currency)?;
     attribution.fx_translation_pnl = Money::new(
         attribution.fx_translation_pnl.amount() * rate_t1 + principal_translation,
         reporting_currency,
-    );
-    attribution.residual = translated(attribution.residual, rate_t1, reporting_currency);
+    )?;
+    attribution.residual = translated(attribution.residual, rate_t1, reporting_currency)?;
     attribution.carry_detail = None;
     attribution.rates_detail = None;
     attribution.credit_detail = None;
@@ -521,49 +541,54 @@ fn translate_primitive_attribution(
     Ok(())
 }
 
-fn translated(value: Money, rate: f64, currency: Currency) -> Money {
+fn translated(value: Money, rate: f64, currency: Currency) -> finstack_quant_core::Result<Money> {
     Money::new(value.amount() * rate, currency)
 }
 
-fn add_money(target: &mut Money, source: Money) {
-    *target = Money::new(target.amount() + source.amount(), target.currency());
+fn add_money(target: &mut Money, source: Money) -> finstack_quant_core::Result<()> {
+    *target = Money::new(target.amount() + source.amount(), target.currency())?;
+    Ok(())
 }
 
-fn add_primitive_attribution(aggregate: &mut PnlAttribution, primitive: PnlAttribution) {
-    add_money(&mut aggregate.total_pnl, primitive.total_pnl);
+fn add_primitive_attribution(
+    aggregate: &mut PnlAttribution,
+    primitive: PnlAttribution,
+) -> finstack_quant_core::Result<()> {
+    add_money(&mut aggregate.total_pnl, primitive.total_pnl)?;
     match (
         aggregate.mark_to_market_pnl.as_mut(),
         primitive.mark_to_market_pnl,
     ) {
-        (Some(target), Some(source)) => add_money(target, source),
+        (Some(target), Some(source)) => add_money(target, source)?,
         _ => aggregate.mark_to_market_pnl = None,
     }
-    add_money(&mut aggregate.carry, primitive.carry);
-    add_money(&mut aggregate.rates_curves_pnl, primitive.rates_curves_pnl);
+    add_money(&mut aggregate.carry, primitive.carry)?;
+    add_money(&mut aggregate.rates_curves_pnl, primitive.rates_curves_pnl)?;
     add_money(
         &mut aggregate.credit_curves_pnl,
         primitive.credit_curves_pnl,
-    );
+    )?;
     add_money(
         &mut aggregate.inflation_curves_pnl,
         primitive.inflation_curves_pnl,
-    );
-    add_money(&mut aggregate.correlations_pnl, primitive.correlations_pnl);
-    add_money(&mut aggregate.fx_pnl, primitive.fx_pnl);
-    add_money(&mut aggregate.vol_pnl, primitive.vol_pnl);
-    add_money(&mut aggregate.cross_factor_pnl, primitive.cross_factor_pnl);
-    add_money(&mut aggregate.model_params_pnl, primitive.model_params_pnl);
+    )?;
+    add_money(&mut aggregate.correlations_pnl, primitive.correlations_pnl)?;
+    add_money(&mut aggregate.fx_pnl, primitive.fx_pnl)?;
+    add_money(&mut aggregate.vol_pnl, primitive.vol_pnl)?;
+    add_money(&mut aggregate.cross_factor_pnl, primitive.cross_factor_pnl)?;
+    add_money(&mut aggregate.model_params_pnl, primitive.model_params_pnl)?;
     add_money(
         &mut aggregate.market_scalars_pnl,
         primitive.market_scalars_pnl,
-    );
+    )?;
     add_money(
         &mut aggregate.fx_translation_pnl,
         primitive.fx_translation_pnl,
-    );
+    )?;
     aggregate.result_invalid |= primitive.result_invalid;
     aggregate.meta.num_repricings += primitive.meta.num_repricings;
     aggregate.meta.notes.extend(primitive.meta.notes);
+    Ok(())
 }
 
 /// Exact canonical evaluation profile required by an attribution method.
@@ -1006,7 +1031,7 @@ fn aggregate_position_attributions(
         by_position.insert(position_id, pos_attr);
     }
 
-    Ok(acc.into_portfolio_attribution(base_currency, by_position))
+    Ok(acc.into_portfolio_attribution(base_currency, by_position)?)
 }
 
 /// Compile and reduce strict T0/T1 metric endpoint valuations for the public
@@ -1296,7 +1321,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "A-B",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 CompositeLegSpec::new(
                     "A",
@@ -1437,7 +1462,7 @@ mod tests {
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
             self.base_value_calls.fetch_add(1, Ordering::SeqCst);
-            Ok(Money::new(100.0, Currency::USD))
+            Ok(Money::from((100_i64, Currency::USD)))
         }
 
         fn price_with_metrics(
@@ -1466,7 +1491,7 @@ mod tests {
             Ok(ValuationResult::stamped_with_config(
                 self.id(),
                 as_of,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 config.as_ref(),
             ))
         }
@@ -1520,7 +1545,7 @@ mod tests {
                     self.id
                 )));
             }
-            Ok(Money::new(100.0, Currency::USD))
+            Ok(Money::from((100_i64, Currency::USD)))
         }
 
         fn price_with_metrics(
@@ -1572,15 +1597,16 @@ mod tests {
         residual: f64,
     ) -> PnlAttribution {
         let mut attr = PnlAttribution::new(
-            Money::new(total, Currency::USD),
+            Money::new(total, Currency::USD).expect("valid money fixture"),
             position_id,
             date!(2026 - 01 - 02),
             date!(2026 - 01 - 03),
             AttributionMethod::Parallel,
         );
-        attr.carry = Money::new(carry, Currency::USD);
-        attr.rates_curves_pnl = Money::new(total - carry - residual, Currency::USD);
-        attr.residual = Money::new(residual, Currency::USD);
+        attr.carry = Money::new(carry, Currency::USD).expect("valid money fixture");
+        attr.rates_curves_pnl =
+            Money::new(total - carry - residual, Currency::USD).expect("valid money fixture");
+        attr.residual = Money::new(residual, Currency::USD).expect("valid money fixture");
         attr
     }
 
@@ -1836,9 +1862,9 @@ mod tests {
     #[test]
     fn portfolio_attribution_rejects_missing_cross_factor_pnl() {
         let base_currency = Currency::EUR;
-        let zero = Money::new(0.0, base_currency);
+        let zero = Money::from((0_i64, base_currency));
         let attr = PortfolioAttribution {
-            total_pnl: Money::new(100.0, base_currency),
+            total_pnl: Money::from((100_i64, base_currency)),
             carry: zero,
             rates_curves_pnl: zero,
             credit_curves_pnl: zero,
@@ -1874,21 +1900,21 @@ mod tests {
 
     #[test]
     fn test_explain_formats_percentages_and_zero_total_safely() {
-        let zero = Money::new(0.0, Currency::USD);
+        let zero = Money::from((0_i64, Currency::USD));
         let explained = PortfolioAttribution {
-            total_pnl: Money::new(200.0, Currency::USD),
-            carry: Money::new(20.0, Currency::USD),
-            rates_curves_pnl: Money::new(100.0, Currency::USD),
-            credit_curves_pnl: Money::new(10.0, Currency::USD),
-            inflation_curves_pnl: Money::new(5.0, Currency::USD),
-            correlations_pnl: Money::new(15.0, Currency::USD),
-            fx_pnl: Money::new(25.0, Currency::USD),
-            fx_translation_pnl: Money::new(10.0, Currency::USD),
+            total_pnl: Money::from((200_i64, Currency::USD)),
+            carry: Money::from((20_i64, Currency::USD)),
+            rates_curves_pnl: Money::from((100_i64, Currency::USD)),
+            credit_curves_pnl: Money::from((10_i64, Currency::USD)),
+            inflation_curves_pnl: Money::from((5_i64, Currency::USD)),
+            correlations_pnl: Money::from((15_i64, Currency::USD)),
+            fx_pnl: Money::from((25_i64, Currency::USD)),
+            fx_translation_pnl: Money::from((10_i64, Currency::USD)),
             cross_factor_pnl: zero,
-            vol_pnl: Money::new(5.0, Currency::USD),
-            model_params_pnl: Money::new(5.0, Currency::USD),
-            market_scalars_pnl: Money::new(3.0, Currency::USD),
-            residual: Money::new(2.0, Currency::USD),
+            vol_pnl: Money::from((5_i64, Currency::USD)),
+            model_params_pnl: Money::from((5_i64, Currency::USD)),
+            market_scalars_pnl: Money::from((3_i64, Currency::USD)),
+            residual: Money::from((2_i64, Currency::USD)),
             by_position: IndexMap::new(),
             rates_detail: None,
             credit_detail: None,
@@ -1907,7 +1933,7 @@ mod tests {
 
         let zero_total = PortfolioAttribution {
             total_pnl: zero,
-            carry: Money::new(5.0, Currency::USD),
+            carry: Money::from((5_i64, Currency::USD)),
             rates_curves_pnl: zero,
             credit_curves_pnl: zero,
             inflation_curves_pnl: zero,
@@ -1918,7 +1944,7 @@ mod tests {
             vol_pnl: zero,
             model_params_pnl: zero,
             market_scalars_pnl: zero,
-            residual: Money::new(-5.0, Currency::USD),
+            residual: Money::from((-5_i64, Currency::USD)),
             by_position: IndexMap::new(),
             rates_detail: None,
             credit_detail: None,
@@ -1938,19 +1964,19 @@ mod tests {
     fn test_reconciliation_check_passes_for_consistent_attribution() {
         let base_currency = Currency::USD;
         let portfolio_attr = PortfolioAttribution {
-            total_pnl: Money::new(200.0, base_currency),
-            carry: Money::new(20.0, base_currency),
-            rates_curves_pnl: Money::new(100.0, base_currency),
-            credit_curves_pnl: Money::new(10.0, base_currency),
-            inflation_curves_pnl: Money::new(5.0, base_currency),
-            correlations_pnl: Money::new(15.0, base_currency),
-            fx_pnl: Money::new(25.0, base_currency),
-            fx_translation_pnl: Money::new(10.0, base_currency),
-            cross_factor_pnl: Money::new(0.0, base_currency),
-            vol_pnl: Money::new(5.0, base_currency),
-            model_params_pnl: Money::new(5.0, base_currency),
-            market_scalars_pnl: Money::new(3.0, base_currency),
-            residual: Money::new(2.0, base_currency),
+            total_pnl: Money::from((200_i64, base_currency)),
+            carry: Money::from((20_i64, base_currency)),
+            rates_curves_pnl: Money::from((100_i64, base_currency)),
+            credit_curves_pnl: Money::from((10_i64, base_currency)),
+            inflation_curves_pnl: Money::from((5_i64, base_currency)),
+            correlations_pnl: Money::from((15_i64, base_currency)),
+            fx_pnl: Money::from((25_i64, base_currency)),
+            fx_translation_pnl: Money::from((10_i64, base_currency)),
+            cross_factor_pnl: Money::from((0_i64, base_currency)),
+            vol_pnl: Money::from((5_i64, base_currency)),
+            model_params_pnl: Money::from((5_i64, base_currency)),
+            market_scalars_pnl: Money::from((3_i64, base_currency)),
+            residual: Money::from((2_i64, base_currency)),
             by_position: IndexMap::new(),
             rates_detail: None,
             credit_detail: None,
@@ -1978,18 +2004,18 @@ mod tests {
     #[test]
     fn reconciliation_check_includes_cross_factor_pnl() {
         let base_currency = Currency::USD;
-        let zero = Money::new(0.0, base_currency);
+        let zero = Money::from((0_i64, base_currency));
         let portfolio_attr = PortfolioAttribution {
-            total_pnl: Money::new(107.0, base_currency),
-            carry: Money::new(20.0, base_currency),
-            rates_curves_pnl: Money::new(80.0, base_currency),
+            total_pnl: Money::from((107_i64, base_currency)),
+            carry: Money::from((20_i64, base_currency)),
+            rates_curves_pnl: Money::from((80_i64, base_currency)),
             credit_curves_pnl: zero,
             inflation_curves_pnl: zero,
             correlations_pnl: zero,
             fx_pnl: zero,
             fx_translation_pnl: zero,
             vol_pnl: zero,
-            cross_factor_pnl: Money::new(7.0, base_currency),
+            cross_factor_pnl: Money::from((7_i64, base_currency)),
             model_params_pnl: zero,
             market_scalars_pnl: zero,
             residual: zero,
@@ -2012,12 +2038,12 @@ mod tests {
     #[test]
     fn test_reconciliation_check_fails_when_totals_mismatch() {
         let base_currency = Currency::USD;
-        let zero = Money::new(0.0, base_currency);
+        let zero = Money::from((0_i64, base_currency));
         // total_pnl deliberately mismatches the sum of factor buckets
         let portfolio_attr = PortfolioAttribution {
-            total_pnl: Money::new(1000.0, base_currency),
-            carry: Money::new(100.0, base_currency),
-            rates_curves_pnl: Money::new(500.0, base_currency),
+            total_pnl: Money::from((1000_i64, base_currency)),
+            carry: Money::from((100_i64, base_currency)),
+            rates_curves_pnl: Money::from((500_i64, base_currency)),
             credit_curves_pnl: zero,
             inflation_curves_pnl: zero,
             correlations_pnl: zero,
@@ -2066,7 +2092,9 @@ mod tests {
         acc.add_converted(&bad, &identity)
             .expect("same-currency add");
 
-        let portfolio = acc.into_portfolio_attribution(Currency::USD, IndexMap::new());
+        let portfolio = acc
+            .into_portfolio_attribution(Currency::USD, IndexMap::new())
+            .expect("valid into_portfolio_attribution fixture");
         assert!(
             portfolio.result_invalid,
             "one invalid position must flag the whole portfolio invalid"
@@ -2079,10 +2107,10 @@ mod tests {
     #[test]
     fn reconciliation_check_fails_when_result_invalid_even_if_numbers_net() {
         let base = Currency::USD;
-        let zero = Money::new(0.0, base);
+        let zero = Money::from((0_i64, base));
         let attr = PortfolioAttribution {
-            total_pnl: Money::new(100.0, base),
-            carry: Money::new(100.0, base),
+            total_pnl: Money::from((100_i64, base)),
+            carry: Money::from((100_i64, base)),
             rates_curves_pnl: zero,
             credit_curves_pnl: zero,
             inflation_curves_pnl: zero,

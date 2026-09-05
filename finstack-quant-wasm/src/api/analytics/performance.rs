@@ -861,7 +861,7 @@ impl JsPerformance {
     ///
     /// * `frequency` - Optional calendar frequency token: `"daily"`,
     ///   `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or
-    ///   `"annual"`; defaults to `"monthly"`.
+    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `"monthly"`.
     ///
     /// # Errors
     ///

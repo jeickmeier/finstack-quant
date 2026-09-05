@@ -11,10 +11,10 @@ pub(crate) fn compute_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    Ok(Money::new(
+    Money::new(
         compute_pv_raw(future, context, as_of)?,
         future.notional.currency(),
-    ))
+    )
 }
 
 pub(crate) fn compute_pv_raw(
@@ -96,7 +96,7 @@ mod tests {
     fn sample_future() -> VolatilityIndexFuture {
         VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-PRICER"))
-            .notional(Money::new(20_000.0, Currency::USD))
+            .notional(Money::from((20_000_i64, Currency::USD)))
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .quoted_price(20.0)

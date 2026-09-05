@@ -19,11 +19,11 @@ fn test_scalars_snapshot_extraction() {
     let market = MarketContext::new()
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(180.0, Currency::USD)),
+            MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "MSFT",
-            MarketScalar::Price(Money::new(400.0, Currency::USD)),
+            MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
         );
 
     // Extract scalars through the unified market snapshot path.
@@ -55,13 +55,13 @@ fn test_market_scalar_freeze_restore() {
     // Market at T₀ with lower prices
     let market_t0 = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(180.0, Currency::USD)),
+        MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
     );
 
     // Market at T₁ with higher prices
     let market_t1 = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(185.0, Currency::USD)),
+        MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
     );
 
     // Extract T₀ scalars and splice them into the T₁ market.
@@ -101,7 +101,7 @@ fn test_equity_price_id_uses_restored_scalar_price() {
         )
         .insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(180.0, Currency::USD)),
+            MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
         );
     let market_t1 = MarketContext::new()
         .insert(
@@ -120,7 +120,7 @@ fn test_equity_price_id_uses_restored_scalar_price() {
         )
         .insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(185.0, Currency::USD)),
+            MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
         );
 
     let snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::SCALARS);
@@ -159,11 +159,11 @@ fn test_taylor_equity_spot_move_lands_in_market_scalars_pnl() {
     };
     let market_t0 = MarketContext::new().insert(discount()).insert_price(
         "AAPL-SPOT",
-        MarketScalar::Price(Money::new(180.0, Currency::USD)),
+        MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
     );
     let market_t1 = MarketContext::new().insert(discount()).insert_price(
         "AAPL-SPOT",
-        MarketScalar::Price(Money::new(185.0, Currency::USD)),
+        MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
     );
 
     let attribution = attribute_pnl(

@@ -788,7 +788,7 @@ impl Bumpable for MarketScalar {
             }
             MarketScalar::Price(m) => match (spec.mode, spec.units) {
                 (BumpMode::Additive, BumpUnits::Fraction) => {
-                    let bump = crate::money::Money::try_new(spec.value, m.currency())?;
+                    let bump = crate::money::Money::new(spec.value, m.currency())?;
                     m.checked_add(bump).map(MarketScalar::Price)
                 }
                 (BumpMode::Additive, BumpUnits::Percent) => {
@@ -963,10 +963,10 @@ mod tests {
 
     #[test]
     fn test_market_scalar_price_fraction_bump_is_absolute() -> crate::Result<()> {
-        let price = MarketScalar::Price(crate::money::Money::new(
-            100.0,
+        let price = MarketScalar::Price(crate::money::Money::from((
+            100_i64,
             crate::currency::Currency::USD,
-        ));
+        )));
         let bumped = price.apply_bump(BumpSpec {
             mode: BumpMode::Additive,
             units: BumpUnits::Fraction,
@@ -986,10 +986,10 @@ mod tests {
 
     #[test]
     fn test_market_scalar_price_percent_bump_is_proportional() -> crate::Result<()> {
-        let price = MarketScalar::Price(crate::money::Money::new(
-            100.0,
+        let price = MarketScalar::Price(crate::money::Money::from((
+            100_i64,
             crate::currency::Currency::USD,
-        ));
+        )));
         let bumped = price.apply_bump(BumpSpec {
             mode: BumpMode::Additive,
             units: BumpUnits::Percent,

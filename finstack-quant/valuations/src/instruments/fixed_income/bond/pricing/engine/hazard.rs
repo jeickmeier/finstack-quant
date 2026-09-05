@@ -110,7 +110,8 @@ impl HazardBondEngine {
         Ok(Money::new(
             Self::price_raw(bond, market, as_of)?,
             bond.notional.currency(),
-        ))
+        )
+        .expect("valid money fixture"))
     }
 
     /// Price a bond using a hazard curve and return the unrounded PV.
@@ -279,7 +280,7 @@ mod tests {
     fn build_test_bond(issue: Date, maturity: Date) -> Bond {
         Bond::builder()
             .id("TEST_BOND_HAZARD".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(
@@ -320,7 +321,7 @@ mod tests {
         }
         Bond::builder()
             .id("TEST_PIK_BOND_HAZARD".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(spec)
@@ -371,7 +372,7 @@ mod tests {
 
         let bond = Bond::builder()
             .id("TEST_BOND_HAZARD_ONDATE".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(

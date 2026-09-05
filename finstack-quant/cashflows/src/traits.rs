@@ -72,16 +72,16 @@ pub trait CashflowScheduleSource: Send + Sync {
     ///         ))
     ///     }
     ///
-    ///     fn notional(&self) -> Option<Money> {
-    ///         Some(self.notional)
+    ///     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+    ///         Ok(Some(self.notional))
     ///     }
     /// }
     ///
-    /// let inst = MyInstrument { notional: Money::new(1_000_000.0, Currency::USD) };
-    /// assert_eq!(inst.notional().unwrap().currency(), Currency::USD);
+    /// let inst = MyInstrument { notional: Money::from((1_000_000_i64, Currency::USD)) };
+    /// assert_eq!(inst.notional().expect("valid notional").unwrap().currency(), Currency::USD);
     /// ```
-    fn notional(&self) -> Option<Money> {
-        None
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(None)
     }
 
     /// Build the complete signed schedule before public lifecycle normalization.
@@ -156,9 +156,9 @@ impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 /// Resolve the schedule-level notional from an optional `Money` hint and a
 /// fallback currency inferred from the flow list.
 fn resolve_notional(hint: Option<Money>, fallback_currency: Currency) -> Notional {
-    match hint {
-        Some(money) => Notional::par(money.amount(), money.currency()),
-        None => Notional::par(0.0, fallback_currency),
+    Notional {
+        initial: hint.unwrap_or_else(|| Money::from((0_i64, fallback_currency))),
+        amort: crate::builder::AmortizationSpec::None,
     }
 }
 
@@ -187,8 +187,8 @@ fn resolve_notional(hint: Option<Money>, fallback_currency: Currency) -> Notiona
 /// use time::Month;
 ///
 /// let flows = vec![
-///     (Date::from_calendar_date(2025, Month::June, 15).unwrap(), Money::new(50_000.0, Currency::USD)),
-///     (Date::from_calendar_date(2025, Month::December, 15).unwrap(), Money::new(1_050_000.0, Currency::USD)),
+///     (Date::from_calendar_date(2025, Month::June, 15).unwrap(), Money::from((50_000_i64, Currency::USD))),
+///     (Date::from_calendar_date(2025, Month::December, 15).unwrap(), Money::from((1_050_000_i64, Currency::USD))),
 /// ];
 /// let schedule = schedule_from_dated_flows(
 ///     flows,
@@ -245,14 +245,14 @@ pub fn schedule_from_dated_flows(
 ///
 /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
 /// let flows = vec![
-///     CashFlow::new(date, None, Money::new(50_000.0, Currency::USD), CFKind::Fixed, 0.5, Some(0.05)),
-///     CashFlow::new(date, None, Money::new(10_000.0, Currency::USD), CFKind::Pik, 0.5, Some(0.01)),
+///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
+///     CashFlow::new(date, None, Money::from((10_000_i64, Currency::USD)), CFKind::Pik, 0.5, Some(0.01)),
 /// ];
 /// let schedule = schedule_from_classified_flows(
 ///     flows,
 ///     DayCount::Act365F,
 ///     ScheduleBuildOpts {
-///         notional_hint: Some(Money::new(1_000_000.0, Currency::USD)),
+///         notional_hint: Some(Money::from((1_000_000_i64, Currency::USD))),
 ///         ..Default::default()
 ///     },
 /// );
@@ -286,8 +286,8 @@ mod tests {
     struct DummyInstrument;
 
     impl CashflowScheduleSource for DummyInstrument {
-        fn notional(&self) -> Option<Money> {
-            Some(Money::new(1_000_000.0, Currency::USD))
+        fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+            Ok(Some(Money::from((1_000_000_i64, Currency::USD))))
         }
 
         fn raw_cashflow_schedule(
@@ -298,15 +298,15 @@ mod tests {
             let d1 = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
             let d2 = Date::from_calendar_date(2025, Month::July, 1).expect("valid date");
             let flows = vec![
-                (d1, Money::new(100.0, Currency::USD)),
-                (d2, Money::new(250.0, Currency::USD)),
+                (d1, Money::from((100_i64, Currency::USD))),
+                (d2, Money::from((250_i64, Currency::USD))),
             ];
             Ok(schedule_from_dated_flows(
                 flows,
                 CFKind::Fixed,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
-                    notional_hint: self.notional(),
+                    notional_hint: self.notional().expect("valid notional"),
                     ..Default::default()
                 },
             ))
@@ -341,7 +341,7 @@ mod tests {
                 CashFlow::new(
                     future,
                     None,
-                    Money::new(30.0, Currency::USD),
+                    Money::from((30_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
@@ -349,7 +349,7 @@ mod tests {
                 CashFlow::new(
                     future,
                     None,
-                    Money::new(40.0, Currency::USD),
+                    Money::from((40_i64, Currency::USD)),
                     CFKind::Pik,
                     0.0,
                     None,
@@ -357,7 +357,7 @@ mod tests {
                 CashFlow::new(
                     past,
                     None,
-                    Money::new(10.0, Currency::USD),
+                    Money::from((10_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
@@ -365,7 +365,7 @@ mod tests {
                 CashFlow::new(
                     as_of,
                     None,
-                    Money::new(20.0, Currency::USD),
+                    Money::from((20_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
@@ -373,7 +373,7 @@ mod tests {
                 CashFlow::new(
                     future,
                     None,
-                    Money::new(50.0, Currency::USD),
+                    Money::from((50_i64, Currency::USD)),
                     CFKind::DefaultedNotional,
                     0.0,
                     None,
@@ -426,7 +426,7 @@ mod tests {
             Vec::new(),
             DayCount::Act365F,
             ScheduleBuildOpts {
-                notional_hint: Some(Money::new(1_000_000.0, Currency::USD)),
+                notional_hint: Some(Money::from((1_000_000_i64, Currency::USD))),
                 meta: CashFlowMeta {
                     representation: CashflowRepresentation::Placeholder,
                     ..Default::default()
@@ -444,9 +444,9 @@ mod tests {
     fn schedule_from_dated_flows_uses_notional_hint() {
         let flows = vec![(
             Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
         )];
-        let notional = Money::new(5_000_000.0, Currency::USD);
+        let notional = Money::from((5_000_000_i64, Currency::USD));
         let schedule = schedule_from_dated_flows(
             flows,
             CFKind::Fixed,
@@ -464,7 +464,7 @@ mod tests {
     fn schedule_from_dated_flows_defaults_currency() {
         let flows = vec![(
             Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-            Money::new(100.0, Currency::EUR),
+            Money::from((100_i64, Currency::EUR)),
         )];
         let schedule = schedule_from_dated_flows(
             flows,
@@ -484,7 +484,7 @@ mod tests {
             CashFlow::new(
                 date,
                 None,
-                Money::new(20.0, Currency::USD),
+                Money::from((20_i64, Currency::USD)),
                 CFKind::PrePayment,
                 0.0,
                 None,
@@ -492,7 +492,7 @@ mod tests {
             CashFlow::new(
                 date,
                 None,
-                Money::new(-5.0, Currency::USD),
+                Money::from((-5_i64, Currency::USD)),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -503,7 +503,7 @@ mod tests {
             flows,
             DayCount::Act365F,
             ScheduleBuildOpts {
-                notional_hint: Some(Money::new(100.0, Currency::USD)),
+                notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
         );
@@ -517,7 +517,7 @@ mod tests {
     fn schedule_from_dated_flows_with_kind_applies_requested_kind() {
         let flows = vec![(
             Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
         )];
 
         let schedule = schedule_from_dated_flows(
@@ -525,7 +525,7 @@ mod tests {
             CFKind::Notional,
             DayCount::Act365F,
             ScheduleBuildOpts {
-                notional_hint: Some(Money::new(100.0, Currency::USD)),
+                notional_hint: Some(Money::from((100_i64, Currency::USD))),
                 ..Default::default()
             },
         );
@@ -540,16 +540,16 @@ mod tests {
         let flows = vec![CashFlow::new(
             date,
             None,
-            Money::new(25.0, Currency::USD),
+            Money::from((25_i64, Currency::USD)),
             CFKind::Fee,
             0.0,
             None,
         )];
-        let notional = Notional::par(250.0, Currency::USD);
+        let notional = Notional::par(250.0, Currency::USD).expect("valid notional fixture");
         let meta = CashFlowMeta {
             representation: CashflowRepresentation::Contractual,
             calendar_ids: vec!["weekends_only".to_string()],
-            facility_limit: Some(Money::new(500.0, Currency::USD)),
+            facility_limit: Some(Money::from((500_i64, Currency::USD))),
             issue_date: Some(date),
             maturity_date: None,
         };

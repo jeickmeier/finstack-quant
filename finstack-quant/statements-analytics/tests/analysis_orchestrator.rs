@@ -56,20 +56,20 @@ fn test_full_lbo_analysis() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
-                    Money::new(10_000_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
-                    Money::new(10_500_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    Money::new(10_500_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 3),
-                    Money::new(11_000_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                    Money::new(11_000_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::quarter(2025, 4),
-                    Money::new(11_500_000.0, Currency::USD),
+                    PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                    Money::new(11_500_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],
         )
@@ -79,7 +79,7 @@ fn test_full_lbo_analysis() {
         .expect("ufcf formula")
         .add_bond(
             "SENIOR-BOND",
-            Money::new(20_000_000.0, Currency::USD),
+            Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             time::macros::date!(2025 - 01 - 01),
             time::macros::date!(2030 - 01 - 01),
@@ -104,9 +104,10 @@ fn test_full_lbo_analysis() {
         .expect("analysis should succeed");
 
     // Statement results populated
-    let ebitda_q1 = analysis
-        .statement
-        .get("ebitda", &PeriodId::quarter(2025, 1));
+    let ebitda_q1 = analysis.statement.get(
+        "ebitda",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(ebitda_q1.is_some());
     assert!(
         (ebitda_q1.unwrap() - 2_500_000.0).abs() < 1.0,
@@ -152,11 +153,11 @@ fn test_statement_only_no_equity_no_credit() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(105_000.0),
                 ),
             ],
@@ -173,7 +174,10 @@ fn test_statement_only_no_equity_no_credit() {
     assert!(!analysis.ev_suppressed_non_positive);
     assert!(analysis
         .statement
-        .get("revenue", &PeriodId::quarter(2025, 1))
+        .get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        )
         .is_some());
 }
 
@@ -187,18 +191,18 @@ fn test_mixed_currency_capital_structure_does_not_panic_in_dynamic_evaluator() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
         )
         .add_bond(
             "USD-BOND",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.05,
             as_of,
             time::macros::date!(2030 - 01 - 01),
@@ -207,7 +211,7 @@ fn test_mixed_currency_capital_structure_does_not_panic_in_dynamic_evaluator() {
         .expect("usd bond")
         .add_bond(
             "EUR-BOND",
-            Money::new(8_000_000.0, Currency::EUR),
+            Money::new(8_000_000.0, Currency::EUR).expect("valid money fixture"),
             0.04,
             as_of,
             time::macros::date!(2030 - 01 - 01),
@@ -228,5 +232,7 @@ fn test_mixed_currency_capital_structure_does_not_panic_in_dynamic_evaluator() {
 
     let cs = results.cs_cashflows.expect("capital structure cashflows");
     assert_eq!(cs.totals_by_currency.len(), 2);
-    assert!(cs.get_total_interest(&PeriodId::quarter(2025, 1)).is_err());
+    assert!(cs
+        .get_total_interest(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
+        .is_err());
 }

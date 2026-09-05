@@ -68,7 +68,7 @@ fn test_inverse_rate_zero_notional_errors() {
     // Zero base notional makes the inverse rate ill-defined; the calculator
     // surfaces a Validation error rather than silently returning zero.
     let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR))
+        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate");
@@ -114,7 +114,7 @@ fn test_inverse_rate_symmetry() {
 fn test_inverse_rate_large_rate() {
     // USD/JPY = 110.0, so JPY/USD = 1/110 ≈ 0.009091
     let fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD))
+        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
         .with_rate(110.0)
         .expect("test rate");

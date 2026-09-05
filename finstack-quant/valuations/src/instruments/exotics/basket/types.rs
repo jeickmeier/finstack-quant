@@ -207,7 +207,7 @@ impl Basket {
             .constituents(constituents)
             .expense_ratio(0.0025)
             .currency(Currency::USD)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
             .pricing_config(BasketPricingConfig::default())
@@ -265,8 +265,8 @@ impl Basket {
         // Create a bond instrument
         let bond = crate::instruments::fixed_income::bond::Bond::fixed(
             "CORP-BOND-001",
-            Money::new(1000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05)?,
             date!(2024 - 01 - 01),
             date!(2034 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -300,7 +300,7 @@ impl Basket {
             .constituents(constituents)
             .expense_ratio(0.001)
             .currency(Currency::USD)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
             .pricing_config(BasketPricingConfig::default())
@@ -399,7 +399,7 @@ impl Instrument for Basket {
         // Scale NAV-per-unit by explicit basket notional for portfolio PV.
         let nav_per_unit = self.calculator().nav(self, curves, as_of, 1.0)?;
         let scaled = nav_per_unit.amount() * self.notional.amount();
-        Ok(Money::new(scaled, self.notional.currency()))
+        Money::new(scaled, self.notional.currency())
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -426,7 +426,7 @@ mod tests {
             constituents: vec![],
             expense_ratio: 0.001,
             currency: Currency::USD,
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -468,7 +468,7 @@ mod tests {
             ],
             expense_ratio: 0.001,
             currency: Currency::USD,
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "USD-OIS".into(),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),

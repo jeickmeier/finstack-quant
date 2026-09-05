@@ -121,7 +121,7 @@ function priceWithMetrics(instrumentJson, metrics) {
     instrumentJson,
     MARKET_JSON,
     '2024-01-01',
-    'discounting',
+    'tree',
     metrics,
     null,
     null

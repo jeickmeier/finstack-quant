@@ -229,7 +229,7 @@ pub(crate) fn project_cashflows(
     max_periods: Option<u32>,
 ) -> Result<MbsProjection> {
     let diagnostics = generate_cashflows(mbs, as_of, max_periods)?;
-    let schedule = schedule_from_projection(mbs, &diagnostics);
+    let schedule = schedule_from_projection(mbs, &diagnostics)?;
     Ok(MbsProjection {
         schedule,
         diagnostics,
@@ -239,56 +239,58 @@ pub(crate) fn project_cashflows(
 fn schedule_from_projection(
     mbs: &AgencyMbsPassthrough,
     projected: &[MbsCashflow],
-) -> CashFlowSchedule {
-    let mut flows = Vec::with_capacity(projected.len() * 3);
+) -> finstack_quant_core::Result<CashFlowSchedule> {
+    Ok({
+        let mut flows = Vec::with_capacity(projected.len() * 3);
 
-    for cf in projected {
-        if cf.interest.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::new(cf.interest, mbs.current_face.currency()),
-                CFKind::Fixed,
-                0.0,
-                Some(mbs.pass_through_rate),
-            ));
+        for cf in projected {
+            if cf.interest.abs() > f64::EPSILON {
+                flows.push(CashFlow::new(
+                    cf.payment_date,
+                    None,
+                    Money::new(cf.interest, mbs.current_face.currency())?,
+                    CFKind::Fixed,
+                    0.0,
+                    Some(mbs.pass_through_rate),
+                ));
+            }
+            if cf.scheduled_principal.abs() > f64::EPSILON {
+                flows.push(CashFlow::new(
+                    cf.payment_date,
+                    None,
+                    Money::new(cf.scheduled_principal, mbs.current_face.currency())?,
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ));
+            }
+            if cf.prepayment.abs() > f64::EPSILON {
+                flows.push(CashFlow::new(
+                    cf.payment_date,
+                    None,
+                    Money::new(cf.prepayment, mbs.current_face.currency())?,
+                    CFKind::PrePayment,
+                    0.0,
+                    None,
+                ));
+            }
         }
-        if cf.scheduled_principal.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::new(cf.scheduled_principal, mbs.current_face.currency()),
-                CFKind::Amortization,
-                0.0,
-                None,
-            ));
-        }
-        if cf.prepayment.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::new(cf.prepayment, mbs.current_face.currency()),
-                CFKind::PrePayment,
-                0.0,
-                None,
-            ));
-        }
-    }
 
-    crate::cashflow::traits::schedule_from_classified_flows(
-        flows,
-        mbs.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
-            notional_hint: Some(mbs.current_face),
-            meta: CashFlowMeta {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                calendar_ids: Vec::new(),
-                facility_limit: None,
-                issue_date: Some(mbs.issue_date),
-                maturity_date: None,
+        crate::cashflow::traits::schedule_from_classified_flows(
+            flows,
+            mbs.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(mbs.current_face),
+                meta: CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    calendar_ids: Vec::new(),
+                    facility_limit: None,
+                    issue_date: Some(mbs.issue_date),
+                    maturity_date: None,
+                },
             },
-        },
-    )
+        )
+    })
 }
 
 fn end_of_month(date: Date) -> Result<Date> {
@@ -387,13 +389,13 @@ pub(crate) fn price_mbs(
     let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam + 12))?;
 
     if schedule.get_flows().is_empty() {
-        return Ok(Money::new(0.0, mbs.current_face.currency()));
+        return Ok(Money::from((0_i64, mbs.current_face.currency())));
     }
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let pv = discount_schedule(&schedule, &discount_curve, as_of, 0.0)?;
 
-    Ok(Money::new(pv, mbs.current_face.currency()))
+    Money::new(pv, mbs.current_face.currency())
 }
 
 /// Price an agency MBS with a spread adjustment.
@@ -434,8 +436,8 @@ mod tests {
             .pool_id("TEST-POOL".into())
             .agency(super::super::AgencyProgram::Fnma)
             .pool_type(super::super::PoolType::Generic)
-            .original_face(Money::new(1_000_000.0, Currency::USD))
-            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .original_face(Money::from((1_000_000_i64, Currency::USD)))
+            .current_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_factor(1.0)
             .wac(0.045)
             .pass_through_rate(0.04)
@@ -580,8 +582,8 @@ mod tests {
             .pool_id("SEASONED-POOL".into())
             .agency(super::super::AgencyProgram::Fnma)
             .pool_type(super::super::PoolType::Generic)
-            .original_face(Money::new(1_000_000.0, Currency::USD))
-            .current_face(Money::new(850_000.0, Currency::USD))
+            .original_face(Money::from((1_000_000_i64, Currency::USD)))
+            .current_face(Money::from((850_000_i64, Currency::USD)))
             .current_factor(0.85)
             .wac(0.045)
             .pass_through_rate(0.04)
@@ -648,8 +650,8 @@ mod tests {
             .pool_id("FWD-POOL".into())
             .agency(super::super::AgencyProgram::Fnma)
             .pool_type(super::super::PoolType::Generic)
-            .original_face(Money::new(1_000_000.0, Currency::USD))
-            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .original_face(Money::from((1_000_000_i64, Currency::USD)))
+            .current_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_factor(1.0)
             .wac(0.045)
             .pass_through_rate(0.04)

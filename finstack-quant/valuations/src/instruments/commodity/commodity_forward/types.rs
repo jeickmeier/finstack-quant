@@ -422,7 +422,7 @@ impl CommodityForward {
             .contract_price
             .unwrap_or(self.forward_price(market, as_of)?);
         let amount = -self.position.sign() * contract_price * self.quantity * self.multiplier;
-        Ok(Money::new(amount, self.underlying.currency))
+        Money::new(amount, self.underlying.currency)
     }
 }
 
@@ -454,10 +454,10 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // If settlement has passed, value is zero
         if self.maturity < as_of {
-            return Ok(finstack_quant_core::money::Money::new(
-                0.0,
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
                 self.underlying.currency,
-            ));
+            )));
         }
 
         // Get market forward price F from quoted price or curve
@@ -474,10 +474,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
         let notional_qty = self.quantity * self.multiplier;
         let pv = self.position.sign() * price_diff * notional_qty * df;
 
-        Ok(finstack_quant_core::money::Money::new(
-            pv,
-            self.underlying.currency,
-        ))
+        finstack_quant_core::money::Money::new(pv, self.underlying.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -503,7 +500,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(invoice.amount().abs(), invoice.currency())),
+                notional_hint: Some(Money::new(invoice.amount().abs(), invoice.currency())?),
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()

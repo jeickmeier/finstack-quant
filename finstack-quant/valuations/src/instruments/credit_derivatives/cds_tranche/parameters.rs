@@ -120,7 +120,7 @@ mod tests {
         let params = CDSTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             date!(2029 - 12 - 20),
             100.0,
         );
@@ -130,7 +130,7 @@ mod tests {
         let mezz = CDSTrancheParams::mezzanine_tranche(
             "CDX.NA.IG",
             42,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             date!(2029 - 12 - 20),
             100.0,
         );

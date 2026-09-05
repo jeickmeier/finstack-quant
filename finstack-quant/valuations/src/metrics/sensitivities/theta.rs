@@ -535,7 +535,7 @@ mod tests {
         finstack_quant_core::cashflow::CashFlow::new(
             Date::from_calendar_date(2025, Month::January, day).expect("flow date"),
             None,
-            Money::new(amount, Currency::USD),
+            Money::new(amount, Currency::USD).expect("valid money fixture"),
             kind,
             0.5,
             None,

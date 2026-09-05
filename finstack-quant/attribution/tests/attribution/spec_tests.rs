@@ -41,8 +41,8 @@ fn test_dates() -> (Date, Date) {
 fn spec_rejects_unknown_metrics() {
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).expect("Valid issue date"),
         create_date(2034, Month::January, 1).expect("Valid maturity"),
         finstack_quant_core::dates::StubKind::ShortFront,

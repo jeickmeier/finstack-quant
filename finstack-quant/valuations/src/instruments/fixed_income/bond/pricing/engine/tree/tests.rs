@@ -20,10 +20,10 @@ fn create_test_bond() -> Bond {
 
     Bond::builder()
         .id("TEST_BOND".into())
-        .notional(Money::new(
-            1000.0,
+        .notional(Money::from((
+            1000_i64,
             finstack_quant_core::currency::Currency::USD,
-        ))
+        )))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(

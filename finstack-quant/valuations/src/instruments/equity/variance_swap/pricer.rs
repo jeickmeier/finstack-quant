@@ -29,14 +29,14 @@ pub(crate) fn compute_pv(
     let settlement_date = inst.effective_settlement_date()?;
 
     if as_of > settlement_date {
-        return Ok(Money::new(0.0, inst.notional.currency()));
+        return Ok(Money::from((0_i64, inst.notional.currency())));
     }
 
     if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
             let (open, high, low, close) = get_historical_ohlc(inst, curves, as_of)?;
             if close.is_empty() {
-                return Ok(Money::new(0.0, inst.notional.currency()));
+                return Ok(Money::from((0_i64, inst.notional.currency())));
             }
             finstack_quant_core::math::stats::realized_variance_ohlc(
                 &open,
@@ -49,7 +49,7 @@ pub(crate) fn compute_pv(
         } else {
             let prices = get_historical_prices(inst, curves, as_of)?;
             if prices.is_empty() {
-                return Ok(Money::new(0.0, inst.notional.currency()));
+                return Ok(Money::from((0_i64, inst.notional.currency())));
             }
             realized_variance(
                 &prices,
@@ -62,12 +62,12 @@ pub(crate) fn compute_pv(
             as_of,
             settlement_date,
         )?;
-        return Ok(inst.payoff(realized_var) * df);
+        return Ok(inst.payoff(realized_var)? * df);
     }
 
     if as_of < inst.start_date {
         let forward_var = remaining_forward_variance(inst, curves, as_of)?;
-        let undiscounted = inst.payoff(forward_var);
+        let undiscounted = inst.payoff(forward_var)?;
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
@@ -81,7 +81,7 @@ pub(crate) fn compute_pv(
     // `seasoned_expected_variance` so the reported metric can never drift from the
     // variance implied by this PV (W-32/W-33).
     let expected_var = seasoned_expected_variance(inst, curves, as_of)?;
-    let undiscounted = inst.payoff(expected_var);
+    let undiscounted = inst.payoff(expected_var)?;
     let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
         disc.as_ref(),
         as_of,
@@ -619,10 +619,10 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-FLAT"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(
-                1_000_000.0,
+            .notional(Money::from((
+                1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .strike_variance(0.04)
             .start_date(as_of)
             .maturity(maturity)
@@ -691,10 +691,10 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-FWDSTART"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(
-                1_000_000.0,
+            .notional(Money::from((
+                1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -835,10 +835,10 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-SEASONED"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(
-                1_000_000.0,
+            .notional(Money::from((
+                1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -902,7 +902,7 @@ mod tests {
             swap.maturity,
         )
         .expect("df");
-        let expected_pv = swap.payoff(expected_var) * df;
+        let expected_pv = swap.payoff(expected_var).expect("valid payoff") * df;
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -913,7 +913,7 @@ mod tests {
 
         // And it must NOT match the (wrong) observation-count weighting.
         let count_var = realized * count_w + forward * (1.0 - count_w);
-        let count_pv = swap.payoff(count_var) * df;
+        let count_pv = swap.payoff(count_var).expect("valid payoff") * df;
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "seasoned MTM must differ from observation-count weighting"
@@ -943,10 +943,10 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-W33"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(
-                1_000_000.0,
+            .notional(Money::from((
+                1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
-            ))
+            )))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -1029,26 +1029,26 @@ mod tests {
 
         let mut swap = VarianceSwap::example().expect("example swap");
 
-        swap.observation_frequency = Tenor::new(1, TenorUnit::Weeks);
+        swap.observation_frequency = Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 52.0);
 
-        swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks);
+        swap.observation_frequency = Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 26.0);
 
-        swap.observation_frequency = Tenor::new(1, TenorUnit::Days);
+        swap.observation_frequency = Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 252.0);
 
         // The policy-aware variant must agree (no TRADING_DAYS_PER_YEAR
         // override in this market context).
         let market = MarketContext::new();
-        swap.observation_frequency = Tenor::new(7, TenorUnit::Days);
+        swap.observation_frequency = Tenor::new(7, TenorUnit::Days).expect("valid tenor fixture");
         assert_eq!(annualization_factor_with_policy(&swap, &market), 36.0);
-        swap.observation_frequency = Tenor::new(14, TenorUnit::Days);
+        swap.observation_frequency = Tenor::new(14, TenorUnit::Days).expect("valid tenor fixture");
         assert_eq!(annualization_factor_with_policy(&swap, &market), 18.0);
 
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);
-        swap.observation_frequency = Tenor::new(2, TenorUnit::Days);
+        swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");
         let dates = observation_dates(&swap).expect("observation schedule");
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));

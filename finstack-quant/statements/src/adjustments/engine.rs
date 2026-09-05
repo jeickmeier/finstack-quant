@@ -217,13 +217,25 @@ mod tests {
     fn mock_results() -> StatementResult {
         let mut results = StatementResult::new();
         let mut ebitda = IndexMap::new();
-        ebitda.insert(PeriodId::quarter(2025, 1), 100.0);
-        ebitda.insert(PeriodId::quarter(2025, 2), 120.0);
+        ebitda.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            100.0,
+        );
+        ebitda.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            120.0,
+        );
         results.nodes.insert("EBITDA".to_string(), ebitda);
 
         let mut revenue = IndexMap::new();
-        revenue.insert(PeriodId::quarter(2025, 1), 1000.0);
-        revenue.insert(PeriodId::quarter(2025, 2), 1200.0);
+        revenue.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            1000.0,
+        );
+        revenue.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            1200.0,
+        );
         results.nodes.insert("Revenue".to_string(), revenue);
 
         results
@@ -263,7 +275,10 @@ mod tests {
     #[test]
     fn add_adjustment_and_validate_agree_on_duplicates() {
         let mut amounts = IndexMap::new();
-        amounts.insert(PeriodId::quarter(2025, 1), 10.0);
+        amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            10.0,
+        );
 
         let config = NormalizationConfig::new("EBITDA")
             .add_adjustment(Adjustment::fixed("a", "A", amounts.clone()))
@@ -282,8 +297,14 @@ mod tests {
     fn test_fixed_adjustment() {
         let results = mock_results();
         let mut amounts = IndexMap::new();
-        amounts.insert(PeriodId::quarter(2025, 1), 10.0);
-        amounts.insert(PeriodId::quarter(2025, 2), 15.0);
+        amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            10.0,
+        );
+        amounts.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            15.0,
+        );
 
         let adj = Adjustment::fixed("addback1", "Addback 1", amounts);
         let config = NormalizationConfig::new("EBITDA")
@@ -322,7 +343,7 @@ mod tests {
             .nodes
             .get_mut("Revenue")
             .expect("Revenue node should exist")
-            .shift_remove(&PeriodId::quarter(2025, 2));
+            .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
 
         let adj = Adjustment::percentage("perc1", "Perc 1", "Revenue", 0.05);
         let config = NormalizationConfig::new("EBITDA")
@@ -342,7 +363,10 @@ mod tests {
         // Synergies: 50.0 fixed. Cap: 20% of EBITDA.
         // Q1 EBITDA = 100. Cap = 20. Raw = 50. Result = 20 (Capped).
         let mut amounts = IndexMap::new();
-        amounts.insert(PeriodId::quarter(2025, 1), 50.0);
+        amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            50.0,
+        );
 
         let adj = Adjustment::fixed("syn", "Synergies", amounts)
             .with_cap(Some("EBITDA".to_string()), 0.20);
@@ -364,8 +388,14 @@ mod tests {
     fn test_merge_into_results() {
         let mut results = mock_results();
         let mut amounts = IndexMap::new();
-        amounts.insert(PeriodId::quarter(2025, 1), 10.0);
-        amounts.insert(PeriodId::quarter(2025, 2), 15.0);
+        amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            10.0,
+        );
+        amounts.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            15.0,
+        );
 
         let adj = Adjustment::fixed("addback1", "Addback 1", amounts);
         let config = NormalizationConfig::new("EBITDA")
@@ -384,13 +414,13 @@ mod tests {
             .expect("Adjusted EBITDA should be added");
         assert_eq!(
             *adjusted
-                .get(&PeriodId::quarter(2025, 1))
+                .get(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
                 .expect("Q1 adjusted value present"),
             110.0
         );
         assert_eq!(
             *adjusted
-                .get(&PeriodId::quarter(2025, 2))
+                .get(&PeriodId::quarter(2025, 2).expect("valid period fixture"))
                 .expect("Q2 adjusted value present"),
             135.0
         );
@@ -407,11 +437,17 @@ mod tests {
         let results = mock_results();
 
         let mut addback_amounts = IndexMap::new();
-        addback_amounts.insert(PeriodId::quarter(2025, 1), 20.0);
+        addback_amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            20.0,
+        );
         let addback = Adjustment::fixed("addback", "Addback", addback_amounts);
 
         let mut second_amounts = IndexMap::new();
-        second_amounts.insert(PeriodId::quarter(2025, 1), 40.0);
+        second_amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            40.0,
+        );
 
         // Omitted base_mode: `with_cap` uses `CapBaseMode::default()`.
         let default_second = Adjustment::fixed("second", "Second", second_amounts.clone())
@@ -463,11 +499,17 @@ mod tests {
     fn test_capped_adjustment_does_not_use_negative_ebitda_as_positive_cap_room() {
         let mut results = StatementResult::new();
         let mut ebitda = IndexMap::new();
-        ebitda.insert(PeriodId::quarter(2025, 1), -100.0);
+        ebitda.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            -100.0,
+        );
         results.nodes.insert("EBITDA".to_string(), ebitda);
 
         let mut amounts = IndexMap::new();
-        amounts.insert(PeriodId::quarter(2025, 1), 50.0);
+        amounts.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            50.0,
+        );
 
         let adj = Adjustment::fixed("syn", "Synergies", amounts)
             .with_cap(Some("EBITDA".to_string()), 0.20);

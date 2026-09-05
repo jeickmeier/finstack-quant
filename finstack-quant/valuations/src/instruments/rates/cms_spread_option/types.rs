@@ -204,11 +204,13 @@ impl CmsSpreadOption {
 
         CmsSpreadOption {
             id: InstrumentId::new("CMS-SPREAD-10Y2Y"),
-            long_cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years),
-            short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years),
+            long_cms_tenor: Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years)
+                .expect("valid example tenor"),
+            short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
+                .expect("valid example tenor"),
             strike: 0.005, // 50bp
             option_type: CmsSpreadOptionType::Call,
-            notional: Money::new(10_000_000.0, Currency::USD),
+            notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry_date: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
             payment_date: Date::from_calendar_date(2027, Month::March, 31).expect("valid"),
             long_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-10Y"),
@@ -392,8 +394,10 @@ mod tests {
     fn long_tenor_shorter_than_short_fails() {
         let mut opt = CmsSpreadOption::example();
         // Swap the tenors so long < short
-        opt.long_cms_tenor = Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years);
-        opt.short_cms_tenor = Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years);
+        opt.long_cms_tenor = Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
+            .expect("valid tenor fixture");
+        opt.short_cms_tenor = Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years)
+            .expect("valid tenor fixture");
         assert!(opt.validate().is_err());
     }
 
@@ -522,10 +526,11 @@ mod tests {
         );
 
         // Explicit per-field override beats the convention.
-        opt.swap_fixed_frequency = Some(Tenor::new(3, TenorUnit::Months));
+        opt.swap_fixed_frequency =
+            Some(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"));
         assert_eq!(
             opt.reference_swap().resolved_fixed_frequency(),
-            Tenor::new(3, TenorUnit::Months)
+            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
         );
     }
 

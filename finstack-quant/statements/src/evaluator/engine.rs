@@ -81,15 +81,15 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
 /// let model = ModelBuilder::new("demo")
 ///     .periods("2025Q1..Q2", None)?
 ///     .value("revenue", &[
-///         (PeriodId::quarter(2025, 1), 100_000.0.into()),
-///         (PeriodId::quarter(2025, 2), 105_000.0.into()),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), 100_000.0.into()),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), 105_000.0.into()),
 ///     ])
 ///     .compute("gross_profit", "revenue * 0.6")?
 ///     .build()?;
 ///
 /// let mut evaluator = Evaluator::new();
 /// let results = evaluator.evaluate(&model)?;
-/// assert_eq!(results.get("revenue", &PeriodId::quarter(2025, 1)), Some(100_000.0));
+/// assert_eq!(results.get("revenue", &PeriodId::quarter(2025, 1).expect("valid period fixture")), Some(100_000.0));
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Clone)]
@@ -951,7 +951,10 @@ mod tests {
             .expect("evaluation should succeed");
 
         assert_eq!(
-            results.get("guarded_metric", &PeriodId::quarter(2025, 1)),
+            results.get(
+                "guarded_metric",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            ),
             Some(0.0)
         );
     }
@@ -966,7 +969,7 @@ mod tests {
     /// and numerically wrong instead of an error.
     #[test]
     fn evaluate_prepared_rejects_a_model_whose_formula_changed() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let build = |factor: &str| {
             ModelBuilder::new("prepared-drift")
                 .periods("2025Q1..Q1", None)
@@ -1006,13 +1009,19 @@ mod tests {
             .periods;
         let mut model = FinancialModelSpec::new("as-of-policy", periods);
         let mut values = IndexMap::new();
-        values.insert(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0));
-        values.insert(PeriodId::quarter(2025, 2), AmountOrScalar::scalar(999.0));
+        values.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(100.0),
+        );
+        values.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            AmountOrScalar::scalar(999.0),
+        );
         model.add_node(
             NodeSpec::new("revenue", NodeType::Mixed)
                 .with_values(values)
                 .with_availability_dates(IndexMap::from([(
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     Date::from_calendar_date(2025, Month::January, 1).expect("date"),
                 )]))
                 .with_formula("123"),
@@ -1025,11 +1034,17 @@ mod tests {
             .expect("evaluation");
 
         assert_eq!(
-            results.get("revenue", &PeriodId::quarter(2025, 1)),
+            results.get(
+                "revenue",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            ),
             Some(100.0)
         );
         assert_eq!(
-            results.get("revenue", &PeriodId::quarter(2025, 2)),
+            results.get(
+                "revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            ),
             Some(123.0)
         );
     }

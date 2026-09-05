@@ -88,7 +88,7 @@ impl EvaluationContext {
     /// # use indexmap::IndexMap;
     /// # use std::sync::Arc;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let mut columns = IndexMap::new();
     /// columns.insert(NodeId::new("revenue"), 0);
     /// let ctx = EvaluationContext::new(period, Arc::new(columns), Arc::new(IndexMap::new()));
@@ -475,7 +475,7 @@ mod tests {
         node_to_column.insert(NodeId::new("cogs"), 1);
 
         let ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -489,7 +489,7 @@ mod tests {
         node_to_column.insert(NodeId::new("revenue"), 0);
 
         let mut ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -510,21 +510,27 @@ mod tests {
         let mut historical = IndexMap::new();
         let mut q1_results = IndexMap::new();
         q1_results.insert("revenue".to_string(), 100_000.0);
-        historical.insert(PeriodId::quarter(2025, 1), q1_results);
+        historical.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            q1_results,
+        );
 
         let ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 2),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(historical),
         );
 
-        let value = ctx.get_historical_value("revenue", &PeriodId::quarter(2025, 1));
+        let value = ctx.get_historical_value(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        );
         assert_eq!(value, Some(100_000.0));
     }
 
     #[test]
     fn named_constructor_adopts_layout_expanded_for_historical_only_nodes() {
-        let q1 = PeriodId::quarter(2025, 1);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut node_to_column = IndexMap::new();
         node_to_column.insert(NodeId::new("revenue"), 0);
         let historical = IndexMap::from_iter([(
@@ -536,7 +542,7 @@ mod tests {
         )]);
 
         let ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 2),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(historical),
         );
@@ -555,7 +561,7 @@ mod tests {
         let columns = Arc::new(IndexMap::from_iter([(NodeId::new("revenue"), 0)]));
         let history = Arc::new(PeriodHistory::new(Arc::clone(&columns)));
         let ctx = EvaluationContext::new_with_history(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             Arc::clone(&history),
             Arc::new(IndexMap::new()),
         );
@@ -574,7 +580,7 @@ mod tests {
         node_to_column.insert(NodeId::new("debt"), 0);
 
         let mut ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -591,7 +597,7 @@ mod tests {
         node_to_column.insert(NodeId::new("bad"), 0);
 
         let mut ctx = EvaluationContext::new(
-            PeriodId::quarter(2025, 1),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );

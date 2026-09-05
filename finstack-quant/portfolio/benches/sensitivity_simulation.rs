@@ -84,7 +84,7 @@ impl Instrument for CurveZeroInstrument {
         Box::new(self.clone())
     }
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-        Ok(Money::new(self.raw_value(market)?, Currency::USD))
+        Ok(Money::new(self.raw_value(market)?, Currency::USD).expect("valid money fixture"))
     }
     fn base_value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
         self.raw_value(market)

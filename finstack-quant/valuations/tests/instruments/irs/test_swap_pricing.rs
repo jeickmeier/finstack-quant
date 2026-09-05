@@ -23,7 +23,7 @@ fn create_test_swap() -> InterestRateSwap {
 
     test_utils::usd_irs_swap(
         "IRS-DETERMINISM-TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04, // 4% fixed rate
         start,
         end,
@@ -260,7 +260,7 @@ fn test_swap_pay_vs_receive_determinism() {
 
     let swap_pay = test_utils::usd_irs_swap(
         "PAY-FIXED",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         start,
         end,
@@ -270,7 +270,7 @@ fn test_swap_pay_vs_receive_determinism() {
 
     let swap_rec = test_utils::usd_irs_swap(
         "RECEIVE-FIXED",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         start,
         end,

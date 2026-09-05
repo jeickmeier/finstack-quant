@@ -22,8 +22,8 @@ use indexmap::IndexMap;
 /// let model = ModelBuilder::new("sensitivity_test")
 ///     .periods("2025Q1..Q2", None)?
 ///     .value("revenue", &[
-///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100_000.0)),
-///         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110_000.0)),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
 ///     ])
 ///     .compute("cogs", "revenue * 0.6")?
 ///     .compute("gross_profit", "revenue - cogs")?
@@ -35,7 +35,7 @@ use indexmap::IndexMap;
 /// // Define parameter to vary
 /// config.add_parameter(ParameterSpec::with_percentages(
 ///     "revenue",
-///     PeriodId::quarter(2025, 1),
+///     PeriodId::quarter(2025, 1).expect("valid period fixture"),
 ///     100_000.0,
 ///     vec![-10.0, 0.0, 10.0],
 /// ));
@@ -316,7 +316,7 @@ impl<'a> SensitivityAnalyzer<'a> {
         if let Some(node) = model.nodes.get_mut(node_id) {
             let typed_value = match node.value_type {
                 Some(NodeValueType::Monetary { currency }) => {
-                    AmountOrScalar::amount(value, currency)
+                    AmountOrScalar::amount(value, currency)?
                 }
                 Some(NodeValueType::Scalar) => AmountOrScalar::scalar(value),
                 None => {
@@ -565,8 +565,8 @@ mod tests {
 
     #[test]
     fn test_diagonal_sensitivity() {
-        let period = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("valid period range")
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_full_grid_sensitivity_builds_cartesian_product() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q1", None)
             .expect("valid period range")
@@ -640,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_tornado_orders_scenarios_by_target_metric_impact() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q1", None)
             .expect("valid period range")
@@ -681,8 +681,8 @@ mod tests {
 
     #[test]
     fn test_full_grid_scenario_metadata_distinguishes_period_overrides() {
-        let period1 = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("valid period range")
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_generate_tornado_entries_sorts_nan_swings_last() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let metric = "gross_profit".to_string();
         let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
         config.add_parameter(ParameterSpec::new(
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn override_at_period_outside_model_grid_errors() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q1", None)
             .expect("valid period range")
@@ -791,7 +791,7 @@ mod tests {
         // 2026Q1 is not in the model grid: previously a silent no-op scenario.
         config.add_parameter(ParameterSpec::new(
             "revenue",
-            PeriodId::quarter(2026, 1),
+            PeriodId::quarter(2026, 1).expect("valid period fixture"),
             100_000.0,
             vec![90_000.0, 110_000.0],
         ));
@@ -807,7 +807,7 @@ mod tests {
 
     #[test]
     fn tornado_entries_anchor_on_true_baseline_when_base_not_in_grid() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q1", None)
             .expect("valid period range")
@@ -851,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_max_target_impact_preserves_infinite_deltas() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let metric = "gross_profit".to_string();
 
         let mut baseline = StatementResult::new();
@@ -887,11 +887,14 @@ mod tests {
 
     #[test]
     fn monetary_sensitivity_preserves_node_currency() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("money-sensitivity")
             .periods("2025Q1..Q1", None)
             .expect("periods")
-            .value_money("revenue", &[(period, Money::new(100_000.0, Currency::USD))])
+            .value_money(
+                "revenue",
+                &[(period, Money::from((100_000_i64, Currency::USD)))],
+            )
             .build()
             .expect("model");
         let analyzer = SensitivityAnalyzer::new(&model);

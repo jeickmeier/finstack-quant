@@ -49,7 +49,7 @@ impl MetricCalculator for JapaneseSimpleYieldCalculator {
             Money::new(
                 quote_ctx.dirty_from_clean_pct(clean_px, notional.amount()),
                 notional.currency(),
-            )
+            )?
         } else {
             let pv_at_quote =
                 crate::instruments::fixed_income::bond::pricing::settlement::model_dirty_at_quote_date(
@@ -59,7 +59,7 @@ impl MetricCalculator for JapaneseSimpleYieldCalculator {
                     quote_ctx.quote_date,
                     context.base_value.amount(),
                 )?;
-            Money::new(pv_at_quote, notional.currency())
+            Money::new(pv_at_quote, notional.currency())?
         };
         if dirty.amount() <= 0.0 {
             return Err(finstack_quant_core::Error::from(

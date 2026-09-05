@@ -186,7 +186,7 @@ impl ImProfile {
 /// `IM(t) = SIMM(sensitivities) × decay(t)`.
 ///
 /// The base IM is `calculator.calculate_from_sensitivities_parts(sensitivities,
-/// currency).0` — the full cross-risk-class ISDA SIMM aggregate.
+/// currency).expect("valid sensitivity fixture").0` — the full cross-risk-class ISDA SIMM aggregate.
 ///
 /// # Arguments
 ///
@@ -215,7 +215,7 @@ pub fn im_profile_from_simm(
     validate_time_grid(time_grid)?;
     sensitivities.validate()?;
     let (base_im, _breakdown) =
-        calculator.calculate_from_sensitivities_parts(sensitivities, currency);
+        calculator.calculate_from_sensitivities_parts(sensitivities, currency)?;
     let profile = ImProfile {
         times: time_grid.to_vec(),
         im_values: time_grid
@@ -516,7 +516,9 @@ mod tests {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("calculator");
         let mut sens = SimmSensitivities::new(Currency::USD);
         sens.add_ir_delta(Currency::USD, "5Y", 50_000.0);
-        let (base_im, _) = calc.calculate_from_sensitivities_parts(&sens, Currency::USD);
+        let (base_im, _) = calc
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect("valid sensitivity fixture");
         assert!(base_im > 0.0, "SIMM IM must be positive for a nonzero DV01");
 
         let decay = ImDecayProfile::LinearToMaturity {

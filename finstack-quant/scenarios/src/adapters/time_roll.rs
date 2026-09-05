@@ -391,7 +391,7 @@ mod tests {
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
             Bond::builder()
                 .id("BOND1".into())
-                .notional(Money::new(100.0, Currency::USD))
+                .notional(Money::from((100_i64, Currency::USD)))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
                 .cashflow_spec(
@@ -486,7 +486,7 @@ mod tests {
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
             Bond::builder()
                 .id("BOND1".into())
-                .notional(Money::new(100.0, Currency::USD))
+                .notional(Money::from((100_i64, Currency::USD)))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
                 .cashflow_spec(
@@ -508,7 +508,7 @@ mod tests {
 
         // 2025-01-01 + 1M calendar is 2025-02-01 (31 days, unadjusted).
         let new_date = base_date + time::Duration::days(31);
-        let mut cf_sum = Money::new(0.0, Currency::USD);
+        let mut cf_sum = Money::from((0_i64, Currency::USD));
         if let Ok(flows) = instrument.dated_cashflows(&market, base_date) {
             for (date, money) in flows {
                 if date > base_date && date <= new_date {

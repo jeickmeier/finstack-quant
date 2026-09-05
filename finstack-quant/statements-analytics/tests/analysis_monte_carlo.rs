@@ -14,11 +14,11 @@ fn evaluate_monte_carlo_produces_deterministic_results() {
         .mixed("revenue")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -67,11 +67,11 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
         .mixed("a")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -81,11 +81,11 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
         .mixed("b")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -101,7 +101,7 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
     let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
 
-    let q3 = PeriodId::quarter(2025, 3);
+    let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res
         .percentile_by_period("a", 0.5)
         .expect("a")
@@ -134,11 +134,11 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
         .mixed("a")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -148,11 +148,11 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
         .mixed("b")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])
@@ -168,7 +168,7 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
     let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
 
-    let q3 = PeriodId::quarter(2025, 3);
+    let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res
         .percentile_by_period("a", 0.5)
         .expect("a")
@@ -201,11 +201,11 @@ fn evaluate_monte_carlo_correlated_forecast_rejects_unknown_peer() {
         .mixed("revenue")
         .values(&[
             (
-                PeriodId::quarter(2025, 1),
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 AmountOrScalar::scalar(100_000.0),
             ),
             (
-                PeriodId::quarter(2025, 2),
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 AmountOrScalar::scalar(110_000.0),
             ),
         ])

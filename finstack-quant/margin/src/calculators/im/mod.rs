@@ -32,7 +32,7 @@ use finstack_quant_core::money::Money;
 /// place.
 #[must_use]
 pub(crate) fn conservative_im(exposure_base: Money, conservative_rate: f64) -> Money {
-    Money::new(exposure_base.amount().abs(), exposure_base.currency()) * conservative_rate
+    exposure_base.abs() * conservative_rate
 }
 
 pub(crate) fn require_im_exposure_base(

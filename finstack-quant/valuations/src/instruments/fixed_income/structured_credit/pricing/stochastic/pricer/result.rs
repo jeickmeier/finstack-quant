@@ -79,8 +79,8 @@ impl StochasticPricingResult {
             clean_price: 0.0,
             dirty_price: 0.0,
             expected_loss,
-            unexpected_loss: Money::new(0.0, currency),
-            expected_shortfall: Money::new(0.0, currency),
+            unexpected_loss: Money::from((0_i64, currency)),
+            expected_shortfall: Money::from((0_i64, currency)),
             es_confidence: 0.95,
             pv_std_error: 0.0,
             pv_confidence_interval: (0.0, 0.0),
@@ -156,9 +156,9 @@ impl TranchePricingResult {
             tranche_id,
             seniority,
             npv,
-            expected_loss: Money::new(0.0, currency),
-            unexpected_loss: Money::new(0.0, currency),
-            expected_shortfall: Money::new(0.0, currency),
+            expected_loss: Money::from((0_i64, currency)),
+            unexpected_loss: Money::from((0_i64, currency)),
+            expected_shortfall: Money::from((0_i64, currency)),
             attachment: 0.0,
             detachment: 1.0,
             average_life: 0.0,
@@ -213,8 +213,8 @@ mod tests {
     #[test]
     fn test_stochastic_result_creation() {
         let currency = Currency::USD;
-        let npv = Money::new(1_000_000.0, currency);
-        let el = Money::new(50_000.0, currency);
+        let npv = Money::from((1_000_000_i64, currency));
+        let el = Money::from((50_000_i64, currency));
 
         let result = StochasticPricingResult::new(npv, el, 1000, PricingMode::Tree);
 
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn test_tranche_result_creation() {
         let currency = Currency::USD;
-        let npv = Money::new(100_000.0, currency);
+        let npv = Money::from((100_000_i64, currency));
 
         let tranche = TranchePricingResult::new("A".to_string(), TrancheSeniority::Senior, npv)
             .with_subordination(0.20, 1.00);
@@ -240,10 +240,10 @@ mod tests {
     #[test]
     fn test_builder_pattern() {
         let currency = Currency::USD;
-        let npv = Money::new(1_000_000.0, currency);
-        let el = Money::new(50_000.0, currency);
-        let ul = Money::new(75_000.0, currency);
-        let es = Money::new(100_000.0, currency);
+        let npv = Money::from((1_000_000_i64, currency));
+        let el = Money::from((50_000_i64, currency));
+        let ul = Money::from((75_000_i64, currency));
+        let es = Money::from((100_000_i64, currency));
 
         let result = StochasticPricingResult::new(npv, el, 1000, PricingMode::Tree)
             .with_unexpected_loss(ul)

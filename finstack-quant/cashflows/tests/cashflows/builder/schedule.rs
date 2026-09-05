@@ -62,14 +62,14 @@ fn linear_vs_step_parity() {
         },
     };
 
-    let init = Money::new(1_000.0, Currency::USD);
+    let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
 
     // Linear
     let mut b1 = CashFlowSchedule::builder();
     let _ = b1
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::LinearTo {
-            final_notional: Money::new(0.0, Currency::USD),
+            final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         })
         .fixed_cf(fixed.clone());
     let s1 = b1.build(None).unwrap();
@@ -98,7 +98,10 @@ fn linear_vs_step_parity() {
     for period in &sched {
         let d = period.payment_date;
         remaining = (remaining - delta).max(0.0);
-        pairs.push((d, Money::new(remaining, Currency::USD)));
+        pairs.push((
+            d,
+            Money::new(remaining, Currency::USD).expect("valid money fixture"),
+        ));
     }
 
     let mut b2 = CashFlowSchedule::builder();
@@ -125,7 +128,7 @@ fn linear_vs_step_parity() {
 fn pik_capitalization_increases_outstanding() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000.0, Currency::USD);
+    let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
 
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Pik,
@@ -170,7 +173,7 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let switch = Date::from_calendar_date(2025, Month::July, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
-    let init = Money::new(1_200.0, Currency::USD);
+    let init = Money::new(1_200.0, Currency::USD).expect("valid money fixture");
 
     let monthly_fixed = FixedWindow {
         rate: Decimal::try_from(0.05).expect("valid"),
@@ -223,7 +226,7 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
     let _ = builder
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::LinearTo {
-            final_notional: Money::new(0.0, Currency::USD),
+            final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         })
         .fixed_to_float(switch, monthly_fixed, quarterly_float, CouponType::Cash);
     let schedule = builder.build(None).unwrap();
@@ -253,7 +256,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let switch = Date::from_calendar_date(2025, Month::April, 20).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let quarterly = finstack_quant_cashflows::builder::ScheduleParams {
         frequency: Tenor::quarterly(),
@@ -330,7 +333,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
 fn ordering_invariants_within_date() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::July, 15).unwrap();
-    let init = Money::new(1_000.0, Currency::USD);
+    let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Split {
             cash_pct: Decimal::try_from(0.5).expect("valid"),
@@ -416,7 +419,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
@@ -484,7 +487,7 @@ fn detects_stub_periods() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
@@ -548,7 +551,11 @@ fn negative_rate_fixed_coupons_are_emitted() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(fixed);
     let schedule = b.build(None).unwrap();
 
@@ -612,7 +619,7 @@ fn floating_rate_spec_rejects_floor_bp_alias() {
 fn outstanding_by_date_dedup_and_values() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::July, 15).unwrap();
-    let init = Money::new(10_000.0, Currency::USD);
+    let init = Money::new(10_000.0, Currency::USD).expect("valid money fixture");
 
     // Force multiple flows per date: split coupon (cash + PIK) and amortization on coupon dates
     let fixed = FixedCouponSpec {
@@ -709,12 +716,13 @@ fn outstanding_by_date_includes_prepayment() {
         vec![CashFlow::new(
             prepay_date,
             None,
-            Money::new(250.0, Currency::USD),
+            Money::new(250.0, Currency::USD).expect("valid money fixture"),
             CFKind::PrePayment,
             0.0,
             None,
         )],
-        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
+            .expect("valid notional fixture"),
         DayCount::Act365F,
         finstack_quant_cashflows::builder::schedule::CashFlowMeta {
             issue_date: Some(prepay_date),
@@ -740,7 +748,7 @@ fn outstanding_by_date_includes_defaulted_notional() {
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(300.0, Currency::USD),
+                Money::new(300.0, Currency::USD).expect("valid money fixture"),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
@@ -748,13 +756,14 @@ fn outstanding_by_date_includes_defaulted_notional() {
             CashFlow::new(
                 recovery_date,
                 None,
-                Money::new(120.0, Currency::USD),
+                Money::new(120.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
             ),
         ],
-        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
+            .expect("valid notional fixture"),
         DayCount::Act365F,
         finstack_quant_cashflows::builder::schedule::CashFlowMeta {
             issue_date: Some(default_date),
@@ -780,7 +789,7 @@ fn outstanding_by_date_includes_defaulted_notional() {
 fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::July, 15).unwrap();
-    let init = Money::new(10_000.0, Currency::USD);
+    let init = Money::new(10_000.0, Currency::USD).expect("valid money fixture");
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: Decimal::try_from(0.05).expect("valid"),
@@ -819,12 +828,13 @@ fn outstanding_by_date_requires_issue_date() {
         vec![CashFlow::new(
             prepay_date,
             None,
-            Money::new(250.0, Currency::USD),
+            Money::new(250.0, Currency::USD).expect("valid money fixture"),
             CFKind::PrePayment,
             0.0,
             None,
         )],
-        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
+            .expect("valid notional fixture"),
         DayCount::Act365F,
         finstack_quant_cashflows::builder::schedule::CashFlowMeta::default(),
     );
@@ -842,10 +852,14 @@ fn fixed_fee_on_issue_date_is_emitted() {
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fee(FeeSpec::Fixed {
             date: issue,
-            amount: Money::new(12_500.0, Currency::USD),
+            amount: Money::new(12_500.0, Currency::USD).expect("valid money fixture"),
         });
 
     let schedule = builder.build(None).unwrap();
@@ -896,7 +910,11 @@ fn schedule_errors_on_unknown_calendar() {
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(fixed);
 
     let result = builder.build(None);
@@ -933,7 +951,7 @@ fn stub_period_thirty360_produces_proportional_accrual() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
@@ -1025,7 +1043,7 @@ fn coupon_amount_golden_values() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
@@ -1131,7 +1149,7 @@ fn cashflow_conservation_bond_principal() {
         },
     };
 
-    let init = Money::new(notional_amt, Currency::USD);
+    let init = Money::new(notional_amt, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
@@ -1186,8 +1204,8 @@ fn cashflow_conservation_amortizing_bond_principal() {
         },
     };
 
-    let init = Money::new(notional_amt, Currency::USD);
-    let final_notional = Money::new(0.0, Currency::USD);
+    let init = Money::new(notional_amt, Currency::USD).expect("valid money fixture");
+    let final_notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
@@ -1242,8 +1260,8 @@ fn outstanding_never_negative() {
         },
     };
 
-    let init = Money::new(notional_amt, Currency::USD);
-    let final_notional = Money::new(0.0, Currency::USD);
+    let init = Money::new(notional_amt, Currency::USD).expect("valid money fixture");
+    let final_notional = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
@@ -1295,7 +1313,7 @@ fn npv_decreases_with_higher_discount_rate() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
@@ -1355,7 +1373,7 @@ fn test_weighted_average_life_two_amort() {
         CashFlow::new(
             d1,
             None,
-            Money::new(500.0, Currency::USD),
+            Money::new(500.0, Currency::USD).expect("valid money fixture"),
             CFKind::Amortization,
             0.0,
             None,
@@ -1363,7 +1381,7 @@ fn test_weighted_average_life_two_amort() {
         CashFlow::new(
             d2,
             None,
-            Money::new(500.0, Currency::USD),
+            Money::new(500.0, Currency::USD).expect("valid money fixture"),
             CFKind::Amortization,
             0.0,
             None,
@@ -1372,7 +1390,7 @@ fn test_weighted_average_life_two_amort() {
 
     let schedule = CashFlowSchedule::from_parts(
         flows,
-        Notional::par(1_000.0, Currency::USD),
+        Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );
@@ -1402,7 +1420,7 @@ fn test_weighted_average_life_bullet() {
     let flows = vec![CashFlow::new(
         maturity,
         None,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         CFKind::Notional,
         0.0,
         None,
@@ -1410,7 +1428,7 @@ fn test_weighted_average_life_bullet() {
 
     let schedule = CashFlowSchedule::from_parts(
         flows,
-        Notional::par(1_000_000.0, Currency::USD),
+        Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );
@@ -1436,7 +1454,7 @@ fn test_weighted_average_life_empty() {
 
     let schedule = CashFlowSchedule::from_parts(
         vec![],
-        Notional::par(1_000_000.0, Currency::USD),
+        Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );
@@ -1464,7 +1482,7 @@ fn test_weighted_average_life_ignores_coupons() {
         CashFlow::new(
             d1,
             None,
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             CFKind::Fixed,
             0.5,
             Some(0.05),
@@ -1473,7 +1491,7 @@ fn test_weighted_average_life_ignores_coupons() {
         CashFlow::new(
             d2,
             None,
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             CFKind::Fixed,
             0.5,
             Some(0.05),
@@ -1482,7 +1500,7 @@ fn test_weighted_average_life_ignores_coupons() {
         CashFlow::new(
             maturity,
             None,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             CFKind::Notional,
             0.0,
             None,
@@ -1491,7 +1509,7 @@ fn test_weighted_average_life_ignores_coupons() {
 
     let schedule = CashFlowSchedule::from_parts(
         flows,
-        Notional::par(1_000_000.0, Currency::USD),
+        Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
     );
@@ -1550,7 +1568,7 @@ fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).floating_cf(float);
     let schedule = builder.build(None).expect("lagged SOFR-style schedule");
@@ -1603,7 +1621,7 @@ fn pik_then_redemption_on_lagged_payment_date() {
         },
     };
 
-    let init = Money::new(1_000.0, Currency::USD);
+    let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = builder.build(None).expect("PIK lagged schedule");
@@ -1668,7 +1686,7 @@ fn lag_zero_weekend_maturity_redeems_on_adjusted_business_day() {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = builder.build(None).expect("lag-0 weekend schedule");
@@ -1717,7 +1735,7 @@ fn principal_exchange_fixed_spec() -> FixedCouponSpec {
 fn principal_exchange_default_emits_issue_and_redemption() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
@@ -1745,7 +1763,7 @@ fn principal_exchange_default_emits_issue_and_redemption() {
 fn principal_exchange_none_is_coupon_only() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let spec = principal_exchange_fixed_spec();
 
     let mut with_exchange = CashFlowSchedule::builder();
@@ -1794,14 +1812,14 @@ fn principal_exchange_none_is_coupon_only() {
 fn principal_exchange_none_keeps_amortization_flows() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
         .principal_exchange(PrincipalExchange::None)
         .amortization(AmortizationSpec::LinearTo {
-            final_notional: Money::new(0.0, Currency::USD),
+            final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         })
         .fixed_cf(principal_exchange_fixed_spec());
     let schedule = builder.build(None).expect("amortizing no-exchange");

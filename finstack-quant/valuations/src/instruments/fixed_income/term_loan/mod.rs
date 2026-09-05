@@ -42,7 +42,7 @@
 //!     id: InstrumentId::new("TL-BULLET-5Y"),
 //!     discount_curve_id: CurveId::new("USD-CREDIT"),
 //!     currency: Currency::USD,
-//!     notional_limit: Some(Money::new(10_000_000.0, Currency::USD)),
+//!     notional_limit: Some(Money::from((10_000_000_i64, Currency::USD))),
 //!     issue: create_date(2025, Month::January, 15)?,
 //!     maturity: create_date(2030, Month::January, 15)?,
 //!     rate: RateSpec::Fixed { rate_bp: 600 },  // 6% fixed

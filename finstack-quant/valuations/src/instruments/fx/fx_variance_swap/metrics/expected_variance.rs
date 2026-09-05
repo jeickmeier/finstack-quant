@@ -80,7 +80,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_id("EURUSD".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)
@@ -170,7 +170,7 @@ mod tests {
             "expected variance must use the time-weighted blend: metric={metric} \
              time-weighted={expected_time}"
         );
-        let pv_from_metric = swap.payoff(metric).amount() * df;
+        let pv_from_metric = swap.payoff(metric).expect("valid payoff").amount() * df;
         assert!(
             (base_value.amount() - pv_from_metric).abs()
                 < 1e-6 * base_value.amount().abs().max(1.0),

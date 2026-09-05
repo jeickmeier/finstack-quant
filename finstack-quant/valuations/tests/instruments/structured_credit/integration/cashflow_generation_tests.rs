@@ -44,7 +44,7 @@ fn create_test_pool() -> AssetPool {
                 asset_type: AssetType::FirstLienLoan {
                     industry: Some(format!("Industry_{}", i % 3)),
                 },
-                balance: Money::new(30_000_000.0, Currency::USD),
+                balance: Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
                 rate: 0.08,
                 spread_bp: Some(450.0 + i as f64 * 50.0),
                 index_id: Some("SOFR-3M".to_string()),
@@ -72,7 +72,7 @@ fn create_test_tranches() -> TrancheStructure {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(15_000_000.0, Currency::USD),
+        Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.15 },
         maturity_date(),
     )
@@ -83,7 +83,7 @@ fn create_test_tranches() -> TrancheStructure {
         10.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(135_000_000.0, Currency::USD),
+        Money::new(135_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
             index_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),

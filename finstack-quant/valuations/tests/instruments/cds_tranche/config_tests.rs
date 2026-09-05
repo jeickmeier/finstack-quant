@@ -264,7 +264,7 @@ fn test_accumulated_loss_valid_zero() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -283,7 +283,7 @@ fn test_accumulated_loss_valid_mid_range() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -302,7 +302,7 @@ fn test_accumulated_loss_valid_one() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -321,7 +321,7 @@ fn test_accumulated_loss_invalid_negative() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -345,7 +345,7 @@ fn test_accumulated_loss_invalid_greater_than_one() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -369,7 +369,7 @@ fn test_accumulated_loss_invalid_large_value() {
     let params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );

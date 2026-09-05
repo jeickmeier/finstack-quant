@@ -23,7 +23,12 @@ pub trait ExerciseBoundaryPayoff: Payoff {
     /// harness discounts it to time 0 with the pathwise money-market
     /// numeraire `B(t_exercise)` — implementations must NOT pre-discount with
     /// the deterministic curve DF.
-    fn intrinsic_at(&self, exercise_idx: usize, short_rate: f64, currency: Currency) -> Money;
+    fn intrinsic_at(
+        &self,
+        exercise_idx: usize,
+        short_rate: f64,
+        currency: Currency,
+    ) -> finstack_quant_core::Result<Money>;
 
     /// Regression basis used for continuation-value estimation at the
     /// specified exercise date. A canonical implementation returns
@@ -60,7 +65,11 @@ pub trait ExerciseBoundaryPayoff: Payoff {
     /// date). Payoffs with intermediate coupons MUST override this so that
     /// coupons paid before an exercise date are neither fed into the
     /// continuation regression nor dropped when the issuer calls.
-    fn value_after(&self, exercise_idx: usize, currency: Currency) -> Money {
+    fn value_after(
+        &self,
+        exercise_idx: usize,
+        currency: Currency,
+    ) -> finstack_quant_core::Result<Money> {
         let _ = exercise_idx;
         self.value(currency)
     }

@@ -297,7 +297,7 @@ impl FxOption {
             )?)
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
             .day_count(DayCount::Act365F)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
@@ -693,7 +693,7 @@ mod validation_tests {
                     .expect("valid delta convention"),
             )
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USDUSD-VOL"))

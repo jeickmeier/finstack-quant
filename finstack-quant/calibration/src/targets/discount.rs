@@ -1141,7 +1141,7 @@ mod tests {
                 calendar_id: None,
                 start_date: base_date,
                 maturity: pay_date,
-                notional: Money::new(1.0, Currency::USD),
+                notional: Money::from((1_i64, Currency::USD)),
                 day_count: DayCount::Act360,
             },
         );
@@ -1210,7 +1210,7 @@ mod tests {
                 calendar_id: None,
                 start_date: base_date,
                 maturity,
-                notional: Money::new(1.0, Currency::USD),
+                notional: Money::from((1_i64, Currency::USD)),
                 day_count: DayCount::Act360,
             },
         );
@@ -1287,7 +1287,7 @@ mod tests {
                         calendar_id: None,
                         start_date: base_date,
                         maturity,
-                        notional: Money::new(notional, Currency::USD),
+                        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
                         day_count: DayCount::Act360,
                     },
                 );
@@ -1401,7 +1401,7 @@ mod tests {
                     calendar_id: None,
                     start_date: base_date,
                     maturity,
-                    notional: Money::new(1.0, Currency::USD),
+                    notional: Money::from((1_i64, Currency::USD)),
                     day_count: DayCount::Act360,
                 },
             );

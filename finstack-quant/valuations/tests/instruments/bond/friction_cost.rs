@@ -26,8 +26,8 @@ fn market(as_of: Date) -> MarketContext {
 fn callable_bond(as_of: Date) -> Bond {
     let mut bond = Bond::fixed(
         "CALLABLE-FRIC",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

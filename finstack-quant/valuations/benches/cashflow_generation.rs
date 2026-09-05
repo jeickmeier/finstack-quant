@@ -70,8 +70,8 @@ fn bench_bond_cashflow_generation(c: &mut Criterion) {
 
     let bond = Bond::fixed(
         format!("BOND-{}Y", tenor),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -100,7 +100,7 @@ fn bench_swap_cashflow_generation(c: &mut Criterion) {
 
     let swap = rates_support::usd_irs_swap(
         InstrumentId::new(format!("IRS-{}Y", tenor)),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         start,
         end,
@@ -148,7 +148,7 @@ fn bench_schedule_builder_fixed(c: &mut Criterion) {
         },
     };
 
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     group.bench_with_input(
         BenchmarkId::from_parameter(format!("{}Y", tenor)),
@@ -175,7 +175,10 @@ fn bench_kahan_summation(c: &mut Criterion) {
         .map(|i| {
             let months = i * 6; // Semi-annual
             let date = base + time::Duration::days(months * 30);
-            (date, Money::new(1000.0, Currency::USD))
+            (
+                date,
+                Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect();
 

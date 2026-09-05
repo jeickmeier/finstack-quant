@@ -80,7 +80,7 @@ pub(crate) fn price_cap_floor(
 
     let strike = cap_floor.strike_f64()?;
 
-    let mut total_pv = Money::new(0.0, cap_floor.notional.currency());
+    let mut total_pv = Money::from((0_i64, cap_floor.notional.currency()));
     let periods = cap_floor.pricing_periods()?;
     if periods.is_empty() {
         return Ok(total_pv);

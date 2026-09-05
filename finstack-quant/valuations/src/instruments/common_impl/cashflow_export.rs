@@ -439,7 +439,7 @@ fn build_envelope(
         )?;
         let base_pv = market
             .convert_money(
-                Money::new(native_pv, ccy),
+                Money::new(native_pv, ccy)?,
                 envelope_currency.unwrap_or(ccy),
                 as_of_date,
             )?
@@ -605,8 +605,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
         let facility = RevolvingCredit::builder()
             .id("RC-CASHFLOW-CREDIT".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
             .commitment_date(as_of)
             .maturity(maturity)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -721,8 +721,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
         let bond = Bond::fixed(
             "BOND-DISC-RECONCILE",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -787,8 +787,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
         let mut bond = Bond::fixed(
             "BOND-CASHFLOW-SCENARIO",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -848,8 +848,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
         let bond = Bond::fixed(
             "BOND-SEASONED-TIME-ORIGIN",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -920,8 +920,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("date");
         let bond = Bond::fixed(
             "BOND-BAD-MODEL",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -955,7 +955,7 @@ mod tests {
         let flow = finstack_quant_cashflows::primitives::CashFlow::new(
             date,
             None,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             CFKind::Notional,
             0.0,
             None,

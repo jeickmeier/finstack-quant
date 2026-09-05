@@ -38,11 +38,11 @@ fn sample_cashflows() -> Vec<(Date, Money)> {
     vec![
         (
             Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-            Money::new(60_000.0, Currency::USD),
+            Money::new(60_000.0, Currency::USD).expect("valid money fixture"),
         ),
         (
             Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-            Money::new(40_000.0, Currency::USD),
+            Money::new(40_000.0, Currency::USD).expect("valid money fixture"),
         ),
     ]
 }
@@ -75,8 +75,13 @@ fn test_tranche_duration_is_true_modified_duration() {
     // first order; the calculator must reproduce the bump value exactly.
     let expected_duration = -(shifted_pv - pv) / (pv * shift);
     let macaulay = weighted_pv / pv;
-    let duration =
-        calculate_tranche_duration(&flows, &curve, as_of, Money::new(pv, Currency::USD)).unwrap();
+    let duration = calculate_tranche_duration(
+        &flows,
+        &curve,
+        as_of,
+        Money::new(pv, Currency::USD).expect("valid money fixture"),
+    )
+    .unwrap();
 
     assert!(
         (duration - expected_duration).abs() < 1e-10,
@@ -102,8 +107,13 @@ fn test_z_spread_zero_for_curve_pv() {
         pv += amount.amount() * df;
     }
 
-    let z_spread_bp =
-        calculate_tranche_z_spread(&flows, &curve, Money::new(pv, Currency::USD), as_of).unwrap();
+    let z_spread_bp = calculate_tranche_z_spread(
+        &flows,
+        &curve,
+        Money::new(pv, Currency::USD).expect("valid money fixture"),
+        as_of,
+    )
+    .unwrap();
 
     assert!(
         z_spread_bp.abs() < 0.1,
@@ -236,7 +246,7 @@ mod discount_margin_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -252,7 +262,7 @@ mod discount_margin_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 senior_coupon,
                 maturity(),
             )
@@ -262,7 +272,7 @@ mod discount_margin_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -294,8 +304,8 @@ mod discount_margin_tests {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let richer = Money::new(pv.amount() * 1.002, pv.currency());
-        let cheaper = Money::new(pv.amount() * 0.998, pv.currency());
+        let richer = Money::new(pv.amount() * 1.002, pv.currency()).expect("valid money fixture");
+        let cheaper = Money::new(pv.amount() * 0.998, pv.currency()).expect("valid money fixture");
         let dm_rich =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
         let dm_cheap =
@@ -323,7 +333,7 @@ mod discount_margin_tests {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let target = Money::new(pv.amount() * 0.99, pv.currency());
+        let target = Money::new(pv.amount() * 0.99, pv.currency()).expect("valid money fixture");
 
         let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), target).unwrap();
 
@@ -406,7 +416,7 @@ mod breakeven_cdr_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -417,7 +427,7 @@ mod breakeven_cdr_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -427,7 +437,7 @@ mod breakeven_cdr_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -507,7 +517,7 @@ mod scenario_table_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -518,7 +528,7 @@ mod scenario_table_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -528,7 +538,7 @@ mod scenario_table_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -664,7 +674,7 @@ mod oas_tests {
         let mut pool = AssetPool::new("POOL", DealType::Abs, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity(),
             DayCount::Thirty360,
@@ -675,7 +685,7 @@ mod oas_tests {
                 0.0,
                 80.0,
                 TrancheSeniority::Senior,
-                Money::new(800_000.0, Currency::USD),
+                Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
             )
@@ -685,7 +695,7 @@ mod oas_tests {
                 80.0,
                 100.0,
                 TrancheSeniority::Equity,
-                Money::new(200_000.0, Currency::USD),
+                Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),
             )
@@ -712,7 +722,8 @@ mod oas_tests {
         let original = 800_000.0;
         // Quote 2% below the model's own price so the spread is non-trivial.
         let market_price = 0.98 * pv.amount() / original * 100.0;
-        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD);
+        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
+            .expect("valid money fixture");
 
         let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
@@ -747,7 +758,8 @@ mod oas_tests {
         let pv = sc.value_tranche("SR", &mkt, as_of).unwrap();
         let original = 800_000.0;
         let market_price = 0.98 * pv.amount() / original * 100.0;
-        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD);
+        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
+            .expect("valid money fixture");
 
         let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();

@@ -106,7 +106,8 @@ pub fn leg_usd_receive(
 ) -> finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
     finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::USD,
-        notional: finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD),
+        notional: finstack_quant_core::money::Money::new(1_000_000.0, Currency::USD)
+            .expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Receive,
         forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
         discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
@@ -131,7 +132,8 @@ pub fn leg_eur_pay(
 ) -> finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
     finstack_quant_valuations::instruments::rates::xccy_swap::XccySwapLeg {
         currency: Currency::EUR,
-        notional: finstack_quant_core::money::Money::new(900_000.0, Currency::EUR),
+        notional: finstack_quant_core::money::Money::new(900_000.0, Currency::EUR)
+            .expect("valid money fixture"),
         side: finstack_quant_valuations::instruments::rates::xccy_swap::LegSide::Pay,
         forward_curve_id: finstack_quant_core::types::CurveId::new("EUR-EURIBOR-3M"),
         discount_curve_id: finstack_quant_core::types::CurveId::new("EUR-OIS"),

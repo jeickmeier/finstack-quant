@@ -314,17 +314,17 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
     };
 
     Ok(LboResult {
-        entry_enterprise_value: Money::new(entry_enterprise_value, currency),
+        entry_enterprise_value: Money::new(entry_enterprise_value, currency)?,
         entry_metric,
-        debt_total: Money::new(debt_total, currency),
-        equity_check: Money::new(equity_check, currency),
-        sources_total: Money::new(sources_total, currency),
-        uses_total: Money::new(uses_total, currency),
+        debt_total: Money::new(debt_total, currency)?,
+        equity_check: Money::new(equity_check, currency)?,
+        sources_total: Money::new(sources_total, currency)?,
+        uses_total: Money::new(uses_total, currency)?,
         sources_uses_balanced,
-        exit_enterprise_value: Money::new(exit_enterprise_value, currency),
+        exit_enterprise_value: Money::new(exit_enterprise_value, currency)?,
         exit_metric,
-        exit_net_debt: Money::new(exit_net_debt, currency),
-        exit_equity_proceeds: Money::new(exit_equity_proceeds, currency),
+        exit_net_debt: Money::new(exit_net_debt, currency)?,
+        exit_equity_proceeds: Money::new(exit_equity_proceeds, currency)?,
         moic,
         checks,
     })

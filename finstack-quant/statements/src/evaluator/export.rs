@@ -115,19 +115,37 @@ mod tests {
         let mut nodes = IndexMap::new();
 
         let mut revenue_periods = IndexMap::new();
-        revenue_periods.insert(PeriodId::quarter(2025, 1), 100_000.0);
-        revenue_periods.insert(PeriodId::quarter(2025, 2), 110_000.0);
+        revenue_periods.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            100_000.0,
+        );
+        revenue_periods.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            110_000.0,
+        );
         nodes.insert("revenue".to_string(), revenue_periods);
 
         let mut cogs_periods = IndexMap::new();
-        cogs_periods.insert(PeriodId::quarter(2025, 1), 60_000.0);
-        cogs_periods.insert(PeriodId::quarter(2025, 2), 66_000.0);
+        cogs_periods.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            60_000.0,
+        );
+        cogs_periods.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            66_000.0,
+        );
         nodes.insert("cogs".to_string(), cogs_periods);
 
         // Gross profit
         let mut gp_periods = IndexMap::new();
-        gp_periods.insert(PeriodId::quarter(2025, 1), 40_000.0);
-        gp_periods.insert(PeriodId::quarter(2025, 2), 44_000.0);
+        gp_periods.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            40_000.0,
+        );
+        gp_periods.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            44_000.0,
+        );
         nodes.insert("gross_profit".to_string(), gp_periods);
 
         StatementResult {

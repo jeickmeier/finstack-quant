@@ -136,7 +136,7 @@ impl Instrument for RestoreTestInstrument {
                 1_000_000.0 * hazard * corr
             }
         };
-        Ok(Money::new(amount, Currency::USD))
+        Ok(Money::new(amount, Currency::USD).expect("valid money fixture"))
     }
 
     fn price_with_metrics(

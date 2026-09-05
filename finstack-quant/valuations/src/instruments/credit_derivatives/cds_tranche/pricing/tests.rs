@@ -144,13 +144,13 @@ fn sample_tranche() -> CDSTranche {
 
     {
         let tranche_params = CDSTrancheParams::new(
-            "CDX.NA.IG.42",                          // index_name
-            42,                                      // series
-            3.0,                                     // attach_pct (3%)
-            7.0,                                     // detach_pct (7%)
-            Money::new(10_000_000.0, Currency::USD), // $10MM notional
-            maturity,                                // maturity
-            500.0,                                   // running_coupon_bp (5%)
+            "CDX.NA.IG.42",                               // index_name
+            42,                                           // series
+            3.0,                                          // attach_pct (3%)
+            7.0,                                          // detach_pct (7%)
+            Money::from((10_000_000_i64, Currency::USD)), // $10MM notional
+            maturity,                                     // maturity
+            500.0,                                        // running_coupon_bp (5%)
         );
         let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
         let mut tranche = CDSTranche::new(
@@ -178,7 +178,7 @@ fn test_model_creation() {
 fn upfront_override_uses_protection_side_and_survives_wipeout() {
     let market = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let upfront = Money::new(125_000.0, Currency::USD);
+    let upfront = Money::from((125000_i64, Currency::USD));
     let pricer = CDSTranchePricer::new();
 
     let mut seller = sample_tranche();
@@ -340,7 +340,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
     let helper_params = CDSTrancheParams::equity_tranche(
         "CDX.NA.IG.42",
         42,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         maturity,
         500.0,
     );
@@ -359,7 +359,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         42,
         0.0,
         3.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         maturity,
         500.0,
     );
@@ -439,7 +439,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         42,
         3.0,
         7.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         as_of.add_months(60),
         0.0,
     );
@@ -487,7 +487,7 @@ fn price_hetero_tranche(
         42,
         attach,
         detach,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         as_of.add_months(60),
         0.0,
     );
@@ -646,7 +646,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         42,
         0.0,
         3.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         as_of.add_months(60),
         0.0,
     );
@@ -696,7 +696,7 @@ fn test_grid_step_refines_exact_convolution() {
         42,
         0.0,
         3.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         as_of.add_months(60),
         0.0,
     );
@@ -830,7 +830,7 @@ fn new_honors_monthly_schedule_params() {
         42,
         3.0,
         7.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         maturity,
         500.0,
     );
@@ -883,7 +883,7 @@ fn standard_constructor_uses_imm_cds_dates() {
         42,
         3.0,
         7.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         maturity,
         500.0,
     );
@@ -1296,7 +1296,7 @@ fn test_thin_tranche_stability() {
         42,
         3.0, // attach at 3%
         3.5, // detach at 3.5% (0.5% width)
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1_000_000_i64, Currency::USD)),
         maturity,
         500.0,
     );
@@ -1333,7 +1333,7 @@ fn test_super_senior_tranche() {
         42,
         30.0,  // super senior attachment
         100.0, // full portfolio detachment
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         maturity,
         25.0, // Very low spread for super senior
     );
@@ -1549,7 +1549,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
                 42,
                 attach,
                 detach,
-                Money::new(10_000_000.0, Currency::USD),
+                Money::from((10000000_i64, Currency::USD)),
                 maturity,
                 500.0,
             );
@@ -1740,7 +1740,7 @@ fn test_stochastic_recovery_impacts_equity_tranche() {
         42,
         0.0, // attach at 0%
         3.0, // detach at 3%
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10_000_000_i64, Currency::USD)),
         maturity,
         500.0, // 5% running coupon
     );
@@ -1907,7 +1907,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
             42,
             attach,
             detach,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10000000_i64, Currency::USD)),
             maturity,
             coupon,
         );
@@ -2376,7 +2376,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
         42,
         attach,
         detach,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::from((10000000_i64, Currency::USD)),
         maturity,
         25.0,
     );

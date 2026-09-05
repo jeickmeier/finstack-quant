@@ -83,7 +83,7 @@ where
     }
 
     /// Apply the instrument scenario to a model `Money` result exactly once.
-    pub(crate) fn apply_value(&self, base_value: Money) -> Money {
+    pub(crate) fn apply_value(&self, base_value: Money) -> finstack_quant_core::Result<Money> {
         apply_scenario_value(self.instrument, base_value)
     }
 
@@ -98,13 +98,18 @@ where
 /// Registry, direct-value, and metric assembly paths all route through this
 /// helper so the adjustment remains an exactly-once lifecycle step.
 #[inline]
-pub(crate) fn apply_scenario_value<I>(instrument: &I, base_value: Money) -> Money
+pub(crate) fn apply_scenario_value<I>(
+    instrument: &I,
+    base_value: Money,
+) -> finstack_quant_core::Result<Money>
 where
     I: crate::instruments::common_impl::traits::Instrument + ?Sized,
 {
     instrument
         .get_scenario_pricing_overrides()
-        .map_or(base_value, |overrides| overrides.apply_to_value(base_value))
+        .map_or(Ok(base_value), |overrides| {
+            overrides.apply_to_value(base_value)
+        })
 }
 
 /// Apply an instrument's scenario price adjustment without currency rounding.
@@ -724,8 +729,8 @@ mod tests {
     struct SingleFlowProvider;
 
     impl finstack_quant_cashflows::CashflowScheduleSource for SingleFlowProvider {
-        fn notional(&self) -> Option<Money> {
-            Some(Money::new(100.0, Currency::USD))
+        fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+            Ok(Some(Money::from((100_i64, Currency::USD))))
         }
 
         fn raw_cashflow_schedule(
@@ -735,13 +740,16 @@ mod tests {
         ) -> finstack_quant_core::Result<CashFlowSchedule> {
             Ok(schedule_from_dated_flows(
                 vec![
-                    (as_of, Money::new(10_000.0, Currency::USD)),
-                    (as_of + Duration::days(30), Money::new(100.0, Currency::USD)),
+                    (as_of, Money::from((10_000_i64, Currency::USD))),
+                    (
+                        as_of + Duration::days(30),
+                        Money::from((100_i64, Currency::USD)),
+                    ),
                 ],
                 crate::cashflow::primitives::CFKind::Fixed,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
-                    notional_hint: self.notional(),
+                    notional_hint: self.notional().expect("valid notional"),
                     ..Default::default()
                 },
             ))
@@ -779,7 +787,7 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(123.45, Currency::USD))
+            Ok(Money::new(123.45, Currency::USD).expect("valid money fixture"))
         }
 
         fn attributes(&self) -> &Attributes {
@@ -823,7 +831,7 @@ mod tests {
         let instrument = Arc::new(StubInstrument::new("STUB"));
         let market = Arc::new(MarketContext::new());
         let as_of = date!(2024 - 01 - 01);
-        let base_value = Money::new(10.0, Currency::USD);
+        let base_value = Money::from((10_i64, Currency::USD));
 
         let mut cfg = FinstackConfig::default();
         // Set a non-default output scale to verify it is propagated into meta
@@ -996,10 +1004,10 @@ mod tests {
     fn configured_dividend_yield_must_be_unitless() {
         let market = MarketContext::new().insert_price(
             "DIV",
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::new(
-                1.0,
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::from((
+                1_i64,
                 Currency::USD,
-            )),
+            ))),
         );
         let err = resolve_optional_dividend_yield(
             &market,

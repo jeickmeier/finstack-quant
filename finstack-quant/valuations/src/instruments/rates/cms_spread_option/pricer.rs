@@ -251,10 +251,10 @@ impl CmsSpreadOptionPricer {
         as_of: Date,
     ) -> Result<Money> {
         let data = self.price_data(inst, market, as_of)?;
-        Ok(Money::new(
+        Money::new(
             data.expected_payoff * data.discount_factor * inst.notional.amount(),
             inst.notional.currency(),
-        ))
+        )
     }
 }
 
@@ -309,7 +309,13 @@ impl Pricer for CmsSpreadOptionPricer {
         let value = Money::new(
             data.expected_payoff * data.discount_factor * option.notional.amount(),
             option.notional.currency(),
-        );
+        )
+        .map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(instrument),
+            )
+        })?;
         let mut result = ValuationResult::stamped(option.id.as_str(), as_of, value);
         result.measures.insert(
             MetricId::custom("long_cms_forward"),

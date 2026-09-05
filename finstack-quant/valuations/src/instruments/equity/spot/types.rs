@@ -237,7 +237,7 @@ impl Equity {
     ) -> finstack_quant_core::Result<Money> {
         let price = match scalar {
             MarketScalar::Price(m) => self.convert_price_to_currency(*m, market, as_of),
-            MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)),
+            MarketScalar::Unitless(v) => Ok(Money::new(*v, self.currency)?),
         }?;
         crate::instruments::common_impl::validation::validate_f64_non_negative(
             price.amount(),
@@ -309,7 +309,7 @@ impl Equity {
     ) -> finstack_quant_core::Result<Money> {
         self.validate()?;
         if let Some(px) = self.price_quote {
-            return Ok(Money::new(px, self.currency));
+            return Money::new(px, self.currency);
         }
         if let Some(price_id) = &self.price_id {
             return self.money_from_scalar(curves.get_price(price_id)?, curves, as_of);
@@ -426,7 +426,7 @@ impl Equity {
             let dy = self.dividend_yield(market)?;
             s0.amount() / df_horizon * (-dy * t).exp()
         };
-        Ok(Money::new(fwd, self.currency))
+        Money::new(fwd, self.currency)
     }
 
     /// Calculate forward total value for the position
@@ -437,10 +437,7 @@ impl Equity {
         t: f64,
     ) -> finstack_quant_core::Result<Money> {
         let per_share = self.forward_price_per_share(curves, as_of, t)?;
-        Ok(Money::new(
-            per_share.amount() * self.effective_shares(),
-            self.currency,
-        ))
+        Money::new(per_share.amount() * self.effective_shares(), self.currency)
     }
 }
 
@@ -478,10 +475,10 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let spot_px = self.price_per_share(market, as_of)?;
 
-        Ok(finstack_quant_core::money::Money::new(
+        finstack_quant_core::money::Money::new(
             spot_px.amount() * self.effective_shares(),
             self.currency,
-        ))
+        )
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -492,11 +489,14 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
-    fn notional(&self) -> Option<Money> {
-        // Equity notional is shares * price (market value)
-        // If price not quoted, return None to avoid incorrect estimation
-        self.price_quote
-            .map(|p| Money::new(self.effective_shares() * p, self.currency))
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok({
+            // Equity notional is shares * price (market value)
+            // If price not quoted, return None to avoid incorrect estimation
+            self.price_quote
+                .map(|p| Money::new(self.effective_shares() * p, self.currency))
+                .transpose()?
+        })
     }
 
     fn raw_cashflow_schedule(
@@ -508,7 +508,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
             Vec::new(),
             finstack_quant_core::dates::DayCount::Act365F, // Standard for equity spot
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
                     ..Default::default()

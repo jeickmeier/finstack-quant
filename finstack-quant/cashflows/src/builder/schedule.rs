@@ -280,7 +280,7 @@ impl Discountable for CashFlowSchedule {
             .collect::<Vec<_>>();
 
         if flows.is_empty() {
-            return Money::try_new(0.0, self.notional.initial.currency());
+            return Money::new(0.0, self.notional.initial.currency());
         }
 
         finstack_quant_core::cashflow::npv(disc, base, &flows)
@@ -416,7 +416,7 @@ impl CashFlowSchedule {
     /// let issue = Date::from_calendar_date(2025, Month::January, 15)?;
     /// let maturity = Date::from_calendar_date(2026, Month::January, 15)?;
     ///
-    /// let notional = Money::new(1_000_000.0, Currency::USD);
+    /// let notional = Money::from((1_000_000_i64, Currency::USD));
     /// let spec = FixedCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate: dec!(0.05),
@@ -631,12 +631,12 @@ impl CashFlowSchedule {
     ///
     /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
     /// let flows = vec![
-    ///     CashFlow::new(date, None, Money::new(50_000.0, Currency::USD), CFKind::Fixed, 0.5, Some(0.05)),
-    ///     CashFlow::new(date, None, Money::new(100_000.0, Currency::USD), CFKind::Amortization, 0.0, None),
+    ///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
+    ///     CashFlow::new(date, None, Money::from((100_000_i64, Currency::USD)), CFKind::Amortization, 0.0, None),
     /// ];
     /// let schedule = CashFlowSchedule::from_parts(
     ///     flows,
-    ///     Notional::par(1_000_000.0, Currency::USD),
+    ///     Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
     ///     DayCount::Act365F,
     ///     CashFlowMeta::default(),
     /// );
@@ -1217,7 +1217,7 @@ impl CashFlowSchedule {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let schedule = CashFlowSchedule::builder()
     ///     .principal(
-    ///         Money::new(1_000_000.0, Currency::USD),
+    ///         Money::from((1_000_000_i64, Currency::USD)),
     ///         Date::from_calendar_date(2025, Month::January, 15)?,
     ///         Date::from_calendar_date(2026, Month::January, 15)?,
     ///     )
@@ -1312,7 +1312,7 @@ mod tests {
         CashFlow::new(
             date,
             None,
-            Money::new(amount, Currency::USD),
+            Money::new(amount, Currency::USD).expect("valid money fixture"),
             kind,
             0.0,
             None,
@@ -1327,7 +1327,7 @@ mod tests {
                 flow(date, 100.0, CFKind::Amortization),
                 flow(date, 200.0, CFKind::Amortization),
             ],
-            Notional::par(1000.0, Currency::USD),
+            Notional::par(1000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1357,7 +1357,7 @@ mod tests {
                 flow(date, 8.0, CFKind::PrePayment),
                 flow(date, 5.0, CFKind::Fixed),
             ],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1374,7 +1374,7 @@ mod tests {
 
         let schedule = CashFlowSchedule::from_parts(
             vec![flow(date, 150.0, CFKind::Amortization)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1390,7 +1390,7 @@ mod tests {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let unvalidated = CashFlowSchedule::from_parts(
             vec![flow(date, 150.0, CFKind::Amortization)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1418,7 +1418,7 @@ mod tests {
                     projected_index_rate: None,
                 }),
             ],
-            Notional::par(50.0, Currency::USD),
+            Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 representation: CashflowRepresentation::Projected,
@@ -1437,7 +1437,7 @@ mod tests {
                     projected_index_rate: None,
                 }),
             ],
-            Notional::par(50.0, Currency::USD),
+            Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 representation: CashflowRepresentation::Projected,
@@ -1450,7 +1450,7 @@ mod tests {
 
         let merged = merge_cashflow_schedules(
             vec![left, right],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
         );
 
@@ -1480,7 +1480,7 @@ mod tests {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let usd = CashFlowSchedule::from_parts(
             vec![flow(date, 100.0, CFKind::Notional)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1488,19 +1488,19 @@ mod tests {
             vec![CashFlow::new(
                 date,
                 None,
-                Money::new(-90.0, Currency::EUR),
+                Money::from((-90_i64, Currency::EUR)),
                 CFKind::Notional,
                 0.0,
                 None,
             )],
-            Notional::par(90.0, Currency::EUR),
+            Notional::par(90.0, Currency::EUR).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
 
         let merged = merge_cashflow_schedules(
             [usd, eur],
-            Notional::par(0.0, Currency::USD),
+            Notional::par(0.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
         );
 
@@ -1520,13 +1520,13 @@ mod tests {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let contractual = CashFlowSchedule::from_parts(
             vec![flow(date, 100.0, CFKind::Fixed)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
         let projected = CashFlowSchedule::from_parts(
             vec![flow(date, 1.0, CFKind::FloatReset)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 representation: CashflowRepresentation::Projected,
@@ -1536,7 +1536,7 @@ mod tests {
 
         let merged = merge_cashflow_schedules(
             [contractual, projected],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
         );
 
@@ -1555,7 +1555,7 @@ mod tests {
                 flow(issue, -100.0, CFKind::Notional),
                 flow(repayment, 30.0, CFKind::Amortization),
             ],
-            Notional::par(0.0, Currency::USD),
+            Notional::par(0.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
@@ -1573,7 +1573,7 @@ mod tests {
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let schedule = CashFlowSchedule::from_parts(
             vec![flow(end, 12.5, CFKind::Fixed)],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1598,7 +1598,7 @@ mod tests {
                 flow(early, 1.0, CFKind::Fixed),
                 flow(late, 2.0, CFKind::Fixed),
             ],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
@@ -1624,7 +1624,7 @@ mod tests {
                 flow(d2, 12.5, CFKind::Fixed).with_accrual(accrual),
                 flow(d1, 100.0, CFKind::Notional),
             ],
-            Notional::par(100.0, Currency::USD),
+            Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         )
@@ -1645,7 +1645,7 @@ mod tests {
                 flow(d1, 500_000.0, CFKind::Amortization),
                 flow(d2, 500_000.0, CFKind::Amortization),
             ],
-            Notional::par(1_000_000.0, Currency::USD),
+            Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Thirty360, // schedule uses 30/360 but WAL should use Act/365F
             CashFlowMeta::default(),
         );
@@ -1701,8 +1701,8 @@ mod tests {
 
         let wal = weighted_average_life_from_principal(
             [
-                (payment, Money::new(40.0, Currency::USD)),
-                (payment, Money::new(60.0, Currency::USD)),
+                (payment, Money::from((40_i64, Currency::USD))),
+                (payment, Money::from((60_i64, Currency::USD))),
             ],
             as_of,
         )
@@ -1719,8 +1719,8 @@ mod tests {
 
         let error = weighted_average_life_from_principal(
             [
-                (first, Money::new(40.0, Currency::USD)),
-                (second, Money::new(60.0, Currency::EUR)),
+                (first, Money::from((40_i64, Currency::USD))),
+                (second, Money::from((60_i64, Currency::EUR))),
             ],
             as_of,
         )
@@ -1742,8 +1742,8 @@ mod tests {
 
         let wal = weighted_average_life_from_principal(
             [
-                (past, Money::new(100.0, Currency::USD)),
-                (as_of, Money::new(100.0, Currency::USD)),
+                (past, Money::from((100_i64, Currency::USD))),
+                (as_of, Money::from((100_i64, Currency::USD))),
             ],
             as_of,
         )

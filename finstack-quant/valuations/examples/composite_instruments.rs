@@ -34,7 +34,7 @@ fn rates_examples() -> finstack_quant_core::Result<(CompositeSpec, CompositeSpec
     let steepener = CompositeSpec::new(
         "USD.2s10s",
         Currency::USD,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         vec![
             CompositeLegSpec::new("TU", two_year.clone(), 1.0),
             CompositeLegSpec::new("TY", ten_year.clone(), -1.0),
@@ -46,7 +46,7 @@ fn rates_examples() -> finstack_quant_core::Result<(CompositeSpec, CompositeSpec
     let butterfly = CompositeSpec::new(
         "USD.2s5s10s",
         Currency::USD,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         vec![
             CompositeLegSpec::new("TU", two_year, -1.0),
             CompositeLegSpec::new("FV", five_year, 1.0),
@@ -73,7 +73,7 @@ fn commodity_spread() -> finstack_quant_core::Result<InstrumentEnvelope> {
     let spread = CompositeSpec::new(
         "BRENT-WTI",
         Currency::USD,
-        Money::new(100_000.0, Currency::USD),
+        Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         vec![
             CompositeLegSpec::new("BRENT", InstrumentJson::CommodityForward(brent), 1.0),
             CompositeLegSpec::new("WTI", InstrumentJson::CommodityForward(wti), -1.0),

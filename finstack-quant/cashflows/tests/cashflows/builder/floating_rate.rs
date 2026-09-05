@@ -79,7 +79,11 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .floating_cf(spec);
     let schedule = builder
         .build(Some(&market))
@@ -124,7 +128,7 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
 
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
     spec.schedule.frequency = Tenor::semi_annual();
@@ -182,7 +186,7 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
 fn test_floating_rate_fallback_error_no_curve() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
 
@@ -203,7 +207,7 @@ fn test_floating_rate_fallback_error_no_curve() {
 fn test_floating_rate_fallback_spread_only_no_curve() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // 200 bp spread => 0.02 rate when index is 0
     let spec = make_float_spec(FloatingRateFallback::SpreadOnly, dec!(200.0));
@@ -248,7 +252,7 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
 fn test_floating_rate_fallback_fixed_rate() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // 200 bp spread + fixed index of 4.5%
     // Expected all-in rate: (0.045 + 0.02) * 1.0 = 0.065
@@ -295,7 +299,7 @@ fn test_floating_rate_fallback_fixed_rate() {
 fn test_floating_rate_fallback_fixed_rate_with_floor_cap() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Fixed index of 4.5% + 200bp spread = 6.5%, but cap at 5%
     let mut spec = make_float_spec(FloatingRateFallback::FixedRate(dec!(0.045)), dec!(200.0));
@@ -339,7 +343,7 @@ fn test_floating_rate_default_fallback_with_curve() {
 
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Default fallback (Error) but with a curve present => should succeed
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
@@ -395,7 +399,7 @@ fn test_pik_flow_metadata() {
     // With CouponType::Pik, the full coupon goes to PIK flows.
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // 200 bp spread => 0.02 rate when index is 0 (SpreadOnly)
     let mut spec = make_float_spec(FloatingRateFallback::SpreadOnly, dec!(200.0));
@@ -486,7 +490,7 @@ fn test_floating_rate_golden_sofr_200bp() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
     let market = make_flat_forward_market(issue, 0.045);
@@ -556,7 +560,7 @@ fn test_floating_rate_golden_zero_spread() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Zero spread
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
@@ -616,7 +620,7 @@ fn test_floating_rate_golden_gearing_includes_spread() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
     spec.rate_spec.gearing = dec!(1.5);
@@ -679,7 +683,7 @@ fn test_floating_rate_golden_gearing_excludes_spread() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
     spec.rate_spec.gearing = dec!(1.5);
@@ -756,7 +760,7 @@ fn test_floating_rate_index_floor_zero() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Build FloatingRateSpec with index floor at 0% and flat curve at -0.4%
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(300.0)); // 3% spread
@@ -804,7 +808,7 @@ fn test_floating_rate_index_cap() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Build FloatingRateSpec with index cap at 5% and flat curve at 6%
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0)); // 2% spread
@@ -852,7 +856,7 @@ fn test_floating_rate_all_in_cap() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Build FloatingRateSpec with all-in cap at 7%
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0)); // 2% spread
@@ -899,7 +903,7 @@ fn test_floating_rate_negative_index_no_floor() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // No floor, negative index rate
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(300.0)); // 3% spread, no floor
@@ -945,7 +949,7 @@ fn test_floating_rate_all_in_floor() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Build FloatingRateSpec with all-in floor at 1%
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0)); // 2% spread
@@ -1040,7 +1044,7 @@ fn test_overnight_compounding_flat_curve() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
         OvernightCompoundingMethod::CompoundedInArrears,
@@ -1105,7 +1109,7 @@ fn test_overnight_simple_average_flat() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
         OvernightCompoundingMethod::SimpleAverage,
@@ -1156,7 +1160,7 @@ fn test_overnight_lockout_flat_curve() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
         OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 },
@@ -1218,7 +1222,7 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2024, Month::July, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     // Steeply rising curve: 3% at base, 8% at 1Y. Any calendar-day shift
     // earlier yields a strictly lower sampled rate.
@@ -1315,7 +1319,7 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2024, Month::July, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(base)
@@ -1391,7 +1395,7 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
 fn test_overnight_compounding_no_curve_error_fallback() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
         OvernightCompoundingMethod::CompoundedInArrears,
@@ -1414,7 +1418,7 @@ fn test_overnight_compounding_no_curve_error_fallback() {
 fn test_overnight_compounding_no_curve_spread_only_fallback() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let spec = make_overnight_float_spec(
         OvernightCompoundingMethod::CompoundedInArrears,
@@ -1455,7 +1459,7 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
     let market = make_flat_forward_market(issue, 0.045);
 
     // Build with overnight compounding
@@ -1538,7 +1542,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     let saturday = Date::from_calendar_date(2025, Month::January, 4).unwrap();
     let monday = Date::from_calendar_date(2025, Month::January, 6).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::April, 8).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
     let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
@@ -1655,7 +1659,7 @@ fn test_overnight_empty_fixing_window_errors() {
     // [Sat 2025-01-04, Sun 2025-01-05): single stub period with no business days.
     let issue = Date::from_calendar_date(2025, Month::January, 4).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 5).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
         .base_date(issue)
@@ -1718,7 +1722,7 @@ fn test_overnight_empty_fixing_window_errors() {
 fn test_seasoned_coupon_before_curve_base_errors_by_default() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Curve based mid-life: the first accrual periods start strictly before it.
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
@@ -1749,7 +1753,7 @@ fn test_seasoned_coupon_before_curve_base_errors_by_default() {
 fn test_seasoned_coupon_before_curve_base_uses_fixed_rate_fallback() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
     let market = make_flat_forward_market(curve_base, 0.03);
@@ -1803,7 +1807,7 @@ fn test_overnight_sampling_uses_fixing_calendar() {
     let base = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let issue = Date::from_calendar_date(2025, Month::April, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::October, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(base)
@@ -1892,7 +1896,11 @@ fn build_single_overnight_coupon(
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .floating_cf(spec);
     let schedule = b.build(Some(market))?;
     Ok(schedule
@@ -2277,7 +2285,7 @@ fn test_seasoned_overnight_lookback_resolves_from_fixings() {
 fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Curve based mid-life: the Jan-15 and Apr-15 resets are realized history.
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
@@ -2335,7 +2343,7 @@ fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing()
 fn test_term_reset_before_curve_base_uses_fixing_when_accrual_starts_on_base() {
     let issue = Date::from_calendar_date(2025, Month::June, 16).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::September, 16).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let curve_base = issue;
     let reset_date = Date::from_calendar_date(2025, Month::June, 12).unwrap();
     let market = make_market_with_fixings(curve_base, 0.03, &[(reset_date, 0.0475)]);
@@ -2393,7 +2401,11 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .floating_cf(spec);
     let schedule = b.build(Some(&market)).expect("overnight coupon");
     let rate = schedule
@@ -2418,7 +2430,7 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
 fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
     let issue = Date::from_calendar_date(2025, Month::June, 16).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::September, 16).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let prior_date = Date::from_calendar_date(2025, Month::June, 13).unwrap();
     let market = make_market_with_fixings(issue, 0.03, &[(prior_date, 0.0475)]);
 
@@ -2447,7 +2459,7 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
 fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
     // Only the Jan-15 fixing is present; the Apr-15 reset has no observation.
@@ -2492,7 +2504,7 @@ fn overnight_basis_none_inherits_act365f() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
     let market = make_flat_forward_market(issue, 0.05);
 
     let inferred = make_overnight_spec_with_day_count(DayCount::Act365F, None);
@@ -2550,7 +2562,7 @@ fn overnight_basis_none_inherits_act360() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let notional = 1_000_000.0;
-    let init = Money::new(notional, Currency::USD);
+    let init = Money::new(notional, Currency::USD).expect("valid money fixture");
     let market = make_flat_forward_market(issue, 0.05);
 
     let inferred = make_overnight_spec_with_day_count(DayCount::Act360, None);
@@ -2588,7 +2600,7 @@ fn overnight_basis_none_inherits_act360() {
 fn overnight_basis_none_rejects_thirty360() {
     let issue = Date::from_calendar_date(2024, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 15).unwrap();
-    let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let market = make_flat_forward_market(issue, 0.05);
     let spec = make_overnight_spec_with_day_count(DayCount::Thirty360, None);
 

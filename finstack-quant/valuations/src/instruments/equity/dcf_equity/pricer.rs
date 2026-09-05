@@ -36,7 +36,7 @@ pub(crate) fn compute_pv(
         )));
     }
     let equity_value = pv_with_rf_bump(dcf, &|_| 0.0)?;
-    Ok(Money::new(equity_value, dcf.currency))
+    Money::new(equity_value, dcf.currency)
 }
 
 /// Equity PV with the risk-free component of the WACC bumped by `bump_at(t)`

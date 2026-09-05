@@ -528,18 +528,18 @@ pub fn credit_market(
 
 /// Create test money in USD
 pub fn usd(amount: f64) -> Money {
-    Money::new(amount, Currency::USD)
+    Money::new(amount, Currency::USD).expect("valid money fixture")
 }
 
 /// Create test money in EUR
 pub fn eur(amount: f64) -> Money {
-    Money::new(amount, Currency::EUR)
+    Money::new(amount, Currency::EUR).expect("valid money fixture")
 }
 
 /// Create test money in GBP
 #[allow(dead_code)]
 pub fn gbp(amount: f64) -> Money {
-    Money::new(amount, Currency::GBP)
+    Money::new(amount, Currency::GBP).expect("valid money fixture")
 }
 
 /// Standard day count for testing

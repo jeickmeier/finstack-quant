@@ -26,9 +26,9 @@ pub fn generate_margin_cashflows(
     cash_amount: Money,
     valuations: &[(Date, f64)],
     currency: finstack_quant_core::currency::Currency,
-) -> Vec<CashFlow> {
+) -> finstack_quant_core::Result<Vec<CashFlow>> {
     if !spec.has_margining() {
-        return vec![];
+        return Ok(vec![]);
     }
 
     let mut cashflows = Vec::new();
@@ -45,7 +45,7 @@ pub fn generate_margin_cashflows(
             cashflows.push(CashFlow::new(
                 *date,
                 None,
-                Money::new(deficit, currency),
+                Money::new(deficit, currency)?,
                 CFKind::VariationMarginPay,
                 0.0,
                 None,
@@ -57,7 +57,7 @@ pub fn generate_margin_cashflows(
             cashflows.push(CashFlow::new(
                 *date,
                 None,
-                Money::new(excess, currency),
+                Money::new(excess, currency)?,
                 CFKind::VariationMarginReceive,
                 0.0,
                 None,
@@ -66,7 +66,7 @@ pub fn generate_margin_cashflows(
         }
     }
 
-    cashflows
+    Ok(cashflows)
 }
 
 /// Generate margin interest cashflows.
@@ -127,7 +127,7 @@ pub fn generate_margin_interest_cashflows(
                 cashflows.push(CashFlow::new(
                     curr.0,
                     None,
-                    Money::new(interest, currency),
+                    Money::new(interest, currency)?,
                     CFKind::MarginInterest,
                     year_fraction,
                     Some(rate),
@@ -187,26 +187,28 @@ mod tests {
     #[test]
     fn no_cashflows_for_none_margin_type() {
         let spec = RepoMarginSpec::none();
-        let cash = Money::new(100_000_000.0, Currency::USD);
+        let cash = Money::from((100_000_000_i64, Currency::USD));
         let valuations = vec![
             (test_date(2025, 1, 15), 102_000_000.0),
             (test_date(2025, 1, 16), 100_000_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
+            .expect("valid margin cashflows fixture");
         assert!(cashflows.is_empty());
     }
 
     #[test]
     fn generates_margin_call_on_deficit() {
         let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
-        let cash = Money::new(100_000_000.0, Currency::USD);
+        let cash = Money::from((100_000_000_i64, Currency::USD));
         let valuations = vec![
             (test_date(2025, 1, 15), 102_000_000.0), // Adequate
             (test_date(2025, 1, 16), 100_000_000.0), // Deficit of 2M
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
+            .expect("valid margin cashflows fixture");
 
         // Should have one margin call for the 2M deficit
         assert_eq!(cashflows.len(), 1);
@@ -217,7 +219,7 @@ mod tests {
     #[test]
     fn margin_call_threshold_suppresses_small_repo_deficits() {
         let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
-        let cash = Money::new(100_000_000.0, Currency::USD);
+        let cash = Money::from((100_000_000_i64, Currency::USD));
         let valuations = vec![
             (test_date(2025, 1, 15), 102_000_000.0),
             // Required collateral is 102M, but the 1% threshold means calls
@@ -225,7 +227,8 @@ mod tests {
             (test_date(2025, 1, 16), 101_500_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
+            .expect("valid margin cashflows fixture");
 
         assert!(cashflows.is_empty());
     }
@@ -233,7 +236,7 @@ mod tests {
     #[test]
     fn persistent_repo_deficit_is_not_called_repeatedly() {
         let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
-        let cash = Money::new(100_000_000.0, Currency::USD);
+        let cash = Money::from((100_000_000_i64, Currency::USD));
         let valuations = vec![
             (test_date(2025, 1, 15), 102_000_000.0),
             (test_date(2025, 1, 16), 100_000_000.0),
@@ -241,7 +244,8 @@ mod tests {
             (test_date(2025, 1, 18), 100_000_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
+            .expect("valid margin cashflows fixture");
 
         assert_eq!(cashflows.len(), 1);
         assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
@@ -251,13 +255,14 @@ mod tests {
     #[test]
     fn generates_margin_return_on_excess() {
         let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
-        let cash = Money::new(100_000_000.0, Currency::USD);
+        let cash = Money::from((100_000_000_i64, Currency::USD));
         let valuations = vec![
             (test_date(2025, 1, 15), 102_000_000.0), // Adequate
             (test_date(2025, 1, 16), 105_000_000.0), // Excess of 3M
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
+            .expect("valid margin cashflows fixture");
 
         // Should have one margin return for the 3M excess
         assert_eq!(cashflows.len(), 1);

@@ -55,7 +55,7 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02)) // 2% div yield
 }

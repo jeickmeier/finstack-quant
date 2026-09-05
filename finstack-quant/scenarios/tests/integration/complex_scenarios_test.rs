@@ -39,7 +39,10 @@ fn test_fx_equity_curve_combo() {
     let mut market = MarketContext::new()
         .insert_fx(fx_matrix)
         .insert(curve)
-        .insert_price("SPY", MarketScalar::Price(Money::new(400.0, Currency::USD)));
+        .insert_price(
+            "SPY",
+            MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
+        );
 
     let mut model = FinancialModelSpec::new("test", vec![]);
 
@@ -212,8 +215,10 @@ fn test_statements_rate_bindings_curve() {
 fn test_time_roll_with_market_shocks() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let mut market = MarketContext::new()
-        .insert_price("SPY", MarketScalar::Price(Money::new(450.0, Currency::USD)));
+    let mut market = MarketContext::new().insert_price(
+        "SPY",
+        MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+    );
     let mut model = FinancialModelSpec::new("test", vec![]);
 
     let scenario = ScenarioSpec {

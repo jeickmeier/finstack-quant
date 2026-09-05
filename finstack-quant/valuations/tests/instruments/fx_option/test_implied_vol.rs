@@ -71,7 +71,8 @@ fn test_implied_vol_recovers_market_vol() {
 
     // Act: Get market price, then solve for IV
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -96,7 +97,8 @@ fn test_implied_vol_self_seeding_solver() {
     let market = build_market_context(as_of, params);
 
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
 
     // Act: Solve with the canonical self-seeding solver.
     let implied_vol = call
@@ -124,7 +126,8 @@ fn test_implied_vol_high_vol_scenario() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -144,7 +147,8 @@ fn test_implied_vol_low_vol_scenario() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -164,7 +168,8 @@ fn test_implied_vol_put_option() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&put, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&put, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = put.implied_vol(&market, as_of, market_pv.amount()).unwrap();
 
     // Assert
@@ -188,7 +193,8 @@ fn test_implied_vol_itm_option() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -214,7 +220,8 @@ fn test_implied_vol_otm_option() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -240,7 +247,8 @@ fn test_implied_vol_short_dated_option() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -266,7 +274,8 @@ fn test_implied_vol_long_dated_option() {
 
     // Act
     let market_pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
     let implied_vol = call
         .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
@@ -313,7 +322,8 @@ fn test_implied_vol_recovers_price_after_override_is_removed() {
 
     // Price at override vol
     let pv =
-        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
+        finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE)
+            .expect("valid money fixture");
 
     // Remove override for IV solve
     call.instrument_pricing_overrides

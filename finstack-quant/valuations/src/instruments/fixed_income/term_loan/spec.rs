@@ -39,7 +39,7 @@
 //!     id: InstrumentId::new("TL-001"),
 //!     discount_curve_id: CurveId::new("USD-CREDIT"),
 //!     currency: Currency::USD,
-//!     notional_limit: Some(Money::new(10_000_000.0, Currency::USD)),
+//!     notional_limit: Some(Money::from((10_000_000_i64, Currency::USD))),
 //!     issue: create_date(2025, Month::January, 1)?,
 //!     maturity: create_date(2030, Month::January, 1)?,
 //!     rate: RateSpec::Fixed { rate_bp: 600 },
@@ -132,7 +132,7 @@ use super::types::RateSpec;
 /// let oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%
 ///
 /// // $50,000 fixed OID
-/// let oid_fixed = OidPolicy::WithheldAmount(Money::new(50_000.0, Currency::USD));
+/// let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -262,7 +262,7 @@ pub enum CommitmentFeeBase {
 ///
 /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let ddtl = DdtlSpec {
-///     commitment_limit: Money::new(10_000_000.0, Currency::USD),
+///     commitment_limit: Money::from((10_000_000_i64, Currency::USD)),
 ///     availability_start: create_date(2025, Month::January, 1)?,
 ///     availability_end: create_date(2026, Month::January, 1)?,
 ///     draws: vec![],
@@ -521,7 +521,7 @@ impl AmortizationSpec {}
 ///     id: InstrumentId::new("TL-001"),
 ///     discount_curve_id: CurveId::new("USD-CREDIT"),
 ///     currency: Currency::USD,
-///     notional_limit: Some(Money::new(25_000_000.0, Currency::USD)),
+///     notional_limit: Some(Money::from((25_000_000_i64, Currency::USD))),
 ///     issue: create_date(2025, Month::January, 15)?,
 ///     maturity: create_date(2030, Month::January, 15)?,
 ///     rate: RateSpec::Floating(floating_spec),

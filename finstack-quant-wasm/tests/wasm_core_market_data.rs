@@ -35,18 +35,22 @@ fn fx_matrix_rate_returns_structured_result() {
 fn forward_curve_projection_grid_and_rate_between() {
     let t_3m = 91.0 / 360.0;
     let t_6m = 183.0 / 360.0;
-    let curve = JsForwardCurve::new(
-        "USD-SOFR-3M",
-        0.25,
-        "2025-01-01",
-        &[0.0, 0.04, t_3m, 0.045],
-        Some("act_360".to_string()),
-        Some("linear".to_string()),
-        Some("flat_forward".to_string()),
-        Some(vec![0.0, t_3m, t_6m]),
-        Some(3),
+    let options = js_sys::JSON::parse(
+        &serde_json::json!({
+            "id": "USD-SOFR-3M",
+            "tenor": 0.25,
+            "baseDate": "2025-01-01",
+            "knots": [0.0, 0.04, t_3m, 0.045],
+            "dayCount": "act_360",
+            "interp": "linear",
+            "extrapolation": "flat_forward",
+            "projectionGrid": [0.0, t_3m, t_6m],
+            "resetLag": 3
+        })
+        .to_string(),
     )
-    .expect("forward curve");
+    .expect("valid options");
+    let curve = JsForwardCurve::new(options).expect("forward curve");
 
     assert!((curve.rate_between(0.0, t_3m).expect("first period") - 0.04).abs() < 1e-14);
     assert!((curve.rate_between(t_3m, t_6m).expect("second period") - 0.045).abs() < 1e-14);

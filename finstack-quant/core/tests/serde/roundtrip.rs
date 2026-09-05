@@ -80,7 +80,7 @@ fn schedule_spec_builds_expected_dates() {
     let spec = ScheduleSpec {
         start,
         end,
-        frequency: Tenor::new(1, TenorUnit::Months),
+        frequency: Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"),
         stub: StubKind::None,
         business_day_convention: Some(BusinessDayConvention::Following),
         calendar_id: Some("target2".to_string()),
@@ -103,7 +103,7 @@ fn schedule_spec_builds_expected_dates() {
     // Cross-check with builder directly
     let builder_schedule = ScheduleBuilder::new(start, end)
         .unwrap()
-        .frequency(Tenor::new(1, TenorUnit::Months))
+        .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
         .adjust_with_id(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();

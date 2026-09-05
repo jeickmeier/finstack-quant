@@ -131,5 +131,5 @@ test('statements_analytics.creditAssessment returns a structured object', () => 
   const evaluated = statements.evaluateModel(MODEL_JSON);
   const assessment = statements_analytics.creditAssessment(JSON.stringify(evaluated), '2025Q1');
   assertStructured(assessment, 'creditAssessment result');
-  assert.ok(assessment.as_of !== undefined, 'as_of is directly readable');
+  assert.equal(assessment.period, '2025Q1', 'assessment period is directly readable');
 });

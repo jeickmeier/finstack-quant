@@ -373,7 +373,7 @@ impl TrsEngine {
             total_pv.add(payment * df);
         }
 
-        Ok(Money::new(total_pv.total(), currency))
+        Money::new(total_pv.total(), currency)
     }
 
     /// Calculates the present value of the financing leg.
@@ -459,7 +459,7 @@ impl TrsEngine {
             total_pv.add(payment * df);
         }
 
-        Ok(Money::new(total_pv.total(), currency))
+        Money::new(total_pv.total(), currency)
     }
 
     /// Calculates the financing annuity for par spread calculation.
@@ -730,7 +730,7 @@ mod tests {
         let ctx = MarketContext::new().insert(disc);
         let params = TotalReturnLegParams {
             schedule: &schedule,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::from((1_i64, Currency::USD)),
             discount_curve_id: "DISC",
             contract_size: 1.0,
             initial_level: Some(1.0),
@@ -777,7 +777,7 @@ mod tests {
         let ctx = MarketContext::new().insert(disc.clone());
         let params = TotalReturnLegParams {
             schedule: &schedule,
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             discount_curve_id: "DISC",
             contract_size: 1.0,
             initial_level: Some(100.0),
@@ -866,7 +866,7 @@ mod tests {
         let pv = TrsEngine::pv_financing_leg(
             &financing,
             &schedule,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             &ctx,
             as_of,
         )
@@ -993,7 +993,7 @@ mod tests {
             compounding: FinancingRateCompounding::OvernightCompounded,
         };
 
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
         let pv_spliced = TrsEngine::pv_financing_leg(&financing, &schedule, notional, &ctx, as_of)
             .expect("pv_spliced");
 
@@ -1198,7 +1198,7 @@ mod tests {
             .expect("forward curve");
 
         let ctx = MarketContext::new().insert(disc).insert(fwd);
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let term = FinancingLegSpec::new("DISC", "FWD", Decimal::ZERO, DayCount::Act365F);
         let ois = term

@@ -95,7 +95,7 @@ fn test_quote_amount_various_currencies() {
 
     // GBPUSD
     let gbp_fx = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP))
+        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.40)
         .expect("test rate");
@@ -116,7 +116,7 @@ fn test_quote_amount_various_currencies() {
 
     // USDJPY
     let jpy_fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD))
+        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
         .with_rate(110.0)
         .expect("test rate");
@@ -139,7 +139,7 @@ fn test_quote_amount_various_currencies() {
 #[test]
 fn test_quote_amount_zero_notional() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR))
+        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate");

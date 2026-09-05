@@ -71,7 +71,7 @@ use std::sync::Arc;
 /// let instrument = Arc::new(
 ///     Deposit::builder()
 ///         .id("DEP-1D".into())
-///         .notional(Money::new(1_000_000.0, Currency::USD))
+///         .notional(Money::from((1_000_000_i64, Currency::USD)))
 ///         .start_date(as_of_t0)
 ///         .maturity(as_of_t1)
 ///         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -159,17 +159,17 @@ pub fn attribute_pnl_metrics_based(
             if coupon_income.abs() > 0.0 {
                 attribution.total_pnl = attribution
                     .total_pnl
-                    .checked_add(Money::new(coupon_income, val_t1.value.currency()))?;
+                    .checked_add(Money::new(coupon_income, val_t1.value.currency())?)?;
             }
-            Money::new(coupon_income, val_t1.value.currency())
+            Money::new(coupon_income, val_t1.value.currency())?
         }
-        Ok(_) => Money::new(0.0, val_t1.value.currency()),
+        Ok(_) => Money::from((0_i64, val_t1.value.currency())),
         Err(e) => {
             attribution.meta.notes.push(format!(
                 "Total-return adjustment unavailable (cashflow collection failed: {e}); \
                  total_pnl is MTM-only for this period"
             ));
-            Money::new(0.0, val_t1.value.currency())
+            Money::from((0_i64, val_t1.value.currency()))
         }
     };
 

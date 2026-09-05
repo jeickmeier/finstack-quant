@@ -54,7 +54,7 @@ fn create_test_bond() -> ConvertibleBond {
 
     ConvertibleBond {
         id: "TEST_CONVERTIBLE".to_string().into(),
-        notional: Money::new(1000.0, Currency::USD),
+        notional: Money::from((1000_i64, Currency::USD)),
         issue_date: issue,
         maturity,
         discount_curve_id: "USD-OIS".into(),
@@ -590,7 +590,7 @@ fn test_thirty_360_day_count_corporate_convention() {
 
     let bond = ConvertibleBond {
         id: "TEST_30360".to_string().into(),
-        notional: Money::new(1000.0, Currency::USD),
+        notional: Money::from((1000_i64, Currency::USD)),
         issue_date: issue,
         maturity,
         discount_curve_id: "USD-OIS".into(),

@@ -49,7 +49,11 @@ fn bridge_builder_schedule_builds() {
     };
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(fixed_spec)
         .build(None)
         .expect("bridge builder should build schedule");

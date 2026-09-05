@@ -126,7 +126,7 @@ impl SwaptionHullWhitePricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -146,7 +146,7 @@ impl SwaptionHullWhitePricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -312,7 +312,13 @@ impl SwaptionHullWhitePricer {
         Ok(ValuationResult::stamped(
             swaption.id.as_str(),
             as_of,
-            Money::new(pv, swaption.notional.currency()),
+            Money::new(pv, swaption.notional.currency()).map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(swaption)
+                        .model(ModelKey::HullWhite1F),
+                )
+            })?,
         ))
     }
 }

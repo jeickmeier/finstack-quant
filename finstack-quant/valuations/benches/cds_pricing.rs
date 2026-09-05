@@ -30,7 +30,7 @@ fn create_cds(tenor_years: i32) -> CreditDefaultSwap {
 
     credit_support::cds_buy_protection(
         format!("CDS-{}Y", tenor_years),
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0, // 100bp spread
         start,
         maturity,

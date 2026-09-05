@@ -74,10 +74,10 @@ impl FxBarrierOptionMcPricer {
     ) -> finstack_quant_core::Result<FxBarrierPricingOutcome> {
         inst.validate()?;
         if as_of > inst.expiry {
-            return Ok(FxBarrierPricingOutcome::deterministic(Money::new(
-                0.0,
+            return Ok(FxBarrierPricingOutcome::deterministic(Money::from((
+                0_i64,
                 inst.quote_currency,
-            )));
+            ))));
         }
 
         let (fx_spot, t) = collect_fx_barrier_expiry_state(inst, curves, as_of)?;
@@ -86,7 +86,7 @@ impl FxBarrierOptionMcPricer {
             return Ok(FxBarrierPricingOutcome::deterministic(Money::new(
                 per_unit * inst.notional.amount(),
                 inst.quote_currency,
-            )));
+            )?));
         }
 
         let (_, r_dom, r_for, sigma, discount_factor) =
@@ -105,7 +105,7 @@ impl FxBarrierOptionMcPricer {
             return Ok(FxBarrierPricingOutcome::deterministic(Money::new(
                 per_unit * inst.notional.amount(),
                 inst.quote_currency,
-            )));
+            )?));
         }
 
         // For FX, drift is r_dom - r_for.
@@ -294,7 +294,7 @@ pub(crate) fn compute_pv(
 ) -> finstack_quant_core::Result<Money> {
     validate_monitoring_state(inst, as_of)?;
     if as_of > inst.expiry {
-        return Ok(Money::new(0.0, inst.quote_currency));
+        return Ok(Money::from((0_i64, inst.quote_currency)));
     }
     let pricer = FxBarrierOptionMcPricer::new();
     pricer
@@ -566,7 +566,7 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 fx_barrier.id(),
                 as_of,
-                Money::new(0.0, fx_barrier.quote_currency),
+                Money::from((0_i64, fx_barrier.quote_currency)),
             ));
         }
 
@@ -590,7 +590,13 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
                 Money::new(
                     per_unit * fx_barrier.notional.amount(),
                     fx_barrier.quote_currency,
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(fx_barrier),
+                    )
+                })?,
             ));
         }
 
@@ -614,7 +620,13 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
                 Money::new(
                     per_unit * fx_barrier.notional.amount(),
                     fx_barrier.quote_currency,
-                ),
+                )
+                .map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(fx_barrier),
+                    )
+                })?,
             ));
         }
 
@@ -633,7 +645,13 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
         let pv = Money::new(
             price_per_unit * fx_barrier.notional.amount(),
             fx_barrier.quote_currency,
-        );
+        )
+        .map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(fx_barrier),
+            )
+        })?;
         Ok(ValuationResult::stamped(fx_barrier.id(), as_of, pv))
     }
 }
@@ -801,7 +819,7 @@ mod tests {
             .barrier_type(BarrierType::UpAndIn)
             .monitoring_start_date(as_of)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -868,7 +886,7 @@ mod tests {
                 .barrier_type(BarrierType::UpAndOut)
                 .monitoring_start_date(as_of)
                 .expiry(expiry)
-                .notional(Money::new(notional, Currency::EUR))
+                .notional(Money::new(notional, Currency::EUR).expect("valid money fixture"))
                 .base_currency(Currency::EUR)
                 .quote_currency(Currency::USD)
                 .day_count(DayCount::Act365F)
@@ -975,7 +993,7 @@ mod tests {
     #[test]
     fn validation_rejects_currency_mismatch_and_invalid_numeric_fields() {
         let mut mismatched = FxBarrierOption::example();
-        mismatched.notional = Money::new(1_000_000.0, Currency::USD);
+        mismatched.notional = Money::from((1_000_000_i64, Currency::USD));
         let err = mismatched.validate().expect_err("currency mismatch");
         assert!(err.to_string().contains("Currency mismatch"));
 
@@ -996,7 +1014,7 @@ mod tests {
             .contains("barrier"));
 
         let mut bad_notional = FxBarrierOption::example();
-        bad_notional.notional = Money::new(0.0, Currency::EUR);
+        bad_notional.notional = Money::from((0_i64, Currency::EUR));
         assert!(bad_notional
             .validate()
             .expect_err("bad notional")
@@ -1033,7 +1051,7 @@ mod tests {
         price_scalar.fx_spot_id = Some("EURUSD-SPOT".into());
         let price_market = MarketContext::new().insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Price(Money::new(1.10, Currency::USD)),
+            MarketScalar::Price(Money::new(1.10, Currency::USD).expect("valid money fixture")),
         );
         let spot = resolve_fx_spot(&price_scalar, &price_market, as_of).expect("price scalar spot");
         assert!((spot - 1.10).abs() < 1e-12);
@@ -1069,7 +1087,7 @@ mod tests {
             .barrier_type(BarrierType::DownAndOut)
             .monitoring_start_date(as_of)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -1094,7 +1112,7 @@ mod tests {
             .barrier_type(BarrierType::DownAndOut)
             .monitoring_start_date(as_of)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
@@ -1210,7 +1228,7 @@ mod tests {
             .barrier_type(BarrierType::UpAndOut)
             .monitoring_start_date(as_of)
             .expiry(expiry)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)

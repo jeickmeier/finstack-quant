@@ -48,7 +48,7 @@ fn test_theta_settled_position() {
 #[test]
 fn test_theta_zero_notional() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR))
+        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
@@ -65,7 +65,7 @@ fn test_theta_calculation_completes() {
         eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17)),
         eurusd_with_notional(5_000_000.0, 1.25).with_settlement(d(2025, 2, 15)),
         sample_gbpusd()
-            .with_notional(Money::new(2_000_000.0, Currency::GBP))
+            .with_notional(Money::new(2_000_000.0, Currency::GBP).expect("valid money fixture"))
             .unwrap()
             .with_rate(1.40)
             .expect("test rate")

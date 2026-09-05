@@ -28,7 +28,7 @@ fn test_irs_at_par_npv_zero() {
 
     let swap = InterestRateSwap {
         id: "SWAP_PAR".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -89,7 +89,7 @@ fn test_irs_receive_fixed_below_market() {
 
     let swap = InterestRateSwap {
         id: "SWAP_OFF_MARKET".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -149,7 +149,7 @@ fn test_irs_receive_fixed_above_market() {
 
     let swap = InterestRateSwap {
         id: "SWAP_ABOVE_MARKET".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
@@ -244,7 +244,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
 
     let swap_receive = InterestRateSwap {
         id: "SWAP_RECEIVE".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
@@ -257,7 +257,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
 
     let swap_pay = InterestRateSwap {
         id: "SWAP_PAY".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
         fixed: fixed_leg,
         float: float_leg,
@@ -297,7 +297,7 @@ fn test_irs_npv_scales_with_notional() {
 
     let swap_1m = test_utils::usd_irs_swap(
         "SWAP_1M",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -307,7 +307,7 @@ fn test_irs_npv_scales_with_notional() {
 
     let swap_10m = test_utils::usd_irs_swap(
         "SWAP_10M",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -337,7 +337,7 @@ fn test_irs_with_spread() {
     // Swap with 50bp spread on floating leg
     let mut swap = test_utils::usd_irs_swap(
         "SWAP_SPREAD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -366,7 +366,7 @@ fn test_irs_short_maturity() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_1Y",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -395,7 +395,7 @@ fn test_irs_zero_rate() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_ZERO",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -426,7 +426,7 @@ fn test_irs_theta_calculation() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_THETA",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,
@@ -464,7 +464,7 @@ fn test_irs_forward_starting() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_FORWARD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         start,
         end,
@@ -486,7 +486,7 @@ fn test_irs_npv_currency_matches() {
 
     let swap = test_utils::usd_irs_swap(
         "SWAP_CCY",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         end,

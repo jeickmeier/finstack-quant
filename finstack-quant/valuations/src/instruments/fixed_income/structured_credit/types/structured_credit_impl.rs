@@ -114,63 +114,65 @@ impl StructuredCredit {
     /// skipped). Basis-point fees use [`PaymentCalculation::PercentageOfCollateral`]
     /// with `annualized: true`. The trustee fee is annual and is divided by
     /// payment periods per year.
-    fn fee_recipients(&self) -> Vec<Recipient> {
-        let Some(fees) = self.fees.as_ref() else {
-            return Vec::new();
-        };
-        let ccy = self.pool.get_base_currency();
-        let mut recipients = Vec::new();
+    fn fee_recipients(&self) -> finstack_quant_core::Result<Vec<Recipient>> {
+        Ok({
+            let Some(fees) = self.fees.as_ref() else {
+                return Ok(Vec::new());
+            };
+            let ccy = self.pool.get_base_currency();
+            let mut recipients = Vec::new();
 
-        fn bp_recipient(id: &str, name: &str, bp: f64) -> Option<Recipient> {
-            (bp > 0.0 && bp.is_finite()).then(|| {
-                Recipient::new(
-                    id,
-                    RecipientType::ServiceProvider(name.to_string()),
-                    PaymentCalculation::PercentageOfCollateral {
-                        rate: bp / 10_000.0,
-                        annualized: true,
-                        day_count: None,
+            fn bp_recipient(id: &str, name: &str, bp: f64) -> Option<Recipient> {
+                (bp > 0.0 && bp.is_finite()).then(|| {
+                    Recipient::new(
+                        id,
+                        RecipientType::ServiceProvider(name.to_string()),
+                        PaymentCalculation::PercentageOfCollateral {
+                            rate: bp / 10_000.0,
+                            annualized: true,
+                            day_count: None,
+                            rounding: None,
+                        },
+                    )
+                })
+            }
+
+            // Trustee fee first: a flat administrative charge senior to everything.
+            let months_per_period = f64::from(self.frequency.months().unwrap_or(12).max(1));
+            let periods_per_year = (12.0 / months_per_period).max(1.0);
+            let trustee_period = fees.trustee_fee_annual.amount() / periods_per_year;
+            if trustee_period > 0.0 && trustee_period.is_finite() {
+                recipients.push(Recipient::new(
+                    "trustee_fee",
+                    RecipientType::ServiceProvider("Trustee".to_string()),
+                    PaymentCalculation::FixedAmount {
+                        amount: Money::new(trustee_period, ccy)?,
                         rounding: None,
                     },
-                )
-            })
-        }
+                ));
+            }
 
-        // Trustee fee first: a flat administrative charge senior to everything.
-        let months_per_period = f64::from(self.frequency.months().unwrap_or(12).max(1));
-        let periods_per_year = (12.0 / months_per_period).max(1.0);
-        let trustee_period = fees.trustee_fee_annual.amount() / periods_per_year;
-        if trustee_period > 0.0 && trustee_period.is_finite() {
-            recipients.push(Recipient::new(
-                "trustee_fee",
-                RecipientType::ServiceProvider("Trustee".to_string()),
-                PaymentCalculation::FixedAmount {
-                    amount: Money::new(trustee_period, ccy),
-                    rounding: None,
-                },
+            recipients.extend(bp_recipient(
+                "senior_mgmt_fee",
+                "Manager",
+                fees.senior_mgmt_fee_bp,
             ));
-        }
+            recipients.extend(bp_recipient(
+                "servicing_fee",
+                "Servicer",
+                fees.servicing_fee_bp,
+            ));
+            if let Some(bp) = fees.master_servicer_fee_bp {
+                recipients.extend(bp_recipient("master_servicer_fee", "MasterServicer", bp));
+            }
+            if let Some(bp) = fees.special_servicer_fee_bp {
+                recipients.extend(bp_recipient("special_servicer_fee", "SpecialServicer", bp));
+            }
+            // Subordinated management fees require a junior fee tier; including
+            // them here would incorrectly make them senior to the notes.
 
-        recipients.extend(bp_recipient(
-            "senior_mgmt_fee",
-            "Manager",
-            fees.senior_mgmt_fee_bp,
-        ));
-        recipients.extend(bp_recipient(
-            "servicing_fee",
-            "Servicer",
-            fees.servicing_fee_bp,
-        ));
-        if let Some(bp) = fees.master_servicer_fee_bp {
-            recipients.extend(bp_recipient("master_servicer_fee", "MasterServicer", bp));
-        }
-        if let Some(bp) = fees.special_servicer_fee_bp {
-            recipients.extend(bp_recipient("special_servicer_fee", "SpecialServicer", bp));
-        }
-        // Subordinated management fees require a junior fee tier; including
-        // them here would incorrectly make them senior to the notes.
-
-        recipients
+            recipients
+        })
     }
 
     /// Attach the deal-type standard fee calibration.
@@ -305,23 +307,25 @@ impl StructuredCredit {
     /// otherwise synthesizes the canonical sequential template. In both cases
     /// deal-level [`Self::coverage_triggers`] are appended for the coverage-test
     /// loop.
-    pub fn create_waterfall(&self) -> Waterfall {
-        let mut waterfall = match self.waterfall.as_ref() {
-            Some(custom) => custom.clone(),
-            // Senior transaction fees, paid ahead of every note.
-            None => Waterfall::standard_sequential(
-                self.deal_type,
-                self.pool.get_base_currency(),
-                &self.tranches,
-                self.fee_recipients(),
-            ),
-        };
+    pub fn create_waterfall(&self) -> finstack_quant_core::Result<Waterfall> {
+        Ok({
+            let mut waterfall = match self.waterfall.as_ref() {
+                Some(custom) => custom.clone(),
+                // Senior transaction fees, paid ahead of every note.
+                None => Waterfall::standard_sequential(
+                    self.deal_type,
+                    self.pool.get_base_currency(),
+                    &self.tranches,
+                    self.fee_recipients()?,
+                ),
+            };
 
-        // Attach deal OC/IC triggers for the waterfall coverage-test loop.
-        for trigger in &self.coverage_triggers {
-            waterfall = waterfall.add_coverage_trigger(trigger.clone());
-        }
-        waterfall
+            // Attach deal OC/IC triggers for the waterfall coverage-test loop.
+            for trigger in &self.coverage_triggers {
+                waterfall = waterfall.add_coverage_trigger(trigger.clone());
+            }
+            waterfall
+        })
     }
 
     /// Attach a fully custom payment waterfall, replacing the template.
@@ -346,7 +350,7 @@ impl StructuredCredit {
     /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
     /// // Start from the template and customize, or build from scratch.
-    /// let waterfall = deal.create_waterfall();
+    /// let waterfall = deal.create_waterfall().expect("valid create_waterfall fixture");
     /// let deal = deal.with_waterfall(waterfall)?;
     /// # Ok(())
     /// # }
@@ -526,7 +530,7 @@ impl core::fmt::Display for StructuredCredit {
         let pool_balance = self
             .pool
             .total_balance()
-            .unwrap_or(Money::new(0.0, self.pool.get_base_currency()));
+            .unwrap_or(Money::from((0_i64, self.pool.get_base_currency())));
         let tranche_count = self.tranches.tranches.len();
 
         write!(

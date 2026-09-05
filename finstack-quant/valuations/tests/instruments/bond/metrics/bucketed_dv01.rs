@@ -39,8 +39,8 @@ fn build_multi_tenor_curve(as_of: time::Date) -> DiscountCurve {
 fn build_plain_bond(as_of: time::Date) -> Bond {
     Bond::fixed(
         "BDKR-PLAIN",
-        Money::new(10_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0425),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0425).expect("valid rate fixture"),
         as_of,
         date!(2034 - 03 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,

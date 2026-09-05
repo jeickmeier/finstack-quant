@@ -187,7 +187,7 @@ impl FxVarianceSwap {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .spot_id("EURUSD".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(
                 Date::from_calendar_date(2024, Month::January, 2).expect("Valid example date"),
@@ -274,12 +274,14 @@ impl FxVarianceSwap {
     }
 
     /// Calculate payoff given realized variance.
-    pub fn payoff(&self, realized_variance: f64) -> Money {
-        let variance_diff = realized_variance - self.strike_variance;
-        Money::new(
-            self.notional.amount() * variance_diff * self.side.sign(),
-            self.notional.currency(),
-        )
+    pub fn payoff(&self, realized_variance: f64) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let variance_diff = realized_variance - self.strike_variance;
+            Money::new(
+                self.notional.amount() * variance_diff * self.side.sign(),
+                self.notional.currency(),
+            )?
+        })
     }
 
     /// Get observation dates based on frequency.
@@ -420,8 +422,8 @@ impl InstrumentTrait for FxVarianceSwap {
 
 // FxVarianceSwap uses both domestic and foreign curves for forward construction
 impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -433,7 +435,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
             Vec::new(),
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
                     ..Default::default()
@@ -485,11 +487,11 @@ mod tests {
             .id(InstrumentId::new("TEST-VARSWAP"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .strike_variance(0.01)
             .start_date(date(2025, Month::January, 6)) // Monday
             .maturity(date(2025, Month::January, 10)) // Friday
-            .observation_frequency(Tenor::new(1, TenorUnit::Days))
+            .observation_frequency(Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture"))
             .base_calendar_id("TARGET2".to_string())
             .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
@@ -529,11 +531,11 @@ mod tests {
             .id(InstrumentId::new("TEST-VARSWAP"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .strike_variance(0.01)
             .start_date(date(2025, Month::January, 2))
             .maturity(date(2025, Month::December, 31))
-            .observation_frequency(Tenor::new(1, TenorUnit::Days))
+            .observation_frequency(Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture"))
             .base_calendar_id("TARGET2".to_string())
             .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
@@ -568,11 +570,11 @@ mod tests {
             .id(InstrumentId::new("TEST-VARSWAP"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .strike_variance(0.01)
             .start_date(date(2025, Month::January, 4)) // Saturday
             .maturity(date(2025, Month::January, 25)) // Saturday
-            .observation_frequency(Tenor::new(1, TenorUnit::Weeks))
+            .observation_frequency(Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture"))
             .base_calendar_id("TARGET2".to_string())
             .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)

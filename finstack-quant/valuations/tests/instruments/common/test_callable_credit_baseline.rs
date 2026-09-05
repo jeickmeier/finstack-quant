@@ -82,8 +82,8 @@ fn replayable_market() -> MarketContext {
 fn callable_credit_bond() -> Bond {
     let mut bond = Bond::fixed(
         "CALLABLE-CREDIT-BASELINE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of(),
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -107,7 +107,7 @@ fn callable_credit_loan() -> TermLoan {
     let mut loan = TermLoan::builder()
         .id(InstrumentId::new("TL-CALLABLE-CREDIT-BASELINE"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of())
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })

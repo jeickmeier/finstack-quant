@@ -102,7 +102,7 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: f64) -> CmsOption {
     CmsOption {
         id: InstrumentId::new("CMS-BENCH"),
         option_type: OptionType::Call,
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.03).unwrap(),
         fixing_dates,
         payment_dates,
@@ -196,7 +196,7 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
             rate: 0.03,
             day_count: DayCount::Thirty360,
         },
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         DayCount::Act360,
         IRSConvention::UsdSofr,
         PayReceive::Receive,

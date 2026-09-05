@@ -211,7 +211,7 @@ mod tests {
             Ok(ValuationResult::stamped(
                 instrument.id(),
                 as_of,
-                Money::new(self.price(instrument), Currency::USD),
+                Money::new(self.price(instrument), Currency::USD).expect("valid money fixture"),
             ))
         }
 
@@ -230,8 +230,8 @@ mod tests {
         let as_of = date!(2025 - 03 - 20);
         let mut bond = Bond::fixed(
             "FLOOR-OAS-ROUNDTRIP",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.06).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -273,7 +273,7 @@ mod tests {
             Arc::new(bond.clone()),
             Arc::new(market.clone()),
             as_of,
-            Money::new(target_dirty, Currency::USD),
+            Money::new(target_dirty, Currency::USD).expect("valid money fixture"),
             MetricContext::default_config(),
         );
         let solved = oas_decimal_from_quote_overrides(&bond, &context)
@@ -296,8 +296,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "OAS-DISPATCH",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.04),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -322,7 +322,7 @@ mod tests {
             Arc::new(bond.clone()),
             Arc::new(market),
             as_of,
-            Money::new(980.0, Currency::USD),
+            Money::from((980_i64, Currency::USD)),
             MetricContext::default_config(),
         );
         context.set_pricer_dispatch(PricingDispatch::registered(

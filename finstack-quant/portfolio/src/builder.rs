@@ -416,7 +416,7 @@ mod tests {
     fn test_builder_dummy_entity_auto_creation() {
         let deposit = Deposit::builder()
             .id("DEP_1".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)

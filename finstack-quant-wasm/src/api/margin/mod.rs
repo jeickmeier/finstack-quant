@@ -82,9 +82,9 @@ pub fn calculate_vm(
 ) -> Result<JsValue, JsValue> {
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(csa_json).map_err(to_js_err)?;
     let ccy: finstack_quant_core::currency::Currency = currency.parse().map_err(to_js_err)?;
-    let exp = finstack_quant_core::money::Money::try_new(exposure, ccy)
+    let exp = finstack_quant_core::money::Money::new(exposure, ccy)
         .map_err(|e| to_js_err(format!("invalid exposure: {e}")))?;
-    let posted = finstack_quant_core::money::Money::try_new(posted_collateral, ccy)
+    let posted = finstack_quant_core::money::Money::new(posted_collateral, ccy)
         .map_err(|e| to_js_err(format!("invalid posted_collateral: {e}")))?;
     let as_of = parse_iso_date(as_of)?;
 

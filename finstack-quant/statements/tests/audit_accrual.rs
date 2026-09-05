@@ -84,8 +84,8 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
 
     let bond = Bond::fixed(
         InstrumentId::new("BOND-AUDIT"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue_date,
         maturity_date,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -105,7 +105,8 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
 
     // Function to get values for a specific month (1-indexed)
     let get_metrics = |month: u8| {
-        let period_id = finstack_quant_core::dates::PeriodId::month(2025, month);
+        let period_id =
+            finstack_quant_core::dates::PeriodId::month(2025, month).expect("valid period fixture");
         let accrued = cashflows
             .get_accrued_interest("BOND-AUDIT", &period_id)
             .expect("accrued");

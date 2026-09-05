@@ -62,8 +62,8 @@ use time::macros::date;
 
 let facility = RevolvingCredit::builder()
     .id("RC-001".into())
-    .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-    .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+    .commitment_amount(Money::new(10_000_000.0, Currency::USD)?)
+    .drawn_amount(Money::new(5_000_000.0, Currency::USD)?)
     .commitment_date(date!(2025 - 01 - 01))
     .maturity(date!(2028 - 01 - 01))
     .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -73,12 +73,12 @@ let facility = RevolvingCredit::builder()
     .draw_repay_spec(DrawRepaySpec::Deterministic(vec![
         DrawRepayEvent {
             date: date!(2025 - 03 - 01),
-            amount: Money::new(1_000_000.0, Currency::USD),
+            amount: Money::new(1_000_000.0, Currency::USD)?,
             is_draw: true,
         },
         DrawRepayEvent {
             date: date!(2025 - 06 - 01),
-            amount: Money::new(500_000.0, Currency::USD),
+            amount: Money::new(500_000.0, Currency::USD)?,
             is_draw: false,
         },
     ]))

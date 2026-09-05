@@ -21,7 +21,7 @@ fn create_test_repo() -> Repo {
     let collateral = CollateralSpec::new("UST-10Y", 10_200_000.0, "UST_10Y_PRICE");
     Repo::term(
         "TEST_REPO",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.045,
         Date::from_calendar_date(2024, Month::January, 15).expect("valid date"),
@@ -108,8 +108,8 @@ fn test_vm_calculator_with_repo_exposure() {
     let vm_calc = VmCalculator::new(csa);
 
     // Simulate repo exposure (positive = we are owed money)
-    let exposure = Money::new(500_000.0, Currency::USD);
-    let posted = Money::new(480_000.0, Currency::USD);
+    let exposure = Money::new(500_000.0, Currency::USD).expect("valid money fixture");
+    let posted = Money::new(480_000.0, Currency::USD).expect("valid money fixture");
     let as_of = test_date();
 
     let result = vm_calc
@@ -127,10 +127,10 @@ fn test_vm_calculator_with_repo_exposure() {
 fn test_margin_call_with_threshold() {
     // Create VM params with meaningful threshold
     let vm_params = VmParameters {
-        threshold: Money::new(50_000.0, Currency::USD),
-        mta: Money::new(10_000.0, Currency::USD),
-        rounding: Money::new(1_000.0, Currency::USD),
-        independent_amount: Money::new(0.0, Currency::USD),
+        threshold: Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+        mta: Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+        rounding: Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        independent_amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         frequency: MarginTenor::Daily,
         settlement_lag: 1,
     };
@@ -149,8 +149,8 @@ fn test_margin_call_with_threshold() {
     let vm_calc = VmCalculator::new(csa);
 
     // Small exposure change within threshold
-    let exposure = Money::new(30_000.0, Currency::USD);
-    let posted = Money::new(0.0, Currency::USD);
+    let exposure = Money::new(30_000.0, Currency::USD).expect("valid money fixture");
+    let posted = Money::new(0.0, Currency::USD).expect("valid money fixture");
     let as_of = test_date();
 
     let result = vm_calc
@@ -169,10 +169,10 @@ fn test_margin_call_with_threshold() {
 fn test_margin_call_exceeds_threshold() {
     // Create VM params with meaningful threshold
     let vm_params = VmParameters {
-        threshold: Money::new(50_000.0, Currency::USD),
-        mta: Money::new(10_000.0, Currency::USD),
-        rounding: Money::new(1_000.0, Currency::USD),
-        independent_amount: Money::new(0.0, Currency::USD),
+        threshold: Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+        mta: Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+        rounding: Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        independent_amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         frequency: MarginTenor::Daily,
         settlement_lag: 1,
     };
@@ -191,8 +191,8 @@ fn test_margin_call_exceeds_threshold() {
     let vm_calc = VmCalculator::new(csa);
 
     // Large exposure that exceeds threshold
-    let exposure = Money::new(100_000.0, Currency::USD);
-    let posted = Money::new(0.0, Currency::USD);
+    let exposure = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
+    let posted = Money::new(0.0, Currency::USD).expect("valid money fixture");
     let as_of = test_date();
 
     let result = vm_calc

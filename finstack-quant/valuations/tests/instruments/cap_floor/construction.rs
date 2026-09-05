@@ -15,7 +15,7 @@ use time::Month;
 
 #[test]
 fn test_cap_creation_basic() {
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -47,7 +47,7 @@ fn test_cap_creation_basic() {
 
 #[test]
 fn test_floor_creation_basic() {
-    let notional = Money::new(5_000_000.0, Currency::EUR);
+    let notional = Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let end = Date::from_calendar_date(2028, Month::March, 15).unwrap();
 
@@ -79,7 +79,7 @@ fn test_floor_creation_basic() {
 
 #[test]
 fn test_cap_new_cap_helper() {
-    let notional = Money::new(1_000_000.0, Currency::GBP);
+    let notional = Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let end = Date::from_calendar_date(2027, Month::June, 1).unwrap();
 
@@ -105,7 +105,7 @@ fn test_cap_new_cap_helper() {
 
 #[test]
 fn test_floor_new_floor_helper() {
-    let notional = Money::new(2_000_000.0, Currency::JPY);
+    let notional = Money::new(2_000_000.0, Currency::JPY).expect("valid money fixture");
     let start = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2031, Month::January, 1).unwrap();
 
@@ -133,7 +133,7 @@ fn test_floor_new_floor_helper() {
 
 #[test]
 fn test_caplet_creation() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2025, Month::April, 1).unwrap();
 
@@ -171,7 +171,7 @@ fn test_caplet_creation() {
 
 #[test]
 fn test_floorlet_creation() {
-    let notional = Money::new(500_000.0, Currency::EUR);
+    let notional = Money::new(500_000.0, Currency::EUR).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::March, 1).unwrap();
     let end = Date::from_calendar_date(2025, Month::September, 1).unwrap();
 
@@ -208,7 +208,7 @@ fn test_floorlet_creation() {
 
 #[test]
 fn test_custom_calendar() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -233,7 +233,7 @@ fn test_custom_calendar() {
 
 #[test]
 fn test_different_day_counts() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -266,7 +266,7 @@ fn test_different_day_counts() {
 
 #[test]
 fn test_different_frequencies() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -299,7 +299,7 @@ fn test_different_frequencies() {
 
 #[test]
 fn test_new_caplet_rejects_nan_strike() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
@@ -321,7 +321,7 @@ fn test_new_caplet_rejects_nan_strike() {
 
 #[test]
 fn test_new_caplet_rejects_infinite_strike() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
@@ -346,7 +346,7 @@ fn test_new_caplet_rejects_infinite_strike() {
 
 #[test]
 fn test_new_floorlet_rejects_nan_strike() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
@@ -368,7 +368,7 @@ fn test_new_floorlet_rejects_nan_strike() {
 
 #[test]
 fn test_new_caplet_accepts_valid_strike() {
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
@@ -396,7 +396,7 @@ fn term_index_rejects_overnight_coupon_settings() {
     let mut caplet = CapFloor::new(
         "TERM-WITH-OVERNIGHT-SETTINGS",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2025, Month::January, 2).unwrap(),
         Date::from_calendar_date(2025, Month::April, 2).unwrap(),
@@ -429,7 +429,7 @@ fn legacy_cap_json_defaults_overnight_coupon_to_none() {
     let cap = CapFloor::new(
         "LEGACY-CAP",
         RateOptionType::Cap,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2025, Month::January, 2).unwrap(),
         Date::from_calendar_date(2026, Month::January, 2).unwrap(),

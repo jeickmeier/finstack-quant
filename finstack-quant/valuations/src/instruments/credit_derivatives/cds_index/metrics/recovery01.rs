@@ -41,7 +41,7 @@ fn market_with_recovery(
 ) -> Result<MarketContext> {
     let hazard = market.get_hazard(curve_id)?;
     let discount_id = index.premium.discount_curve_id.clone();
-    let synthetic = index.to_synthetic_cds();
+    let synthetic = index.to_synthetic_cds()?;
 
     let frozen_curve_market = || -> Result<MarketContext> {
         Ok(market

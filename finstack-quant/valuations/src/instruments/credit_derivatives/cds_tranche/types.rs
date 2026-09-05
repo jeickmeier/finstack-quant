@@ -249,7 +249,7 @@ impl CDSTranche {
         let params = super::parameters::CDSTrancheParams::equity_tranche(
             "CDX.NA.IG",
             42,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             date!(2029 - 12 - 20),
             100.0,
         );
@@ -557,8 +557,8 @@ impl Instrument for CDSTranche {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CDSTranche {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(

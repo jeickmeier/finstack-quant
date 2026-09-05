@@ -45,7 +45,7 @@ impl MetricCalculator for YtwCalculator {
         let mut candidates: Vec<(Date, Money)> = Vec::with_capacity(candidate_calls.len() + 1);
         for (date, price_pct) in candidate_calls {
             let out = outstanding_before(&out_path, date, currency);
-            let redemption = Money::new(out.amount() * (price_pct / 100.0), currency);
+            let redemption = Money::new(out.amount() * (price_pct / 100.0), currency)?;
             candidates.push((date, redemption));
         }
 

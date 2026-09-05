@@ -42,7 +42,7 @@ fn monthly_observations(
 pub fn sample_tips() -> InflationLinkedBond {
     let mut bond = InflationLinkedBond::builder()
         .id(InstrumentId::new("TIPS-TEST"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .real_coupon(Decimal::try_from(0.0125).expect("valid decimal")) // 1.25% real coupon
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::ActAct)
@@ -69,7 +69,7 @@ pub fn sample_tips() -> InflationLinkedBond {
 pub fn sample_uk_linker() -> InflationLinkedBond {
     let mut bond = InflationLinkedBond::builder()
         .id(InstrumentId::new("UK-GILT-TEST"))
-        .notional(Money::new(1_000_000.0, Currency::GBP))
+        .notional(Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"))
         .real_coupon(Decimal::try_from(0.00625).expect("valid decimal")) // 0.625% real coupon
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::ActAct)

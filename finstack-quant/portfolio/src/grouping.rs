@@ -111,7 +111,7 @@ pub fn aggregate_by_book(
         })?;
 
         // Start with zero
-        let mut total = Money::new(0.0, base_currency);
+        let mut total = Money::from((0_i64, base_currency));
 
         // Add direct position values
         for pos_id in &book.position_ids {
@@ -175,7 +175,7 @@ mod tests {
         PortfolioValuation {
             as_of: date!(2024 - 01 - 01),
             position_values: IndexMap::new(),
-            total_base_currency: Money::new(0.0, Currency::USD),
+            total_base_currency: Money::from((0_i64, Currency::USD)),
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
             fx_collapse_policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,

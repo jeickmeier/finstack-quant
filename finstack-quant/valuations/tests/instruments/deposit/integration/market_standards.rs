@@ -18,7 +18,7 @@ fn test_standard_usd_3m_deposit() {
     let ctx = ctx_with_flat_rate(base, "USD-OIS", 0.02);
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 4, 1))
         .day_count(DayCount::Act360)
@@ -50,7 +50,7 @@ fn test_standard_eur_6m_deposit() {
     let ctx = ctx_with_flat_rate(base, "EUR-OIS", 0.015);
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(10_000_000.0, Currency::EUR))
+        .notional(Money::new(10_000_000.0, Currency::EUR).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
@@ -79,7 +79,7 @@ fn test_overnight_deposit_libor_style() {
     let ctx = ctx_with_flat_rate(base, "USD-OIS", 0.05);
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(50_000_000.0, Currency::USD))
+        .notional(Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 1, 2))
         .day_count(DayCount::Act360)
@@ -153,7 +153,7 @@ fn test_dv01_magnitude_check() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .build();
 
@@ -174,7 +174,7 @@ fn test_simple_interest_calculation() {
     let rate = 0.05;
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .quote_rate(rate)
@@ -197,21 +197,21 @@ fn test_multi_currency_portfolio() {
     let ctx_gbp = ctx_with_standard_disc(base, "GBP-OIS");
 
     let dep_usd = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .discount_curve_id("USD-OIS")
         .build();
 
     let dep_eur = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.02)
         .discount_curve_id("EUR-OIS")
         .build();
 
     let dep_gbp = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::GBP))
+        .notional(Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.025)
         .discount_curve_id("GBP-OIS")
@@ -287,7 +287,7 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
     // End date set to ~1 month after expected spot
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-1M-FRIDAY"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(trade_date) // Will be adjusted by spot lag
         .maturity(date(2025, 2, 7)) // 1 month maturity from spot
         .day_count(DayCount::Act360)
@@ -361,7 +361,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
     // Build deposit WITHOUT spot_lag_days - should use raw start date
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-RAW"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(trade_date)
         .maturity(date(2025, 2, 3))
         .day_count(DayCount::Act360)
@@ -395,7 +395,7 @@ fn test_gbp_deposit_t0_settlement() {
     // Build GBP deposit with T+0 spot lag
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-GBP-1M"))
-        .notional(Money::new(1_000_000.0, Currency::GBP))
+        .notional(Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"))
         .start_date(trade_date)
         .maturity(date(2025, 2, 3))
         .day_count(DayCount::Act365F) // GBP uses Act/365
@@ -447,7 +447,7 @@ fn test_modified_following_eom_adjustment() {
     // Actually Jan 31, 2026 is a Saturday.
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-EOM"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(trade_date)
         .maturity(date(2026, 1, 31)) // Saturday - should roll back to Friday Jan 30
         .day_count(DayCount::Act360)

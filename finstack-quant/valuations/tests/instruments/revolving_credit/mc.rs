@@ -32,8 +32,8 @@ fn test_mc_pricer_stochastic_utilization() {
     // Create a revolving credit facility with stochastic utilization
     let facility = RevolvingCredit::builder()
         .id("RC-MC-001".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD)) // 50% initial utilization
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture")) // 50% initial utilization
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5% interest
@@ -111,8 +111,8 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
     // Zero vol (should collapse toward deterministic behavior wrt default randomness off)
     let facility_zero_vol = RevolvingCredit::builder()
         .id("RC-MC-ANCHOR".into())
-        .commitment_amount(Money::new(5_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(2_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
@@ -155,8 +155,8 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
     // Higher vol should not increase PV for the lender on average (default risk)
     let facility_high_vol = RevolvingCredit::builder()
         .id("RC-MC-ANCHOR-HV".into())
-        .commitment_amount(Money::new(5_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(2_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
@@ -208,8 +208,8 @@ fn test_mc_pricer_deterministic_reproducibility() {
 
     let facility = RevolvingCredit::builder()
         .id("RC-MC-002".into())
-        .commitment_amount(Money::new(5_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(2_500_000.0, Currency::USD))
+        .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(2_500_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.04 })
@@ -267,8 +267,10 @@ fn test_mc_pricer_convergence() {
     for &num_paths in &num_paths_list {
         let facility = RevolvingCredit::builder()
             .id(format!("RC-MC-003-{}", num_paths).into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(6_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(commitment_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
@@ -322,8 +324,8 @@ fn test_mc_utilization_mean_reversion() {
     // Start with very low utilization (10%), target 80%
     let facility = RevolvingCredit::builder()
         .id("RC-MC-004".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(1_000_000.0, Currency::USD)) // 10% initial
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")) // 10% initial
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -361,8 +363,8 @@ fn test_mc_utilization_mean_reversion() {
     // Compare to a facility with constant high utilization
     let high_util_facility = RevolvingCredit::builder()
         .id("RC-MC-005".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(8_000_000.0, Currency::USD)) // 80% constant
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% constant
         .commitment_date(commitment_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -468,8 +470,10 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     let make_stoch_spec = |id: &str, all_in_cap_bp: Option<Decimal>| -> RevolvingCredit {
         RevolvingCredit::builder()
             .id(id.into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(commitment_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Floating(make_float_spec(all_in_cap_bp)))
@@ -583,8 +587,10 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
     let make_facility = |sigma: f64| {
         RevolvingCredit::builder()
             .id("RC-OIS-HW".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(val_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Floating(float_spec.clone()))

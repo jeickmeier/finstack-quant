@@ -36,9 +36,9 @@ fn bump_scalar_price(
     let current = context.get_price(price_id)?;
     let bumped_value = match current {
         MarketScalar::Unitless(v) => MarketScalar::Unitless(v * (1.0 + bump_pct)),
-        MarketScalar::Price(m) => {
-            MarketScalar::Price(Money::new(m.amount() * (1.0 + bump_pct), m.currency()))
-        }
+        MarketScalar::Price(m) => MarketScalar::Price(
+            Money::new(m.amount() * (1.0 + bump_pct), m.currency()).expect("valid money fixture"),
+        ),
     };
     Ok(context.clone().insert_price(price_id, bumped_value))
 }
@@ -246,7 +246,7 @@ fn fx_vanna_and_volga_match_reference_fd() -> finstack_quant_core::Result<()> {
         Currency::USD,
         strike,
         expiry,
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "EURUSD-VOL",
     )
     .unwrap();
@@ -325,7 +325,7 @@ fn fx_volga_returns_zero_when_surface_vol_is_zero() -> finstack_quant_core::Resu
         Currency::USD,
         1.10,
         expiry,
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "EURUSD-VOL",
     )
     .unwrap();

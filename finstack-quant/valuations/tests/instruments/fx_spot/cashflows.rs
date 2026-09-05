@@ -87,7 +87,7 @@ fn test_settlement_on_valuation_date() {
 #[test]
 fn test_settlement_from_fx_matrix() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_settlement(d(2025, 1, 17));
     let market = market_with_fx_matrix();
@@ -124,7 +124,7 @@ fn test_settlement_explicit_rate_overrides_matrix() {
 #[test]
 fn test_settlement_lag_custom() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
@@ -178,7 +178,7 @@ fn test_settlement_with_business_day_convention() {
 #[test]
 fn test_settlement_zero_notional() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR))
+        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
@@ -218,7 +218,7 @@ fn test_multiple_instruments_independent_settlement() {
 #[test]
 fn test_settlement_without_rate_or_matrix_fails() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_settlement(d(2025, 1, 17));
     let market = MarketContext::new(); // No FX matrix
@@ -237,13 +237,13 @@ fn test_value_matches_provider_flows() {
     let provider_flows = fx
         .dated_cashflows(&market, as_of)
         .expect("provider flows should build");
-    let provider_total =
-        provider_flows
-            .into_iter()
-            .fold(Money::new(0.0, Currency::USD), |acc, (_, amount)| {
-                acc.checked_add(amount)
-                    .expect("flow sum should remain in a single currency")
-            });
+    let provider_total = provider_flows.into_iter().fold(
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        |acc, (_, amount)| {
+            acc.checked_add(amount)
+                .expect("flow sum should remain in a single currency")
+        },
+    );
 
     approx_eq(
         value.amount(),
@@ -258,7 +258,7 @@ fn test_value_matches_provider_flows() {
 fn test_settlement_lag_negative() {
     // Test backward-looking settlement (unusual but valid)
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
@@ -276,7 +276,7 @@ fn test_settlement_lag_negative() {
 #[test]
 fn test_calendar_aware_settlement_lag() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
@@ -326,7 +326,7 @@ fn cashflow_uses_valuation_date_spot_not_settlement_date_rate() {
         Currency::EUR,
         Currency::USD,
     )
-    .with_notional(Money::new(1_000_000.0, Currency::EUR))
+    .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
     .expect("valid notional")
     .with_settlement(d(2025, 1, 17));
     let market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(DateAwareFx {

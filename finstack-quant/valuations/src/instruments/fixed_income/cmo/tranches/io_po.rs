@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_io_characteristics() {
-        let io = CmoTranche::io_strip("IO", Money::new(100_000.0, Currency::USD), 0.04);
+        let io = CmoTranche::io_strip("IO", Money::from((100_000_i64, Currency::USD)), 0.04);
         let chars = IoStripCharacteristics::from_tranche(&io);
 
         assert!((chars.notional - 100_000.0).abs() < 1.0);
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn test_po_characteristics() {
-        let po = CmoTranche::po_strip("PO", Money::new(100_000.0, Currency::USD));
+        let po = CmoTranche::po_strip("PO", Money::from((100_000_i64, Currency::USD)));
         let chars = PoStripCharacteristics::from_tranche(&po);
 
         assert!((chars.face - 100_000.0).abs() < 1.0);
@@ -307,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_io_prepay_sensitivity() {
-        let io = CmoTranche::io_strip("IO", Money::new(100_000.0, Currency::USD), 0.04);
+        let io = CmoTranche::io_strip("IO", Money::from((100_000_i64, Currency::USD)), 0.04);
         let chars = IoStripCharacteristics::from_tranche(&io);
 
         let base_value = 10_000.0;
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_po_prepay_sensitivity() {
-        let po = CmoTranche::po_strip("PO", Money::new(100_000.0, Currency::USD));
+        let po = CmoTranche::po_strip("PO", Money::from((100_000_i64, Currency::USD)));
         let chars = PoStripCharacteristics::from_tranche(&po);
 
         let base_value = 90_000.0;

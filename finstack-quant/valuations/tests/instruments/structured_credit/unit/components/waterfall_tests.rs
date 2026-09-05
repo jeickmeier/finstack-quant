@@ -26,7 +26,7 @@ fn test_waterfall_builder_creates_proper_priority_order() {
                 "trustee",
                 RecipientType::ServiceProvider("Trustee".into()),
                 PaymentCalculation::FixedAmount {
-                    amount: Money::new(25_000.0, Currency::USD),
+                    amount: Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
                     rounding: None,
                 },
             )),
@@ -123,7 +123,7 @@ fn test_payment_priority_ordering() {
             "fee",
             RecipientType::ServiceProvider("Test".into()),
             PaymentCalculation::FixedAmount {
-                amount: Money::new(1000.0, Currency::USD),
+                amount: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
                 rounding: None,
             },
         )),
@@ -150,7 +150,7 @@ fn test_allocation_mode_sequential() {
             "r1",
             RecipientType::ServiceProvider("P1".into()),
             PaymentCalculation::FixedAmount {
-                amount: Money::new(1000.0, Currency::USD),
+                amount: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
                 rounding: None,
             },
         ));
@@ -188,7 +188,11 @@ fn test_allocation_mode_pro_rata() {
 
 #[test]
 fn test_recipient_fixed_fee_helper() {
-    let recipient = Recipient::fixed_fee("trustee", "Trustee", Money::new(50_000.0, Currency::USD));
+    let recipient = Recipient::fixed_fee(
+        "trustee",
+        "Trustee",
+        Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+    );
 
     assert_eq!(recipient.id, "trustee");
     match &recipient.recipient_type {
@@ -235,17 +239,17 @@ fn test_tier_multiple_recipients() {
         .add_recipient(Recipient::fixed_fee(
             "trustee",
             "Trustee",
-            Money::new(50_000.0, Currency::USD),
+            Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
         ))
         .add_recipient(Recipient::fixed_fee(
             "admin",
             "Admin",
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
         ))
         .add_recipient(Recipient::fixed_fee(
             "rating",
             "RatingAgency",
-            Money::new(10_000.0, Currency::USD),
+            Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
         ));
 
     assert_eq!(tier.recipients.len(), 3);
@@ -269,7 +273,7 @@ fn test_waterfall_engine_add_tier() {
         "recipient",
         RecipientType::ServiceProvider("Test".into()),
         PaymentCalculation::FixedAmount {
-            amount: Money::new(1000.0, Currency::USD),
+            amount: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
             rounding: None,
         },
     ));
@@ -294,7 +298,7 @@ fn abs_template_does_not_trap_junior_coupon() {
         0.0,
         70.0,
         TrancheSeniority::Senior,
-        Money::new(70_000.0, Currency::USD),
+        Money::new(70_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity,
     )
@@ -304,7 +308,7 @@ fn abs_template_does_not_trap_junior_coupon() {
         70.0,
         90.0,
         TrancheSeniority::Mezzanine,
-        Money::new(20_000.0, Currency::USD),
+        Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.06 },
         maturity,
     )
@@ -314,7 +318,7 @@ fn abs_template_does_not_trap_junior_coupon() {
         90.0,
         100.0,
         TrancheSeniority::Equity,
-        Money::new(10_000.0, Currency::USD),
+        Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.0 },
         maturity,
     )

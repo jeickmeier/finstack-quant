@@ -242,8 +242,8 @@ impl crate::cashflow::traits::CashflowScheduleSource for LeveredRealEstateEquity
         let flows = self
             .equity_cashflows(market, as_of)?
             .into_iter()
-            .map(|(date, amount)| (date, Money::new(amount, self.currency)))
-            .collect();
+            .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,
@@ -279,8 +279,8 @@ mod tests {
             .valuation_date(as_of)
             .valuation_method(RealEstateValuationMethod::Dcf)
             .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
-            .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
-            .sale_price_opt(Some(Money::new(1_100.0, Currency::USD)))
+            .purchase_price_opt(Some(Money::from((1_000_i64, Currency::USD))))
+            .sale_price_opt(Some(Money::from((1_100_i64, Currency::USD))))
             .discount_rate_opt(Some(0.10))
             .day_count(DayCount::Act365F)
             .attributes(Default::default())

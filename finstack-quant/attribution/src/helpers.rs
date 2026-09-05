@@ -250,77 +250,82 @@ pub(crate) fn total_return_carry_inputs(
     as_of_t0: Date,
     as_of_t1: Date,
     currency: Currency,
-) -> TotalReturnCarryInputs {
-    let mut warnings = Vec::new();
-    let mut invalid = false;
+) -> finstack_quant_core::Result<TotalReturnCarryInputs> {
+    Ok({
+        let mut warnings = Vec::new();
+        let mut invalid = false;
 
-    let cash_paid =
-        match collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency) {
-            Ok(value) => factor_money_or_invalid(
-                value,
-                currency,
-                "carry cash income",
-                &mut warnings,
-                &mut invalid,
-            ),
-            Err(e) => {
-                warnings.push(format!("carry cash income unavailable: {e}"));
-                Money::new(0.0, currency)
-            }
+        let cash_paid =
+            match collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency) {
+                Ok(value) => factor_money_or_invalid(
+                    value,
+                    currency,
+                    "carry cash income",
+                    &mut warnings,
+                    &mut invalid,
+                ),
+                Err(e) => {
+                    warnings.push(format!("carry cash income unavailable: {e}"));
+                    Money::from((0_i64, currency))
+                }
+            };
+
+        let t0_metrics = instrument
+            .price_with_metrics(
+                market,
+                as_of_t0,
+                &[MetricId::Accrued, MetricId::Ytm],
+                PricingOptions::default(),
+            )
+            .ok();
+        let metric = |result: Option<&finstack_quant_valuations::results::ValuationResult>,
+                      id: MetricId|
+         -> Option<f64> {
+            result
+                .and_then(|r| r.measures.get(id.as_str()).copied())
+                .filter(|v| v.is_finite())
+        };
+        let accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
+        let ytm = metric(t0_metrics.as_ref(), MetricId::Ytm);
+        let accrued_t1 = instrument
+            .price_with_metrics(
+                market,
+                as_of_t1,
+                &[MetricId::Accrued],
+                PricingOptions::default(),
+            )
+            .ok()
+            .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
+            .filter(|v| v.is_finite());
+        let delta_accrued = match (accrued_t0, accrued_t1) {
+            (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)?),
+            _ => None,
         };
 
-    let t0_metrics = instrument
-        .price_with_metrics(
+        let flat_window_diff = match ytm {
+            Some(ytm) => {
+                flat_window_diff_from_ytm(instrument, market, as_of_t0, as_of_t1, currency, ytm)?
+            }
+            None => None,
+        };
+        let funding_cost = reprice_funding_cost(
+            instrument,
             market,
             as_of_t0,
-            &[MetricId::Accrued, MetricId::Ytm],
-            PricingOptions::default(),
-        )
-        .ok();
-    let metric = |result: Option<&finstack_quant_valuations::results::ValuationResult>,
-                  id: MetricId|
-     -> Option<f64> {
-        result
-            .and_then(|r| r.measures.get(id.as_str()).copied())
-            .filter(|v| v.is_finite())
-    };
-    let accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
-    let ytm = metric(t0_metrics.as_ref(), MetricId::Ytm);
-    let accrued_t1 = instrument
-        .price_with_metrics(
-            market,
             as_of_t1,
-            &[MetricId::Accrued],
-            PricingOptions::default(),
-        )
-        .ok()
-        .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
-        .filter(|v| v.is_finite());
-    let delta_accrued = match (accrued_t0, accrued_t1) {
-        (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)),
-        _ => None,
-    };
+            currency,
+            &mut warnings,
+        );
 
-    let flat_window_diff = ytm.and_then(|ytm| {
-        flat_window_diff_from_ytm(instrument, market, as_of_t0, as_of_t1, currency, ytm)
-    });
-    let funding_cost = reprice_funding_cost(
-        instrument,
-        market,
-        as_of_t0,
-        as_of_t1,
-        currency,
-        &mut warnings,
-    );
-
-    TotalReturnCarryInputs {
-        cash_paid,
-        delta_accrued,
-        flat_window_diff,
-        funding_cost,
-        warnings,
-        invalid,
-    }
+        TotalReturnCarryInputs {
+            cash_paid,
+            delta_accrued,
+            flat_window_diff,
+            funding_cost,
+            warnings,
+            invalid,
+        }
+    })
 }
 
 /// `F_t1 - F_t0` on a flat-YTM(t0) curve, or `None` if flat pricing is unavailable.
@@ -331,14 +336,22 @@ fn flat_window_diff_from_ytm(
     as_of_t1: Date,
     currency: Currency,
     ytm: f64,
-) -> Option<Money> {
-    let flat = build_flat_ytm_market(instrument, market, ytm).ok()?;
-    let f_t0 = instrument.value(&flat, as_of_t0).ok()?.amount();
-    let f_t1 = instrument.value(&flat, as_of_t1).ok()?.amount();
+) -> Result<Option<Money>> {
+    let Ok(flat) = build_flat_ytm_market(instrument, market, ytm) else {
+        return Ok(None);
+    };
+    let Ok(f_t0) = instrument.value(&flat, as_of_t0) else {
+        return Ok(None);
+    };
+    let f_t0 = f_t0.amount();
+    let Ok(f_t1) = instrument.value(&flat, as_of_t1) else {
+        return Ok(None);
+    };
+    let f_t1 = f_t1.amount();
     if f_t0.is_finite() && f_t1.is_finite() {
-        Some(Money::new(f_t1 - f_t0, currency))
+        Money::new(f_t1 - f_t0, currency).map(Some)
     } else {
-        None
+        Ok(None)
     }
 }
 
@@ -424,7 +437,7 @@ fn reprice_funding_cost(
 ) -> Option<Money> {
     let curve_id = instrument.funding_curve_id()?;
     if as_of_t1 <= as_of_t0 {
-        return Some(Money::new(0.0, currency));
+        return Some(Money::from((0_i64, currency)));
     }
     let funding_curve = match market.get_discount(curve_id.as_str()) {
         Ok(curve) => curve,
@@ -487,7 +500,13 @@ fn reprice_funding_cost(
     };
     let cost = pv * ((annual_rate * dcf).exp() - 1.0);
     if cost.is_finite() {
-        Some(Money::new(cost, currency))
+        match Money::new(cost, currency) {
+            Ok(amount) => Some(amount),
+            Err(error) => {
+                warnings.push(format!("funding_cost omitted: {error}"));
+                None
+            }
+        }
     } else {
         warnings.push("funding_cost omitted: non-finite funding accrual".to_string());
         None
@@ -609,14 +628,15 @@ pub(crate) fn factor_money_or_invalid(
     notes: &mut Vec<String>,
     result_invalid: &mut bool,
 ) -> Money {
-    if amount.is_finite() {
-        Money::new(amount, currency)
-    } else {
-        notes.push(format!(
-            "Non-finite factor P&L ({amount:?}) for {label}; attribution flagged invalid"
-        ));
-        *result_invalid = true;
-        Money::new(0.0, currency)
+    match Money::new(amount, currency) {
+        Ok(money) => money,
+        Err(error) => {
+            notes.push(format!(
+                "Invalid factor P&L ({amount:?}) for {label}: {error}; attribution flagged invalid"
+            ));
+            *result_invalid = true;
+            Money::from((0_i64, currency))
+        }
     }
 }
 
@@ -692,8 +712,8 @@ mod tests {
         use finstack_quant_valuations::instruments::Bond;
         let bond = Bond::fixed(
             "USE-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -730,8 +750,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let bond = Bond::fixed(
             "FLAT-YTM-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2024 - 01 - 01),
             date!(2034 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -785,8 +805,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let bond = Bond::with_convention(
             "FLAT-YTM-BUND",
-            Money::new(1_000_000.0, Currency::EUR),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::EUR)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2024 - 01 - 01),
             date!(2034 - 01 - 01),
             BondConvention::GermanBund,
@@ -823,8 +843,8 @@ mod tests {
         let as_of_t1 = date!(2025 - 01 - 16);
         let mut bond = Bond::fixed(
             "FUND-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 15),
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -867,8 +887,8 @@ mod tests {
 
     #[test]
     fn test_compute_pnl() {
-        let val_t0 = Money::new(1000.0, Currency::EUR);
-        let val_t1 = Money::new(1100.0, Currency::EUR);
+        let val_t0 = Money::from((1000_i64, Currency::EUR));
+        let val_t1 = Money::from((1100_i64, Currency::EUR));
         let fx = FxMatrix::new(Arc::new(TestFx));
         let market = MarketContext::new().insert_fx(fx);
         let as_of = date!(2025 - 01 - 15);
@@ -883,7 +903,7 @@ mod tests {
     #[test]
     fn test_compute_pnl_with_fx() {
         // Test FX translation isolation
-        let pv = Money::new(1000.0, Currency::EUR);
+        let pv = Money::from((1000_i64, Currency::EUR));
 
         // T0 market: EUR/USD = 1.1
         let fx_t0 = FxMatrix::new(Arc::new(TestFx));

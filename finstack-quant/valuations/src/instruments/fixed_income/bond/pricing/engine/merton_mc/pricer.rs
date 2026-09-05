@@ -172,11 +172,12 @@ impl Pricer for SimpleBondMertonMcPricer {
         // ---- Full pricing pass -----------------------------------------
         let mc_result = bond
             .price_merton_mc(&effective_config, discount_rate, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))?;
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
         let mc_clean_pct = mc_result.clean_price_pct;
         let pv_amount = mc_clean_pct / 100.0 * bond.notional.amount();
-        let pv = Money::new(pv_amount, bond.notional.currency());
+        let pv = Money::new(pv_amount, bond.notional.currency())
+            .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
 
         let mut measures = IndexMap::new();
         measures.insert(
@@ -284,7 +285,7 @@ impl Pricer for SimpleBondMertonMcPricer {
 
         let mc_result = bond
             .price_merton_mc(&effective_config, discount_rate, as_of)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))?;
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
         Ok(mc_result.clean_price_pct / 100.0 * bond.notional.amount())
     }
@@ -315,8 +316,8 @@ mod tests {
         .seed(7);
         let mut bond = Bond::fixed(
             "MERTON_OPTION_GUARD",
-            Money::new(100.0, Currency::USD),
-            Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2029 - 01 - 15),
             StubKind::ShortFront,

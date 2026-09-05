@@ -105,9 +105,9 @@ mod tests {
     #[test]
     fn test_sequential_order() {
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(100.0, Currency::USD), 0.04, 1),
-            CmoTranche::sequential("B", Money::new(100.0, Currency::USD), 0.05, 2),
-            CmoTranche::sequential("C", Money::new(100.0, Currency::USD), 0.06, 3),
+            CmoTranche::sequential("A", Money::from((100_i64, Currency::USD)), 0.04, 1),
+            CmoTranche::sequential("B", Money::from((100_i64, Currency::USD)), 0.05, 2),
+            CmoTranche::sequential("C", Money::from((100_i64, Currency::USD)), 0.06, 3),
         ];
 
         let order = SequentialOrder::from_tranches(&tranches);

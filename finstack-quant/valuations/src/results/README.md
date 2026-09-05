@@ -41,7 +41,7 @@ use indexmap::IndexMap;
 use time::macros::date;
 
 let as_of = date!(2025 - 01 - 15);
-let pv = Money::new(1_000_000.0, Currency::USD);
+let pv = Money::new(1_000_000.0, Currency::USD)?;
 
 let mut measures = IndexMap::new();
 measures.insert(MetricId::Dv01, -1_250.0);

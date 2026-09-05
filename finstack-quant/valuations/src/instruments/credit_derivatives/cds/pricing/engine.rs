@@ -90,7 +90,7 @@ impl CDSPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.pv_protection_leg_raw(cds, disc, surv, as_of)?;
-        Ok(Money::new(pv, cds.notional.currency()))
+        Money::new(pv, cds.notional.currency())
     }
 
     /// Calculate PV of protection leg (raw f64)
@@ -203,7 +203,7 @@ impl CDSPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.pv_premium_leg_raw(cds, disc, surv, as_of)?;
-        Ok(Money::new(pv, cds.notional.currency()))
+        Money::new(pv, cds.notional.currency())
     }
 
     /// Calculate PV of premium leg (raw f64)
@@ -624,7 +624,7 @@ mod cds_hazard_reprice_cache_tests {
     ) -> finstack_quant_core::Result<CreditDefaultSwap> {
         let mut cds = CreditDefaultSwap::new_isda(
             InstrumentId::new("CACHE-TEST-CDS"),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             PayReceive::Pay,
             CdsConvention::IsdaNa,
             Decimal::new(10_000, 2),

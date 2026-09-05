@@ -29,8 +29,8 @@ fn test_accrued_uses_settlement_at_issue() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "ACCR1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -56,8 +56,8 @@ fn test_accrued_mid_period() {
     let mid = date!(2025 - 04 - 01); // ~3 months later
     let bond = Bond::fixed(
         "ACCR2",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -83,8 +83,8 @@ fn test_quoted_price_accrued_uses_settlement_date() {
     let as_of = date!(2025 - 04 - 01);
     let mut bond = Bond::fixed(
         "ACCR-QUOTE",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -149,7 +149,7 @@ fn test_accrued_frn_uses_forward_rate() {
     use finstack_quant_valuations::instruments::Attributes;
     let bond = Bond::builder()
         .id("FRN1".into())
-        .notional(Money::new(100.0, Currency::USD))
+        .notional(Money::new(100.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
         .cashflow_spec(
@@ -201,8 +201,8 @@ fn test_clean_dirty_ex_coupon_parity() {
 
     let bond = Bond::fixed(
         "B",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         date!(2026 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

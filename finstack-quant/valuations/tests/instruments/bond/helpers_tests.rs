@@ -28,16 +28,18 @@ fn test_periods_per_year_monthly() {
 #[test]
 fn test_periods_per_year_days() {
     // 30 days = 365/30 ≈ 12.17 periods per year
-    let result = periods_per_year(Tenor::new(30, TenorUnit::Days)).unwrap();
+    let result =
+        periods_per_year(Tenor::new(30, TenorUnit::Days).expect("valid tenor fixture")).unwrap();
     assert!((result - 12.166666).abs() < 0.01);
 
     // 90 days ≈ 4.06 periods per year
-    let result = periods_per_year(Tenor::new(90, TenorUnit::Days)).unwrap();
+    let result =
+        periods_per_year(Tenor::new(90, TenorUnit::Days).expect("valid tenor fixture")).unwrap();
     assert!((result - 4.0555).abs() < 0.01);
 
     // 365 days = 1 period per year
     assert_eq!(
-        periods_per_year(Tenor::new(365, TenorUnit::Days)).unwrap(),
+        periods_per_year(Tenor::new(365, TenorUnit::Days).expect("valid tenor fixture")).unwrap(),
         1.0
     );
 }
@@ -45,15 +47,15 @@ fn test_periods_per_year_days() {
 #[test]
 fn test_periods_per_year_years_and_weeks() {
     assert_eq!(
-        periods_per_year(Tenor::new(2, TenorUnit::Years)).unwrap(),
+        periods_per_year(Tenor::new(2, TenorUnit::Years).expect("valid tenor fixture")).unwrap(),
         0.5
     );
     assert_eq!(
-        periods_per_year(Tenor::new(1, TenorUnit::Weeks)).unwrap(),
+        periods_per_year(Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture")).unwrap(),
         52.0
     );
     assert_eq!(
-        periods_per_year(Tenor::new(2, TenorUnit::Weeks)).unwrap(),
+        periods_per_year(Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture")).unwrap(),
         26.0
     );
 }
@@ -210,7 +212,10 @@ fn test_price_from_ytm_compounded_params_single_flow() {
     // Single cashflow in 1 year. Use non-leap year dates so Act365F gives year_fraction = 1.0 exactly.
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let payment_date = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
-    let flows = vec![(payment_date, Money::new(100.0, Currency::USD))];
+    let flows = vec![(
+        payment_date,
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    )];
 
     let ytm = 0.05;
     let price = price_from_ytm_compounded_params(
@@ -237,8 +242,14 @@ fn test_price_from_ytm_compounded_params_act_act_isma() {
     let date2 = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
 
     let flows = vec![
-        (date1, Money::new(2.5, Currency::USD)),
-        (date2, Money::new(102.5, Currency::USD)),
+        (
+            date1,
+            Money::new(2.5, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            date2,
+            Money::new(102.5, Currency::USD).expect("valid money fixture"),
+        ),
     ];
 
     let ytm = 0.05;
@@ -268,8 +279,14 @@ fn test_price_from_ytm_compounded_params_multiple_flows() {
     let date2 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     let flows = vec![
-        (date1, Money::new(5.0, Currency::USD)),
-        (date2, Money::new(105.0, Currency::USD)),
+        (
+            date1,
+            Money::new(5.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            date2,
+            Money::new(105.0, Currency::USD).expect("valid money fixture"),
+        ),
     ];
 
     let ytm = 0.06;
@@ -295,8 +312,14 @@ fn test_price_from_ytm_compounded_params_past_flows_ignored() {
     let future_date = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
 
     let flows = vec![
-        (past_date, Money::new(100.0, Currency::USD)), // Should be ignored
-        (future_date, Money::new(100.0, Currency::USD)),
+        (
+            past_date,
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        ), // Should be ignored
+        (
+            future_date,
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        ),
     ];
 
     let ytm = 0.05;
@@ -323,8 +346,14 @@ fn test_price_from_ytm_compounded_params_zero_ytm() {
     let date2 = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
 
     let flows = vec![
-        (date1, Money::new(50.0, Currency::USD)),
-        (date2, Money::new(50.0, Currency::USD)),
+        (
+            date1,
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            date2,
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
+        ),
     ];
 
     let price = price_from_ytm_compounded_params(
@@ -364,7 +393,10 @@ fn test_price_from_ytm_compounded_params_empty_flows() {
 fn test_price_from_ytm_compounded_params_different_day_counts() {
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let payment_date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-    let flows = vec![(payment_date, Money::new(100.0, Currency::USD))];
+    let flows = vec![(
+        payment_date,
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    )];
     let ytm = 0.05;
 
     // Test different day count conventions
@@ -401,7 +433,10 @@ fn test_price_from_ytm_compounded_params_long_maturity() {
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2054, time::Month::January, 1).unwrap();
 
-    let flows = vec![(maturity, Money::new(100.0, Currency::USD))];
+    let flows = vec![(
+        maturity,
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    )];
 
     let ytm = 0.04; // 4% yield
     let price = price_from_ytm_compounded_params(
@@ -426,7 +461,10 @@ fn test_price_from_ytm_compounded_params_long_maturity() {
 fn test_price_from_ytm_compounded_params_continuous_vs_annual() {
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let payment_date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-    let flows = vec![(payment_date, Money::new(100.0, Currency::USD))];
+    let flows = vec![(
+        payment_date,
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    )];
     let ytm = 0.05;
 
     let price_annual = price_from_ytm_compounded_params(

@@ -137,7 +137,7 @@ pub(crate) fn quoted_workout_path(
     let dirty_now = Money::new(
         quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
         bond.notional.currency(),
-    );
+    )?;
     let schedule = effective_bond.full_cashflow_schedule(curves)?;
     let (workout_yield, workout_flows) =
         crate::instruments::fixed_income::bond::pricing::quote_conversions::solve_ytw_from_flows(

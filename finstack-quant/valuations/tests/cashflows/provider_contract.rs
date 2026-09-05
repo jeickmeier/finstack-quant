@@ -120,7 +120,7 @@ fn verify_provider_contract<T: CashflowProvider>(
     }
 
     // Contract: Currency consistency (if notional provided)
-    if let Some(notional) = provider.notional() {
+    if let Some(notional) = provider.notional().expect("valid notional") {
         let expected_currency = notional.currency();
         for (date, money) in &flows {
             assert_eq!(
@@ -217,8 +217,8 @@ mod bond_contract {
 
         let bond = Bond::fixed(
             "TEST-FIXED-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -245,7 +245,7 @@ mod bond_contract {
 
         let bond = Bond::floating(
             "TEST-FLOAT-BOND",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             "USD-SOFR-3M",
             200, // 200 bp spread
             issue,
@@ -280,7 +280,7 @@ mod irs_contract {
 
         let swap = crate::cashflows::rates_support::usd_irs_swap(
             "TEST-IRS-PAY",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,
             start,
             end,
@@ -299,7 +299,7 @@ mod irs_contract {
 
         let swap = crate::cashflows::rates_support::usd_irs_swap(
             "TEST-IRS-REC",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             0.04,
             start,
             end,

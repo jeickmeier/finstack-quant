@@ -161,7 +161,7 @@ impl CashflowSpec {
     ///
     /// // US Treasury-style: 4% coupon, semi-annual, 30/360
     /// let spec = CashflowSpec::fixed_rate(
-    ///     Rate::from_percent(4.0),
+    ///     Rate::from_percent(4.0).expect("valid rate fixture"),
     ///     Tenor::semi_annual(),
     ///     DayCount::Thirty360,
     /// )
@@ -685,9 +685,9 @@ impl CashflowSpec {
     /// let maturity = Date::from_calendar_date(2028, Month::January, 1).unwrap();
     /// let amort = AmortizationSpec::StepRemaining {
     ///     schedule: vec![
-    ///         (step1, Money::new(333_333.33, Currency::USD)),
-    ///         (step2, Money::new(666_666.67, Currency::USD)),
-    ///         (maturity, Money::new(0.0, Currency::USD)),
+    ///         (step1, Money::new(333_333.33, Currency::USD).expect("valid money fixture")),
+    ///         (step2, Money::new(666_666.67, Currency::USD).expect("valid money fixture")),
+    ///         (maturity, Money::from((0_i64, Currency::USD))),
     ///     ],
     /// };
     ///

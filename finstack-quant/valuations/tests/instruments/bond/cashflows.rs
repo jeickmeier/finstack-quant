@@ -46,8 +46,8 @@ fn test_fixed_rate_cashflows() {
 
     let bond = Bond::fixed(
         "FIXED_CF",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -78,8 +78,8 @@ fn test_cashflow_dates_alignment() {
 
     let bond = Bond::fixed(
         "CF_DATES",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -113,7 +113,7 @@ fn test_quarterly_coupon_frequency() {
 
     let bond = Bond::builder()
         .id("QUARTERLY".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -138,7 +138,7 @@ fn test_floating_rate_cashflows() {
 
     let bond = Bond::builder()
         .id("FRN".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -173,14 +173,14 @@ fn test_amortizing_bond_linear() {
 
     let bond = Bond::builder()
         .id("AMORT_LINEAR".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
             AmortizationSpec::LinearTo {
-                final_notional: Money::new(400.0, Currency::USD),
+                final_notional: Money::new(400.0, Currency::USD).expect("valid money fixture"),
             },
         ))
         .discount_curve_id("USD-OIS".into())
@@ -225,7 +225,11 @@ fn test_custom_cashflows_from_schedule() {
     };
 
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
             coupon_type: CouponType::Cash,
             initial_rate: Decimal::new(4, 2),
@@ -251,7 +255,11 @@ fn test_pik_cashflows() {
 
     // Build PIK toggle schedule
     let custom_schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Pik,
             rate: rust_decimal::Decimal::try_from(0.08).expect("valid"),
@@ -300,8 +308,8 @@ fn test_cashflows_for_matured_bond() {
 
     let bond = Bond::fixed(
         "MATURED",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -331,7 +339,7 @@ fn test_cashflows_with_short_front_stub() {
     use finstack_quant_cashflows::builder::specs::CouponType;
     let bond = Bond::builder()
         .id("STUB_SHORT".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
@@ -382,8 +390,8 @@ fn test_zero_coupon_cashflows() {
 
     let bond = Bond::fixed(
         "ZERO",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.0),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.0).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -415,8 +423,8 @@ fn test_cashflows_notional_scaling() {
     for notional_amt in notionals {
         let bond = Bond::fixed(
             format!("SCALE_{}", notional_amt),
-            Money::new(notional_amt, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(notional_amt, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -442,8 +450,8 @@ fn test_cashflow_schedule_fixed() {
 
     let bond = Bond::fixed(
         "FULL_SCHED",
-        Money::new(1000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -466,7 +474,7 @@ fn test_cashflow_schedule_floating() {
 
     let bond = Bond::builder()
         .id("FULL_FRN".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -504,7 +512,7 @@ fn test_cashflows_day_count_conventions() {
     for day_count in day_counts {
         let bond = Bond::builder()
             .id(format!("DC_{:?}", day_count).into())
-            .notional(Money::new(1000.0, Currency::USD))
+            .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(as_of)
             .maturity(maturity)
             .cashflow_spec(
@@ -530,14 +538,14 @@ fn test_amortizing_full_redemption() {
 
     let bond = Bond::builder()
         .id("AMORT_FULL".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
             AmortizationSpec::LinearTo {
-                final_notional: Money::new(0.0, Currency::USD),
+                final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             },
         ))
         .discount_curve_id("USD-OIS".into())
@@ -562,7 +570,7 @@ fn test_actact_isma_daycount_context() {
 
     let bond = Bond::builder()
         .id("ACTACT_ISMA".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
@@ -650,7 +658,7 @@ fn test_bus252_daycount_with_calendar() {
 
     let bond = Bond::builder()
         .id("BUS252".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {

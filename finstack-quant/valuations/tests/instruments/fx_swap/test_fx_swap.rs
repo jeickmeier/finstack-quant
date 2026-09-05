@@ -29,7 +29,7 @@ fn standard_swap_tenor_preserves_explicit_end_of_month_policy() {
         Currency::USD,
         Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
         Tenor::parse("1M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "USD-OIS",
         "EUR-OIS",
         None,

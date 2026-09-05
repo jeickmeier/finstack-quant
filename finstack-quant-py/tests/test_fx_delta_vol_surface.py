@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 
 import pytest
@@ -110,3 +111,11 @@ def test_with_10d_wings_smoke() -> None:
     # 10D wings produce a 5-point smile in implied_vol; a sanity probe.
     vol = get_fx_delta_vol(surface, 0.5, 1.30, forward=1.20)
     assert vol > 0.0
+
+
+@pytest.mark.parametrize("field", ["rr_10d", "bf_10d"])
+def test_json_rejects_unpaired_wings(field: str) -> None:
+    payload = json.loads(_example_surface(with_10d=True).to_json())
+    del payload[field]
+    with pytest.raises(ValueError, match="must both be provided"):
+        FxDeltaVolSurface.from_json(json.dumps(payload))

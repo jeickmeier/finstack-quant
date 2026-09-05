@@ -24,8 +24,8 @@ use time::Month;
 fn test_attribution_envelope_json_roundtrip() {
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -101,8 +101,8 @@ fn test_attribution_envelope_json_roundtrip() {
 fn test_attribution_envelope_deserialization_rejects_unknown_schema() {
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -170,8 +170,8 @@ fn test_attribution_envelope_waterfall_roundtrip() {
 
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -290,8 +290,8 @@ fn test_attribution_envelope_from_example_json() {
 fn test_attribution_envelope_to_from_json_helpers() {
     let bond = Bond::fixed(
         "TEST-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -360,7 +360,7 @@ fn test_attribution_result_envelope_roundtrip() {
     };
     use finstack_quant_core::config::results_meta;
 
-    let total = Money::new(1000.0, Currency::USD);
+    let total = Money::new(1000.0, Currency::USD).expect("valid money fixture");
     let pnl_attr = PnlAttribution::new(
         total,
         "TEST-BOND",
@@ -540,7 +540,7 @@ fn test_populated_detail_fields_roundtrip_through_json() {
     use finstack_quant_core::types::CurveId;
     use indexmap::IndexMap;
 
-    let usd = |v: f64| Money::new(v, Currency::USD);
+    let usd = |v: f64| Money::new(v, Currency::USD).expect("valid money fixture");
 
     let mut attr = finstack_quant_attribution::PnlAttribution::new(
         usd(1000.0),

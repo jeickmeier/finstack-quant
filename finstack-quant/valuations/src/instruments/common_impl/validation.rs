@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn validate_money_checks_finite_and_gt() {
-        let money = Money::new(1.0, Currency::USD);
+        let money = Money::from((1_i64, Currency::USD));
         assert!(validate_money_finite(money, "test").is_ok());
         assert!(validate_money_gt(money, 0.0, "test").is_ok());
         assert!(validate_money_gt(money, 2.0, "test").is_err());

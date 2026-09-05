@@ -22,7 +22,7 @@ fn test_zero_coupon_loan() {
     let loan = TermLoan::builder()
         .id("TL-ZERO".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 0 }) // Zero coupon
@@ -61,7 +61,7 @@ fn test_very_short_maturity() {
     let loan = TermLoan::builder()
         .id("TL-SHORT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2025 - 04 - 01)) // 3 months
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -97,7 +97,7 @@ fn test_very_long_maturity() {
     let loan = TermLoan::builder()
         .id("TL-LONG".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2055 - 01 - 01)) // 30 years
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -133,7 +133,7 @@ fn test_negative_rate_environment() {
     let loan = TermLoan::builder()
         .id("TL-NEGRATE".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -174,7 +174,7 @@ fn ddtl_spec_template() -> TermLoanSpec {
         discount_curve_id: CurveId::from("USD-OIS"),
         credit_curve_id: None,
         currency: Currency::USD,
-        notional_limit: Some(Money::new(1_000_000.0, Currency::USD)),
+        notional_limit: Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")),
         issue: date!(2025 - 01 - 01),
         maturity: date!(2030 - 01 - 01),
         rate: RateSpec::Fixed { rate_bp: 500 },
@@ -202,17 +202,17 @@ fn test_ddtl_draws_exceeding_commitment_rejected() {
     // Cumulative draws ($6M + $6M = $12M) exceed $10M commitment
     let mut spec = ddtl_spec_template();
     spec.ddtl = Some(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![
             DrawEvent {
                 date: date!(2025 - 06 - 01),
-                amount: Money::new(6_000_000.0, Currency::USD),
+                amount: Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"),
             },
             DrawEvent {
                 date: date!(2026 - 01 - 01),
-                amount: Money::new(6_000_000.0, Currency::USD),
+                amount: Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
         commitment_step_downs: vec![],
@@ -230,17 +230,17 @@ fn test_ddtl_draws_within_commitment_accepted() {
     // Cumulative draws ($4M + $4M = $8M) within $10M
     let mut spec = ddtl_spec_template();
     spec.ddtl = Some(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![
             DrawEvent {
                 date: date!(2025 - 06 - 01),
-                amount: Money::new(4_000_000.0, Currency::USD),
+                amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
             DrawEvent {
                 date: date!(2026 - 01 - 01),
-                amount: Money::new(4_000_000.0, Currency::USD),
+                amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
         commitment_step_downs: vec![],
@@ -259,7 +259,7 @@ fn test_ddtl_draws_within_commitment_accepted() {
 fn test_negative_oid_pct_rejected() {
     let mut spec = ddtl_spec_template();
     spec.ddtl = Some(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
@@ -280,7 +280,7 @@ fn test_negative_oid_pct_rejected() {
 fn test_zero_oid_pct_accepted() {
     let mut spec = ddtl_spec_template();
     spec.ddtl = Some(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],

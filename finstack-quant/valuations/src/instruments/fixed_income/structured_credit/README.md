@@ -167,7 +167,7 @@ let waterfall = WaterfallBuilder::new(Currency::USD)
         WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
             "trustee",
             "Trustee",
-            Money::new(25_000.0, Currency::USD),
+            Money::new(25_000.0, Currency::USD)?,
         )),
     )
     .add_tier(

@@ -196,7 +196,7 @@ mod tests {
 
         let spec = FeeSpec::Fixed {
             date: Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
-            amount: Money::new(100.0, Currency::USD),
+            amount: Money::from((100_i64, Currency::USD)),
         };
         let mut value = serde_json::to_value(&spec).expect("serializable spec");
         let inner = value

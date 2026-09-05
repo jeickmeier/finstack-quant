@@ -99,7 +99,7 @@ pub fn fx_standard_spot_lag_days(base: Currency, quote: Currency) -> u32 {
 /// * `cal_id` - Optional canonical calendar ID. `None` explicitly selects the
 ///   weekends-only calendar; an unrecognized ID returns an error. `+`-joined
 ///   ids such as `"nyse+gblo"` resolve to a union calendar (see
-///   [`calendar_by_id_strict`](crate::dates::calendar_by_id_strict)).
+///   [`calendar_by_id_strict`]).
 pub fn resolve_calendar(cal_id: Option<&str>) -> Result<&'static dyn HolidayCalendar> {
     match cal_id {
         Some(id) => calendar_by_id_strict(id),

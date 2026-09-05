@@ -52,7 +52,7 @@ fn build_market(rate: f64, base_date: Date) -> MarketContext {
 fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRateSwap {
     InterestRateSwap {
         id: "IRS_DV01_TEST".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,
         fixed: finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
@@ -164,7 +164,7 @@ fn test_dv01_scales_with_notional() {
     let swap_1m = create_standard_swap(as_of, end, PayReceive::Receive);
 
     let mut swap_10m = create_standard_swap(as_of, end, PayReceive::Receive);
-    swap_10m.notional = Money::new(10_000_000.0, Currency::USD);
+    swap_10m.notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let dv01_1m = *swap_1m
         .price_with_metrics(

@@ -27,7 +27,7 @@ pub(crate) fn compute_pv(
         super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of)?,
     };
 
-    Ok(Money::new(value, asset.currency))
+    Money::new(value, asset.currency)
 }
 
 /// Asset value with the risk-free component of the discount rate bumped per

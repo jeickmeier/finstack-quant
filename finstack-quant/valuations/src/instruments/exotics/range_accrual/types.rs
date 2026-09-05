@@ -237,7 +237,7 @@ impl RangeAccrual {
             .upper_bound(1.05) // 105% of initial spot
             .bounds_type(BoundsType::RelativeToInitialSpot)
             .coupon_rate(0.08) // 8% annual if inside range
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -273,7 +273,7 @@ impl RangeAccrual {
             .upper_bound(0.06) // 6% upper bound
             .bounds_type(BoundsType::Absolute)
             .coupon_rate(0.05) // 5% annual if inside range
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .day_count(DayCount::Act360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SOFR-RATE".into())

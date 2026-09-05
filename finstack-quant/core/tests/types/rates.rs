@@ -11,21 +11,21 @@ fn percentage(percent: f64) -> Percentage {
 #[test]
 fn rate_conversions_roundtrip() {
     // Test decimal -> bp -> decimal
-    let rate = Rate::from_decimal(0.0525);
+    let rate = Rate::from_decimal(0.0525).expect("valid rate fixture");
     assert_eq!(rate.as_bp(), 525);
     let rate2 = Rate::from_bp(525);
     assert!((rate.as_decimal() - rate2.as_decimal()).abs() < 1e-10);
 
     // Test percent -> bp -> percent
-    let rate = Rate::from_percent(5.25);
+    let rate = Rate::from_percent(5.25).expect("valid rate fixture");
     assert_eq!(rate.as_bp(), 525);
     assert!((rate.as_percent() - 5.25).abs() < 1e-10);
 }
 
 #[test]
 fn rate_arithmetic_operations() {
-    let r1 = Rate::from_percent(3.0);
-    let r2 = Rate::from_percent(1.5);
+    let r1 = Rate::from_percent(3.0).expect("valid rate fixture");
+    let r2 = Rate::from_percent(1.5).expect("valid rate fixture");
 
     // Addition
     let sum = r1 + r2;
@@ -54,12 +54,12 @@ fn rate_predicates() {
     assert!(!Rate::ZERO.is_positive());
     assert!(!Rate::ZERO.is_negative());
 
-    let positive = Rate::from_percent(2.5);
+    let positive = Rate::from_percent(2.5).expect("valid rate fixture");
     assert!(!positive.is_zero());
     assert!(positive.is_positive());
     assert!(!positive.is_negative());
 
-    let negative = Rate::from_percent(-1.5);
+    let negative = Rate::from_percent(-1.5).expect("valid rate fixture");
     assert!(!negative.is_zero());
     assert!(!negative.is_positive());
     assert!(negative.is_negative());
@@ -67,18 +67,18 @@ fn rate_predicates() {
 
 #[test]
 fn rate_abs() {
-    let negative = Rate::from_percent(-3.5);
+    let negative = Rate::from_percent(-3.5).expect("valid rate fixture");
     let abs_val = negative.abs();
     assert!((abs_val.as_percent() - 3.5).abs() < 1e-10);
 
-    let positive = Rate::from_percent(2.5);
+    let positive = Rate::from_percent(2.5).expect("valid rate fixture");
     let abs_val = positive.abs();
     assert_eq!(abs_val.as_percent(), 2.5);
 }
 
 #[test]
 fn rate_display_formatting() {
-    let rate = Rate::from_percent(2.5);
+    let rate = Rate::from_percent(2.5).expect("valid rate fixture");
     assert_eq!(format!("{}", rate), "2.5000%");
 
     let rate = Rate::from_bp(150);
@@ -233,14 +233,14 @@ fn percentage_from_conversions() {
 #[test]
 fn cross_type_conversions() {
     // Rate <-> Bps
-    let rate = Rate::from_percent(2.5);
+    let rate = Rate::from_percent(2.5).expect("valid rate fixture");
     let bp: Bps = rate.into();
     assert_eq!(bp.as_bp(), 250);
     let rate_back: Rate = bp.into();
     assert_eq!(rate.as_bp(), rate_back.as_bp());
 
     // Rate <-> Percentage
-    let rate = Rate::from_percent(3.5);
+    let rate = Rate::from_percent(3.5).expect("valid rate fixture");
     let pct: Percentage = rate.into();
     assert!((pct.as_percent() - 3.5).abs() < 1e-10);
     let rate_back: Rate = pct.into();
@@ -256,41 +256,42 @@ fn cross_type_conversions() {
 
 #[test]
 fn non_finite_constructors_reject_input() {
-    assert!(catch_unwind(|| Rate::from_decimal(f64::NAN)).is_err());
-    assert!(catch_unwind(|| Rate::from_percent(f64::INFINITY)).is_err());
+    assert!(Rate::from_decimal(f64::NAN).is_err());
+    assert!(Rate::from_percent(f64::INFINITY).is_err());
     assert!(Percentage::new(f64::NEG_INFINITY).is_err());
     assert!(Rate::try_from(f64::NAN).is_err());
 }
 
 #[test]
 fn non_finite_rate_arithmetic_panics() {
-    let rate = Rate::from_percent(3.0);
+    let rate = Rate::from_percent(3.0).expect("valid rate fixture");
 
     assert!(catch_unwind(|| {
         let _ = rate * f64::NAN;
     })
     .is_err());
     assert!(catch_unwind(|| {
-        let _ = rate + Rate::from_decimal(f64::INFINITY);
+        let large = Rate::from_decimal(f64::MAX).expect("finite rate");
+        let _ = large + large;
     })
     .is_err());
 }
 
 #[test]
 fn checked_rate_arithmetic_rejects_non_finite_results() {
-    let rate = Rate::from_percent(3.0);
+    let rate = Rate::from_percent(3.0).expect("valid rate fixture");
 
     assert!(rate.checked_mul(f64::NAN).is_err());
     assert!(rate.checked_div(0.0).is_err());
     assert_eq!(
-        rate.checked_add(Rate::from_percent(2.0))
+        rate.checked_add(Rate::from_percent(2.0).expect("valid rate fixture"))
             .unwrap()
             .as_percent(),
         5.0
     );
     assert!(
         (rate
-            .checked_sub(Rate::from_percent(2.0))
+            .checked_sub(Rate::from_percent(2.0).expect("valid rate fixture"))
             .unwrap()
             .as_percent()
             - 1.0)
@@ -326,7 +327,7 @@ fn rate_edge_cases() {
     assert!((tiny.as_decimal() - 0.0001).abs() < 1e-10);
 
     // Large rates
-    let large = Rate::from_percent(100.0);
+    let large = Rate::from_percent(100.0).expect("valid rate fixture");
     assert_eq!(large.as_bp(), 10000);
     assert!((large.as_decimal() - 1.0).abs() < 1e-10);
 
@@ -364,9 +365,9 @@ fn percentage_ordering() {
 
 #[test]
 fn rate_ordering() {
-    let r1 = Rate::from_percent(2.0);
-    let r2 = Rate::from_percent(3.0);
-    let r3 = Rate::from_percent(2.0);
+    let r1 = Rate::from_percent(2.0).expect("valid rate fixture");
+    let r2 = Rate::from_percent(3.0).expect("valid rate fixture");
+    let r3 = Rate::from_percent(2.0).expect("valid rate fixture");
 
     assert!(r1 < r2);
     assert!(r2 > r1);
@@ -381,7 +382,7 @@ proptest! {
         decimal in -1_000.0_f64..1_000.0,
         divisor in prop_oneof![-1_000.0_f64..-1.0e-9, 1.0e-9_f64..1_000.0],
     ) {
-        let rate = Rate::try_from_decimal(decimal).unwrap();
+        let rate = Rate::from_decimal(decimal).unwrap();
         let divided = rate.checked_div(divisor).unwrap();
 
         prop_assert!(divided.as_decimal().is_finite());

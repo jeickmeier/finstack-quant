@@ -74,7 +74,7 @@ fn test_protection_leg_positive_pv() {
 
     let cds = test_utils::cds_buy_protection(
         "PROT_LEG_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -100,7 +100,7 @@ fn test_premium_leg_positive_pv() {
 
     let cds = test_utils::cds_buy_protection(
         "PREM_LEG_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -131,7 +131,7 @@ fn test_npv_calculation_buyer() {
 
     let cds = test_utils::cds_buy_protection(
         "NPV_BUYER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -157,7 +157,7 @@ fn test_par_spread_increases_with_hazard() {
 
     let cds = test_utils::cds_buy_protection(
         "PAR_SPREAD_HAZARD",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -189,7 +189,7 @@ fn test_par_spread_errors_when_expired() {
 
     let cds = test_utils::cds_buy_protection(
         "EXPIRED_PAR",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         start,
         end,
@@ -226,7 +226,7 @@ fn test_premium_leg_metric_positive() {
 
     let cds = test_utils::cds_buy_protection(
         "PREM_METRIC",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         500.0,
         as_of,
         end,
@@ -254,7 +254,7 @@ fn test_npv_buyer_seller_opposite() {
 
     let buyer = test_utils::cds_buy_protection(
         "BUYER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -265,7 +265,7 @@ fn test_npv_buyer_seller_opposite() {
 
     let seller = test_utils::cds_sell_protection(
         "SELLER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -301,7 +301,7 @@ fn test_par_spread_positive() {
 
     let cds = test_utils::cds_buy_protection(
         "PAR_SPREAD_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -331,7 +331,7 @@ fn test_par_spread_gives_zero_npv() {
 
     let mut cds = test_utils::cds_buy_protection(
         "PAR_NPV_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -367,7 +367,7 @@ fn test_risky_annuity_positive() {
 
     let cds = test_utils::cds_buy_protection(
         "RISKY_ANN_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -394,7 +394,7 @@ fn test_risky_pv01_scales_with_notional() {
 
     let cds1 = test_utils::cds_buy_protection(
         "PV01_1MM",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -405,7 +405,7 @@ fn test_risky_pv01_scales_with_notional() {
 
     let cds10 = test_utils::cds_buy_protection(
         "PV01_10MM",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -433,7 +433,7 @@ fn test_schedule_generation_isda() {
 
     let cds = test_utils::cds_buy_protection(
         "SCHEDULE_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -482,7 +482,7 @@ fn test_schedule_generation_isda() {
 fn test_cdsw_final_coupon_cashflow_accrual_matches_pricer_premium_pv() {
     let as_of = date!(2025 - 03 - 20);
     let maturity = date!(2025 - 06 - 20);
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let spread_bp = 100.0;
 
     let disc = build_discount_curve(0.0, as_of, "USD_OIS");
@@ -542,7 +542,7 @@ fn test_higher_hazard_increases_protection_value() {
 
         let cds = test_utils::cds_buy_protection(
             "HAZARD_SENS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -578,7 +578,7 @@ fn test_higher_recovery_decreases_protection_value() {
 
         let mut cds = test_utils::cds_buy_protection(
             "RECOVERY_SENS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -613,7 +613,7 @@ fn test_premium_leg_increases_with_spread() {
 
     let cds_low = test_utils::cds_buy_protection(
         "PREM_LOW",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -623,7 +623,7 @@ fn test_premium_leg_increases_with_spread() {
     .expect("CDS construction should succeed");
     let cds_high = test_utils::cds_buy_protection(
         "PREM_HIGH",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         200.0,
         as_of,
         end,
@@ -653,7 +653,7 @@ fn test_settlement_delay_reduces_protection_pv() {
 
     let mut cds_no_delay = test_utils::cds_buy_protection(
         "NO_DELAY",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -686,7 +686,7 @@ fn test_aod_uses_default_settlement_timing() {
 
     let mut cds_no_delay = test_utils::cds_buy_protection(
         "AOD_NO_DELAY",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         1000.0,
         as_of,
         end,

@@ -65,10 +65,10 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
     let value_at_fixed_rate = |rate| {
         InterestRateSwap::builder()
             .id(format!("IRS-{rate:.0}").into())
-            .notional(Money::new(
-                1_000_000.0,
-                finstack_quant_core::currency::Currency::USD,
-            ))
+            .notional(
+                Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .side(PayReceive::Receive)
             .fixed(fixed(rate))
             .float(float.clone())

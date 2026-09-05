@@ -27,30 +27,30 @@ fn test_wal_calculation_equal_payments() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(25_000.0, Currency::USD),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(25_000.0, Currency::USD),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(25_000.0, Currency::USD),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2029, Month::January, 1).unwrap(),
-                Money::new(25_000.0, Currency::USD),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -76,26 +76,26 @@ fn test_wal_calculation_front_loaded_payments() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(70_000.0, Currency::USD),
+                Money::new(70_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(20_000.0, Currency::USD),
+                Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(10_000.0, Currency::USD),
+                Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -121,26 +121,26 @@ fn test_wal_calculation_back_loaded_payments() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(10_000.0, Currency::USD),
+                Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(20_000.0, Currency::USD),
+                Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(70_000.0, Currency::USD),
+                Money::new(70_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -165,17 +165,17 @@ fn test_wal_calculation_single_payment() {
         interest_flows: vec![],
         principal_flows: vec![(
             Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-            Money::new(100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         )],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -201,13 +201,13 @@ fn test_wal_calculation_empty_cashflows() {
         principal_flows: vec![],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(0.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -233,22 +233,22 @@ fn test_wal_ignores_past_cashflows() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-                Money::new(50_000.0, Currency::USD), // In the past - should ignore
+                Money::new(50_000.0, Currency::USD).expect("valid money fixture"), // In the past - should ignore
             ),
             (
                 Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-                Money::new(50_000.0, Currency::USD),
+                Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -276,26 +276,26 @@ fn test_wal_rmbs_with_psa() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(40_000.0, Currency::USD),
+                Money::new(40_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2029, Month::January, 1).unwrap(),
-                Money::new(35_000.0, Currency::USD),
+                Money::new(35_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-                Money::new(25_000.0, Currency::USD),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act
@@ -321,22 +321,22 @@ fn test_wal_clo_short_duration() {
         principal_flows: vec![
             (
                 Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-                Money::new(60_000.0, Currency::USD),
+                Money::new(60_000.0, Currency::USD).expect("valid money fixture"),
             ),
             (
                 Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-                Money::new(40_000.0, Currency::USD),
+                Money::new(40_000.0, Currency::USD).expect("valid money fixture"),
             ),
         ],
         pik_flows: vec![],
         deferred_flows: Vec::new(),
-        final_balance: Money::new(0.0, Currency::USD),
-        total_interest: Money::new(0.0, Currency::USD),
-        total_principal: Money::new(100_000.0, Currency::USD),
-        total_pik: Money::new(0.0, Currency::USD),
-        total_deferred: Money::new(0.0, Currency::USD),
+        final_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_interest: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_principal: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        total_pik: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        total_deferred: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         writedown_flows: vec![],
-        total_writedown: Money::new(0.0, Currency::USD),
+        total_writedown: Money::new(0.0, Currency::USD).expect("valid money fixture"),
     };
 
     // Act

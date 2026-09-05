@@ -64,7 +64,7 @@ fn test_book_hierarchy_three_levels() {
     // Create test instruments
     let dep1 = Deposit::builder()
         .id("DEP_1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -77,7 +77,7 @@ fn test_book_hierarchy_three_levels() {
 
     let dep2 = Deposit::builder()
         .id("DEP_2".into())
-        .notional(Money::new(500_000.0, Currency::USD))
+        .notional(Money::new(500_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 03 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -90,7 +90,7 @@ fn test_book_hierarchy_three_levels() {
 
     let dep3 = Deposit::builder()
         .id("DEP_3".into())
-        .notional(Money::new(750_000.0, Currency::USD))
+        .notional(Money::new(750_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 04 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -222,7 +222,7 @@ fn test_book_hierarchy_multiple_root_books() {
     // Create test instruments
     let dep1 = Deposit::builder()
         .id("DEP_1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -235,7 +235,7 @@ fn test_book_hierarchy_multiple_root_books() {
 
     let dep2 = Deposit::builder()
         .id("DEP_2".into())
-        .notional(Money::new(500_000.0, Currency::USD))
+        .notional(Money::new(500_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 03 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -320,7 +320,7 @@ fn test_position_without_book() {
 
     let dep1 = Deposit::builder()
         .id("DEP_1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -361,7 +361,7 @@ fn test_book_hierarchy_is_order_independent() {
 
     let deposit = Deposit::builder()
         .id("DEP".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -418,7 +418,7 @@ fn test_reassigning_position_between_books_removes_stale_membership() {
 
     let deposit = Deposit::builder()
         .id("DEP".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)

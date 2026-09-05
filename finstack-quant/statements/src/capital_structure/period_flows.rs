@@ -166,7 +166,7 @@ pub fn calculate_period_flows(
         .filter(|(d, _)| *d < period.start)
         .map(|(_, balance)| {
             if balance.amount() < 0.0 {
-                Money::new(-balance.amount(), balance.currency())
+                balance.checked_neg()
             } else {
                 *balance
             }
@@ -298,7 +298,7 @@ pub fn calculate_period_flows(
             }
 
             let scaled_abs_value =
-                Money::new(cf.amount.amount().abs() * scale, cf.amount.currency());
+                Money::new(cf.amount.amount().abs() * scale, cf.amount.currency())?;
 
             match cf.kind {
                 // Guarded on the shared predicate so this arm and
@@ -318,7 +318,7 @@ pub fn calculate_period_flows(
                     // commitment or the total facility size, NOT on the drawn
                     // balance — they must not be scaled by the drawn-balance
                     // ratio. Pass them through at the scheduled amount.
-                    breakdown.fees += Money::new(cf.amount.amount().abs(), cf.amount.currency());
+                    breakdown.fees += Money::new(cf.amount.amount().abs(), cf.amount.currency())?;
                 }
                 CFKind::Fee | CFKind::UsageFee => {
                     // Generic and usage (drawn-balance based) fees scale with
@@ -378,8 +378,8 @@ pub fn calculate_period_flows(
     } else {
         (net_interest_cash.abs(), 0.0)
     };
-    breakdown.interest_expense_cash = Money::new(expense, currency);
-    breakdown.interest_income_cash = Some(Money::new(income, currency));
+    breakdown.interest_expense_cash = Money::new(expense, currency)?;
+    breakdown.interest_income_cash = Some(Money::new(income, currency)?);
 
     // Get closing balance from outstanding_by_date.
     // Find the most recent outstanding balance at or before period end.
@@ -391,7 +391,7 @@ pub fn calculate_period_flows(
         .find(|(date, _)| *date <= snapshot_date)
         .map(|(_, balance)| {
             if balance.amount() < 0.0 {
-                Money::new(-balance.amount(), balance.currency())
+                balance.checked_neg()
             } else {
                 *balance
             }
@@ -411,11 +411,11 @@ pub fn calculate_period_flows(
                     .first()
                     .is_some_and(|(date, _)| *date > snapshot_date);
             if pre_issuance {
-                return Money::new(0.0, currency);
+                return Money::from((0_i64, currency));
             }
             let initial = full_schedule.get_notional().initial;
             if initial.amount() < 0.0 {
-                Money::new(-initial.amount(), initial.currency())
+                initial.checked_neg()
             } else {
                 initial
             }
@@ -449,9 +449,9 @@ pub fn calculate_period_flows(
                     _ => None,
                 })
                 .sum();
-            Money::new((net_new_funding - in_period_repayments).max(0.0), currency)
+            Money::new((net_new_funding - in_period_repayments).max(0.0), currency)?
         } else {
-            Money::new(0.0, currency)
+            Money::from((0_i64, currency))
         }
     } else {
         scheduled_closing_balance
@@ -472,7 +472,7 @@ pub fn calculate_period_flows(
     } else {
         accrued_scalar * scale
     };
-    breakdown.accrued_interest = Money::new(accrued_interest, currency);
+    breakdown.accrued_interest = Money::new(accrued_interest, currency)?;
 
     // `net_new_funding` (revolver draws + initial-exchange notional in this
     // period) is returned so the waterfall can recover the payable balance
@@ -482,7 +482,7 @@ pub fn calculate_period_flows(
     Ok((
         breakdown,
         closing_balance,
-        Money::new(net_new_funding, currency),
+        Money::new(net_new_funding, currency)?,
         warnings,
     ))
 }
@@ -515,7 +515,7 @@ mod tests {
     fn test_schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
         CashFlowSchedule::from_parts(
             flows,
-            Notional::par(notional, Currency::USD),
+            Notional::par(notional, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue_date),
@@ -529,7 +529,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -540,7 +540,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(-50_000.0, Currency::USD),
+                    Money::from((-50_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -554,8 +554,8 @@ mod tests {
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -581,7 +581,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -595,7 +595,7 @@ mod tests {
                     CashFlow::new(
                         pay_date,
                         None,
-                        Money::new(-40_000.0, Currency::USD),
+                        Money::from((-40_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         None,
@@ -603,7 +603,7 @@ mod tests {
                     CashFlow::new(
                         pay_date,
                         None,
-                        Money::new(53_000.0, Currency::USD),
+                        Money::from((53_000_i64, Currency::USD)),
                         CFKind::FloatReset,
                         0.25,
                         None,
@@ -618,8 +618,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -660,7 +660,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -675,7 +675,7 @@ mod tests {
                     CashFlow::new(
                         draw_date,
                         None,
-                        Money::new(1_000_000.0, Currency::USD),
+                        Money::from((1_000_000_i64, Currency::USD)),
                         CFKind::RevolvingDraw,
                         0.0,
                         None,
@@ -683,7 +683,7 @@ mod tests {
                     CashFlow::new(
                         coupon_date,
                         None,
-                        Money::new(20_000.0, Currency::USD),
+                        Money::from((20_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         None,
@@ -699,8 +699,8 @@ mod tests {
         let (breakdown, closing, net_new_funding, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(0.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -725,7 +725,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -737,7 +737,7 @@ mod tests {
                 vec![CashFlow::new(
                     coupon_date,
                     None,
-                    Money::new(20_000.0, Currency::USD),
+                    Money::from((20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -751,8 +751,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(0.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -781,7 +781,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -793,7 +793,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(20_000.0, Currency::USD),
+                    Money::from((20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -809,8 +809,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(50_000.0, Currency::USD),
-            Money::new(160_000.0, Currency::USD),
+            Money::from((50_000_i64, Currency::USD)),
+            Money::from((160_000_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -833,7 +833,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -844,7 +844,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(20_000.0, Currency::USD),
+                    Money::from((20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -860,8 +860,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_100_000.0, Currency::USD),
-            Money::new(100_000.0, Currency::USD),
+            Money::from((1_100_000_i64, Currency::USD)),
+            Money::from((100_000_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -881,7 +881,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -895,7 +895,7 @@ mod tests {
                     CashFlow::new(
                         pay_date,
                         None,
-                        Money::new(-40_000.0, Currency::USD),
+                        Money::from((-40_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         None,
@@ -903,7 +903,7 @@ mod tests {
                     CashFlow::new(
                         pay_date,
                         None,
-                        Money::new(10_000.0, Currency::USD),
+                        Money::from((10_000_i64, Currency::USD)),
                         CFKind::FloatReset,
                         0.25,
                         None,
@@ -918,8 +918,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -935,7 +935,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -947,7 +947,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-50_000.0, Currency::USD),
+                        Money::from((-50_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         None,
@@ -955,7 +955,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
-                        Money::new(-100_000.0, Currency::USD),
+                        Money::from((-100_000_i64, Currency::USD)),
                         CFKind::Amortization,
                         0.0,
                         None,
@@ -970,8 +970,8 @@ mod tests {
         let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(0.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -991,7 +991,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1002,7 +1002,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(-100_000.0, Currency::USD),
+                    Money::from((-100_000_i64, Currency::USD)),
                     CFKind::RevolvingDraw,
                     0.0,
                     None,
@@ -1016,8 +1016,8 @@ mod tests {
         let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(0.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1059,7 +1059,7 @@ mod tests {
             flows.push(CashFlow::new(
                 q_start(q),
                 None,
-                Money::new(-outstanding * 0.01, Currency::USD),
+                Money::new(-outstanding * 0.01, Currency::USD).expect("valid money fixture"),
                 CFKind::Fixed,
                 0.25,
                 Some(0.04),
@@ -1067,7 +1067,7 @@ mod tests {
             flows.push(CashFlow::new(
                 q_start(q),
                 None,
-                Money::new(100_000.0, Currency::USD),
+                Money::from((100_000_i64, Currency::USD)),
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -1079,7 +1079,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let mut opening = Money::new(1_000_000.0, Currency::USD);
+        let mut opening = Money::from((1_000_000_i64, Currency::USD));
         // Q2..Q4 each contain one boundary-dated coupon + amortization.
         let expected_interest = [10_000.0, 9_000.0, 8_000.0];
         for (idx, q) in (2u8..=4).enumerate() {
@@ -1089,7 +1089,7 @@ mod tests {
                 q_start(q + 1)
             };
             let period = Period {
-                id: PeriodId::quarter(2025, q),
+                id: PeriodId::quarter(2025, q).expect("valid period fixture"),
                 start: q_start(q),
                 end,
                 is_actual: false,
@@ -1098,7 +1098,7 @@ mod tests {
                 &instrument,
                 &period,
                 opening,
-                Money::new(0.0, Currency::USD),
+                Money::from((0_i64, Currency::USD)),
                 &market_ctx,
                 issue,
                 None,
@@ -1132,7 +1132,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1143,7 +1143,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(-20_000.0, Currency::USD),
+                    Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
@@ -1159,8 +1159,8 @@ mod tests {
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_160_000.0, Currency::USD),
-            Money::new(160_000.0, Currency::USD),
+            Money::from((1_160_000_i64, Currency::USD)),
+            Money::from((160_000_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1181,8 +1181,8 @@ mod tests {
         let (unclamped, _, _, scale_warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(1_160_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((1_160_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1200,7 +1200,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1213,7 +1213,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-100_000.0, Currency::USD),
+                        Money::from((-100_000_i64, Currency::USD)),
                         CFKind::RevolvingDraw,
                         0.0,
                         None,
@@ -1221,7 +1221,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
-                        Money::new(30_000.0, Currency::USD),
+                        Money::from((30_000_i64, Currency::USD)),
                         CFKind::RevolvingRepayment,
                         0.0,
                         None,
@@ -1238,8 +1238,8 @@ mod tests {
         let (breakdown, closing, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(0.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1262,7 +1262,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1274,7 +1274,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-5_000.0, Currency::USD),
+                        Money::from((-5_000_i64, Currency::USD)),
                         CFKind::CommitmentFee,
                         0.25,
                         None,
@@ -1282,7 +1282,7 @@ mod tests {
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
-                        Money::new(-2_000.0, Currency::USD),
+                        Money::from((-2_000_i64, Currency::USD)),
                         CFKind::FacilityFee,
                         0.25,
                         None,
@@ -1299,8 +1299,8 @@ mod tests {
         let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(500_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((500_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1319,7 +1319,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1330,7 +1330,7 @@ mod tests {
                 vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
-                    Money::new(-50_000.0, Currency::USD),
+                    Money::from((-50_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
@@ -1344,8 +1344,8 @@ mod tests {
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
-            Money::new(100_000.0, Currency::USD),
-            Money::new(0.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
             None,
@@ -1392,7 +1392,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,
@@ -1404,7 +1404,7 @@ mod tests {
                     CashFlow::new(
                         issue,
                         None,
-                        Money::new(-1_000_000.0, Currency::USD),
+                        Money::from((-1_000_000_i64, Currency::USD)),
                         CFKind::Notional,
                         0.0,
                         None,
@@ -1412,7 +1412,7 @@ mod tests {
                     CashFlow::new(
                         start,
                         None,
-                        Money::new(-20_000.0, Currency::USD),
+                        Money::from((-20_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         Some(0.08),
@@ -1420,7 +1420,7 @@ mod tests {
                     CashFlow::new(
                         start,
                         None,
-                        Money::new(100_000.0, Currency::USD),
+                        Money::from((100_000_i64, Currency::USD)),
                         CFKind::Amortization,
                         0.0,
                         None,
@@ -1441,7 +1441,7 @@ mod tests {
             .filter(|(d, _)| *d < period.start)
             .map(|(_, balance)| {
                 if balance.amount() < 0.0 {
-                    Money::new(-balance.amount(), balance.currency())
+                    Money::new(-balance.amount(), balance.currency()).expect("valid money fixture")
                 } else {
                     *balance
                 }
@@ -1459,7 +1459,7 @@ mod tests {
             &instrument,
             &period,
             scheduled_opening,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
             &market_ctx,
             issue,
             None,

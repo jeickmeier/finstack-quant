@@ -1222,11 +1222,13 @@ impl ScenarioPricingOverrides {
     }
 
     /// Apply the configured price shock to a present value.
-    pub fn apply_to_value(&self, value: Money) -> Money {
-        let Some(shock) = self.scenario_price_shock_pct else {
-            return value;
-        };
-        Money::new(value.amount() * (1.0 + shock), value.currency())
+    pub fn apply_to_value(&self, value: Money) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let Some(shock) = self.scenario_price_shock_pct else {
+                return Ok(value);
+            };
+            Money::new(value.amount() * (1.0 + shock), value.currency())?
+        })
     }
 }
 

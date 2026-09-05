@@ -166,7 +166,7 @@ impl SwaptionLsmcPricer {
         )
         .with_std_dev(stats.std_dev());
 
-        Ok(MoneyEstimate::from_estimate(estimate, currency))
+        MoneyEstimate::from_estimate(estimate, currency)
     }
 
     /// Generate short rate paths using a custom time grid.

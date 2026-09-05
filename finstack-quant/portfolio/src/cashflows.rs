@@ -200,7 +200,7 @@ impl PortfolioCashflows {
                     )?;
                     let entry = per_kind_base
                         .entry(*kind)
-                        .or_insert_with(|| Money::new(0.0, base_currency));
+                        .or_insert_with(|| Money::from((0_i64, base_currency)));
                     *entry = entry.checked_add(converted).map_err(Error::Core)?;
                 }
             }
@@ -377,16 +377,24 @@ pub fn aggregate_full_cashflows(
             .cashflow_schedule(market, portfolio.as_of)
         {
             Ok(schedule) => {
-                let scaled_flows: Vec<_> = schedule
+                let scaled_flows = schedule
                     .get_flows()
                     .iter()
-                    .map(|flow| (*flow, position.scale_value(flow.amount)))
-                    .collect();
+                    .map(|flow| {
+                        position
+                            .scale_value(flow.amount)
+                            .map(|amount| (*flow, amount))
+                    })
+                    .collect::<finstack_quant_core::Result<Vec<_>>>();
+                let (schedule, scaled_flows) = match scaled_flows {
+                    Ok(flows) => (Ok(schedule), flows),
+                    Err(error) => (Err(error), Vec::new()),
+                };
                 PositionCashflowResult {
                     position_id: position.position_id.clone(),
                     instrument_id,
                     instrument_type,
-                    schedule: Ok(schedule),
+                    schedule,
                     scaled_flows,
                 }
             }
@@ -498,7 +506,7 @@ pub fn aggregate_full_cashflows(
         let per_kind = per_currency.entry(event.amount.currency()).or_default();
         let entry = per_kind
             .entry(event.kind)
-            .or_insert_with(|| Money::new(0.0, event.amount.currency()));
+            .or_insert_with(|| Money::from((0_i64, event.amount.currency())));
         *entry = entry.checked_add(event.amount).map_err(Error::Core)?;
     }
 
@@ -621,7 +629,7 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(0.0, Currency::USD))
+            Ok(Money::from((0_i64, Currency::USD)))
         }
 
         fn attributes(&self) -> &Attributes {
@@ -659,13 +667,13 @@ mod tests {
                 (
                     Currency::EUR,
                     IndexMap::from([
-                        (CFKind::Fixed, Money::new(100.0, Currency::EUR)),
-                        (CFKind::Notional, Money::new(200.0, Currency::EUR)),
+                        (CFKind::Fixed, Money::from((100_i64, Currency::EUR))),
+                        (CFKind::Notional, Money::from((200_i64, Currency::EUR))),
                     ]),
                 ),
                 (
                     Currency::USD,
-                    IndexMap::from([(CFKind::Fee, Money::new(-10.0, Currency::USD))]),
+                    IndexMap::from([(CFKind::Fee, Money::from((-10_i64, Currency::USD)))]),
                 ),
             ]),
         );
@@ -675,11 +683,11 @@ mod tests {
             IndexMap::from([
                 (
                     Currency::USD,
-                    IndexMap::from([(CFKind::Fixed, Money::new(50.0, Currency::USD))]),
+                    IndexMap::from([(CFKind::Fixed, Money::from((50_i64, Currency::USD)))]),
                 ),
                 (
                     Currency::EUR,
-                    IndexMap::from([(CFKind::Fee, Money::new(-5.0, Currency::EUR))]),
+                    IndexMap::from([(CFKind::Fee, Money::from((-5_i64, Currency::EUR)))]),
                 ),
             ]),
         );
@@ -688,7 +696,7 @@ mod tests {
             date!(2026 - 02 - 01),
             IndexMap::from([(
                 Currency::EUR,
-                IndexMap::from([(CFKind::Fixed, Money::new(25.0, Currency::EUR))]),
+                IndexMap::from([(CFKind::Fixed, Money::from((25_i64, Currency::EUR)))]),
             )]),
         );
 
@@ -707,8 +715,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let bond = bond::Bond::fixed(
             "BOND_001",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2027 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -925,8 +933,8 @@ mod tests {
         let maturity = date!(2027 - 01 - 01);
         let bond = bond::Bond::fixed(
             "BOND_FULL",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             issue,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1038,15 +1046,18 @@ mod tests {
         let march = by_date_kind
             .get(&date!(2025 - 03 - 15))
             .expect("march bucket should exist");
-        assert_eq!(march[&CFKind::Fixed], Money::new(120.0, Currency::USD));
-        assert_eq!(march[&CFKind::Notional], Money::new(240.0, Currency::USD));
-        assert_eq!(march[&CFKind::Fee], Money::new(-10.0, Currency::USD));
+        assert_eq!(march[&CFKind::Fixed], Money::from((120_i64, Currency::USD)));
+        assert_eq!(
+            march[&CFKind::Notional],
+            Money::from((240_i64, Currency::USD))
+        );
+        assert_eq!(march[&CFKind::Fee], Money::from((-10_i64, Currency::USD)));
 
         let august = by_date_kind
             .get(&date!(2025 - 08 - 01))
             .expect("august bucket should exist");
-        assert_eq!(august[&CFKind::Fixed], Money::new(50.0, Currency::USD));
-        assert_eq!(august[&CFKind::Fee], Money::new(-6.0, Currency::USD));
+        assert_eq!(august[&CFKind::Fixed], Money::from((50_i64, Currency::USD)));
+        assert_eq!(august[&CFKind::Fee], Money::from((-6_i64, Currency::USD)));
     }
 
     fn single_kind_flow(date: Date, money: Money, kind: CFKind) -> PortfolioCashflows {
@@ -1094,7 +1105,7 @@ mod tests {
     fn collapse_converts_1y_eur_flow_with_cip_forward() {
         let as_of = date!(2025 - 01 - 01);
         let payment = date!(2026 - 01 - 01);
-        let full = single_kind_flow(payment, Money::new(1.0, Currency::EUR), CFKind::Fixed);
+        let full = single_kind_flow(payment, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let market = market_with_cip_eurusd(as_of, 1.10, 0.99, 0.95);
 
         let by_date_kind = full
@@ -1104,14 +1115,14 @@ mod tests {
         let expected = 1.10 * 0.99 / 0.95;
         assert_eq!(
             by_date_kind[&payment][&CFKind::Fixed],
-            Money::new(expected, Currency::USD)
+            Money::new(expected, Currency::USD).expect("valid money fixture")
         );
     }
 
     #[test]
     fn collapse_uses_spot_for_payment_on_as_of() {
         let as_of = date!(2025 - 01 - 01);
-        let full = single_kind_flow(as_of, Money::new(1.0, Currency::EUR), CFKind::Fixed);
+        let full = single_kind_flow(as_of, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let market = market_with_cip_eurusd(as_of, 1.10, 0.99, 0.95);
 
         let by_date_kind = full
@@ -1120,7 +1131,7 @@ mod tests {
 
         assert_eq!(
             by_date_kind[&as_of][&CFKind::Fixed],
-            Money::new(1.10, Currency::USD)
+            Money::new(1.10, Currency::USD).expect("valid money fixture")
         );
     }
 
@@ -1128,7 +1139,7 @@ mod tests {
     fn collapse_errors_when_eur_discount_is_missing() {
         let as_of = date!(2025 - 01 - 01);
         let payment = date!(2026 - 01 - 01);
-        let full = single_kind_flow(payment, Money::new(1.0, Currency::EUR), CFKind::Fixed);
+        let full = single_kind_flow(payment, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
             .set_quote(Currency::EUR, Currency::USD, 1.10)
@@ -1151,7 +1162,7 @@ mod tests {
     fn collapse_uses_explicit_discount_curve_ids() {
         let as_of = date!(2025 - 01 - 01);
         let payment = date!(2026 - 01 - 01);
-        let full = single_kind_flow(payment, Money::new(1.0, Currency::EUR), CFKind::Fixed);
+        let full = single_kind_flow(payment, Money::from((1_i64, Currency::EUR)), CFKind::Fixed);
         let provider = Arc::new(SimpleFxProvider::new());
         provider
             .set_quote(Currency::EUR, Currency::USD, 1.10)
@@ -1171,7 +1182,7 @@ mod tests {
         let expected = 1.10 * 0.99 / 0.95;
         assert_eq!(
             by_date_kind[&payment][&CFKind::Fixed],
-            Money::new(expected, Currency::USD)
+            Money::new(expected, Currency::USD).expect("valid money fixture")
         );
     }
 

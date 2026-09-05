@@ -134,7 +134,7 @@ fn check_finding_serde_roundtrip() {
         check_id: "bs_identity".into(),
         severity: Severity::Error,
         message: "Assets != Liabilities + Equity".into(),
-        period: Some(PeriodId::quarter(2025, 1)),
+        period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 100.0,
             relative_pct: 0.5,
@@ -227,7 +227,7 @@ fn sample_report() -> CheckReport {
         check_id: "bs".into(),
         severity: Severity::Error,
         message: "Balance mismatch".into(),
-        period: Some(PeriodId::quarter(2025, 1)),
+        period: Some(PeriodId::quarter(2025, 1).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 1000.0,
             relative_pct: 5.0,
@@ -240,7 +240,7 @@ fn sample_report() -> CheckReport {
         check_id: "ratio".into(),
         severity: Severity::Warning,
         message: "High leverage".into(),
-        period: Some(PeriodId::quarter(2025, 2)),
+        period: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
         materiality: Some(Materiality {
             absolute: 50.0,
             relative_pct: 0.25,

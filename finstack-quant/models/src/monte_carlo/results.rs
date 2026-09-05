@@ -66,13 +66,13 @@ impl MoneyEstimate {
     pub fn from_estimate(
         estimate: crate::monte_carlo::estimate::Estimate,
         currency: Currency,
-    ) -> Self {
-        Self {
-            mean: Money::new(estimate.mean, currency),
+    ) -> finstack_quant_core::Result<Self> {
+        Ok(Self {
+            mean: Money::new(estimate.mean, currency)?,
             stderr: estimate.stderr,
             ci_95: (
-                Money::new(estimate.ci_95.0, currency),
-                Money::new(estimate.ci_95.1, currency),
+                Money::new(estimate.ci_95.0, currency)?,
+                Money::new(estimate.ci_95.1, currency)?,
             ),
             num_paths: estimate.num_paths,
             num_simulated_paths: estimate.num_simulated_paths,
@@ -82,7 +82,7 @@ impl MoneyEstimate {
             percentile_75: estimate.percentile_75,
             min: estimate.min,
             max: estimate.max,
-        }
+        })
     }
 
     /// Return `stderr / abs(mean.amount())`.
@@ -190,7 +190,8 @@ mod tests {
             .with_percentiles(95.0, 105.0)
             .with_range(80.0, 120.0);
 
-        let money_estimate = MoneyEstimate::from_estimate(estimate, Currency::USD);
+        let money_estimate = MoneyEstimate::from_estimate(estimate, Currency::USD)
+            .expect("valid money estimate fixture");
 
         assert_eq!(money_estimate.std_dev, Some(10.0));
         assert_eq!(money_estimate.median, Some(99.0));

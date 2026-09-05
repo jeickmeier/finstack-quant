@@ -22,7 +22,7 @@ fn test_ytm_par_loan() {
     let loan = TermLoan::builder()
         .id("TL-YTM-PAR".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -85,7 +85,7 @@ fn test_ytm_discount_loan() {
     let loan = TermLoan::builder()
         .id("TL-YTM-DISC".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 300 })
@@ -130,7 +130,7 @@ fn test_ytm_uses_quoted_clean_price_when_present() {
     let mut loan = TermLoan::builder()
         .id("TL-YTM-QUOTE".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -194,13 +194,13 @@ fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
     // Custom amortization: 30% repaid in 2026 → 70% outstanding at as_of.
     let amort = AmortizationSpec::Custom(vec![(
         date!(2026 - 01 - 01),
-        Money::new(0.3 * commitment, Currency::USD),
+        Money::new(0.3 * commitment, Currency::USD).expect("valid money fixture"),
     )]);
 
     let mut loan = TermLoan::builder()
         .id("TL-YTM-AMORT-QUOTE".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(commitment, Currency::USD))
+        .notional_limit(Money::new(commitment, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -263,7 +263,7 @@ fn test_ytm_current_period_coupon_uses_fixing() {
         let mut loan = TermLoan::builder()
             .id("TL-YTM-FIXING".into())
             .currency(Currency::USD)
-            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Floating(FloatingRateSpec {

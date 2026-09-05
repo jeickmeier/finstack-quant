@@ -429,7 +429,7 @@ fn test_currency_mismatch_detected() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
     let mut call = build_call_option(as_of, expiry, 1.20, 1_000_000.0);
-    call.notional = Money::new(1_000_000.0, QUOTE); // Wrong currency
+    call.notional = Money::new(1_000_000.0, QUOTE).expect("valid money fixture"); // Wrong currency
 
     let market = build_market_context(as_of, MarketParams::atm());
 

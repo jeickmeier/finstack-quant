@@ -245,7 +245,9 @@ fn test_real_estate_appraisal_override() {
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
         .discount_rate_opt(Some(0.10))
-        .appraisal_value_opt(Some(Money::new(1_500.0, Currency::USD)))
+        .appraisal_value_opt(Some(
+            Money::new(1_500.0, Currency::USD).expect("valid money fixture"),
+        ))
         .day_count(DayCount::Act365F)
         .attributes(Attributes::new())
         .build()
@@ -270,7 +272,9 @@ fn test_real_estate_custom_metrics_compute() {
         .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.10))
         .day_count(DayCount::Act365F)
@@ -319,8 +323,12 @@ fn test_real_estate_unlevered_metrics_include_acquisition_cost_line_items() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
-        .acquisition_costs(vec![Money::new(100.0, Currency::USD)])
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
+        .acquisition_costs(vec![
+            Money::new(100.0, Currency::USD).expect("valid money fixture")
+        ])
         .discount_rate_opt(Some(0.0))
         .terminal_cap_rate_opt(Some(0.10))
         .day_count(DayCount::Act365F)
@@ -369,9 +377,9 @@ fn test_real_estate_terminal_only_sale_price_is_allowed() {
     // Sale happens before the first NOI date, so there are no flows on/before horizon.
     let sale_date = date(2025, 6, 1);
 
-    let sale_price = Money::new(1_000.0, Currency::USD);
+    let sale_price = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
     let disposition_cost_pct = 0.10; // 10%
-    let disposition_costs = vec![Money::new(50.0, Currency::USD)];
+    let disposition_costs = vec![Money::new(50.0, Currency::USD).expect("valid money fixture")];
     let net_sale = sale_price.amount() * (1.0 - disposition_cost_pct) - 50.0;
 
     let asset = RealEstateAsset::builder()
@@ -477,7 +485,9 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.10))
         .day_count(DayCount::Act365F)
@@ -488,7 +498,7 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
     let loan = TermLoan::builder()
         .id("TL-RE-001".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(600.0, Currency::USD))
+        .notional_limit(Money::new(600.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
         .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
@@ -554,7 +564,9 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.10))
         .day_count(DayCount::Act365F)
@@ -565,7 +577,7 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
     let loan = TermLoan::builder()
         .id("TL-RE-002".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(700.0, Currency::USD))
+        .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
         .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
@@ -636,7 +648,9 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.09))
         .day_count(DayCount::Act365F)
@@ -649,7 +663,7 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
     let loan = TermLoan::builder()
         .id("TL-RE-SENS".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(700.0, Currency::USD))
+        .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
         .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
@@ -713,7 +727,9 @@ fn build_mid_sale_dcf_asset() -> RealEstateAsset {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0), (noi2, 100.0), (noi3, 100.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.10))
         .sale_date_opt(Some(noi2))
@@ -838,7 +854,9 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 120.0), (noi2, 120.0)])
-        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD)))
+        .purchase_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.10))
         .day_count(DayCount::Act365F)
@@ -850,7 +868,7 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
     let loan = TermLoan::builder()
         .id("TL-RE-DSCR".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(700.0, Currency::USD))
+        .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
         .rate(RateSpec::Fixed { rate_bp: 600 }) // 6% => ~42/yr interest
@@ -928,11 +946,13 @@ fn test_real_estate_validate_rejects_bad_cost_inputs() {
     assert!(negative_scalar.validate().is_err());
 
     let mut negative_line_item = base.clone();
-    negative_line_item.acquisition_costs = vec![Money::new(-10.0, Currency::USD)];
+    negative_line_item.acquisition_costs =
+        vec![Money::new(-10.0, Currency::USD).expect("valid money fixture")];
     assert!(negative_line_item.validate().is_err());
 
     let mut negative_disposition = base.clone();
-    negative_disposition.disposition_costs = vec![Money::new(-10.0, Currency::USD)];
+    negative_disposition.disposition_costs =
+        vec![Money::new(-10.0, Currency::USD).expect("valid money fixture")];
     assert!(negative_disposition.validate().is_err());
 
     let mut nan_stabilized = base;
@@ -953,7 +973,9 @@ fn test_real_estate_direct_cap_appraisal_without_cap_rate() {
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::DirectCap)
         .noi_schedule(vec![(noi1, 100.0)])
-        .appraisal_value_opt(Some(Money::new(1_500.0, Currency::USD)))
+        .appraisal_value_opt(Some(
+            Money::new(1_500.0, Currency::USD).expect("valid money fixture"),
+        ))
         .day_count(DayCount::Act365F)
         .attributes(Attributes::new())
         .build()

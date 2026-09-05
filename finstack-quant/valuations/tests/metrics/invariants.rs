@@ -46,7 +46,7 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
     let maturity = as_of.saturating_add(time::Duration::days(10 * 365));
     let bond = Bond::builder()
         .id("CUSTOM_DV01_GRID".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -106,7 +106,7 @@ proptest! {
         // Build bond
         let bond = Bond::builder()
             .id("PROP_DV01_TEST".into())
-            .notional(Money::new(notional, Currency::USD))
+            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(CashflowSpec::fixed(
@@ -182,7 +182,7 @@ proptest! {
         // Build bond with $10M notional for significant DV01
         let bond = Bond::builder()
             .id("PROP_SIGN_TEST".into())
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(CashflowSpec::fixed(
@@ -286,7 +286,7 @@ mod mc_invariants {
             strike: 100.0,
             option_type: OptionType::Call,
             expiry,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             averaging_method: AveragingMethod::Arithmetic,
             fixing_dates: vec![date!(2024 - 07 - 01), date!(2025 - 01 - 01)],
             day_count: DayCount::Act365F,
@@ -336,7 +336,7 @@ mod mc_invariants {
             strike: 100.0,
             option_type: OptionType::Call,
             expiry,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             averaging_method: AveragingMethod::Arithmetic,
             fixing_dates: vec![date!(2024 - 07 - 01), date!(2025 - 01 - 01)],
             day_count: DayCount::Act365F,
@@ -476,7 +476,7 @@ mod cds_invariants {
 
             let cds = crate::credit_support::cds_buy_protection(
                 "PROP_PAR_TEST",
-                Money::new(10_000_000.0, Currency::USD),
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 spread_bp,
                 as_of,
                 maturity,
@@ -513,7 +513,7 @@ mod cds_invariants {
 
             let cds_low_recovery = crate::credit_support::cds_buy_protection(
                 "PROP_RECOVERY_LOW",
-                Money::new(10_000_000.0, Currency::USD),
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 100.0,
                 as_of,
                 maturity,
@@ -621,7 +621,7 @@ mod cs01_invariants {
 
             let cds = crate::credit_support::cds_buy_protection(
                 "PROP_CS01_TEST",
-                Money::new(10_000_000.0, Currency::USD),
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 spread_bp,
                 as_of,
                 maturity,
@@ -737,7 +737,7 @@ mod cs_gamma_consistency {
 
         let cds = crate::credit_support::cds_buy_protection(
             "CS_GAMMA_CONSISTENCY",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
             as_of,
             maturity,
@@ -760,7 +760,7 @@ mod cs_gamma_consistency {
 
         let cds = crate::credit_support::cds_buy_protection(
             "CS_GAMMA_FALLBACK",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             200.0,
             as_of,
             maturity,
@@ -863,7 +863,7 @@ mod bucketed_cs01_invariants {
 
         let cds = crate::credit_support::cds_buy_protection(
             "CS01_BUCKET_TEST",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             maturity,
@@ -935,7 +935,7 @@ mod additional_invariants {
 
             let bond = Bond::builder()
                 .id(format!("MATURITY_{}Y", years).into())
-                .notional(Money::new(10_000_000.0, Currency::USD))
+                .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
                 .issue_date(as_of)
                 .maturity(maturity)
                 .cashflow_spec(

@@ -61,7 +61,7 @@ pub(crate) fn price_caplet_floorlet(
         } else {
             (strike - forward).max(0.0)
         };
-        return Ok(Money::new(intrinsic * annuity, ccy));
+        return Money::new(intrinsic * annuity, ccy);
     }
 
     let pv = bachelier_price(
@@ -80,7 +80,7 @@ pub(crate) fn price_caplet_floorlet(
         )));
     }
 
-    Ok(Money::new(pv, ccy))
+    Money::new(pv, ccy)
 }
 
 /// Bachelier forward delta (per unit forward).

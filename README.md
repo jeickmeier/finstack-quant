@@ -148,8 +148,8 @@ fn main() -> finstack_quant::core::Result<()> {
     let _eur = "eur".parse::<Currency>().expect("valid ISO-4217 currency");
 
     // Arithmetic refuses to mix currencies.
-    let subtotal = Money::new(49.50, Currency::EUR);
-    let tax = Money::new(9.90, Currency::EUR);
+    let subtotal = Money::new(49.50, Currency::EUR)?;
+    let tax = Money::new(9.90, Currency::EUR)?;
     let total = subtotal.checked_add(tax)?;
     assert_eq!(format!("{total}"), "EUR 59.40");
     Ok(())

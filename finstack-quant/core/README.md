@@ -172,8 +172,8 @@ fn main() -> finstack_quant_core::Result<()> {
     let usd_ois = market.get_discount("USD-OIS")?; // Arc<DiscountCurve>
 
     let flows = [
-        (date!(2025 - 07 - 01), Money::new(25_000.0, Currency::USD)),
-        (date!(2026 - 01 - 01), Money::new(1_025_000.0, Currency::USD)),
+        (date!(2025 - 07 - 01), Money::new(25_000.0, Currency::USD)?),
+        (date!(2026 - 01 - 01), Money::new(1_025_000.0, Currency::USD)?),
     ];
 
     // Flows dated on or before `base` are excluded (pricing-standard cutoff).
@@ -181,7 +181,7 @@ fn main() -> finstack_quant_core::Result<()> {
     assert_eq!(pv.currency(), Currency::USD);
 
     // Currency safety is enforced, not converted away.
-    assert!(pv.checked_add(Money::new(1.0, Currency::EUR)).is_err());
+    assert!(pv.checked_add(Money::new(1.0, Currency::EUR)?).is_err());
     Ok(())
 }
 ```
@@ -189,17 +189,17 @@ fn main() -> finstack_quant_core::Result<()> {
 ## Conventions that will bite you
 
 **Decimal vs f64.** `Money` stores `rust_decimal::Decimal` plus a `Currency`.
-`Money::new`/`try_new` accept `f64` and `amount()` returns `f64`;
+`Money::new` accepts `f64` and `amount()` returns `f64`;
 `Money::from_decimal`/`amount_decimal()` are the lossless path. Curves, rates,
 vols, correlations, greeks, and solver internals use `f64`. Wrapping an `f64`
 result in `Money` gives it currency semantics and Decimal storage — it does not
 make the preceding arithmetic Decimal-exact. See
 [INVARIANTS.md §1](../../INVARIANTS.md).
 
-**Money construction does not round.** `Money::new`/`try_new` preserve the raw
+**Money construction does not round.** `Money::new` preserves the raw
 finite amount; ISO 4217 minor-unit quantization must be asked for explicitly via
-`Money::new_with_config`/`try_new_with_config` or a `RoundingContext`.
-Non-finite amounts are rejected.
+`Money::new_with_config` or a `RoundingContext`.
+Construction returns `Result`; non-finite and unrepresentable amounts are rejected.
 
 **Currency safety.** `Money` arithmetic is fallible and refuses mixed
 currencies. Cross-currency work goes through an `FxProvider`, and the applied

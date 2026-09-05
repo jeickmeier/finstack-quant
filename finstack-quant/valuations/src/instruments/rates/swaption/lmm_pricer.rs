@@ -285,7 +285,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 
@@ -320,7 +320,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
             return Ok(ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
-                Money::new(0.0, swaption.notional.currency()),
+                Money::from((0_i64, swaption.notional.currency())),
             ));
         }
 

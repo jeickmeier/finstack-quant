@@ -347,10 +347,10 @@ impl<'a> CashflowEngine<'a> {
             };
 
             // Accumulators for aggregated accruals
-            let mut total_interest = Money::new(0.0, ccy);
-            let mut total_commitment_fee = Money::new(0.0, ccy);
-            let mut total_usage_fee = Money::new(0.0, ccy);
-            let mut total_facility_fee = Money::new(0.0, ccy);
+            let mut total_interest = Money::from((0_i64, ccy));
+            let mut total_commitment_fee = Money::from((0_i64, ccy));
+            let mut total_usage_fee = Money::from((0_i64, ccy));
+            let mut total_facility_fee = Money::from((0_i64, ccy));
             let mut total_accrual = 0.0;
             let mut reset_date_opt: Option<Date> = None;
 
@@ -644,7 +644,10 @@ impl<'a> CashflowEngine<'a> {
             flows,
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
+                notional_hint: Some(Money::from((
+                    0_i64,
+                    self.facility.commitment_amount.currency(),
+                ))),
                 meta: self.schedule_meta(),
             },
         ))
@@ -885,7 +888,10 @@ impl<'a> CashflowEngine<'a> {
             flows,
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
+                notional_hint: Some(Money::from((
+                    0_i64,
+                    self.facility.commitment_amount.currency(),
+                ))),
                 meta: self.schedule_meta(),
             },
         ))
@@ -947,8 +953,8 @@ mod tests {
         let adjusted = Date::from_calendar_date(2027, Month::January, 4).expect("date");
         let facility = RevolvingCredit::builder()
             .id("RC-BDC-BOUNDARY".into())
-            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
             .commitment_date(start)
             .maturity(maturity)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

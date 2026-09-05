@@ -36,8 +36,8 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "QE-FIXED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -128,7 +128,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
 
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2030 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Simple FRN: 3M SOFR + 150bp
     let frn = Bond::floating(
@@ -200,8 +200,8 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "QE-OAS-ASW",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -302,8 +302,8 @@ fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "QE-ISPR",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -355,8 +355,8 @@ fn test_quote_engine_asw_market_rejects_matured_schedule() {
     let as_of = maturity;
     let bond = Bond::fixed(
         "QE-ASW-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -388,8 +388,8 @@ fn test_quote_engine_spread_and_yield_paths_reprice_to_same_clean_price() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "QE-SPREAD-INVARIANTS",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -472,8 +472,8 @@ fn test_quote_engine_i_spread_rejects_matured_schedule() {
     let as_of = maturity;
     let bond = Bond::fixed(
         "QE-ISPR-MATURED",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

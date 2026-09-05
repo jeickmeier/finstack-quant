@@ -197,7 +197,10 @@ fn test_time_roll_with_bond_carry() {
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("BOND1".into())
-            .notional(finstack_quant_core::money::Money::new(100.0, Currency::USD))
+            .notional(
+                finstack_quant_core::money::Money::new(100.0, Currency::USD)
+                    .expect("valid money fixture"),
+            )
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(730))
             .cashflow_spec(

@@ -50,8 +50,8 @@ impl FxProvider for ReciprocalFx {
 
 #[test]
 fn explicit_convert_and_add() {
-    let usd = Money::new(100.0, Currency::USD);
-    let eur = Money::new(90.0, Currency::EUR);
+    let usd = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    let eur = Money::new(90.0, Currency::EUR).expect("valid money fixture");
     let prov = StaticFx { rate: 1.2 }; // EUR→USD 1.2 for test
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 

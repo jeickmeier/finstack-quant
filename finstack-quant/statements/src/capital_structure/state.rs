@@ -92,7 +92,7 @@ impl CapitalStructureState {
         self.opening_balances
             .get(instrument_id)
             .copied()
-            .unwrap_or_else(|| Money::new(0.0, currency))
+            .unwrap_or_else(|| Money::from((0_i64, currency)))
     }
 
     /// Get closing balance for an instrument, defaulting to zero if not present.
@@ -100,7 +100,7 @@ impl CapitalStructureState {
         self.closing_balances
             .get(instrument_id)
             .copied()
-            .unwrap_or_else(|| Money::new(0.0, currency))
+            .unwrap_or_else(|| Money::from((0_i64, currency)))
     }
 
     /// Update closing balance for an instrument.
@@ -114,7 +114,7 @@ impl CapitalStructureState {
         self.period_new_funding
             .get(instrument_id)
             .copied()
-            .unwrap_or_else(|| Money::new(0.0, currency))
+            .unwrap_or_else(|| Money::from((0_i64, currency)))
     }
 
     /// Advance state to next period: closing balances become opening balances.

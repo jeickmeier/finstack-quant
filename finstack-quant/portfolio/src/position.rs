@@ -171,7 +171,7 @@ impl Position {
     /// # fn main() -> finstack_quant_portfolio::Result<()> {
     /// let instrument = Deposit::builder()
     ///     .id("DEP_1M".into())
-    ///     .notional(Money::new(1_000_000.0, Currency::USD))
+    ///     .notional(Money::from((1_000_000_i64, Currency::USD)))
     ///     .start_date(date!(2024-01-01))
     ///     .maturity(date!(2024-02-01))
     ///     .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -332,7 +332,7 @@ impl Position {
     /// // Create an instrument to attach to the position (example: a simple deposit)
     /// let deposit = Deposit::builder()
     ///     .id("DEP_1M".into())
-    ///     .notional(Money::new(1_000_000.0, Currency::USD))
+    ///     .notional(Money::from((1_000_000_i64, Currency::USD)))
     ///     .start_date(as_of)
     ///     .maturity(date!(2024-02-01))
     ///     .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -431,7 +431,7 @@ impl Position {
     /// # fn main() -> finstack_quant_portfolio::Result<()> {
     /// let instrument = Deposit::builder()
     ///     .id("DEP_1M".into())
-    ///     .notional(Money::new(1_000_000.0, Currency::USD))
+    ///     .notional(Money::from((1_000_000_i64, Currency::USD)))
     ///     .start_date(date!(2024-01-01))
     ///     .maturity(date!(2024-02-01))
     ///     .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -448,24 +448,26 @@ impl Position {
     ///     PositionUnit::Percentage,
     /// )?;
     ///
-    /// let scaled = position.scale_value(Money::new(200.0, Currency::USD));
+    /// let scaled = position.scale_value(Money::from((200_i64, Currency::USD))).expect("valid scale_value fixture");
     /// assert_eq!(scaled.amount(), 100.0);
     /// # Ok(())
     /// # }
     /// ```
-    pub fn scale_value(&self, value: Money) -> Money {
-        // See [`PositionUnit`] for the full scaling contract. `Notional` treats
-        // `quantity` as a lot multiplier, so the scale factor is simply `quantity`.
-        if let PositionUnit::Notional(Some(notional_currency)) = self.unit {
-            if notional_currency != value.currency() {
-                tracing::warn!(
-                    position_id = %self.position_id,
-                    "Notional currency {} differs from instrument currency {}",
-                    notional_currency, value.currency()
-                );
+    pub fn scale_value(&self, value: Money) -> finstack_quant_core::Result<Money> {
+        Ok({
+            // See [`PositionUnit`] for the full scaling contract. `Notional` treats
+            // `quantity` as a lot multiplier, so the scale factor is simply `quantity`.
+            if let PositionUnit::Notional(Some(notional_currency)) = self.unit {
+                if notional_currency != value.currency() {
+                    tracing::warn!(
+                        position_id = %self.position_id,
+                        "Notional currency {} differs from instrument currency {}",
+                        notional_currency, value.currency()
+                    );
+                }
             }
-        }
-        Money::new(value.amount() * self.scale_factor(), value.currency())
+            Money::new(value.amount() * self.scale_factor(), value.currency())?
+        })
     }
 
     /// Unit-aware scale factor applied to instrument P&L or PV.
@@ -600,7 +602,7 @@ mod tests {
     fn test_position_creation() {
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -642,7 +644,7 @@ mod tests {
     fn percentage_quantity_above_one_hundred_is_rejected() {
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -667,7 +669,7 @@ mod tests {
     fn minor1_percentage_quantity_below_negative_one_hundred_is_rejected() {
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -692,7 +694,7 @@ mod tests {
     fn notional_two_lots_scales_deal_pv_not_unit_notional() {
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -711,8 +713,10 @@ mod tests {
         .expect("two-lot notional position should build");
 
         assert_eq!(position.scale_factor(), 2.0);
-        let deal_pv = Money::new(1_000_000.0, Currency::USD);
-        let scaled = position.scale_value(deal_pv);
+        let deal_pv = Money::from((1_000_000_i64, Currency::USD));
+        let scaled = position
+            .scale_value(deal_pv)
+            .expect("valid scale_value fixture");
         assert_eq!(scaled.amount(), 2_000_000.0);
         assert!((scaled.amount() - 2e6 * deal_pv.amount()).abs() > 1.0);
     }

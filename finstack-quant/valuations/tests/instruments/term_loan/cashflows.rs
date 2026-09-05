@@ -31,7 +31,7 @@ fn test_fixed_coupon_cashflows() {
     let loan = TermLoan::builder()
         .id("TL-CF-FIXED".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year
         .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
@@ -67,7 +67,7 @@ fn test_pik_interest_capitalization() {
     let loan = TermLoan::builder()
         .id("TL-CF-PIK".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 800 })
@@ -108,30 +108,32 @@ fn test_fixed_amount_oid_prorated_across_draws() {
     let oid = 300_000.0;
 
     let ddtl = DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD),
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: issue,
         availability_end: date!(2025 - 12 - 31),
         draws: vec![
             DrawEvent {
                 date: draw_1_date,
-                amount: Money::new(6_000_000.0, Currency::USD),
+                amount: Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"),
             },
             DrawEvent {
                 date: draw_2_date,
-                amount: Money::new(4_000_000.0, Currency::USD),
+                amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
         commitment_step_downs: vec![],
         usage_fee_bp: 0,
         commitment_fee_bp: 0,
         fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: Some(OidPolicy::WithheldAmount(Money::new(oid, Currency::USD))),
+        oid_policy: Some(OidPolicy::WithheldAmount(
+            Money::new(oid, Currency::USD).expect("valid money fixture"),
+        )),
     };
 
     let loan = TermLoan::builder()
         .id("TL-CF-OID-PRORATA".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -190,7 +192,7 @@ fn test_over_amortization_is_capped() {
     let loan = TermLoan::builder()
         .id("TL-CF-OVERCAP".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year, 4 quarterly periods
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -253,7 +255,7 @@ fn test_linear_amort_no_event_at_issue_date() {
     let loan = TermLoan::builder()
         .id("TL-CF-LINEAR-ISSUE".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -325,7 +327,7 @@ fn test_percent_per_period_full_amort() {
     let loan = TermLoan::builder()
         .id("TL-CF-100PCT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(1_000_000.0, Currency::USD))
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -376,7 +378,7 @@ fn test_percent_of_original_notional_flat_dollar() {
     let loan = TermLoan::builder()
         .id("TL-CF-FLAT-AMORT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(notional, Currency::USD))
+        .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year, 4 quarterly periods
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -435,7 +437,7 @@ fn test_flat_vs_geometric_amort_differ() {
         TermLoan::builder()
             .id(id.into())
             .currency(Currency::USD)
-            .notional_limit(Money::new(notional, Currency::USD))
+            .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -518,7 +520,7 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
     let loan = TermLoan::builder()
         .id("TL-DDTL-AMORT".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(commitment, Currency::USD))
+        .notional_limit(Money::new(commitment, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -532,12 +534,12 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(commitment, Currency::USD),
+            commitment_limit: Money::new(commitment, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: date!(2025 - 06 - 01),
             draws: vec![DrawEvent {
                 date: issue,
-                amount: Money::new(drawn, Currency::USD),
+                amount: Money::new(drawn, Currency::USD).expect("valid money fixture"),
             }],
             commitment_step_downs: vec![],
             usage_fee_bp: 0,
@@ -592,7 +594,7 @@ fn test_commitment_fees_use_correct_kind() {
     let loan = TermLoan::builder()
         .id("TL-CF-FEEKIND".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2027 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -606,7 +608,7 @@ fn test_commitment_fees_use_correct_kind() {
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD),
+            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: date!(2026 - 01 - 01),
             draws: vec![],
@@ -692,7 +694,7 @@ mod margin_stepup_period_semantics {
         TermLoan::builder()
             .id(id.into())
             .currency(Currency::USD)
-            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Floating(FloatingRateSpec {
@@ -733,7 +735,7 @@ mod margin_stepup_period_semantics {
         TermLoan::builder()
             .id(id.into())
             .currency(Currency::USD)
-            .notional_limit(Money::new(10_000_000.0, Currency::USD))
+            .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Fixed { rate_bp: 650 })

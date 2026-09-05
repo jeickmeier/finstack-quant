@@ -50,7 +50,7 @@ fn build_market_from_deps(
     for spot_id in deps.market_scalar_ids.iter() {
         market = market.insert_price(
             spot_id,
-            MarketScalar::Price(Money::new(100.0, spot_currency)),
+            MarketScalar::Price(Money::new(100.0, spot_currency).expect("valid money fixture")),
         );
     }
 
@@ -107,7 +107,9 @@ fn test_missing_forward_curve_with_spot_succeeds() {
     for spot_id in deps.market_scalar_ids.iter() {
         market = market.insert_price(
             spot_id,
-            MarketScalar::Price(Money::new(100.0, option.underlying.currency)),
+            MarketScalar::Price(
+                Money::new(100.0, option.underlying.currency).expect("valid money fixture"),
+            ),
         );
     }
 

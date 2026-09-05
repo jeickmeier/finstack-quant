@@ -327,7 +327,7 @@ impl VarianceSwap {
         VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-1Y"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04) // 20% vol squared
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2025 - 01 - 01))
@@ -398,13 +398,15 @@ impl VarianceSwap {
     }
 
     /// Calculate payoff given realized variance.
-    pub fn payoff(&self, realized_variance: f64) -> Money {
-        let variance_diff = realized_variance - self.strike_variance;
-        let sign = self.side.sign();
-        Money::new(
-            self.notional.amount() * variance_diff * sign,
-            self.notional.currency(),
-        )
+    pub fn payoff(&self, realized_variance: f64) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let variance_diff = realized_variance - self.strike_variance;
+            let sign = self.side.sign();
+            Money::new(
+                self.notional.amount() * variance_diff * sign,
+                self.notional.currency(),
+            )?
+        })
     }
 
     /// Get observation dates based on frequency.
@@ -567,8 +569,8 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
 
 // Declare canonical market dependencies for the DV01 calculator.
 impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -580,7 +582,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
             Vec::new(),
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
                     ..Default::default()

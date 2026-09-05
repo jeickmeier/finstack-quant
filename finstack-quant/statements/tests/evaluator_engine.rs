@@ -17,11 +17,11 @@ fn test_simple_evaluation() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -33,11 +33,17 @@ fn test_simple_evaluation() {
     let results = evaluator.evaluate(&model).expect("test should succeed");
 
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(100_000.0)
     );
     assert_eq!(
-        results.get("revenue", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "revenue",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(110_000.0)
     );
 }
@@ -51,11 +57,11 @@ fn test_formula_evaluation() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -69,11 +75,17 @@ fn test_formula_evaluation() {
     let results = evaluator.evaluate(&model).expect("test should succeed");
 
     assert_eq!(
-        results.get("cogs", &PeriodId::quarter(2025, 1)),
+        results.get(
+            "cogs",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
         Some(60_000.0)
     );
     assert_eq!(
-        results.get("cogs", &PeriodId::quarter(2025, 2)),
+        results.get(
+            "cogs",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture")
+        ),
         Some(66_000.0)
     );
 }
@@ -111,9 +123,12 @@ fn test_recompile_on_reuse() {
     nodes.insert(
         "x".into(),
         NodeSpec::new("x", NodeType::Value).with_values(
-            [(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10.0))]
-                .into_iter()
-                .collect(),
+            [(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(10.0),
+            )]
+            .into_iter()
+            .collect(),
         ),
     );
     nodes.insert(
@@ -124,19 +139,31 @@ fn test_recompile_on_reuse() {
 
     let mut evaluator = Evaluator::new();
     let first = evaluator.evaluate(&model).expect("first eval");
-    assert_eq!(first.get("y", &PeriodId::quarter(2025, 1)), Some(20.0));
+    assert_eq!(
+        first.get(
+            "y",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
+        Some(20.0)
+    );
 
     if let Some(node) = model.get_node_mut("y") {
         node.formula_text = Some("x * 3".to_string());
     }
 
     let second = evaluator.evaluate(&model).expect("second eval");
-    assert_eq!(second.get("y", &PeriodId::quarter(2025, 1)), Some(30.0));
+    assert_eq!(
+        second.get(
+            "y",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture")
+        ),
+        Some(30.0)
+    );
 }
 
 #[test]
 fn test_results_include_warnings() {
-    let period = PeriodId::quarter(2025, 1);
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let model = ModelBuilder::new("warnings")
         .periods("2025Q1..Q1", None)
         .expect("valid period")

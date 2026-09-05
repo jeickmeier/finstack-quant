@@ -139,6 +139,19 @@ class TestMoney:
         cfg.set_ingest_scale("USD", 1)
         assert Money(1.29, "USD", config=cfg) == Money("1.2", "USD")
 
+    @pytest.mark.parametrize("amount", [1.2345, "1.2345", Decimal("1.2345")])
+    def test_config_rounds_every_input_representation(self, amount: float | str | Decimal) -> None:
+        cfg = FinstackConfig()
+        cfg.set_ingest_scale("USD", 2)
+        assert Money(amount, "USD", config=cfg).amount_decimal == Decimal("1.23")
+
+    @pytest.mark.parametrize("amount", ["9007199254740993.125", Decimal("9007199254740993.125")])
+    def test_config_preserves_exact_decimal_before_rounding(self, amount: str | Decimal) -> None:
+        cfg = FinstackConfig(rounding_mode="floor")
+        cfg.set_ingest_scale("USD", 2)
+        assert Money(amount, "USD", config=cfg).amount_decimal == Decimal("9007199254740993.12")
+        assert Money(amount, "USD").amount_decimal == Decimal("9007199254740993.125")
+
 
 class TestConfig:
     def test_scale_overrides_and_eq(self) -> None:

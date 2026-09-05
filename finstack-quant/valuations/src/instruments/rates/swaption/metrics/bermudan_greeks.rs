@@ -390,7 +390,7 @@ mod tests {
         let swaption = BermudanSwaption::new(
             "TEST-BERM",
             OptionType::Call,
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             0.03,
             swap_start,
             swap_end,

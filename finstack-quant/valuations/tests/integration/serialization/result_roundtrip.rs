@@ -9,7 +9,11 @@ use finstack_quant_valuations::results::ValuationResult;
 fn valuation_result_roundtrip_serde() {
     // Build a simple result
     let as_of = time::macros::date!(2024 - 01 - 15);
-    let mut vr = ValuationResult::stamped("BOND-1", as_of, Money::new(100.0, Currency::USD));
+    let mut vr = ValuationResult::stamped(
+        "BOND-1",
+        as_of,
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    );
     vr.measures.insert(MetricId::custom("pv"), 100.0);
     vr.measures.insert(MetricId::Dv01, 0.0123);
 

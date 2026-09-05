@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "bytes": 125670,
+      "bytes": 125825,
       "kind": "input",
       "path": "schemas/market_data/1/market_context_state.schema.json",
       "summary": "Curves, surfaces, prices, series and FX for one valuation date; the market input to every pricing, scenario and attribution call.",

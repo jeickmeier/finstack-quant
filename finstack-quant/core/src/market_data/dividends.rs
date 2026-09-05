@@ -33,12 +33,12 @@
 //! let schedule = DividendScheduleBuilder::new("AAPL-DIVS")
 //!     .underlying("AAPL")
 //!     .currency(Currency::USD)
-//!     .cash(d1, Money::new(0.24, Currency::USD))
-//!     .cash(d2, Money::new(0.25, Currency::USD))
+//!     .cash(d1, Money::new(0.24, Currency::USD).expect("valid money fixture"))
+//!     .cash(d2, Money::new(0.25, Currency::USD).expect("valid money fixture"))
 //!     .build()
 //!     .expect("DividendScheduleBuilder should succeed");
 //!
-//! assert_eq!(schedule.events.len(), 2);
+//! assert_eq!(schedule.get_events().len(), 2);
 //! ```
 
 use crate::currency::Currency;
@@ -118,28 +118,59 @@ pub struct DividendEvent {
 /// use finstack_quant_core::dates::Date;
 /// use time::Month;
 ///
-/// let mut schedule = DividendSchedule::new("AAPL-DIVS")
-///     .with_underlying("AAPL")
-///     .with_currency(Currency::USD)
-///     .add_cash(
+/// let schedule = DividendSchedule::builder("AAPL-DIVS")
+///     .underlying("AAPL")
+///     .currency(Currency::USD)
+///     .cash(
 ///         Date::from_calendar_date(2025, Month::March, 15).expect("Valid date"),
-///         Money::new(0.24, Currency::USD)
-///     );
+///         Money::new(0.24, Currency::USD).expect("valid money fixture")
+///     ).build().expect("Valid dividends");
 ///
-/// assert_eq!(schedule.events.len(), 1);
+/// assert_eq!(schedule.get_events().len(), 1);
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DividendSchedule {
     /// Unique identifier of this schedule in the market context.
-    pub id: CurveId,
+    id: CurveId,
     /// Optional display symbol/ticker for convenience.
-    pub underlying: Option<String>,
+    underlying: Option<String>,
     /// Sorted events by date (ascending).
-    pub events: Vec<DividendEvent>,
+    events: Vec<DividendEvent>,
     /// Quote currency for cash dividends (optional metadata).
-    pub currency: Option<Currency>,
+    currency: Option<Currency>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DividendScheduleWire {
+    id: CurveId,
+    underlying: Option<String>,
+    events: Vec<DividendEvent>,
+    currency: Option<Currency>,
+}
+
+impl<'de> Deserialize<'de> for DividendSchedule {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        Self::try_from(DividendScheduleWire::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl TryFrom<DividendScheduleWire> for DividendSchedule {
+    type Error = Error;
+    fn try_from(wire: DividendScheduleWire) -> Result<Self> {
+        DividendScheduleBuilder {
+            id: wire.id,
+            underlying: wire.underlying,
+            events: wire.events,
+            currency: wire.currency,
+        }
+        .build()
+    }
 }
 
 impl DividendSchedule {
@@ -151,58 +182,24 @@ impl DividendSchedule {
         DividendScheduleBuilder::new(id)
     }
 
-    /// Create a new empty schedule with identifier `id`.
-    pub fn new(id: impl Into<CurveId>) -> Self {
-        Self {
-            id: id.into(),
-            underlying: None,
-            events: Vec::new(),
-            currency: None,
-        }
+    /// Identifier used to retrieve this schedule from market data.
+    pub fn get_id(&self) -> &CurveId {
+        &self.id
     }
 
-    /// Set human-readable underlying/ticker symbol.
-    pub fn with_underlying(mut self, underlying: impl Into<String>) -> Self {
-        self.underlying = Some(underlying.into());
-        self
+    /// Optional human-readable underlying ticker.
+    pub fn get_underlying(&self) -> Option<&str> {
+        self.underlying.as_deref()
     }
 
-    /// Set the default currency for cash dividends.
-    pub fn with_currency(mut self, ccy: Currency) -> Self {
-        self.currency = Some(ccy);
-        self
+    /// Validated dividend events in ascending date order.
+    pub fn get_events(&self) -> &[DividendEvent] {
+        &self.events
     }
 
-    /// Add a cash dividend event.
-    pub fn add_cash(mut self, date: Date, amount: Money) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Cash(amount),
-        });
-        self
-    }
-
-    /// Add a proportional yield event (metadata for models using yields).
-    pub fn add_yield(mut self, date: Date, dividend_yield: f64) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Yield(dividend_yield),
-        });
-        self
-    }
-
-    /// Add a stock dividend event given a ratio (e.g., 0.05 for 5%).
-    pub fn add_stock(mut self, date: Date, ratio: f64) -> Self {
-        self.events.push(DividendEvent {
-            date,
-            kind: DividendKind::Stock { ratio },
-        });
-        self
-    }
-
-    /// Sort events by date ascending; call after bulk insertion.
-    pub fn sort_by_date(&mut self) {
-        self.events.sort_by_key(|e| e.date);
+    /// Optional default cash-dividend currency metadata.
+    pub fn get_currency(&self) -> Option<Currency> {
+        self.currency
     }
 
     /// Return events filtered to a date range inclusive.
@@ -331,8 +328,14 @@ mod tests {
 
         let sched = DividendScheduleBuilder::new("AAPL-DIVS")
             .underlying("AAPL")
-            .cash(d1, Money::new(0.24, Currency::USD))
-            .cash(d2, Money::new(0.24, Currency::USD))
+            .cash(
+                d1,
+                Money::new(0.24, Currency::USD).expect("valid money fixture"),
+            )
+            .cash(
+                d2,
+                Money::new(0.24, Currency::USD).expect("valid money fixture"),
+            )
             .stock(d3, 0.02)
             .build()
             .expect("DividendScheduleBuilder should succeed in test");

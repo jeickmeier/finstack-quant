@@ -16,7 +16,7 @@ fn test_fx_forward_builder() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .attributes(Attributes::new())
@@ -37,7 +37,7 @@ fn test_fx_forward_builder_with_optional_fields() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .contract_rate_opt(Some(1.12))
         .spot_rate_override_opt(Some(1.10))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -76,7 +76,7 @@ fn test_fx_forward_from_trade_date() {
         Currency::USD,
         trade_date,
         Tenor::parse("3M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "USD-OIS",
         "EUR-OIS",
         None,
@@ -101,7 +101,7 @@ fn standard_forward_tenor_preserves_explicit_end_of_month_policy() {
         Currency::USD,
         Date::from_calendar_date(2024, Month::January, 29).expect("valid date"),
         Tenor::parse("1M").expect("valid tenor"),
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "USD-OIS",
         "EUR-OIS",
         None,
@@ -159,7 +159,7 @@ fn test_fx_forward_with_forward_points_builder() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .attributes(Attributes::new())
@@ -179,7 +179,7 @@ fn test_fx_forward_with_forward_pips() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .attributes(Attributes::new())
@@ -199,7 +199,7 @@ fn test_fx_forward_with_forward_pips_jpy_pair() {
         .base_currency(Currency::USD)
         .quote_currency(Currency::JPY)
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .domestic_discount_curve_id(CurveId::new("JPY-OIS"))
         .foreign_discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())

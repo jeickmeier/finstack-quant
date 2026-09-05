@@ -50,9 +50,11 @@ fn portfolio_result(
     PortfolioMarginResult {
         as_of,
         base_currency: Currency::USD,
-        total_initial_margin: Money::new(total_initial_margin, Currency::USD),
-        total_variation_margin: Money::new(total_variation_margin, Currency::USD),
-        total_margin: Money::new(total_margin, Currency::USD),
+        total_initial_margin: Money::new(total_initial_margin, Currency::USD)
+            .expect("valid money fixture"),
+        total_variation_margin: Money::new(total_variation_margin, Currency::USD)
+            .expect("valid money fixture"),
+        total_margin: Money::new(total_margin, Currency::USD).expect("valid money fixture"),
         by_netting_set,
         total_positions,
         positions_without_margin: 0,
@@ -154,11 +156,12 @@ fn simm_sensitivities_serialize_deterministically_across_insertion_orders() {
         NettingSetMargin::new(
             NettingSetId::bilateral("BANK_A", "CSA_01"),
             date!(2025 - 01 - 15),
-            Money::new(1_250_000.0, Currency::USD),
-            Money::new(150_000.0, Currency::USD),
+            Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+            Money::new(150_000.0, Currency::USD).expect("valid money fixture"),
             4,
             ImMethodology::Simm,
         )
+        .expect("valid new fixture")
         .with_simm_breakdown(sensitivities, Default::default())
     };
 
@@ -180,16 +183,20 @@ fn im_breakdown_serializes_in_sorted_order_across_reversed_insertions() {
         }
         let mut breakdown = HashMap::default();
         for (name, amount) in entries {
-            breakdown.insert(name.to_string(), Money::new(amount, Currency::USD));
+            breakdown.insert(
+                name.to_string(),
+                Money::new(amount, Currency::USD).expect("valid money fixture"),
+            );
         }
         NettingSetMargin::new(
             NettingSetId::bilateral("BANK_A", "CSA_01"),
             date!(2025 - 01 - 15),
-            Money::new(1_250_000.0, Currency::USD),
-            Money::new(150_000.0, Currency::USD),
+            Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+            Money::new(150_000.0, Currency::USD).expect("valid money fixture"),
             4,
             ImMethodology::Simm,
         )
+        .expect("valid new fixture")
         .with_simm_breakdown(sample_simm_sensitivities(), breakdown)
     };
 
@@ -212,7 +219,7 @@ fn im_breakdown_serializes_in_sorted_order_across_reversed_insertions() {
     assert_eq!(restored.im_breakdown.len(), 3);
     assert_eq!(
         restored.im_breakdown["CreditQualifying"],
-        Money::new(125_000.0, Currency::USD)
+        Money::new(125_000.0, Currency::USD).expect("valid money fixture")
     );
 }
 
@@ -235,16 +242,17 @@ fn test_netting_set_margin_json_roundtrip() {
     let margin = NettingSetMargin::new(
         NettingSetId::bilateral("BANK_A", "CSA_01"),
         date!(2025 - 01 - 15),
-        Money::new(1_250_000.0, Currency::USD),
-        Money::new(150_000.0, Currency::USD),
+        Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(150_000.0, Currency::USD).expect("valid money fixture"),
         4,
         ImMethodology::Simm,
     )
+    .expect("valid new fixture")
     .with_simm_breakdown(
         sample_simm_sensitivities(),
         std::iter::once((
             "InterestRate".to_string(),
-            Money::new(875_000.0, Currency::USD),
+            Money::new(875_000.0, Currency::USD).expect("valid money fixture"),
         ))
         .collect(),
     );
@@ -286,19 +294,21 @@ fn test_portfolio_margin_result_json_roundtrip() {
     let usd_margin = NettingSetMargin::new(
         NettingSetId::cleared("LCH"),
         date!(2025 - 01 - 15),
-        Money::new(900_000.0, Currency::USD),
-        Money::new(100_000.0, Currency::USD),
+        Money::new(900_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         5,
         ImMethodology::ClearingHouse,
-    );
+    )
+    .expect("valid new fixture");
     let eur_margin = NettingSetMargin::new(
         NettingSetId::bilateral("BANK_B", "CSA_EUR"),
         date!(2025 - 01 - 15),
-        Money::new(825_000.0, Currency::USD),
-        Money::new(55_000.0, Currency::USD),
+        Money::new(825_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(55_000.0, Currency::USD).expect("valid money fixture"),
         3,
         ImMethodology::Simm,
     )
+    .expect("valid new fixture")
     .with_simm_breakdown(sample_simm_sensitivities(), Default::default());
 
     let result = PortfolioMarginResult {
@@ -321,14 +331,16 @@ fn minor17_netting_set_deserialize_rejects_inconsistent_total() {
     let margin = NettingSetMargin::new(
         NettingSetId::bilateral("BANK_A", "CSA_01"),
         date!(2025 - 01 - 15),
-        Money::new(1_250_000.0, Currency::USD),
-        Money::new(150_000.0, Currency::USD),
+        Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(150_000.0, Currency::USD).expect("valid money fixture"),
         4,
         ImMethodology::Simm,
-    );
+    )
+    .expect("valid new fixture");
     let mut json = serde_json::to_value(&margin).expect("margin should serialize");
     json["total_margin"] =
-        serde_json::to_value(Money::new(1.0, Currency::USD)).expect("money should serialize");
+        serde_json::to_value(Money::new(1.0, Currency::USD).expect("valid money fixture"))
+            .expect("money should serialize");
 
     let err = serde_json::from_value::<NettingSetMargin>(json)
         .expect_err("minor 17: inconsistent netting-set total must fail");
@@ -343,15 +355,17 @@ fn minor17_portfolio_margin_deserialize_rejects_inconsistent_totals() {
     let margin = NettingSetMargin::new(
         NettingSetId::cleared("LCH"),
         date!(2025 - 01 - 15),
-        Money::new(900_000.0, Currency::USD),
-        Money::new(100_000.0, Currency::USD),
+        Money::new(900_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         5,
         ImMethodology::ClearingHouse,
-    );
+    )
+    .expect("valid new fixture");
     let result = portfolio_result(date!(2025 - 01 - 15), [margin]);
     let mut json = serde_json::to_value(&result).expect("result should serialize");
     json["total_margin"] =
-        serde_json::to_value(Money::new(1.0, Currency::USD)).expect("money should serialize");
+        serde_json::to_value(Money::new(1.0, Currency::USD).expect("valid money fixture"))
+            .expect("money should serialize");
 
     let err = serde_json::from_value::<PortfolioMarginResult>(json)
         .expect_err("minor 17: inconsistent portfolio totals must fail");
@@ -377,11 +391,12 @@ fn portfolio_wire_round_trip_preserves_all_sensitivity_buckets() {
     let margin = NettingSetMargin::new(
         NettingSetId::bilateral("BANK_A", "CSA_01"),
         date!(2025 - 01 - 15),
-        Money::new(1_250_000.0, Currency::USD),
-        Money::new(150_000.0, Currency::USD),
+        Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"),
+        Money::new(150_000.0, Currency::USD).expect("valid money fixture"),
         4,
         ImMethodology::Simm,
     )
+    .expect("valid new fixture")
     .with_simm_breakdown(original.clone(), HashMap::default());
 
     let text = serde_json::to_string(&margin).expect("netting set serializes");

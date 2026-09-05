@@ -112,7 +112,7 @@ fn build_deposit_portfolio() -> finstack_quant_portfolio::Portfolio {
 
     let dep1 = Deposit::builder()
         .id("DEP_1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(dep1_end)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -125,7 +125,7 @@ fn build_deposit_portfolio() -> finstack_quant_portfolio::Portfolio {
 
     let dep2 = Deposit::builder()
         .id("DEP_2".into())
-        .notional(Money::new(2_000_000.0, Currency::USD))
+        .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(dep2_end)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -210,8 +210,8 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
     // All bonds use the same discount curve "USD" so that YTM is well-defined.
     let mut bond_aaa = Bond::fixed(
         "BOND_AAA",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.03),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -221,8 +221,8 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
 
     let mut bond_bbb = Bond::fixed(
         "BOND_BBB",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -232,8 +232,8 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
 
     let mut bond_ccc = Bond::fixed(
         "BOND_CCC",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.08),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.08).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -366,7 +366,7 @@ fn optimize_partial_trade_universe_keeps_excluded_positions_fixed() {
         "FIXED",
         Arc::new(FixedValueInstrument::new(
             "FIXED",
-            Money::new(80.0, Currency::USD),
+            Money::new(80.0, Currency::USD).expect("valid money fixture"),
         )),
         1.0,
         PositionUnit::Units,
@@ -378,7 +378,7 @@ fn optimize_partial_trade_universe_keeps_excluded_positions_fixed() {
         "TRADE",
         Arc::new(FixedValueInstrument::new(
             "TRADE",
-            Money::new(20.0, Currency::USD),
+            Money::new(20.0, Currency::USD).expect("valid money fixture"),
         )),
         1.0,
         PositionUnit::Units,
@@ -402,7 +402,7 @@ fn optimize_partial_trade_universe_keeps_excluded_positions_fixed() {
         "ENTITY_A",
         Arc::new(FixedValueInstrument::new(
             "CANDIDATE",
-            Money::new(30.0, Currency::USD),
+            Money::new(30.0, Currency::USD).expect("valid money fixture"),
         )),
         PositionUnit::Units,
     );
@@ -471,7 +471,7 @@ fn value_weighted_average_bound_with_negative_filtered_weight_sum_errors() {
         "LONG",
         Arc::new(FixedValueInstrument::new(
             "LONG",
-            Money::new(150.0, Currency::USD),
+            Money::new(150.0, Currency::USD).expect("valid money fixture"),
         )),
         1.0,
         PositionUnit::Units,
@@ -483,7 +483,7 @@ fn value_weighted_average_bound_with_negative_filtered_weight_sum_errors() {
         "SHORT",
         Arc::new(FixedValueInstrument::new(
             "SHORT",
-            Money::new(-50.0, Currency::USD),
+            Money::new(-50.0, Currency::USD).expect("valid money fixture"),
         )),
         1.0,
         PositionUnit::Units,
@@ -552,7 +552,7 @@ fn pv_base_objective_with_candidate_in_scope_is_rejected() {
         "A",
         Arc::new(FixedValueInstrument::new(
             "A",
-            Money::new(80.0, Currency::USD),
+            Money::new(80.0, Currency::USD).expect("valid money fixture"),
         )),
         1.0,
         PositionUnit::Units,
@@ -572,7 +572,7 @@ fn pv_base_objective_with_candidate_in_scope_is_rejected() {
         "ENTITY_A",
         Arc::new(FixedValueInstrument::new(
             "CANDIDATE",
-            Money::new(30.0, Currency::USD),
+            Money::new(30.0, Currency::USD).expect("valid money fixture"),
         )),
         PositionUnit::Units,
     );

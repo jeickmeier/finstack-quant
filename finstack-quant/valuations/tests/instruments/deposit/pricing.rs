@@ -141,13 +141,13 @@ fn test_notional_scales_pv_linearly() {
 
     // Execute
     let dep_1m = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .build();
 
     let dep_2m = DepositBuilder::new(base)
-        .notional(Money::new(2_000_000.0, Currency::USD))
+        .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .quote_rate(0.03)
         .build();
@@ -357,7 +357,7 @@ fn test_generic_dv01_works_with_cashflows() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep = DepositBuilder::new(base)
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
         .build();
 

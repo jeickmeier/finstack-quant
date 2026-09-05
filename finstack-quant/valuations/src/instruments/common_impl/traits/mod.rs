@@ -35,8 +35,8 @@
 //! let maturity = create_date(2030, Month::January, 15)?;
 //! let bond = Bond::fixed(
 //!     "BOND-001",
-//!     Money::new(1_000_000.0, Currency::USD),
-//!     Rate::from_percent(5.0),
+//!     Money::from((1_000_000_i64, Currency::USD)),
+//!     Rate::from_percent(5.0).expect("valid rate fixture"),
 //!     issue,
 //!     maturity,
 //!     finstack_quant_core::dates::StubKind::None,

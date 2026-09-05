@@ -50,10 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .value_money(
             "revenue",
             &[
-                (PeriodId::quarter(2025, 1), Money::new(10_000_000.0, Currency::USD)),
-                (PeriodId::quarter(2025, 2), Money::new(10_500_000.0, Currency::USD)),
-                (PeriodId::quarter(2025, 3), Money::new(11_000_000.0, Currency::USD)),
-                (PeriodId::quarter(2025, 4), Money::new(11_500_000.0, Currency::USD)),
+                (PeriodId::quarter(2025, 1)?, Money::new(10_000_000.0, Currency::USD)?),
+                (PeriodId::quarter(2025, 2)?, Money::new(10_500_000.0, Currency::USD)?),
+                (PeriodId::quarter(2025, 3)?, Money::new(11_000_000.0, Currency::USD)?),
+                (PeriodId::quarter(2025, 4)?, Money::new(11_500_000.0, Currency::USD)?),
             ],
         )
         .compute("ebitda", "revenue * 0.25")?

@@ -53,7 +53,7 @@ use rust_decimal::Decimal;
 ///     .side(PayReceive::Pay)
 ///     .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())
-///     .frequency(Tenor::new(1, TenorUnit::Months))
+///     .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .build()
 ///     .expect("Valid swap");
@@ -240,7 +240,7 @@ impl CommoditySwap {
                 Date::from_calendar_date(2025, time::Month::December, 31)
                     .expect("Valid example date"),
             )
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(Tenor::monthly())
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(
@@ -485,7 +485,7 @@ impl CommoditySwap {
                 let flow = CashFlow::new(
                     payment_date,
                     reset_date,
-                    Money::new(amount.amount(), self.underlying.currency),
+                    Money::new(amount.amount(), self.underlying.currency)?,
                     kind,
                     accrual_factor,
                     None,
@@ -511,16 +511,15 @@ impl CommoditySwap {
             PayReceive::Pay => -self.quantity * fixed_price,
             PayReceive::Receive => self.quantity * fixed_price,
         };
-        Ok(self
-            .payment_schedule(self.start_date)?
+        self.payment_schedule(self.start_date)?
             .into_iter()
             .map(|payment_date| {
-                (
+                Ok((
                     payment_date,
-                    Money::new(signed_amount, self.underlying.currency),
-                )
+                    Money::new(signed_amount, self.underlying.currency)?,
+                ))
             })
-            .collect())
+            .collect::<finstack_quant_core::Result<Vec<_>>>()
     }
 
     fn floating_leg_flows(
@@ -550,7 +549,7 @@ impl CommoditySwap {
             };
             flows.push((
                 payment_date,
-                Money::new(signed_amount, self.underlying.currency),
+                Money::new(signed_amount, self.underlying.currency)?,
             ));
             prev_period_end = payment_date;
         }
@@ -595,10 +594,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
             }
         };
 
-        Ok(finstack_quant_core::money::Money::new(
-            npv,
-            self.underlying.currency,
-        ))
+        finstack_quant_core::money::Money::new(npv, self.underlying.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -630,7 +626,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
             flows,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(0.0, self.underlying.currency)),
+                notional_hint: Some(Money::from((0_i64, self.underlying.currency))),
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()
@@ -692,7 +688,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
             .build()
@@ -758,7 +757,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -793,7 +795,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -812,7 +817,10 @@ mod tests {
             .side(PayReceive::Receive) // Receiving fixed
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -848,7 +856,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -977,7 +988,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -1027,7 +1041,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::December, 31).expect("date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");
@@ -1073,7 +1090,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .realized_fixings(realized_fixings)
             .build()
@@ -1192,7 +1212,10 @@ mod tests {
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
-            .frequency(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months))
+            .frequency(
+                Tenor::new(1, finstack_quant_core::dates::TenorUnit::Months)
+                    .expect("valid tenor fixture"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("should build");

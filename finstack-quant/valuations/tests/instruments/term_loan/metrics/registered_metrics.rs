@@ -29,7 +29,7 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
     let mut loan = TermLoan::builder()
         .id("TL-REGMETRICS".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate_bp: 600 })
@@ -109,7 +109,10 @@ fn test_all_in_rate_unchanged_by_upfront_fee_oid_eir_captures_it() {
         "all_in_rate",
     );
     let with_fee = metric(
-        &term_loan(Some(Money::new(200_000.0, Currency::USD)), false),
+        &term_loan(
+            Some(Money::new(200_000.0, Currency::USD).expect("valid money fixture")),
+            false,
+        ),
         MetricId::custom("all_in_rate"),
         "all_in_rate",
     );
@@ -123,7 +126,10 @@ fn test_all_in_rate_unchanged_by_upfront_fee_oid_eir_captures_it() {
     // therefore rises above the 6% coupon. This is the metric that represents
     // the true fee-inclusive "all-in" cost.
     let eir = metric(
-        &term_loan(Some(Money::new(200_000.0, Currency::USD)), false),
+        &term_loan(
+            Some(Money::new(200_000.0, Currency::USD).expect("valid money fixture")),
+            false,
+        ),
         MetricId::custom("oid_eir_amortization"),
         "oid_eir_rate",
     );

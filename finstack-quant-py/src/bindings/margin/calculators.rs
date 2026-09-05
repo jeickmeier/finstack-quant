@@ -543,7 +543,7 @@ pub(super) fn money_from_amount(amount: f64, currency: Currency) -> PyResult<Mon
             "amount must be finite, got {amount}"
         )));
     }
-    Money::try_new(amount, currency).map_err(core_to_py)
+    Money::new(amount, currency).map_err(core_to_py)
 }
 
 /// Register calculator classes.

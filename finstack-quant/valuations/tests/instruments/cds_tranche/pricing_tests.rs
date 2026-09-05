@@ -98,7 +98,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
         42,
         3.0,
         7.0,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2030 - 01 - 01),
         500.0,
     );
@@ -242,7 +242,7 @@ fn test_same_day_upfront_has_opposite_sign_for_buy_and_sell() {
     let pricer = CDSTranchePricer::new();
     let market = standard_market_context();
     let as_of = base_date();
-    let upfront = Money::new(150_000.0, Currency::USD);
+    let upfront = Money::new(150_000.0, Currency::USD).expect("valid money fixture");
 
     let sell_base = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
     let buy_base = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
@@ -307,10 +307,12 @@ fn test_pv_scales_with_notional() {
     let as_of = base_date();
 
     let mut tranche_10mm = mezzanine_tranche();
-    tranche_10mm.notional = finstack_quant_core::money::Money::new(10_000_000.0, Currency::USD);
+    tranche_10mm.notional = finstack_quant_core::money::Money::new(10_000_000.0, Currency::USD)
+        .expect("valid money fixture");
 
     let mut tranche_20mm = mezzanine_tranche();
-    tranche_20mm.notional = finstack_quant_core::money::Money::new(20_000_000.0, Currency::USD);
+    tranche_20mm.notional = finstack_quant_core::money::Money::new(20_000_000.0, Currency::USD)
+        .expect("valid money fixture");
 
     // Act
     let pv_10 = pricer

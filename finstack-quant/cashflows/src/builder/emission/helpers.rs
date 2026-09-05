@@ -36,7 +36,7 @@ pub(in crate::builder) fn add_pik_flow_if_nonzero(
         flows.push(CashFlow::new(
             date,
             None,
-            Money::new(pik_amt, ccy),
+            Money::new(pik_amt, ccy)?,
             CFKind::Pik,
             accrual_factor,
             rate,

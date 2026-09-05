@@ -94,10 +94,10 @@ pub fn npv(
 
     // Eq. 2.5: O = P(t_e) · E_0[(ξV_te + H(K) + D)+]
     let pv_per_n = price_with_calibrated_mean(&ctx, m, ctx.t_expiry.max(0.0));
-    Ok(Money::new(
+    Money::new(
         pv_per_n * option.notional.amount(),
         option.notional.currency(),
-    ))
+    )
 }
 
 /// Bloomberg CDSO theta: shorten the exercise time by 1/365.25 while
@@ -982,7 +982,7 @@ mod tests {
             super::super::strike::CDSOptionStrike::Spread(bp_to_decimal(strike_bp)),
             as_of.add_months(12),
             as_of.add_months(60),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             option_type,
         )
         .expect("valid option params")
@@ -1559,7 +1559,7 @@ mod tests {
             ),
             as_of.add_months(12),
             as_of.add_months(60),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             option_type,
         )
         .expect("valid option params")

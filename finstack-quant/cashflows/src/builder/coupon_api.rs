@@ -131,7 +131,7 @@ impl CashFlowBuilder {
     /// let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
     /// let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
     /// let schedule = CashFlowSchedule::builder()
-    ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
     ///     .fixed_cf(FixedCouponSpec {
     ///         coupon_type: CouponType::Cash,
     ///         rate: dec!(0.05),
@@ -192,7 +192,7 @@ impl CashFlowBuilder {
     /// let mut builder = CashFlowSchedule::builder();
     ///
     /// let _ = builder
-    ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
     ///     .floating_cf(FloatingCouponSpec {
     ///         coupon_type: CouponType::Cash,
     ///         rate_spec: FloatingRateSpec {
@@ -264,7 +264,7 @@ impl CashFlowBuilder {
     /// let mut builder = CashFlowSchedule::builder();
     ///
     /// let _ = builder
-    ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
     ///     .fee(FeeSpec::PeriodicBp {
     ///         base: FeeBase::Drawn,
     ///         bp: dec!(25),
@@ -358,7 +358,7 @@ impl CashFlowBuilder {
     /// };
     ///
     /// let schedule = CashFlowSchedule::builder()
-    ///     .principal(Money::new(25_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((25_000_000_i64, Currency::USD)), issue, maturity)
     ///     .fixed_cf(fixed_spec)
     ///     .payment_split_program(&payment_steps)
     ///     .build(None)?;
@@ -448,7 +448,7 @@ impl CashFlowBuilder {
     /// let mut builder = CashFlowSchedule::builder();
     ///
     /// let _ = builder
-    ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
     ///     .step_up_cf(StepUpCouponSpec {
     ///         coupon_type: CouponType::Cash,
     ///         initial_rate: dec!(0.04),
@@ -585,7 +585,7 @@ impl CashFlowBuilder {
     /// );
     ///
     /// let schedule = CashFlowSchedule::builder()
-    ///     .principal(Money::new(10_000_000.0, Currency::USD), issue, maturity)
+    ///     .principal(Money::from((10_000_000_i64, Currency::USD)), issue, maturity)
     ///     .fixed_to_float(switch, fixed_win, float_spec, CouponType::Cash)
     ///     .build(Some(&market))?;
     ///

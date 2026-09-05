@@ -15,7 +15,7 @@ pub(super) fn apply(
 
     // Same-day window: no elapsed carry.
     if time_period_days <= 0.0 {
-        attribution.carry = Money::new(0.0, inputs.ccy);
+        attribution.carry = Money::from((0_i64, inputs.ccy));
         return Ok(());
     }
 

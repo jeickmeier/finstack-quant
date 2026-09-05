@@ -32,7 +32,7 @@ fn create_single_tranche(currency: Currency) -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
@@ -57,7 +57,7 @@ fn run_waterfall(
     // Tests treat everything above interest as principal proceeds.
     let principal_collections = available_cash
         .checked_sub(interest_collections)
-        .unwrap_or(Money::new(0.0, available_cash.currency()));
+        .unwrap_or(Money::new(0.0, available_cash.currency()).expect("valid money fixture"));
     let context = WaterfallContext {
         available_cash,
         interest_collections,
@@ -70,9 +70,9 @@ fn run_waterfall(
         tranche_balances: None,
         asset_balances: None,
         deferred_interest: None,
-        reserve_balance: Money::new(0.0, available_cash.currency()),
-        restricted_cash: Money::new(0.0, Currency::USD),
-        recovery_proceeds: Money::new(0.0, available_cash.currency()),
+        reserve_balance: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
+        restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        recovery_proceeds: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         floating_rate_shift: 0.0,
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(
@@ -100,7 +100,7 @@ fn property_cash_conservation() {
                     RecipientType::ServiceProvider("Test".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(1_000.0, currency),
+                        amount: Money::new(1_000.0, currency).expect("valid money fixture"),
                     },
                 )),
             )
@@ -119,11 +119,11 @@ fn property_cash_conservation() {
         let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
         let result = run_waterfall(
             &waterfall,
-            Money::new(available_amount, currency),
-            Money::new(0.0, currency),
+            Money::new(available_amount, currency).expect("valid money fixture"),
+            Money::new(0.0, currency).expect("valid money fixture"),
             payment_date,
             &tranches,
-            Money::new(100_000_000.0, currency),
+            Money::new(100_000_000.0, currency).expect("valid money fixture"),
             None,
             &pool,
             &create_market(),
@@ -163,7 +163,7 @@ fn property_non_negative_distributions() {
                 RecipientType::ServiceProvider("Test".into()),
                 PaymentCalculation::FixedAmount {
                     rounding: None,
-                    amount: Money::new(10_000.0, currency),
+                    amount: Money::new(10_000.0, currency).expect("valid money fixture"),
                 },
             )),
         )
@@ -173,11 +173,11 @@ fn property_non_negative_distributions() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(5_000.0, currency), // Less than required
-        Money::new(0.0, currency),
+        Money::new(5_000.0, currency).expect("valid money fixture"), // Less than required
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -225,7 +225,7 @@ fn property_priority_ordering() {
                     RecipientType::ServiceProvider("Provider1".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(100_000.0, currency),
+                        amount: Money::new(100_000.0, currency).expect("valid money fixture"),
                     },
                 )),
         )
@@ -237,7 +237,7 @@ fn property_priority_ordering() {
                     RecipientType::ServiceProvider("Provider2".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                     },
                 )),
         )
@@ -248,11 +248,11 @@ fn property_priority_ordering() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(75_000.0, currency),
-        Money::new(0.0, currency),
+        Money::new(75_000.0, currency).expect("valid money fixture"),
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -299,7 +299,7 @@ fn property_pro_rata_weight_distribution() {
                         RecipientType::ServiceProvider("Provider1".into()),
                         PaymentCalculation::FixedAmount {
                             rounding: None,
-                            amount: Money::new(100_000.0, currency),
+                            amount: Money::new(100_000.0, currency).expect("valid money fixture"),
                         },
                     )
                     .with_weight(0.60), // 60%
@@ -310,7 +310,7 @@ fn property_pro_rata_weight_distribution() {
                         RecipientType::ServiceProvider("Provider2".into()),
                         PaymentCalculation::FixedAmount {
                             rounding: None,
-                            amount: Money::new(100_000.0, currency),
+                            amount: Money::new(100_000.0, currency).expect("valid money fixture"),
                         },
                     )
                     .with_weight(0.40), // 40%
@@ -322,11 +322,11 @@ fn property_pro_rata_weight_distribution() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(150_000.0, currency), // Less than total requested
-        Money::new(0.0, currency),
+        Money::new(150_000.0, currency).expect("valid money fixture"), // Less than total requested
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -371,7 +371,7 @@ fn property_shortfall_computation() {
                 RecipientType::ServiceProvider("Test".into()),
                 PaymentCalculation::FixedAmount {
                     rounding: None,
-                    amount: Money::new(100_000.0, currency),
+                    amount: Money::new(100_000.0, currency).expect("valid money fixture"),
                 },
             )),
         )
@@ -382,11 +382,11 @@ fn property_shortfall_computation() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(200_000.0, currency),
-        Money::new(0.0, currency),
+        Money::new(200_000.0, currency).expect("valid money fixture"),
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -408,11 +408,11 @@ fn property_shortfall_computation() {
     // Case 2: Partial payment
     let result = run_waterfall(
         &waterfall,
-        Money::new(50_000.0, currency),
-        Money::new(0.0, currency),
+        Money::new(50_000.0, currency).expect("valid money fixture"),
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -452,7 +452,7 @@ fn property_tier_count_consistency() {
                     RecipientType::ServiceProvider(format!("Provider{}", i)),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(10_000.0, currency),
+                        amount: Money::new(10_000.0, currency).expect("valid money fixture"),
                     },
                 ),
             ),
@@ -464,11 +464,11 @@ fn property_tier_count_consistency() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(15_000.0, currency), // Only enough for ~1.5 tiers
-        Money::new(0.0, currency),
+        Money::new(15_000.0, currency).expect("valid money fixture"), // Only enough for ~1.5 tiers
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -511,11 +511,11 @@ fn property_diversion_tracking() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(1_000_000.0, currency),
-        Money::new(0.0, currency),
+        Money::new(1_000_000.0, currency).expect("valid money fixture"),
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),
@@ -559,7 +559,7 @@ fn property_monotonic_tier_allocation() {
                     RecipientType::ServiceProvider("P1".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                     },
                 )),
         )
@@ -571,7 +571,7 @@ fn property_monotonic_tier_allocation() {
                     RecipientType::ServiceProvider("P2".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                     },
                 )),
         )
@@ -583,7 +583,7 @@ fn property_monotonic_tier_allocation() {
                     RecipientType::ServiceProvider("P3".into()),
                     PaymentCalculation::FixedAmount {
                         rounding: None,
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                     },
                 )),
         )
@@ -593,11 +593,11 @@ fn property_monotonic_tier_allocation() {
     let payment_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let result = run_waterfall(
         &waterfall,
-        Money::new(100_000.0, currency), // Enough for 2 tiers
-        Money::new(0.0, currency),
+        Money::new(100_000.0, currency).expect("valid money fixture"), // Enough for 2 tiers
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &create_market(),

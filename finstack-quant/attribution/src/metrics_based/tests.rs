@@ -126,7 +126,7 @@ fn test_metrics_based_carry_matches_theta() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-THETA",
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1_000_i64, Currency::USD)),
     ));
 
     let mut measures_t0 = IndexMap::new();
@@ -135,14 +135,14 @@ fn test_metrics_based_carry_matches_theta() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-THETA",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-THETA",
         as_of_t1,
-        Money::new(995.0, Currency::USD),
+        Money::from((995_i64, Currency::USD)),
         meta,
     );
 
@@ -172,7 +172,7 @@ fn metrics_based_carry_without_horizon_stamp_rejects_multi_day_window() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-CARRY-NO-HORIZON",
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
     ));
 
     let mut measures_t0 = IndexMap::new();
@@ -181,14 +181,14 @@ fn metrics_based_carry_without_horizon_stamp_rejects_multi_day_window() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-NO-HORIZON",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-NO-HORIZON",
         as_of_t1,
-        Money::new(975.0, Currency::USD),
+        Money::from((975_i64, Currency::USD)),
         meta,
     );
 
@@ -214,14 +214,14 @@ fn metrics_based_carry_without_horizon_stamp_rejects_multi_day_window() {
     let val_t0_1d = ValuationResult::stamped_with_meta(
         "TEST-CARRY-NO-HORIZON",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta2.clone(),
     )
     .with_measures(measures_1d);
     let val_t1_1d = ValuationResult::stamped_with_meta(
         "TEST-CARRY-NO-HORIZON",
         date!(2025 - 01 - 16),
-        Money::new(995.0, Currency::USD),
+        Money::from((995_i64, Currency::USD)),
         meta2,
     );
     let attribution_1d = attribute_pnl_metrics_based(
@@ -253,7 +253,7 @@ fn metrics_based_carry_matching_horizon_stamp_uses_metrics_as_is() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-CARRY-MATCHED-HORIZON",
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
     ));
 
     let mut measures_t0 = IndexMap::new();
@@ -267,14 +267,14 @@ fn metrics_based_carry_matching_horizon_stamp_uses_metrics_as_is() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-MATCHED-HORIZON",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-MATCHED-HORIZON",
         as_of_t1,
-        Money::new(988.0, Currency::USD),
+        Money::from((988_i64, Currency::USD)),
         meta,
     );
 
@@ -302,7 +302,7 @@ fn metrics_based_carry_mismatched_horizon_uses_realized_coupon() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-CARRY-MISMATCHED-HORIZON",
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
     ));
 
     let mut measures_t0 = IndexMap::new();
@@ -316,14 +316,14 @@ fn metrics_based_carry_mismatched_horizon_uses_realized_coupon() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-MISMATCHED-HORIZON",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-MISMATCHED-HORIZON",
         as_of_t1,
-        Money::new(975.0, Currency::USD),
+        Money::from((975_i64, Currency::USD)),
         meta,
     );
 
@@ -362,18 +362,18 @@ fn metrics_based_missing_carry_metric_adds_note() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-MISSING-CARRY",
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
     ));
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-MISSING-CARRY",
         as_of_t0,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta.clone(),
     );
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-MISSING-CARRY",
         as_of_t1,
-        Money::new(1_000.0, Currency::USD),
+        Money::from((1000_i64, Currency::USD)),
         meta,
     );
 
@@ -408,7 +408,7 @@ fn test_metrics_based_carry_decomposition_populates_detail_fields() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
         "TEST-CARRY-DECOMP",
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
     ));
 
     let mut measures_t0 = IndexMap::new();
@@ -422,14 +422,14 @@ fn test_metrics_based_carry_decomposition_populates_detail_fields() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-DECOMP",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CARRY-DECOMP",
         as_of_t1,
-        Money::new(99_995.5, Currency::USD),
+        Money::new(99_995.5, Currency::USD).expect("valid money fixture"),
         meta,
     );
 
@@ -491,7 +491,7 @@ fn test_metrics_based_rates_bucketed_dv01() {
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("TEST-RATES", Money::new(100_000.0, Currency::USD))
+        TestInstrument::new("TEST-RATES", Money::from((100_000_i64, Currency::USD)))
             .with_discount_curves(&["USD-OIS"]),
     );
 
@@ -504,14 +504,14 @@ fn test_metrics_based_rates_bucketed_dv01() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-RATES",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-RATES",
         as_of_t1,
-        Money::new(99_600.0, Currency::USD),
+        Money::from((99_600_i64, Currency::USD)),
         meta,
     );
 
@@ -537,7 +537,7 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("TEST-INFLATION", Money::new(100_000.0, Currency::USD))
+        TestInstrument::new("TEST-INFLATION", Money::from((100000_i64, Currency::USD)))
             .with_inflation_curves(&["US-CPI"]),
     );
     let curve = |id: &str, end_cpi: f64| {
@@ -561,14 +561,14 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-INFLATION",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-INFLATION",
         as_of_t1,
-        Money::new(100_100.0, Currency::USD),
+        Money::from((100100_i64, Currency::USD)),
         meta,
     );
 
@@ -595,8 +595,11 @@ fn inflation_attribution_supports_index_only_sources() {
     let as_of_t0 = date!(2025 - 12 - 15);
     let as_of_t1 = date!(2026 - 01 - 15);
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("TEST-INFLATION-INDEX", Money::new(100_000.0, Currency::USD))
-            .with_inflation_curves(&["US-CPI"]),
+        TestInstrument::new(
+            "TEST-INFLATION-INDEX",
+            Money::from((100000_i64, Currency::USD)),
+        )
+        .with_inflation_curves(&["US-CPI"]),
     );
     let index = |include_new_print: bool| {
         let mut observations = vec![
@@ -617,14 +620,14 @@ fn inflation_attribution_supports_index_only_sources() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-INFLATION-INDEX",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-INFLATION-INDEX",
         as_of_t1,
-        Money::new(100_100.0, Currency::USD),
+        Money::from((100100_i64, Currency::USD)),
         meta,
     );
 
@@ -781,7 +784,7 @@ fn test_vanna_alone_does_not_produce_spot_vol_cross_pnl() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(SpotVolTestInstrument::new(
         "TEST-SPOT-VOL",
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
     ));
 
     let surface_t0 = VolSurface::builder("TEST-VOL")
@@ -812,14 +815,14 @@ fn test_vanna_alone_does_not_produce_spot_vol_cross_pnl() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-SPOT-VOL",
         as_of_t0,
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-SPOT-VOL",
         as_of_t1,
-        Money::new(132.0, Currency::USD),
+        Money::from((132_i64, Currency::USD)),
         meta,
     );
 
@@ -868,7 +871,7 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
     let mut cap = CapFloor::new(
         "HW-SURFACE-CAP",
         RateOptionType::Cap,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1000000_i64, Currency::USD)),
         0.05,
         date!(2024 - 04 - 01),
         date!(2029 - 04 - 01),
@@ -974,7 +977,7 @@ fn test_cross_gamma_spot_vol_uses_pct_spot_move() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(SpotVolTestInstrument::new(
         "TEST-SPOT-VOL-CGAMMA",
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
     ));
 
     let surface_t0 = VolSurface::builder("TEST-VOL")
@@ -1008,14 +1011,14 @@ fn test_cross_gamma_spot_vol_uses_pct_spot_move() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-SPOT-VOL-CGAMMA",
         as_of_t0,
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-SPOT-VOL-CGAMMA",
         as_of_t1,
-        Money::new(102.07, Currency::USD), // arbitrary end value
+        Money::new(102.07, Currency::USD).expect("valid money fixture"), // arbitrary end value
         meta,
     );
 
@@ -1161,7 +1164,7 @@ fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(CreditVolTestInstrument::new(
         "TEST-CREDIT-VOL-CGAMMA",
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
     ));
 
     let hazard = |as_of: Date, h: f64| {
@@ -1209,14 +1212,14 @@ fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CREDIT-VOL-CGAMMA",
         as_of_t0,
-        Money::new(100.0, Currency::USD),
+        Money::from((100_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CREDIT-VOL-CGAMMA",
         as_of_t1,
-        Money::new(101.0, Currency::USD),
+        Money::from((101_i64, Currency::USD)),
         meta,
     );
 
@@ -1352,7 +1355,7 @@ fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(CreditCurvesTestInstrument::new(
         "TEST-CREDIT-FALLBACK",
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         &["MISSING-HAZ", "ACME-HAZ"],
     ));
 
@@ -1387,14 +1390,14 @@ fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-CREDIT-FALLBACK",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-CREDIT-FALLBACK",
         as_of_t1,
-        Money::new(95_000.0, Currency::USD),
+        Money::from((95_000_i64, Currency::USD)),
         meta,
     );
 
@@ -1526,7 +1529,7 @@ fn test_primary_spot_driver_is_largest_move_not_first_measurable() {
 
     let instrument: Arc<dyn Instrument> = Arc::new(MultiSpotTestInstrument::new(
         "TEST-MULTI-SPOT",
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
     ));
 
     // FLAT-SPOT is declared FIRST and is measurable but unmoved (50 → 50);
@@ -1544,14 +1547,14 @@ fn test_primary_spot_driver_is_largest_move_not_first_measurable() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-MULTI-SPOT",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-MULTI-SPOT",
         as_of_t1,
-        Money::new(110_000.0, Currency::USD),
+        Money::from((110_000_i64, Currency::USD)),
         meta,
     );
 
@@ -1620,7 +1623,7 @@ fn test_metrics_based_rates_keyrate_aware_for_steepener() {
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("TEST-KEYRATE", Money::new(100_000.0, Currency::USD))
+        TestInstrument::new("TEST-KEYRATE", Money::from((100_000_i64, Currency::USD)))
             .with_discount_curves(&["USD-OIS"]),
     );
 
@@ -1658,14 +1661,14 @@ fn test_metrics_based_rates_keyrate_aware_for_steepener() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-KEYRATE",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-KEYRATE",
         as_of_t1,
-        Money::new(99_000.0, Currency::USD),
+        Money::from((99_000_i64, Currency::USD)),
         meta,
     );
 
@@ -1717,9 +1720,12 @@ fn test_rates_curve_in_both_discount_and_forward_lists_counts_once() {
 
     // Same curve id declared as BOTH discount and forward dependency.
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("TEST-SINGLE-CURVE", Money::new(100_000.0, Currency::USD))
-            .with_discount_curves(&["USD-OIS"])
-            .with_forward_curves(&["USD-OIS"]),
+        TestInstrument::new(
+            "TEST-SINGLE-CURVE",
+            Money::from((100_000_i64, Currency::USD)),
+        )
+        .with_discount_curves(&["USD-OIS"])
+        .with_forward_curves(&["USD-OIS"]),
     );
 
     // Steepener fixture identical to
@@ -1754,14 +1760,14 @@ fn test_rates_curve_in_both_discount_and_forward_lists_counts_once() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-SINGLE-CURVE",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-SINGLE-CURVE",
         as_of_t1,
-        Money::new(98_345.0, Currency::USD),
+        Money::from((98_345_i64, Currency::USD)),
         meta,
     );
 
@@ -1800,7 +1806,7 @@ fn test_rates_convexity_uses_dv01_weighted_average_shift() {
     let instrument: Arc<dyn Instrument> = Arc::new(
         TestInstrument::new(
             "TEST-KEYRATE-CONVEXITY",
-            Money::new(100_000.0, Currency::USD),
+            Money::from((100_000_i64, Currency::USD)),
         )
         .with_discount_curves(&["USD-OIS"]),
     );
@@ -1839,14 +1845,14 @@ fn test_rates_convexity_uses_dv01_weighted_average_shift() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-KEYRATE-CONVEXITY",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100_000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "TEST-KEYRATE-CONVEXITY",
         as_of_t1,
-        Money::new(98_345.0, Currency::USD),
+        Money::from((98_345_i64, Currency::USD)),
         meta,
     );
 
@@ -1908,7 +1914,7 @@ fn nan_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
     // exists — that keeps us in the `dv01 * avg_shift` branch where a NaN
     // DV01 will flow into `Money::new`.
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("NAN-DV01", Money::new(100_000.0, Currency::USD))
+        TestInstrument::new("NAN-DV01", Money::from((100000_i64, Currency::USD)))
             .with_discount_curves(&["USD-OIS"]),
     );
 
@@ -1923,14 +1929,14 @@ fn nan_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "NAN-DV01",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "NAN-DV01",
         as_of_t1,
-        Money::new(99_600.0, Currency::USD),
+        Money::from((99600_i64, Currency::USD)),
         meta,
     );
 
@@ -1968,7 +1974,7 @@ fn inf_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("INF-DV01", Money::new(100_000.0, Currency::USD))
+        TestInstrument::new("INF-DV01", Money::from((100000_i64, Currency::USD)))
             .with_discount_curves(&["USD-OIS"]),
     );
     let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
@@ -1980,14 +1986,14 @@ fn inf_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "INF-DV01",
         as_of_t0,
-        Money::new(100_000.0, Currency::USD),
+        Money::from((100000_i64, Currency::USD)),
         meta.clone(),
     )
     .with_measures(measures_t0);
     let val_t1 = ValuationResult::stamped_with_meta(
         "INF-DV01",
         as_of_t1,
-        Money::new(99_600.0, Currency::USD),
+        Money::from((99600_i64, Currency::USD)),
         meta,
     );
 

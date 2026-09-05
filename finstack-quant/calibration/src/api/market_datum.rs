@@ -142,7 +142,7 @@ impl MarketDatum {
             MarketDatum::XccyQuote(q) => q.id().as_str(),
             MarketDatum::FxSpot(d) => &d.id,
             MarketDatum::Price(d) => &d.id,
-            MarketDatum::DividendSchedule(d) => d.schedule.id.as_str(),
+            MarketDatum::DividendSchedule(d) => d.schedule.get_id().as_str(),
             MarketDatum::FixingSeries(s) => s.id().as_str(),
             MarketDatum::InflationFixings(i) => i.id.as_str(),
             MarketDatum::CreditIndex(c) => c.id.as_str(),
@@ -248,7 +248,7 @@ mod tests {
         let rq = RateQuote::Deposit {
             id: QuoteId::new("USD-DEP-1M"),
             index: IndexId::new("USD-SOFR"),
-            pillar: Pillar::Tenor(Tenor::new(1, TenorUnit::Months)),
+            pillar: Pillar::Tenor(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),
             rate: 0.0525,
         };
         let datum = MarketDatum::RateQuote(rq);

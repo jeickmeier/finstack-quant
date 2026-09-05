@@ -89,8 +89,8 @@ fn create_ust_bond(
 ) -> Bond {
     Bond::fixed(
         bond_id,
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -197,7 +197,7 @@ struct TestBondFutureConfig {
 fn create_ust_10y_future(config: TestBondFutureConfig) -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD))
+        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
         .expiry(config.expiry)
         .delivery_start(config.delivery_start)
         .delivery_end(config.delivery_end)
@@ -216,7 +216,7 @@ fn create_ust_10y_future(config: TestBondFutureConfig) -> BondFuture {
 fn create_ust_10y_future_with_ctd(config: TestBondFutureConfig, ctd_bond: Bond) -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD))
+        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
         .expiry(config.expiry)
         .delivery_start(config.delivery_start)
         .delivery_end(config.delivery_end)
@@ -238,7 +238,7 @@ fn try_create_ust_10y_future(
 ) -> finstack_quant_core::Result<BondFuture> {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD))
+        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
         .expiry(config.expiry)
         .delivery_start(config.delivery_start)
         .delivery_end(config.delivery_end)

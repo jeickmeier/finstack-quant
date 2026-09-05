@@ -76,8 +76,8 @@ mod tests {
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
         let bond = Bond::fixed(
             "SPREAD-DURATION-VALIDATION",
-            Money::new(notional, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             maturity,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -95,7 +95,7 @@ mod tests {
             Arc::new(bond),
             Arc::new(market),
             as_of,
-            Money::new(notional, Currency::USD),
+            Money::new(notional, Currency::USD).expect("valid money fixture"),
             MetricContext::default_config(),
         );
         context.computed.insert(MetricId::ZSpread, 0.0);

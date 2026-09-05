@@ -349,7 +349,8 @@ mod tests {
                 Money::new(
                     1_000.0 - 10_000.0 * oas - 1_000_000.0 * oas * oas,
                     Currency::USD,
-                ),
+                )
+                .expect("valid money fixture"),
             ))
         }
     }
@@ -382,7 +383,8 @@ mod tests {
                 Money::new(
                     1_000.0 - 10_000.0 * z_spread - 1_000_000.0 * z_spread * z_spread,
                     Currency::USD,
-                ),
+                )
+                .expect("valid money fixture"),
             ))
         }
     }
@@ -403,8 +405,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "CS01-DISPATCH",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.04),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             StubKind::ShortFront,
@@ -476,8 +478,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = Bond::fixed(
             "CS01-Z-DISPATCH",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.04),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 15),
             StubKind::ShortFront,

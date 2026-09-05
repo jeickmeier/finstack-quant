@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn payer_and_receiver_constructors_set_expected_defaults() {
         let (expiry, swap_start, swap_end) = sample_dates();
-        let notional = Money::new(5_000_000.0, Currency::USD);
+        let notional = Money::from((5_000_000_i64, Currency::USD));
 
         let payer = SwaptionParams::payer(notional, 0.0325, expiry, swap_start, swap_end)
             .expect("valid payer params");
@@ -187,7 +187,7 @@ mod tests {
     fn fluent_overrides_replace_optional_configuration() {
         let (expiry, swap_start, swap_end) = sample_dates();
         let params = SwaptionParams::payer(
-            Money::new(2_000_000.0, Currency::GBP),
+            Money::from((2_000_000_i64, Currency::GBP)),
             0.04,
             expiry,
             swap_start,
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn constructors_reject_non_finite_strike_inputs_without_panicking() {
         let (expiry, swap_start, swap_end) = sample_dates();
-        let notional = Money::new(1_000_000.0, Currency::USD);
+        let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let payer_result = std::panic::catch_unwind(|| {
             SwaptionParams::payer(notional, f64::NAN, expiry, swap_start, swap_end)

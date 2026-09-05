@@ -64,7 +64,7 @@ pub fn quarterly_values(n: usize, base: f64, step: f64) -> Vec<(PeriodId, Amount
     (0..n)
         .map(|i| {
             (
-                PeriodId::quarter(2025 + (i / 4) as i32, ((i % 4) + 1) as u8),
+                PeriodId::quarter(2025 + (i / 4) as i32, ((i % 4) + 1) as u8).expect("valid period fixture"),
                 AmountOrScalar::scalar(base + i as f64 * step),
             )
         })
@@ -76,7 +76,7 @@ pub fn monthly_values(n: usize, base: f64, step: f64) -> Vec<(PeriodId, AmountOr
     (0..n)
         .map(|i| {
             (
-                PeriodId::month(2024 + (i / 12) as i32, ((i % 12) + 1) as u8),
+                PeriodId::month(2024 + (i / 12) as i32, ((i % 12) + 1) as u8).expect("valid period fixture"),
                 AmountOrScalar::scalar(base + i as f64 * step),
             )
         })
@@ -92,11 +92,11 @@ pub fn simple_pl_model() -> FinancialModelSpec {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
@@ -204,7 +204,7 @@ pub fn bond_cs_model(n_bonds: usize, n_quarters: usize) -> FinancialModelSpec {
         builder = builder
             .add_bond(
                 &id,
-                Money::new(10_000_000.0, Currency::USD),
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 maturity,
@@ -235,7 +235,7 @@ fn term_loan(id: &str, notional: f64) -> FinancialStatementInstrument {
         TermLoan::builder()
             .id(id.into())
             .currency(Currency::USD)
-            .notional_limit(Money::new(notional, Currency::USD))
+            .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .issue_date(issue_date())
             .maturity(maturity_date())
             .rate(RateSpec::Fixed { rate_bp: 500 })
@@ -316,7 +316,7 @@ pub fn mc_forecast_model() -> FinancialModelSpec {
         .unwrap()
         .value(
             "revenue",
-            &[(PeriodId::quarter(2024, 4), AmountOrScalar::scalar(100.0))],
+            &[(PeriodId::quarter(2024, 4).expect("valid period fixture"), AmountOrScalar::scalar(100.0))],
         )
         .forecast("revenue", ForecastSpec::normal(0.05, 0.02, 42))
         .compute("cogs", "revenue * 0.6")
@@ -332,7 +332,7 @@ pub fn rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec {
     let revenue_values: Vec<(PeriodId, AmountOrScalar)> = (0..n_periods)
         .map(|i| {
             (
-                PeriodId::quarter(2020 + (i / 4) as i32, ((i % 4) + 1) as u8),
+                PeriodId::quarter(2020 + (i / 4) as i32, ((i % 4) + 1) as u8).expect("valid period fixture"),
                 AmountOrScalar::scalar(100.0 + i as f64),
             )
         })

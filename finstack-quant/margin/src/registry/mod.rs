@@ -1273,15 +1273,18 @@ impl VmDefaults {
     /// # Returns
     ///
     /// Concrete VM parameters in `currency`.
-    pub fn to_vm_params(&self, currency: finstack_quant_core::currency::Currency) -> VmParameters {
-        VmParameters {
-            threshold: Money::new(self.threshold, currency),
-            mta: Money::new(self.mta, currency),
-            rounding: Money::new(self.rounding, currency),
-            independent_amount: Money::new(self.independent_amount, currency),
+    pub fn to_vm_params(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<VmParameters> {
+        Ok(VmParameters {
+            threshold: Money::new(self.threshold, currency)?,
+            mta: Money::new(self.mta, currency)?,
+            rounding: Money::new(self.rounding, currency)?,
+            independent_amount: Money::new(self.independent_amount, currency)?,
             frequency: self.frequency,
             settlement_lag: self.settlement_lag,
-        }
+        })
     }
 }
 
@@ -1300,14 +1303,14 @@ impl ImMethodDefaults {
         &self,
         methodology: ImMethodology,
         currency: finstack_quant_core::currency::Currency,
-    ) -> ImParameters {
-        ImParameters {
+    ) -> finstack_quant_core::Result<ImParameters> {
+        Ok(ImParameters {
             methodology,
             mpor_days: self.mpor_days,
-            threshold: Money::new(self.threshold, currency),
-            mta: Money::new(self.mta, currency),
+            threshold: Money::new(self.threshold, currency)?,
+            mta: Money::new(self.mta, currency)?,
             segregated: self.segregated,
-        }
+        })
     }
 }
 

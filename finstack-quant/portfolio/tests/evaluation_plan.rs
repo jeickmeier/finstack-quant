@@ -104,7 +104,7 @@ impl Instrument for ProbedInstrument {
                 self.id
             )));
         }
-        Ok(Money::new(self.value, Currency::USD))
+        Ok(Money::new(self.value, Currency::USD).expect("valid money fixture"))
     }
 
     fn price_with_metrics(
@@ -145,7 +145,7 @@ impl Instrument for ProbedInstrument {
         Ok(ValuationResult::stamped_with_config(
             self.id(),
             as_of,
-            Money::new(self.value, Currency::USD),
+            Money::new(self.value, Currency::USD).expect("valid money fixture"),
             config,
         ))
     }

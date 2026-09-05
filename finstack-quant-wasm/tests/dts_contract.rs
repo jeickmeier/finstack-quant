@@ -305,6 +305,7 @@ fn forward_curve_dts_exposes_projection_grid_and_rate_between() {
     let dts = index_dts();
     let curve = interface_block(&dts, "ForwardCurve");
     let constructor = interface_block(&dts, "ForwardCurveConstructor");
+    let options = interface_block(&dts, "ForwardCurveOptions");
 
     assert!(contains_ignoring_ws(
         curve,
@@ -316,14 +317,16 @@ fn forward_curve_dts_exposes_projection_grid_and_rate_between() {
     ));
     assert!(contains_ignoring_ws(curve, "readonly resetLag: number;"));
     assert!(contains_ignoring_ws(
-        constructor,
+        options,
         "projectionGrid?: NumericArray"
     ));
-    assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    assert!(contains_ignoring_ws(options, "knots: NumericArray"));
+    assert!(contains_ignoring_ws(options, "resetLag?: number | null"));
     assert!(contains_ignoring_ws(
         constructor,
-        "resetLag?: number | null"
+        "new (options: ForwardCurveOptions): ForwardCurve;"
     ));
+    assert!(!constructor.contains("fromOptions"));
 }
 
 #[test]

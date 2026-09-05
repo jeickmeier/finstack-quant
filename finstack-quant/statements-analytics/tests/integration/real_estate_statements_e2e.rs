@@ -27,22 +27,40 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
             .value(
                 "rent",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(100.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(110.0),
+                    ),
                 ],
             )
             .value(
                 "taxes",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(20.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(22.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(20.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(22.0),
+                    ),
                 ],
             )
             .value(
                 "capex",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(6.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(5.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(6.0),
+                    ),
                 ],
             ),
         "total_rev",

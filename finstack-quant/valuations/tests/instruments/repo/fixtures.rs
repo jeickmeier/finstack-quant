@@ -70,23 +70,23 @@ pub fn create_standard_market_context() -> MarketContext {
         .insert(create_usd_discount_curve())
         .insert_price(
             "TREASURY_BOND_PRICE",
-            MarketScalar::Price(Money::new(1.02, Currency::USD)),
+            MarketScalar::Price(Money::new(1.02, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "CORPORATE_BOND_PRICE",
-            MarketScalar::Price(Money::new(0.98, Currency::USD)),
+            MarketScalar::Price(Money::new(0.98, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "SPECIAL_BOND_PRICE",
-            MarketScalar::Price(Money::new(1.05, Currency::USD)),
+            MarketScalar::Price(Money::new(1.05, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "HIGH_YIELD_PRICE",
-            MarketScalar::Price(Money::new(0.85, Currency::USD)),
+            MarketScalar::Price(Money::new(0.85, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "EQUITY_PRICE",
-            MarketScalar::Price(Money::new(150.0, Currency::USD)),
+            MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
         )
 }
 

@@ -160,7 +160,7 @@ impl AttributionFactor {
 /// let instrument = Arc::new(
 ///     Deposit::builder()
 ///         .id("DEP-1D".into())
-///         .notional(Money::new(1_000_000.0, Currency::USD))
+///         .notional(Money::from((1_000_000_i64, Currency::USD)))
 ///         .start_date(as_of_t0)
 ///         .maturity(as_of_t1)
 ///         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -415,7 +415,7 @@ impl PnlAttribution {
         t1: Date,
         method: AttributionMethod,
     ) -> Self {
-        let zero = Money::new(0.0, total_pnl.currency());
+        let zero = Money::from((0_i64, total_pnl.currency()));
 
         Self {
             total_pnl,
@@ -646,6 +646,10 @@ impl PnlAttribution {
     /// A non-finite `factor` flags the attribution invalid and leaves the
     /// values untouched instead of panicking inside `Money`'s arithmetic
     /// (this crate forbids panics on public APIs).
+    ///
+    /// # Arguments
+    ///
+    /// * `factor` - Dimensionless position multiplier applied in place to attribution amounts; negative values reverse exposure, and non-finite values flag the result invalid without scaling.
     pub fn scale(&mut self, factor: f64) {
         if !factor.is_finite() {
             self.meta.notes.push(format!(
@@ -742,7 +746,7 @@ impl PnlAttribution {
                 e
             );
             self.meta.notes.push(note);
-            self.residual = Money::new(0.0, self.total_pnl.currency());
+            self.residual = Money::from((0_i64, self.total_pnl.currency()));
             self.meta.residual_pct = 0.0;
             // Surface the failure so `residual_within_tolerance`
             // does NOT report a "clean" 0 residual after a validation error.
@@ -819,7 +823,7 @@ impl PnlAttribution {
                 attributed_sum.amount()
             );
             self.meta.notes.push(note);
-            self.residual = Money::new(0.0, self.total_pnl.currency());
+            self.residual = Money::from((0_i64, self.total_pnl.currency()));
             self.meta.residual_pct = 0.0;
             self.result_invalid = true;
             return Ok(());
@@ -830,7 +834,7 @@ impl PnlAttribution {
             Err(e) => {
                 let note = format!("Failed to compute residual: {}", e);
                 self.meta.notes.push(note);
-                self.residual = Money::new(0.0, self.total_pnl.currency());
+                self.residual = Money::from((0_i64, self.total_pnl.currency()));
                 self.meta.residual_pct = 0.0;
                 // Flag invalid so tolerance checks fail.
                 self.result_invalid = true;
@@ -1151,19 +1155,19 @@ mod tests {
     #[test]
     fn test_carry_detail_scale_and_explain_include_decomposition_fields() {
         let mut attribution = PnlAttribution::new(
-            Money::new(10.0, Currency::USD),
+            Money::from((10_i64, Currency::USD)),
             "BOND-1",
             date!(2025 - 01 - 15),
             date!(2025 - 02 - 15),
             AttributionMethod::MetricsBased,
         );
-        attribution.carry = Money::new(10.0, Currency::USD);
+        attribution.carry = Money::from((10_i64, Currency::USD));
         attribution.carry_detail = Some(CarryDetail {
-            total: Money::new(10.0, Currency::USD),
-            coupon_income: Some(SourceLine::scalar(Money::new(3.0, Currency::USD))),
-            pull_to_par: Some(Money::new(4.0, Currency::USD)),
-            roll_down: Some(SourceLine::scalar(Money::new(5.0, Currency::USD))),
-            funding_cost: Some(Money::new(2.0, Currency::USD)),
+            total: Money::from((10_i64, Currency::USD)),
+            coupon_income: Some(SourceLine::scalar(Money::from((3_i64, Currency::USD)))),
+            pull_to_par: Some(Money::from((4_i64, Currency::USD))),
+            roll_down: Some(SourceLine::scalar(Money::from((5_i64, Currency::USD)))),
+            funding_cost: Some(Money::from((2_i64, Currency::USD))),
         });
 
         attribution.scale(0.5);
@@ -1204,11 +1208,17 @@ mod tests {
     #[test]
     fn test_cross_factor_detail_serde_roundtrip() {
         let detail = CrossFactorDetail {
-            total: Money::new(500.0, Currency::USD),
+            total: Money::from((500_i64, Currency::USD)),
             by_pair: {
                 let mut map = IndexMap::new();
-                map.insert("Rates×Credit".to_string(), Money::new(300.0, Currency::USD));
-                map.insert("Spot×Vol".to_string(), Money::new(200.0, Currency::USD));
+                map.insert(
+                    "Rates×Credit".to_string(),
+                    Money::from((300_i64, Currency::USD)),
+                );
+                map.insert(
+                    "Spot×Vol".to_string(),
+                    Money::from((200_i64, Currency::USD)),
+                );
                 map
             },
         };
@@ -1221,7 +1231,7 @@ mod tests {
 
     #[test]
     fn test_compute_residual_includes_cross_factor() {
-        let total = Money::new(1000.0, Currency::USD);
+        let total = Money::from((1000_i64, Currency::USD));
         let mut attr = PnlAttribution::new(
             total,
             "TEST",
@@ -1229,9 +1239,9 @@ mod tests {
             date!(2025 - 01 - 02),
             AttributionMethod::Parallel,
         );
-        attr.rates_curves_pnl = Money::new(600.0, Currency::USD);
-        attr.credit_curves_pnl = Money::new(200.0, Currency::USD);
-        attr.cross_factor_pnl = Money::new(150.0, Currency::USD);
+        attr.rates_curves_pnl = Money::from((600_i64, Currency::USD));
+        attr.credit_curves_pnl = Money::from((200_i64, Currency::USD));
+        attr.cross_factor_pnl = Money::from((150_i64, Currency::USD));
 
         attr.compute_residual().unwrap();
 
@@ -1245,7 +1255,7 @@ mod tests {
     #[test]
     fn test_mark_to_market_pnl_captured_at_construction_and_preserved() {
         use crate::helpers::apply_total_return_carry;
-        let raw_pnl = Money::new(1000.0, Currency::USD);
+        let raw_pnl = Money::from((1000_i64, Currency::USD));
         let mut attr = PnlAttribution::new(
             raw_pnl,
             "TEST-MTM",
@@ -1258,8 +1268,8 @@ mod tests {
         assert_eq!(attr.mark_to_market_pnl.map(|m| m.amount()), Some(1000.0));
 
         // Simulate total-return adjustment (coupon income paid in period).
-        let coupon = Money::new(50.0, Currency::USD);
-        let theta = Money::new(30.0, Currency::USD);
+        let coupon = Money::from((50_i64, Currency::USD));
+        let theta = Money::from((30_i64, Currency::USD));
         let carry_inputs = crate::helpers::TotalReturnCarryInputs {
             cash_paid: coupon,
             delta_accrued: None,
@@ -1286,7 +1296,7 @@ mod tests {
     /// success even though `residual == 0` was set by the failure path.
     #[test]
     fn test_failed_residual_marks_invalid_and_blocks_tolerance_check() {
-        let total = Money::new(1000.0, Currency::USD);
+        let total = Money::from((1000_i64, Currency::USD));
         let mut attr = PnlAttribution::new(
             total,
             "TEST",
@@ -1295,7 +1305,7 @@ mod tests {
             AttributionMethod::Parallel,
         );
         // Deliberately mismatched currency so validate_currencies errors out.
-        attr.rates_curves_pnl = Money::new(600.0, Currency::EUR);
+        attr.rates_curves_pnl = Money::from((600_i64, Currency::EUR));
 
         let err = attr.compute_residual();
         assert!(err.is_err(), "currency mismatch must error");
@@ -1320,25 +1330,25 @@ mod tests {
     fn test_scale_preserves_credit_factor_detail_reconciliation() {
         let usd = Currency::USD;
         let mut attr = PnlAttribution::new(
-            Money::new(100.0, usd),
+            Money::from((100_i64, usd)),
             "BOND-SCALE",
             date!(2025 - 01 - 15),
             date!(2025 - 02 - 15),
             AttributionMethod::Parallel,
         );
-        attr.credit_curves_pnl = Money::new(100.0, usd);
+        attr.credit_curves_pnl = Money::from((100_i64, usd));
         attr.credit_factor_detail = Some(CreditFactorAttribution {
             model_id: "test/0".to_string(),
-            generic_pnl: Money::new(40.0, usd),
+            generic_pnl: Money::from((40_i64, usd)),
             levels: vec![LevelPnl {
                 level_name: "rating".to_string(),
-                total: Money::new(30.0, usd),
+                total: Money::from((30_i64, usd)),
                 by_bucket: BTreeMap::new(),
             }],
-            adder_pnl_total: Money::new(20.0, usd),
-            curve_shape_pnl: Money::new(10.0, usd),
+            adder_pnl_total: Money::from((20_i64, usd)),
+            curve_shape_pnl: Money::from((10_i64, usd)),
             adder_pnl_by_issuer: None,
-            adder_magnitude: Some(Money::new(20.0, usd)),
+            adder_magnitude: Some(Money::from((20_i64, usd))),
         });
 
         let reconciles = |a: &PnlAttribution| {

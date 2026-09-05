@@ -24,8 +24,8 @@ fn create_test_swap() -> InterestRateSwap {
 
     crate::test_support::rates::usd_irs_swap(
         InstrumentId::new("TEST_IRS"),
-        Money::new(100_000_000.0, Currency::USD), // 100MM notional
-        0.035,                                    // 3.5% fixed rate
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"), // 100MM notional
+        0.035,                                                                  // 3.5% fixed rate
         start,
         end,
         PayReceive::Pay,
@@ -35,10 +35,10 @@ fn create_test_swap() -> InterestRateSwap {
 
 fn create_bilateral_margin_spec() -> OtcMarginSpec {
     let vm_params = VmParameters {
-        threshold: Money::new(500_000.0, Currency::USD),
-        mta: Money::new(100_000.0, Currency::USD),
-        rounding: Money::new(10_000.0, Currency::USD),
-        independent_amount: Money::new(0.0, Currency::USD),
+        threshold: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
+        mta: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+        rounding: Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+        independent_amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         frequency: MarginTenor::Daily,
         settlement_lag: 1,
     };
@@ -46,8 +46,8 @@ fn create_bilateral_margin_spec() -> OtcMarginSpec {
     let im_params = ImParameters {
         methodology: ImMethodology::Simm,
         mpor_days: 10, // Standard bilateral MPOR
-        threshold: Money::new(50_000_000.0, Currency::USD),
-        mta: Money::new(500_000.0, Currency::USD),
+        threshold: Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
+        mta: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         segregated: true,
     };
 
@@ -74,10 +74,10 @@ fn create_bilateral_margin_spec() -> OtcMarginSpec {
 
 fn create_cleared_margin_spec() -> OtcMarginSpec {
     let vm_params = VmParameters {
-        threshold: Money::new(0.0, Currency::USD), // CCPs have zero threshold
-        mta: Money::new(0.0, Currency::USD),
-        rounding: Money::new(1.0, Currency::USD),
-        independent_amount: Money::new(0.0, Currency::USD),
+        threshold: Money::new(0.0, Currency::USD).expect("valid money fixture"), // CCPs have zero threshold
+        mta: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        rounding: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        independent_amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         frequency: MarginTenor::Daily,
         settlement_lag: 0, // Same-day settlement at CCPs
     };
@@ -85,8 +85,8 @@ fn create_cleared_margin_spec() -> OtcMarginSpec {
     let im_params = ImParameters {
         methodology: ImMethodology::ClearingHouse,
         mpor_days: 5, // Typically shorter for cleared
-        threshold: Money::new(0.0, Currency::USD),
-        mta: Money::new(0.0, Currency::USD),
+        threshold: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        mta: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         segregated: true,
     };
 
@@ -152,8 +152,8 @@ fn test_vm_calculation_for_irs() {
     let vm_calc = VmCalculator::new(margin_spec.csa);
 
     // Simulate MTM exposure
-    let exposure = Money::new(2_000_000.0, Currency::USD);
-    let posted = Money::new(1_500_000.0, Currency::USD);
+    let exposure = Money::new(2_000_000.0, Currency::USD).expect("valid money fixture");
+    let posted = Money::new(1_500_000.0, Currency::USD).expect("valid money fixture");
     let as_of = test_date();
 
     let result = vm_calc
@@ -202,8 +202,8 @@ fn test_vm_threshold_behavior() {
     let as_of = test_date();
 
     // Exposure below threshold (500k)
-    let small_exposure = Money::new(200_000.0, Currency::USD);
-    let no_posted = Money::new(0.0, Currency::USD);
+    let small_exposure = Money::new(200_000.0, Currency::USD).expect("valid money fixture");
+    let no_posted = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let result = vm_calc
         .calculate(small_exposure, no_posted, as_of)
@@ -217,7 +217,7 @@ fn test_vm_threshold_behavior() {
     );
 
     // Exposure above threshold
-    let large_exposure = Money::new(1_000_000.0, Currency::USD);
+    let large_exposure = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let result = vm_calc
         .calculate(large_exposure, no_posted, as_of)
@@ -239,27 +239,27 @@ fn test_margin_call_series_generation() {
     let exposures: Vec<(Date, Money)> = vec![
         (
             Date::from_calendar_date(2024, Month::June, 10).expect("valid"),
-            Money::new(100_000.0, Currency::USD),
+            Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         ),
         (
             Date::from_calendar_date(2024, Month::June, 11).expect("valid"),
-            Money::new(300_000.0, Currency::USD),
+            Money::new(300_000.0, Currency::USD).expect("valid money fixture"),
         ),
         (
             Date::from_calendar_date(2024, Month::June, 12).expect("valid"),
-            Money::new(800_000.0, Currency::USD),
+            Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
         ),
         (
             Date::from_calendar_date(2024, Month::June, 13).expect("valid"),
-            Money::new(1_200_000.0, Currency::USD),
+            Money::new(1_200_000.0, Currency::USD).expect("valid money fixture"),
         ),
         (
             Date::from_calendar_date(2024, Month::June, 14).expect("valid"),
-            Money::new(600_000.0, Currency::USD),
+            Money::new(600_000.0, Currency::USD).expect("valid money fixture"),
         ),
     ];
 
-    let initial_collateral = Money::new(0.0, Currency::USD);
+    let initial_collateral = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let margin_calls = vm_calc
         .generate_margin_calls(&exposures, initial_collateral)

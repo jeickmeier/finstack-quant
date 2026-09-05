@@ -38,7 +38,7 @@ impl RecoveryQueue {
     pub(crate) fn pending_amount(&self, base_currency: Currency) -> Money {
         self.pending
             .iter()
-            .fold(Money::new(0.0, base_currency), |acc, (_, amt)| {
+            .fold(Money::from((0_i64, base_currency)), |acc, (_, amt)| {
                 acc.checked_add(*amt).unwrap_or(acc)
             })
     }
@@ -61,7 +61,7 @@ impl RecoveryQueue {
         recovery_lag_months: u32,
         base_currency: Currency,
     ) -> finstack_quant_core::Result<Money> {
-        let mut released = Money::new(0.0, base_currency);
+        let mut released = Money::from((0_i64, base_currency));
 
         while let Some((orig_date, _)) = self.pending.front() {
             let months_elapsed = orig_date.months_until(current_date);

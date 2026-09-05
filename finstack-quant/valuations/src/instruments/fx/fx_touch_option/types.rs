@@ -299,7 +299,7 @@ impl FxTouchOption {
             .barrier_level(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
-            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .payout_timing(PayoutTiming::AtExpiry)
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
             .monitoring_start_date_opt(Some(date!(2024 - 01 - 01)))
@@ -615,7 +615,7 @@ mod tests {
             .barrier_level(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
-            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .payout_timing(PayoutTiming::AtExpiry)
             .monitoring_start_date(time::macros::date!(2024 - 01 - 01))
             .expiry(time::macros::date!(2027 - 01 - 15))
@@ -636,7 +636,7 @@ mod tests {
         // Pricing discounts the payout at the domestic (quote) rate; a base
         // (foreign) currency payout would be silently mispriced.
         let result = base_touch_builder()
-            .payout_amount(Money::new(1_000_000.0, Currency::EUR))
+            .payout_amount(Money::from((1_000_000_i64, Currency::EUR)))
             .build();
         assert!(
             result.is_err(),
@@ -691,7 +691,7 @@ mod tests {
     #[test]
     fn validation_rejects_negative_payout_amount() {
         let result = base_touch_builder()
-            .payout_amount(Money::new(-1.0, Currency::USD))
+            .payout_amount(Money::from((-1_i64, Currency::USD)))
             .build();
         assert!(
             result.is_err(),
@@ -700,18 +700,16 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Money::new requires finite amount")]
     fn validation_rejects_nan_payout_amount() {
-        // Money::new panics on NaN before the builder validate hook can run;
-        // this test documents that the type system prevents non-finite payout amounts.
-        let _ = Money::new(f64::NAN, Currency::USD);
+        // Construction rejects NaN before the builder can receive a payout amount.
+        assert!(Money::new(f64::NAN, Currency::USD).is_err());
     }
 
     #[test]
     fn validation_accepts_zero_payout_amount() {
         // Zero payout is legitimate (no-touch semantics allow it)
         let result = base_touch_builder()
-            .payout_amount(Money::new(0.0, Currency::USD))
+            .payout_amount(Money::from((0_i64, Currency::USD)))
             .build();
         assert!(
             result.is_ok(),
@@ -772,7 +770,7 @@ mod tests {
             .barrier_level(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
-            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
             .payout_timing(PayoutTiming::AtExpiry)
             .monitoring_start_date(as_of)
             .expiry(expiry)

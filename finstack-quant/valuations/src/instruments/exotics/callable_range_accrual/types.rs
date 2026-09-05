@@ -121,7 +121,7 @@ impl CallableRangeAccrual {
                 .upper_bound(0.06)
                 .bounds_type(BoundsType::Absolute)
                 .coupon_rate(0.065)
-                .notional(Money::new(1_000_000.0, Currency::USD))
+                .notional(Money::from((1_000_000_i64, Currency::USD)))
                 .day_count(DayCount::Act360)
                 .accrual_start_date(date!(2025 - 12 - 31))
                 .rate_index_id(finstack_quant_core::types::IndexId::new("SOFR"))

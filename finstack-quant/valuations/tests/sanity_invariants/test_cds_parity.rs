@@ -75,7 +75,7 @@ fn create_5y_cds_buy(as_of: Date) -> finstack_quant_valuations::instruments::Cre
 
     credit_support::cds_buy_protection(
         "CDS-QLPARITY-5Y-BUY",
-        Money::new(NOTIONAL, Currency::USD),
+        Money::new(NOTIONAL, Currency::USD).expect("valid money fixture"),
         SPREAD_BP,
         start,
         maturity,
@@ -93,7 +93,7 @@ fn create_5y_cds_sell(as_of: Date) -> finstack_quant_valuations::instruments::Cr
 
     credit_support::cds_sell_protection(
         "CDS-QLPARITY-5Y-SELL",
-        Money::new(NOTIONAL, Currency::USD),
+        Money::new(NOTIONAL, Currency::USD).expect("valid money fixture"),
         SPREAD_BP,
         start,
         maturity,

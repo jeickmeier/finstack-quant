@@ -61,7 +61,7 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_TEST".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date,
         maturity: end,
@@ -129,7 +129,7 @@ fn test_floor_theta() {
     let floor = CapFloor {
         id: "FLOOR_TEST".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date,
         maturity: end,
@@ -270,7 +270,7 @@ fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
     let caplet = CapFloor::new(
         "SAME-DAY-THETA",
         RateOptionType::Caplet,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         as_of,
         date!(2024 - 06 - 01),

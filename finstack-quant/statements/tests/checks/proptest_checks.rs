@@ -13,7 +13,7 @@ use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 use proptest::prelude::*;
 
 fn q1() -> PeriodId {
-    PeriodId::quarter(2025, 1)
+    PeriodId::quarter(2025, 1).expect("valid period fixture")
 }
 
 // Balance-sheet articulation: always passes when A = L + E

@@ -58,7 +58,7 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
     CapFloor {
         id: "CAP_TEST".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -130,7 +130,7 @@ fn test_floor_dv01_signed_negative() {
     let floor = CapFloor {
         id: "FLOOR_TEST".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -235,7 +235,7 @@ fn test_dv01_scales_with_notional() {
 
     let small_cap = create_standard_cap(as_of, end, 0.05);
     let mut large_cap = create_standard_cap(as_of, end, 0.05);
-    large_cap.notional = Money::new(10_000_000.0, Currency::USD);
+    large_cap.notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
@@ -286,7 +286,7 @@ fn test_rfr_cap_dv01_reports_raw_model_curve_risk_without_quote_scalar() {
     let cap = CapFloor {
         id: "RFR-CAP-RAW-DV01".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,

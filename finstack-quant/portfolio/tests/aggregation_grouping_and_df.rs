@@ -20,7 +20,7 @@ fn dataframe_exports_have_expected_columns() {
 
     let dep = Deposit::builder()
         .id("D".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

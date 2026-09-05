@@ -78,7 +78,11 @@ fn test_schedule_discountable_simple() {
     };
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(fixed)
         .build(None)
         .unwrap();
@@ -143,7 +147,11 @@ fn test_npv_zero_rate() {
     };
 
     let schedule = CashFlowSchedule::builder()
-        .principal(Money::new(1_000.0, Currency::USD), issue, maturity)
+        .principal(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
         .fixed_cf(fixed)
         .build(None)
         .unwrap();

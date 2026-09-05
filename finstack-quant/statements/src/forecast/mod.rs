@@ -477,7 +477,9 @@ mod tests {
 
     fn quarters(n: u8) -> Vec<PeriodId> {
         (0..n)
-            .map(|i| PeriodId::quarter(2025 + i32::from(i / 4), i % 4 + 1))
+            .map(|i| {
+                PeriodId::quarter(2025 + i32::from(i / 4), i % 4 + 1).expect("valid period fixture")
+            })
             .collect()
     }
 
@@ -630,7 +632,10 @@ mod tests {
     #[test]
     fn convenience_ctors_produce_valid_specs() {
         let mut overrides = indexmap::IndexMap::new();
-        overrides.insert(PeriodId::quarter(2025, 3), 120.0);
+        overrides.insert(
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            120.0,
+        );
         ForecastSpec::overrides(overrides)
             .validate()
             .expect("override spec");

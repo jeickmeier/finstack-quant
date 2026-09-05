@@ -4,9 +4,7 @@ use crate::bindings::core::dates::calendar::extract_business_day_convention;
 use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Schedule, ScheduleBuilder, ScheduleErrorPolicy, ScheduleSpec, StubKind,
-};
+use finstack_quant_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleSpec, StubKind};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule, PyType};
 
@@ -210,7 +208,7 @@ fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
 
 /// A generated date schedule.
 ///
-/// Immutable value type produced by ``ScheduleBuilder`` / ``Schedule.generate``.
+/// Immutable value type produced by ``ScheduleBuilder``.
 /// ``dates`` is the unadjusted accrual grid (start plus every period end);
 /// ``payment_dates`` and ``fixing_dates`` are one per accrual period.
 /// Iterating a schedule yields its ``dates``.
@@ -218,7 +216,7 @@ fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import Schedule
-/// >>> schedule = Schedule.generate("2025-01-15", "2025-07-15", frequency="3M", stub="none")
+/// >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
 /// >>> [d.isoformat() for d in schedule]
 /// ['2025-01-15', '2025-04-15', '2025-07-15']
 #[pyclass(
@@ -269,82 +267,6 @@ impl PySchedule {
     #[pyo3(text_signature = "(start, end)")]
     fn builder(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<PyScheduleBuilder> {
         PyScheduleBuilder::from_dates(start, end)
-    }
-
-    /// Build a schedule in one call from keyword options.
-    ///
-    /// Parameters
-    /// ----------
-    /// start : datetime.date | str
-    ///     First accrual date.
-    /// end : datetime.date | str
-    ///     Final accrual date; must not precede ``start``.
-    /// frequency : Tenor | str
-    ///     Roll frequency (default ``"6M"``).
-    /// stub : StubKind | str
-    ///     Stub rule (default ``"short_front"``).
-    /// convention : BusinessDayConvention | str
-    ///     Business-day convention for payment dates (default
-    ///     ``"modified_following"``); only applied when ``calendar`` is set.
-    /// calendar : HolidayCalendar | str | None
-    ///     Holiday calendar object or id (``"usny"``, ``"nyse+gblo"``);
-    ///     ``None`` leaves dates unadjusted.
-    /// eom : bool
-    ///     End-of-month roll rule (default ``False``).
-    /// payment_lag : int
-    ///     Business days after each adjusted period end for the payment date
-    ///     (default ``0``).
-    /// fixing_lag : int | None
-    ///     T-minus business days from each accrual start for the fixing date
-    ///     (default ``None`` = no fixing dates).
-    /// imm : bool
-    ///     Roll on standard IMM dates (third Wednesday); default ``False``.
-    /// cds_imm : bool
-    ///     Roll on CDS IMM dates (20th); default ``False``. Mutually
-    ///     exclusive with ``imm``.
-    /// error_policy : ScheduleErrorPolicy | str
-    ///     Recoverable-error policy (default ``"strict"``).
-    ///
-    /// Returns
-    /// -------
-    /// Schedule
-    ///     The generated schedule.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If dates, tenor, stub, convention or policy are invalid, both IMM
-    ///     modes are set, or a lag is negative / needs a calendar.
-    /// KeyError
-    ///     If ``calendar`` names an unknown calendar under ``STRICT``.
-    /// TypeError
-    ///     If an unknown option keyword is passed.
-    #[staticmethod]
-    #[pyo3(
-        signature = (start, end, **options),
-        text_signature = "(start, end, *, frequency='6M', stub='short_front', convention='modified_following', calendar=None, eom=False, payment_lag=0, fixing_lag=None, imm=False, cds_imm=False, error_policy='strict')"
-    )]
-    fn generate(
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
-        options: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<PySchedule> {
-        let mut spec = PyScheduleBuilder::from_dates(start, end)?.spec;
-        spec.frequency = finstack_quant_core::dates::Tenor::semi_annual();
-        spec.stub = StubKind::ShortFront;
-        spec.business_day_convention = Some(BusinessDayConvention::ModifiedFollowing);
-        if let Some(options) = options {
-            for (key, value) in options.iter() {
-                let key: String = key.extract()?;
-                apply_generate_option(&mut spec, &key, &value)?;
-            }
-        }
-        if spec.calendar_id.is_none() {
-            // Without a calendar the convention is inert; keep the spec
-            // consistent with the builder (adjustment requires both).
-            spec.business_day_convention = None;
-        }
-        spec.build().map(Self::from_inner).map_err(core_to_py)
     }
 
     /// Build a schedule from a serialized spec (``dict`` or JSON string)
@@ -432,7 +354,7 @@ impl PySchedule {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let n = self.inner.dates.len().saturating_sub(1);
         let starts = &self.inner.dates[..n];
-        let ends = &self.inner.dates[1..];
+        let ends = self.inner.dates.get(1..).unwrap_or_default();
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
         let column = |dates: &[time::Date]| -> PyResult<Bound<'py, PyAny>> {
             to_datetime.call1((crate::bindings::pandas_utils::dates_to_pylist(py, dates)?,))
@@ -493,40 +415,6 @@ impl PySchedule {
     }
 }
 
-/// Apply one ``Schedule.generate`` keyword to the spec.
-fn apply_generate_option(
-    spec: &mut ScheduleSpec,
-    key: &str,
-    value: &Bound<'_, PyAny>,
-) -> PyResult<()> {
-    match key {
-        "frequency" => spec.frequency = extract_tenor(value)?,
-        "stub" => spec.stub = extract_stub_kind(value)?,
-        "convention" => {
-            spec.business_day_convention = Some(extract_business_day_convention(value)?)
-        }
-        "calendar" => {
-            spec.calendar_id = if value.is_none() {
-                None
-            } else {
-                Some(calendar_code(value)?)
-            }
-        }
-        "eom" => spec.end_of_month = value.extract()?,
-        "payment_lag" => spec.payment_lag_business_days = value.extract()?,
-        "fixing_lag" => spec.fixing_lag_business_days = value.extract()?,
-        "imm" => spec.imm_mode = value.extract()?,
-        "cds_imm" => spec.cds_imm_mode = value.extract()?,
-        "error_policy" => spec.error_policy = extract_error_policy(value)?,
-        other => {
-            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-                "Schedule.generate() got an unexpected keyword argument '{other}'"
-            )))
-        }
-    }
-    Ok(())
-}
-
 /// Registry id for a ``HolidayCalendar`` wrapper or calendar-id string.
 ///
 /// Wrappers contribute their canonical code. Strings are stored as given and
@@ -578,24 +466,8 @@ impl PyScheduleBuilder {
     pub(crate) fn from_dates(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
-        // Fail closed on an inverted range at construction, exactly as the
-        // canonical Rust builder does.
-        ScheduleBuilder::new(s, e).map_err(core_to_py)?;
         Ok(Self {
-            spec: ScheduleSpec {
-                start: s,
-                end: e,
-                frequency: finstack_quant_core::dates::Tenor::monthly(),
-                stub: StubKind::None,
-                business_day_convention: None,
-                calendar_id: None,
-                end_of_month: false,
-                imm_mode: false,
-                cds_imm_mode: false,
-                error_policy: ScheduleErrorPolicy::Strict,
-                payment_lag_business_days: 0,
-                fixing_lag_business_days: None,
-            },
+            spec: ScheduleSpec::new(s, e).map_err(core_to_py)?,
         })
     }
 }

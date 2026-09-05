@@ -55,8 +55,8 @@ fn coupon_payment_inside_window_keeps_total_return_identity() {
     // contains exactly one coupon (2025-01-20, a Monday).
     let bond = Bond::fixed(
         "COUPON-WINDOW-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2024 - 07 - 20),
         date!(2029 - 07 - 20),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -142,8 +142,8 @@ fn negative_rates_regime_attribution_succeeds() {
 
     let bond = Bond::fixed(
         "NEG-RATES-BOND",
-        Money::new(1_000_000.0, Currency::EUR),
-        finstack_quant_core::types::Rate::from_decimal(0.01),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.01).expect("valid rate fixture"),
         date!(2025 - 01 - 01),
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -218,9 +218,12 @@ fn metrics_based_attributes_forward_curve_basis_move() {
         .insert(fwd(as_of_t1, 0.0210));
 
     let instrument: Arc<dyn Instrument> = Arc::new(
-        TestInstrument::new("BASIS-SWAP", Money::new(0.0, Currency::USD))
-            .with_discount_curves(&["USD-OIS"])
-            .with_forward_curves(&["USD-SOFR-3M"]),
+        TestInstrument::new(
+            "BASIS-SWAP",
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        )
+        .with_discount_curves(&["USD-OIS"])
+        .with_forward_curves(&["USD-SOFR-3M"]),
     );
 
     // Per-tenor key-rate DV01 on BOTH curves; only the forward curve moves.
@@ -239,14 +242,14 @@ fn metrics_based_attributes_forward_curve_basis_move() {
     let val_t0 = ValuationResult::stamped_with_meta(
         "BASIS-SWAP",
         as_of_t0,
-        Money::new(p0, Currency::USD),
+        Money::new(p0, Currency::USD).expect("valid money fixture"),
         meta.clone(),
     )
     .with_measures(measures.clone());
     let val_t1 = ValuationResult::stamped_with_meta(
         "BASIS-SWAP",
         as_of_t1,
-        Money::new(p0 + expected_rates, Currency::USD),
+        Money::new(p0 + expected_rates, Currency::USD).expect("valid money fixture"),
         meta,
     )
     .with_measures(measures);

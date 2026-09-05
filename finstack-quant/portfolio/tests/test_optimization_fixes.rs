@@ -50,7 +50,7 @@ fn test_deposit(
 ) -> Result<Deposit, Box<dyn std::error::Error>> {
     Ok(Deposit::builder()
         .id(id.into())
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(create_date(2024, Month::February, 1)?)
         .day_count(DayCount::Act365F)
@@ -187,7 +187,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
     // Deposit 1: Long 1M USD
     let dep1 = Deposit::builder()
         .id("DEP_LONG".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(create_date(2024, Month::February, 1)?)
         .day_count(DayCount::Act365F)
@@ -199,7 +199,7 @@ fn test_notional_weighting() -> Result<(), Box<dyn std::error::Error>> {
 
     let dep2 = Deposit::builder()
         .id("DEP_SHORT".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(create_date(2024, Month::February, 1)?)
         .day_count(DayCount::Act365F)
@@ -293,7 +293,7 @@ fn test_candidate_batching() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..10 {
         let dep = Deposit::builder()
             .id(format!("CAND_DEP_{}", i).into())
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
             .maturity(create_date(2024, Month::February, 1)?)
             .day_count(DayCount::Act365F)
@@ -338,7 +338,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
         "MISSING",
         Arc::new(MetricInstrument::new(
             "MISSING",
-            Money::new(50.0, Currency::USD),
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -351,7 +351,7 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
         "RICH",
         Arc::new(MetricInstrument::new(
             "RICH",
-            Money::new(50.0, Currency::USD),
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
             rich_measures,
         )),
         1.0,
@@ -399,7 +399,7 @@ fn test_pv_native_objective_rejected_in_aggregated_expression() {
         "USD_INST",
         Arc::new(MetricInstrument::new(
             "USD_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -412,7 +412,7 @@ fn test_pv_native_objective_rejected_in_aggregated_expression() {
         "EUR_INST",
         Arc::new(MetricInstrument::new(
             "EUR_INST",
-            Money::new(100.0, Currency::EUR),
+            Money::new(100.0, Currency::EUR).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -466,7 +466,7 @@ fn test_short_candidates_can_take_negative_weights() {
         "ENT_A",
         Arc::new(MetricInstrument::new(
             "SHORT_CANDIDATE",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         PositionUnit::Units,
@@ -477,7 +477,7 @@ fn test_short_candidates_can_take_negative_weights() {
         "ENT_A",
         Arc::new(MetricInstrument::new(
             "LONG_CANDIDATE",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         PositionUnit::Units,
@@ -548,12 +548,12 @@ fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std:
     let as_of = create_date(2024, Month::January, 1)?;
     let long_instrument = Arc::new(MetricInstrument::new(
         "LONG_INST",
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         IndexMap::new(),
     ));
     let short_instrument = Arc::new(MetricInstrument::new(
         "SHORT_INST",
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         IndexMap::new(),
     ));
     let long = Position::new(
@@ -635,7 +635,7 @@ fn m8_candidate_entity_filters_apply_to_metric_constraints(
         "OTHER",
         Arc::new(MetricInstrument::new(
             "NON_TARGET",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         PositionUnit::Units,
@@ -645,7 +645,7 @@ fn m8_candidate_entity_filters_apply_to_metric_constraints(
         "TARGET",
         Arc::new(MetricInstrument::new(
             "TARGET",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         PositionUnit::Units,
@@ -704,7 +704,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         "LOW_INST",
         Arc::new(MetricInstrument::new(
             "LOW_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             low_measures,
         )),
         1.0,
@@ -716,7 +716,7 @@ fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Er
         "HIGH_INST",
         Arc::new(MetricInstrument::new(
             "HIGH_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             high_measures,
         )),
         1.0,
@@ -777,7 +777,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         "A_INST",
         Arc::new(MetricInstrument::new(
             "A_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -789,7 +789,7 @@ fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::e
         "B_INST",
         Arc::new(MetricInstrument::new(
             "B_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -846,7 +846,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         "LOW_INST",
         Arc::new(MetricInstrument::new(
             "LOW_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             low_measures,
         )),
         1.0,
@@ -858,7 +858,7 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
         "HIGH_INST",
         Arc::new(MetricInstrument::new(
             "HIGH_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             high_measures,
         )),
         1.0,
@@ -925,7 +925,7 @@ fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std
         "ZERO_INST",
         Arc::new(MetricInstrument::new(
             "ZERO_INST",
-            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -962,7 +962,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
         "PERCENT_INST",
         Arc::new(MetricInstrument::new(
             "PERCENT_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         50.0,
@@ -974,7 +974,7 @@ fn notional_weight_rejects_missing_instrument_notional() -> Result<(), Box<dyn s
         "UNIT_INST",
         Arc::new(MetricInstrument::new(
             "UNIT_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1097,7 +1097,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
         "HI_INST",
         Arc::new(MetricInstrument::new(
             "HI_INST",
-            Money::new(-100.0, Currency::USD),
+            Money::new(-100.0, Currency::USD).expect("valid money fixture"),
             high_measures,
         )),
         1.0,
@@ -1110,7 +1110,7 @@ fn mo19_unfiltered_vwa_objective_with_non_unit_budget_is_rejected() {
         "LO_INST",
         Arc::new(MetricInstrument::new(
             "LO_INST",
-            Money::new(-100.0, Currency::USD),
+            Money::new(-100.0, Currency::USD).expect("valid money fixture"),
             low_measures,
         )),
         1.0,
@@ -1164,7 +1164,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
         "HI_INST",
         Arc::new(MetricInstrument::new(
             "HI_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             high_measures,
         )),
         1.0,
@@ -1177,7 +1177,7 @@ fn mo19_unfiltered_vwa_objective_with_unit_budget_picks_high_yield() {
         "LO_INST",
         Arc::new(MetricInstrument::new(
             "LO_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             low_measures,
         )),
         1.0,
@@ -1231,7 +1231,7 @@ fn infeasible_result_turnover_is_nan() {
         "A_INST",
         Arc::new(MetricInstrument::new(
             "A_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1299,7 +1299,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
         "SCORED_INST",
         Arc::new(MetricInstrument::new(
             "SCORED_INST",
-            Money::new(50.0, Currency::USD),
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
             scored_measures,
         )),
         1.0,
@@ -1312,7 +1312,7 @@ fn exclude_policy_removes_missing_metric_positions_from_vwa_bound_denominator() 
         "UNSCORED_INST",
         Arc::new(MetricInstrument::new(
             "UNSCORED_INST",
-            Money::new(50.0, Currency::USD),
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1379,7 +1379,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
         "SCORED_INST",
         Arc::new(MetricInstrument::new(
             "SCORED_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             scored_measures,
         )),
         1.0,
@@ -1392,7 +1392,7 @@ fn vwa_bound_slack_is_reported_in_metric_units() {
         "OTHER_INST",
         Arc::new(MetricInstrument::new(
             "OTHER_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1469,7 +1469,7 @@ fn mo21_duplicate_budget_constraints_are_rejected() {
         "A_INST",
         Arc::new(MetricInstrument::new(
             "A_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1515,7 +1515,7 @@ fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
         "INST_1",
         Arc::new(MetricInstrument::new(
             "INST_1",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1638,7 +1638,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
         "PERCENT_INST",
         Arc::new(MetricInstrument::new(
             "PERCENT_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         50.0,
@@ -1650,7 +1650,7 @@ fn value_weight_percentage_reconstructs_via_scale_factor() -> Result<(), Box<dyn
         "UNIT_INST",
         Arc::new(MetricInstrument::new(
             "UNIT_INST",
-            Money::new(50.0, Currency::USD),
+            Money::new(50.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,
@@ -1723,7 +1723,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
         "HI_INST",
         Arc::new(MetricInstrument::new(
             "HI_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             high_measures,
         )),
         1.0,
@@ -1736,7 +1736,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
         "LO_INST",
         Arc::new(MetricInstrument::new(
             "LO_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             low_measures,
         )),
         1.0,
@@ -1749,7 +1749,7 @@ fn exclude_policy_skips_missing_metric_in_weighted_sum() {
         "MISSING_INST",
         Arc::new(MetricInstrument::new(
             "MISSING_INST",
-            Money::new(100.0, Currency::USD),
+            Money::new(100.0, Currency::USD).expect("valid money fixture"),
             IndexMap::new(),
         )),
         1.0,

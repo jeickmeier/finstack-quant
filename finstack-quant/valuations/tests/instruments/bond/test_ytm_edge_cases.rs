@@ -50,8 +50,8 @@ fn test_deep_discount_bond_ytm() {
 
     let mut bond = Bond::fixed(
         "DEEP-DISCOUNT",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05), // 5% coupon
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"), // 5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -94,7 +94,7 @@ fn test_zero_coupon_bond_ytm() {
 
     let mut bond = Bond::builder()
         .id("ZERO-COUPON".into())
-        .notional(Money::new(1_000.0, Currency::USD))
+        .notional(Money::new(1_000.0, Currency::USD).expect("valid money fixture"))
         .cashflow_spec(
             CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
@@ -146,7 +146,7 @@ fn test_odd_first_coupon_ytm() {
 
     let mut bond = Bond::builder()
         .id("ODD-FIRST".into())
-        .notional(Money::new(1_000.0, Currency::USD))
+        .notional(Money::new(1_000.0, Currency::USD).expect("valid money fixture"))
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -205,8 +205,8 @@ fn test_eom_february_maturity_ytm() {
 
     let mut bond = Bond::with_convention(
         "EOM-FEB",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         issue,
         maturity,
         BondConvention::UsCorporate,
@@ -266,7 +266,7 @@ fn test_long_first_coupon_ytm() {
 
     let mut bond = Bond::builder()
         .id("LONG-FIRST".into())
-        .notional(Money::new(1_000.0, Currency::USD))
+        .notional(Money::new(1_000.0, Currency::USD).expect("valid money fixture"))
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.06).expect("valid"),
@@ -322,8 +322,8 @@ fn test_premium_bond_ytm_solver_convergence() {
 
     let mut bond = Bond::fixed(
         "PREMIUM",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.08), // 8% coupon (high)
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.08).expect("valid rate fixture"), // 8% coupon (high)
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -372,8 +372,8 @@ fn test_very_long_maturity_bond() {
 
     let mut bond = Bond::fixed(
         "LONG-30Y",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -423,8 +423,8 @@ fn test_near_maturity_bond_ytm() {
 
     let mut bond = Bond::fixed(
         "NEAR-MATURITY",
-        Money::new(1_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -471,8 +471,8 @@ fn test_negative_ytm_extreme_premium() {
 
     let mut bond = Bond::fixed(
         "NEG-YTM",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.005), // 0.5% coupon
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.005).expect("valid rate fixture"), // 0.5% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

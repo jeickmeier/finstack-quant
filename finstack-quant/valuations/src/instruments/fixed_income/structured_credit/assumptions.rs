@@ -208,7 +208,7 @@ impl StructuredCreditAssumptionRegistry {
     pub(crate) fn deal_fees(&self, id: &str, base_currency: Currency) -> Result<DealFees> {
         let fees = &self.deal_profile(id)?.fees;
         Ok(DealFees {
-            trustee_fee_annual: Money::new(fees.trustee_fee_annual, base_currency),
+            trustee_fee_annual: Money::new(fees.trustee_fee_annual, base_currency)?,
             senior_mgmt_fee_bp: fees.senior_mgmt_fee_bp,
             subordinated_mgmt_fee_bp: fees.subordinated_mgmt_fee_bp,
             servicing_fee_bp: fees.servicing_fee_bp,

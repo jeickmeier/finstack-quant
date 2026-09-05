@@ -393,8 +393,8 @@ fn sample_bond_with_issuer(idx: usize) -> Bond {
     let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
     let mut bond = Bond::fixed(
         format!("BENCH-BOND-{idx}"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

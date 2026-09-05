@@ -110,7 +110,7 @@ pub struct TbaSettlement {
 ///     .term(TbaTerm::ThirtyYear)
 ///     .settlement_year(2027)
 ///     .settlement_month(3)
-///     .notional(Money::new(10_000_000.0, Currency::USD))
+///     .notional(Money::from((10_000_000_i64, Currency::USD)))
 ///     .trade_price(98.5)
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .build()
@@ -278,7 +278,7 @@ impl AgencyTba {
             .term(TbaTerm::ThirtyYear)
             .settlement_year(2027)
             .settlement_month(3)
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .trade_price(98.5)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(
@@ -370,17 +370,19 @@ impl AgencyTba {
     }
 
     /// Calculate trade value (notional × price).
-    pub fn trade_value(&self) -> Money {
-        Money::new(
-            self.notional.amount() * self.trade_price / 100.0,
-            self.notional.currency(),
-        )
+    pub fn trade_value(&self) -> finstack_quant_core::Result<Money> {
+        Ok({
+            Money::new(
+                self.notional.amount() * self.trade_price / 100.0,
+                self.notional.currency(),
+            )?
+        })
     }
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -522,7 +524,7 @@ mod tests {
     #[test]
     fn test_trade_value() {
         let tba = AgencyTba::example().expect("AgencyTba example is valid");
-        let value = tba.trade_value();
+        let value = tba.trade_value().expect("valid trade_value fixture");
         // 10M at 98.5 = 9.85M
         assert!((value.amount() - 9_850_000.0).abs() < 1.0);
     }

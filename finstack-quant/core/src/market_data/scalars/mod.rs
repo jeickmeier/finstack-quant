@@ -12,7 +12,7 @@
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! // 1. Store a spot quote as a scalar
-//! let spot = MarketScalar::Price(finstack_quant_core::money::Money::new(101.5, Currency::USD));
+//! let spot = MarketScalar::Price(finstack_quant_core::money::Money::new(101.5, Currency::USD).expect("valid money fixture"));
 //! if let MarketScalar::Price(m) = &spot {
 //!     assert_eq!(m.currency(), Currency::USD);
 //! }

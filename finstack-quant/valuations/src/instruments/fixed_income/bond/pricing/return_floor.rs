@@ -391,8 +391,8 @@ mod tests {
         // 2-year, 10% annual (semi-annual by Bond::fixed convention), bullet, $100 notional.
         Bond::fixed(
             "L",
-            Money::new(100.0, Currency::USD),
-            Rate::from_percent(10.0),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_percent(10.0).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2026 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -457,7 +457,7 @@ mod tests {
         let negative_cash_date = date!(2024 - 10 - 01);
         let amort_date = date!(2025 - 01 - 01);
         let maturity = date!(2026 - 01 - 01);
-        let money = |amount| Money::new(amount, Currency::USD);
+        let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
         let schedule = CashFlowSchedule::from_parts(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
@@ -481,7 +481,7 @@ mod tests {
                 ),
                 CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
             ],
-            Notional::par(1_000.0, Currency::USD),
+            Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
@@ -572,7 +572,9 @@ mod tests {
     fn xirr_floor_meets_target_at_each_call() {
         let bond = fixed_10pct_bullet();
         let curves = MarketContext::new();
-        let spec = ReturnFloorSpec::xirr(finstack_quant_core::types::Rate::from_percent(12.0));
+        let spec = ReturnFloorSpec::xirr(
+            finstack_quant_core::types::Rate::from_percent(12.0).expect("valid rate fixture"),
+        );
         let sched = lower_return_floor(&bond, &spec, &curves, date!(2024 - 01 - 15)).unwrap();
         let yr1 = sched
             .calls
@@ -651,7 +653,9 @@ mod tests {
         let target = 0.12;
         let schedule = lower_return_floor(
             &bond,
-            &ReturnFloorSpec::xirr(finstack_quant_core::types::Rate::from_decimal(target)),
+            &ReturnFloorSpec::xirr(
+                finstack_quant_core::types::Rate::from_decimal(target).expect("valid rate fixture"),
+            ),
             &curves,
             date!(2024 - 01 - 15),
         )
@@ -865,8 +869,8 @@ mod tests {
     fn fixed_5y_10pct() -> Bond {
         Bond::fixed(
             "T11",
-            Money::new(100.0, Currency::USD),
-            Rate::from_percent(10.0),
+            Money::from((100_i64, Currency::USD)),
+            Rate::from_percent(10.0).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2029 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -1012,7 +1016,7 @@ mod tests {
     fn xirr_floor_holds_on_every_early_call_path() {
         let xirr_target = 0.12_f64;
         let v0 = 100.0_f64;
-        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0));
+        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0).expect("valid rate fixture"));
         let as_of = date!(2024 - 01 - 15);
         let spec = bond.return_floor.as_ref().unwrap();
 
@@ -1166,13 +1170,13 @@ mod tests {
         use std::sync::Arc;
 
         let xirr_target = 0.12_f64;
-        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0));
+        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0).expect("valid rate fixture"));
         let as_of = date!(2024 - 01 - 15);
 
         // Use a 5% flat discount environment — the XIRR to worst should be ~10%
         // (the bond's coupon rate) since the maturity path is the worst exit.
         let market = Arc::new(flat_discount_market(0.05, as_of));
-        let base_value = Money::new(100.0, Currency::USD);
+        let base_value = Money::from((100_i64, Currency::USD));
 
         let mut ctx = MetricContext::new(
             Arc::new(bond),

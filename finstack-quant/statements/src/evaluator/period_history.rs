@@ -187,7 +187,7 @@ mod tests {
     fn push_row_round_trips_by_node_and_period() {
         let cols = columns(&["revenue", "cogs"]);
         let mut history = PeriodHistory::new(Arc::clone(&cols));
-        let q1 = PeriodId::quarter(2025, 1);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         history.push_row(q1, vec![Some(100.0), Some(40.0)]);
 
         assert_eq!(history.len(), 1);
@@ -196,7 +196,10 @@ mod tests {
         assert_eq!(history.get_value("cogs", &q1), Some(40.0));
         assert_eq!(history.get_value("missing", &q1), None);
         assert_eq!(
-            history.get_value("revenue", &PeriodId::quarter(2025, 2)),
+            history.get_value(
+                "revenue",
+                &PeriodId::quarter(2025, 2).expect("valid period fixture")
+            ),
             None
         );
     }
@@ -204,8 +207,8 @@ mod tests {
     #[test]
     fn from_named_maps_preserves_lookups_without_string_maps_at_read() {
         let cols = columns(&["revenue"]);
-        let q1 = PeriodId::quarter(2025, 1);
-        let q2 = PeriodId::quarter(2025, 2);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut named = IndexMap::new();
         named.insert(q1, IndexMap::from_iter([("revenue".to_string(), 10.0)]));
         named.insert(q2, IndexMap::from_iter([("revenue".to_string(), 12.0)]));
@@ -221,7 +224,7 @@ mod tests {
     fn none_slots_are_absent_not_zero() {
         let cols = columns(&["revenue", "cogs"]);
         let mut history = PeriodHistory::new(cols);
-        let q1 = PeriodId::quarter(2025, 1);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         history.push_row(q1, vec![Some(100.0), None]);
         assert_eq!(history.get_value("revenue", &q1), Some(100.0));
         assert_eq!(history.get_value("cogs", &q1), None);

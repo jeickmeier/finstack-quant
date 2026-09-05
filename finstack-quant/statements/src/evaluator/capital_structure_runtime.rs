@@ -185,7 +185,7 @@ pub(crate) fn resolve_opening_balance(
 
     let abs_money = |m: &Money| -> Money {
         if m.amount() < 0.0 {
-            Money::new(-m.amount(), m.currency())
+            m.checked_neg()
         } else {
             *m
         }
@@ -211,7 +211,10 @@ pub(crate) fn resolve_opening_balance(
             .first()
             .is_some_and(|(d, _)| *d > period_start);
     if pre_issuance {
-        return Ok(Money::new(0.0, schedule.get_notional().initial.currency()));
+        return Ok(Money::from((
+            0_i64,
+            schedule.get_notional().initial.currency(),
+        )));
     }
 
     if let Some((_, m)) = outstanding_path.first() {
@@ -221,7 +224,10 @@ pub(crate) fn resolve_opening_balance(
     // Use the schedule's own notional currency rather than guessing USD: an
     // empty-schedule non-USD instrument must not seed a USD zero balance (it can
     // later trip the waterfall's single-currency check with a confusing error).
-    Ok(Money::new(0.0, schedule.get_notional().initial.currency()))
+    Ok(Money::from((
+        0_i64,
+        schedule.get_notional().initial.currency(),
+    )))
 }
 
 fn compute_contractual_flows(
@@ -244,7 +250,7 @@ fn compute_contractual_flows(
                 balance
             } else {
                 let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
-                Money::new(0.0, schedule.get_notional().initial.currency())
+                Money::from((0_i64, schedule.get_notional().initial.currency()))
             };
 
         // Toggle-driven PIK capitalization accumulated in state is excluded
@@ -253,7 +259,7 @@ fn compute_contractual_flows(
             .cumulative_toggled_pik
             .get(instrument_id.as_str())
             .copied()
-            .unwrap_or_else(|| Money::new(0.0, opening_balance.currency()));
+            .unwrap_or_else(|| Money::from((0_i64, opening_balance.currency())));
         if !cs_state.residual_schedules.contains_key(instrument_id) {
             let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
             cs_state
@@ -496,7 +502,7 @@ mod opening_tests {
                     CashFlow::new(
                         issue,
                         None,
-                        Money::new(-1_000_000.0, Currency::USD),
+                        Money::from((-1_000_000_i64, Currency::USD)),
                         CFKind::Notional,
                         0.0,
                         None,
@@ -504,7 +510,7 @@ mod opening_tests {
                     CashFlow::new(
                         coupon_date,
                         None,
-                        Money::new(-20_000.0, Currency::USD),
+                        Money::from((-20_000_i64, Currency::USD)),
                         CFKind::Fixed,
                         0.25,
                         Some(0.08),
@@ -512,13 +518,13 @@ mod opening_tests {
                     CashFlow::new(
                         coupon_date,
                         None,
-                        Money::new(100_000.0, Currency::USD),
+                        Money::from((100_000_i64, Currency::USD)),
                         CFKind::Amortization,
                         0.0,
                         None,
                     ),
                 ],
-                Notional::par(1_000_000.0, Currency::USD),
+                Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
                 DayCount::Act365F,
                 CashFlowMeta {
                     issue_date: Some(issue),
@@ -554,7 +560,7 @@ mod fx_policy_tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
-            id: PeriodId::quarter(2025, 1),
+            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
             start,
             end,
             is_actual: false,

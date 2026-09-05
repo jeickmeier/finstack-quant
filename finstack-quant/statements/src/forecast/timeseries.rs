@@ -771,14 +771,20 @@ mod tests {
             "method".into() => serde_json::json!("linear"),
         };
 
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
 
         let result = timeseries_forecast(100.0, &periods, &params)
             .expect("timeseries_forecast should succeed");
 
         // Should continue linear trend
-        assert!(result[&PeriodId::quarter(2025, 1)] > 130.0);
-        assert!(result[&PeriodId::quarter(2025, 2)] > result[&PeriodId::quarter(2025, 1)]);
+        assert!(result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] > 130.0);
+        assert!(
+            result[&PeriodId::quarter(2025, 2).expect("valid period fixture")]
+                > result[&PeriodId::quarter(2025, 1).expect("valid period fixture")]
+        );
     }
 
     #[test]
@@ -797,10 +803,10 @@ mod tests {
         };
 
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
-            PeriodId::quarter(2025, 4),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
         ];
 
         let result =
@@ -810,8 +816,8 @@ mod tests {
         assert!(result.len() == 4);
 
         // Check that growth is applied
-        let q1 = result[&PeriodId::quarter(2025, 1)];
-        let q2 = result[&PeriodId::quarter(2025, 2)];
+        let q1 = result[&PeriodId::quarter(2025, 1).expect("valid period fixture")];
+        let q2 = result[&PeriodId::quarter(2025, 2).expect("valid period fixture")];
         assert!(q1 > 0.0, "Q1 should be positive");
         assert!(q2 > 0.0, "Q2 should be positive");
     }
@@ -855,9 +861,9 @@ mod tests {
     #[test]
     fn damped_holt_with_phi_one_matches_classic_holt() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
         let undamped =
             timeseries_forecast(0.0, &periods, &holt_params(None)).expect("classic Holt");
@@ -878,7 +884,9 @@ mod tests {
     fn damped_holt_levels_off_at_asymptote() {
         let phi = 0.8;
         let periods: Vec<PeriodId> = (0..20)
-            .map(|i| PeriodId::quarter(2025 + i / 4, (i % 4 + 1) as u8))
+            .map(|i| {
+                PeriodId::quarter(2025 + i / 4, (i % 4 + 1) as u8).expect("valid period fixture")
+            })
             .collect();
         let damped =
             timeseries_forecast(0.0, &periods, &holt_params(Some(phi))).expect("damped Holt");
@@ -909,7 +917,7 @@ mod tests {
 
     #[test]
     fn damped_holt_rejects_out_of_range_phi() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for phi in [0.0, -0.5, 1.5, f64::INFINITY] {
             let err = timeseries_forecast(0.0, &periods, &holt_params(Some(phi)))
                 .expect_err("out-of-range phi must be rejected");
@@ -919,7 +927,7 @@ mod tests {
 
     #[test]
     fn phi_rejected_for_non_exponential_methods() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = indexmap::indexmap! {
             "historical".to_string() => serde_json::json!([100.0, 110.0, 120.0]),
             "method".to_string() => serde_json::json!("linear"),
@@ -967,7 +975,10 @@ mod tests {
 
     #[test]
     fn test_seasonal_forecast_rejects_unsupported_season_start() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let params = indexmap! {
             "historical".into() => serde_json::json!([0.0, 10.0, 0.0, 10.0, 0.0, 10.0]),
             "season_length".into() => serde_json::json!(2),
@@ -999,13 +1010,22 @@ mod tests {
             "method".into() => serde_json::json!("moving_average"),
             "window".into() => serde_json::json!(2),
         };
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
 
         let result = timeseries_forecast(40.0, &periods, &params)
             .expect("timeseries_forecast should succeed");
 
-        assert!((result[&PeriodId::quarter(2025, 1)] - 50.0).abs() < 1e-9);
-        assert!((result[&PeriodId::quarter(2025, 2)] - 60.0).abs() < 1e-9);
+        assert!(
+            (result[&PeriodId::quarter(2025, 1).expect("valid period fixture")] - 50.0).abs()
+                < 1e-9
+        );
+        assert!(
+            (result[&PeriodId::quarter(2025, 2).expect("valid period fixture")] - 60.0).abs()
+                < 1e-9
+        );
     }
 
     #[test]
@@ -1015,7 +1035,7 @@ mod tests {
             "method".into() => serde_json::json!("moving_average"),
             "windoww".into() => serde_json::json!(2),
         };
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let err = crate::forecast::apply_forecast_for_node(
             &crate::types::ForecastSpec {
@@ -1038,7 +1058,7 @@ mod tests {
             "mode".into() => serde_json::json!("additive"),
             "seasonstart".into() => serde_json::json!(1),
         };
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let err = crate::forecast::apply_forecast_for_node(
             &crate::types::ForecastSpec {
@@ -1060,7 +1080,7 @@ mod tests {
             "season_length".into() => serde_json::json!(0),
             "mode".into() => serde_json::json!("additive"),
         };
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let result = seasonal_forecast(100.0, &periods, &params);
         assert!(result.is_err(), "zero season length must be rejected");
@@ -1072,7 +1092,7 @@ mod tests {
             "historical".into() => serde_json::json!([100.0, "bad", 110.0]),
             "method".into() => serde_json::json!("linear"),
         };
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let result = timeseries_forecast(100.0, &periods, &params);
         assert!(
@@ -1096,19 +1116,19 @@ mod tests {
             "growth".into() => serde_json::json!(0.0),
         };
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
-            PeriodId::quarter(2025, 4),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
         ];
 
         let result =
             seasonal_forecast(100.0, &periods, &params).expect("seasonal_forecast should succeed");
 
-        let q1 = result[&PeriodId::quarter(2025, 1)];
-        let q2 = result[&PeriodId::quarter(2025, 2)];
-        let q3 = result[&PeriodId::quarter(2025, 3)];
-        let q4 = result[&PeriodId::quarter(2025, 4)];
+        let q1 = result[&PeriodId::quarter(2025, 1).expect("valid period fixture")];
+        let q2 = result[&PeriodId::quarter(2025, 2).expect("valid period fixture")];
+        let q3 = result[&PeriodId::quarter(2025, 3).expect("valid period fixture")];
+        let q4 = result[&PeriodId::quarter(2025, 4).expect("valid period fixture")];
 
         assert!((q2 / q1 - 0.8).abs() < 0.05, "q2/q1={}", q2 / q1);
         assert!((q3 / q1 - 1.2).abs() < 0.05, "q3/q1={}", q3 / q1);
@@ -1128,7 +1148,7 @@ mod tests {
             "season_length".into() => serde_json::json!(4),
             "mode".into() => serde_json::json!("multiplicative"),
         };
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let err = seasonal_forecast(10.0, &periods, &params)
             .expect_err("zero-crossing trend must be rejected in multiplicative mode");

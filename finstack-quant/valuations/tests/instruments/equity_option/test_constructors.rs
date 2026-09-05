@@ -23,7 +23,7 @@ fn test_builder_creates_valid_option() {
         .option_type(OptionType::Call)
         .exercise_style(ExerciseStyle::European)
         .expiry(expiry)
-        .notional(Money::new(100.0, Currency::USD))
+        .notional(Money::new(100.0, Currency::USD).expect("valid money fixture"))
         .day_count(DayCount::Act365F)
         .settlement(SettlementType::Cash)
         .discount_curve_id(CurveId::new(DISC_ID))

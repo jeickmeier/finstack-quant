@@ -42,7 +42,7 @@ impl Payoff for ShortRateCallPayoff {
         self.rate_at_expiry = s.get_key(StateKey::ShortRate);
         Ok(())
     }
-    fn value(&self, ccy: Currency) -> Money {
+    fn value(&self, ccy: Currency) -> finstack_quant_core::Result<Money> {
         let r = self.rate_at_expiry.unwrap_or(0.0);
         Money::new(self.notional * (r - self.strike).max(0.0), ccy)
     }

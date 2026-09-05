@@ -139,27 +139,27 @@ impl AttributionSpec {
             .steps
             .iter()
             .map(|step| {
-                if matches!(step.kind, CreditStepKind::CurveShape) {
-                    Money::new(0.0, ccy)
+                Ok(if matches!(step.kind, CreditStepKind::CurveShape) {
+                    Money::from((0_i64, ccy))
                 } else {
                     // P&L = ∂PV/∂s × Δs_factor. `cs01_amt` is already the signed
                     // PV sensitivity to an up-bump, so no extra negation.
-                    Money::new(cs01_amt * step.delta_bp, ccy)
-                }
+                    Money::new(cs01_amt * step.delta_bp, ccy)?
+                })
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         apply_curve_shape_residual(
             &mut step_pnls,
             &cascade.steps,
             attribution.credit_curves_pnl,
-        );
+        )?;
 
         let detail = build_credit_factor_attribution(
             model,
             &cascade,
             &self.credit_factor_detail_options,
             &step_pnls,
-        );
+        )?;
         Ok(Some(detail))
     }
 }
@@ -256,6 +256,10 @@ impl AttributionSpec {
 
         // 3. Sample base rate r and spread s at the bond's tenor (or 5y
         //    fallback). Use the instrument's expiry when available.
+        let fallback_tenor = finstack_quant_core::dates::Tenor::new(
+            5,
+            finstack_quant_core::dates::TenorUnit::Years,
+        )?;
         let tenor_date = instrument.expiry().unwrap_or_else(|| {
             let cal_code = instrument
                 .attributes()
@@ -274,10 +278,7 @@ impl AttributionSpec {
                         .ok()
                 })
                 .unwrap_or(finstack_quant_core::dates::DayCount::Act365F);
-            let tenor = finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            );
+            let tenor = fallback_tenor;
             tenor
                 .add_to_date(
                     self.as_of_t0,
@@ -361,8 +362,8 @@ impl AttributionSpec {
         };
         let coupon_credit_amt = coupon.amount() * credit_share;
         let (coupon_rates, coupon_credit) = (
-            Money::new(coupon.amount() - coupon_credit_amt, ccy),
-            Money::new(coupon_credit_amt, ccy),
+            Money::new(coupon.amount() - coupon_credit_amt, ccy)?,
+            Money::new(coupon_credit_amt, ccy)?,
         );
 
         // 5. Split roll_down. v1: scalar level factors → all credit roll
@@ -371,8 +372,8 @@ impl AttributionSpec {
         //    period. All roll_down lands in rates_part.
         let roll = carry_detail.roll_down.as_ref().map(|l| l.total);
         let (roll_rates, roll_credit) = match roll {
-            Some(r) => (r, Money::new(0.0, ccy)),
-            None => (Money::new(0.0, ccy), Money::new(0.0, ccy)),
+            Some(r) => (r, Money::from((0_i64, ccy))),
+            None => (Money::from((0_i64, ccy)), Money::from((0_i64, ccy))),
         };
 
         // 5b. Split pull_to_par on the same credit share. It is
@@ -407,7 +408,7 @@ impl AttributionSpec {
         let credit_total = Money::new(
             coupon_credit.amount() + roll_credit.amount() + ptp_credit_amt,
             ccy,
-        );
+        )?;
 
         let num_levels = model.hierarchy.levels.len();
 
@@ -454,7 +455,7 @@ impl AttributionSpec {
             let dim = &model.hierarchy.levels[k];
             let level_name = hierarchy_level_name(dim);
             let share = *level_share * scale_credit;
-            let total_money = Money::new(share, ccy);
+            let total_money = Money::new(share, ccy)?;
             let by_bucket = single_issuer_by_bucket(
                 model,
                 issuer_row,
@@ -470,9 +471,9 @@ impl AttributionSpec {
             });
         }
 
-        let generic_money = Money::new(pc_share_of_s * scale_credit, ccy);
+        let generic_money = Money::new(pc_share_of_s * scale_credit, ccy)?;
         let adder_total_money = if s_model.abs() > 1e-15 {
-            Money::new(adder_of_s * scale_credit, ccy)
+            Money::new(adder_of_s * scale_credit, ccy)?
         } else {
             // Degenerate: no spread observable, route the entire credit
             // total to adder so invariant 4 still holds.
@@ -503,7 +504,7 @@ impl AttributionSpec {
         let rates_carry_total = Money::new(
             coupon_rates.amount() + roll_rates.amount() + ptp_rates_amt - funding_in_rates,
             ccy,
-        );
+        )?;
 
         attribution.credit_carry_decomposition = Some(CreditCarryDecomposition {
             model_id: credit_factor_model_id(model),
@@ -628,8 +629,8 @@ mod tests {
     fn credit_bond(curve_id: &CurveId) -> Bond {
         let mut bond = Bond::fixed(
             "BOND-ISSUER-B",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             create_date(2024, Month::January, 1).unwrap(),
             create_date(2030, Month::January, 1).unwrap(),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -683,11 +684,11 @@ mod tests {
     /// total = 1000 (coupon) + 300 (pull_to_par) + 200 (roll) − 50 (funding).
     fn four_component_carry_detail(ccy: Currency) -> CarryDetail {
         CarryDetail {
-            total: Money::new(1450.0, ccy),
-            coupon_income: Some(SourceLine::scalar(Money::new(1000.0, ccy))),
-            pull_to_par: Some(Money::new(300.0, ccy)),
-            roll_down: Some(SourceLine::scalar(Money::new(200.0, ccy))),
-            funding_cost: Some(Money::new(50.0, ccy)),
+            total: Money::from((1450_i64, ccy)),
+            coupon_income: Some(SourceLine::scalar(Money::from((1000_i64, ccy)))),
+            pull_to_par: Some(Money::from((300_i64, ccy))),
+            roll_down: Some(SourceLine::scalar(Money::from((200_i64, ccy)))),
+            funding_cost: Some(Money::from((50_i64, ccy))),
         }
     }
 
@@ -703,7 +704,7 @@ mod tests {
             .insert(flat_hazard(curve_id.as_str(), t0, hazard_rate, recovery));
 
         let mut attribution = PnlAttribution::new(
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
             "BOND-ISSUER-B",
             t0,
             t1,

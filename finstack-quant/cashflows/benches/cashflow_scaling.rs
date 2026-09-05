@@ -37,7 +37,11 @@ fn base_date() -> Date {
 fn build_monthly(base: Date, years: i32) -> CashFlowSchedule {
     let maturity = Date::from_calendar_date(2025 + years, Month::January, 15).unwrap();
     CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), base, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            base,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: dec!(0.06),
@@ -66,7 +70,11 @@ fn build_adjusted(
 ) -> CashFlowSchedule {
     let maturity = Date::from_calendar_date(2025 + years, Month::January, 15).unwrap();
     CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), base, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            base,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: dec!(0.06),

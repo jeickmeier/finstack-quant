@@ -219,7 +219,7 @@ impl PortfolioMarginAggregator {
             for (position_id, message) in degraded_positions {
                 result.add_degraded_position(position_id, message);
             }
-            result.add_netting_set(ns_margin);
+            result.add_netting_set(ns_margin)?;
         }
 
         // Count positions without margin
@@ -281,7 +281,11 @@ impl PortfolioMarginAggregator {
         // One unit of the sensitivity currency expressed in base currency is the
         // spot conversion factor applied uniformly to every (amount) entry.
         let fx_rate = self
-            .convert_to_base(Money::new(1.0, sensitivities.base_currency), market, as_of)
+            .convert_to_base(
+                Money::from((1_i64, sensitivities.base_currency)),
+                market,
+                as_of,
+            )
             .map_err(|e| Error::valuation(position_id.clone(), e.to_string()))?;
         Ok(sensitivities.scaled_to_currency(self.base_currency, fx_rate))
     }
@@ -362,7 +366,7 @@ impl PortfolioMarginAggregator {
         }
         let vm = self.apply_vm_terms(
             netting_set,
-            Money::new(total_mtm, self.base_currency),
+            Money::new(total_mtm, self.base_currency)?,
             as_of,
         )?;
 
@@ -378,10 +382,10 @@ impl PortfolioMarginAggregator {
         } else {
             let (im, simm_breakdown) =
                 if let Some(ref sensitivities) = netting_set.aggregated_sensitivities {
-                    let (im, breakdown) = self.calculate_simm_with_breakdown(sensitivities);
+                    let (im, breakdown) = self.calculate_simm_with_breakdown(sensitivities)?;
                     (im, Some((sensitivities.clone(), breakdown)))
                 } else {
-                    (Money::new(0.0, self.base_currency), None)
+                    (Money::from((0_i64, self.base_currency)), None)
                 };
             (im, ImMethodology::Simm, simm_breakdown)
         };
@@ -393,7 +397,7 @@ impl PortfolioMarginAggregator {
             vm,
             position_count,
             im_methodology,
-        );
+        )?;
 
         if let Some((sensitivities, breakdown)) = simm_breakdown {
             result = result.with_simm_breakdown(sensitivities, breakdown);
@@ -438,7 +442,7 @@ impl PortfolioMarginAggregator {
                     // identical cleared contracts are fungible at the CCP,
                     // so an offsetting short cancels its long's IM
                     // contribution.
-                    let scaled_im = position.scale_value(im_result.amount);
+                    let scaled_im = position.scale_value(im_result.amount)?;
                     let amount = if scaled_im.currency() == self.base_currency {
                         Ok(scaled_im.amount())
                     } else {
@@ -458,7 +462,7 @@ impl PortfolioMarginAggregator {
             }
         }
 
-        Ok(Money::new(total, self.base_currency))
+        Ok(Money::new(total, self.base_currency)?)
     }
 
     fn apply_vm_terms(
@@ -474,7 +478,7 @@ impl PortfolioMarginAggregator {
             return Ok(gross_vm);
         };
 
-        let current_collateral = Money::new(0.0, self.base_currency);
+        let current_collateral = Money::from((0_i64, self.base_currency));
         let vm_result = VmCalculator::new(spec.csa.clone())
             .calculate(gross_vm, current_collateral, as_of)
             .map_err(|e| Error::validation(format!("M-13: CSA VM calculation failed: {e}")))?;
@@ -505,10 +509,10 @@ impl PortfolioMarginAggregator {
                     )));
                 }
             }
-            Ok(position.scale_value(unit_mtm))
+            Ok(position.scale_value(unit_mtm)?)
         } else {
             // Default: return zero
-            Ok(Money::new(0.0, self.base_currency))
+            Ok(Money::from((0_i64, self.base_currency)))
         }
     }
 
@@ -527,11 +531,13 @@ impl PortfolioMarginAggregator {
     fn calculate_simm_with_breakdown(
         &self,
         sensitivities: &SimmSensitivities,
-    ) -> (Money, finstack_quant_core::HashMap<String, Money>) {
-        let (total_im, breakdown) = self
-            .simm_calculator
-            .calculate_from_sensitivities_parts(sensitivities, self.base_currency);
-        (Money::new(total_im, self.base_currency), breakdown)
+    ) -> finstack_quant_core::Result<(Money, finstack_quant_core::HashMap<String, Money>)> {
+        Ok({
+            let (total_im, breakdown) = self
+                .simm_calculator
+                .calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
+            (Money::new(total_im, self.base_currency)?, breakdown)
+        })
     }
 }
 
@@ -708,7 +714,7 @@ mod tests {
             "irs-1",
             netting_set_id,
             1_000_000.0,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
         ));
         let position = Position::new(
             "pos-1",
@@ -754,7 +760,7 @@ mod tests {
             "irs-1",
             netting_set_id,
             0.0,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
         ));
         let position = Position::new(
             "pos-1",
@@ -794,8 +800,8 @@ mod tests {
         let netting_set_id = NettingSetId::bilateral("BANK", "CSA");
         let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
         csa.vm_params = VmParameters::with_threshold(
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(100_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((100_000_i64, Currency::USD)),
         );
         let margin_spec = OtcMarginSpec::bilateral_simm(csa);
         let instrument = Arc::new(
@@ -803,7 +809,7 @@ mod tests {
                 "irs-1",
                 netting_set_id,
                 0.0,
-                Money::new(1_200_000.0, Currency::USD),
+                Money::from((1_200_000_i64, Currency::USD)),
             )
             .with_margin_spec(margin_spec),
         );
@@ -840,7 +846,7 @@ mod tests {
     fn m10_cleared_netting_set_uses_clearing_house_im_calculator() {
         let as_of = date!(2024 - 01 - 01);
         let netting_set_id = NettingSetId::cleared("LCH");
-        let exposure_base = Money::new(10_000_000.0, Currency::USD);
+        let exposure_base = Money::from((10_000_000_i64, Currency::USD));
         let expected_im = ClearingHouseImCalculator::for_ccp("LCH")
             .calculate_conservative(exposure_base)
             .amount();
@@ -849,7 +855,7 @@ mod tests {
                 "irs-1",
                 netting_set_id,
                 9_999_999.0,
-                Money::new(0.0, Currency::USD),
+                Money::from((0_i64, Currency::USD)),
             )
             .with_im_exposure_base(exposure_base),
         );
@@ -895,7 +901,7 @@ mod tests {
             "irs-1",
             netting_set_id,
             1_000_000.0,
-            Money::new(0.0, Currency::USD),
+            Money::from((0_i64, Currency::USD)),
         ));
         let position = Position::new(
             "pos-1",

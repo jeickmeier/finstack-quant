@@ -60,8 +60,8 @@ pub fn sample_bond(id: &str, maturity_year_offset: i32) -> Bond {
         Date::from_calendar_date(2025 + maturity_year_offset, Month::January, 1).unwrap();
     Bond::fixed(
         id,
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -80,8 +80,8 @@ pub fn sample_eur_bond(id: &str, maturity_year_offset: i32) -> Bond {
         Date::from_calendar_date(2025 + maturity_year_offset, Month::January, 1).unwrap();
     Bond::fixed(
         id,
-        Money::new(1_000_000.0, Currency::EUR),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -156,7 +156,7 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
             .insert_fx(fx_t0)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(180.0, Currency::USD)),
+                MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
             ),
         market_t1: lean
             .market_t1
@@ -165,7 +165,7 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
             .insert_fx(fx_t1)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(185.0, Currency::USD)),
+                MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
             ),
         as_of_t0: lean.as_of_t0,
         as_of_t1: lean.as_of_t1,
@@ -237,11 +237,11 @@ pub fn equity_markets() -> BondMarkets {
     BondMarkets {
         market_t0: MarketContext::new().insert(disc_t0).insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(180.0, Currency::USD)),
+            MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
         ),
         market_t1: MarketContext::new().insert(disc_t1).insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(185.0, Currency::USD)),
+            MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
         ),
         as_of_t0,
         as_of_t1,

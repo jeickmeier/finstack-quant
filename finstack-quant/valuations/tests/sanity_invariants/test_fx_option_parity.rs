@@ -122,7 +122,7 @@ fn create_fx_option(expiry: Date, option_type: OptionType) -> FxOption {
         )
         .expiry(expiry)
         .day_count(DayCount::Act365F)
-        .notional(Money::new(1.0, BASE)) // Per-unit notional
+        .notional(Money::new(1.0, BASE).expect("valid money fixture")) // Per-unit notional
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))

@@ -13,8 +13,8 @@ fn test_oas_with_quoted_price() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::fixed(
         "OAS2",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -50,8 +50,8 @@ fn test_oas_uses_direct_quoted_oas() {
     let quoted_oas = 0.0125;
     let mut bond = Bond::fixed(
         "OAS-DIRECT",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,

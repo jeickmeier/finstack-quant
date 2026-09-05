@@ -40,7 +40,7 @@ fn test_pv_anchored_at_as_of() {
 
     let bond = Bond::builder()
         .id("TEST_PV_ANCHOR".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -96,7 +96,7 @@ fn test_callable_exercise_coupon_always_paid() {
 
     let callable = Bond::builder()
         .id("TEST_CALLABLE".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -121,7 +121,7 @@ fn test_callable_exercise_coupon_always_paid() {
     // Straight bond (same but without call)
     let straight = Bond::builder()
         .id("TEST_STRAIGHT".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -172,7 +172,7 @@ fn test_putable_bond_worth_more() {
 
     let putable = Bond::builder()
         .id("TEST_PUTABLE".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -197,7 +197,7 @@ fn test_putable_bond_worth_more() {
     // Straight bond (same but without put)
     let straight = Bond::builder()
         .id("TEST_STRAIGHT".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -238,7 +238,7 @@ fn test_bond_pricing_basic() {
 
     let bond = Bond::builder()
         .id("TEST_PRICING".into())
-        .notional(Money::new(1000.0, Currency::USD))
+        .notional(Money::new(1000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(

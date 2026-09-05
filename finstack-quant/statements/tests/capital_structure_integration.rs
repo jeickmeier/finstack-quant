@@ -24,8 +24,8 @@ use rates_support::usd_irs_swap;
 fn test_build_instrument_from_bond_spec() {
     let bond = Bond::fixed(
         InstrumentId::new("BOND-001"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
         Date::from_calendar_date(2030, Month::January, 15).expect("valid date"),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -39,7 +39,10 @@ fn test_build_instrument_from_bond_spec() {
     };
 
     let instrument = build_instrument_from_spec(&spec).expect("bond should build");
-    let notional = instrument.notional().expect("bond exposes notional");
+    let notional = instrument
+        .notional()
+        .expect("valid amount")
+        .expect("bond exposes notional");
     assert_eq!(notional.currency(), Currency::USD);
 }
 
@@ -47,7 +50,7 @@ fn test_build_instrument_from_bond_spec() {
 fn test_build_instrument_from_swap_spec() {
     let swap = usd_irs_swap(
         InstrumentId::new("SWAP-001"),
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
         Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
@@ -61,7 +64,10 @@ fn test_build_instrument_from_swap_spec() {
     };
 
     let instrument = build_instrument_from_spec(&spec).expect("swap should build");
-    let notional = instrument.notional().expect("swap exposes notional");
+    let notional = instrument
+        .notional()
+        .expect("valid amount")
+        .expect("swap exposes notional");
     assert_eq!(notional.currency(), Currency::USD);
 }
 
@@ -80,8 +86,8 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
 
     let bond_1 = Bond::fixed(
         InstrumentId::new("BOND-1"),
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -91,8 +97,8 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
 
     let bond_2 = Bond::fixed(
         InstrumentId::new("BOND-2"),
-        Money::new(2_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -108,7 +114,8 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
     let cashflows = support::aggregate_period_flows(&instruments, &periods, &market_ctx, issue)
         .expect("aggregate cashflows");
 
-    let period_id = finstack_quant_core::dates::PeriodId::month(2025, 1);
+    let period_id =
+        finstack_quant_core::dates::PeriodId::month(2025, 1).expect("valid period fixture");
 
     // Debt balance totals should sum across instruments even without FX matrix present.
     let total_balance = cashflows

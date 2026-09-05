@@ -102,7 +102,7 @@ pub fn make_forward_market(base: Date) -> MarketContext {
 pub fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlowSchedule {
     CashFlowSchedule::builder()
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             base,
             maturity_of(base, years),
         )
@@ -118,7 +118,11 @@ pub fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlow
 pub fn build_monthly(base: Date, years: i32) -> CashFlowSchedule {
     let maturity = maturity_of(base, years);
     CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), base, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            base,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: dec!(0.06),
@@ -146,7 +150,11 @@ pub fn build_adjusted(
 ) -> CashFlowSchedule {
     let maturity = maturity_of(base, years);
     CashFlowSchedule::builder()
-        .principal(Money::new(1_000_000.0, Currency::USD), base, maturity)
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            base,
+            maturity,
+        )
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: dec!(0.06),
@@ -222,7 +230,7 @@ pub fn overnight_float_spec(
 pub fn build_floating_term(base: Date, years: i32, market: &MarketContext) -> CashFlowSchedule {
     CashFlowSchedule::builder()
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             base,
             maturity_of(base, years),
         )
@@ -239,7 +247,7 @@ pub fn build_overnight(
 ) -> CashFlowSchedule {
     CashFlowSchedule::builder()
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             base,
             maturity_of(base, years),
         )
@@ -251,12 +259,12 @@ pub fn build_overnight(
 pub fn build_amortizing_linear(base: Date, years: i32) -> CashFlowSchedule {
     CashFlowSchedule::builder()
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             base,
             maturity_of(base, years),
         )
         .amortization(AmortizationSpec::LinearTo {
-            final_notional: Money::new(0.0, Currency::USD),
+            final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         })
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
@@ -270,7 +278,7 @@ pub fn build_amortizing_linear(base: Date, years: i32) -> CashFlowSchedule {
 pub fn build_fixed_with_periodic_fee(base: Date, years: i32) -> CashFlowSchedule {
     CashFlowSchedule::builder()
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             base,
             maturity_of(base, years),
         )
@@ -309,7 +317,7 @@ pub fn make_quarterly_periods(base: Date, n_quarters: u32) -> Vec<Period> {
         let end = Date::from_calendar_date(end_year, Month::try_from(end_m).unwrap(), 1).unwrap();
 
         periods.push(Period {
-            id: PeriodId::quarter(year, q),
+            id: PeriodId::quarter(year, q).expect("valid period fixture"),
             start,
             end,
             is_actual: true,
@@ -329,7 +337,10 @@ pub fn make_dated_flows(n: usize, base: Date) -> finstack_quant_cashflows::Dated
         .map(|i| {
             let days = (i as i64) * 90 + 90;
             let d = base + time::Duration::days(days);
-            (d, Money::new(10_000.0, Currency::USD))
+            (
+                d,
+                Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect()
 }
@@ -342,7 +353,7 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
             CashFlow::new(
                 base + time::Duration::days(days),
                 None,
-                Money::new(per, Currency::USD),
+                Money::new(per, Currency::USD).expect("valid money fixture"),
                 CFKind::Amortization,
                 0.25,
                 None,
@@ -354,7 +365,9 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
         flows,
         DayCount::Act365F,
         ScheduleBuildOpts {
-            notional_hint: Some(Money::new(1_000_000.0, Currency::USD)),
+            notional_hint: Some(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            ),
             meta: CashFlowMeta {
                 issue_date: Some(base),
                 ..Default::default()
@@ -389,5 +402,5 @@ pub fn five_year_fixed_json() -> &'static str {
 }
 
 pub fn notional(k: f64) -> Notional {
-    Notional::par(k, Currency::USD)
+    Notional::par(k, Currency::USD).expect("valid notional fixture")
 }

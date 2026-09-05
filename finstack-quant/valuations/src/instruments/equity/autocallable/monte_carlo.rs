@@ -326,17 +326,19 @@ impl Payoff for AutocallablePayoff {
         Ok(())
     }
 
-    fn value(&self, currency: Currency) -> Money {
-        let redemption_ratio = if let Some(idx) = self.autocalled_at {
-            self.payment_df_ratios[idx]
-        } else {
-            let payment_df_ratio = self.payment_df_ratios.last().copied().unwrap_or(1.0);
-            self.final_payoff_ratio(self.final_spot, self.min_spot_observed) * payment_df_ratio
-        };
-        Money::new(
-            (redemption_ratio + self.discounted_coupon_ratio) * self.notional,
-            currency,
-        )
+    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let redemption_ratio = if let Some(idx) = self.autocalled_at {
+                self.payment_df_ratios[idx]
+            } else {
+                let payment_df_ratio = self.payment_df_ratios.last().copied().unwrap_or(1.0);
+                self.final_payoff_ratio(self.final_spot, self.min_spot_observed) * payment_df_ratio
+            };
+            Money::new(
+                (redemption_ratio + self.discounted_coupon_ratio) * self.notional,
+                currency,
+            )?
+        })
     }
 
     fn reset(&mut self) {
@@ -413,7 +415,7 @@ mod tests {
 
         assert_eq!(payoff.autocalled_at, Some(0));
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         // Should be coupon (0.08) + principal (1.0) = 1.08 * notional
         assert!((value.amount() - 108_000.0).abs() < 1e-6);
     }
@@ -449,7 +451,7 @@ mod tests {
 
         payoff.on_event(&mut state).expect("valid payoff event");
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
 
         // Capital protection: max(0.9, 1.0 * 0.8) = 0.9
         // Expected: 90_000.0 (0.9 * 100_000.0)
@@ -541,7 +543,7 @@ mod tests {
         state.set(state_keys::SPOT, 55.0);
         payoff.on_event(&mut state).expect("valid payoff event");
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         // Knocked in at spot=55, strike=100, S0=100: put loss = max(1.0 - 0.55, 0)
         // = 0.45, and the note pays principal - put_loss = 1.0 - 0.45 = 0.55.
         let expected = 0.55 * notional;
@@ -652,7 +654,7 @@ mod tests {
         state.set(state_keys::SPOT, 150.0);
         payoff.on_event(&mut state).expect("valid payoff event");
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         let expected = 1.2 * 100_000.0;
         assert!(
             (value.amount() - expected).abs() < 1e-6,
@@ -708,7 +710,7 @@ mod tests {
         obs.set(state_keys::SPOT, 95.0);
         payoff.on_event(&mut obs).expect("valid payoff event");
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         // Knock-in monitored only at t=1.0 where spot=95 > 60 barrier => NOT
         // knocked in => full principal returned.
         assert!(
@@ -754,7 +756,7 @@ mod tests {
         payoff.on_event(&mut state).expect("valid payoff event");
         assert_eq!(payoff.autocalled_at, Some(2));
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         // Memory: accrued coupons = 0.03 + 0.04 + 0.05 = 0.12, plus principal.
         // Payoff = (0.12 + 1.0) * 100_000 = 112_000.
         let expected = (0.03 + 0.04 + 0.05 + 1.0) * 100_000.0;
@@ -797,7 +799,7 @@ mod tests {
         payoff.on_event(&mut state).expect("valid payoff event");
         assert_eq!(payoff.autocalled_at, Some(2));
 
-        let value = payoff.value(Currency::USD);
+        let value = payoff.value(Currency::USD).expect("valid payoff");
         // Non-memory: only coupon[2] = 0.05 is paid, plus principal.
         let expected = (0.05 + 1.0) * 100_000.0;
         assert!(
@@ -834,7 +836,10 @@ mod tests {
         second.set(state_keys::SPOT, 100.0);
         payoff.on_event(&mut second).expect("second observation");
         assert_eq!(payoff.autocalled_at, None);
-        assert_eq!(payoff.value(Currency::USD).amount(), 107_000.0);
+        assert_eq!(
+            payoff.value(Currency::USD).expect("valid payoff").amount(),
+            107_000.0
+        );
     }
 
     #[test]
@@ -858,6 +863,9 @@ mod tests {
         state.set(state_keys::SPOT, 110.0);
         payoff.on_event(&mut state).expect("autocall observation");
 
-        assert_eq!(payoff.value(Currency::USD).amount(), 97_000.0);
+        assert_eq!(
+            payoff.value(Currency::USD).expect("valid payoff").amount(),
+            97_000.0
+        );
     }
 }

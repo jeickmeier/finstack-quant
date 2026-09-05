@@ -264,7 +264,10 @@ fn periodic_returns_reject_unknown_frequency() {
         .expect("frequency errors should be JavaScript Error objects")
         .message()
         .into();
-    assert!(message.contains("Unknown frequency"));
+    assert!(
+        message.contains("unknown period kind 'hourly'"),
+        "{message}"
+    );
 }
 
 #[wasm_bindgen_test]

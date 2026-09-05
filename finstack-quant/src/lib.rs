@@ -48,7 +48,7 @@
 //! use finstack_quant::core::currency::Currency;
 //! use finstack_quant::core::money::Money;
 //!
-//! let amount = Money::new(100.0, Currency::USD);
+//! let amount = Money::from((100_i64, Currency::USD));
 //! assert_eq!(amount.currency(), Currency::USD);
 //! ```
 //!

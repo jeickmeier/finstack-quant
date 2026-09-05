@@ -20,8 +20,8 @@ fn test_dv01_sensitivity() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-DV01-001".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(as_of)
         .maturity(date!(2028 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -67,7 +67,7 @@ fn test_dv01_sensitivity() {
 fn floating_dv01_reflects_forward_reprojection() {
     let as_of = date!(2025 - 01 - 01);
     let rate = 0.04;
-    let commitment = Money::new(10_000_000.0, Currency::USD);
+    let commitment = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
     let build = |id: &str, base_rate_spec: BaseRateSpec| -> RevolvingCredit {
         RevolvingCredit::builder()

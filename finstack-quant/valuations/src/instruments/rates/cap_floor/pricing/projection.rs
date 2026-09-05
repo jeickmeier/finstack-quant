@@ -210,7 +210,7 @@ mod tests {
         let mut caplet = CapFloor::new(
             "SOFR-CAPLET",
             RateOptionType::Caplet,
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             0.04,
             date!(2025 - 01 - 02),
             date!(2025 - 04 - 02),

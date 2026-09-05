@@ -539,7 +539,7 @@ impl InterestRateSwap {
 
         let swap = Self::builder()
             .id(InstrumentId::new("IRS-5Y-USD-STD"))
-            .notional(Money::new(10_000_000.0, Currency::USD))
+            .notional(Money::from((10_000_000_i64, Currency::USD)))
             .side(PayReceive::Pay)
             .fixed(crate::instruments::common_impl::parameters::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -650,8 +650,8 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateSwap {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(
@@ -795,7 +795,7 @@ mod tests {
     fn from_conventions_uses_overnight_rfr_compounding() {
         let swap = InterestRateSwap::from_conventions(ConventionSwapParams {
             id: InstrumentId::new("USD-SOFR-OIS-SWAP-5Y"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             side: PayReceive::Pay,
             fixed_rate: 0.04,
             start: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
@@ -815,7 +815,7 @@ mod tests {
     fn single_curve_ois_does_not_require_a_forward_curve_dependency() {
         let swap = InterestRateSwap::from_conventions(ConventionSwapParams {
             id: InstrumentId::new("USD-SOFR-OIS-SINGLE-CURVE"),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
             side: PayReceive::Pay,
             fixed_rate: 0.04,
             start: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),

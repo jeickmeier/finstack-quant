@@ -190,7 +190,7 @@ impl RevolvingCreditPricer {
         let estimate = MoneyEstimate::from_estimate(
             Estimate::new(mean, stderr, (ci_low, ci_high), pvs.len()),
             facility.commitment_amount.currency(),
-        );
+        )?;
 
         let result = EnhancedMonteCarloResult {
             mc_result: MonteCarloResult {

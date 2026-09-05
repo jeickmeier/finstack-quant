@@ -24,7 +24,7 @@ use rust_decimal::Decimal;
 #[test]
 fn test_fi_index_trs_currency_mismatch_validation() {
     // Arrange - Try to create FI index TRS with mismatched currencies
-    let notional = Money::new(10_000_000.0, USD);
+    let notional = Money::new(10_000_000.0, USD).expect("valid money fixture");
     let underlying = IndexUnderlyingParams::new("EUR-INDEX", EUR); // EUR index
 
     let result = FIIndexTotalReturnSwap::builder()
@@ -132,7 +132,7 @@ fn test_fi_index_trs_builder_validation() {
 
     let result = FIIndexTotalReturnSwap::builder()
         .id("TRS-NO-YIELD".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",
@@ -256,7 +256,7 @@ fn test_equity_trs_with_zero_notional() {
     // Arrange
     let market = create_market_context();
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(0.0, USD))
+        .notional(Money::new(0.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -276,7 +276,7 @@ fn test_fi_index_trs_with_tiny_notional() {
     // Arrange
     let market = create_market_context();
     let trs = TestFIIndexTrsBuilder::new()
-        .notional(Money::new(0.01, USD)) // 1 cent
+        .notional(Money::new(0.01, USD).expect("valid money fixture")) // 1 cent
         .build();
 
     // Act
@@ -292,7 +292,7 @@ fn test_equity_trs_with_huge_notional() {
     // Arrange
     let market = create_market_context();
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(1e12, USD)) // $1 trillion
+        .notional(Money::new(1e12, USD).expect("valid money fixture")) // $1 trillion
         .build();
 
     // Act
@@ -364,7 +364,7 @@ fn test_equity_trs_with_past_start_date() {
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-PAST-START".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",
@@ -405,7 +405,7 @@ fn test_equity_trs_with_very_short_tenor_1_day() {
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-1DAY".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",
@@ -446,7 +446,7 @@ fn test_fi_index_trs_maturity_equals_valuation_date() {
 
     let trs = FIIndexTotalReturnSwap::builder()
         .id("TRS-MATURE".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",
@@ -528,7 +528,7 @@ fn test_equity_trs_with_zero_contract_size() {
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-ZERO-CONTRACT".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",
@@ -574,7 +574,7 @@ fn test_equity_trs_with_fractional_contract_size() {
 
     let trs = EquityTotalReturnSwap::builder()
         .id("TRS-MINI".into())
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .underlying(underlying)
         .financing(FinancingLegSpec::new(
             "USD-OIS",

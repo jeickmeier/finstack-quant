@@ -440,9 +440,7 @@ impl FundEvent {
     /// Contributions are negative (outflows), distributions/proceeds are positive (inflows).
     pub fn signed_amount(&self) -> Money {
         match self.kind {
-            FundEventKind::Contribution => {
-                Money::new(-self.amount.amount(), self.amount.currency())
-            }
+            FundEventKind::Contribution => self.amount.checked_neg(),
             FundEventKind::Distribution | FundEventKind::Proceeds => self.amount,
         }
     }
@@ -501,40 +499,37 @@ pub struct AllocationLedger {
 
 impl AllocationLedger {
     /// Extract LP-only cashflows for NPV calculation.
-    pub fn lp_cashflows(&self) -> Vec<(Date, Money)> {
-        let mut by_date: IndexMap<Date, f64> = IndexMap::new();
-        let mut currency: Option<Currency> = None;
+    pub fn lp_cashflows(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+        Ok({
+            let mut by_date: IndexMap<Date, f64> = IndexMap::new();
+            let mut currency: Option<Currency> = None;
 
-        for (date, amount) in &self.contributions {
-            currency = currency.or(Some(amount.currency()));
-            *by_date.entry(*date).or_default() += amount.amount();
-        }
-
-        for row in &self.rows {
-            let amt = row.to_lp.amount();
-            if amt.abs() > 1e-6 {
-                currency = currency.or(Some(row.to_lp.currency()));
-                *by_date.entry(row.date).or_default() += amt;
+            for (date, amount) in &self.contributions {
+                currency = currency.or(Some(amount.currency()));
+                *by_date.entry(*date).or_default() += amount.amount();
             }
-        }
 
-        let Some(ccy) = currency else {
-            return Vec::new();
-        };
-
-        let mut flows: Vec<(Date, Money)> = by_date
-            .into_iter()
-            .filter_map(|(date, amt)| {
+            for row in &self.rows {
+                let amt = row.to_lp.amount();
                 if amt.abs() > 1e-6 {
-                    Some((date, Money::new(amt, ccy)))
-                } else {
-                    None
+                    currency = currency.or(Some(row.to_lp.currency()));
+                    *by_date.entry(row.date).or_default() += amt;
                 }
-            })
-            .collect();
+            }
 
-        flows.sort_by_key(|(date, _)| *date);
-        flows
+            let Some(ccy) = currency else {
+                return Ok(Vec::new());
+            };
+
+            let mut flows: Vec<(Date, Money)> = by_date
+                .into_iter()
+                .filter(|(_, amt)| amt.abs() > 1e-6)
+                .map(|(date, amt)| Money::new(amt, ccy).map(|money| (date, money)))
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+
+            flows.sort_by_key(|(date, _)| *date);
+            flows
+        })
     }
 
     /// Export allocation ledger as structured data for DataFrame creation.
@@ -673,7 +668,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         let contributions: Vec<(Date, Money)> = sorted_events
             .iter()
             .filter(|e| e.kind == FundEventKind::Contribution)
-            .map(|e| (e.date, Money::new(-e.amount.amount(), e.amount.currency())))
+            .map(|e| (e.date, e.amount.checked_neg()))
             .collect();
 
         let mut ledger_rows = Vec::new();
@@ -851,7 +846,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         // allocations from earlier tranches in this call are handled via
         // `lp_allocated_in_call_so_far`.
         let lp_history =
-            self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date);
+            self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date)?;
 
         // Precompute holdback percent (0.0 if none or clawback disabled)
         let holdback_pct: f64 = (match &self.spec.clawback {
@@ -1043,7 +1038,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                 if lp_allocated_in_call_so_far > 1e-9 {
                     flows.push((
                         params.allocation_date,
-                        Money::new(lp_allocated_in_call_so_far, params.currency),
+                        Money::new(lp_allocated_in_call_so_far, params.currency)?,
                     ));
                 }
                 self.calculate_lp_irr_to_date(&flows)
@@ -1054,10 +1049,10 @@ impl<'a> EquityWaterfallEngine<'a> {
                 period_key: self.period_key_for(params.allocation_date).map(Arc::from),
                 deal_id: None, // Set by caller for American style
                 tranche: tranche_name,
-                to_lp: Money::new(to_lp, params.currency),
-                to_gp: Money::new(to_gp_paid, params.currency),
-                lp_unreturned: Money::new(lp_unreturned, params.currency),
-                gp_carry_cum: Money::new(gp_carry_cum_after, params.currency),
+                to_lp: Money::new(to_lp, params.currency)?,
+                to_gp: Money::new(to_gp_paid, params.currency)?,
+                lp_unreturned: Money::new(lp_unreturned, params.currency)?,
+                gp_carry_cum: Money::new(gp_carry_cum_after, params.currency)?,
                 lp_irr_to_date,
                 note: None,
             });
@@ -1101,23 +1096,25 @@ impl<'a> EquityWaterfallEngine<'a> {
         all_events: &[FundEvent],
         prior_rows: &[AllocationRow],
         allocation_date: Date,
-    ) -> Vec<(Date, Money)> {
-        let mut flows: Vec<(Date, Money)> = Vec::new();
-        for event in all_events {
-            if event.kind == FundEventKind::Contribution && event.date <= allocation_date {
-                flows.push((
-                    event.date,
-                    Money::new(-event.amount.amount(), event.amount.currency()),
-                ));
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+        Ok({
+            let mut flows: Vec<(Date, Money)> = Vec::new();
+            for event in all_events {
+                if event.kind == FundEventKind::Contribution && event.date <= allocation_date {
+                    flows.push((
+                        event.date,
+                        Money::new(-event.amount.amount(), event.amount.currency())?,
+                    ));
+                }
             }
-        }
-        for row in prior_rows {
-            if row.date <= allocation_date && row.to_lp.amount().abs() > 1e-9 {
-                flows.push((row.date, row.to_lp));
+            for row in prior_rows {
+                if row.date <= allocation_date && row.to_lp.amount().abs() > 1e-9 {
+                    flows.push((row.date, row.to_lp));
+                }
             }
-        }
-        flows.sort_by_key(|(d, _)| *d);
-        flows
+            flows.sort_by_key(|(d, _)| *d);
+            flows
+        })
     }
 
     /// Calculate the amount needed for preferred return using robust root finding.
@@ -1176,10 +1173,12 @@ impl<'a> EquityWaterfallEngine<'a> {
             }
 
             let mut flows_with_additional = lp_flows.to_vec();
-            flows_with_additional.push((
-                current_date,
-                Money::new(additional_amount, lp_flows[0].1.currency()),
-            ));
+            // An unrepresentable candidate is outside the solver objective domain,
+            // like an invalid IRR; signal the existing finite objective penalty.
+            let Ok(additional) = Money::new(additional_amount, lp_flows[0].1.currency()) else {
+                return IRR_OBJECTIVE_PENALTY;
+            };
+            flows_with_additional.push((current_date, additional));
 
             match self.calculate_irr(&flows_with_additional, base_date) {
                 Ok(irr) => irr - target_irr,
@@ -1317,7 +1316,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         };
         synthetic.push(FundEvent::distribution(
             as_of,
-            Money::new(total_distributions, currency),
+            Money::new(total_distributions, currency)?,
         ));
 
         // Clawback disabled in the replay: no holdback (rows carry gross GP
@@ -1393,8 +1392,8 @@ impl<'a> EquityWaterfallEngine<'a> {
                 };
 
                 let currency = last_row.to_gp.currency();
-                let to_gp = Money::new(delta_gp, currency);
-                let to_lp = Money::new((-delta_gp).max(0.0), currency);
+                let to_gp = Money::new(delta_gp, currency)?;
+                let to_lp = Money::new((-delta_gp).max(0.0), currency)?;
 
                 let settlement_row = AllocationRow {
                     date: settlement_date,
@@ -1404,9 +1403,9 @@ impl<'a> EquityWaterfallEngine<'a> {
                     to_lp,
                     to_gp,
                     lp_unreturned: last_row.lp_unreturned,
-                    gp_carry_cum: Money::new(allowed_gp_total, currency),
+                    gp_carry_cum: Money::new(allowed_gp_total, currency)?,
                     lp_irr_to_date: {
-                        let flows = self.lp_net_history(events, ledger_rows, settlement_date);
+                        let flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
                         self.calculate_lp_irr_to_date(&flows)
                     },
                     note: Some(Arc::from("Clawback settlement and holdback release")),
@@ -1433,8 +1432,8 @@ impl<'a> EquityWaterfallEngine<'a> {
         }
 
         let currency = last_row.to_gp.currency();
-        let to_gp = Money::new(delta_gp, currency);
-        let to_lp = Money::new((-delta_gp).max(0.0), currency);
+        let to_gp = Money::new(delta_gp, currency)?;
+        let to_lp = Money::new((-delta_gp).max(0.0), currency)?;
 
         let settlement_row = AllocationRow {
             date: settlement_date,
@@ -1444,9 +1443,9 @@ impl<'a> EquityWaterfallEngine<'a> {
             to_lp,
             to_gp,
             lp_unreturned: last_row.lp_unreturned,
-            gp_carry_cum: Money::new(allowed_gp_total, currency),
+            gp_carry_cum: Money::new(allowed_gp_total, currency)?,
             lp_irr_to_date: {
-                let flows = self.lp_net_history(events, ledger_rows, settlement_date);
+                let flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
                 self.calculate_lp_irr_to_date(&flows)
             },
             note: Some(Arc::from("Clawback settlement and holdback release")),
@@ -1493,7 +1492,7 @@ mod tests {
     fn fund_event_creation() {
         let contrib = FundEvent::contribution(
             test_date(2020, 1, 1),
-            Money::new(1000000.0, test_currency()),
+            Money::from((1000000_i64, test_currency())),
         );
 
         assert_eq!(contrib.kind, FundEventKind::Contribution);
@@ -1501,7 +1500,7 @@ mod tests {
 
         let distrib = FundEvent::distribution(
             test_date(2025, 1, 1),
-            Money::new(1500000.0, test_currency()),
+            Money::from((1500000_i64, test_currency())),
         );
 
         assert_eq!(distrib.kind, FundEventKind::Distribution);
@@ -1519,11 +1518,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 1, 1),
-                Money::new(1500000.0, test_currency()),
+                Money::from((1500000_i64, test_currency())),
             ),
         ];
 
@@ -1556,11 +1555,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, Currency::USD),
+                Money::from((1_000_000_i64, Currency::USD)),
             ),
             FundEvent::distribution(
                 test_date(2025, 1, 1),
-                Money::new(1_500_000.0, Currency::EUR),
+                Money::from((1_500_000_i64, Currency::EUR)),
             ),
         ];
 
@@ -1589,22 +1588,22 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
             )
             .with_deal_id("A_late"),
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
             )
             .with_deal_id("Z_early"),
             FundEvent::proceeds(
                 test_date(2022, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
                 "A_late",
             ),
             FundEvent::proceeds(
                 test_date(2021, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
                 "Z_early",
             ),
         ];
@@ -1632,22 +1631,22 @@ mod tests {
         let mut events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
             )
             .with_deal_id("deal_a"),
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
             )
             .with_deal_id("deal_b"),
             FundEvent::proceeds(
                 test_date(2022, 1, 1),
-                Money::new(1_500_000.0, test_currency()),
+                Money::from((1_500_000_i64, test_currency())),
                 "deal_a",
             ),
             FundEvent::proceeds(
                 test_date(2021, 1, 1),
-                Money::new(900_000.0, test_currency()),
+                Money::from((900_000_i64, test_currency())),
                 "deal_b",
             ),
         ];
@@ -1669,11 +1668,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
         ];
 
@@ -1734,8 +1733,14 @@ mod tests {
         // 1000 in, 1500 out after 4 years: ROC takes 1000, the pref
         // entitlement is ~1000·(1.08⁴ − 1) ≈ 360 — leaving ~140 unallocated.
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2024, 1, 1), Money::new(1500.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2024, 1, 1),
+                Money::from((1500_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1783,8 +1788,14 @@ mod tests {
             .expect("Operation succeeded");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
-            FundEvent::distribution(test_date(2024, 1, 1), Money::new(280.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2024, 1, 1),
+                Money::from((280_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1824,8 +1835,14 @@ mod tests {
             .expect("spec builds");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1400.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((1400_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1863,8 +1880,14 @@ mod tests {
             .expect("spec builds");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1100.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((1100_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1891,8 +1914,14 @@ mod tests {
             .expect("spec builds");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2021, 1, 1), Money::new(2000.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((2000_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1952,8 +1981,14 @@ mod tests {
             .expect("spec builds");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1500.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((1500_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -1999,9 +2034,18 @@ mod tests {
             .expect("Operation succeeded");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
-            FundEvent::distribution(test_date(2022, 1, 1), Money::new(150.0, test_currency())),
-            FundEvent::contribution(test_date(2023, 1, 1), Money::new(90.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2022, 1, 1),
+                Money::from((150_i64, test_currency())),
+            ),
+            FundEvent::contribution(
+                test_date(2023, 1, 1),
+                Money::from((90_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -2037,8 +2081,14 @@ mod tests {
             .expect("spec");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
-            FundEvent::distribution(test_date(2022, 1, 1), Money::new(150.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2022, 1, 1),
+                Money::from((150_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -2089,8 +2139,14 @@ mod tests {
             .expect("spec");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
-            FundEvent::distribution(test_date(2022, 1, 1), Money::new(120.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2022, 1, 1),
+                Money::from((120_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -2135,11 +2191,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2024, 11, 1), // 2024Q4
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 2, 15), // 2025Q1
-                Money::new(1200000.0, test_currency()),
+                Money::from((1200000_i64, test_currency())),
             ),
         ];
 
@@ -2172,11 +2228,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2024, 1, 1), // Outside period range
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2026, 1, 1), // Outside period range
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
         ];
 
@@ -2208,10 +2264,13 @@ mod tests {
             .expect("Operation succeeded");
 
         let events = vec![
-            FundEvent::contribution(test_date(2025, 1, 1), Money::new(100.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2025, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
             FundEvent::distribution(
                 test_date(2025, 6, 15), // 2025Q2
-                Money::new(150.0, test_currency()),
+                Money::from((150_i64, test_currency())),
             ),
         ];
 
@@ -2249,9 +2308,18 @@ mod tests {
             .expect("Operation succeeded");
 
         let events = vec![
-            FundEvent::contribution(test_date(2024, 1, 1), Money::new(100.0, test_currency())),
-            FundEvent::distribution(test_date(2024, 4, 15), Money::new(150.0, test_currency())),
-            FundEvent::contribution(test_date(2024, 5, 15), Money::new(90.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2024, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2024, 4, 15),
+                Money::from((150_i64, test_currency())),
+            ),
+            FundEvent::contribution(
+                test_date(2024, 5, 15),
+                Money::from((90_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec)
@@ -2281,11 +2349,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2025, 1, 1),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2025, 6, 15),
-                Money::new(1000000.0, test_currency()),
+                Money::from((1000000_i64, test_currency())),
             ),
         ];
 
@@ -2328,8 +2396,14 @@ mod tests {
 
         // LP contributes $1 000; fund distributes $1 500 five years later.
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
-            FundEvent::distribution(test_date(2025, 1, 1), Money::new(1500.0, test_currency())),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2025, 1, 1),
+                Money::from((1500_i64, test_currency())),
+            ),
         ];
 
         let engine = EquityWaterfallEngine::new(&spec);
@@ -2430,11 +2504,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 test_date(2020, 1, 1),
-                Money::new(1_000_000.0, test_currency()),
+                Money::from((1_000_000_i64, test_currency())),
             ),
             FundEvent::distribution(
                 test_date(2022, 1, 1),
-                Money::new(1_500_000.0, test_currency()),
+                Money::from((1_500_000_i64, test_currency())),
             ),
         ];
 
@@ -2454,18 +2528,24 @@ mod tests {
             .expect("spec builds");
 
         let events = vec![
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency()))
-                .with_deal_id("WINNER"),
-            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency()))
-                .with_deal_id("LOSER"),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("WINNER"),
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("LOSER"),
             FundEvent::proceeds(
                 test_date(2021, 1, 1),
-                Money::new(150.0, test_currency()),
+                Money::from((150_i64, test_currency())),
                 "WINNER",
             ),
             FundEvent::proceeds(
                 test_date(2022, 1, 1),
-                Money::new(50.0, test_currency()),
+                Money::from((50_i64, test_currency())),
                 "LOSER",
             ),
         ];
@@ -2504,15 +2584,15 @@ mod tests {
 
         let contribution = FundEvent::contribution(
             test_date(2020, 1, 1),
-            Money::new(1_000_000.0, test_currency()),
+            Money::from((1_000_000_i64, test_currency())),
         );
         let same_day_call = FundEvent::contribution(
             test_date(2022, 1, 1),
-            Money::new(500_000.0, test_currency()),
+            Money::from((500_000_i64, test_currency())),
         );
         let distribution = FundEvent::distribution(
             test_date(2022, 1, 1),
-            Money::new(1_200_000.0, test_currency()),
+            Money::from((1_200_000_i64, test_currency())),
         );
 
         let engine = EquityWaterfallEngine::new(&spec);

@@ -111,7 +111,7 @@ impl ImResult {
 ///         as_of: Date,
 ///     ) -> finstack_quant_core::Result<ImResult> {
 ///         let mtm = instrument.mtm_for_vm(context, as_of)?;
-///         let im = Money::new(mtm.amount().abs() * self.fixed_rate, mtm.currency());
+///         let im = Money::new(mtm.amount().abs() * self.fixed_rate, mtm.currency()).expect("valid money fixture");
 ///         Ok(ImResult::simple(
 ///             im,
 ///             ImMethodology::InternalModel,

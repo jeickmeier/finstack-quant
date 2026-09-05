@@ -165,9 +165,9 @@ impl MarginCall {
             call_type: MarginCallType::InitialMargin,
             amount,
             collateral_type,
-            mtm_trigger: Money::new(0.0, currency),
-            threshold: Money::new(0.0, currency),
-            mta_applied: Money::new(0.0, currency),
+            mtm_trigger: Money::from((0_i64, currency)),
+            threshold: Money::from((0_i64, currency)),
+            mta_applied: Money::from((0_i64, currency)),
         }
     }
 
@@ -229,10 +229,10 @@ mod tests {
         let call = MarginCall::vm_delivery(
             test_date(2025, 1, 15),
             test_date(2025, 1, 16),
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(5_000_000.0, Currency::USD),
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(500_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((5_000_000_i64, Currency::USD)),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((500_000_i64, Currency::USD)),
         );
 
         assert!(call.is_delivery());
@@ -246,10 +246,10 @@ mod tests {
         let call = MarginCall::vm_return(
             test_date(2025, 1, 15),
             test_date(2025, 1, 16),
-            Money::new(500_000.0, Currency::USD),
-            Money::new(2_000_000.0, Currency::USD),
-            Money::new(1_000_000.0, Currency::USD),
-            Money::new(500_000.0, Currency::USD),
+            Money::from((500_000_i64, Currency::USD)),
+            Money::from((2_000_000_i64, Currency::USD)),
+            Money::from((1_000_000_i64, Currency::USD)),
+            Money::from((500_000_i64, Currency::USD)),
         );
 
         assert!(!call.is_delivery());
@@ -261,7 +261,7 @@ mod tests {
         let call = MarginCall::initial_margin(
             test_date(2025, 1, 15),
             test_date(2025, 1, 17),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::from((10_000_000_i64, Currency::USD)),
             Some(CollateralAssetClass::Cash),
         );
 

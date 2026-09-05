@@ -37,7 +37,7 @@ impl MarketContext {
                 crate::market_data::scalars::MarketScalar::Price(crate::money::Money::new(
                     m.amount() * (1.0 + bump_pct),
                     m.currency(),
-                ))
+                )?)
             }
         };
         Arc::make_mut(&mut self.prices).insert(key.clone(), bumped);

@@ -126,17 +126,19 @@ pub(crate) fn scalar_numeric_value(
 pub(crate) fn scalar_with_numeric_value(
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
-) -> finstack_quant_core::market_data::scalars::MarketScalar {
-    match template {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value)
+) -> finstack_quant_core::Result<finstack_quant_core::market_data::scalars::MarketScalar> {
+    Ok({
+        match template {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value)
+            }
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+                finstack_quant_core::market_data::scalars::MarketScalar::Price(
+                    finstack_quant_core::money::Money::new(value, money.currency())?,
+                )
+            }
         }
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                finstack_quant_core::money::Money::new(value, money.currency()),
-            )
-        }
-    }
+    })
 }
 
 /// Clone a market context and replace a scalar quote with a new numeric value.
@@ -145,10 +147,12 @@ pub(crate) fn replace_scalar_value(
     scalar_id: &str,
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
-) -> finstack_quant_core::market_data::context::MarketContext {
-    context
-        .clone()
-        .insert_price(scalar_id, scalar_with_numeric_value(template, value))
+) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
+    Ok({
+        context
+            .clone()
+            .insert_price(scalar_id, scalar_with_numeric_value(template, value)?)
+    })
 }
 
 /// Compute a central difference normalized by the full bump width.
@@ -243,7 +247,10 @@ pub(crate) fn bump_scalar_price(
         }
         finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                finstack_quant_core::money::Money::new(m.amount() * (1.0 + bump_pct), m.currency()),
+                finstack_quant_core::money::Money::new(
+                    m.amount() * (1.0 + bump_pct),
+                    m.currency(),
+                )?,
             )
         }
     };
@@ -498,8 +505,9 @@ mod tests {
 
     #[test]
     fn scalar_helpers_preserve_variant_and_currency() {
-        let price_scalar = MarketScalar::Price(Money::new(99.0, Currency::USD));
-        let rebuilt = scalar_with_numeric_value(&price_scalar, 101.0);
+        let price_scalar = MarketScalar::Price(Money::from((99_i64, Currency::USD)));
+        let rebuilt = scalar_with_numeric_value(&price_scalar, 101.0)
+            .expect("valid scalar_with_numeric_value fixture");
         match rebuilt {
             MarketScalar::Price(money) => {
                 assert_eq!(money.currency(), Currency::USD);
@@ -509,7 +517,8 @@ mod tests {
         }
 
         let unitless = MarketScalar::Unitless(0.02);
-        let rebuilt = scalar_with_numeric_value(&unitless, 0.03);
+        let rebuilt = scalar_with_numeric_value(&unitless, 0.03)
+            .expect("valid scalar_with_numeric_value fixture");
         assert_eq!(scalar_numeric_value(&rebuilt), 0.03);
     }
 
@@ -517,9 +526,13 @@ mod tests {
     fn replace_scalar_value_updates_only_requested_quote() {
         let market = MarketContext::new()
             .insert_price("A", MarketScalar::Unitless(1.0))
-            .insert_price("B", MarketScalar::Price(Money::new(2.0, Currency::USD)));
+            .insert_price(
+                "B",
+                MarketScalar::Price(Money::from((2_i64, Currency::USD))),
+            );
         let current = market.get_price("B").expect("quote should exist");
-        let bumped = replace_scalar_value(&market, "B", current, 3.5);
+        let bumped = replace_scalar_value(&market, "B", current, 3.5)
+            .expect("valid replace_scalar_value fixture");
 
         assert_eq!(
             scalar_numeric_value(bumped.get_price("A").expect("quote should exist")),

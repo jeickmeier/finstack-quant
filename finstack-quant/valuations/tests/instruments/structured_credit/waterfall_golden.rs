@@ -61,7 +61,7 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             asset_type: AssetType::FirstLienLoan {
                 industry: Some("Technology".into()),
             },
-            balance: Money::new(asset_balance, currency),
+            balance: Money::new(asset_balance, currency).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: Some(400.0),
             index_id: Some("SOFR-3M".into()),
@@ -90,7 +90,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         0.0,
         70.0,
         TrancheSeniority::Senior,
-        Money::new(175_000_000.0, currency),
+        Money::new(175_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
@@ -101,7 +101,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         70.0,
         85.0,
         TrancheSeniority::Mezzanine,
-        Money::new(37_500_000.0, currency),
+        Money::new(37_500_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.065 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
@@ -112,7 +112,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         85.0,
         95.0,
         TrancheSeniority::Subordinated,
-        Money::new(25_000_000.0, currency),
+        Money::new(25_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
@@ -123,7 +123,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         95.0,
         100.0,
         TrancheSeniority::Equity,
-        Money::new(12_500_000.0, currency),
+        Money::new(12_500_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.0 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
@@ -148,7 +148,7 @@ fn run_waterfall(
     // Tests treat everything above interest as principal proceeds.
     let principal_collections = available_cash
         .checked_sub(interest_collections)
-        .unwrap_or(Money::new(0.0, available_cash.currency()));
+        .unwrap_or(Money::new(0.0, available_cash.currency()).expect("valid money fixture"));
     let context = WaterfallContext {
         available_cash,
         interest_collections,
@@ -161,9 +161,9 @@ fn run_waterfall(
         tranche_balances: None,
         asset_balances: None,
         deferred_interest: None,
-        reserve_balance: Money::new(0.0, available_cash.currency()),
-        restricted_cash: Money::new(0.0, Currency::USD),
-        recovery_proceeds: Money::new(0.0, available_cash.currency()),
+        reserve_balance: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
+        restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        recovery_proceeds: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         floating_rate_shift: 0.0,
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(
@@ -191,7 +191,7 @@ fn test_golden_clo_2_0_full_payment() {
                     "trustee",
                     RecipientType::ServiceProvider("Trustee".into()),
                     PaymentCalculation::FixedAmount {
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                         rounding: None,
                     },
                 ))
@@ -254,10 +254,10 @@ fn test_golden_clo_2_0_full_payment() {
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(15_000_000.0, currency); // Quarterly cash available
-    let interest_collections = Money::new(3_000_000.0, currency);
+    let available_cash = Money::new(15_000_000.0, currency).expect("valid money fixture"); // Quarterly cash available
+    let interest_collections = Money::new(3_000_000.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
-    let pool_balance = Money::new(250_000_000.0, currency);
+    let pool_balance = Money::new(250_000_000.0, currency).expect("valid money fixture");
     let period_start = payment_date - Duration::days(90);
     let result = run_waterfall(
         &waterfall,
@@ -330,8 +330,8 @@ fn test_golden_clo_oc_breach_diversion() {
 
     // Create impaired pool (lower collateral value)
     let mut pool = create_test_pool(200_000_000.0, currency); // Down from $250M
-    pool.cumulative_defaults = Money::new(30_000_000.0, currency);
-    pool.cumulative_recoveries = Money::new(15_000_000.0, currency);
+    pool.cumulative_defaults = Money::new(30_000_000.0, currency).expect("valid money fixture");
+    pool.cumulative_recoveries = Money::new(15_000_000.0, currency).expect("valid money fixture");
 
     let tranches = create_test_tranches(currency);
 
@@ -343,7 +343,7 @@ fn test_golden_clo_oc_breach_diversion() {
                     "trustee",
                     RecipientType::ServiceProvider("Trustee".into()),
                     PaymentCalculation::FixedAmount {
-                        amount: Money::new(50_000.0, currency),
+                        amount: Money::new(50_000.0, currency).expect("valid money fixture"),
                         rounding: None,
                     },
                 )),
@@ -362,7 +362,7 @@ fn test_golden_clo_oc_breach_diversion() {
                 .add_recipient(Recipient::tranche_principal(
                     "class_a_prin",
                     "CLASS_A",
-                    Some(Money::new(174_500_000.0, currency)),
+                    Some(Money::new(174_500_000.0, currency).expect("valid money fixture")),
                 )),
         )
         .add_tier(
@@ -393,10 +393,10 @@ fn test_golden_clo_oc_breach_diversion() {
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(5_000_000.0, currency);
-    let interest_collections = Money::new(2_500_000.0, currency);
+    let available_cash = Money::new(5_000_000.0, currency).expect("valid money fixture");
+    let interest_collections = Money::new(2_500_000.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
-    let pool_balance = Money::new(200_000_000.0, currency);
+    let pool_balance = Money::new(200_000_000.0, currency).expect("valid money fixture");
 
     let result = run_waterfall(
         &waterfall,
@@ -456,7 +456,7 @@ fn test_golden_cmbs_sequential_pay() {
         0.0,
         70.0,
         TrancheSeniority::Senior,
-        Money::new(350_000_000.0, currency),
+        Money::new(350_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
@@ -467,7 +467,7 @@ fn test_golden_cmbs_sequential_pay() {
         70.0,
         85.0,
         TrancheSeniority::Mezzanine,
-        Money::new(75_000_000.0, currency),
+        Money::new(75_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.045 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
@@ -478,7 +478,7 @@ fn test_golden_cmbs_sequential_pay() {
         85.0,
         100.0,
         TrancheSeniority::Subordinated,
-        Money::new(75_000_000.0, currency),
+        Money::new(75_000_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
@@ -530,10 +530,10 @@ fn test_golden_cmbs_sequential_pay() {
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(20_000_000.0, currency);
-    let interest_collections = Money::new(5_000_000.0, currency);
+    let available_cash = Money::new(20_000_000.0, currency).expect("valid money fixture");
+    let interest_collections = Money::new(5_000_000.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::February, 1).unwrap();
-    let pool_balance = Money::new(500_000_000.0, currency);
+    let pool_balance = Money::new(500_000_000.0, currency).expect("valid money fixture");
 
     let result = run_waterfall(
         &waterfall,
@@ -578,7 +578,7 @@ fn test_golden_cre_pro_rata_distribution() {
         0.0,
         95.0,
         TrancheSeniority::Equity,
-        Money::new(47_500_000.0, currency),
+        Money::new(47_500_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
@@ -589,7 +589,7 @@ fn test_golden_cre_pro_rata_distribution() {
         95.0,
         100.0,
         TrancheSeniority::Equity,
-        Money::new(2_500_000.0, currency),
+        Money::new(2_500_000.0, currency).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
@@ -604,7 +604,7 @@ fn test_golden_cre_pro_rata_distribution() {
                 "operating",
                 RecipientType::ServiceProvider("Operating".into()),
                 PaymentCalculation::FixedAmount {
-                    amount: Money::new(100_000.0, currency),
+                    amount: Money::new(100_000.0, currency).expect("valid money fixture"),
                     rounding: None,
                 },
             )),
@@ -661,10 +661,10 @@ fn test_golden_cre_pro_rata_distribution() {
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(5_000_000.0, currency); // Quarterly NOI
-    let interest_collections = Money::new(0.0, currency);
+    let available_cash = Money::new(5_000_000.0, currency).expect("valid money fixture"); // Quarterly NOI
+    let interest_collections = Money::new(0.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
-    let pool_balance = Money::new(50_000_000.0, currency);
+    let pool_balance = Money::new(50_000_000.0, currency).expect("valid money fixture");
     let period_start = payment_date - Duration::days(90);
 
     let result = run_waterfall(
@@ -744,7 +744,7 @@ fn test_golden_cash_conservation() {
                 "fee1",
                 RecipientType::ServiceProvider("Provider".into()),
                 PaymentCalculation::FixedAmount {
-                    amount: Money::new(10_000.0, currency),
+                    amount: Money::new(10_000.0, currency).expect("valid money fixture"),
                     rounding: None,
                 },
             )),
@@ -757,16 +757,16 @@ fn test_golden_cash_conservation() {
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(1_000_000.0, currency);
+    let available_cash = Money::new(1_000_000.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
 
     let result = run_waterfall(
         &waterfall,
         available_cash,
-        Money::new(0.0, currency),
+        Money::new(0.0, currency).expect("valid money fixture"),
         payment_date,
         &tranches,
-        Money::new(100_000_000.0, currency),
+        Money::new(100_000_000.0, currency).expect("valid money fixture"),
         None,
         &pool,
         &market,

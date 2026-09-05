@@ -234,7 +234,7 @@ impl FxSwap {
             .far_date(
                 Date::from_calendar_date(2024, time::Month::July, 5).expect("Valid example date"),
             )
-            .base_notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.10))
@@ -357,7 +357,7 @@ impl FxSwap {
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())),
+                notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),
                 ..Default::default()
             },
         ))
@@ -401,10 +401,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
 
         // End-of-day policy: far-leg settlement remains live on its event date.
         if crate::instruments::fx::shared::event_has_occurred(self.far_date, as_of) {
-            return Ok(finstack_quant_core::money::Money::new(
-                0.0,
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
                 self.quote_currency,
-            ));
+            )));
         }
 
         // Currency safety check before expensive calculations
@@ -419,10 +419,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;
 
         let total_pv = ctx.total_pv();
-        Ok(finstack_quant_core::money::Money::new(
-            total_pv,
-            self.quote_currency,
-        ))
+        finstack_quant_core::money::Money::new(total_pv, self.quote_currency)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -455,7 +452,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 crate::cashflow::traits::ScheduleBuildOpts {
-                    notional_hint: Some(Money::new(0.0, self.base_currency)),
+                    notional_hint: Some(Money::from((0_i64, self.base_currency))),
                     meta: crate::cashflow::builder::CashFlowMeta {
                         representation:
                             crate::cashflow::builder::CashflowRepresentation::NoResidual,
@@ -473,22 +470,22 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         let near_base = self.single_cashflow_schedule(
             as_of,
             self.near_date,
-            Money::new(base_amount, self.base_currency),
+            Money::new(base_amount, self.base_currency)?,
         )?;
         let near_quote_schedule = self.single_cashflow_schedule(
             as_of,
             self.near_date,
-            Money::new(-near_quote, self.quote_currency),
+            Money::new(-near_quote, self.quote_currency)?,
         )?;
         let far_base_schedule = self.single_cashflow_schedule(
             as_of,
             self.far_date,
-            Money::new(-base_amount, self.base_currency),
+            Money::new(-base_amount, self.base_currency)?,
         )?;
         let far_quote_schedule = self.single_cashflow_schedule(
             as_of,
             self.far_date,
-            Money::new(far_quote, self.quote_currency),
+            Money::new(far_quote, self.quote_currency)?,
         )?;
 
         Ok(merge_cashflow_schedules(
@@ -498,7 +495,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
                 far_base_schedule,
                 far_quote_schedule,
             ],
-            Notional::par(0.0, self.base_currency),
+            Notional::par(0.0, self.base_currency)?,
             finstack_quant_core::dates::DayCount::Act365F,
         )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -575,7 +572,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(date(2024, Month::July, 5)) // Far date is actually earlier
             .far_date(date(2024, Month::January, 5))
-            .base_notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.10))

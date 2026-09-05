@@ -110,7 +110,9 @@ impl Instrument for FxLinkedInstrument {
 
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
         if self.base_currency == self.reporting_currency {
-            return Ok(Money::new(self.notional, self.reporting_currency));
+            return Ok(
+                Money::new(self.notional, self.reporting_currency).expect("valid money fixture")
+            );
         }
 
         let fx_matrix = market.fx().ok_or_else(|| {
@@ -121,10 +123,10 @@ impl Instrument for FxLinkedInstrument {
         let query = FxQuery::new(self.base_currency, self.reporting_currency, as_of);
         let rate = fx_matrix.rate(query)?;
 
-        Ok(Money::new(
-            self.notional * rate.rate,
-            self.reporting_currency,
-        ))
+        Ok(
+            Money::new(self.notional * rate.rate, self.reporting_currency)
+                .expect("valid money fixture"),
+        )
     }
 
     fn price_with_metrics(
@@ -152,8 +154,8 @@ fn test_fx_attribution_parallel_internal_exposure() {
 
     let bond = Bond::fixed(
         "US-BOND-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -229,8 +231,8 @@ fn test_waterfall_attribution_sum_equality() {
 
     let bond = Bond::fixed(
         "US-BOND-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -325,8 +327,8 @@ fn test_fx_attribution_cross_currency_exposure() {
 
     let eur_bond = Bond::fixed(
         "EUR-BOND-001",
-        Money::new(1_000_000.0, Currency::EUR),
-        finstack_quant_core::types::Rate::from_decimal(0.03), // 3% EUR coupon
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"), // 3% EUR coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -510,8 +512,8 @@ fn test_fx_attribution_eur_weakening() {
 
     let eur_bond = Bond::fixed(
         "EUR-BOND-WEAK",
-        Money::new(1_000_000.0, Currency::EUR),
-        finstack_quant_core::types::Rate::from_decimal(0.03),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -575,8 +577,8 @@ fn test_waterfall_factor_ordering_sensitivity() {
 
     let bond = Bond::fixed(
         "US-BOND-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -671,8 +673,8 @@ fn test_waterfall_rejects_non_carry_first_order() {
 
     let bond = Bond::fixed(
         "US-BOND-DOCTRINE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2025, Month::January, 1).unwrap(),
         create_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -719,8 +721,8 @@ fn test_waterfall_rejects_duplicate_factors() {
 
     let bond = Bond::fixed(
         "US-BOND-DUP-FACTOR",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         create_date(2025, Month::January, 1).unwrap(),
         create_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,

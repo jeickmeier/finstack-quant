@@ -594,6 +594,12 @@ impl FrtbSensitivities {
     }
 
     /// Add a GIRR delta sensitivity.
+    ///
+    /// # Arguments
+    ///
+    /// * `ccy` - Currency of the interest-rate risk factor; identifies the GIRR currency bucket without converting the supplied sensitivity.
+    /// * `tenor` - Regulatory tenor label used as the bucket key; repeated keys accumulate their sensitivities.
+    /// * `delta` - Signed base-currency P&L per one percentage-point yield shift, equal to 100 times DV01; risk weights are applied later.
     pub fn add_girr_delta(&mut self, ccy: Currency, tenor: &str, delta: f64) {
         *self
             .girr_delta

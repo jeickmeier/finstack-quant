@@ -43,19 +43,23 @@ fn jan(day: u8) -> Date {
 
 #[test]
 fn dividend_schedule_builds_and_filters() {
-    let schedule = DividendSchedule::new("AAPL-DIVS")
-        .with_underlying("AAPL")
-        .with_currency(Currency::USD)
-        .add_cash(jan(5), Money::new(1.25, Currency::USD))
-        .add_yield(jan(12), 0.03)
-        .add_stock(jan(20), 0.05);
+    let schedule = DividendSchedule::builder("AAPL-DIVS")
+        .underlying("AAPL")
+        .currency(Currency::USD)
+        .cash(
+            jan(5),
+            Money::new(1.25, Currency::USD).expect("valid money fixture"),
+        )
+        .yield_div(jan(12), 0.03)
+        .stock(jan(20), 0.05)
+        .build()
+        .expect("valid dividend schedule");
 
-    // Sorting should order events ascending
-    let mut sortable = schedule.clone();
-    sortable.sort_by_date();
-    assert!(sortable.events.first().unwrap().date <= sortable.events.last().unwrap().date);
-
-    let between = sortable.events_between(jan(6), jan(15));
+    assert!(schedule
+        .get_events()
+        .windows(2)
+        .all(|pair| pair[0].date <= pair[1].date));
+    let between = schedule.events_between(jan(6), jan(15));
     assert_eq!(between.len(), 1);
     assert!(matches!(between[0].kind, DividendKind::Yield(_)));
 
@@ -66,8 +70,13 @@ fn dividend_schedule_builds_and_filters() {
 
 #[test]
 fn dividend_schedule_validate_rejects_negative_cash() {
-    let schedule = DividendSchedule::new("NEG").add_cash(jan(5), Money::new(-1.0, Currency::USD));
-    assert!(schedule.validate().is_err());
+    let schedule = DividendSchedule::builder("NEG")
+        .cash(
+            jan(5),
+            Money::new(-1.0, Currency::USD).expect("valid money fixture"),
+        )
+        .build();
+    assert!(schedule.is_err());
 }
 
 #[test]

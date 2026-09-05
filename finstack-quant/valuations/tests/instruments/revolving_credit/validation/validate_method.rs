@@ -21,8 +21,8 @@ use time::macros::date;
 fn valid_facility() -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-VALIDATE".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .commitment_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -46,7 +46,7 @@ fn test_validate_valid_facility_passes() {
 fn test_validate_drawn_exceeds_commitment() {
     // Build directly to bypass builder (which doesn't validate this)
     let mut facility = valid_facility();
-    facility.drawn_amount = Money::new(15_000_000.0, Currency::USD);
+    facility.drawn_amount = Money::new(15_000_000.0, Currency::USD).expect("valid money fixture");
 
     let result = facility.validate();
     assert!(result.is_err());
@@ -220,7 +220,7 @@ fn test_validate_nan_fixed_rate() {
 #[test]
 fn test_validate_currency_mismatch() {
     let mut facility = valid_facility();
-    facility.drawn_amount = Money::new(5_000_000.0, Currency::EUR);
+    facility.drawn_amount = Money::new(5_000_000.0, Currency::EUR).expect("valid money fixture");
 
     let result = facility.validate();
     assert!(result.is_err());
@@ -251,8 +251,8 @@ fn test_validate_maturity_before_commitment() {
 #[test]
 fn test_validate_zero_commitment() {
     let mut facility = valid_facility();
-    facility.commitment_amount = Money::new(0.0, Currency::USD);
-    facility.drawn_amount = Money::new(0.0, Currency::USD);
+    facility.commitment_amount = Money::new(0.0, Currency::USD).expect("valid money fixture");
+    facility.drawn_amount = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     let result = facility.validate();
     assert!(result.is_err());
@@ -292,7 +292,7 @@ fn test_validate_fee_tiers_duplicate_threshold() {
 #[test]
 fn test_validate_negative_drawn_amount() {
     let mut facility = valid_facility();
-    facility.drawn_amount = Money::new(-1_000_000.0, Currency::USD);
+    facility.drawn_amount = Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let result = facility.validate();
     assert!(result.is_err());

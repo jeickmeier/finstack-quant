@@ -37,7 +37,7 @@ pub(crate) fn compute_pv(
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     if as_of > inst.expiry {
-        return Ok(Money::new(0.0, inst.underlying.currency));
+        return Ok(Money::from((0_i64, inst.underlying.currency)));
     }
     let t = inst
         .day_count
@@ -72,10 +72,10 @@ pub(crate) fn compute_pv(
             OptionType::Call => (average - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - average).max(0.0),
         };
-        return Ok(Money::new(
+        return Money::new(
             payoff * disc_curve.df_between_dates(as_of, inst.expiry)? * inst.quantity,
             inst.underlying.currency,
-        ));
+        );
     }
 
     // Handle expired / fully observed options
@@ -95,10 +95,7 @@ pub(crate) fn compute_pv(
             OptionType::Call => (average - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - average).max(0.0),
         };
-        return Ok(Money::new(
-            intrinsic * inst.quantity,
-            inst.underlying.currency,
-        ));
+        return Money::new(intrinsic * inst.quantity, inst.underlying.currency);
     }
 
     let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
@@ -161,10 +158,7 @@ pub(crate) fn compute_pv(
             OptionType::Call => (average - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - average).max(0.0),
         };
-        return Ok(Money::new(
-            payoff * df * inst.quantity,
-            inst.underlying.currency,
-        ));
+        return Money::new(payoff * df * inst.quantity, inst.underlying.currency);
     }
 
     // Compute price based on averaging method
@@ -204,7 +198,7 @@ pub(crate) fn compute_pv(
         ),
     };
 
-    Ok(Money::new(price * inst.quantity, inst.underlying.currency))
+    Money::new(price * inst.quantity, inst.underlying.currency)
 }
 
 /// Geometric Asian pricing with commodity forwards (Kemna-Vorst adapted).

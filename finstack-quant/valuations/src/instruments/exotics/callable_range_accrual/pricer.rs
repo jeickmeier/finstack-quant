@@ -184,7 +184,10 @@ impl Payoff for CallableRangeAccrualPayoff {
         Ok(())
     }
 
-    fn value(&self, currency: finstack_quant_core::currency::Currency) -> Money {
+    fn value(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<Money> {
         Money::new(self.note_value(), currency)
     }
 
@@ -202,7 +205,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
         exercise_idx: usize,
         _short_rate: f64,
         currency: finstack_quant_core::currency::Currency,
-    ) -> Money {
+    ) -> finstack_quant_core::Result<Money> {
         // Undiscounted at-exercise call amount; the LSMC harness discounts it
         // to time 0 with the pathwise bank-account numeraire B(t_exercise).
         let call_price = self.call_prices.get(exercise_idx).copied().unwrap_or(0.0);
@@ -588,7 +591,7 @@ fn effective_upper_bound(inst: &CallableRangeAccrual, initial_rate: f64) -> f64 
 }
 
 fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEstimate {
-    let zero = Money::new(0.0, currency);
+    let zero = Money::from((0_i64, currency));
     MoneyEstimate {
         mean: zero,
         stderr: 0.0,
@@ -642,16 +645,19 @@ mod tests {
                 .upper_bound(0.04)
                 .bounds_type(BoundsType::Absolute)
                 .coupon_rate(coupon_rate)
-                .notional(Money::new(1_000_000.0, Currency::USD))
+                .notional(Money::from((1_000_000_i64, Currency::USD)))
                 .day_count(DayCount::Act365F)
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .accrual_start_date(date(2025, Month::January, 1))
                 .rate_index_id_opt(Some("SOFR".into()))
                 .projection_curve_id_opt(Some(CurveId::new("USD-OIS")))
-                .reference_tenor_opt(Some(finstack_quant_core::dates::Tenor::new(
-                    6,
-                    finstack_quant_core::dates::TenorUnit::Months,
-                )))
+                .reference_tenor_opt(Some(
+                    finstack_quant_core::dates::Tenor::new(
+                        6,
+                        finstack_quant_core::dates::TenorUnit::Months,
+                    )
+                    .expect("valid tenor fixture"),
+                ))
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)

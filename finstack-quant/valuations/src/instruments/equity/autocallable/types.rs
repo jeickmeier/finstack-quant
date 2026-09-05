@@ -565,7 +565,7 @@ impl Autocallable {
             .final_payoff_type(FinalPayoffType::Participation { rate: 1.0 })
             .participation_rate(1.0)
             .cap_level(1.5) // 150% cap
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -657,7 +657,7 @@ mod validation_tests {
             .final_payoff_type(FinalPayoffType::Participation { rate: 1.0 })
             .participation_rate(1.0)
             .cap_level(1.5)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

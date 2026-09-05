@@ -161,7 +161,9 @@ mod tests {
     use finstack_quant_core::dates::PeriodId;
 
     fn quarters(n: u8) -> Vec<PeriodId> {
-        (1..=n).map(|q| PeriodId::quarter(2025, q)).collect()
+        (1..=n)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect()
     }
 
     fn params(entries: &[(&str, serde_json::Value)]) -> IndexMap<String, serde_json::Value> {

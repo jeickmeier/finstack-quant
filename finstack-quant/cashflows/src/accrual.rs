@@ -769,7 +769,7 @@ mod tests {
                 CashFlow::new(
                     *date,
                     None,
-                    Money::new(25000.0, Currency::USD),
+                    Money::from((25000_i64, Currency::USD)),
                     CFKind::Fixed,
                     *af,
                     Some(0.05),
@@ -779,7 +779,7 @@ mod tests {
 
         CashFlowSchedule {
             flows,
-            notional: Notional::par(1_000_000.0, Currency::USD),
+            notional: Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
             day_count,
             meta: Default::default(),
         }
@@ -815,7 +815,7 @@ mod tests {
             CashFlow::new(
                 make_date(2025, 1, 15),
                 None,
-                Money::new(-1_000_000.0, Currency::USD),
+                Money::from((-1_000_000_i64, Currency::USD)),
                 CFKind::Notional,
                 0.0,
                 None,
@@ -863,7 +863,7 @@ mod tests {
             CashFlow::new(
                 end,
                 None,
-                Money::new(30_000.0, Currency::USD),
+                Money::from((30_000_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.5,
                 Some(0.06),
@@ -877,7 +877,7 @@ mod tests {
             CashFlow::new(
                 end,
                 None,
-                Money::new(20_000.0, Currency::USD),
+                Money::from((20_000_i64, Currency::USD)),
                 CFKind::Fixed,
                 150.0 / 365.0,
                 Some(0.048666666666666664),
@@ -891,7 +891,7 @@ mod tests {
         ];
         let schedule = CashFlowSchedule {
             flows,
-            notional: Notional::par(1_000_000.0, Currency::USD),
+            notional: Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
             day_count: DayCount::Thirty360,
             meta: crate::builder::CashFlowMeta {
                 issue_date: Some(issue),

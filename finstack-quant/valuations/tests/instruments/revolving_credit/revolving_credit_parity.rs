@@ -112,8 +112,10 @@ mod tests {
         // Create deterministic facility
         let facility_det = RevolvingCredit::builder()
             .id("RC-DET-FIXED".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -129,8 +131,10 @@ mod tests {
         // Create stochastic facility with zero volatility
         let facility_stoch = RevolvingCredit::builder()
             .id("RC-STOCH-FIXED".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -175,8 +179,10 @@ mod tests {
         // Create deterministic facility
         let facility_det = RevolvingCredit::builder()
             .id("RC-DET-FLOAT".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Floating(
@@ -211,8 +217,10 @@ mod tests {
         // Create stochastic facility with zero volatility
         let facility_stoch = RevolvingCredit::builder()
             .id("RC-STOCH-FLOAT".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Floating(
@@ -276,8 +284,10 @@ mod tests {
         // Create facilities with hazard curve
         let facility_det = RevolvingCredit::builder()
             .id("RC-DET-HAZARD".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -293,8 +303,10 @@ mod tests {
 
         let facility_stoch = RevolvingCredit::builder()
             .id("RC-STOCH-HAZARD".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -339,7 +351,7 @@ mod tests {
 
         // Create tiered fee structure
         let fees = RevolvingCreditFees {
-            upfront_fee: Some(Money::new(50_000.0, Currency::USD)),
+            upfront_fee: Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture")),
             commitment_fee_tiers: vec![
                 FeeTier {
                     threshold: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -383,8 +395,10 @@ mod tests {
 
             let facility_det = RevolvingCredit::builder()
                 .id(format!("RC-DET-TIER-{}", utilization).into())
-                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(drawn, Currency::USD))
+                .commitment_amount(
+                    Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                )
+                .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -399,8 +413,10 @@ mod tests {
 
             let facility_stoch = RevolvingCredit::builder()
                 .id(format!("RC-STOCH-TIER-{}", utilization).into())
-                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(drawn, Currency::USD))
+                .commitment_amount(
+                    Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                )
+                .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -448,25 +464,27 @@ mod tests {
         let events = vec![
             DrawRepayEvent {
                 date: date(2025, 3, 1),
-                amount: Money::new(1_000_000.0, Currency::USD),
+                amount: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 is_draw: true,
             },
             DrawRepayEvent {
                 date: date(2025, 6, 1),
-                amount: Money::new(500_000.0, Currency::USD),
+                amount: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
                 is_draw: false,
             },
             DrawRepayEvent {
                 date: date(2025, 9, 1),
-                amount: Money::new(2_000_000.0, Currency::USD),
+                amount: Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
                 is_draw: true,
             },
         ];
 
         let facility_det = RevolvingCredit::builder()
             .id("RC-DET-EVENTS".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(3_000_000.0, Currency::USD))
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"))
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -484,8 +502,10 @@ mod tests {
         // Average utilization ≈ 45%
         let facility_stoch = RevolvingCredit::builder()
             .id("RC-STOCH-CONST".into())
-            .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-            .drawn_amount(Money::new(4_500_000.0, Currency::USD)) // 45% utilization
+            .commitment_amount(
+                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            )
+            .drawn_amount(Money::new(4_500_000.0, Currency::USD).expect("valid money fixture")) // 45% utilization
             .commitment_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -522,26 +542,32 @@ mod tests {
             finstack_quant_core::dates::Tenor::new(
                 1,
                 finstack_quant_core::dates::TenorUnit::Months,
-            ), // Monthly
+            )
+            .expect("valid tenor fixture"), // Monthly
             finstack_quant_core::dates::Tenor::new(
                 3,
                 finstack_quant_core::dates::TenorUnit::Months,
-            ), // Quarterly
+            )
+            .expect("valid tenor fixture"), // Quarterly
             finstack_quant_core::dates::Tenor::new(
                 6,
                 finstack_quant_core::dates::TenorUnit::Months,
-            ), // Semi-annual
+            )
+            .expect("valid tenor fixture"), // Semi-annual
             finstack_quant_core::dates::Tenor::new(
                 12,
                 finstack_quant_core::dates::TenorUnit::Months,
-            ), // Annual
+            )
+            .expect("valid tenor fixture"), // Annual
         ];
 
         for frequency in frequencies {
             let facility_det = RevolvingCredit::builder()
                 .id(format!("RC-DET-FREQ-{:?}", frequency).into())
-                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+                .commitment_amount(
+                    Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                )
+                .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
@@ -556,8 +582,10 @@ mod tests {
 
             let facility_stoch = RevolvingCredit::builder()
                 .id(format!("RC-STOCH-FREQ-{:?}", frequency).into())
-                .commitment_amount(Money::new(10_000_000.0, Currency::USD))
-                .drawn_amount(Money::new(5_000_000.0, Currency::USD))
+                .commitment_amount(
+                    Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+                )
+                .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
                 .commitment_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })

@@ -193,7 +193,7 @@ fn cds_imm_schedule_params_reach_the_cashflow_compiler() {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(
-            Money::new(1_000_000.0, Currency::USD),
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             d(2024, 3, 20),
             d(2024, 12, 20),
         )

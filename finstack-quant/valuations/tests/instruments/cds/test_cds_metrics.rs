@@ -132,7 +132,7 @@ fn create_replayable_test_market(as_of: Date) -> MarketContext {
 fn create_test_cds(as_of: Date, maturity: Date) -> CreditDefaultSwap {
     crate::test_support::credit::cds_buy_protection(
         "METRICS_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,
@@ -900,7 +900,7 @@ fn test_jump_to_default_negative_for_seller() {
 
     let cds = crate::test_support::credit::cds_sell_protection(
         "JTD_SELLER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,
@@ -962,7 +962,7 @@ fn test_jump_to_default_uses_adjusted_coupon_schedule_for_accrued() {
     let as_of = date!(2027 - 04 - 01);
     let maturity = date!(2031 - 12 - 20);
 
-    let notional = Money::new(10_000_000.0, Currency::USD);
+    let notional = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let mut cds = crate::test_support::credit::cds_buy_protection(
         "JTD_SCHEDULE_ADJ",
         notional,
@@ -1368,7 +1368,7 @@ fn test_metrics_scale_with_notional() {
 
     let cds_small = crate::test_support::credit::cds_buy_protection(
         "SMALL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,
@@ -1379,7 +1379,7 @@ fn test_metrics_scale_with_notional() {
 
     let cds_large = crate::test_support::credit::cds_buy_protection(
         "LARGE",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,

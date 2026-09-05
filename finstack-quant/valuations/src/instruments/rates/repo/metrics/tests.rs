@@ -21,7 +21,7 @@ fn create_test_repo() -> Repo {
     let collateral = CollateralSpec::new("BOND_ABC", 1000.0, "BOND_ABC_PRICE");
     Repo::term(
         "REPO_001",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::from((1000000_i64, Currency::USD)),
         collateral,
         0.05,
         test_date(2025, 1, 15),
@@ -42,7 +42,7 @@ fn create_test_context() -> MarketContext {
         .expect("should succeed");
     MarketContext::new().insert(disc).insert_price(
         "BOND_ABC_PRICE",
-        MarketScalar::Price(Money::new(1.02, Currency::USD)),
+        MarketScalar::Price(Money::new(1.02, Currency::USD).expect("valid test amount")),
     )
 }
 
@@ -54,7 +54,7 @@ fn test_collateral_value_calculator() {
         std::sync::Arc::new(repo),
         std::sync::Arc::new(market_context),
         test_date(2025, 1, 10),
-        Money::new(0.0, Currency::USD),
+        Money::from((0_i64, Currency::USD)),
         MetricContext::default_config(),
     );
 
@@ -71,7 +71,7 @@ fn test_required_collateral_calculator() {
         std::sync::Arc::new(repo),
         std::sync::Arc::new(market_context),
         test_date(2025, 1, 10),
-        Money::new(0.0, Currency::USD),
+        Money::from((0_i64, Currency::USD)),
         MetricContext::default_config(),
     );
 
@@ -88,7 +88,7 @@ fn test_effective_rate_calculator() {
         std::sync::Arc::new(repo),
         std::sync::Arc::new(market_context),
         test_date(2025, 1, 10),
-        Money::new(0.0, Currency::USD),
+        Money::from((0_i64, Currency::USD)),
         MetricContext::default_config(),
     );
 

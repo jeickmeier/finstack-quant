@@ -79,7 +79,7 @@ sensitivities.add_ir_delta(Currency::USD, "5Y", 50_000.0);
 sensitivities.add_equity_delta("AAPL", 100_000.0);
 
 // (total_im: f64, breakdown: HashMap<String, Money>)
-let (total_im, breakdown) = calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD);
+let (total_im, breakdown) = calc.calculate_from_sensitivities_parts(&sensitivities, Currency::USD)?;
 assert!(total_im >= 0.0);
 assert!(breakdown.contains_key("IR_Delta"));
 # Ok::<(), finstack_quant_core::Error>(())
@@ -100,8 +100,8 @@ use finstack_quant_margin::{CsaSpec, VmCalculator};
 
 let calc = VmCalculator::new(CsaSpec::usd_regulatory()?);
 
-let exposure = Money::new(5_000_000.0, Currency::USD);
-let posted = Money::new(3_000_000.0, Currency::USD);
+let exposure = Money::new(5_000_000.0, Currency::USD)?;
+let posted = Money::new(3_000_000.0, Currency::USD)?;
 let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
 
 let result = calc.calculate(exposure, posted, as_of)?;

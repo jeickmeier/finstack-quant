@@ -28,7 +28,7 @@
 //! assert!(matches!(moic_floor.kind, ReturnFloorKind::Moic(_)));
 //!
 //! // XIRR floor at 12% with OID issue price
-//! let xirr_floor = ReturnFloorSpec::xirr(Rate::from_percent(12.0))
+//! let xirr_floor = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"))
 //!     .issue_price(IssuePrice::PctOfPar(98.0));
 //! assert!(matches!(xirr_floor.issue_price, IssuePrice::PctOfPar(_)));
 //! ```
@@ -264,7 +264,7 @@ pub enum ProtectionWindow {
 /// assert!(spec.validate().is_ok());
 ///
 /// // 10% XIRR floor with 98 OID, validated
-/// let spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0))
+/// let spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0).expect("valid rate fixture"))
 ///     .issue_price(IssuePrice::PctOfPar(98.0));
 /// assert!(spec.validate().is_ok());
 /// ```
@@ -283,8 +283,8 @@ pub enum ProtectionWindow {
 /// // 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.
 /// let loan = Bond::fixed(
 ///     "LOAN-001",
-///     Money::new(1_000_000.0, Currency::USD),
-///     Rate::from_percent(10.0),
+///     Money::from((1_000_000_i64, Currency::USD)),
+///     Rate::from_percent(10.0).expect("valid rate fixture"),
 ///     date!(2025 - 01 - 01),
 ///     date!(2030 - 01 - 01),
 ///     finstack_quant_core::dates::StubKind::None,
@@ -355,7 +355,7 @@ impl ReturnFloorSpec {
     ///
     /// # Arguments
     ///
-    /// * `rate` — target annualized internal rate of return (e.g. `Rate::from_percent(12.0)`).
+    /// * `rate` — target annualized internal rate of return (e.g. `Rate::from_percent(12.0).expect("valid rate fixture")`).
     ///
     /// # Examples
     ///
@@ -363,7 +363,7 @@ impl ReturnFloorSpec {
     /// use finstack_quant_valuations::instruments::fixed_income::bond::ReturnFloorSpec;
     /// use finstack_quant_core::types::Rate;
     ///
-    /// let spec = ReturnFloorSpec::xirr(Rate::from_percent(12.0));
+    /// let spec = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"));
     /// assert!(spec.validate().is_ok());
     /// ```
     pub fn xirr(rate: impl Into<Rate>) -> Self {
@@ -500,8 +500,8 @@ mod tests {
 
     #[test]
     fn xirr_constructor_and_fluent_setters() {
-        let spec =
-            ReturnFloorSpec::xirr(Rate::from_percent(12.0)).issue_price(IssuePrice::PctOfPar(98.0));
+        let spec = ReturnFloorSpec::xirr(Rate::from_percent(12.0).expect("valid rate fixture"))
+            .issue_price(IssuePrice::PctOfPar(98.0));
         assert!(matches!(spec.kind, ReturnFloorKind::Xirr(_)));
         assert!(matches!(spec.issue_price, IssuePrice::PctOfPar(p) if (p - 98.0).abs() < 1e-12));
     }
@@ -522,7 +522,9 @@ mod tests {
         }
         for amount in [0.0, -100.0] {
             assert!(ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::Amount(Money::new(amount, Currency::USD)))
+                .issue_price(IssuePrice::Amount(
+                    Money::new(amount, Currency::USD).expect("valid money fixture")
+                ))
                 .validate()
                 .is_err());
         }
@@ -530,22 +532,24 @@ mod tests {
 
     #[test]
     fn resolve_rejects_nonpositive_and_currency_mismatched_issue_prices() {
-        let notional = Money::new(100.0, Currency::USD);
+        let notional = Money::from((100_i64, Currency::USD));
         assert!(IssuePrice::PctOfPar(0.0).resolve(notional).is_err());
         assert!(IssuePrice::PctOfPar(f64::NAN).resolve(notional).is_err());
-        assert!(IssuePrice::Amount(Money::new(-1.0, Currency::USD))
+        assert!(IssuePrice::Amount(Money::from((-1_i64, Currency::USD)))
             .resolve(notional)
             .is_err());
-        assert!(IssuePrice::Amount(Money::new(100.0, Currency::EUR))
+        assert!(IssuePrice::Amount(Money::from((100_i64, Currency::EUR)))
             .resolve(notional)
             .is_err());
     }
 
     #[test]
     fn validate_rejects_xirr_at_or_below_minus_one() {
-        assert!(ReturnFloorSpec::xirr(Rate::from_decimal(-1.0))
-            .validate()
-            .is_err());
+        assert!(
+            ReturnFloorSpec::xirr(Rate::from_decimal(-1.0).expect("valid rate fixture"))
+                .validate()
+                .is_err()
+        );
     }
 
     #[test]

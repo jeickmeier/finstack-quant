@@ -56,7 +56,7 @@ fn create_standard_cap(_as_of: Date, start: Date, end: Date, strike: f64) -> Cap
     CapFloor {
         id: "CAP_TEST".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(strike).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -132,7 +132,7 @@ fn test_floor_forward_pv01() {
     let floor = CapFloor {
         id: "FLOOR_TEST".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,

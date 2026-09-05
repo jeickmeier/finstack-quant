@@ -959,11 +959,11 @@ impl TermLoanTreePricer {
             )));
         }
         match self.prepare(loan, market, as_of)? {
-            None => Ok(Money::new(0.0, loan.currency)),
+            None => Ok(Money::from((0_i64, loan.currency))),
             Some(prepared) => Ok(Money::new(
                 Self::price_on_tree(&prepared, market, oas_bp)?,
                 loan.currency,
-            )),
+            )?),
         }
     }
 
@@ -1078,7 +1078,7 @@ mod tests {
 
     fn dummy_loan() -> TermLoan {
         let mut loan = TermLoan::example().expect("example loan");
-        loan.notional_limit = Money::new(100.0, Currency::USD);
+        loan.notional_limit = Money::from((100_i64, Currency::USD));
         loan
     }
 

@@ -51,7 +51,7 @@ use time::macros::date;
 ///     .base_currency(Currency::EUR)
 ///     .quote_currency(Currency::USD)
 ///     .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())
-///     .notional(Money::new(1_000_000.0, Currency::EUR))
+///     .notional(Money::from((1_000_000_i64, Currency::EUR)))
 ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
 ///     .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
 ///     .build()
@@ -266,7 +266,7 @@ impl FxForward {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(date!(2025 - 06 - 15))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .contract_rate_opt(Some(1.12))
@@ -411,7 +411,7 @@ impl FxForward {
     ///     .base_currency(Currency::EUR)
     ///     .quote_currency(Currency::USD)
     ///     .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())
-    ///     .notional(Money::new(1_000_000.0, Currency::EUR))
+    ///     .notional(Money::from((1_000_000_i64, Currency::EUR)))
     ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
     ///     .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
     ///     .build()
@@ -485,7 +485,7 @@ impl FxForward {
     ///     .base_currency(Currency::EUR)
     ///     .quote_currency(Currency::USD)
     ///     .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())
-    ///     .notional(Money::new(1_000_000.0, Currency::EUR))
+    ///     .notional(Money::from((1_000_000_i64, Currency::EUR)))
     ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
     ///     .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
     ///     .build()
@@ -591,10 +591,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
 
         // End-of-day policy: the settlement legs remain live on maturity.
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
-            return Ok(finstack_quant_core::money::Money::new(
-                0.0,
+            return Ok(finstack_quant_core::money::Money::from((
+                0_i64,
                 self.quote_currency,
-            ));
+            )));
         }
 
         let inputs = crate::instruments::fx::shared::collect_fx_forward_inputs(
@@ -615,10 +615,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
                 * (inputs.spot * inputs.df_foreign - contract_rate * inputs.df_domestic)
         });
 
-        Ok(finstack_quant_core::money::Money::new(
-            pv,
-            self.quote_currency,
-        ))
+        finstack_quant_core::money::Money::new(pv, self.quote_currency)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -666,7 +663,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
                 Vec::new(),
                 finstack_quant_core::dates::DayCount::Act365F,
                 crate::cashflow::traits::ScheduleBuildOpts {
-                    notional_hint: Some(Money::new(0.0, self.base_currency)),
+                    notional_hint: Some(Money::from((0_i64, self.base_currency))),
                     meta: crate::cashflow::builder::CashFlowMeta {
                         representation:
                             crate::cashflow::builder::CashflowRepresentation::NoResidual,
@@ -676,8 +673,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
             ));
         }
         let contract_rate = self.contractual_forward_rate(market, as_of)?;
-        let base_amount = Money::new(self.notional.amount(), self.base_currency);
-        let quote_amount = Money::new(-self.notional.amount() * contract_rate, self.quote_currency);
+        let base_amount = Money::new(self.notional.amount(), self.base_currency)?;
+        let quote_amount =
+            Money::new(-self.notional.amount() * contract_rate, self.quote_currency)?;
 
         let base_flow = self.single_leg_schedule(as_of, base_amount)?;
         let quote_schedule = self.single_leg_schedule(as_of, quote_amount)?;
@@ -691,7 +689,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(0.0, self.base_currency)),
+                notional_hint: Some(Money::from((0_i64, self.base_currency))),
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation,
                     ..Default::default()
@@ -759,7 +757,7 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::EUR, // Same as base - invalid
             maturity: Date::from_calendar_date(2025, Month::June, 15).expect("valid date"),
-            notional: Money::new(1_000_000.0, Currency::EUR),
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
             contract_rate: None,
             domestic_discount_curve_id: CurveId::new("EUR-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
@@ -787,7 +785,7 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
             maturity: Date::from_calendar_date(2025, Month::June, 15).expect("valid date"),
-            notional: Money::new(1_000_000.0, Currency::USD), // Wrong currency
+            notional: Money::from((1_000_000_i64, Currency::USD)), // Wrong currency
             contract_rate: None,
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
@@ -815,7 +813,7 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
             maturity: Date::from_calendar_date(2025, Month::June, 15).expect("valid date"),
-            notional: Money::new(1_000_000.0, Currency::EUR),
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
             contract_rate: Some(-1.10), // Negative rate - invalid
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
@@ -843,7 +841,7 @@ mod tests {
             base_currency: Currency::EUR,
             quote_currency: Currency::USD,
             maturity: Date::from_calendar_date(2025, Month::June, 15).expect("valid date"),
-            notional: Money::new(1_000_000.0, Currency::EUR),
+            notional: Money::from((1_000_000_i64, Currency::EUR)),
             contract_rate: Some(1.10),
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
@@ -877,7 +875,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(Date::from_calendar_date(2024, Month::July, 15).expect("valid date"))
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .attributes(Attributes::new())
@@ -934,7 +932,7 @@ mod tests {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(maturity)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .contract_rate_opt(Some(1.12))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))

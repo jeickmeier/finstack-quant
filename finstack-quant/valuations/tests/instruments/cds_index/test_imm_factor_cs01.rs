@@ -49,7 +49,7 @@ fn imm_20th_schedule_for_index_synthetic() {
     let idx = CDSIndex::from_preset(
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-IMM",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -58,7 +58,9 @@ fn imm_20th_schedule_for_index_synthetic() {
         "HZ-IDX",
     )
     .expect("valid test parameters");
-    let cds = idx.to_synthetic_cds();
+    let cds = idx
+        .to_synthetic_cds()
+        .expect("valid to_synthetic_cds fixture");
     let schedule_dates = cds.isda_coupon_schedule().unwrap();
     // Internal coupon dates (excluding first and last) should be near the 20th.
     for d in schedule_dates
@@ -107,7 +109,7 @@ fn index_factor_scales_pv() {
     let idx_base = CDSIndex::from_preset(
         &preset,
         "CDX-BASE",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -121,7 +123,7 @@ fn index_factor_scales_pv() {
     let idx_scaled = CDSIndex::from_preset(
         &preset,
         "CDX-SCALED",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,

@@ -62,7 +62,7 @@ fn test_black_model_symmetry() {
     let caplet = CapFloor {
         id: "CAPLET".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -126,7 +126,7 @@ fn test_vega_gamma_relation() {
     let cap = CapFloor {
         id: "CAP_RELATIONS".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -193,7 +193,7 @@ fn test_delta_by_finite_difference() {
     let caplet = CapFloor {
         id: "CAPLET_FD".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -288,7 +288,7 @@ fn test_vega_by_finite_difference() {
     let caplet = CapFloor {
         id: "CAPLET_VEGA_FD".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -385,7 +385,7 @@ fn test_numerical_stability_extreme_params() {
     let cap = CapFloor {
         id: "CAP_EXTREME".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(100_000_000.0, Currency::USD), // $100MM
+        notional: Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"), // $100MM
         strike: Decimal::try_from(0.15).expect("valid decimal"), // 15% strike
         start_date: as_of,
         maturity: end,

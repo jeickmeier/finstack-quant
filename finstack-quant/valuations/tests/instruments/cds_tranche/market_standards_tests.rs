@@ -128,7 +128,7 @@ fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade()
     let params = CDSTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",
         42,
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         date!(2029 - 12 - 20),
         500.0,
     );
@@ -302,7 +302,8 @@ fn test_equity_tranche_parameters() {
         finstack_quant_core::money::Money::new(
             10_000_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         maturity_5y(),
         1000.0,
     );
@@ -321,7 +322,8 @@ fn test_mezzanine_tranche_parameters() {
         finstack_quant_core::money::Money::new(
             10_000_000.0,
             finstack_quant_core::currency::Currency::USD,
-        ),
+        )
+        .expect("valid money fixture"),
         maturity_5y(),
         500.0,
     );

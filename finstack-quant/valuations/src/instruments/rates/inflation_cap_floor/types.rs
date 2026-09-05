@@ -221,7 +221,7 @@ impl InflationCapFloor {
         InflationCapFloor::builder()
             .id(InstrumentId::new("INFLCAP-USD-5Y"))
             .option_type(InflationCapFloorType::Cap)
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike(Decimal::try_from(0.03).expect("valid decimal"))
             .start_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid example date"),
@@ -404,7 +404,7 @@ impl InflationCapFloor {
         model: ModelKey,
     ) -> finstack_quant_core::Result<Money> {
         let pv = self.npv_raw_with_model(curves, as_of, model)?;
-        Ok(Money::new(pv, self.notional.currency()))
+        Money::new(pv, self.notional.currency())
     }
 
     /// Raw (unrounded `f64`) present value, used by finite-difference metrics

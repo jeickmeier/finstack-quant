@@ -72,11 +72,11 @@ fn test_financing_leg_pv_scales_with_notional() {
     let as_of = as_of_date();
 
     let trs_1m = TestEquityTrsBuilder::new()
-        .notional(Money::new(1_000_000.0, USD))
+        .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_5m = TestEquityTrsBuilder::new()
-        .notional(Money::new(5_000_000.0, USD))
+        .notional(Money::new(5_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -168,11 +168,11 @@ fn test_financing_annuity_scales_with_notional() {
     let as_of = as_of_date();
 
     let trs_1m = TestEquityTrsBuilder::new()
-        .notional(Money::new(1_000_000.0, USD))
+        .notional(Money::new(1_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     let trs_10m = TestEquityTrsBuilder::new()
-        .notional(Money::new(10_000_000.0, USD))
+        .notional(Money::new(10_000_000.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -295,7 +295,7 @@ fn test_financing_annuity_bounded() {
     let tenor_years = 1.0;
 
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(notional, USD))
+        .notional(Money::new(notional, USD).expect("valid money fixture"))
         .tenor_months(12)
         .build();
 
@@ -365,7 +365,7 @@ fn test_financing_leg_with_very_small_notional() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(100.0, USD))
+        .notional(Money::new(100.0, USD).expect("valid money fixture"))
         .build();
 
     // Act
@@ -387,7 +387,7 @@ fn test_financing_leg_with_large_notional() {
     let market = create_market_context();
     let as_of = as_of_date();
     let trs = TestEquityTrsBuilder::new()
-        .notional(Money::new(1_000_000_000.0, USD)) // $1B
+        .notional(Money::new(1_000_000_000.0, USD).expect("valid money fixture")) // $1B
         .build();
 
     // Act

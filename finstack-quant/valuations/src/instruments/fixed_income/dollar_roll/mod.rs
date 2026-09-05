@@ -33,7 +33,7 @@
 //!     .agency(AgencyProgram::Fnma)
 //!     .coupon(0.04)
 //!     .term(TbaTerm::ThirtyYear)
-//!     .notional(Money::new(10_000_000.0, Currency::USD))
+//!     .notional(Money::from((10_000_000_i64, Currency::USD)))
 //!     .front_settlement_year(2024)
 //!     .front_settlement_month(3)
 //!     .back_settlement_year(2024)

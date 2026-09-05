@@ -45,7 +45,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
     let loan = TermLoan::builder()
         .id("TL-001".into())
         .currency(Currency::USD)
-        .notional_limit(Money::new(5_000_000.0, Currency::USD))
+        .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate_bp: 800 })
@@ -97,7 +97,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
         "term loan should produce per-instrument capital-structure cashflows"
     );
 
-    let q2 = finstack_quant_core::dates::PeriodId::quarter(2025, 2);
+    let q2 = finstack_quant_core::dates::PeriodId::quarter(2025, 2).expect("valid period fixture");
     let q2_interest = result
         .get("tl_interest", &q2)
         .expect("Q2 term loan interest should evaluate");
@@ -106,7 +106,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
         "expected non-zero Q2 term loan interest, got {q2_interest}"
     );
 
-    let q1 = finstack_quant_core::dates::PeriodId::quarter(2025, 1);
+    let q1 = finstack_quant_core::dates::PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q1_balance = result
         .get("tl_balance", &q1)
         .expect("Q1 term loan balance should evaluate");

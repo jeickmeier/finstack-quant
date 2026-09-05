@@ -943,7 +943,7 @@ mod tests {
             as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
             if as_of >= self.expiry {
-                return Ok(Money::new(0.0, Currency::USD));
+                return Ok(Money::from((0_i64, Currency::USD)));
             }
             let spot_scalar = market.get_price(self.spot_id.as_str())?;
             let spot = match spot_scalar {
@@ -951,7 +951,7 @@ mod tests {
                 MarketScalar::Unitless(v) => *v,
             };
             // Simple analytic PV = S^2 (currency USD)
-            Ok(Money::new(spot * spot, Currency::USD))
+            Ok(Money::new(spot * spot, Currency::USD).expect("valid money fixture"))
         }
 
         fn price_with_metrics(
@@ -1032,7 +1032,7 @@ mod tests {
         ) -> finstack_quant_core::Result<Money> {
             // This intentionally rounds away most of the PV to exercise the raw path
             let raw = self.raw_pv(market)?;
-            Ok(Money::new(raw, Currency::USD))
+            Ok(Money::new(raw, Currency::USD).expect("valid money fixture"))
         }
 
         fn base_value_raw(
@@ -1096,7 +1096,7 @@ mod tests {
     fn market_with_spot(spot_id: &str, price: f64) -> MarketContext {
         MarketContext::new().insert_price(
             spot_id,
-            MarketScalar::Price(Money::new(price, Currency::USD)),
+            MarketScalar::Price(Money::new(price, Currency::USD).expect("valid money fixture")),
         )
     }
 
@@ -1241,7 +1241,7 @@ mod tests {
         let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", 0.0);
 
-        let base_value = Money::new(0.0, Currency::USD);
+        let base_value = Money::from((0_i64, Currency::USD));
         let registry = registry_for_test::<TestFdInstrument>();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
@@ -1267,7 +1267,7 @@ mod tests {
         let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
         let market = market_with_spot("SPOT", -10.0);
 
-        let base_value = Money::new(0.0, Currency::USD);
+        let base_value = Money::from((0_i64, Currency::USD));
         let registry = registry_for_test::<TestFdInstrument>();
         let mut ctx = MetricContext::new(
             Arc::new(inst),
@@ -1470,7 +1470,7 @@ mod tests {
             market: &MarketContext,
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
-            Ok(Money::new(self.raw_pv(market)?, Currency::USD))
+            Ok(Money::new(self.raw_pv(market)?, Currency::USD).expect("valid money fixture"))
         }
 
         fn base_value_raw(

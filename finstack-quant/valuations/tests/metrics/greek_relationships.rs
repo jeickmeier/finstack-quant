@@ -33,7 +33,7 @@ fn create_test_option(expiry: Date, strike: f64, option_type: OptionType) -> Equ
         option_type,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -122,7 +122,10 @@ fn create_market_context(
     MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("AAPL", MarketScalar::Price(Money::new(spot, Currency::USD)))
+        .insert_price(
+            "AAPL",
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+        )
         .insert_price("AAPL_DIV", MarketScalar::Unitless(div_yield))
 }
 
@@ -197,14 +200,18 @@ fn test_speed_equals_gamma_convexity() {
     let spot_bump = spot * spot_bump_pct;
     let market_up = market.clone().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(spot + spot_bump, Currency::USD)),
+        MarketScalar::Price(
+            Money::new(spot + spot_bump, Currency::USD).expect("valid money fixture"),
+        ),
     );
     let gamma_at_s_up = option.gamma(&market_up, as_of).unwrap();
 
     // Compute gamma at spot - bump
     let market_down = market.clone().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(spot - spot_bump, Currency::USD)),
+        MarketScalar::Price(
+            Money::new(spot - spot_bump, Currency::USD).expect("valid money fixture"),
+        ),
     );
     let gamma_at_s_down = option.gamma(&market_down, as_of).unwrap();
 

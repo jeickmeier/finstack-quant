@@ -89,8 +89,8 @@ fn market() -> MarketContext {
 fn floating_credit_bond() -> Bond {
     let mut bond = Bond::fixed(
         "FRN-CREDIT-RESETS",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.06),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
         as_of(),
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -301,7 +301,7 @@ fn floating_credit_loan(coupon_type: CouponType) -> TermLoan {
     TermLoan::builder()
         .id(InstrumentId::new("TL-FLOATING-CREDIT-RESETS"))
         .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of())
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {

@@ -203,7 +203,7 @@ impl LookbackOption {
             .lookback_type(LookbackType::FixedStrike)
             .expiry(date!(2024 - 12 - 20))
             .expiry_fixing_opt(None)
-            .notional(Money::new(100_000.0, Currency::USD))
+            .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

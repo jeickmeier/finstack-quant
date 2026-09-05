@@ -730,7 +730,12 @@ async function main() {
   });
 
   bench('core', 'ForwardCurve construction + rate()', 4000, () => {
-    const fc = new w.ForwardCurve('USD-FWD', 0.25, '2024-01-02', [0.0, 0.03, 5.0, 0.035]);
+    const fc = new w.ForwardCurve({
+      id: 'USD-FWD',
+      tenor: 0.25,
+      baseDate: '2024-01-02',
+      knots: [0.0, 0.03, 5.0, 0.035],
+    });
     fc.rate(1.25);
   });
 

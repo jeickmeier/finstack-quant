@@ -130,7 +130,7 @@ impl CompositeInstrument {
         let spec = CompositeSpec::new(
             "COMPOSITE-EXAMPLE",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             vec![
                 CompositeLegSpec::new("COMPOSITE-LONG", InstrumentJson::Equity(long), 1.0),
                 CompositeLegSpec::new("COMPOSITE-SHORT", InstrumentJson::Equity(short), -1.0),
@@ -345,7 +345,7 @@ impl CompositeInstrument {
                 as_of,
             )?;
             exposure.value =
-                Money::new(unit_value * exposure.quantity, self.spec.reporting_currency);
+                Money::new(unit_value * exposure.quantity, self.spec.reporting_currency)?;
             for (metric_id, value) in result.measures {
                 if !is_additive_metric(&metric_id) {
                     continue;
@@ -378,10 +378,7 @@ impl CompositeInstrument {
                 )));
             }
         }
-        Ok(aggregate_primitive_paths(
-            self.spec.reporting_currency,
-            paths,
-        ))
+        aggregate_primitive_paths(self.spec.reporting_currency, paths)
     }
 
     pub(crate) fn valuation_details_with_metrics(
@@ -430,7 +427,7 @@ impl CompositeInstrument {
                 let native_value = Money::new(
                     valuation.value.amount() * resolved.quantity,
                     valuation.value.currency(),
-                );
+                )?;
                 let reporting_value = Money::new(
                     convert_amount(
                         market,
@@ -440,7 +437,7 @@ impl CompositeInstrument {
                         as_of,
                     )?,
                     self.spec.reporting_currency,
-                );
+                )?;
                 Ok(CompositeLegValuation {
                     instrument_id: leg.instrument_id.clone(),
                     quantity: resolved.quantity,
@@ -508,10 +505,10 @@ impl Instrument for CompositeInstrument {
     }
 
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        Ok(Money::new(
+        Money::new(
             self.base_value_raw_impl(market, as_of)?,
             self.spec.reporting_currency,
-        ))
+        )
     }
 
     fn base_value_raw(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
@@ -535,7 +532,7 @@ impl Instrument for CompositeInstrument {
             dependencies.merge(MarketDependencies::from_instrument_json(
                 leg.instrument.as_ref(),
             )?);
-            if let Some(notional) = instrument.notional() {
+            if let Some(notional) = instrument.notional()? {
                 if notional.currency() != self.spec.reporting_currency {
                     dependencies.add_fx_pair(notional.currency(), self.spec.reporting_currency);
                 }

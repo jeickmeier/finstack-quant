@@ -33,7 +33,7 @@ fn test_pool_asset_floating_rate_loan_creation() {
     // Arrange & Act
     let asset = PoolAsset::floating_rate_loan(
         "LOAN001",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         450.0,
         maturity_date(),
@@ -54,7 +54,7 @@ fn test_pool_asset_fixed_rate_bond_creation() {
     // Arrange & Act
     let asset = PoolAsset::fixed_rate_bond(
         "BOND001",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.07,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -73,7 +73,7 @@ fn test_pool_asset_builder_methods() {
     // Arrange & Act
     let asset = PoolAsset::floating_rate_loan(
         "LOAN002",
-        Money::new(15_000_000.0, Currency::USD),
+        Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         500.0,
         maturity_date(),
@@ -94,7 +94,7 @@ fn test_pool_asset_spread_bps_fallback_to_rate() {
     // Arrange: Fixed rate bond without explicit spread
     let asset = PoolAsset::fixed_rate_bond(
         "BOND002",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -112,14 +112,17 @@ fn test_pool_asset_default_with_recovery() {
     // Arrange
     let mut asset = PoolAsset::fixed_rate_bond(
         "BOND003",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.08,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
     );
 
     // Act
-    asset.default_with_recovery(Money::new(400_000.0, Currency::USD), test_date());
+    asset.default_with_recovery(
+        Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
+        test_date(),
+    );
 
     // Assert
     assert!(asset.is_defaulted);
@@ -131,7 +134,7 @@ fn test_pool_asset_remaining_term_calculation() {
     // Arrange
     let asset = PoolAsset::fixed_rate_bond(
         "BOND004",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -170,7 +173,7 @@ fn test_asset_pool_total_balance_calculation() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -178,7 +181,7 @@ fn test_asset_pool_total_balance_calculation() {
     ));
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L2",
-        Money::new(15_000_000.0, Currency::USD),
+        Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         450.0,
         maturity_date(),
@@ -211,7 +214,7 @@ fn test_asset_pool_rejects_asset_currency_mismatch() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::EUR),
+        Money::new(10_000_000.0, Currency::EUR).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -236,7 +239,7 @@ fn test_asset_pool_performing_balance_excludes_defaults() {
     // Add performing asset
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -246,13 +249,16 @@ fn test_asset_pool_performing_balance_excludes_defaults() {
     // Add defaulted asset
     let mut defaulted = PoolAsset::floating_rate_loan(
         "L2",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
     );
-    defaulted.default_with_recovery(Money::new(2_000_000.0, Currency::USD), test_date());
+    defaulted.default_with_recovery(
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
+        test_date(),
+    );
     pool.assets.push(defaulted);
 
     // Act
@@ -272,7 +278,7 @@ fn test_pool_weighted_avg_coupon_single_asset() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -291,14 +297,14 @@ fn test_pool_weighted_avg_coupon_multiple_assets() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06, // 6%
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B2",
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         0.09, // 9%
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -329,7 +335,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0, // 400bps
         maturity_date(),
@@ -337,7 +343,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
     ));
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L2",
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         500.0, // 500bps
         maturity_date(),
@@ -359,7 +365,7 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
     // Floating rate with explicit spread
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         450.0,
         maturity_date(),
@@ -370,7 +376,7 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
     // (the all-in coupon is not a spread; no rate × 10⁴ fallback).
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.07, // 700bps all-in coupon, no spread component
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -389,7 +395,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
 
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -397,7 +403,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
     ));
     let mut defaulted = PoolAsset::floating_rate_loan(
         "L2",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         900.0,
         maturity_date(),
@@ -417,14 +423,14 @@ fn test_pool_weighted_avg_maturity() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2028, Month::January, 1).unwrap(), // 3 years
         finstack_quant_core::dates::DayCount::Thirty360,
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B2",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         Date::from_calendar_date(2032, Month::January, 1).unwrap(), // 7 years
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -446,7 +452,7 @@ fn test_pool_diversity_score_single_obligor() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity_date(),
@@ -457,7 +463,7 @@ fn test_pool_diversity_score_single_obligor() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L2",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             450.0,
             maturity_date(),
@@ -480,7 +486,7 @@ fn test_pool_diversity_score_multiple_obligors() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity_date(),
@@ -491,7 +497,7 @@ fn test_pool_diversity_score_multiple_obligors() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L2",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             450.0,
             maturity_date(),
@@ -528,7 +534,7 @@ fn test_pool_assets_by_industry() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity_date(),
@@ -539,7 +545,7 @@ fn test_pool_assets_by_industry() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L2",
-            Money::new(15_000_000.0, Currency::USD),
+            Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             450.0,
             maturity_date(),
@@ -550,7 +556,7 @@ fn test_pool_assets_by_industry() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L3",
-            Money::new(20_000_000.0, Currency::USD),
+            Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             500.0,
             maturity_date(),
@@ -577,7 +583,7 @@ fn test_pool_assets_by_obligor() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity_date(),
@@ -588,7 +594,7 @@ fn test_pool_assets_by_obligor() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L2",
-            Money::new(15_000_000.0, Currency::USD),
+            Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             450.0,
             maturity_date(),
@@ -615,7 +621,7 @@ fn test_calculate_pool_stats_comprehensive() {
     pool.assets.push(
         PoolAsset::floating_rate_loan(
             "L1",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             "SOFR-3M",
             400.0,
             maturity_date(),
@@ -629,7 +635,7 @@ fn test_calculate_pool_stats_comprehensive() {
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "B1",
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.07,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Thirty360,
@@ -659,7 +665,7 @@ fn test_calculate_pool_stats_with_defaults() {
     // Add performing asset
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(9_000_000.0, Currency::USD),
+        Money::new(9_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -669,13 +675,16 @@ fn test_calculate_pool_stats_with_defaults() {
     // Add defaulted asset
     let mut defaulted = PoolAsset::floating_rate_loan(
         "L2",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
     );
-    defaulted.default_with_recovery(Money::new(400_000.0, Currency::USD), test_date());
+    defaulted.default_with_recovery(
+        Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
+        test_date(),
+    );
     pool.assets.push(defaulted);
 
     // Act
@@ -693,7 +702,7 @@ fn test_pool_zero_balance_asset() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(0.0, Currency::USD), // Zero balance
+        Money::new(0.0, Currency::USD).expect("valid money fixture"), // Zero balance
         0.06,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -713,7 +722,7 @@ fn test_pool_negative_days_remaining_term() {
     // Arrange
     let asset = PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         Date::from_calendar_date(2020, Month::January, 1).unwrap(), // Past maturity
         finstack_quant_core::dates::DayCount::Thirty360,
@@ -735,7 +744,7 @@ fn test_pool_asset_type_classification() {
         asset_type: AssetType::FirstLienLoan {
             industry: Some("Tech".to_string()),
         },
-        balance: Money::new(10_000_000.0, Currency::USD),
+        balance: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         rate: 0.07,
         spread_bp: Some(450.0),
         index_id: Some("SOFR-3M".to_string()),

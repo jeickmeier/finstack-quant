@@ -169,7 +169,7 @@ where
         payoff.on_event(&mut path_state)?;
     }
 
-    Ok(payoff.value(currency).amount())
+    Ok(payoff.value(currency)?.amount())
 }
 
 impl McEngine {
@@ -261,7 +261,7 @@ impl McEngine {
             initial_point.add_typed_cashflow(time, amount, cf_type);
         });
         if self.config.path_capture.capture_payoffs {
-            let payoff_money = payoff.value(currency);
+            let payoff_money = payoff.value(currency)?;
             initial_point.set_payoff(payoff_money.amount());
         }
         simulated_path.add_point(initial_point);
@@ -290,13 +290,13 @@ impl McEngine {
 
             if self.config.path_capture.capture_payoffs {
                 // Capture intermediate payoff value (undiscounted)
-                let payoff_money = payoff.value(currency);
+                let payoff_money = payoff.value(currency)?;
                 point.set_payoff(payoff_money.amount());
             }
             simulated_path.add_point(point);
         }
 
-        let payoff_money = payoff.value(currency);
+        let payoff_money = payoff.value(currency)?;
         let payoff_value = payoff_money.amount();
 
         simulated_path.set_final_value(payoff_value * discount_factor);
@@ -408,8 +408,8 @@ impl McEngine {
             payoff_a.on_event(&mut path_state_a)?;
         }
 
-        let v_p = payoff_p.value(currency).amount();
-        let v_a = payoff_a.value(currency).amount();
+        let v_p = payoff_p.value(currency)?.amount();
+        let v_a = payoff_a.value(currency)?.amount();
         Ok(0.5 * (v_p + v_a))
     }
 }

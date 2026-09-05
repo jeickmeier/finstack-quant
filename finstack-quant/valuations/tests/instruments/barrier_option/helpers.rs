@@ -88,14 +88,14 @@ pub fn create_down_and_out_call(
         id: "BARRIER_DOC_TEST".into(),
         underlying_ticker: SPOT_ID.into(),
         strike,
-        barrier: Money::new(barrier, Currency::USD),
+        barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
         rebate: None,
         rebate_timing: Default::default(),
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry,
         observed_barrier_breached: None,
-        notional: Money::new(1.0, Currency::USD),
+        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count,
         use_gobet_miri: false,
         discount_curve_id: DISC_ID.into(),
@@ -130,7 +130,7 @@ pub fn build_market_with_day_count(
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD)),
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
 }

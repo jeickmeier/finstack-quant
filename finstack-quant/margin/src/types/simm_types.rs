@@ -744,6 +744,11 @@ impl SimmSensitivities {
     }
 
     /// Add a commodity delta sensitivity bucket.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - Commodity bucket label from the SIMM registry; repeated labels accumulate their sensitivities, and validation rejects unknown labels.
+    /// * `delta` - Signed currency delta in the calculation's base currency before SIMM risk weighting; no currency conversion is performed here.
     pub fn add_commodity_delta(&mut self, bucket: impl Into<String>, delta: f64) {
         let key = bucket.into();
         *self.commodity_delta.entry(key).or_insert(0.0) += delta;

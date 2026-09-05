@@ -65,5 +65,5 @@ test('periodicReturns rejects unsupported frequency tokens', () => {
     [[0.01, 0.02]],
     ['FUND']
   );
-  assert.throws(() => perf.periodicReturns('hourly'), /Unknown frequency/);
+  assert.throws(() => perf.periodicReturns('hourly'), /unknown period kind 'hourly'/);
 });

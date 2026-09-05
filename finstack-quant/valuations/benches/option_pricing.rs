@@ -70,7 +70,7 @@ fn create_market() -> MarketContext {
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD)),
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
 }
@@ -82,14 +82,14 @@ fn create_barrier_option() -> BarrierOption {
         id: "BARRIER-12M".into(),
         underlying_ticker: "SPX".into(),
         strike: 100.0,
-        barrier: Money::new(80.0, Currency::USD),
+        barrier: Money::new(80.0, Currency::USD).expect("valid money fixture"),
         rebate: None,
         rebate_timing: Default::default(),
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry: as_of + time::Duration::days(365),
         observed_barrier_breached: None,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: finstack_quant_core::dates::DayCount::Act365F,
         use_gobet_miri: false,
         discount_curve_id: "USD_DISC".into(),
@@ -129,7 +129,10 @@ fn create_barrier_market() -> MarketContext {
     MarketContext::new()
         .insert(disc)
         .insert_surface(vol_surface)
-        .insert_price("SPX", MarketScalar::Price(Money::new(100.0, Currency::USD)))
+        .insert_price(
+            "SPX",
+            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        )
         .insert_price("SPX_DIV", MarketScalar::Unitless(0.02))
 }
 

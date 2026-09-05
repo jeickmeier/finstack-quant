@@ -105,8 +105,8 @@ fn test_callable_bond_tree_pricing_reasonable() {
     // Create straight bond
     let straight_bond = Bond::fixed(
         "STRAIGHT",
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -117,8 +117,8 @@ fn test_callable_bond_tree_pricing_reasonable() {
     // Create callable bond
     let mut callable_bond = Bond::fixed(
         "CALLABLE",
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -188,8 +188,8 @@ fn test_tree_convergence_with_steps() {
 
     let mut callable_bond = Bond::fixed(
         "CALLABLE_CONV",
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -240,8 +240,8 @@ fn test_putable_bond_tree_pricing_reasonable() {
 
     let straight_bond = Bond::fixed(
         "STRAIGHT2",
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -251,8 +251,8 @@ fn test_putable_bond_tree_pricing_reasonable() {
 
     let mut putable_bond = Bond::fixed(
         "PUTABLE",
-        Money::new(notional, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(coupon_rate),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(coupon_rate).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

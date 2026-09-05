@@ -73,7 +73,7 @@ fn test_realistic_usd_cap_pricing() {
     let cap = CapFloor {
         id: "USD_CAP_5Y_5%".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"), // 5% ATM
         start_date: start,
         maturity: end,
@@ -126,7 +126,7 @@ fn test_realistic_otm_floor_pricing() {
     let floor = CapFloor {
         id: "USD_FLOOR_3Y_3%".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(5_000_000.0, Currency::USD),
+        notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.03).expect("valid decimal"), // 3% OTM floor (forwards ~5%)
         start_date: start,
         maturity: end,
@@ -176,7 +176,7 @@ fn test_semi_annual_vs_quarterly_frequency() {
     let quarterly_cap = CapFloor {
         id: "CAP_QUARTERLY".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -204,7 +204,7 @@ fn test_semi_annual_vs_quarterly_frequency() {
     let semi_annual_cap = CapFloor {
         id: "CAP_SEMIANNUAL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,

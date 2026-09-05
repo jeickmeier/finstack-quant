@@ -116,8 +116,8 @@ fn make_model(levels: Vec<HierarchyDimension>) -> CreditFactorModel {
 fn make_bond() -> Bond {
     let mut bond = Bond::fixed(
         "BOND-ISSUER-A",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05_f64),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05_f64).expect("valid rate fixture"),
         create_date(2024, Month::January, 1).unwrap(),
         create_date(2034, Month::January, 1).unwrap(),
         finstack_quant_core::dates::StubKind::ShortFront,

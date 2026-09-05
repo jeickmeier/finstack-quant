@@ -242,7 +242,7 @@ pub(crate) fn resolve_rate_quote_dates(
                     let delivery_tenor = finstack_quant_core::dates::Tenor::new(
                         fut_conv.delivery_months as u32,
                         TenorUnit::Months,
-                    );
+                    )?;
                     let period_end = delivery_tenor.add_to_date(
                         period_start,
                         Some(cal),
@@ -363,7 +363,7 @@ fn build_deposit(
 
     let deposit = Deposit::builder()
         .id(InstrumentId::new(id.as_str()))
-        .notional(Money::new(ctx.notional(), conv.currency))
+        .notional(Money::new(ctx.notional(), conv.currency)?)
         .start_date(start)
         .maturity(end)
         .day_count(conv.day_count)
@@ -407,7 +407,7 @@ fn build_fra(
 
     let fra = ForwardRateAgreement::builder()
         .id(InstrumentId::new(id.as_str()))
-        .notional(Money::new(ctx.notional(), conv.currency))
+        .notional(Money::new(ctx.notional(), conv.currency)?)
         .fixing_date(fixing)
         .start_date(start_date)
         .maturity(end_date)
@@ -467,7 +467,7 @@ fn build_future(
 
     let future = InterestRateFuture::builder()
         .id(InstrumentId::new(id.as_str()))
-        .notional(Money::new(ctx.notional(), idx_conv.currency))
+        .notional(Money::new(ctx.notional(), idx_conv.currency)?)
         .expiry(expiry_date)
         .fixing_date(fixing)
         .period_start(period_start)
@@ -598,7 +598,7 @@ fn build_swap(
 
     let mut swap = InterestRateSwap::builder()
         .id(InstrumentId::new(id.as_str()))
-        .notional(Money::new(ctx.notional(), conv.currency))
+        .notional(Money::new(ctx.notional(), conv.currency)?)
         .side(PayReceive::Pay)
         .fixed(fixed)
         .float(float)
@@ -662,10 +662,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: Some(0.0010), // 10bp in decimal
         };
@@ -697,10 +700,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: None,
         };
@@ -741,10 +747,13 @@ mod tests {
             let quote = RateQuote::Swap {
                 id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
                 index: IndexId::new("USD-SOFR-OIS"),
-                pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                    5,
-                    finstack_quant_core::dates::TenorUnit::Years,
-                )),
+                pillar: Pillar::Tenor(
+                    finstack_quant_core::dates::Tenor::new(
+                        5,
+                        finstack_quant_core::dates::TenorUnit::Years,
+                    )
+                    .expect("valid tenor fixture"),
+                ),
                 rate: 0.0450,
                 spread_decimal: Some(spread_decimal),
             };
@@ -777,10 +786,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: Some(f64::NAN),
         };
@@ -807,10 +819,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: Some(f64::INFINITY),
         };
@@ -825,10 +840,13 @@ mod tests {
         let quote_neg = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: Some(f64::NEG_INFINITY),
         };
@@ -891,10 +909,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
             index: IndexId::new("USD-SOFR-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                5,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    5,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.0450,
             spread_decimal: None,
         };
@@ -930,10 +951,13 @@ mod tests {
         let quote = RateQuote::Swap {
             id: QuoteId::new("GBP-SONIA-OIS-SWAP-2Y"),
             index: IndexId::new("GBP-SONIA-OIS"),
-            pillar: Pillar::Tenor(finstack_quant_core::dates::Tenor::new(
-                2,
-                finstack_quant_core::dates::TenorUnit::Years,
-            )),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    2,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
             rate: 0.04,
             spread_decimal: None,
         };

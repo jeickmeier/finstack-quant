@@ -694,7 +694,7 @@ fn compute_summary(steps: &[ReplayStep]) -> Result<ReplaySummary> {
         start_value,
         end_value,
         total_pnl,
-        max_drawdown: Money::new(max_dd, start_value.currency()),
+        max_drawdown: Money::new(max_dd, start_value.currency())?,
         max_drawdown_pct: max_dd_pct,
         max_drawdown_peak_date: max_dd_peak_date,
         max_drawdown_trough_date: max_dd_trough_date,
@@ -717,7 +717,7 @@ mod tests {
             valuation: PortfolioValuation {
                 as_of: date,
                 position_values: IndexMap::new(),
-                total_base_currency: Money::new(value, Currency::USD),
+                total_base_currency: Money::new(value, Currency::USD).expect("valid money fixture"),
                 by_entity: IndexMap::new(),
                 degraded_positions: Vec::new(),
                 fx_collapse_policy: FxConversionPolicy::CashflowDate,

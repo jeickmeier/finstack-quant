@@ -109,7 +109,7 @@ fn create_quantlib_convertible(
 
     ConvertibleBond {
         id: id.to_string().into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         issue_date: issue,
         maturity,
         settlement_days: None,
@@ -631,7 +631,7 @@ fn quantlib_parity_zero_coupon_convertible() {
 
     let zero_coupon = ConvertibleBond {
         id: "CB_ZERO".to_string().into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         issue_date: base,
         maturity,
         settlement_days: None,
@@ -910,7 +910,7 @@ fn quantlib_parity_mandatory_conversion() {
 
     let mandatory_bond = ConvertibleBond {
         id: "CB_MAND".to_string().into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         issue_date: base,
         maturity,
         settlement_days: None,
@@ -1000,7 +1000,7 @@ fn quantlib_parity_window_conversion() {
 
     let window_bond = ConvertibleBond {
         id: "CB_WINDOW".to_string().into(),
-        notional: Money::new(notional, Currency::USD),
+        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
         issue_date: base,
         maturity,
         settlement_days: None,

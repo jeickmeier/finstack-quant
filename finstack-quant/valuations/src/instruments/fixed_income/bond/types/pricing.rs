@@ -534,8 +534,8 @@ mod tests {
     fn ex_coupon_bond() -> Bond {
         let mut bond = Bond::fixed(
             "EX-FLOWS",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             date!(2025 - 01 - 01),
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -554,8 +554,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let mut bond = Bond::fixed(
             "DETERMINISTIC-CREDIT-BULLET",
-            Money::new(100.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((100_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             as_of,
             date!(2027 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -664,7 +664,7 @@ mod tests {
     #[test]
     fn bond_validation_enforces_return_floor_and_resolved_issue_price() {
         assert!(
-            Money::try_new(f64::NAN, Currency::USD).is_err(),
+            Money::new(f64::NAN, Currency::USD).is_err(),
             "Money rejects NaN before it can enter IssuePrice::Amount"
         );
         let base = ex_coupon_bond();
@@ -674,11 +674,11 @@ mod tests {
             ReturnFloorSpec::moic(1.0).issue_price(IssuePrice::PctOfPar(0.0)),
             ReturnFloorSpec::moic(1.0).issue_price(IssuePrice::PctOfPar(-1.0)),
             ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::Amount(Money::new(0.0, Currency::USD))),
+                .issue_price(IssuePrice::Amount(Money::from((0_i64, Currency::USD)))),
             ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::Amount(Money::new(-1.0, Currency::USD))),
+                .issue_price(IssuePrice::Amount(Money::from((-1_i64, Currency::USD)))),
             ReturnFloorSpec::moic(1.0)
-                .issue_price(IssuePrice::Amount(Money::new(100.0, Currency::EUR))),
+                .issue_price(IssuePrice::Amount(Money::from((100_i64, Currency::EUR)))),
         ];
         for return_floor in invalid {
             let mut bond = base.clone();
@@ -693,7 +693,7 @@ mod tests {
     #[test]
     fn public_value_enforces_complete_bond_validation() {
         let mut bond = ex_coupon_bond();
-        bond.notional = Money::new(0.0, Currency::USD);
+        bond.notional = Money::from((0_i64, Currency::USD));
         let err = bond
             .value(&MarketContext::new(), date!(2025 - 01 - 02))
             .expect_err("zero bond notional must fail before market lookup");

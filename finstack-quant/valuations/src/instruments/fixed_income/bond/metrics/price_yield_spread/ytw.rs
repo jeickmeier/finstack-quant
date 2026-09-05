@@ -88,7 +88,7 @@ impl MetricCalculator for YtwCalculator {
 
         // Dirty price in currency at quote_date: quoted clean is % of par.
         let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount());
-        let dirty_now = Money::new(dirty_amt, bond.notional.currency());
+        let dirty_now = Money::new(dirty_amt, bond.notional.currency())?;
 
         // Lower return-floor protection into its pricing-effective call
         // schedule before scanning workouts. Contractual cashflows are

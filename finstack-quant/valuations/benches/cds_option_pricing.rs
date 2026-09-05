@@ -38,7 +38,7 @@ fn create_cds_option(
         option_type,
         expiry,
         cds_maturity,
-        notional: Money::new(10_000_000.0, Currency::USD),
+        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         settlement: finstack_quant_valuations::instruments::SettlementType::Cash,
         underlying_is_index: false,
         index_factor: None,

@@ -65,7 +65,7 @@ fn test_compounding_lookback_sensitivity() {
 
     let mut irs = InterestRateSwap::builder()
         .id("TEST-COMP".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -140,7 +140,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
 
     let mut irs = InterestRateSwap::builder()
         .id("TEST-RATE-CUTOFF-BUSINESS-DAY".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -301,7 +301,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
 
     let irs = InterestRateSwap::builder()
         .id("TEST-SEASONED-COMP".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -385,7 +385,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
 
     let irs = InterestRateSwap::builder()
         .id("TEST-SEASONED-COMP-WITH-FIX".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -464,7 +464,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
     // Create swap with significant spread (50bp) on near-zero rate
     let irs = InterestRateSwap::builder()
         .id("TEST-SPREAD-ZERO".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -557,7 +557,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
     // Create swap with spread (100bp) on negative rate
     let irs = InterestRateSwap::builder()
         .id("TEST-SPREAD-NEG".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
@@ -658,7 +658,7 @@ fn test_observation_shift_before_curve_base_date() {
     // Create a swap that's already partially into its first period
     let irs = InterestRateSwap::builder()
         .id("TEST-OBS-SHIFT".into())
-        .notional(Money::new(10_000_000.0, Currency::USD))
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),

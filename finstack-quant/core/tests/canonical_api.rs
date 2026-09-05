@@ -56,8 +56,14 @@ mod npv_tests {
     fn npv_with_flat_curve() {
         let base = d(2024, 1, 1);
         let flows = vec![
-            (base, Money::new(-100_000.0, Currency::USD)),
-            (d(2025, 1, 1), Money::new(110_000.0, Currency::USD)),
+            (
+                base,
+                Money::new(-100_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                d(2025, 1, 1),
+                Money::new(110_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         ];
         let rate: f64 = 0.05;
         let day_count = DayCount::Act365F;
@@ -83,9 +89,18 @@ mod npv_tests {
     fn npv_various_rates() {
         let base = d(2024, 1, 1);
         let flows = vec![
-            (base, Money::new(-50_000.0, Currency::USD)),
-            (d(2024, 7, 1), Money::new(25_000.0, Currency::USD)),
-            (d(2025, 1, 1), Money::new(30_000.0, Currency::USD)),
+            (
+                base,
+                Money::new(-50_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                d(2024, 7, 1),
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                d(2025, 1, 1),
+                Money::new(30_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         ];
 
         for rate in [0.0_f64, 0.01, 0.05, 0.10, 0.25] {
@@ -112,8 +127,14 @@ mod npv_tests {
     fn npv_different_day_counts() {
         let base = d(2024, 1, 1);
         let flows = vec![
-            (base, Money::new(-100.0, Currency::USD)),
-            (d(2024, 7, 1), Money::new(105.0, Currency::USD)),
+            (
+                base,
+                Money::new(-100.0, Currency::USD).expect("valid money fixture"),
+            ),
+            (
+                d(2024, 7, 1),
+                Money::new(105.0, Currency::USD).expect("valid money fixture"),
+            ),
         ];
         let rate: f64 = 0.05;
 

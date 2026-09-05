@@ -55,7 +55,7 @@ fn test_equity_bucketed_dv01_computed() {
     let usd_curve = build_flat_curve(0.05, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(150.0, Currency::USD)),
+        MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
     );
 
     let result = equity
@@ -97,7 +97,7 @@ fn test_equity_bucketed_dv01_with_market_price() {
     let usd_curve = build_flat_curve(0.03, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(
         "MSFT",
-        MarketScalar::Price(Money::new(350.0, Currency::USD)),
+        MarketScalar::Price(Money::new(350.0, Currency::USD).expect("valid money fixture")),
     );
 
     let result = equity

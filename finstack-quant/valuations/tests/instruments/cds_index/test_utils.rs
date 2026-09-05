@@ -136,7 +136,7 @@ pub fn standard_single_curve_index(id: &str, start: Date, end: Date, notional: f
     CDSIndex::from_preset(
         &standard_cdx_params(),
         id,
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,
@@ -158,7 +158,7 @@ pub fn standard_constituents_index(
     CDSIndex::from_preset(
         &standard_cdx_params(),
         id,
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         PayReceive::Pay,
         start,
         end,

@@ -437,7 +437,7 @@ impl CashFlow {
     /// use time::Month;
     ///
     /// let date = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
-    /// let amount = Money::new(100.0, Currency::USD);
+    /// let amount = Money::from((100_i64, Currency::USD));
     /// let cf = CashFlow::new(date, None, amount, CFKind::Fixed, 0.0, None);
     /// assert!(cf.validate().is_ok());
     ///
@@ -445,7 +445,7 @@ impl CashFlow {
     /// let zero_cf = CashFlow::new(
     ///     date,
     ///     None,
-    ///     Money::new(0.0, Currency::USD),
+    ///     Money::from((0_i64, Currency::USD)),
     ///     CFKind::Fixed,
     ///     0.0,
     ///     None,
@@ -545,7 +545,7 @@ mod tests {
     #[test]
     fn cashflow_validation_works() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let amount = Money::new(100.0, Currency::USD);
+        let amount = Money::from((100_i64, Currency::USD));
 
         let cf = CashFlow {
             date,
@@ -569,7 +569,7 @@ mod tests {
         let json = serde_json::json!({
             "date": Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
             "reset_date": null,
-            "amount": Money::new(100.0, Currency::USD),
+            "amount": Money::from((100_i64, Currency::USD)),
             "kind": "fixed",
             "accrual_factor": 0.25,
             "rate": 0.05,
@@ -584,7 +584,7 @@ mod tests {
     #[test]
     fn cashflow_kinds_construct_correctly() {
         let date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
-        let amt = Money::new(1_000.0, Currency::EUR);
+        let amt = Money::from((1_000_i64, Currency::EUR));
 
         let princ = CashFlow {
             date,
@@ -636,7 +636,7 @@ mod tests {
 
         // Zero amounts validate (floored coupons are legitimate;
         // ).
-        let zero = Money::new(0.0, Currency::EUR);
+        let zero = Money::from((0_i64, Currency::EUR));
         let zero_cf = CashFlow {
             date,
             reset_date: None,
@@ -722,7 +722,7 @@ mod tests {
     #[test]
     fn margin_cashflow_kinds_construct_correctly() {
         let date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
-        let amt = Money::new(1_000_000.0, Currency::USD);
+        let amt = Money::from((1_000_000_i64, Currency::USD));
 
         // Initial margin posting
         let im_post = CashFlow {
@@ -780,7 +780,7 @@ mod tests {
         let margin_int = CashFlow {
             date,
             reset_date: None,
-            amount: Money::new(5_000.0, Currency::USD),
+            amount: Money::from((5_000_i64, Currency::USD)),
             kind: CFKind::MarginInterest,
             accrual_factor: 0.25,
             rate: Some(0.05),

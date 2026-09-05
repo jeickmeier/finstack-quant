@@ -211,8 +211,8 @@ impl CompositeHistoryEngine {
             rows.push(CompositeHistoryRow {
                 date: observation.date,
                 value,
-                cashflows: Money::new(cashflows, initial.spec.reporting_currency),
-                pnl: Money::new(pnl, initial.spec.reporting_currency),
+                cashflows: Money::new(cashflows, initial.spec.reporting_currency)?,
+                pnl: Money::new(pnl, initial.spec.reporting_currency)?,
                 period_return,
                 return_index,
                 held_state_effective_date,
@@ -351,7 +351,7 @@ mod tests {
         let spec = CompositeSpec::new(
             "HISTORY",
             Currency::USD,
-            Money::new(100.0, Currency::USD),
+            Money::from((100_i64, Currency::USD)),
             legs,
             WeightingMethod::UserDefined {
                 required_metrics: Vec::new(),

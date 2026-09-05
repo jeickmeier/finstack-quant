@@ -13,8 +13,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Error;
 
 impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
-    fn notional(&self) -> Option<Money> {
-        self.pool.total_balance().ok()
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(self.pool.total_balance().ok())
     }
 
     fn raw_cashflow_schedule(
@@ -41,7 +41,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
             detailed_flows,
             day_count,
             ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()

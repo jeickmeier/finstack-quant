@@ -51,8 +51,8 @@ mod tests {
         Arc::new(
             Bond::fixed(
                 "PLAIN-BOND-002",
-                Money::new(1_000_000.0, Currency::USD),
-                finstack_quant_core::types::Rate::from_decimal(0.05),
+                Money::from((1_000_000_i64, Currency::USD)),
+                finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
                 create_date(2024, Month::January, 1).expect("valid issue date"),
                 create_date(2029, Month::January, 1).expect("valid maturity date"),
                 finstack_quant_core::dates::StubKind::ShortFront,

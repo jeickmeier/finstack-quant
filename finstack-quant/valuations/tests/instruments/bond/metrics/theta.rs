@@ -12,8 +12,8 @@ fn test_theta_finite() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "THETA1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -49,8 +49,8 @@ fn test_theta_sign_diagnostic() {
 
     let bond = Bond::fixed(
         "THETA_SIGN",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.04),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.04).expect("valid rate fixture"),
         date!(2024 - 01 - 15),
         date!(2028 - 01 - 15),
         finstack_quant_core::dates::StubKind::ShortFront,

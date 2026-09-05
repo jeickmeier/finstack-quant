@@ -116,7 +116,7 @@ pub(super) fn simulate_period(
     // subtraction of this period's flows is applied to the correct base.
     if state.was_reinvestment_active && !is_reinvestment_active {
         let actual_sum: f64 = state.pool_state.balances.iter().sum();
-        state.pool_outstanding = Money::new(actual_sum.max(0.0), state.base_currency);
+        state.pool_outstanding = Money::new(actual_sum.max(0.0), state.base_currency)?;
     }
     state.was_reinvestment_active = is_reinvestment_active;
 
@@ -252,10 +252,10 @@ pub(super) fn simulate_period(
                 // Reduce tranche balance BEFORE waterfall execution.
                 if let Some(current_balance) = state.tranche_balances.get_mut(tranche_id_str) {
                     let new_balance = (current_balance.amount() - incremental).max(0.0);
-                    *current_balance = Money::new(new_balance, state.base_currency);
+                    *current_balance = Money::new(new_balance, state.base_currency)?;
                 }
 
-                let writedown = Money::new(incremental, state.base_currency);
+                let writedown = Money::new(incremental, state.base_currency)?;
                 if let Some(res) = state.results.get_mut(tranche_id_str) {
                     res.writedown_flows.push((pay_date, writedown));
                     res.total_writedown = res.total_writedown.checked_add(writedown)?;
@@ -456,8 +456,8 @@ pub(super) fn simulate_period(
             );
             state.spread_account = state
                 .spread_account
-                .checked_add(Money::new(capture, state.base_currency))?;
-            total_cash_for_waterfall = Money::new(net_after.max(0.0), state.base_currency);
+                .checked_add(Money::new(capture, state.base_currency)?)?;
+            total_cash_for_waterfall = Money::new(net_after.max(0.0), state.base_currency)?;
             spread_net_capture = capture;
         } else {
             // Draw from the account to cover the interest shortfall (bounded by
@@ -465,7 +465,7 @@ pub(super) fn simulate_period(
             let draw = (debt_interest_due - interest_avail)
                 .min(state.spread_account.amount())
                 .max(0.0);
-            let draw_money = Money::new(draw, state.base_currency);
+            let draw_money = Money::new(draw, state.base_currency)?;
             state.spread_account = state.spread_account.checked_sub(draw_money)?;
             total_cash_for_waterfall = total_cash_for_waterfall.checked_add(draw_money)?;
             spread_net_capture = -draw;
@@ -511,7 +511,7 @@ pub(super) fn simulate_period(
         let shortfall = (debt_interest_due - total_cash_for_waterfall.amount()).max(0.0);
         let draw = shortfall.min(state.reserve_balance.amount()).max(0.0);
         if draw > 0.0 {
-            let draw_money = Money::new(draw, state.base_currency);
+            let draw_money = Money::new(draw, state.base_currency)?;
             state.reserve_balance = state.reserve_balance.checked_sub(draw_money)?;
             total_cash_for_waterfall = total_cash_for_waterfall.checked_add(draw_money)?;
             reserve_net_capture = -draw;
@@ -532,7 +532,7 @@ pub(super) fn simulate_period(
             state.principal_funding_account = Money::new(
                 state.principal_funding_account.amount() + captured,
                 state.base_currency,
-            );
+            )?;
         } else if (early_amortization || pay_date >= spec.bullet_date)
             && state.principal_funding_account.amount() > 0.0
         {
@@ -546,8 +546,8 @@ pub(super) fn simulate_period(
             // mis-states senior WAL, duration and price in exactly the stress
             // scenario the feature models (cash conserved, timing wrong).
             funding_net_release = state.principal_funding_account.amount();
-            state.principal_funding_account = Money::new(0.0, state.base_currency);
-            let release = Money::new(funding_net_release, state.base_currency);
+            state.principal_funding_account = Money::from((0_i64, state.base_currency));
+            let release = Money::new(funding_net_release, state.base_currency)?;
             principal_available_for_waterfall =
                 principal_available_for_waterfall.checked_add(release)?;
             total_cash_for_waterfall = total_cash_for_waterfall.checked_add(release)?;
@@ -647,7 +647,7 @@ pub(super) fn simulate_period(
         .checked_sub(total_principal_from_pool)?
         .checked_sub(pool_flows.default)?;
     let coverage_test_pool_balance = if coverage_test_pool_balance.amount() < 0.0 {
-        Money::new(0.0, state.base_currency)
+        Money::from((0_i64, state.base_currency))
     } else {
         coverage_test_pool_balance
     };
@@ -718,13 +718,13 @@ pub(super) fn simulate_period(
             .tranche_balances
             .get(tranche_id_str)
             .copied()
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
 
         let existing_deferred = state
             .deferred_interest
             .get(tranche_id_str)
             .copied()
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
 
         // Current-period interest due on post-writedown balance, as the
         // waterfall spec defines the claim (`claim_caps`, F3): uncapped
@@ -754,10 +754,10 @@ pub(super) fn simulate_period(
                     state.floating_rate_shift,
                 )?,
                 state.base_currency,
-            )
+            )?
         } else {
             match claim_caps.get(tranche_id_str) {
-                None => Money::new(0.0, state.base_currency),
+                None => Money::from((0_i64, state.base_currency)),
                 Some(cap) => Money::new(
                     tranche_period_interest_due(
                         tranche,
@@ -773,7 +773,7 @@ pub(super) fn simulate_period(
                         state.floating_rate_shift,
                     )?,
                     state.base_currency,
-                ),
+                )?,
             }
         };
         let total_interest_claim = if tranche.pik_enabled {
@@ -786,7 +786,7 @@ pub(super) fn simulate_period(
             .distributions
             .get(recipient_key)
             .copied()
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
 
         // SC-M28: take the waterfall's OWN interest/principal classification
         // rather than re-deriving it from the aggregate.
@@ -813,17 +813,17 @@ pub(super) fn simulate_period(
             .principal_distributions
             .get(recipient_key)
             .copied()
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
         let principal_classified = Money::new(
             principal_from_waterfall
                 .amount()
                 .min(payment_received.amount())
                 .max(0.0),
             state.base_currency,
-        );
+        )?;
         let interest_portion = payment_received
             .checked_sub(principal_classified)
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
         let interest_paid = if interest_portion.amount() >= total_interest_claim.amount() {
             total_interest_claim
         } else {
@@ -835,21 +835,21 @@ pub(super) fn simulate_period(
                 .min(existing_deferred.amount())
                 .max(0.0),
             state.base_currency,
-        );
+        )?;
         let current_interest_paid = interest_paid
             .checked_sub(deferred_repaid)
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
         let current_interest_shortfall = Money::new(
             (current_interest_due.amount() - current_interest_paid.amount()).max(0.0),
             state.base_currency,
-        );
+        )?;
 
         // Anything the waterfall did not classify as interest retires notional.
         // (`interest_paid` can be below `interest_portion` when the claim is
         // smaller than what the interest tiers paid — that excess is principal.)
         let principal_payment = payment_received
             .checked_sub(interest_paid)
-            .unwrap_or(Money::new(0.0, state.base_currency));
+            .unwrap_or(Money::from((0_i64, state.base_currency)));
 
         if let Some(res) = state.results.get_mut(tranche_id_str) {
             if payment_received.amount() > 0.0 {
@@ -883,11 +883,11 @@ pub(super) fn simulate_period(
         }
 
         let remaining_deferred = if tranche.pik_enabled {
-            Money::new(0.0, state.base_currency)
+            Money::from((0_i64, state.base_currency))
         } else {
             existing_deferred
                 .checked_sub(deferred_repaid)
-                .unwrap_or(Money::new(0.0, state.base_currency))
+                .unwrap_or(Money::from((0_i64, state.base_currency)))
                 .checked_add(current_interest_shortfall)?
         };
         state
@@ -912,7 +912,7 @@ pub(super) fn simulate_period(
             // zero so a negative balance never propagates into later periods'
             // interest accrual and coverage tests.
             let after_principal = if after_principal.amount() < 0.0 {
-                Money::new(0.0, state.base_currency)
+                Money::from((0_i64, state.base_currency))
             } else {
                 after_principal
             };
@@ -942,7 +942,7 @@ pub(super) fn simulate_period(
     if state.pool_outstanding.amount() < 0.0
         && state.pool_outstanding.amount().abs() <= WRITEDOWN_DE_MINIMIS
     {
-        state.pool_outstanding = Money::new(0.0, state.base_currency);
+        state.pool_outstanding = Money::from((0_i64, state.base_currency));
     }
 
     // Pool cash must equal recipient distributions plus residual cash and net

@@ -14,7 +14,6 @@ use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyFloat, PyInt, PyList, PyString, PyTuple, PyType};
 use pyo3::IntoPyObjectExt;
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::bindings::core::config::{extract_rounding_mode, PyFinstackConfig};
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
@@ -131,8 +130,12 @@ fn money_from_amount_with_config(
 ) -> PyResult<Money> {
     const TYPE_MSG: &str = "Money amount must be float, int, str, or decimal.Decimal";
     let from_f64 = |amount: f64| match cfg {
-        Some(cfg) => Money::try_new_with_config(amount, ccy, &cfg.inner),
-        None => Money::try_new(amount, ccy),
+        Some(cfg) => Money::new_with_config(amount, ccy, &cfg.inner),
+        None => Money::new(amount, ccy),
+    };
+    let from_decimal = |amount| match cfg {
+        Some(cfg) => Money::from_decimal_with_config(amount, ccy, &cfg.inner),
+        None => Money::from_decimal(amount, ccy),
     };
     if obj.is_instance_of::<PyFloat>() || obj.is_instance_of::<PyInt>() {
         let amount: f64 = obj.extract().map_err(|_| PyTypeError::new_err(TYPE_MSG))?;
@@ -140,11 +143,11 @@ fn money_from_amount_with_config(
     }
     if is_python_decimal(obj)? {
         let d = decimal_from_py(obj)?;
-        return Money::from_decimal(d, ccy).map_err(core_to_py);
+        return from_decimal(d).map_err(core_to_py);
     }
     if let Ok(text) = obj.cast::<PyString>() {
         let d = parse_decimal_str(text.to_str()?)?;
-        return Money::from_decimal(d, ccy).map_err(core_to_py);
+        return from_decimal(d).map_err(core_to_py);
     }
     let amount: f64 = obj.extract().map_err(|_| PyTypeError::new_err(TYPE_MSG))?;
     from_f64(amount).map_err(core_to_py)
@@ -182,7 +185,7 @@ impl PyMoney {
     #[pyo3(text_signature = "(cls, currency)")]
     fn zero(_cls: &Bound<'_, PyType>, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
         let ccy = extract_currency(currency)?;
-        Money::try_new(0.0, ccy)
+        Money::new(0.0, ccy)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -393,17 +396,7 @@ impl PyMoney {
         other: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         if let Ok(rhs) = other.extract::<PyRef<'_, PyMoney>>() {
-            if self.inner.currency() != rhs.inner.currency() {
-                return Err(currency_mismatch(self.inner, rhs.inner));
-            }
-            let ratio = self
-                .inner
-                .amount_decimal()
-                .checked_div(rhs.inner.amount_decimal())
-                .ok_or_else(|| value_error("division by zero"))?;
-            let ratio = ratio
-                .to_f64()
-                .ok_or_else(|| value_error("Money ratio is not representable as float"))?;
+            let ratio = self.inner.checked_div(rhs.inner).map_err(core_to_py)?;
             return ratio.into_bound_py_any(py);
         }
         let scalar: f64 = other.extract()?;
@@ -424,11 +417,7 @@ impl PyMoney {
 
     /// Absolute value (same currency).
     fn __abs__(&self) -> Self {
-        if self.inner.amount_decimal().is_sign_negative() {
-            Self::from_inner(self.inner.checked_neg())
-        } else {
-            *self
-        }
+        Self::from_inner(self.inner.abs())
     }
 
     /// ``float(money)`` — the ``amount`` view.
@@ -440,15 +429,8 @@ impl PyMoney {
     /// (``n`` defaults to the currency's minor units).
     #[pyo3(signature = (ndigits=None))]
     fn __round__(&self, ndigits: Option<i32>) -> PyResult<Self> {
-        use rust_decimal::RoundingStrategy;
-        let dp = ndigits.unwrap_or_else(|| i32::from(self.inner.currency().decimals()));
-        let scale =
-            u32::try_from(dp).map_err(|_| value_error("round(Money, n) requires n >= 0"))?;
-        let rounded = self
-            .inner
-            .amount_decimal()
-            .round_dp_with_strategy(scale, RoundingStrategy::MidpointNearestEven);
-        Money::from_decimal(rounded, self.inner.currency())
+        self.inner
+            .round(ndigits)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

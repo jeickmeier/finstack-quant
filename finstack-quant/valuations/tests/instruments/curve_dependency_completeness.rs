@@ -75,7 +75,7 @@ fn test_bond_curve_dependencies_complete() {
 
     let bond = Bond::builder()
         .id("BOND-DEPS-TEST".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(
@@ -115,7 +115,7 @@ fn test_cds_curve_dependencies_complete() {
 
     let cds = test_utils::cds_buy_protection(
         "CDS-DEPS-TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,
@@ -157,7 +157,7 @@ fn test_missing_dependency_fails() {
 
     let cds = test_utils::cds_buy_protection(
         "CDS-MISSING-TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,
@@ -190,7 +190,7 @@ fn test_dependency_count_reasonable() {
     // A simple fixed-rate bond should only need 1 discount curve
     let bond = Bond::builder()
         .id("BOND-COUNT-TEST".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
@@ -219,7 +219,7 @@ fn test_dependency_count_reasonable() {
     // A CDS should need 1 discount + 1 credit curve
     let cds = test_utils::cds_buy_protection(
         "CDS-COUNT-TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         maturity,

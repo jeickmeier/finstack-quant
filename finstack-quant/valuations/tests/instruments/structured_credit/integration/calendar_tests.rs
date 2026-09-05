@@ -37,7 +37,7 @@ fn create_test_pool() -> AssetPool {
     let mut pool = AssetPool::new("TEST_POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "LOAN_1",
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -52,7 +52,7 @@ fn create_test_tranches() -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(50_000_000.0, Currency::USD),
+        Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
     )

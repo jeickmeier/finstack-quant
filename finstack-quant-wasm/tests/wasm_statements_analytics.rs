@@ -13,8 +13,8 @@ fn test_model_json() -> String {
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    let q1 = PeriodId::quarter(2024, 1);
-    let q2 = PeriodId::quarter(2024, 2);
+    let q1 = PeriodId::quarter(2024, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2024, 2).expect("valid period fixture");
     let model = ModelBuilder::new("test_model")
         .periods("2024Q1..Q2", None)
         .unwrap()

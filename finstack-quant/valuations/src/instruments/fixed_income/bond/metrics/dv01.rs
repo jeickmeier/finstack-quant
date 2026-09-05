@@ -216,7 +216,7 @@ mod tests {
             Ok(ValuationResult::stamped(
                 instrument.id(),
                 as_of,
-                Money::new(777.0, Currency::USD),
+                Money::from((777_i64, Currency::USD)),
             ))
         }
     }
@@ -227,8 +227,8 @@ mod tests {
         let curve_id = CurveId::new("USD-OIS");
         let bond = Bond::fixed(
             "DV01-DISPATCH",
-            Money::new(1_000.0, Currency::USD),
-            Rate::from_decimal(0.04),
+            Money::from((1_000_i64, Currency::USD)),
+            Rate::from_decimal(0.04).expect("valid rate fixture"),
             date!(2020 - 01 - 15),
             date!(2030 - 01 - 15),
             StubKind::ShortFront,
@@ -247,7 +247,7 @@ mod tests {
             Arc::new(bond.clone()),
             Arc::new(market.clone()),
             as_of,
-            Money::new(1_000.0, Currency::USD),
+            Money::from((1_000_i64, Currency::USD)),
             MetricContext::default_config(),
         );
         let native_dv01 = curve_bump_dv01(&bond, &native_context, &curve_id).expect("native DV01");
@@ -267,7 +267,7 @@ mod tests {
             Arc::new(bond.clone()),
             Arc::new(market),
             as_of,
-            Money::new(777.0, Currency::USD),
+            Money::from((777_i64, Currency::USD)),
             MetricContext::default_config(),
         );
         context.set_pricer_dispatch(PricingDispatch::registered(

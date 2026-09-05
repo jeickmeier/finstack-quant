@@ -92,7 +92,7 @@ pub fn create_call(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -119,7 +119,7 @@ pub fn create_put(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD),
+        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
@@ -153,7 +153,7 @@ pub fn build_standard_market(
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD)),
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
 }
@@ -168,7 +168,7 @@ pub fn build_smile_market(as_of: Date, spot: f64, rate: f64, div_yield: f64) -> 
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD)),
+            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
 }

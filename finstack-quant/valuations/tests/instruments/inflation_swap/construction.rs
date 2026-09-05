@@ -121,7 +121,7 @@ fn test_swap_with_different_notionals() {
     for notional_amt in &[1_000.0, 100_000.0, 1_000_000.0, 100_000_000.0] {
         let swap = InflationSwapBuilder::new()
             .id("ZCINF-NOT".into())
-            .notional(Money::new(*notional_amt, Currency::USD))
+            .notional(Money::new(*notional_amt, Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
             .maturity(maturity)
             .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))

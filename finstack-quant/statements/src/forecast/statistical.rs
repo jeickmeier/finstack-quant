@@ -961,7 +961,10 @@ mod tests {
 
     #[test]
     fn lognormal_zero_base_is_rejected() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let error = lognormal_forecast_with_stream(0.0, &periods, &lognormal_params(), Some(11))
             .expect_err("zero cannot anchor a GBM path");
         assert!(error.to_string().contains("strictly positive"));
@@ -969,7 +972,10 @@ mod tests {
 
     #[test]
     fn lognormal_zero_base_z_recording_is_rejected() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let params = lognormal_params();
         let node = NodeId::new("node");
         let values = IndexMap::from([(periods[0], 0.0), (periods[1], 0.0)]);
@@ -997,7 +1003,7 @@ mod tests {
     /// every downstream tail and breach probability wrong and no diagnostic.
     #[test]
     fn statistical_forecast_rejects_unknown_parameter_keys() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let mut params = lognormal_params();
         params.insert("sigma".to_string(), serde_json::json!(0.4));
 
@@ -1018,7 +1024,7 @@ mod tests {
     /// must validate its own keys too.
     #[test]
     fn correlated_forecast_rejects_unknown_parameter_keys() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let mut params = lognormal_params();
         params.insert("correlation_with".to_string(), serde_json::json!("peer"));
         params.insert("correlation".to_string(), serde_json::json!(0.5));
@@ -1051,7 +1057,7 @@ mod tests {
     /// Correlation keys stay legal on statistical methods.
     #[test]
     fn correlation_keys_are_allowed_on_statistical_methods() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let mut params = lognormal_params();
         params.insert("correlation_with".to_string(), serde_json::json!("peer"));
         params.insert("correlation".to_string(), serde_json::json!(0.5));
@@ -1069,7 +1075,7 @@ mod tests {
     /// `determine_base_value`, so the forecast boundary must fail closed.
     #[test]
     fn lognormal_rejects_non_finite_base_value() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let err = lognormal_forecast(f64::NAN, &periods, &lognormal_params())
             .expect_err("NaN base must be rejected");
         assert!(
@@ -1082,7 +1088,7 @@ mod tests {
     /// requirement, so enabling correlation cannot change validation.
     #[test]
     fn correlated_lognormal_rejects_negative_base_like_independent_path() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = lognormal_params();
 
         // The independent path is the reference behaviour.
@@ -1119,7 +1125,7 @@ mod tests {
     /// The correlated path must also reject a non-finite base.
     #[test]
     fn correlated_lognormal_rejects_non_finite_base() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = lognormal_params();
 
         let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
@@ -1151,7 +1157,7 @@ mod tests {
     /// that would silently propagate into every correlated peer.
     #[test]
     fn z_score_recording_rejects_invalid_lognormal_base() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = lognormal_params();
         let mut values = IndexMap::new();
         values.insert(periods[0], 100.0);
@@ -1184,7 +1190,10 @@ mod tests {
 
     #[test]
     fn mean_reverting_is_deterministic_per_seed() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let params = mean_reverting_params();
         let a = mean_reverting_forecast(0.10, &periods, &params).expect("forecast");
         let b = mean_reverting_forecast(0.10, &periods, &params).expect("forecast");
@@ -1200,7 +1209,9 @@ mod tests {
     /// decay of the gap: `gap_t = (1 - κ)^t · gap_0`.
     #[test]
     fn mean_reverting_zero_vol_decays_gap_geometrically() {
-        let periods: Vec<PeriodId> = (1..=4).map(|q| PeriodId::quarter(2025, q)).collect();
+        let periods: Vec<PeriodId> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect();
         let mut params = mean_reverting_params();
         params.insert("std_dev".to_string(), serde_json::json!(0.0));
 
@@ -1219,7 +1230,7 @@ mod tests {
 
     #[test]
     fn mean_reverting_rejects_out_of_range_reversion_speed() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for speed in [0.0, -0.5, 1.5, f64::NAN] {
             let mut params = mean_reverting_params();
             params.insert("reversion_speed".to_string(), serde_json::json!(speed));
@@ -1231,7 +1242,7 @@ mod tests {
 
     #[test]
     fn mean_reverting_rejects_missing_parameters_and_bad_base() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for missing in ["long_run_mean", "reversion_speed", "std_dev", "seed"] {
             let mut params = mean_reverting_params();
             params.shift_remove(missing);
@@ -1247,7 +1258,10 @@ mod tests {
     /// recorded shocks must reproduce the raw normals the generator drew.
     #[test]
     fn mean_reverting_z_recording_inverts_the_generator() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let params = mean_reverting_params();
         let node = NodeId::new("nim");
 
@@ -1280,7 +1294,10 @@ mod tests {
     /// peer's Z-scores exactly, applied through the AR(1) recurrence.
     #[test]
     fn mean_reverting_correlated_series_mixes_peer_shocks() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let peer_z = [0.7, -1.2];
         let mut cache: IndexMap<NodeId, IndexMap<PeriodId, f64>> = IndexMap::new();
         let entry = cache.entry(NodeId::new("peer")).or_default();
@@ -1336,7 +1353,10 @@ mod tests {
 
     #[test]
     fn bootstrap_is_deterministic_per_seed() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
         let params = bootstrap_params();
         let a = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
         let b = bootstrap_forecast(100.0, &periods, &params).expect("forecast");
@@ -1352,7 +1372,9 @@ mod tests {
     /// must compound one of exactly those rates and stay positive.
     #[test]
     fn bootstrap_growth_mode_resamples_observed_rates() {
-        let periods: Vec<PeriodId> = (1..=4).map(|q| PeriodId::quarter(2025, q)).collect();
+        let periods: Vec<PeriodId> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect();
         let results = bootstrap_forecast(100.0, &periods, &bootstrap_params()).expect("forecast");
 
         let observed_rates = [0.05, -0.05, 0.10];
@@ -1373,7 +1395,9 @@ mod tests {
     /// sign-crossing series that growth mode must reject.
     #[test]
     fn bootstrap_diff_mode_handles_sign_crossing_history() {
-        let periods: Vec<PeriodId> = (1..=4).map(|q| PeriodId::quarter(2025, q)).collect();
+        let periods: Vec<PeriodId> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect();
         let mut params = IndexMap::new();
         params.insert(
             "historical".to_string(),
@@ -1397,7 +1421,7 @@ mod tests {
 
     #[test]
     fn bootstrap_growth_mode_rejects_non_positive_history() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let mut params = bootstrap_params();
         params.insert(
             "historical".to_string(),
@@ -1410,7 +1434,7 @@ mod tests {
 
     #[test]
     fn bootstrap_rejects_short_history_bad_mode_and_missing_seed() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = bootstrap_params();
         params.insert("historical".to_string(), serde_json::json!([100.0]));
@@ -1428,7 +1452,10 @@ mod tests {
 
     #[test]
     fn test_normal_forecast_deterministic() {
-        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let periods = vec![
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        ];
 
         let mut params = IndexMap::new();
         params.insert("mean".to_string(), serde_json::json!(100_000.0));
@@ -1442,18 +1469,18 @@ mod tests {
 
         // Same seed should produce identical results
         assert_eq!(
-            results1[&PeriodId::quarter(2025, 1)],
-            results2[&PeriodId::quarter(2025, 1)]
+            results1[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            results2[&PeriodId::quarter(2025, 1).expect("valid period fixture")]
         );
         assert_eq!(
-            results1[&PeriodId::quarter(2025, 2)],
-            results2[&PeriodId::quarter(2025, 2)]
+            results1[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+            results2[&PeriodId::quarter(2025, 2).expect("valid period fixture")]
         );
     }
 
     #[test]
     fn test_normal_forecast_different_seeds() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params1 = IndexMap::new();
         params1.insert("mean".to_string(), serde_json::json!(100_000.0));
@@ -1472,14 +1499,14 @@ mod tests {
 
         // Different seeds should produce different results
         assert_ne!(
-            results1[&PeriodId::quarter(2025, 1)],
-            results2[&PeriodId::quarter(2025, 1)]
+            results1[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            results2[&PeriodId::quarter(2025, 1).expect("valid period fixture")]
         );
     }
 
     #[test]
     fn test_normal_forecast_missing_parameters() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         // Missing mean
         let mut params = IndexMap::new();
@@ -1503,10 +1530,10 @@ mod tests {
     #[test]
     fn test_lognormal_forecast_always_positive() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
-            PeriodId::quarter(2025, 4),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
+            PeriodId::quarter(2025, 4).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();
@@ -1525,7 +1552,7 @@ mod tests {
 
     #[test]
     fn test_lognormal_forecast_deterministic() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         params.insert("mean".to_string(), serde_json::json!(11.5));
@@ -1539,14 +1566,14 @@ mod tests {
 
         // Same seed should produce identical results
         assert_eq!(
-            results1[&PeriodId::quarter(2025, 1)],
-            results2[&PeriodId::quarter(2025, 1)]
+            results1[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+            results2[&PeriodId::quarter(2025, 1).expect("valid period fixture")]
         );
     }
 
     #[test]
     fn test_lognormal_forecast_clamps_overflow() {
-        let periods = vec![PeriodId::quarter(2025, 1)];
+        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
         let mut params = IndexMap::new();
         params.insert("mean".to_string(), serde_json::json!(1000.0));
@@ -1569,7 +1596,9 @@ mod tests {
     #[test]
     fn test_normal_forecast_no_nan() {
         let periods: Vec<_> = (0..100)
-            .map(|i| PeriodId::quarter(2025 + i / 4, ((i % 4) as u8) + 1))
+            .map(|i| {
+                PeriodId::quarter(2025 + i / 4, ((i % 4) as u8) + 1).expect("valid period fixture")
+            })
             .collect();
 
         for seed in 0..1000 {
@@ -1596,9 +1625,9 @@ mod tests {
     #[test]
     fn test_lognormal_zero_stddev_degenerate() {
         let periods = vec![
-            PeriodId::quarter(2025, 1),
-            PeriodId::quarter(2025, 2),
-            PeriodId::quarter(2025, 3),
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            PeriodId::quarter(2025, 3).expect("valid period fixture"),
         ];
 
         let mut params = IndexMap::new();

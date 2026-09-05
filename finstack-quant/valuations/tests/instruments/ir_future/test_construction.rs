@@ -76,7 +76,7 @@ fn test_multiple_contracts() {
     // 5 contracts = 5 * face value
     let future = InterestRateFuture {
         id: "IRF_5_CONTRACTS".into(),
-        notional: Money::new(5_000_000.0, Currency::USD),
+        notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         expiry: start,
         fixing_date: Some(start),
         period_start: Some(start),
@@ -114,7 +114,7 @@ fn test_different_day_counts() {
     for day_count in day_counts {
         let future = InterestRateFuture {
             id: "IRF_DC_TEST".into(),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             expiry: start,
             fixing_date: Some(start),
             period_start: Some(start),
@@ -173,7 +173,7 @@ fn test_implied_rate_calculation() {
 
     // Quoted price 97.50 => implied rate 2.50%
     let future = create_standard_future(start, end);
-    let implied = future.implied_rate();
+    let implied = future.implied_rate().expect("finite futures quote");
 
     assert!(
         (implied.as_decimal() - 0.025).abs() < 1e-10,
@@ -196,7 +196,7 @@ fn test_implied_rate_various_prices() {
     for (price, expected_rate) in test_cases {
         let mut future = create_standard_future(start, end);
         future.quoted_price = price;
-        let implied = future.implied_rate();
+        let implied = future.implied_rate().expect("finite futures quote");
 
         assert!(
             (implied.as_decimal() - expected_rate).abs() < 1e-10,

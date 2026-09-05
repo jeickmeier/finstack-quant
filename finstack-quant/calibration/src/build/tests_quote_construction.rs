@@ -186,7 +186,7 @@ fn test_all_quote_types_instrument_construction() {
             {
                 let swap = InflationSwap::builder()
                     .id(format!("INF-{}", maturity).into())
-                    .notional(Money::new(1_000_000.0, currency))
+                    .notional(Money::from((1_000_000_i64, currency)))
                     .start_date(base_date)
                     .maturity(*maturity)
                     .fixed_rate(Decimal::try_from(*rate).expect("valid decimal"))

@@ -60,7 +60,7 @@ impl MetricCalculator for YtmCalculator {
         )?;
         flows.push((
             settlement_date,
-            Money::new(-target_price.amount(), target_price.currency()),
+            Money::new(-target_price.amount(), target_price.currency())?,
         ));
 
         // Add signed canonical schedule flows after settlement_date

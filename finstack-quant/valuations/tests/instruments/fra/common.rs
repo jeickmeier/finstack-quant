@@ -123,7 +123,7 @@ pub fn create_standard_fra() -> ForwardRateAgreement {
     let (fixing, start, end) = standard_fra_dates();
     ForwardRateAgreement {
         id: "FRA_TEST".into(),
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixing_date: Some(fixing),
         start_date: start,
         maturity: end,
@@ -164,7 +164,7 @@ impl Default for TestFraBuilder {
         let (fixing, start, end) = standard_fra_dates();
         Self {
             id: "FRA_TEST".to_string(),
-            notional: Money::new(1_000_000.0, Currency::USD),
+            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             fixing_date: Some(fixing),
             start_date: start,
             maturity: end,
@@ -189,7 +189,7 @@ impl TestFraBuilder {
     }
 
     pub fn notional(mut self, amount: f64, currency: Currency) -> Self {
-        self.notional = Money::new(amount, currency);
+        self.notional = Money::new(amount, currency).expect("valid money fixture");
         self
     }
 

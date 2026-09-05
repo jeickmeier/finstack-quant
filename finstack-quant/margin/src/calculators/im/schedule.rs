@@ -387,7 +387,7 @@ impl ScheduleImCalculator {
         as_of: Date,
     ) -> ImResult {
         let rate = self.schedule.rate(asset_class.clone(), maturity_years);
-        let amount = Money::new(notional.amount().abs(), notional.currency()) * rate;
+        let amount = notional.abs() * rate;
         self.result_from_amount(amount, as_of, asset_class.to_string())
     }
 
@@ -436,23 +436,22 @@ impl ScheduleImCalculator {
     /// [`Self::ngr_breakdown_key`]. Returns `None` when `positions` is empty,
     /// all notionals are zero (the NGR denominator would be zero), or the
     /// netting set mixes currencies.
-    #[must_use]
     pub fn calculate_netting_set_with_ngr(
         &self,
         positions: &[(Money, Money)],
         asset_class: ScheduleAssetClass,
         maturity_years: f64,
         as_of: Date,
-    ) -> Option<ImResult> {
+    ) -> finstack_quant_core::Result<Option<ImResult>> {
         if positions.is_empty() {
-            return None;
+            return Ok(None);
         }
         // Reporting currency must be consistent across the netting set.
         let reporting_currency = positions[0].0.currency();
         if positions.iter().any(|(mtm, notional)| {
             mtm.currency() != reporting_currency || notional.currency() != reporting_currency
         }) {
-            return None;
+            return Ok(None);
         }
 
         // Neumaier compensated summation guards against catastrophic
@@ -475,7 +474,7 @@ impl ScheduleImCalculator {
         // (e.g., JPY) and the NGR clamp `clamp(0.0, 1.0)` already caps
         // any spurious near-zero division.
         if gross_notional_sum <= 0.0 {
-            return None;
+            return Ok(None);
         }
 
         let ngr = if positive_mtm_sum <= 0.0 {
@@ -485,8 +484,12 @@ impl ScheduleImCalculator {
         };
         let reduction = 0.4 + 0.6 * ngr;
         let rate = self.schedule.rate(asset_class.clone(), maturity_years);
-        let amount = Money::new(gross_notional_sum * rate * reduction, reporting_currency);
-        Some(self.result_from_amount(amount, as_of, Self::ngr_breakdown_key(&asset_class)))
+        let amount = Money::new(gross_notional_sum * rate * reduction, reporting_currency)?;
+        Ok(Some(self.result_from_amount(
+            amount,
+            as_of,
+            Self::ngr_breakdown_key(&asset_class),
+        )))
     }
 
     /// Canonical schedule IM breakdown key for NGR-reduced netting-set results.
@@ -592,7 +595,7 @@ mod tests {
         let calc = ScheduleImCalculator::bcbs_standard()
             .expect("bcbs_standard calculator should load from embedded registry");
 
-        let notional = Money::new(100_000_000.0, Currency::USD);
+        let notional = Money::from((100_000_000_i64, Currency::USD));
         let im = calc.calculate_for_notional(
             notional,
             ScheduleAssetClass::InterestRate,
@@ -642,7 +645,7 @@ mod tests {
             .expect("bcbs_standard calculator should load from embedded registry");
         let instrument = AtMarketInstrument {
             id: "ATM-SWAP".to_string(),
-            value: Money::new(0.0, Currency::USD),
+            value: Money::from((0_i64, Currency::USD)),
         };
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
@@ -664,7 +667,7 @@ mod tests {
             .with_asset_class(ScheduleAssetClass::Credit)
             .with_maturity(7.0);
 
-        let notional = Money::new(50_000_000.0, Currency::USD);
+        let notional = Money::from((50_000_000_i64, Currency::USD));
         let im =
             calc.calculate_for_notional(notional, ScheduleAssetClass::Credit, 7.0, test_date());
 
@@ -699,12 +702,12 @@ mod tests {
         // Two perfectly-offsetting positions of ±10M MtM, each 100M notional.
         let positions = vec![
             (
-                Money::new(10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
             (
-                Money::new(-10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(-10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
         ];
         let im = calc
@@ -714,6 +717,7 @@ mod tests {
                 5.0,
                 test_date(),
             )
+            .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
         // Gross = 200M, 5Y IR rate = 4%, reduction = 0.4.
@@ -735,12 +739,12 @@ mod tests {
 
         let positions = vec![
             (
-                Money::new(10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
             (
-                Money::new(5.0e6, Currency::USD),
-                Money::new(50.0e6, Currency::USD),
+                Money::new(5.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(50.0e6, Currency::USD).expect("valid money fixture"),
             ),
         ];
         let im = calc
@@ -750,6 +754,7 @@ mod tests {
                 5.0,
                 test_date(),
             )
+            .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
         // Σ MtM = 15M, Σ|MtM| = 15M → NGR = 1.0. Gross = 150M; reduction = 1.0.
@@ -771,12 +776,12 @@ mod tests {
 
         let positions = vec![
             (
-                Money::new(10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
             (
-                Money::new(-5.0e6, Currency::USD),
-                Money::new(50.0e6, Currency::USD),
+                Money::new(-5.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(50.0e6, Currency::USD).expect("valid money fixture"),
             ),
         ];
         let im = calc
@@ -786,6 +791,7 @@ mod tests {
                 5.0,
                 test_date(),
             )
+            .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
         let ngr = 5.0 / 10.0; // 1/2
@@ -806,12 +812,12 @@ mod tests {
 
         let positions = vec![
             (
-                Money::new(-10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(-10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
             (
-                Money::new(-5.0e6, Currency::USD),
-                Money::new(50.0e6, Currency::USD),
+                Money::new(-5.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(50.0e6, Currency::USD).expect("valid money fixture"),
             ),
         ];
         let im = calc
@@ -821,6 +827,7 @@ mod tests {
                 5.0,
                 test_date(),
             )
+            .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
         let expected = 150.0e6 * 0.04 * 0.4;
@@ -840,16 +847,17 @@ mod tests {
 
         assert!(calc
             .calculate_netting_set_with_ngr(&[], ScheduleAssetClass::InterestRate, 5.0, test_date())
+            .expect("valid netting-set IM fixture")
             .is_none());
 
         let mixed = vec![
             (
-                Money::new(10.0e6, Currency::USD),
-                Money::new(100.0e6, Currency::USD),
+                Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
+                Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
             ),
             (
-                Money::new(5.0e6, Currency::EUR),
-                Money::new(50.0e6, Currency::EUR),
+                Money::new(5.0e6, Currency::EUR).expect("valid money fixture"),
+                Money::new(50.0e6, Currency::EUR).expect("valid money fixture"),
             ),
         ];
         assert!(calc
@@ -859,6 +867,7 @@ mod tests {
                 5.0,
                 test_date()
             )
+            .expect("valid netting-set IM fixture")
             .is_none());
     }
 

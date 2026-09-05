@@ -135,7 +135,7 @@ pub fn default_waterfall_order() -> Vec<AttributionFactor> {
 /// let instrument = Arc::new(
 ///     Deposit::builder()
 ///         .id("DEP-1D".into())
-///         .notional(Money::new(1_000_000.0, Currency::USD))
+///         .notional(Money::from((1_000_000_i64, Currency::USD)))
 ///         .start_date(as_of_t0)
 ///         .maturity(as_of_t1)
 ///         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -345,7 +345,7 @@ pub(crate) fn attribute_pnl_waterfall(
                     ctx.as_of_t0,
                     ctx.as_of_t1,
                     factor_pnl.currency(),
-                );
+                )?;
                 // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
                 for w in &carry_inputs.warnings {
                     attribution.meta.notes.push(w.clone());
@@ -396,7 +396,7 @@ pub(crate) fn attribute_pnl_waterfall(
                 c,
                 credit_factor_detail_options,
                 &credit_step_pnls,
-            );
+            )?;
             attribution.credit_factor_detail = Some(detail);
         }
     }
@@ -450,7 +450,7 @@ impl<'a> WaterfallContext<'a> {
     ) -> Result<Money> {
         let _span = tracing::info_span!("waterfall_credit_cascade").entered();
         let base_currency = self.current_val.currency();
-        let mut total = Money::new(0.0, base_currency);
+        let mut total = Money::from((0_i64, base_currency));
 
         // Credit base: the running market *before* the credit cascade — its
         // credit curves are still T0. Par-spread re-bootstrap bumps do not
@@ -517,7 +517,7 @@ impl<'a> WaterfallContext<'a> {
         let base_currency = prev_val.currency();
 
         if !self.factor_use.uses_attribution_factor(factor) {
-            return Ok(Money::new(0.0, base_currency));
+            return Ok(Money::from((0_i64, base_currency)));
         }
 
         if matches!(factor, AttributionFactor::ModelParameters) {
@@ -596,7 +596,7 @@ impl<'a> WaterfallContext<'a> {
                     instrument_id = %self.target_instrument.id(),
                     "Waterfall attribution: repricing with T₁ model parameters failed, returning zero P&L"
                 );
-                Ok(Money::new(0.0, base_currency))
+                Ok(Money::from((0_i64, base_currency)))
             }
         }
     }
@@ -668,7 +668,7 @@ mod tests {
         let as_of_t1 = date!(2025 - 01 - 16);
 
         let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::new(
-            TestInstrument::new("TEST-001", Money::new(1000.0, Currency::USD)),
+            TestInstrument::new("TEST-001", Money::from((1000_i64, Currency::USD))),
         );
 
         let market_t0 = MarketContext::new();
@@ -705,7 +705,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         let market = MarketContext::new();
         let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::new(
-            TestInstrument::new("TEST-DEC", Money::new(0.0, Currency::USD)),
+            TestInstrument::new("TEST-DEC", Money::from((0_i64, Currency::USD))),
         );
         let mut ctx = WaterfallContext {
             target_instrument: &instrument,
@@ -713,7 +713,7 @@ mod tests {
             factor_use: InstrumentFactorUse::of(instrument.as_ref()),
             source_market: &market,
             current_market: market.clone(),
-            current_val: Money::new(1.0e9, Currency::USD),
+            current_val: Money::new(1.0e9, Currency::USD).expect("valid money fixture"),
             market_t1: &market,
             as_of_t0: date!(2025 - 01 - 15),
             as_of_t1: date!(2025 - 01 - 16),
@@ -725,8 +725,11 @@ mod tests {
         // Apply 30 increments of 0.1; ideal answer is exactly 1_000_000_003.
         for _ in 0..30 {
             let prev = ctx.current_val;
-            ctx.update_current_value(prev, Money::new(0.1, Currency::USD))
-                .expect("same-currency add must succeed");
+            ctx.update_current_value(
+                prev,
+                Money::new(0.1, Currency::USD).expect("valid money fixture"),
+            )
+            .expect("same-currency add must succeed");
         }
 
         // Decimal arithmetic is exact for these inputs; the only rounding
@@ -746,7 +749,7 @@ mod tests {
         use finstack_quant_core::market_data::context::MarketContext;
         let market = MarketContext::new();
         let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::new(
-            TestInstrument::new("TEST-CCY", Money::new(0.0, Currency::USD)),
+            TestInstrument::new("TEST-CCY", Money::from((0_i64, Currency::USD))),
         );
         let mut ctx = WaterfallContext {
             target_instrument: &instrument,
@@ -754,7 +757,7 @@ mod tests {
             factor_use: InstrumentFactorUse::of(instrument.as_ref()),
             source_market: &market,
             current_market: market.clone(),
-            current_val: Money::new(100.0, Currency::USD),
+            current_val: Money::from((100_i64, Currency::USD)),
             market_t1: &market,
             as_of_t0: date!(2025 - 01 - 15),
             as_of_t1: date!(2025 - 01 - 16),
@@ -763,7 +766,8 @@ mod tests {
             recalibration_provider: Arc::new(CachedRecalibrationProvider::new()),
         };
 
-        let result = ctx.update_current_value(ctx.current_val, Money::new(10.0, Currency::EUR));
+        let result =
+            ctx.update_current_value(ctx.current_val, Money::from((10_i64, Currency::EUR)));
         assert!(result.is_err(), "mixed-currency add must fail");
     }
 }

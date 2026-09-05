@@ -472,7 +472,7 @@ mod tests {
 
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -518,7 +518,7 @@ mod tests {
 
         let dep1 = Deposit::builder()
             .id("DEP_1".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -531,7 +531,7 @@ mod tests {
 
         let dep2 = Deposit::builder()
             .id("DEP_2".into())
-            .notional(Money::new(500_000.0, Currency::USD))
+            .notional(Money::from((500_000_i64, Currency::USD)))
             .start_date(as_of)
             .maturity(date!(2024 - 03 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)

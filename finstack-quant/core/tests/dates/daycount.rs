@@ -568,7 +568,7 @@ fn actact_isma_requires_frequency() {
     // With frequency, should work
     let ctx = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months)),
+        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -584,7 +584,7 @@ fn actact_isma_full_coupon_period() {
 
     let ctx = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months)),
+        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -604,7 +604,7 @@ fn actact_isma_multiple_frequencies() {
     // Quarterly
     let ctx_q = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(3, TenorUnit::Months)),
+        frequency: Some(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -616,7 +616,7 @@ fn actact_isma_multiple_frequencies() {
     // Monthly
     let ctx_m = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(1, TenorUnit::Months)),
+        frequency: Some(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -650,7 +650,7 @@ fn actact_isma_eom_regular_period_is_exactly_half() {
     // give exactly 0.5.
     let ctx = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months)),
+        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -676,7 +676,7 @@ fn actact_isma_eom_grid_preserves_roll_day_across_short_month() {
     // semi-annual EOM periods sum to exactly 1.0 .
     let ctx = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months)),
+        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -694,7 +694,7 @@ fn actact_isma_partial_period() {
 
     let ctx = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months)),
+        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,
@@ -720,7 +720,7 @@ fn actact_vs_actact_isma_comparison() {
 
     let ctx_isma = DayCountContext {
         calendar: None,
-        frequency: Some(Tenor::new(12, TenorUnit::Months)),
+        frequency: Some(Tenor::new(12, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
         coupon_period: None,
         end_is_termination_date: false,

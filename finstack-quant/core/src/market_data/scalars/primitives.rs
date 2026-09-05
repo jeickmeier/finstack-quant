@@ -98,7 +98,7 @@ impl std::str::FromStr for SeriesInterpolation {
 /// let beta = MarketScalar::Unitless(1.2);
 ///
 /// // Spot price (with currency)
-/// let spot = MarketScalar::Price(Money::new(152.75, Currency::USD));
+/// let spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect("valid money fixture"));
 ///
 /// assert!(matches!(beta, MarketScalar::Unitless(_)));
 /// if let MarketScalar::Price(m) = spot {
@@ -533,7 +533,7 @@ mod tests {
     fn market_scalar_shadow_rejects_non_finite_values() {
         assert!(MarketScalar::try_from(MarketScalarWire::Unitless(f64::NAN)).is_err());
         assert!(MarketScalar::try_from(MarketScalarWire::Unitless(f64::INFINITY)).is_err());
-        assert!(crate::money::Money::try_new(f64::NEG_INFINITY, Currency::USD).is_err());
+        assert!(crate::money::Money::new(f64::NEG_INFINITY, Currency::USD).is_err());
     }
 
     #[test]

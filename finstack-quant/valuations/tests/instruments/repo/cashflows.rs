@@ -15,7 +15,7 @@ fn test_cashflow_schedule_structure() {
 
     let repo = Repo::term(
         "CF_STRUCTURE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -37,7 +37,7 @@ fn test_full_schedule_marks_initial_exchange_as_notional() {
 
     let repo = Repo::term(
         "CF_KIND",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -61,7 +61,7 @@ fn test_initial_cashflow_negative() {
 
     let repo = Repo::term(
         "CF_INITIAL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -90,7 +90,7 @@ fn test_final_cashflow_includes_interest() {
 
     let repo = Repo::term(
         "CF_FINAL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -127,7 +127,7 @@ fn test_cashflow_dates_match_repo_dates() {
 
     let repo = Repo::term(
         "CF_DATES",
-        Money::new(2_000_000.0, Currency::USD),
+        Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.045,
         start,
@@ -158,7 +158,7 @@ fn test_cashflow_net_present_value() {
 
     let repo = Repo::term(
         "CF_NPV",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -184,7 +184,7 @@ fn test_value_matches_discounted_provider_flows() {
 
     let repo = Repo::term(
         "CF_VALUE_PATH",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -200,10 +200,13 @@ fn test_value_matches_discounted_provider_flows() {
         .expect("provider flows should build");
     let discounted_total = provider_flows
         .into_iter()
-        .try_fold(Money::new(0.0, Currency::USD), |acc, (date, amount)| {
-            let df = discount.df_between_dates(as_of, date)?;
-            acc.checked_add(amount * df)
-        })
+        .try_fold(
+            Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            |acc, (date, amount)| {
+                let df = discount.df_between_dates(as_of, date)?;
+                acc.checked_add(amount * df)
+            },
+        )
         .expect("discounting provider flows should succeed");
 
     assert_money_approx_eq(pv, discounted_total, 0.01);
@@ -216,7 +219,7 @@ fn test_dated_flows_exclude_settled_start_leg_mid_life() {
 
     let repo = Repo::term(
         "CF_MIDLIFE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -241,7 +244,7 @@ fn test_zero_rate_cashflows() {
 
     let repo = Repo::term(
         "CF_ZERO",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.0, // Zero rate
         date(2025, 1, 15),
@@ -263,7 +266,7 @@ fn test_overnight_repo_cashflows() {
 
     let repo = Repo::overnight(
         "CF_OVERNIGHT",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -291,7 +294,7 @@ fn test_cashflows_currency_consistency() {
 
     let repo = Repo::term(
         "CF_CURRENCY",
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         collateral,
         0.035,
         date(2025, 1, 15),
@@ -314,7 +317,7 @@ fn test_large_notional_cashflows() {
 
     let repo = Repo::term(
         "CF_LARGE",
-        Money::new(100_000_000.0, Currency::USD), // 100 million
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"), // 100 million
         collateral,
         0.05,
         date(2025, 1, 15),

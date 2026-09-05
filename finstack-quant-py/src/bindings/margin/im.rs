@@ -710,6 +710,7 @@ impl PyScheduleImCalculator {
         Ok(self
             .inner
             .calculate_netting_set_with_ngr(&money_positions, asset_class, maturity_years, as_of)
+            .map_err(crate::errors::core_to_py)?
             .map(PyImResult::from_inner))
     }
 

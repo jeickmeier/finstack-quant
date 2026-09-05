@@ -124,7 +124,7 @@ fn builtin_pl_metrics_articulate_numerically() {
     use finstack_quant_statements::types::AmountOrScalar;
 
     let registry = Registry::with_builtins().unwrap();
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let v = |x: f64| AmountOrScalar::scalar(x);
 
     let model = ModelBuilder::new("articulation")
@@ -354,11 +354,11 @@ fn test_model_builder_with_builtin_metrics() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -366,8 +366,14 @@ fn test_model_builder_with_builtin_metrics() {
         .value(
             "cogs",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
             ],
         )
         .with_builtin_metrics()
@@ -395,11 +401,11 @@ fn test_evaluate_model_with_select_metrics() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -407,8 +413,14 @@ fn test_evaluate_model_with_select_metrics() {
         .value(
             "cogs",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
             ],
         )
         .add_metric_from_registry("fin.gross_profit", &registry)
@@ -423,23 +435,35 @@ fn test_evaluate_model_with_select_metrics() {
 
     // Check that fin.gross_profit was calculated correctly
     let q1_gross_profit = results
-        .get("fin.gross_profit", &PeriodId::quarter(2025, 1))
+        .get(
+            "fin.gross_profit",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q1_gross_profit, 40_000.0); // 100,000 - 60,000
 
     let q2_gross_profit = results
-        .get("fin.gross_profit", &PeriodId::quarter(2025, 2))
+        .get(
+            "fin.gross_profit",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     assert_eq!(q2_gross_profit, 44_000.0); // 110,000 - 66,000
 
     // Check that fin.gross_margin was calculated correctly
     let q1_gross_margin = results
-        .get("fin.gross_margin", &PeriodId::quarter(2025, 1))
+        .get(
+            "fin.gross_margin",
+            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        )
         .unwrap();
     assert!((q1_gross_margin - 0.4).abs() < 0.0001); // 40,000 / 100,000 = 0.4
 
     let q2_gross_margin = results
-        .get("fin.gross_margin", &PeriodId::quarter(2025, 2))
+        .get(
+            "fin.gross_margin",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
         .unwrap();
     assert!((q2_gross_margin - 0.4).abs() < 0.0001); // 44,000 / 110,000 = 0.4
 }
@@ -456,11 +480,11 @@ fn test_add_metric_from_registry() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -468,8 +492,14 @@ fn test_add_metric_from_registry() {
         .value(
             "cogs",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(60_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(66_000.0),
+                ),
             ],
         )
         .add_metric_from_registry("fin.gross_profit", &registry)
@@ -547,11 +577,11 @@ fn test_complete_pl_model_with_select_registry_metrics() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
@@ -560,11 +590,11 @@ fn test_complete_pl_model_with_select_registry_metrics() {
             "cogs",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(600_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(660_000.0),
                 ),
             ],
@@ -573,11 +603,11 @@ fn test_complete_pl_model_with_select_registry_metrics() {
             "opex",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
@@ -585,15 +615,27 @@ fn test_complete_pl_model_with_select_registry_metrics() {
         .value(
             "depreciation",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(50_000.0),
+                ),
             ],
         )
         .value(
             "amortization",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10_000.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(10_000.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10_000.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(10_000.0),
+                ),
             ],
         )
         // Only add the metrics we can calculate with the given inputs
@@ -618,7 +660,7 @@ fn test_complete_pl_model_with_select_registry_metrics() {
     // Test Q1 calculations. Convention: opex excludes D&A, so
     // EBITDA = 1,000k − 600k − 200k = 200k and
     // operating income (EBIT) = EBITDA − 60k D&A = 140k.
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q1).unwrap(), 400_000.0);
     assert_eq!(results.get("fin.operating_income", &q1).unwrap(), 140_000.0);
     assert_eq!(results.get("fin.ebitda", &q1).unwrap(), 200_000.0);
@@ -627,7 +669,7 @@ fn test_complete_pl_model_with_select_registry_metrics() {
 
     // Test Q2 calculations: EBITDA = 1,100k − 660k − 220k = 220k,
     // operating income = 220k − 60k = 160k.
-    let q2 = PeriodId::quarter(2025, 2);
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q2).unwrap(), 440_000.0);
     assert_eq!(results.get("fin.operating_income", &q2).unwrap(), 160_000.0);
     assert_eq!(results.get("fin.ebitda", &q2).unwrap(), 220_000.0);
@@ -680,11 +722,11 @@ fn test_inter_metric_dependencies_in_model() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_000_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(1_100_000.0),
                 ),
             ],
@@ -693,11 +735,11 @@ fn test_inter_metric_dependencies_in_model() {
             "cogs",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(600_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(660_000.0),
                 ),
             ],
@@ -706,11 +748,11 @@ fn test_inter_metric_dependencies_in_model() {
             "opex",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
@@ -726,12 +768,12 @@ fn test_inter_metric_dependencies_in_model() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Verify that all dependencies were added and calculated correctly
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     assert_eq!(results.get("custom.gross_profit", &q1).unwrap(), 400_000.0);
     assert_eq!(results.get("custom.ebitda", &q1).unwrap(), 200_000.0);
     assert!((results.get("custom.ebitda_margin", &q1).unwrap() - 0.2).abs() < 0.0001);
 
-    let q2 = PeriodId::quarter(2025, 2);
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     assert_eq!(results.get("custom.gross_profit", &q2).unwrap(), 440_000.0);
     assert_eq!(results.get("custom.ebitda", &q2).unwrap(), 220_000.0);
     assert!((results.get("custom.ebitda_margin", &q2).unwrap() - 0.2).abs() < 0.0001);
@@ -775,7 +817,10 @@ fn test_deep_dependency_chain() {
         .unwrap()
         .value(
             "base",
-            &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            &[(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(100.0),
+            )],
         )
         // Only add level4 - should automatically add all dependencies
         .add_metric_from_registry("chain.level4", &registry)
@@ -786,7 +831,7 @@ fn test_deep_dependency_chain() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     // base = 100
     // level1 = 100 * 2 = 200
     // level2 = 200 + 10 = 210
@@ -805,8 +850,14 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
     // Provide enough leaf nodes so with_builtin_metrics() can compute all registry metrics.
     let zero_periods = |v: f64| {
         [
-            (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(v)),
-            (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(v)),
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                AmountOrScalar::scalar(v),
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                AmountOrScalar::scalar(v),
+            ),
         ]
     };
     let base_model_fn = || {
@@ -817,11 +868,11 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
                 "revenue",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(100_000.0),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
@@ -829,8 +880,14 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
             .value(
                 "cogs",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(60_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(66_000.0),
+                    ),
                 ],
             )
             .value("opex", &zero_periods(0.0))
@@ -870,7 +927,7 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
     let r_bulk = eval.evaluate(&model_bulk).unwrap();
     let r_select = eval.evaluate(&model_select).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let bulk_val = r_bulk.get("fin.gross_profit", &q1).unwrap();
     let select_val = r_select.get("fin.gross_profit", &q1).unwrap();
 
@@ -894,11 +951,11 @@ fn registry_with_builtins_matches_new_then_load() {
                 "revenue",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(100_000.0),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(110_000.0),
                     ),
                 ],
@@ -906,8 +963,14 @@ fn registry_with_builtins_matches_new_then_load() {
             .value(
                 "cogs",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(60_000.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(66_000.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(60_000.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(66_000.0),
+                    ),
                 ],
             )
     };
@@ -933,7 +996,7 @@ fn registry_with_builtins_matches_new_then_load() {
     let r_a = eval.evaluate(&model_a).unwrap();
     let r_b = eval.evaluate(&model_b).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let v1 = r_a.get("fin.gross_profit", &q1).unwrap();
     let v2 = r_b.get("fin.gross_profit", &q1).unwrap();
 
@@ -956,11 +1019,11 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             "revenue",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(200_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(220_000.0),
                 ),
             ],
@@ -969,11 +1032,11 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             "cogs",
             &[
                 (
-                    PeriodId::quarter(2025, 1),
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100_000.0),
                 ),
                 (
-                    PeriodId::quarter(2025, 2),
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(110_000.0),
                 ),
             ],
@@ -981,78 +1044,144 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
         .value(
             "opex",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "interest_expense",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "tax_expense",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "depreciation",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "amortization",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "principal_payment",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "total_assets",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(1.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
             ],
         )
         .value(
             "total_debt",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "total_equity",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(1.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
             ],
         )
         .value(
             "taxes",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
             ],
         )
         .value(
             "current_liabilities",
             &[
-                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
-                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(1.0)),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
             ],
         )
         .with_builtin_metrics()
@@ -1063,7 +1192,7 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).unwrap();
 
-    let q1 = PeriodId::quarter(2025, 1);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     // fin.gross_margin depends on gross_profit / revenue; both must resolve correctly
     let margin = results.get("fin.gross_margin", &q1).unwrap();
     assert!(

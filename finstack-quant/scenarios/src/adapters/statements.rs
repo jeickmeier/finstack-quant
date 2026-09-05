@@ -36,7 +36,7 @@ pub(crate) fn rate_binding_effects(binding: &RateBindingSpec) -> Vec<ScenarioEff
 
 fn with_node_values_mut<F>(model: &mut FinancialModelSpec, node_id: &str, mut f: F) -> Result<bool>
 where
-    F: FnMut(&mut AmountOrScalar),
+    F: FnMut(&mut AmountOrScalar) -> Result<()>,
 {
     let node = model
         .get_node_mut(node_id)
@@ -47,7 +47,7 @@ where
     match node.values.as_mut() {
         Some(values) => {
             for val in values.values_mut() {
-                f(val);
+                f(val)?;
             }
             Ok(true)
         }
@@ -63,12 +63,14 @@ pub fn apply_forecast_percent(
 ) -> Result<bool> {
     let factor = 1.0 + (pct / 100.0);
 
-    with_node_values_mut(model, node_id, |val| match val {
-        AmountOrScalar::Scalar(s) => *s *= factor,
-        AmountOrScalar::Amount(money) => {
-            *money =
-                finstack_quant_core::money::Money::new(money.amount() * factor, money.currency());
+    with_node_values_mut(model, node_id, |val| {
+        match val {
+            AmountOrScalar::Scalar(s) => *s *= factor,
+            AmountOrScalar::Amount(money) => {
+                *money = money.checked_mul_f64(factor)?;
+            }
         }
+        Ok(())
     })
 }
 

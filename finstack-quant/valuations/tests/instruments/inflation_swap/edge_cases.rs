@@ -159,7 +159,7 @@ fn test_very_small_notional() {
 
     let swap = InflationSwap::builder()
         .id("ZCINF-SMALL".into())
-        .notional(Money::new(1.0, Currency::USD)) // $1 notional
+        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture")) // $1 notional
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
@@ -403,7 +403,7 @@ fn test_swap_with_multiple_currencies() {
 
     let swap_eur = InflationSwap::builder()
         .id("ZCINF-EUR".into())
-        .notional(Money::new(1_000_000.0, Currency::EUR))
+        .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(maturity)
         .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))

@@ -567,8 +567,8 @@ mod tests {
 
     #[test]
     fn historical_context_rebuild_copies_the_matching_columnar_row() {
-        let q1 = PeriodId::quarter(2025, 1);
-        let q2 = PeriodId::quarter(2025, 2);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let columns = std::sync::Arc::new(IndexMap::from_iter([
             (NodeId::new("cogs"), 0),
             (NodeId::new("revenue"), 1),
@@ -596,13 +596,14 @@ mod tests {
     ) -> CapitalStructureCashflows {
         let mut snapshot = CapitalStructureCashflows::new();
         let breakdown = CashflowBreakdown {
-            interest_expense_cash: Money::new(interest, Currency::USD),
-            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
-            interest_expense_pik: Money::new(0.0, Currency::USD),
-            principal_payment: Money::new(0.0, Currency::USD),
-            fees: Money::new(0.0, Currency::USD),
-            debt_balance: Money::new(debt_balance, Currency::USD),
-            accrued_interest: Money::new(0.0, Currency::USD),
+            interest_expense_cash: Money::new(interest, Currency::USD)
+                .expect("valid money fixture"),
+            interest_income_cash: Some(Money::from((0_i64, Currency::USD))),
+            interest_expense_pik: Money::from((0_i64, Currency::USD)),
+            principal_payment: Money::from((0_i64, Currency::USD)),
+            fees: Money::from((0_i64, Currency::USD)),
+            debt_balance: Money::new(debt_balance, Currency::USD).expect("valid money fixture"),
+            accrued_interest: Money::from((0_i64, Currency::USD)),
         };
         let mut totals = IndexMap::new();
         totals.insert(period, breakdown);
@@ -630,8 +631,8 @@ mod tests {
 
     #[test]
     fn ewm_var_defaults_to_bias_correction() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         let mut context = build_context_with_history(p2, "series", vec![(p1, 1.0)], 2.0);
         let value_default = evaluate_function(
@@ -670,9 +671,9 @@ mod tests {
         // pd.Series([1, 2, 3]).ewm(alpha=0.5, adjust=False).var(bias=False) → 1.1
         // Hand check: ŵ = [0.25, 0.25, 0.5], mean = 2.25, biased var = 0.6875,
         // Σŵ² = 0.375, correction = 1 / (1 − 0.375) = 1.6, 0.6875 * 1.6 = 1.1.
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context = build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, 2.0)], 3.0);
         let value = evaluate_function(
@@ -693,9 +694,9 @@ mod tests {
         // for [1, NaN, 3] with adjust=False are (1−α)² and α:
         // pd.Series([1, nan, 3]).ewm(alpha=0.5, adjust=False).mean().iloc[-1]
         //   = (0.25·1 + 0.5·3) / 0.75 = 7/3.
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context =
             build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, f64::NAN)], 3.0);
@@ -718,10 +719,10 @@ mod tests {
         // correction = 7/4 ⇒ 26/49 · 7/4 = 13/14.
         // (Two-observation cases cannot discriminate: unbiased var of two
         // points is d²/2 under any weighting.)
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
-        let p4 = PeriodId::quarter(2025, 4);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
+        let p4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
         let mut context = build_context_with_history(
             p4,
@@ -744,8 +745,8 @@ mod tests {
     fn ewm_rejects_alpha_zero() {
         // pandas requires 0 < alpha <= 1: alpha = 0 freezes the mean at the
         // oldest value and zeroes the variance bias-correction denominator.
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         for func in [Function::EwmMean, Function::EwmVar, Function::EwmStd] {
             let mut context = build_context_with_history(p2, "series", vec![(p1, 1.0)], 2.0);
@@ -766,9 +767,9 @@ mod tests {
         // 2 * ewm_mean(series) — and, more importantly, an expression argument
         // must evaluate at all rather than erroring with "requires a column
         // reference".
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context = build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, 2.0)], 3.0);
         let column_mean = evaluate_function(
@@ -822,8 +823,8 @@ mod tests {
 
     #[test]
     fn elementwise_math_functions_match_shared_semantics() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = build_context_with_history(p2, "x", vec![(p1, 1.0)], 2.5);
 
         let eval = |func: Function, args: &[Expr], context: &mut EvaluationContext| {
@@ -934,9 +935,9 @@ mod tests {
         // pandas parity: rolling(window=4) uses min_periods=window by default,
         // so a 3-observation history yields NaN — not a silent 3-point mean
         // presented as a 4-period statistic.
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context =
             build_context_with_history(p3, "series", vec![(p1, 10.0), (p2, 20.0)], 30.0);
@@ -953,9 +954,9 @@ mod tests {
 
     #[test]
     fn rolling_mean_honors_explicit_min_periods() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context =
             build_context_with_history(p3, "series", vec![(p1, 10.0), (p2, 20.0)], 30.0);
@@ -978,9 +979,9 @@ mod tests {
     fn rolling_mean_nan_in_window_yields_nan_by_default() {
         // A NaN inside a full window reduces the finite-observation count
         // below min_periods (= window by default), matching pandas.
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         let mut context =
             build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, f64::NAN)], 3.0);
@@ -1006,9 +1007,9 @@ mod tests {
     /// since pandas 1.0).
     #[test]
     fn rolling_count_respects_min_periods_default() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
-        let p3 = PeriodId::quarter(2025, 3);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let p3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
 
         // 3 observations (one NaN → 2 finite), window 4: partial window.
         let mut context =
@@ -1047,8 +1048,8 @@ mod tests {
 
     #[test]
     fn rolling_min_periods_larger_than_window_rejected() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
         let mut context = build_context_with_history(p2, "series", vec![(p1, 1.0)], 2.0);
         let err = evaluate_function(
@@ -1067,7 +1068,7 @@ mod tests {
 
     #[test]
     fn sum_function_handles_large_cancellations() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
             std::sync::Arc::new(IndexMap::new()),
@@ -1090,12 +1091,24 @@ mod tests {
     #[test]
     fn growth_rate_defaults_to_period_frequency() {
         let history = vec![
-            (PeriodId::quarter(2024, 1), 100.0),
-            (PeriodId::quarter(2024, 2), 110.0),
-            (PeriodId::quarter(2024, 3), 121.0),
-            (PeriodId::quarter(2024, 4), 133.1),
+            (
+                PeriodId::quarter(2024, 1).expect("valid period fixture"),
+                100.0,
+            ),
+            (
+                PeriodId::quarter(2024, 2).expect("valid period fixture"),
+                110.0,
+            ),
+            (
+                PeriodId::quarter(2024, 3).expect("valid period fixture"),
+                121.0,
+            ),
+            (
+                PeriodId::quarter(2024, 4).expect("valid period fixture"),
+                133.1,
+            ),
         ];
-        let current_period = PeriodId::quarter(2025, 1);
+        let current_period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = build_context_with_history(current_period, "series", history, 146.41);
 
         let value = evaluate_function(
@@ -1123,7 +1136,7 @@ mod tests {
 
     #[test]
     fn annualize_uses_period_kind_when_periods_missing() {
-        let period = PeriodId::month(2025, 3);
+        let period = PeriodId::month(2025, 3).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
             std::sync::Arc::new(IndexMap::new()),
@@ -1153,10 +1166,16 @@ mod tests {
 
     #[test]
     fn ttm_requires_a_full_trailing_window() {
-        let current_period = PeriodId::quarter(2025, 3);
+        let current_period = PeriodId::quarter(2025, 3).expect("valid period fixture");
         let history = vec![
-            (PeriodId::quarter(2025, 1), 10.0),
-            (PeriodId::quarter(2025, 2), 20.0),
+            (
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                10.0,
+            ),
+            (
+                PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                20.0,
+            ),
         ];
         let mut context = build_context_with_history(current_period, "ebitda", history, 30.0);
 
@@ -1173,7 +1192,7 @@ mod tests {
 
     #[test]
     fn abs_and_sign_helpers_cover_edge_cases() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
             std::sync::Arc::new(IndexMap::new()),
@@ -1228,7 +1247,7 @@ mod tests {
 
     #[test]
     fn nan_conditions_are_falsey_in_formula_logic() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
             std::sync::Arc::new(IndexMap::new()),
@@ -1253,8 +1272,8 @@ mod tests {
 
     #[test]
     fn collect_historical_values_sorted_supports_cs_references() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
             std::sync::Arc::new(IndexMap::new()),
@@ -1273,8 +1292,8 @@ mod tests {
 
     #[test]
     fn lag_supports_cs_references() {
-        let p1 = PeriodId::quarter(2025, 1);
-        let p2 = PeriodId::quarter(2025, 2);
+        let p1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
             std::sync::Arc::new(IndexMap::new()),

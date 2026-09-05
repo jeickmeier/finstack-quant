@@ -50,8 +50,8 @@
 //! let as_of = date!(2025-01-01);
 //! let bond = Bond::with_convention(
 //!     "CORP-001",
-//!     Money::new(1_000_000.0, Currency::USD),
-//!     Rate::from_decimal(0.05),
+//!     Money::from((1_000_000_i64, Currency::USD)),
+//!     Rate::from_decimal(0.05).expect("valid rate fixture"),
 //!     date!(2024-01-15),
 //!     date!(2034-01-15),
 //!     BondConvention::UsCorporate,
@@ -156,7 +156,7 @@
 //!     "SPX",
 //!     4500.0,
 //!     expiry,
-//!     Money::new(100.0, Currency::USD),
+//!     Money::from((100_i64, Currency::USD)),
 //! )?;
 //!
 //! // `european_call` binds the standard ids: USD-OIS, EQUITY-SPOT,
@@ -215,7 +215,7 @@
 //!     "SPX",
 //!     4500.0,
 //!     create_date(2024, Month::July, 1)?,
-//!     Money::new(100.0, Currency::USD),
+//!     Money::from((100_i64, Currency::USD)),
 //! )?;
 //! let market = MarketContext::new()
 //!     .insert(

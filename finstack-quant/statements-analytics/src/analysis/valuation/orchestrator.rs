@@ -62,22 +62,22 @@ struct DcfSpec {
 /// let model = ModelBuilder::new("demo")
 ///     .periods("2025Q1..Q4", None)?
 ///     .value_money("ufcf", &[
-///         (PeriodId::quarter(2025, 1), Money::new(100_000.0, Currency::USD)),
-///         (PeriodId::quarter(2025, 2), Money::new(105_000.0, Currency::USD)),
-///         (PeriodId::quarter(2025, 3), Money::new(110_000.0, Currency::USD)),
-///         (PeriodId::quarter(2025, 4), Money::new(115_000.0, Currency::USD)),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), Money::from((100_000_i64, Currency::USD))),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), Money::from((105_000_i64, Currency::USD))),
+///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((110_000_i64, Currency::USD))),
+///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((115_000_i64, Currency::USD))),
 ///     ])
 ///     .value("total_debt", &[
-///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(500_000.0)),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
+///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
+///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
 ///     ])
 ///     .value("cash", &[
-///         (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(50_000.0)),
+///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
+///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
+///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
+///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
 ///     ])
 ///     .with_meta("currency", serde_json::json!("USD"))
 ///     .build()?;
@@ -347,7 +347,7 @@ impl CorporateAnalysisBuilder {
     /// use finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let model = ModelBuilder::new("demo")
     ///     .periods("2025Q1..Q1", None)?
     ///     .value("ebitda", &[(period, AmountOrScalar::scalar(100.0))])
@@ -571,11 +571,11 @@ mod tests {
                 "revenue",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
                         AmountOrScalar::scalar(1_000_000.0),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         AmountOrScalar::scalar(1_100_000.0),
                     ),
                 ],
@@ -594,7 +594,10 @@ mod tests {
         assert!(!result.ev_suppressed_non_positive);
         assert!(result
             .statement
-            .get("ebitda", &PeriodId::quarter(2025, 1))
+            .get(
+                "ebitda",
+                &PeriodId::quarter(2025, 1).expect("valid period fixture")
+            )
             .is_some());
     }
 
@@ -607,20 +610,20 @@ mod tests {
                 "ufcf",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
-                        Money::new(100_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Money::from((100_000_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
-                        Money::new(110_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Money::from((110_000_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::quarter(2025, 3),
-                        Money::new(120_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        Money::from((120_000_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::quarter(2025, 4),
-                        Money::new(130_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                        Money::from((130_000_i64, Currency::USD)),
                     ),
                 ],
             )
@@ -649,7 +652,10 @@ mod tests {
             .expect("periods")
             .value(
                 "ufcf",
-                &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(100.0),
+                )],
             )
             .with_meta("currency", serde_json::json!("USD"))
             .build()
@@ -690,7 +696,10 @@ mod tests {
             .expect("periods")
             .value_money(
                 "ufcf",
-                &[(PeriodId::quarter(2025, 1), Money::new(0.0, Currency::USD))],
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    Money::from((0_i64, Currency::USD)),
+                )],
             )
             .with_meta("currency", serde_json::json!("USD"))
             .build()
@@ -717,20 +726,26 @@ mod tests {
                 "revenue",
                 &[
                     (
-                        PeriodId::quarter(2025, 1),
-                        Money::new(1_000_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Money::from((1_000_000_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::quarter(2025, 2),
-                        Money::new(1_100_000.0, Currency::USD),
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Money::from((1_100_000_i64, Currency::USD)),
                     ),
                 ],
             )
-            .availability_dates("revenue", &[(PeriodId::quarter(2025, 1), as_of)])
+            .availability_dates(
+                "revenue",
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    as_of,
+                )],
+            )
             .expect("availability")
             .add_bond(
                 "BOND-001",
-                Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD),
+                Money::from((1_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                 0.05,
                 date!(2025 - 01 - 01),
                 date!(2026 - 01 - 01),
@@ -762,13 +777,13 @@ mod tests {
     fn sample_periods() -> Vec<Period> {
         vec![
             Period {
-                id: PeriodId::quarter(2025, 1),
+                id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
                 start: date!(2025 - 01 - 01),
                 end: date!(2025 - 04 - 01),
                 is_actual: false,
             },
             Period {
-                id: PeriodId::quarter(2025, 2),
+                id: PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 start: date!(2025 - 04 - 01),
                 end: date!(2025 - 07 - 01),
                 is_actual: false,
@@ -785,8 +800,14 @@ mod tests {
         assert_eq!(
             path,
             vec![
-                (PeriodId::quarter(2025, 1), 10_000_000.0),
-                (PeriodId::quarter(2025, 2), 10_000_000.0),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    10_000_000.0
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    10_000_000.0
+                ),
             ]
         );
     }
@@ -796,8 +817,14 @@ mod tests {
         let periods = sample_periods();
         let mut statement = StatementResult::new();
         let mut values = IndexMap::new();
-        values.insert(PeriodId::quarter(2025, 1), 10_000_000.0);
-        values.insert(PeriodId::quarter(2025, 2), 12_000_000.0);
+        values.insert(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            10_000_000.0,
+        );
+        values.insert(
+            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+            12_000_000.0,
+        );
         statement
             .nodes
             .insert("enterprise_value".to_string(), values);
@@ -807,8 +834,14 @@ mod tests {
         assert_eq!(
             path,
             vec![
-                (PeriodId::quarter(2025, 1), 10_000_000.0),
-                (PeriodId::quarter(2025, 2), 12_000_000.0),
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    10_000_000.0
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    12_000_000.0
+                ),
             ]
         );
 
@@ -816,18 +849,24 @@ mod tests {
             .nodes
             .get_mut("enterprise_value")
             .expect("node")
-            .shift_remove(&PeriodId::quarter(2025, 2));
+            .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
         let path = ltv_reference_path(&periods, &statement, Some("enterprise_value"), None)
             .expect("partial node path");
-        assert_eq!(path, vec![(PeriodId::quarter(2025, 1), 10_000_000.0)]);
+        assert_eq!(
+            path,
+            vec![(
+                PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                10_000_000.0
+            )]
+        );
     }
 
     #[test]
     fn test_ltv_value_node_on_builder_uses_per_period_values() {
         let as_of = date!(2025 - 01 - 01);
         let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
-        let q1 = PeriodId::quarter(2025, 1);
-        let q2 = PeriodId::quarter(2025, 2);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("ltv-node")
             .periods("2025Q1..Q2", Some("2025Q1"))
             .expect("periods")
@@ -860,7 +899,7 @@ mod tests {
             .expect("availability")
             .add_bond(
                 "BOND-001",
-                Money::new(4_000_000.0, finstack_quant_core::currency::Currency::USD),
+                Money::from((4_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                 0.05,
                 date!(2025 - 01 - 01),
                 date!(2026 - 01 - 01),

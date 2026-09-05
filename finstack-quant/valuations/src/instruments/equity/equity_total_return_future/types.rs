@@ -295,10 +295,7 @@ impl crate::instruments::Instrument for EquityTotalReturnFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Ok(Money::new(
-            self.npv_raw(market, as_of)?,
-            self.terms.currency,
-        ))
+        Money::new(self.npv_raw(market, as_of)?, self.terms.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -385,7 +382,7 @@ mod tests {
             .insert_price("TESX-ACCRUED-FUNDING", MarketScalar::Unitless(3.0))
             .insert_price(
                 "TESX-SPREAD-BPS",
-                MarketScalar::Price(Money::new(50.0, Currency::EUR)),
+                MarketScalar::Price(Money::from((50_i64, Currency::EUR))),
             );
 
         let error = future

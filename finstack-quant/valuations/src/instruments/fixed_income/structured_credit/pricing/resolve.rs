@@ -341,8 +341,14 @@ mod step_down_weight_tests {
 
     fn balances(a: f64, b: f64) -> HashMap<String, Money> {
         let mut m = HashMap::new();
-        m.insert("A".to_string(), Money::new(a, Currency::USD));
-        m.insert("B".to_string(), Money::new(b, Currency::USD));
+        m.insert(
+            "A".to_string(),
+            Money::new(a, Currency::USD).expect("valid money fixture"),
+        );
+        m.insert(
+            "B".to_string(),
+            Money::new(b, Currency::USD).expect("valid money fixture"),
+        );
         m
     }
 

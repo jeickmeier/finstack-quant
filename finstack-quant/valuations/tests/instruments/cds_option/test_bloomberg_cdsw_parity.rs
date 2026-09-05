@@ -115,7 +115,7 @@ fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
     // the prior IMM (2026-03-20). Built via the public test helper.
     let mut cds = crate::test_support::credit::cds_buy_protection(
         "CDX-NA-IG-46-SPOT",
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0, // 100 bp standard CDX coupon
         date!(2026 - 03 - 20),
         date!(2031 - 06 - 20),
@@ -306,7 +306,7 @@ fn diag_cdx_ig_46_spot_cds_reconciliation() {
     // a residual beyond the integration floor is a pricer/convention gap.
     let mut par_cds = crate::test_support::credit::cds_buy_protection(
         "CDX-NA-IG-46-PAR-CHECK-5Y",
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         53.6264,
         date!(2026 - 03 - 20),
         date!(2031 - 06 - 20),

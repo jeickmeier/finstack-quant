@@ -69,7 +69,7 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
     };
     Arc::new(ConvertibleBond {
         id: "CONV-CREDIT-ATTR".to_string().into(),
-        notional: Money::new(1000.0, Currency::USD),
+        notional: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
         issue_date: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
         maturity: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         discount_curve_id: "USD-OIS".into(),

@@ -72,7 +72,7 @@ pub fn create_standard_payer_swaption(
     strike: f64,
 ) -> Swaption {
     let params = SwaptionParams::payer(
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike,
         expiry,
         swap_start,

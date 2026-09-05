@@ -33,8 +33,8 @@
 //! // Create a 5-year USD Treasury bond
 //! let bond = Bond::fixed(
 //!     "UST-5Y",
-//!     Money::new(1_000_000.0, Currency::USD),
-//!     Rate::from_percent(4.5),
+//!     Money::from((1_000_000_i64, Currency::USD)),
+//!     Rate::from_percent(4.5).expect("valid rate fixture"),
 //!     date!(2025-01-15),
 //!     date!(2030-01-15),
 //!     finstack_quant_core::dates::StubKind::None,

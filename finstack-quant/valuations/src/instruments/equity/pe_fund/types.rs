@@ -125,20 +125,20 @@ impl PrivateMarketsFund {
         let events = vec![
             super::waterfall::FundEvent::contribution(
                 date!(2024 - 01 - 15),
-                Money::new(5_000_000.0, Currency::USD),
+                Money::from((5_000_000_i64, Currency::USD)),
             ),
             super::waterfall::FundEvent::contribution(
                 date!(2024 - 06 - 15),
-                Money::new(2_000_000.0, Currency::USD),
+                Money::from((2_000_000_i64, Currency::USD)),
             ),
             super::waterfall::FundEvent::proceeds(
                 date!(2026 - 03 - 01),
-                Money::new(4_000_000.0, Currency::USD),
+                Money::from((4_000_000_i64, Currency::USD)),
                 "DEAL-1",
             ),
             super::waterfall::FundEvent::distribution(
                 date!(2027 - 01 - 01),
-                Money::new(4_000_000.0, Currency::USD),
+                Money::from((4_000_000_i64, Currency::USD)),
             ),
         ];
         Ok(PrivateMarketsFund::new(

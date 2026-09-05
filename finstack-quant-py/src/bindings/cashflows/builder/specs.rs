@@ -1584,7 +1584,8 @@ impl PyNotional {
     #[pyo3(text_signature = "(amount, currency)")]
     fn par(amount: f64, currency: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: Notional::par(amount, extract_currency(currency)?),
+            inner: Notional::par(amount, extract_currency(currency)?)
+                .map_err(crate::errors::core_to_py)?,
         })
     }
 

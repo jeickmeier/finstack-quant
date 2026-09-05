@@ -99,7 +99,7 @@ mod replay_tests {
         let as_of = date!(2024 - 01 - 01);
         let deposit = Deposit::builder()
             .id("DEP_1M".into())
-            .notional(Money::new(1_000_000.0, Currency::USD))
+            .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(DayCount::Act360)
@@ -485,7 +485,7 @@ mod replay_tests {
 
     impl ReplayProbeInstrument {
         fn value_for_date(as_of: Date) -> Money {
-            Money::new(f64::from(as_of.day()) * 100.0, Currency::USD)
+            Money::new(f64::from(as_of.day()) * 100.0, Currency::USD).expect("valid money fixture")
         }
 
         fn check_snapshot(&self, as_of: Date) -> finstack_quant_core::Result<()> {

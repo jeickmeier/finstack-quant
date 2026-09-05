@@ -45,7 +45,7 @@
 //! // Create a deposit instrument
 //! let deposit = Deposit::builder()
 //!     .id("DEP_1M".into())
-//!     .notional(Money::new(1_000_000.0, Currency::USD))
+//!     .notional(Money::from((1_000_000_i64, Currency::USD)))
 //!     .start_date(as_of)
 //!     .maturity(date!(2024-02-01))
 //!     .day_count(finstack_quant_core::dates::DayCount::Act360)

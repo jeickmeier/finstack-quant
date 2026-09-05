@@ -385,7 +385,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
         .map(|index| {
             ForwardRateAgreement::builder()
                 .id(InstrumentId::new(format!("CACHE-BENCH-FRA-{index}")))
-                .notional(Money::new(10_000_000.0, Currency::USD))
+                .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
                 .start_date(start)
                 .maturity(maturity)
                 .fixed_rate(Decimal::try_from(0.047).expect("decimal rate"))

@@ -184,7 +184,7 @@ fn test_single_curve_buy_vs_sell_protection() {
     let idx_sell = CDSIndex::from_preset(
         &standard_cdx_params(),
         "CDX-SELL",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         PayReceive::Receive,
         start,
         end,
@@ -364,7 +364,9 @@ fn test_single_curve_synthetic_cds_pricing_equivalence() {
     let ctx = standard_market_context(as_of);
 
     let idx = standard_single_curve_index("CDX-EQUIV", start, end, 10_000_000.0);
-    let synthetic_cds = idx.to_synthetic_cds();
+    let synthetic_cds = idx
+        .to_synthetic_cds()
+        .expect("valid to_synthetic_cds fixture");
 
     let idx_npv = idx.value(&ctx, as_of).unwrap();
     let cds_npv = synthetic_cds.value(&ctx, as_of).unwrap();
@@ -389,7 +391,7 @@ fn test_single_curve_upfront_payment() {
     let npv_no_upfront = idx.value(&ctx, as_of).unwrap();
 
     // Add upfront payment
-    let upfront = Money::new(100_000.0, Currency::USD);
+    let upfront = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     idx.instrument_pricing_overrides
         .market_quotes
         .upfront_payment = Some(upfront);

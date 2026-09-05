@@ -67,7 +67,7 @@
 //!     .averaging_method(AveragingMethod::Arithmetic)
 //!     .expiry(date!(2025-06-30))
 //!     .fixing_dates(fixing_dates)
-//!     .notional(Money::new(100_000.0, Currency::USD))
+//!     .notional(Money::from((100_000_i64, Currency::USD)))
 //!     .day_count(DayCount::Act365F)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .spot_id("SPX-SPOT".to_string().into())

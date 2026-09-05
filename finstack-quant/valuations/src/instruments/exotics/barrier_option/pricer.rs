@@ -141,10 +141,7 @@ impl BarrierOptionMcPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-            return Ok(Money::new(
-                unit * inst.notional.amount(),
-                inst.notional.currency(),
-            ));
+            return Money::new(unit * inst.notional.amount(), inst.notional.currency());
         }
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
@@ -302,7 +299,7 @@ fn price_expired_barrier(
         }
     };
 
-    Ok(Money::new(pv, ccy))
+    Money::new(pv, ccy)
 }
 
 use finstack_quant_models::closed_form::barrier::{
@@ -447,7 +444,13 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             let pv = Money::new(
                 unit * barrier_opt.notional.amount(),
                 barrier_opt.notional.currency(),
-            );
+            )
+            .map_err(|error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
+                )
+            })?;
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
 
@@ -528,7 +531,13 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         let pv = Money::new(
             price * barrier_opt.notional.amount(),
             barrier_opt.notional.currency(),
-        );
+        )
+        .map_err(|error| {
+            crate::pricer::PricingError::from_core(
+                error,
+                crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
+            )
+        })?;
         Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv))
     }
 }
@@ -577,7 +586,10 @@ mod tests {
         MarketContext::new()
             .insert(discount)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Price(Money::new(spot, Currency::USD)))
+            .insert_price(
+                "SPX",
+                MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            )
             .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
     }
 
@@ -586,7 +598,7 @@ mod tests {
             id: InstrumentId::new("BARRIER-BENCH"),
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD),
+            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,
@@ -594,7 +606,7 @@ mod tests {
             expiry,
             observed_barrier_breached: None,
             expiry_fixing: None,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
             use_gobet_miri: false,
             discount_curve_id: "USD_DISC".into(),
@@ -649,11 +661,11 @@ mod tests {
         let base = BarrierOption {
             barrier_type: BarrierType::UpAndOut,
             option_type: OptionType::Call,
-            barrier: Money::new(barrier, Currency::USD),
+            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
             ..down_and_out_call(expiry, strike, barrier)
         };
         let with_rebate = BarrierOption {
-            rebate: Some(Money::new(rebate, Currency::USD)),
+            rebate: Some(Money::new(rebate, Currency::USD).expect("valid money fixture")),
             ..base.clone()
         };
         let with_rebate_at_expiry = BarrierOption {
@@ -705,7 +717,7 @@ mod tests {
         let base = down_and_out_call(date(2024, 7, 1), 100.0, 80.0);
 
         let knocked_out = BarrierOption {
-            rebate: Some(Money::new(3.0, Currency::USD)),
+            rebate: Some(Money::from((3_i64, Currency::USD))),
             observed_barrier_breached: Some(true),
             ..base.clone()
         };
@@ -720,7 +732,7 @@ mod tests {
         };
         let no_hit_knock_in = BarrierOption {
             barrier_type: BarrierType::UpAndIn,
-            rebate: Some(Money::new(2.5, Currency::USD)),
+            rebate: Some(Money::new(2.5, Currency::USD).expect("valid money fixture")),
             observed_barrier_breached: Some(false),
             ..base
         };
@@ -882,7 +894,12 @@ mod tests {
             MarketContext::new()
                 .insert(disc)
                 .insert_surface(surface)
-                .insert_price("SPX", MarketScalar::Price(Money::new(spot, Currency::USD)))
+                .insert_price(
+                    "SPX",
+                    MarketScalar::Price(
+                        Money::new(spot, Currency::USD).expect("valid money fixture"),
+                    ),
+                )
                 .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
         };
         let market_360 = {
@@ -904,7 +921,12 @@ mod tests {
             MarketContext::new()
                 .insert(disc)
                 .insert_surface(surface)
-                .insert_price("SPX", MarketScalar::Price(Money::new(spot, Currency::USD)))
+                .insert_price(
+                    "SPX",
+                    MarketScalar::Price(
+                        Money::new(spot, Currency::USD).expect("valid money fixture"),
+                    ),
+                )
                 .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
         };
 
@@ -957,7 +979,7 @@ mod tests {
         let option = BarrierOption {
             barrier_type: BarrierType::UpAndOut,
             option_type: OptionType::Put,
-            barrier: Money::new(barrier, Currency::USD),
+            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
             ..down_and_out_call(expiry, strike, barrier)
         };
         let market = market(as_of, spot, vol, rate, div_yield);
@@ -1121,14 +1143,14 @@ mod tests {
             expiry_fixing: None,
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD),
+            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,
             barrier_type: BarrierType::UpAndOut,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::new(1.0, Currency::USD),
+            notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
             use_gobet_miri: false,
             discount_curve_id: "USD_DISC".into(),

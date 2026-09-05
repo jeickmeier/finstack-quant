@@ -174,8 +174,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let mut bond = Bond::fixed(
             "RATES-CREDIT-VEGA",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             as_of,
             date!(2030 - 01 - 01),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -230,7 +230,7 @@ mod tests {
                 Arc::new(instrument),
                 Arc::new(market.clone()),
                 as_of,
-                Money::new(1_000.0, Currency::USD),
+                Money::from((1_000_i64, Currency::USD)),
                 MetricContext::default_config(),
             );
             let vega = BondVegaCalculator
@@ -254,8 +254,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let mut clean_bond = Bond::fixed(
             "QUOTE-NORMALIZED-VEGA",
-            Money::new(1_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.06),
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
             date!(2024 - 01 - 15),
             date!(2030 - 01 - 15),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -306,7 +306,7 @@ mod tests {
                 Arc::new(bond),
                 Arc::new(market.clone()),
                 as_of,
-                Money::new(1_000.0, Currency::USD),
+                Money::from((1_000_i64, Currency::USD)),
                 MetricContext::default_config(),
             );
             BondVegaCalculator

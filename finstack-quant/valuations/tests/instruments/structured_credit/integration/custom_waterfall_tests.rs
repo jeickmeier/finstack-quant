@@ -47,7 +47,7 @@ fn create_test_pool() -> AssetPool {
             asset_type: AssetType::FirstLienLoan {
                 industry: Some(format!("Industry_{}", i % 3)),
             },
-            balance: Money::new(30_000_000.0, Currency::USD),
+            balance: Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: None,
             index_id: None,
@@ -74,7 +74,7 @@ fn create_test_tranches() -> TrancheStructure {
         0.0,
         10.0,
         TrancheSeniority::Equity,
-        Money::new(15_000_000.0, Currency::USD),
+        Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.15 },
         maturity_date(),
     )
@@ -85,7 +85,7 @@ fn create_test_tranches() -> TrancheStructure {
         10.0,
         25.0,
         TrancheSeniority::Subordinated,
-        Money::new(22_500_000.0, Currency::USD),
+        Money::new(22_500_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.09 },
         maturity_date(),
     )
@@ -96,7 +96,7 @@ fn create_test_tranches() -> TrancheStructure {
         25.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(112_500_000.0, Currency::USD),
+        Money::new(112_500_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.06 },
         maturity_date(),
     )
@@ -197,7 +197,10 @@ fn attaching_the_template_waterfall_is_an_exact_identity() {
     let base = create_test_deal();
     let custom = base
         .clone()
-        .with_waterfall(base.create_waterfall())
+        .with_waterfall(
+            base.create_waterfall()
+                .expect("valid create_waterfall fixture"),
+        )
         .expect("template waterfall must validate");
     let market = create_test_market();
 
@@ -403,7 +406,7 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(100_000_000.0, Currency::USD),
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
             index_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
@@ -451,20 +454,21 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
     let payment_date = Date::from_calendar_date(2026, Month::April, 6).expect("date");
     let run = |shift: f64| {
         let ctx = WaterfallContext {
-            available_cash: Money::new(10_000_000.0, Currency::USD),
-            interest_collections: Money::new(10_000_000.0, Currency::USD),
-            principal_collections: Money::new(0.0, Currency::USD),
+            available_cash: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            interest_collections: Money::new(10_000_000.0, Currency::USD)
+                .expect("valid money fixture"),
+            principal_collections: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             payment_date,
             period_start,
             valuation_date: test_date(),
-            pool_balance: Money::new(100_000_000.0, Currency::USD),
+            pool_balance: Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
             market: &market,
             tranche_balances: None,
             asset_balances: None,
             deferred_interest: None,
-            reserve_balance: Money::new(0.0, Currency::USD),
-            restricted_cash: Money::new(0.0, Currency::USD),
-            recovery_proceeds: Money::new(0.0, Currency::USD),
+            reserve_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            recovery_proceeds: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             floating_rate_shift: shift,
         };
         let dist = execute_waterfall(&waterfall, &tranches, &pool, ctx).expect("execute");

@@ -86,7 +86,7 @@ pub(crate) fn compute_pv(
         unit_price,
         "equity option unit price",
     )?;
-    Ok(Money::new(unit_price * inst.notional.amount(), ccy))
+    Money::new(unit_price * inst.notional.amount(), ccy)
 }
 /// Cash greeks for an equity option (scaled by contract size; vega per 1% vol).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

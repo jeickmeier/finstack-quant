@@ -19,26 +19,20 @@ const materializationDependencies: number = materializationReport.dependencies;
 const discountFromArray = new core.DiscountCurve('USD-OIS', '2025-01-01', numberValues);
 const discountFromTyped = new core.DiscountCurve('USD-OIS-TYPED', '2025-01-01', typedValues);
 
-const forwardFromArray = new core.ForwardCurve(
-  'USD-SOFR-3M',
-  0.25,
-  '2025-01-01',
-  [0, 0.04, 1, 0.045],
-  undefined,
-  undefined,
-  undefined,
-  [0, 0.25, 1]
-);
-const forwardFromTyped = new core.ForwardCurve(
-  'USD-SOFR-3M-TYPED',
-  0.25,
-  '2025-01-01',
-  new Float64Array([0, 0.04, 1, 0.045]),
-  undefined,
-  undefined,
-  undefined,
-  new Float64Array([0, 0.25, 1])
-);
+const forwardFromArray = new core.ForwardCurve({
+  id: 'USD-SOFR-3M',
+  tenor: 0.25,
+  baseDate: '2025-01-01',
+  knots: [0, 0.04, 1, 0.045],
+  projectionGrid: [0, 0.25, 1],
+});
+const forwardFromTyped = new core.ForwardCurve({
+  id: 'USD-SOFR-3M-TYPED',
+  tenor: 0.25,
+  baseDate: '2025-01-01',
+  knots: new Float64Array([0, 0.04, 1, 0.045]),
+  projectionGrid: new Float64Array([0, 0.25, 1]),
+});
 
 const cubeFromArrays = new core.VolCube(
   'USD-SWAPTION',

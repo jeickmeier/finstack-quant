@@ -568,7 +568,7 @@ impl PyCsaSpec {
                 "CSA {field} must be finite, got {amount}"
             )));
         }
-        Money::try_new(amount, self.inner.base_currency).map_err(core_to_py)
+        Money::new(amount, self.inner.base_currency).map_err(core_to_py)
     }
 }
 

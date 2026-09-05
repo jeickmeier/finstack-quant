@@ -239,21 +239,23 @@ impl CmoWaterfall {
     }
 
     /// Get total current face across all tranches (excluding IO).
-    pub fn total_current_face(&self) -> Money {
-        let total: f64 = self
-            .tranches
-            .iter()
-            .filter(|t| t.receives_principal())
-            .map(|t| t.current_face.amount())
-            .sum();
+    pub fn total_current_face(&self) -> finstack_quant_core::Result<Money> {
+        Ok({
+            let total: f64 = self
+                .tranches
+                .iter()
+                .filter(|t| t.receives_principal())
+                .map(|t| t.current_face.amount())
+                .sum();
 
-        let currency = self
-            .tranches
-            .first()
-            .map(|t| t.current_face.currency())
-            .unwrap_or(Currency::USD);
+            let currency = self
+                .tranches
+                .first()
+                .map(|t| t.current_face.currency())
+                .unwrap_or(Currency::USD);
 
-        Money::new(total, currency)
+            Money::new(total, currency)?
+        })
     }
 }
 
@@ -460,9 +462,9 @@ impl AgencyCmo {
         // (4.5% WAC less 50bp of fees), so the structure stays
         // interest-covered for the life of the deal.
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-            CmoTranche::sequential("C", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::sequential("C", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
         ];
 
         Self::builder()
@@ -492,9 +494,9 @@ impl AgencyCmo {
     pub fn example_accrual() -> finstack_quant_core::Result<Self> {
         use time::macros::date;
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.04, 3),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.04, 3),
         ];
 
         Self::builder()
@@ -516,12 +518,12 @@ impl AgencyCmo {
         let tranches = vec![
             CmoTranche::pac(
                 "PAC",
-                Money::new(50_000_000.0, Currency::USD),
+                Money::from((50_000_000_i64, Currency::USD)),
                 0.0375,
                 1,
                 PacCollar::standard(),
             ),
-            CmoTranche::support("SUP", Money::new(50_000_000.0, Currency::USD), 0.04, 2),
+            CmoTranche::support("SUP", Money::from((50_000_000_i64, Currency::USD)), 0.04, 2),
         ];
 
         Self::builder()
@@ -542,8 +544,8 @@ impl AgencyCmo {
         use time::macros::date;
         // IO strips the full 3.5% pass-through (4.0% WAC less 50bp fees).
         let tranches = vec![
-            CmoTranche::io_strip("IO", Money::new(100_000_000.0, Currency::USD), 0.035),
-            CmoTranche::po_strip("PO", Money::new(100_000_000.0, Currency::USD)),
+            CmoTranche::io_strip("IO", Money::from((100_000_000_i64, Currency::USD)), 0.035),
+            CmoTranche::po_strip("PO", Money::from((100_000_000_i64, Currency::USD))),
         ];
 
         Self::builder()
@@ -602,7 +604,7 @@ impl AgencyCmo {
                     .cmo_collateral_defaults();
                 let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
                 let pass_through = wac - defaults.servicing_fee_rate - defaults.guarantee_fee_rate;
-                (pass_through, cmo.waterfall.total_current_face().amount())
+                (pass_through, cmo.waterfall.total_current_face()?.amount())
             }
         };
 
@@ -653,8 +655,8 @@ impl AgencyCmo {
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
-    fn notional(&self) -> Option<Money> {
-        self.reference_tranche().map(|tranche| tranche.current_face)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(self.reference_tranche().map(|tranche| tranche.current_face))
     }
 
     fn raw_cashflow_schedule(
@@ -754,7 +756,10 @@ mod tests {
     #[test]
     fn test_total_face() {
         let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
-        let total = cmo.waterfall.total_current_face();
+        let total = cmo
+            .waterfall
+            .total_current_face()
+            .expect("valid total_current_face fixture");
 
         // 40M + 30M + 30M = 100M
         assert!((total.amount() - 100_000_000.0).abs() < 1.0);
@@ -776,9 +781,9 @@ mod tests {
     fn interest_deficient_deal_rejected_at_build() {
         use time::macros::date;
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.04, 1),
-            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
-            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.05, 3),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.04, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.045, 2),
+            CmoTranche::sequential("Z", Money::from((30_000_000_i64, Currency::USD)), 0.05, 3),
         ];
 
         let result = AgencyCmo::builder()
@@ -812,9 +817,9 @@ mod tests {
     fn tranche_coupon_above_pass_through_rejected_even_if_aggregate_covered() {
         use time::macros::date;
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
-            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 3),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::sequential("B", Money::from((30_000_000_i64, Currency::USD)), 0.04, 2),
+            CmoTranche::sequential("Z", Money::from((30_000_000_i64, Currency::USD)), 0.045, 3),
         ];
 
         let result = AgencyCmo::builder()
@@ -855,8 +860,8 @@ mod tests {
     fn accrual_coupon_above_pass_through_rejected() {
         use time::macros::date;
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.045, 2),
         ];
 
         let result = AgencyCmo::builder()
@@ -885,8 +890,8 @@ mod tests {
     fn accrual_zero_priority_rejected() {
         use time::macros::date;
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
-            CmoTranche::accrual("Z", Money::new(30_000_000.0, Currency::USD), 0.04, 0),
+            CmoTranche::sequential("A", Money::from((40_000_000_i64, Currency::USD)), 0.035, 1),
+            CmoTranche::accrual("Z", Money::from((30_000_000_i64, Currency::USD)), 0.04, 0),
         ];
 
         let result = AgencyCmo::builder()

@@ -30,8 +30,8 @@ fn test_dm_fixed_bond_is_rejected_in_strict_mode() {
     let as_of = date!(2025 - 01 - 01);
     let bond = Bond::fixed(
         "DM1",
-        Money::new(100.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -77,7 +77,7 @@ fn test_dm_missing_forward_curve_returns_error() {
     // Floating-rate bond referencing a discount curve that will be missing in the market
     let bond = Bond::floating(
         "DM-FRN-MISSING-FWD",
-        Money::new(100.0, Currency::USD),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
         200,
         as_of,
@@ -93,7 +93,7 @@ fn test_dm_missing_forward_curve_returns_error() {
 
     // Build a minimal metric context without relying on successful base pricing;
     // base_value is arbitrary here since we're testing failure in the DM objective.
-    let base_value = Money::new(100.0, Currency::USD);
+    let base_value = Money::new(100.0, Currency::USD).expect("valid money fixture");
     let mut mctx = MetricContext::new(
         Arc::new(bond),
         Arc::new(market),
@@ -146,7 +146,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
     let maturity_ig = date!(2027 - 01 - 01); // short IG
     let maturity_hy = date!(2030 - 01 - 01); // medium HY
     let maturity_distressed = date!(2035 - 01 - 01); // longer distressed
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     // Simple, monotonic curves suitable for FRN pricing.
     let disc = DiscountCurve::builder("USD-OIS")
@@ -304,7 +304,7 @@ fn flat_frn_market(
 fn flat_market_frn(as_of: time::Date, maturity: time::Date, margin_bp: i32) -> Bond {
     Bond::floating(
         "DM-PAR-PIN",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
         margin_bp,
         as_of,
@@ -400,7 +400,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
     let as_of = date!(2025 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let bond = prepare_dm_roundtrip_frn(
         Bond::floating(
@@ -475,7 +475,7 @@ fn test_dm_amortizing_frn_is_supported() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = Bond::floating(
         "DM-AMORT-FRN",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
         100,
         as_of,
@@ -489,7 +489,7 @@ fn test_dm_amortizing_frn_is_supported() {
     bond.cashflow_spec = CashflowSpec::Amortizing {
         base: Box::new(bond.cashflow_spec.clone()),
         schedule: AmortizationSpec::LinearTo {
-            final_notional: Money::new(500_000.0, Currency::USD),
+            final_notional: Money::new(500_000.0, Currency::USD).expect("valid money fixture"),
         },
     };
     bond.instrument_pricing_overrides =

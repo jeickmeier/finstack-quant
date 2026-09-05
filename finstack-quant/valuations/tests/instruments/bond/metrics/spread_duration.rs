@@ -24,8 +24,8 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
     let as_of = date!(2025 - 01 - 06);
     let mut bond = Bond::fixed(
         "SD-BULLET",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         date!(2030 - 01 - 06),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -33,7 +33,7 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
     )
     .expect("bond builds");
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )
@@ -186,12 +186,12 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
     let as_of = date!(2025 - 01 - 06);
     let quote_date = date!(2025 - 01 - 09);
     let call_date = date!(2027 - 01 - 06);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let clean_quote = 105.0;
     let mut bond = Bond::fixed(
         "SD-CALLABLE",
         notional,
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         date!(2023 - 01 - 06),
         date!(2032 - 01 - 06),
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -199,7 +199,7 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
     )
     .expect("bond builds");
     bond.cashflow_spec = CashflowSpec::fixed_rate(
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         Tenor::annual(),
         DayCount::Act365F,
     )
@@ -260,7 +260,8 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
         .collect();
     workout_flows.push((
         call_date,
-        Money::new(notional.amount() + accrued_at_call, notional.currency()),
+        Money::new(notional.amount() + accrued_at_call, notional.currency())
+            .expect("valid money fixture"),
     ));
 
     let manual_pv = |spread: f64| -> f64 {

@@ -59,8 +59,8 @@
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //!
-//! let usd = Money::new(100.0, Currency::USD);
-//! let eur = Money::new(85.0, Currency::EUR);
+//! let usd = Money::from((100_i64, Currency::USD));
+//! let eur = Money::from((85_i64, Currency::EUR));
 //!
 //! // Attempting to add different currencies returns CurrencyMismatch
 //! let result = usd.checked_add(eur);

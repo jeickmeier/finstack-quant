@@ -557,7 +557,7 @@ mod tests {
             _as_of: Date,
         ) -> finstack_quant_core::Result<Money> {
             self.base_calls.fetch_add(1, Ordering::SeqCst);
-            Ok(Money::new(100.0, Currency::USD))
+            Ok(Money::from((100_i64, Currency::USD)))
         }
 
         fn price_with_metrics(
@@ -581,7 +581,7 @@ mod tests {
             Ok(ValuationResult::stamped_with_config(
                 self.id(),
                 as_of,
-                Money::new(100.0, Currency::USD),
+                Money::from((100_i64, Currency::USD)),
                 config.as_ref(),
             ))
         }

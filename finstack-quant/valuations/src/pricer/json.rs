@@ -664,8 +664,8 @@ mod tests {
     fn bond_instrument_json() -> String {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -705,7 +705,7 @@ mod tests {
             Ok(ValuationResult::stamped(
                 bond.id(),
                 as_of,
-                Money::new(321.0, bond.notional.currency()),
+                Money::from((321_i64, bond.notional.currency())),
             ))
         }
     }
@@ -722,8 +722,8 @@ mod tests {
     fn default_model_resolves_to_instrument_native_model() {
         let bond = Bond::fixed(
             "TEST-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -941,7 +941,7 @@ mod tests {
             crate::instruments::fixed_income::revolving_credit::DrawRepaySpec::Deterministic(vec![
                 crate::instruments::fixed_income::revolving_credit::DrawRepayEvent {
                     date: facility.maturity + time::Duration::days(1),
-                    amount: Money::new(1_000_000.0, Currency::USD),
+                    amount: Money::from((1_000_000_i64, Currency::USD)),
                     is_draw: true,
                 },
             ]);
@@ -975,7 +975,7 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_invalid_term_loan_notional() {
         let mut loan = TermLoan::example().expect("term loan");
-        loan.notional_limit = Money::new(-1.0, Currency::USD);
+        loan.notional_limit = Money::from((-1_i64, Currency::USD));
         let json = envelope_json(InstrumentJson::TermLoan(loan));
         assert!(validate_instrument_json(&json)
             .expect_err("negative notional must fail")
@@ -1009,8 +1009,8 @@ mod tests {
     fn validate_instrument_json_accepts_versioned_envelope() {
         let bond = Bond::fixed(
             "ENVELOPE-BOND",
-            Money::new(1_000_000.0, Currency::USD),
-            finstack_quant_core::types::Rate::from_decimal(0.05),
+            Money::from((1_000_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
             finstack_quant_core::dates::StubKind::ShortFront,

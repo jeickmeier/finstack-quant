@@ -90,7 +90,10 @@ fn npv_100_cashflows_maintains_precision() {
             let month = (i % 12) + 1;
             let date =
                 Date::from_calendar_date(year, Month::try_from(month as u8).unwrap(), 1).unwrap();
-            (date, Money::new(1000.0, Currency::USD))
+            (
+                date,
+                Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect();
 
@@ -127,7 +130,10 @@ fn npv_500_cashflows_maintains_precision() {
         .map(|i| {
             let days = i * 7;
             let date = base + time::Duration::days(days as i64);
-            (date, Money::new(100.0, Currency::USD))
+            (
+                date,
+                Money::new(100.0, Currency::USD).expect("valid money fixture"),
+            )
         })
         .collect();
 
@@ -168,7 +174,10 @@ fn npv_50_year_cashflow_is_positive_and_small() {
     let day_count = DayCount::Act365F;
     let ctx = DayCountContext::default();
 
-    let flows = vec![(maturity, Money::new(1_000_000.0, Currency::USD))];
+    let flows = vec![(
+        maturity,
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
     // Calculate actual year fraction (includes leap years)
@@ -196,7 +205,10 @@ fn npv_100_year_cashflow_is_tiny_but_positive() {
     let maturity = d(2125, 1, 1); // 100 years
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
-    let flows = vec![(maturity, Money::new(1_000_000.0, Currency::USD))];
+    let flows = vec![(
+        maturity,
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
     // DF(100y) at 5% continuous = exp(-0.05 * 100) = exp(-5) ≈ 0.00674
@@ -223,7 +235,10 @@ fn npv_cashflow_at_base_date_is_excluded_by_default() {
     let base = d(2025, 1, 1);
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
-    let flows = vec![(base, Money::new(100_000.0, Currency::USD))];
+    let flows = vec![(
+        base,
+        Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
     assert_eq!(
         pv.amount(),
@@ -249,7 +264,10 @@ fn npv_negative_rate_inflates_value() {
     let base = d(2025, 1, 1);
     let curve = FlatRateCurve::new("TEST", base, -0.02); // Negative rate
 
-    let flows = vec![(d(2026, 1, 1), Money::new(100.0, Currency::USD))];
+    let flows = vec![(
+        d(2026, 1, 1),
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
     // Negative rate: DF > 1, so PV > FV
@@ -276,9 +294,18 @@ fn npv_zero_rate_preserves_value() {
     let curve = FlatRateCurve::new("TEST", base, 0.0);
 
     let flows = vec![
-        (d(2026, 1, 1), Money::new(1000.0, Currency::USD)),
-        (d(2027, 1, 1), Money::new(1000.0, Currency::USD)),
-        (d(2028, 1, 1), Money::new(1000.0, Currency::USD)),
+        (
+            d(2026, 1, 1),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            d(2027, 1, 1),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            d(2028, 1, 1),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        ),
     ];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
@@ -298,7 +325,10 @@ fn npv_very_large_amounts() {
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
     // $1 trillion cashflow
-    let flows = vec![(d(2026, 1, 1), Money::new(1e12, Currency::USD))];
+    let flows = vec![(
+        d(2026, 1, 1),
+        Money::new(1e12, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
     // DF(1y) at 5% = exp(-0.05) ≈ 0.9512
@@ -319,7 +349,10 @@ fn npv_very_small_amounts() {
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
     // $0.01 cashflow (1 cent, minimum for USD)
-    let flows = vec![(d(2026, 1, 1), Money::new(0.01, Currency::USD))];
+    let flows = vec![(
+        d(2026, 1, 1),
+        Money::new(0.01, Currency::USD).expect("valid money fixture"),
+    )];
     let pv = npv(&curve, base, &flows).expect("NPV should succeed");
 
     // PV should be positive but tiny
@@ -392,8 +425,14 @@ fn npv_rejects_mixed_currencies() {
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
     let flows = vec![
-        (d(2026, 1, 1), Money::new(1000.0, Currency::USD)),
-        (d(2027, 1, 1), Money::new(1000.0, Currency::EUR)), // Different currency!
+        (
+            d(2026, 1, 1),
+            Money::new(1000.0, Currency::USD).expect("valid money fixture"),
+        ),
+        (
+            d(2027, 1, 1),
+            Money::new(1000.0, Currency::EUR).expect("valid money fixture"),
+        ), // Different currency!
     ];
 
     let result = npv(&curve, base, &flows);

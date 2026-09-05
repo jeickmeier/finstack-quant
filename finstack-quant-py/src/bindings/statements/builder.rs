@@ -1142,7 +1142,8 @@ impl PyModelBuilder {
                      us_corporate, eur_corporate"
                 ))
             })?;
-        let rate = finstack_quant_core::types::Rate::from_decimal(coupon_rate);
+        let rate = finstack_quant_core::types::Rate::from_decimal(coupon_rate)
+            .map_err(crate::errors::core_to_py)?;
         let state = slf.take_any()?;
         let next = match state {
             BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(

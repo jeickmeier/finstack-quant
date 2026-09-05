@@ -81,7 +81,7 @@ fn test_irs_pricing_negative_discount_rate() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("NEG_DISC_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.01, // 1% fixed rate
         as_of,
         maturity,
@@ -112,7 +112,7 @@ fn test_irs_dv01_negative_discount_rate() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("NEG_DV01_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.01,
         as_of,
         maturity,
@@ -162,7 +162,7 @@ fn test_irs_pricing_negative_forward_rate() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("NEG_FWD_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.01, // Pay 1% fixed
         as_of,
         maturity,
@@ -193,7 +193,7 @@ fn test_irs_par_rate_with_negative_rates() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("PAR_NEG_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.01, // Initial rate doesn't matter for par rate calc
         as_of,
         maturity,
@@ -235,7 +235,7 @@ fn test_irs_deep_negative_rates() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("DEEP_NEG_TEST"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         -0.005, // Pay -50bp fixed (receive negative)
         as_of,
         maturity,
@@ -284,7 +284,7 @@ fn test_payer_receiver_symmetry_negative_rates() {
 
     let payer = test_utils::usd_irs_swap(
         InstrumentId::new("PAYER_NEG"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixed_rate,
         as_of,
         maturity,
@@ -294,7 +294,7 @@ fn test_payer_receiver_symmetry_negative_rates() {
 
     let receiver = test_utils::usd_irs_swap(
         InstrumentId::new("RECEIVER_NEG"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         fixed_rate,
         as_of,
         maturity,
@@ -330,7 +330,7 @@ fn test_annuity_positive_with_negative_rates() {
 
     let swap = test_utils::usd_irs_swap(
         InstrumentId::new("ANNUITY_NEG"),
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.01,
         as_of,
         maturity,

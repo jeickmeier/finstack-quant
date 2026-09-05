@@ -44,10 +44,7 @@ impl EquityPricer {
     /// - `as_of`: valuation date (unused currently)
     pub fn pv(&self, inst: &Equity, curves: &MarketContext, as_of: Date) -> Result<Money> {
         let px = self.price_per_share(inst, curves, as_of)?;
-        Ok(Money::new(
-            px.amount() * inst.effective_shares(),
-            inst.currency,
-        ))
+        Money::new(px.amount() * inst.effective_shares(), inst.currency)
     }
 
     /// Resolve dividend yield (annualized, decimal) for the equity.
@@ -83,10 +80,7 @@ impl EquityPricer {
         t: f64,
     ) -> Result<Money> {
         let per_share = self.forward_price_per_share(inst, curves, as_of, t)?;
-        Ok(Money::new(
-            per_share.amount() * inst.effective_shares(),
-            inst.currency,
-        ))
+        Money::new(per_share.amount() * inst.effective_shares(), inst.currency)
     }
 }
 

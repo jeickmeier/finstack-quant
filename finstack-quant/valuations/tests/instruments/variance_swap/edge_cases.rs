@@ -118,7 +118,7 @@ fn test_valuation_with_negative_rates() {
 fn test_valuation_with_very_large_notional() {
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
-    swap.notional = Money::new(1e12, Currency::USD); // $1 trillion
+    swap.notional = Money::new(1e12, Currency::USD).expect("valid money fixture"); // $1 trillion
     let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.22);
     let as_of = swap.start_date;
 
@@ -134,7 +134,7 @@ fn test_valuation_with_very_large_notional() {
 fn test_valuation_with_very_small_notional() {
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
-    swap.notional = Money::new(1.0, Currency::USD); // $1
+    swap.notional = Money::new(1.0, Currency::USD).expect("valid money fixture"); // $1
     let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.22);
     let as_of = swap.start_date;
 
@@ -353,7 +353,7 @@ fn test_realized_variance_with_single_price_point() {
 fn test_valuation_preserves_currency() {
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
-    swap.notional = Money::new(DEFAULT_NOTIONAL, Currency::EUR);
+    swap.notional = Money::new(DEFAULT_NOTIONAL, Currency::EUR).expect("valid money fixture");
     let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.22);
     let as_of = swap.start_date;
 
@@ -371,11 +371,11 @@ fn test_payoff_preserves_currency_across_calculations() {
 
     for ccy in currencies {
         let mut swap = sample_swap(PayReceive::Receive);
-        swap.notional = Money::new(DEFAULT_NOTIONAL, ccy);
+        swap.notional = Money::new(DEFAULT_NOTIONAL, ccy).expect("valid money fixture");
         let realized_var = 0.06;
 
         // Act
-        let payoff = swap.payoff(realized_var);
+        let payoff = swap.payoff(realized_var).expect("valid variance payoff");
 
         // Assert
         assert_eq!(payoff.currency(), ccy);
@@ -446,7 +446,11 @@ fn test_payoff_is_linear_in_variance_difference() {
     // Act
     let payoffs: Vec<f64> = var_diffs
         .iter()
-        .map(|&diff| swap.payoff(swap.strike_variance + diff).amount())
+        .map(|&diff| {
+            swap.payoff(swap.strike_variance + diff)
+                .expect("valid variance payoff")
+                .amount()
+        })
         .collect();
 
     // Assert - should be exactly linear
@@ -545,7 +549,7 @@ fn test_cashflow_schedule_preserves_currency() {
 
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
-    swap.notional = Money::new(DEFAULT_NOTIONAL, Currency::EUR);
+    swap.notional = Money::new(DEFAULT_NOTIONAL, Currency::EUR).expect("valid money fixture");
     let ctx = base_context();
     let as_of = swap.start_date;
 

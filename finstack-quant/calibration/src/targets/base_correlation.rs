@@ -109,7 +109,7 @@ fn compute_upfront_money(
     upfront_pct: f64,
     notional: f64,
     currency: finstack_quant_core::currency::Currency,
-) -> Money {
+) -> finstack_quant_core::Result<Money> {
     let attachment_pct = normalize_pct(attachment);
     let detachment_pct = normalize_pct(detachment);
     let width_frac = ((detachment_pct - attachment_pct) / 100.0).max(0.0);
@@ -235,7 +235,7 @@ impl BaseCorrelationTarget {
             quote.upfront_pct,
             self.params.notional,
             self.params.currency,
-        );
+        )?;
 
         Ok(CalibrationQuote::CDSTranche(CDSTrancheCalibrationQuote {
             prepared: prepared_quote,
@@ -560,7 +560,8 @@ mod tests {
 
         // upfront_pct is a decimal fraction of tranche notional: -0.02 = -2%.
         // Tranche notional = 1_000_000 * (7% - 3%) = 40_000; upfront = -800.
-        let upfront = compute_upfront_money(0.03, 0.07, -0.02, 1_000_000.0, Currency::USD);
+        let upfront = compute_upfront_money(0.03, 0.07, -0.02, 1_000_000.0, Currency::USD)
+            .expect("valid upfront amount fixture");
         assert_eq!(upfront.currency(), Currency::USD);
         assert!((upfront.amount() - (-800.0)).abs() < 1e-12);
     }

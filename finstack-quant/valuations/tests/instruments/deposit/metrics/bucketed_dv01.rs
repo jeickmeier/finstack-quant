@@ -24,18 +24,24 @@ fn test_bucketed_dv01_scales_with_notional() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
     let dep_1m = DepositBuilder::new(base)
-        .notional(finstack_quant_core::money::Money::new(
-            1_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(
+                1_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+        )
         .maturity(date(2025, 7, 1))
         .build();
 
     let dep_2m = DepositBuilder::new(base)
-        .notional(finstack_quant_core::money::Money::new(
-            2_000_000.0,
-            finstack_quant_core::currency::Currency::USD,
-        ))
+        .notional(
+            finstack_quant_core::money::Money::new(
+                2_000_000.0,
+                finstack_quant_core::currency::Currency::USD,
+            )
+            .expect("valid money fixture"),
+        )
         .maturity(date(2025, 7, 1))
         .build();
 

@@ -67,7 +67,7 @@ use time::macros::date;
 let loan = TermLoan::builder()
     .id(InstrumentId::new("TL-USD-5Y"))
     .currency(Currency::USD)
-    .notional_limit(Money::new(10_000_000.0, Currency::USD))
+    .notional_limit(Money::new(10_000_000.0, Currency::USD)?)
     .issue_date(date!(2024 - 01 - 01))
     .maturity(date!(2029 - 01 - 01))
     .rate(RateSpec::Fixed { rate_bp: 600 })          // 6.00%

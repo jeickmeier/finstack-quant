@@ -14,7 +14,7 @@ use finstack_quant_valuations::{
 #[test]
 fn test_same_currency_pair() {
     let fx = FxSpot::new(InstrumentId::new("USDUSD"), Currency::USD, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::USD))
+        .with_notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expect("notional should be accepted before pair validation")
         .with_rate(1.0)
         .expect("rate should be accepted before pair validation");
@@ -69,7 +69,7 @@ fn test_extremely_small_rate() {
 fn test_negative_notional() {
     // Negative notional (short position)
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(-1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(-1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate");
@@ -184,7 +184,7 @@ fn test_concurrent_pricing() {
 #[test]
 fn test_missing_fx_matrix_error_message() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap();
     let market = MarketContext::new(); // No FX matrix
 
@@ -249,7 +249,7 @@ fn test_extreme_settlement_lag() {
     // Test with very far future settlement instead of lag
     let far_future = d(2050, 1, 15);
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")

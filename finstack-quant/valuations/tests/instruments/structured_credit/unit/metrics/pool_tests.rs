@@ -33,7 +33,7 @@ fn tranche_structure() -> TrancheStructure {
         0.0,
         100.0,
         TrancheSeniority::Senior,
-        Money::new(8_000_000.0, Currency::USD),
+        Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity_date(),
     )
@@ -46,7 +46,7 @@ fn metric_context(instrument: StructuredCredit) -> MetricContext {
         Arc::new(instrument),
         Arc::new(MarketContext::new()),
         as_of(),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     )
 }
@@ -56,7 +56,7 @@ fn test_pool_stats_weighted_spread_and_coupon() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         "SOFR-3M",
         400.0,
         maturity_date(),
@@ -64,7 +64,7 @@ fn test_pool_stats_weighted_spread_and_coupon() {
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
-        Money::new(20_000_000.0, Currency::USD),
+        Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         0.06,
         maturity_date(),
         DayCount::Thirty360,
@@ -91,7 +91,7 @@ fn test_pool_stats_default_rate() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     let mut defaulted = PoolAsset::fixed_rate_bond(
         "D1",
-        Money::new(5_000_000.0, Currency::USD),
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         maturity_date(),
         DayCount::Thirty360,
@@ -101,7 +101,7 @@ fn test_pool_stats_default_rate() {
     pool.assets.push(defaulted);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "D2",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         maturity_date(),
         DayCount::Thirty360,
@@ -120,7 +120,7 @@ fn test_clo_warf_calculator_matches_weighted_average_factors() {
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "B1",
-            Money::new(5_000_000.0, Currency::USD),
+            Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
             0.06,
             maturity_date(),
             DayCount::Thirty360,
@@ -130,7 +130,7 @@ fn test_clo_warf_calculator_matches_weighted_average_factors() {
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "B2",
-            Money::new(3_000_000.0, Currency::USD),
+            Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"),
             0.08,
             maturity_date(),
             DayCount::Thirty360,
@@ -162,7 +162,7 @@ fn test_clo_warf_calculator_uses_default_factor_for_missing_ratings() {
     let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "UNRATED",
-        Money::new(4_000_000.0, Currency::USD),
+        Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
         0.07,
         maturity_date(),
         DayCount::Thirty360,
@@ -203,7 +203,7 @@ fn test_rmbs_cpr_and_cdr_use_current_deal_seasoning() {
         Arc::new(instrument),
         Arc::new(MarketContext::new()),
         Date::from_calendar_date(2025, Month::July, 1).unwrap(),
-        Money::new(0.0, Currency::USD),
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
         MetricContext::default_config(),
     );
 

@@ -187,8 +187,8 @@ mod tests {
             Ok(())
         }
 
-        fn value(&self, currency: Currency) -> Money {
-            Money::new(self.terminal, currency)
+        fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
+            Ok(Money::new(self.terminal, currency).expect("valid money fixture"))
         }
 
         fn reset(&mut self) {

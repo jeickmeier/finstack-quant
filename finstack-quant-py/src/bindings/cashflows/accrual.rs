@@ -421,7 +421,8 @@ impl PyAccrualIndex {
     fn accrued_at(&self, as_of: &Bound<'_, PyAny>) -> PyResult<PyMoney> {
         self.inner
             .accrued_at(extract_date(as_of)?)
-            .map(|amount| PyMoney::from_inner(Money::new(amount, self.currency)))
+            .and_then(|amount| Money::new(amount, self.currency))
+            .map(PyMoney::from_inner)
             .map_err(core_to_py)
     }
 
@@ -474,7 +475,8 @@ fn py_accrued_interest_amount(
     let currency = schedule.get_notional().currency();
     let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());
     py.detach(move || accrued_interest_amount(&schedule, as_of, &cfg))
-        .map(|amount| PyMoney::from_inner(Money::new(amount, currency)))
+        .and_then(|amount| Money::new(amount, currency))
+        .map(PyMoney::from_inner)
         .map_err(core_to_py)
 }
 

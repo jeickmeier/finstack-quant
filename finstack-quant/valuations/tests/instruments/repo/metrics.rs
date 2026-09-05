@@ -15,7 +15,7 @@ fn create_test_repo() -> Repo {
     let collateral = treasury_collateral();
     Repo::term(
         "METRICS_TEST",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -96,7 +96,7 @@ fn test_collateral_coverage_overcollateralized() {
     let collateral = CollateralSpec::new("SPECIAL_BOND", 2_000_000.0, "SPECIAL_BOND_PRICE");
     let repo = Repo::term(
         "OVERCOLLATERALIZED",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -488,7 +488,7 @@ fn test_metric_date_handling_uses_adjusted_dates() {
 
     let repo_weekend = finstack_quant_valuations::instruments::rates::repo::RepoBuilder::new()
         .id("WEEKEND-DATES".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral.clone())
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(start_saturday)
@@ -511,7 +511,7 @@ fn test_metric_date_handling_uses_adjusted_dates() {
 
     let repo_adjusted = finstack_quant_valuations::instruments::rates::repo::RepoBuilder::new()
         .id("ADJUSTED-DATES".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(start_monday)

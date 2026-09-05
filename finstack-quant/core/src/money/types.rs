@@ -1,7 +1,7 @@
 //! Money type, conversions, formatting, and arithmetic operations.
 //!
-//! [`Money`] stores amounts as scaled integers to avoid cumulative rounding
-//! error while retaining ergonomic APIs for arithmetic and formatting.
+//! [`Money`] stores amounts as decimals to preserve decimal precision while
+//! retaining ergonomic APIs for arithmetic and formatting.
 //! Instances retain their [`Currency`] tag and refuse to mix currencies unless
 //! explicitly converted via [`super::fx::FxProvider`].
 //!
@@ -16,7 +16,7 @@
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //!
-//! let amt = Money::new(100.0, Currency::USD);
+//! let amt = Money::from((100_i64, Currency::USD));
 //! assert_eq!(amt.currency(), Currency::USD);
 //! assert_eq!(format!("{}", amt), "USD 100.00");
 //! ```
@@ -63,9 +63,7 @@ fn group_thousands(int_str: &str, sep: char) -> String {
 
 /// Formatting options for [`Money::format_with`].
 ///
-/// `format_with` is the canonical formatter entry for [`Money`]. The older
-/// [`Money::format`], [`Money::format_with_separators`], and
-/// [`Money::format_with_config`] helpers delegate here.
+/// Configuration-aware formatting and Display delegate to this canonical formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormatOpts {
     /// Number of fractional digits. `None` means "use currency default" (from
@@ -93,8 +91,7 @@ impl Default for FormatOpts {
 
 /// Currency-tagged monetary amount with safe arithmetic.
 ///
-/// Values are stored using a fixed-point representation derived from ISO 4217
-/// decimal places.
+/// Values retain decimal precision independently of ISO 4217 display precision.
 ///
 /// When you need configurable rounding during ingestion, use
 /// [`Money::new_with_config`].
@@ -104,7 +101,7 @@ impl Default for FormatOpts {
 /// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::currency::Currency;
 ///
-/// let notional = Money::new(1_000_000.0, Currency::EUR);
+/// let notional = Money::from((1_000_000_i64, Currency::EUR));
 /// assert_eq!(notional.currency(), Currency::EUR);
 /// assert_eq!(notional.amount(), 1_000_000.0);
 /// ```
@@ -113,8 +110,8 @@ impl Default for FormatOpts {
 #[serde(deny_unknown_fields)]
 pub struct Money {
     /// Monetary amount, carried on the wire as an exact decimal string rather
-    /// than a JSON number so no precision is lost in transit. Rounded to the
-    /// currency's ISO 4217 minor-unit scale.
+    /// than a JSON number so no precision is lost in transit. Construction with
+    /// configuration applies the selected ingest scale; raw construction does not.
     #[serde(with = "crate::wire::decimal")]
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DecimalWire"))]
     amount: AmountRepr,
@@ -124,43 +121,11 @@ pub struct Money {
 }
 
 impl Money {
-    /// Format the amount with custom decimals and optional currency symbol.
-    ///
-    /// Uses Bankers rounding (IEEE 754 round-half-to-even). For other rounding
-    /// modes, use [`Money::format_with_config`].
+    /// Format an amount with explicit precision, currency display, grouping, and rounding.
     ///
     /// # Arguments
     ///
-    /// * `decimals` - Number of decimal places to display
-    /// * `show_currency` - Whether to include currency code
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let amount = Money::new(1_042_315.67, Currency::USD);
-    /// assert_eq!(amount.format(2, true), "USD 1042315.67");
-    /// assert_eq!(amount.format(2, false), "1042315.67");
-    /// assert_eq!(amount.format(0, true), "USD 1042316");
-    /// ```
-    pub fn format(&self, decimals: usize, show_currency: bool) -> String {
-        self.format_with(FormatOpts {
-            decimals: Some(decimals),
-            show_currency,
-            group: None,
-            rounding: RoundingMode::Bankers,
-        })
-    }
-
-    /// Canonical formatter. Prefer this over [`Money::format`] /
-    /// [`Money::format_with_separators`] / [`Money::format_with_config`] —
-    /// those methods delegate here.
-    ///
-    /// # Arguments
-    ///
-    /// * `opts` - Options controlling validation, interpolation, or execution behavior.
+    /// * `opts` - Display precision (currency minor units when omitted), currency-prefix flag, optional thousands separator, and rounding mode; does not change the stored amount.
     pub fn format_with(&self, opts: FormatOpts) -> String {
         use super::rounding::round_decimal;
         let dp = opts
@@ -189,84 +154,10 @@ impl Money {
         }
     }
 
-    /// Format with thousands separators and currency.
-    ///
-    /// Uses Bankers rounding. For custom rounding, use [`Money::format_with_config`].
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let amount = Money::new(1_042_315.67, Currency::USD);
-    /// let formatted = amount.format_with_separators(2);
-    /// assert_eq!(formatted, "USD 1,042,315.67");
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `decimals` - Number of fractional digits to show when formatting the money amount
-    pub fn format_with_separators(&self, decimals: usize) -> String {
-        self.format_with(FormatOpts {
-            decimals: Some(decimals),
-            show_currency: true,
-            group: Some(','),
-            rounding: RoundingMode::Bankers,
-        })
-    }
-
-    /// Create a new [`Money`] value using ISO-4217 minor units and bankers rounding.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `amount` is not finite (NaN or infinity) or cannot be
-    /// represented by the internal Decimal type. Use [`Money::try_new`] for a
-    /// fallible constructor.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_core::currency::Currency;
-    ///
-    /// let amt = Money::new(10.0, Currency::USD);
-    /// assert_eq!(format!("{}", amt), "USD 10.00");
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `amount` - Finite monetary quantity in major currency units before rounding
-    /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    #[inline]
-    #[allow(clippy::expect_used)] // Compatibility constructor is documented to panic.
-    pub fn new(amount: f64, currency: Currency) -> Self {
-        Self::try_new(amount, currency)
-            .expect("Money::new requires finite amount representable by Decimal")
-    }
-
-    /// Create a new [`Money`] value using an explicit configuration for rounding.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `amount` is not finite (NaN or infinity) or cannot be
-    /// represented by the internal Decimal type. Use
-    /// [`Money::try_new_with_config`] for a fallible constructor.
-    ///
-    /// # Arguments
-    ///
-    /// * `amount` - Finite monetary quantity in major currency units before rounding
-    /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    /// * `cfg` - Finstack configuration controlling rounding policy and money tolerances
-    #[allow(clippy::expect_used)] // Compatibility constructor is documented to panic.
-    pub fn new_with_config(amount: f64, currency: Currency, cfg: &FinstackConfig) -> Self {
-        Self::try_new_with_config(amount, currency, cfg)
-            .expect("Money::new_with_config requires a finite representable amount")
-    }
-
-    /// Fallible constructor using ISO-4217 minor units and bankers rounding.
+    /// Construct from a finite f64 without ingest rounding.
     ///
     /// Ingests the `f64` through its shortest round-trippable Decimal form,
-    /// then rounds to the currency's ISO-4217 minor-unit scale. Use
+    /// preserving its Decimal precision. Use
     /// [`Self::from_decimal`] when the caller already holds an exact Decimal.
     ///
     /// # Errors
@@ -279,13 +170,13 @@ impl Money {
     ///
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    pub fn try_new(amount: f64, currency: Currency) -> Result<Self, Error> {
+    pub fn new(amount: f64, currency: Currency) -> Result<Self, Error> {
         Self::try_new_impl(amount, currency, None)
     }
 
     /// Construct from a `Decimal` amount, preserving full precision.
     ///
-    /// Unlike [`Money::new`] / [`Money::try_new`], this constructor never goes
+    /// Unlike [`Money::new`], this constructor never goes
     /// through `f64`, so it is the preferred entry point when the caller already
     /// has a high-precision value (e.g., a Python `decimal.Decimal` rendered to
     /// a string and parsed via `Decimal::from_str`). Use this for hedge-fund
@@ -316,10 +207,33 @@ impl Money {
         Ok(Self { amount, currency })
     }
 
+    /// Construct from an exact Decimal using the configured ingest rounding policy.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Exact monetary amount in major currency units, rounded without conversion through f64.
+    /// * `currency` - ISO-4217 currency used to select the ingest scale.
+    /// * `cfg` - Configuration supplying the currency scale override (or max(6, ISO minor-unit digits)) and rounding mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns a conversion error if the rounded amount cannot provide an f64 view.
+    pub fn from_decimal_with_config(
+        amount: rust_decimal::Decimal,
+        currency: Currency,
+        cfg: &FinstackConfig,
+    ) -> Result<Self, Error> {
+        let scale = cfg.ingest_scale(currency).min(28) as i32;
+        Self::from_decimal(
+            super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
+            currency,
+        )
+    }
+
     /// Fallible constructor using an explicit configuration for rounding.
     ///
     /// Uses `cfg` to select the ingest scale and rounding mode for `currency`.
-    /// This is the configuration-aware counterpart to [`Self::try_new`].
+    /// This is the configuration-aware counterpart to [`Self::new`].
     ///
     /// # Errors
     ///
@@ -332,7 +246,7 @@ impl Money {
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
     /// * `cfg` - Finstack configuration controlling rounding policy and money tolerances
-    pub fn try_new_with_config(
+    pub fn new_with_config(
         amount: f64,
         currency: Currency,
         cfg: &FinstackConfig,
@@ -361,8 +275,7 @@ impl Money {
             let (dp, mode) = Self::ingest_rounding_params(currency, Some(cfg));
             try_round_f64(amount, dp as i32, mode)?
         } else {
-            // Shortest round-trip conversion (`Decimal::from_f64`) per the
-            //  `0.1_f64`
+            // Shortest round-trip conversion (`Decimal::from_f64`): `0.1_f64`
             // ingests as `0.1`, not the 28-digit IEEE expansion that
             // `from_f64_retain` would embed. `from_f64` can also fail when a
             // finite f64 lies outside Decimal's representable range.
@@ -411,7 +324,7 @@ impl Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let m = Money::new(1234.56, Currency::USD);
+    /// let m = Money::new(1234.56, Currency::USD).expect("valid money fixture");
     /// assert_eq!(m.amount_decimal().to_string(), "1234.56");
     /// ```
     #[inline]
@@ -452,8 +365,8 @@ impl Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let lhs = Money::new(50.0, Currency::USD);
-    /// let rhs = Money::new(25.0, Currency::USD);
+    /// let lhs = Money::from((50_i64, Currency::USD));
+    /// let rhs = Money::from((25_i64, Currency::USD));
     ///
     /// // Preferred: explicit about Result return
     /// let sum = lhs.checked_add(rhs).expect("Currency match should succeed");
@@ -490,8 +403,8 @@ impl Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let lhs = Money::new(50.0, Currency::USD);
-    /// let rhs = Money::new(25.0, Currency::USD);
+    /// let lhs = Money::from((50_i64, Currency::USD));
+    /// let rhs = Money::from((25_i64, Currency::USD));
     ///
     /// // Preferred: explicit about Result return
     /// let diff = lhs.checked_sub(rhs).expect("Currency match should succeed");
@@ -529,7 +442,7 @@ impl Money {
     /// use finstack_quant_core::currency::Currency;
     /// # fn main() -> finstack_quant_core::Result<()> {
     ///
-    /// let m = Money::new(100.0, Currency::USD);
+    /// let m = Money::from((100_i64, Currency::USD));
     /// let doubled = m.checked_mul_f64(2.0)?;
     /// assert_eq!(doubled.amount(), 200.0);
     ///
@@ -567,7 +480,7 @@ impl Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let m = Money::new(100.0, Currency::USD);
+    /// let m = Money::from((100_i64, Currency::USD));
     /// assert_eq!(m.checked_neg().amount(), -100.0);
     /// assert_eq!(m.checked_neg().checked_neg(), m);
     /// ```
@@ -592,7 +505,7 @@ impl Money {
     /// use finstack_quant_core::currency::Currency;
     /// # fn main() -> finstack_quant_core::Result<()> {
     ///
-    /// let m = Money::new(100.0, Currency::USD);
+    /// let m = Money::from((100_i64, Currency::USD));
     /// let half = m.checked_div_f64(2.0)?;
     /// assert_eq!(half.amount(), 50.0);
     ///
@@ -616,6 +529,55 @@ impl Money {
     pub fn checked_div_f64(self, rhs: f64) -> Result<Self, Error> {
         Ok(Self {
             amount: try_repr_div_f64(self.amount, rhs)?,
+            currency: self.currency,
+        })
+    }
+
+    /// Divide by another same-currency amount, returning a dimensionless f64 ratio.
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - Nonzero divisor in the same currency; no FX conversion is performed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency mismatch, division-by-zero, or conversion-overflow error.
+    pub fn checked_div(self, rhs: Self) -> Result<f64, Error> {
+        use rust_decimal::prelude::ToPrimitive;
+        ensure_same_currency(&self, &rhs)?;
+        if rhs.amount.is_zero() {
+            return Err(Error::Validation("division by zero".into()));
+        }
+        self.amount
+            .checked_div(rhs.amount)
+            .and_then(|ratio| ratio.to_f64())
+            .ok_or(Error::Input(InputError::ConversionOverflow))
+    }
+
+    /// Return the absolute amount in the same currency without rounding.
+    pub fn abs(self) -> Self {
+        Self {
+            amount: self.amount.abs(),
+            currency: self.currency,
+        }
+    }
+
+    /// Bankers-round the exact amount while preserving its currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `ndigits` - Nonnegative number of decimal places in major currency units; None selects the currency's ISO minor units. Precision above Decimal's capacity leaves the value unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when ndigits is negative.
+    pub fn round(self, ndigits: Option<i32>) -> Result<Self, Error> {
+        let dp = ndigits.unwrap_or_else(|| i32::from(self.currency.decimals()));
+        if dp < 0 {
+            return Err(Error::Validation("round(Money, n) requires n >= 0".into()));
+        }
+        Ok(Self {
+            amount: super::rounding::round_decimal(self.amount, dp, RoundingMode::Bankers),
             currency: self.currency,
         })
     }
@@ -649,7 +611,7 @@ impl Money {
     ///     }
     /// }
     ///
-    /// let eur = Money::new(100.0, Currency::EUR);
+    /// let eur = Money::from((100_i64, Currency::EUR));
     /// let trade_date = Date::from_calendar_date(2024, Month::January, 2).expect("Valid date");
     /// let usd = eur.convert(
     ///     Currency::USD,
@@ -718,7 +680,11 @@ impl fmt::Display for Money {
         // `format(currency_decimals, true)` (a raw `{:.prec$}` on the Decimal
         // would truncate instead of round).
         let dp = usize::from(self.currency.decimals());
-        f.write_str(&self.format(dp, true))
+        f.write_str(&self.format_with(FormatOpts {
+            decimals: Some(dp),
+            group: None,
+            ..FormatOpts::default()
+        }))
     }
 }
 
@@ -731,7 +697,7 @@ impl Money {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::config::FinstackConfig;
     ///
-    /// let amt = Money::new(10.0, Currency::USD);
+    /// let amt = Money::from((10_i64, Currency::USD));
     /// let mut cfg = FinstackConfig::default();
     /// cfg.rounding
     ///     .output_scale
@@ -808,9 +774,10 @@ macro_rules! from_integer_tuple {
 
 from_integer_tuple!(i64, u64);
 
-impl From<(f64, Currency)> for Money {
+impl TryFrom<(f64, Currency)> for Money {
+    type Error = Error;
     #[inline]
-    fn from(value: (f64, Currency)) -> Self {
+    fn try_from(value: (f64, Currency)) -> Result<Self, Error> {
         Self::new(value.0, value.1)
     }
 }
@@ -844,8 +811,8 @@ impl AddAssign for Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let mut total = Money::new(100.0, Currency::USD);
-    /// total += Money::new(50.0, Currency::USD);
+    /// let mut total = Money::from((100_i64, Currency::USD));
+    /// total += Money::from((50_i64, Currency::USD));
     /// assert_eq!(total.amount(), 150.0);
     /// ```
     #[track_caller]
@@ -878,8 +845,8 @@ impl SubAssign for Money {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::currency::Currency;
     ///
-    /// let mut total = Money::new(100.0, Currency::USD);
-    /// total -= Money::new(30.0, Currency::USD);
+    /// let mut total = Money::from((100_i64, Currency::USD));
+    /// total -= Money::from((30_i64, Currency::USD));
     /// assert_eq!(total.amount(), 70.0);
     /// ```
     #[track_caller]
@@ -927,15 +894,15 @@ mod tests {
 
     #[test]
     fn creation_and_accessors() {
-        let m = Money::new(100.0, Currency::USD);
+        let m = Money::from((100_i64, Currency::USD));
         assert_eq!(m.amount(), 100.0);
         assert_eq!(m.currency(), Currency::USD);
     }
 
     #[test]
     fn checked_ops() {
-        let a = Money::new(50.0, Currency::USD);
-        let b = Money::new(25.0, Currency::USD);
+        let a = Money::from((50_i64, Currency::USD));
+        let b = Money::from((25_i64, Currency::USD));
         let c = a
             .checked_add(b)
             .expect("Currency match should succeed in test");
@@ -944,14 +911,14 @@ mod tests {
 
     #[test]
     fn currency_mismatch_error() {
-        let usd = Money::new(10.0, Currency::USD);
-        let eur = Money::new(10.0, Currency::EUR);
+        let usd = Money::from((10_i64, Currency::USD));
+        let eur = Money::from((10_i64, Currency::EUR));
         assert!(usd.checked_add(eur).is_err());
     }
 
     #[test]
     fn macro_constructs_money() {
-        let m = crate::money!(250.0, GBP);
+        let m = crate::money!(250.0, GBP).expect("valid money literal");
         assert_eq!(m.amount(), 250.0);
         assert_eq!(m.currency(), Currency::GBP);
     }
@@ -966,9 +933,9 @@ mod tests {
     }
 
     #[test]
-    fn format_with_separators_handles_negative_values() {
-        let m = Money::new(-1234.56, Currency::USD);
-        let formatted = m.format_with_separators(2);
+    fn grouped_format_handles_negative_values() {
+        let m = Money::new(-1234.56, Currency::USD).expect("valid money fixture");
+        let formatted = m.format_with(FormatOpts::default());
         assert!(
             formatted.starts_with("USD -1,234.56"),
             "formatted output should keep sign on integer part only: {}",
@@ -977,20 +944,19 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "finite amount")]
     fn new_rejects_non_finite_amounts() {
-        let _ = Money::new(f64::NAN, Currency::USD);
+        assert!(Money::new(f64::NAN, Currency::USD).is_err());
     }
 
     #[test]
     #[should_panic(expected = "Money division requires finite")]
     fn division_by_zero_panics() {
-        let _ = Money::new(10.0, Currency::USD) / 0.0;
+        let _ = Money::from((10_i64, Currency::USD)) / 0.0;
     }
 
     #[test]
     fn checked_mul_div_f64_accepts_finite_scalars() {
-        let money = Money::new(10.0, Currency::USD);
+        let money = Money::from((10_i64, Currency::USD));
 
         assert_eq!(
             money
@@ -1010,7 +976,7 @@ mod tests {
 
     #[test]
     fn checked_mul_div_f64_reject_invalid_scalars() {
-        let money = Money::new(10.0, Currency::USD);
+        let money = Money::from((10_i64, Currency::USD));
 
         assert!(money.checked_mul_f64(f64::NAN).is_err());
         assert!(money.checked_mul_f64(f64::INFINITY).is_err());
@@ -1020,7 +986,7 @@ mod tests {
 
     #[test]
     fn money_operators_accept_finite_scalars() {
-        let money = Money::new(12.0, Currency::USD);
+        let money = Money::from((12_i64, Currency::USD));
 
         assert_eq!((money * 2.0).amount(), 24.0);
         assert_eq!((money / 3.0).amount(), 4.0);
@@ -1028,7 +994,7 @@ mod tests {
 
     #[test]
     fn money_assign_operators_accept_finite_scalars() {
-        let mut money = Money::new(12.0, Currency::USD);
+        let mut money = Money::from((12_i64, Currency::USD));
 
         money *= 2.5;
         assert_eq!(money.amount(), 30.0);
@@ -1049,7 +1015,9 @@ mod tests {
 
     #[test]
     fn money_json_field_names_are_stable() {
-        let json = serde_json::to_value(Money::new(10.25, Currency::USD)).expect("serializes");
+        let json =
+            serde_json::to_value(Money::new(10.25, Currency::USD).expect("valid money fixture"))
+                .expect("serializes");
         let object = json.as_object().expect("money serializes as an object");
 
         assert_eq!(object.len(), 2);
@@ -1060,7 +1028,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Money multiplication requires finite")]
     fn multiply_by_nan_panics() {
-        let _ = Money::new(10.0, Currency::USD) * f64::NAN;
+        let _ = Money::from((10_i64, Currency::USD)) * f64::NAN;
     }
 
     struct NaNProvider;
@@ -1078,7 +1046,7 @@ mod tests {
 
     #[test]
     fn convert_rejects_non_finite_rate() {
-        let usd = Money::new(5.0, Currency::USD);
+        let usd = Money::from((5_i64, Currency::USD));
         let date =
             Date::from_calendar_date(2024, time::Month::January, 1).expect("Valid test date");
         let res = usd.convert(
@@ -1094,7 +1062,7 @@ mod tests {
     fn amount_does_not_silently_return_zero_for_large_values() {
         // This test documents the fix: large values must NOT silently become 0.
         // Prior to the fix, conversion failure would return 0.0 silently.
-        let large_amount = Money::new(1_000_000_000_000.0, Currency::USD);
+        let large_amount = Money::from((1_000_000_000_000_i64, Currency::USD));
         let amount = large_amount.amount();
         assert!(
             amount > 0.0,
@@ -1106,18 +1074,18 @@ mod tests {
         );
     }
 
-    // Fallible constructor tests (Money::try_new / Money::try_new_with_config)
+    // Fallible constructor tests (Money::new / Money::new_with_config)
 
     #[test]
     fn try_new_succeeds_for_finite_values() {
-        let m = Money::try_new(123.45, Currency::USD).expect("Finite value should succeed");
+        let m = Money::new(123.45, Currency::USD).expect("Finite value should succeed");
         assert!((m.amount() - 123.45).abs() < 1e-10);
         assert_eq!(m.currency(), Currency::USD);
     }
 
     #[test]
     fn try_new_returns_error_for_nan() {
-        let result = Money::try_new(f64::NAN, Currency::USD);
+        let result = Money::new(f64::NAN, Currency::USD);
         assert!(result.is_err());
         assert!(matches!(
             result,
@@ -1129,7 +1097,7 @@ mod tests {
 
     #[test]
     fn try_new_returns_error_for_positive_infinity() {
-        let result = Money::try_new(f64::INFINITY, Currency::EUR);
+        let result = Money::new(f64::INFINITY, Currency::EUR);
         assert!(result.is_err());
         assert!(matches!(
             result,
@@ -1141,7 +1109,7 @@ mod tests {
 
     #[test]
     fn try_new_returns_error_for_negative_infinity() {
-        let result = Money::try_new(f64::NEG_INFINITY, Currency::GBP);
+        let result = Money::new(f64::NEG_INFINITY, Currency::GBP);
         assert!(result.is_err());
         assert!(matches!(
             result,
@@ -1155,14 +1123,13 @@ mod tests {
     fn try_new_with_config_succeeds_for_finite_values() {
         let mut cfg = FinstackConfig::default();
         cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 3);
-        let m =
-            Money::try_new_with_config(1.2345, Currency::USD, &cfg).expect("Finite should succeed");
+        let m = Money::new_with_config(1.2345, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 1.234).abs() < 1e-9);
     }
 
     #[test]
     fn try_new_preserves_internal_precision_by_default() {
-        let m = Money::try_new(10.005, Currency::USD).expect("Finite should succeed");
+        let m = Money::new(10.005, Currency::USD).expect("Finite should succeed");
         assert!((m.amount() - 10.005).abs() < 1e-12);
     }
 
@@ -1170,27 +1137,26 @@ mod tests {
     fn try_new_with_config_honors_ingest_scale_override() {
         let mut cfg = FinstackConfig::default();
         cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 2);
-        let m =
-            Money::try_new_with_config(10.999, Currency::USD, &cfg).expect("Finite should succeed");
+        let m = Money::new_with_config(10.999, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 11.00).abs() < 1e-12);
     }
 
     #[test]
     fn try_new_with_config_returns_error_for_non_finite() {
         let cfg = FinstackConfig::default();
-        let result = Money::try_new_with_config(f64::NAN, Currency::USD, &cfg);
+        let result = Money::new_with_config(f64::NAN, Currency::USD, &cfg);
         assert!(result.is_err());
     }
 
     #[test]
     fn try_new_handles_zero() {
-        let m = Money::try_new(0.0, Currency::USD).expect("Zero should succeed");
+        let m = Money::new(0.0, Currency::USD).expect("Zero should succeed");
         assert_eq!(m.amount(), 0.0);
     }
 
     #[test]
     fn try_new_handles_negative_zero() {
-        let m = Money::try_new(-0.0, Currency::USD).expect("Negative zero should succeed");
+        let m = Money::new(-0.0, Currency::USD).expect("Negative zero should succeed");
         // -0.0 == 0.0 in floating point
         assert_eq!(m.amount(), 0.0);
     }
@@ -1198,7 +1164,7 @@ mod tests {
     #[test]
     fn try_new_handles_very_small_values() {
         let small = 1e-15;
-        let m = Money::try_new(small, Currency::USD).expect("Small value should succeed");
+        let m = Money::new(small, Currency::USD).expect("Small value should succeed");
         // Construction preserves the raw finite amount; formatting/rounding is a separate concern.
         assert_eq!(m.amount(), small);
     }
@@ -1206,13 +1172,13 @@ mod tests {
     #[test]
     fn try_new_handles_large_finite_values() {
         let large = 1e15;
-        let m = Money::try_new(large, Currency::USD).expect("Large finite value should succeed");
+        let m = Money::new(large, Currency::USD).expect("Large finite value should succeed");
         assert_eq!(m.amount(), large);
     }
 
     #[test]
     fn try_new_rejects_finite_values_outside_decimal_range() {
-        let result = Money::try_new(1e100, Currency::USD);
+        let result = Money::new(1e100, Currency::USD);
         assert!(matches!(
             result,
             Err(crate::Error::Input(InputError::ConversionOverflow))
@@ -1238,30 +1204,30 @@ mod tests {
     #[test]
     #[should_panic(expected = "Currency mismatch")]
     fn add_assign_panics_on_currency_mismatch() {
-        let mut usd = Money::new(100.0, Currency::USD);
-        let eur = Money::new(50.0, Currency::EUR);
+        let mut usd = Money::from((100_i64, Currency::USD));
+        let eur = Money::from((50_i64, Currency::EUR));
         usd += eur;
     }
 
     #[test]
     #[should_panic(expected = "Currency mismatch")]
     fn sub_assign_panics_on_currency_mismatch() {
-        let mut usd = Money::new(100.0, Currency::USD);
-        let eur = Money::new(50.0, Currency::EUR);
+        let mut usd = Money::from((100_i64, Currency::USD));
+        let eur = Money::from((50_i64, Currency::EUR));
         usd -= eur;
     }
 
     #[test]
     fn add_assign_succeeds_for_matching_currencies() {
-        let mut total = Money::new(100.0, Currency::USD);
-        total += Money::new(50.0, Currency::USD);
+        let mut total = Money::from((100_i64, Currency::USD));
+        total += Money::from((50_i64, Currency::USD));
         assert_eq!(total.amount(), 150.0);
     }
 
     #[test]
     fn sub_assign_succeeds_for_matching_currencies() {
-        let mut total = Money::new(100.0, Currency::USD);
-        total -= Money::new(30.0, Currency::USD);
+        let mut total = Money::from((100_i64, Currency::USD));
+        total -= Money::from((30_i64, Currency::USD));
         assert_eq!(total.amount(), 70.0);
     }
 

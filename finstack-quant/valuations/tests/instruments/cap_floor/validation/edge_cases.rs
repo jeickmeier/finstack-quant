@@ -60,7 +60,7 @@ fn test_zero_vol_itm_cap() {
     let cap = CapFloor {
         id: "CAP_ZERO_VOL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.03).expect("valid decimal"), // ITM (forward = 5%)
         start_date: as_of,
         maturity: end,
@@ -108,7 +108,7 @@ fn test_zero_vol_otm_cap() {
     let cap = CapFloor {
         id: "CAP_ZERO_VOL_OTM".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.07).expect("valid decimal"), // OTM (forward = 5%)
         start_date: as_of,
         maturity: end,
@@ -160,7 +160,7 @@ fn test_very_high_strike() {
     let cap = CapFloor {
         id: "CAP_HIGH_STRIKE".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.50).expect("valid decimal"), // Extremely OTM
         start_date: as_of,
         maturity: end,
@@ -209,7 +209,7 @@ fn test_very_low_strike_floor() {
     let floor = CapFloor {
         id: "FLOOR_LOW_STRIKE".into(),
         rate_option_type: RateOptionType::Floor,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.001).expect("valid decimal"), // Extremely OTM for floor
         start_date: as_of,
         maturity: end,
@@ -258,7 +258,7 @@ fn test_very_short_maturity() {
     let caplet = CapFloor {
         id: "CAPLET_SHORT".into(),
         rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -307,7 +307,7 @@ fn test_expired_cap() {
     let cap = CapFloor {
         id: "CAP_EXPIRED".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: start,
         maturity: end,
@@ -361,7 +361,7 @@ fn test_zero_notional() {
     let cap = CapFloor {
         id: "CAP_ZERO_NOTIONAL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(0.0, Currency::USD),
+        notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,
@@ -413,7 +413,7 @@ fn test_very_high_vol() {
     let cap = CapFloor {
         id: "CAP_HIGH_VOL".into(),
         rate_option_type: RateOptionType::Cap,
-        notional: Money::new(1_000_000.0, Currency::USD),
+        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.05).expect("valid decimal"),
         start_date: as_of,
         maturity: end,

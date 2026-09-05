@@ -139,7 +139,7 @@ impl CollateralSpec {
             }
         };
 
-        Ok(Money::new(unit_value * self.quantity, currency))
+        Money::new(unit_value * self.quantity, currency)
     }
 }
 
@@ -299,7 +299,7 @@ impl Repo {
             Date::from_calendar_date(2024, time::Month::January, 9).expect("Valid example date");
         Self::term(
             "REPO-GC-7D",
-            Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD),
+            Money::from((10_000_000_i64, finstack_quant_core::currency::Currency::USD)),
             collateral,
             0.0525,
             start,
@@ -511,18 +511,18 @@ impl Repo {
     pub fn pv(&self, context: &MarketContext, as_of: Date) -> Result<Money> {
         let (_, adj_maturity) = self.adjusted_dates()?;
         if as_of >= adj_maturity {
-            return Ok(Money::new(0.0, self.cash_amount.currency()));
+            return Ok(Money::from((0_i64, self.cash_amount.currency())));
         }
 
         let disc_curve = context.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(context, as_of)?;
 
         if flows.is_empty() {
-            return Ok(Money::new(0.0, self.cash_amount.currency()));
+            return Ok(Money::from((0_i64, self.cash_amount.currency())));
         }
 
         flows.into_iter().try_fold(
-            Money::new(0.0, self.cash_amount.currency()),
+            Money::from((0_i64, self.cash_amount.currency())),
             |acc, (date, amount)| {
                 let df = disc_curve.df_between_dates(as_of, date)?;
                 acc.checked_add(amount * df)
@@ -550,7 +550,7 @@ impl Repo {
         let effective_rate = self.effective_rate()?;
         let interest = self.cash_amount.amount() * effective_rate * year_fraction;
 
-        Ok(Money::new(interest, self.cash_amount.currency()))
+        Money::new(interest, self.cash_amount.currency())
     }
 
     /// Calculate total repayment amount (principal + interest).
@@ -643,8 +643,8 @@ impl Instrument for Repo {
 // Attributable is provided via blanket impl for all Instrument types
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
-    fn notional(&self) -> Option<Money> {
-        Some(self.cash_amount)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.cash_amount))
     }
 
     fn raw_cashflow_schedule(
@@ -654,7 +654,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         let (adj_start, adj_maturity) = self.adjusted_dates()?;
 
-        let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency());
+        let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency())?;
         let total_repayment = self.total_repayment()?;
         let flows = vec![
             crate::cashflow::primitives::CashFlow::new(
@@ -679,7 +679,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
             flows,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: self.notional(),
+                notional_hint: self.notional()?,
                 ..Default::default()
             },
         );
@@ -707,7 +707,7 @@ mod tests {
         let collateral = CollateralSpec::new("BOND", 100.0, "BOND_PX");
         let repo = Repo::term(
             "R",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             collateral,
             0.05,
             date(2025, 1, 1),
@@ -731,7 +731,7 @@ mod tests {
         // This gives ~91 days = 91/360 ≈ 0.2528 years
         let repo = Repo::term(
             "R",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             collateral,
             0.12, // 12%
             date(2025, 1, 6),
@@ -755,7 +755,7 @@ mod tests {
         let collateral = CollateralSpec::new("BOND", 100.0, "BOND_PX");
         let repo = Repo::term(
             "R",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             collateral,
             0.05,
             date(2025, 1, 1),
@@ -794,7 +794,7 @@ mod tests {
         // Build repo with TARGET2 calendar and Following BDC
         let repo = Repo::builder()
             .id(InstrumentId::from("REPO-WEEKEND-TEST"))
-            .cash_amount(Money::new(1_000_000.0, Currency::USD))
+            .cash_amount(Money::from((1_000_000_i64, Currency::USD)))
             .collateral(collateral)
             .repo_rate(rust_decimal::Decimal::try_from(0.05).expect("valid decimal"))
             .start_date(start_saturday)
@@ -872,7 +872,7 @@ mod tests {
         // Build repo without calendar
         let result = Repo::builder()
             .id(InstrumentId::from("REPO-NO-CAL"))
-            .cash_amount(Money::new(1_000_000.0, Currency::USD))
+            .cash_amount(Money::from((1_000_000_i64, Currency::USD)))
             .collateral(collateral)
             .repo_rate(rust_decimal::Decimal::try_from(0.05).expect("valid decimal"))
             .start_date(date(2025, 1, 4)) // Saturday
@@ -907,7 +907,7 @@ mod tests {
 
         let result = Repo::builder()
             .id(InstrumentId::from("REPO-BAD-CAL"))
-            .cash_amount(Money::new(1_000_000.0, Currency::USD))
+            .cash_amount(Money::from((1_000_000_i64, Currency::USD)))
             .collateral(collateral)
             .repo_rate(rust_decimal::Decimal::try_from(0.05).expect("valid decimal"))
             .start_date(date(2025, 1, 4))
@@ -945,7 +945,7 @@ mod tests {
         let start_monday = date(2025, 1, 6);
         let maturity_monday = date(2025, 1, 13);
 
-        let cash_amount = Money::new(1_000_000.0, Currency::USD);
+        let cash_amount = Money::from((1_000_000_i64, Currency::USD));
         let repo_rate = rust_decimal::Decimal::try_from(0.05).expect("valid decimal");
 
         let collateral1 = CollateralSpec::new("BOND", 100.0, "BOND_PX");
@@ -1082,7 +1082,7 @@ mod tests {
 
         let repo = Repo::overnight(
             "OVERNIGHT-TEST",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             collateral,
             0.05,
             start_saturday,
@@ -1132,7 +1132,7 @@ mod tests {
 
         let result = Repo::overnight(
             "OVERNIGHT-BAD-CAL",
-            Money::new(1_000_000.0, Currency::USD),
+            Money::from((1_000_000_i64, Currency::USD)),
             collateral,
             0.05,
             date(2025, 1, 6),

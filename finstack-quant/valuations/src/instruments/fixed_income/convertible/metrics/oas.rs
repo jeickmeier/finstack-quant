@@ -194,7 +194,7 @@ mod tests {
 
         ConvertibleBond {
             id: "TEST_CB_OAS".to_string().into(),
-            notional: Money::new(notional_usd, Currency::USD),
+            notional: Money::new(notional_usd, Currency::USD).expect("valid money fixture"),
             issue_date: issue,
             maturity,
             discount_curve_id: "USD-OIS".into(),

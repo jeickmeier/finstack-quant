@@ -27,7 +27,7 @@ pub(crate) fn lp_cashflows(
     fund: &PrivateMarketsFund,
 ) -> finstack_quant_core::Result<Vec<(finstack_quant_core::dates::Date, Money)>> {
     let ledger = run_waterfall(fund)?;
-    Ok(ledger.lp_cashflows())
+    ledger.lp_cashflows()
 }
 
 /// Holder-view present value of the fund position.
@@ -68,7 +68,7 @@ pub(crate) fn compute_pv(
             }
             nav
         }
-        None => Money::new(0.0, fund.currency),
+        None => Money::from((0_i64, fund.currency)),
     };
 
     let future_flows: Vec<(Date, Money)> = lp_cashflows(fund)?
@@ -83,7 +83,7 @@ pub(crate) fn compute_pv(
         future_flows.npv(disc.as_ref(), as_of)?
     } else {
         let total: f64 = future_flows.iter().map(|(_, m)| m.amount()).sum();
-        Money::new(total, fund.currency)
+        Money::new(total, fund.currency)?
     };
 
     future_pv.checked_add(nav)
@@ -107,11 +107,11 @@ mod tests {
         let events = vec![
             FundEvent::contribution(
                 date!(2020 - 01 - 01),
-                Money::new(1_000_000.0, Currency::USD),
+                Money::from((1_000_000_i64, Currency::USD)),
             ),
             FundEvent::distribution(
                 date!(2025 - 01 - 01),
-                Money::new(2_000_000.0, Currency::USD),
+                Money::from((2_000_000_i64, Currency::USD)),
             ),
         ];
         PrivateMarketsFund::new("PMF-M13", Currency::USD, spec, events)
@@ -134,7 +134,8 @@ mod tests {
 
     #[test]
     fn unrealized_nav_adds_to_pv() {
-        let fund = fully_realized_fund().with_unrealized_nav(Money::new(750_000.0, Currency::USD));
+        let fund =
+            fully_realized_fund().with_unrealized_nav(Money::from((750_000_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = date!(2025 - 06 - 01);
         let pv = fund.value(&market, as_of).expect("pv should compute");
@@ -160,7 +161,8 @@ mod tests {
 
     #[test]
     fn unrealized_nav_rejects_future_realization_events() {
-        let fund = fully_realized_fund().with_unrealized_nav(Money::new(750_000.0, Currency::USD));
+        let fund =
+            fully_realized_fund().with_unrealized_nav(Money::from((750_000_i64, Currency::USD)));
         let error = compute_pv(&fund, &MarketContext::new(), date!(2024 - 01 - 01))
             .expect_err("NAV plus future distributions must fail");
         assert!(error.to_string().contains("valuation mode"));
@@ -168,7 +170,7 @@ mod tests {
 
     #[test]
     fn unrealized_nav_currency_mismatch_errors() {
-        let fund = fully_realized_fund().with_unrealized_nav(Money::new(100.0, Currency::EUR));
+        let fund = fully_realized_fund().with_unrealized_nav(Money::from((100_i64, Currency::EUR)));
         let market = MarketContext::new();
         let result = compute_pv(&fund, &market, date!(2025 - 01 - 01));
         assert!(matches!(

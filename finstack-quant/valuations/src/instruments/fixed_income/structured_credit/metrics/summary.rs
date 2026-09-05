@@ -112,7 +112,7 @@ pub fn calculate_tranche_metrics(
             pv += amount.amount() * curve.df_between_dates(as_of, *date)?;
         }
     }
-    let pv_money = Money::new(pv, deal.pool.get_base_currency());
+    let pv_money = Money::new(pv, deal.pool.get_base_currency())?;
     let price_pct = if original_balance > 0.0 {
         pv / original_balance * 100.0
     } else {
@@ -130,7 +130,7 @@ pub fn calculate_tranche_metrics(
     let target_pv = Money::new(
         target_price_pct / 100.0 * original_balance,
         pv_money.currency(),
-    );
+    )?;
     let z_spread_bp = calculate_tranche_z_spread(&cashflows.cashflows, curve, target_pv, as_of)?;
     let cs01 = calculate_tranche_cs01(&cashflows.cashflows, curve, z_spread_bp * 1e-4, as_of)?;
     let spread_duration = if pv != 0.0 {

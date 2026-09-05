@@ -25,7 +25,7 @@ fn test_position_spec_roundtrip() {
 
     let deposit = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -74,7 +74,7 @@ fn test_portfolio_spec_serialization() {
 
     let dep1 = Deposit::builder()
         .id("DEP_1".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -84,7 +84,7 @@ fn test_portfolio_spec_serialization() {
 
     let dep2 = Deposit::builder()
         .id("DEP_2".into())
-        .notional(Money::new(500_000.0, Currency::USD))
+        .notional(Money::new(500_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -150,7 +150,7 @@ fn test_portfolio_spec_json_roundtrip() {
 
     let deposit = Deposit::builder()
         .id("DEP_1M".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .start_date(as_of)
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)

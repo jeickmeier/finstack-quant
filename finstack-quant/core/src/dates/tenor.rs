@@ -118,7 +118,7 @@ impl TenorUnit {
 /// use finstack_quant_core::dates::{Tenor, TenorUnit};
 /// # fn main() -> finstack_quant_core::Result<()> {
 ///
-/// let tenor = Tenor::new(3, TenorUnit::Months);
+/// let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
 /// assert_eq!(tenor.count(), 3);
 /// assert_eq!(tenor.unit(), TenorUnit::Months);
 ///
@@ -160,42 +160,11 @@ impl TryFrom<TenorDe> for Tenor {
     type Error = crate::Error;
 
     fn try_from(raw: TenorDe) -> Result<Self, Self::Error> {
-        Self::try_new(raw.count, raw.unit)
+        Self::new(raw.count, raw.unit)
     }
 }
 
 impl Tenor {
-    /// Create a new tenor with the specified count and unit.
-    ///
-    /// # Arguments
-    /// * `count` - Number of periods
-    /// * `unit` - Period unit type
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Tenor, TenorUnit};
-    ///
-    /// let quarterly = Tenor::new(3, TenorUnit::Months);
-    /// let annual = Tenor::new(1, TenorUnit::Years);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics when `count` is zero or exceeds the unit-specific maximum. Use
-    /// [`Self::try_new`] for data supplied by users, files, or external APIs.
-    #[inline]
-    pub const fn new(count: u32, unit: TenorUnit) -> Self {
-        let max_count = match unit {
-            TenorUnit::Days => MAX_TENOR_DAYS,
-            TenorUnit::Weeks => MAX_TENOR_WEEKS,
-            TenorUnit::Months => MAX_TENOR_MONTHS,
-            TenorUnit::Years => MAX_TENOR_YEARS,
-        };
-        assert!(count > 0 && count <= max_count, "invalid tenor count");
-        Self { count, unit }
-    }
-
     /// Number of units in this tenor.
     pub const fn count(self) -> u32 {
         self.count
@@ -222,7 +191,7 @@ impl Tenor {
     ///
     /// * `count` - Number of tenor units in the resulting interval.
     /// * `unit` - Unit enum selecting the interpretation of the numeric magnitude
-    pub fn try_new(count: u32, unit: TenorUnit) -> crate::Result<Self> {
+    pub fn new(count: u32, unit: TenorUnit) -> crate::Result<Self> {
         let max_count = match unit {
             TenorUnit::Days => MAX_TENOR_DAYS,
             TenorUnit::Weeks => MAX_TENOR_WEEKS,
@@ -307,9 +276,9 @@ impl Tenor {
             // It's effectively an integer number of months
             let m = rounded_months as u32;
             if m > 0 && m.is_multiple_of(12) {
-                Self::try_new(m / 12, TenorUnit::Years)
+                Self::new(m / 12, TenorUnit::Years)
             } else {
-                Self::try_new(m, TenorUnit::Months)
+                Self::new(m, TenorUnit::Months)
             }
         } else {
             // Convert to days
@@ -321,7 +290,7 @@ impl Tenor {
                 DayCount::Act365F => (years * 365.0).round(),
                 _ => (years * 365.25).round(),
             };
-            Self::try_new(days as u32, TenorUnit::Days)
+            Self::new(days as u32, TenorUnit::Days)
         }
     }
 
@@ -436,7 +405,7 @@ impl Tenor {
             .into());
         };
         let unit = TenorUnit::from_char(unit_char)?;
-        Self::try_new(count, unit)
+        Self::new(count, unit)
     }
 
     /// Convert tenor to a simple year fraction approximation.
@@ -704,49 +673,73 @@ impl Tenor {
     /// Convenience constructor for Annual frequency (1 Year).
     #[inline]
     pub const fn annual() -> Self {
-        Self::new(1, TenorUnit::Years)
+        Self {
+            count: 1,
+            unit: TenorUnit::Years,
+        }
     }
 
     /// Convenience constructor for Semi-Annual frequency (6 Months).
     #[inline]
     pub const fn semi_annual() -> Self {
-        Self::new(6, TenorUnit::Months)
+        Self {
+            count: 6,
+            unit: TenorUnit::Months,
+        }
     }
 
     /// Convenience constructor for Quarterly frequency (3 Months).
     #[inline]
     pub const fn quarterly() -> Self {
-        Self::new(3, TenorUnit::Months)
+        Self {
+            count: 3,
+            unit: TenorUnit::Months,
+        }
     }
 
     /// Convenience constructor for Bi-Monthly frequency (2 Months).
     #[inline]
     pub const fn bimonthly() -> Self {
-        Self::new(2, TenorUnit::Months)
+        Self {
+            count: 2,
+            unit: TenorUnit::Months,
+        }
     }
 
     /// Convenience constructor for Monthly frequency (1 Month).
     #[inline]
     pub const fn monthly() -> Self {
-        Self::new(1, TenorUnit::Months)
+        Self {
+            count: 1,
+            unit: TenorUnit::Months,
+        }
     }
 
     /// Convenience constructor for Bi-Weekly frequency (2 Weeks).
     #[inline]
     pub const fn biweekly() -> Self {
-        Self::new(2, TenorUnit::Weeks)
+        Self {
+            count: 2,
+            unit: TenorUnit::Weeks,
+        }
     }
 
     /// Convenience constructor for Weekly frequency (1 Week).
     #[inline]
     pub const fn weekly() -> Self {
-        Self::new(1, TenorUnit::Weeks)
+        Self {
+            count: 1,
+            unit: TenorUnit::Weeks,
+        }
     }
 
     /// Convenience constructor for Daily frequency (1 Day).
     #[inline]
     pub const fn daily() -> Self {
-        Self::new(1, TenorUnit::Days)
+        Self {
+            count: 1,
+            unit: TenorUnit::Days,
+        }
     }
 
     /// Create a Tenor from payments per year.
@@ -770,7 +763,7 @@ impl Tenor {
         // Try to fit into months first
         if 12 % payments == 0 {
             let months = 12 / payments;
-            Ok(Self::new(months, TenorUnit::Months))
+            Self::new(months, TenorUnit::Months)
         } else {
             // If it doesn't fit into months, try roughly into weeks (52)
             // But standard market convention usually implies months.
@@ -896,15 +889,15 @@ mod tests {
     fn test_from_years_prefers_months_and_handles_invalid_values() {
         assert_eq!(
             Tenor::from_years(1.0, DayCount::Act365F).expect("valid"),
-            Tenor::new(1, TenorUnit::Years)
+            Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture")
         );
         assert_eq!(
             Tenor::from_years(0.25, DayCount::Act365F).expect("valid"),
-            Tenor::new(3, TenorUnit::Months)
+            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
         );
         assert_eq!(
             Tenor::from_years(10.0 / 365.0, DayCount::Act365F).expect("valid"),
-            Tenor::new(10, TenorUnit::Days)
+            Tenor::new(10, TenorUnit::Days).expect("valid tenor fixture")
         );
         assert!(Tenor::from_years(-1.0, DayCount::Act365F).is_err());
         assert!(Tenor::from_years(f64::NAN, DayCount::Act365F).is_err());
@@ -914,11 +907,11 @@ mod tests {
     fn test_from_payments_per_year_validation() {
         assert_eq!(
             Tenor::from_payments_per_year(4).expect("quarterly"),
-            Tenor::new(3, TenorUnit::Months)
+            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
         );
         assert_eq!(
             Tenor::from_payments_per_year(12).expect("monthly"),
-            Tenor::new(1, TenorUnit::Months)
+            Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")
         );
         assert!(Tenor::from_payments_per_year(0).is_err());
         assert!(Tenor::from_payments_per_year(5).is_err());
@@ -971,12 +964,12 @@ mod tests {
 
     #[test]
     fn checked_constructor_rejects_zero_and_conversion_overflow() {
-        assert!(Tenor::try_new(0, TenorUnit::Months).is_err());
-        assert!(Tenor::try_new(u32::MAX, TenorUnit::Years).is_err());
-        assert!(Tenor::try_new(u32::MAX, TenorUnit::Weeks).is_err());
+        assert!(Tenor::new(0, TenorUnit::Months).is_err());
+        assert!(Tenor::new(u32::MAX, TenorUnit::Years).is_err());
+        assert!(Tenor::new(u32::MAX, TenorUnit::Weeks).is_err());
         assert_eq!(
-            Tenor::try_new(3, TenorUnit::Months).unwrap(),
-            Tenor::new(3, TenorUnit::Months)
+            Tenor::new(3, TenorUnit::Months).unwrap(),
+            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
         );
     }
 
@@ -1027,7 +1020,7 @@ mod tests {
 
     #[test]
     fn tenor_rejects_count_exceeding_supported_range() {
-        let err = Tenor::try_new((i32::MAX as u32) + 1, TenorUnit::Months)
+        let err = Tenor::new((i32::MAX as u32) + 1, TenorUnit::Months)
             .expect_err("oversized tenor rejected at construction");
         assert!(err.to_string().contains("maximum supported tenor"));
     }
@@ -1075,13 +1068,37 @@ mod tests {
 
     #[test]
     fn test_convenience_constructors() {
-        assert_eq!(Tenor::daily(), Tenor::new(1, TenorUnit::Days));
-        assert_eq!(Tenor::weekly(), Tenor::new(1, TenorUnit::Weeks));
-        assert_eq!(Tenor::biweekly(), Tenor::new(2, TenorUnit::Weeks));
-        assert_eq!(Tenor::monthly(), Tenor::new(1, TenorUnit::Months));
-        assert_eq!(Tenor::bimonthly(), Tenor::new(2, TenorUnit::Months));
-        assert_eq!(Tenor::quarterly(), Tenor::new(3, TenorUnit::Months));
-        assert_eq!(Tenor::semi_annual(), Tenor::new(6, TenorUnit::Months));
-        assert_eq!(Tenor::annual(), Tenor::new(1, TenorUnit::Years));
+        assert_eq!(
+            Tenor::daily(),
+            Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::weekly(),
+            Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::biweekly(),
+            Tenor::new(2, TenorUnit::Weeks).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::monthly(),
+            Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::bimonthly(),
+            Tenor::new(2, TenorUnit::Months).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::quarterly(),
+            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::semi_annual(),
+            Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")
+        );
+        assert_eq!(
+            Tenor::annual(),
+            Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture")
+        );
     }
 }

@@ -146,9 +146,18 @@ fn create_base_market() -> MarketContext {
         .insert(base_corr)
         .insert(hazard_ig)
         .insert(hazard_hy)
-        .insert_price("SPY", MarketScalar::Price(Money::new(450.0, Currency::USD)))
-        .insert_price("QQQ", MarketScalar::Price(Money::new(380.0, Currency::USD)))
-        .insert_price("EWU", MarketScalar::Price(Money::new(32.0, Currency::USD)))
+        .insert_price(
+            "SPY",
+            MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+        )
+        .insert_price(
+            "QQQ",
+            MarketScalar::Price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
+        )
+        .insert_price(
+            "EWU",
+            MarketScalar::Price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
+        )
 }
 
 /// Create a financial model with multiple nodes

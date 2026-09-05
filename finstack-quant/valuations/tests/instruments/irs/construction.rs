@@ -18,7 +18,7 @@ fn test_irs_standard_construction() {
     // Standard USD swap using defaults
     let swap = test_utils::usd_irs_swap(
         "IRS-5Y",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -42,7 +42,7 @@ fn test_irs_builder_pattern() {
     // Use builder for full control
     let swap = InterestRateSwap::builder()
         .id("IRS-CUSTOM".into())
-        .notional(Money::new(5_000_000.0, Currency::USD))
+        .notional(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
@@ -98,7 +98,7 @@ fn test_irs_builder_pattern() {
 fn test_irs_receive_vs_pay() {
     let start = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let rate = 0.05;
 
     let swap_receive = test_utils::usd_irs_swap(
@@ -127,7 +127,7 @@ fn test_irs_short_maturity() {
     // 6-month swap
     let swap = test_utils::usd_irs_swap(
         "IRS-6M",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2024 - 07 - 01),
@@ -144,7 +144,7 @@ fn test_irs_long_maturity() {
     // 30-year swap
     let swap = test_utils::usd_irs_swap(
         "IRS-30Y",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         0.04,
         date!(2024 - 01 - 01),
         date!(2054 - 01 - 01),
@@ -160,7 +160,7 @@ fn test_irs_long_maturity() {
 fn test_irs_zero_spread() {
     let swap = test_utils::usd_irs_swap(
         "IRS-ZERO-SPREAD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -175,7 +175,7 @@ fn test_irs_zero_spread() {
 fn test_irs_with_spread() {
     let mut swap = test_utils::usd_irs_swap(
         "IRS-WITH-SPREAD",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -196,7 +196,7 @@ fn test_irs_different_leg_frequencies() {
     // Fixed semiannual, float quarterly (standard)
     let swap = InterestRateSwap::builder()
         .id("IRS-DIFF-FREQ".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
@@ -241,7 +241,7 @@ fn test_irs_different_leg_frequencies() {
 fn test_irs_attribute_management() {
     let mut swap = test_utils::usd_irs_swap(
         "IRS-ATTRS",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
@@ -268,7 +268,7 @@ fn test_irs_attribute_management() {
 fn test_irs_calendar_specification() {
     let swap = InterestRateSwap::builder()
         .id("IRS-CAL".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
@@ -313,7 +313,7 @@ fn test_irs_calendar_specification() {
 fn test_irs_stub_specification() {
     let swap = InterestRateSwap::builder()
         .id("IRS-STUB".into())
-        .notional(Money::new(1_000_000.0, Currency::USD))
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .side(PayReceive::Receive)
         .fixed(finstack_quant_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),

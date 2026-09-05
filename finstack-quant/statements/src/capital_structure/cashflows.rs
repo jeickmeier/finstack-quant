@@ -29,27 +29,27 @@ use serde::{Deserialize, Serialize};
 /// # use finstack_quant_core::money::Money;
 /// # use finstack_quant_core::currency::Currency;
 /// let mut cs = CapitalStructureCashflows::new();
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// cs.by_instrument
 ///     .entry("BOND-1".into())
 ///     .or_default()
 ///     .insert(period, CashflowBreakdown {
-///         interest_expense_cash: Money::new(10_000.0, Currency::USD),
+///         interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
 ///         interest_income_cash: None,
-///         interest_expense_pik: Money::new(2_500.0, Currency::USD),
-///         principal_payment: Money::new(100_000.0, Currency::USD),
-///         fees: Money::new(0.0, Currency::USD),
-///         debt_balance: Money::new(4_900_000.0, Currency::USD),
-///         accrued_interest: Money::new(5_000.0, Currency::USD),
+///         interest_expense_pik: Money::from((2_500_i64, Currency::USD)),
+///         principal_payment: Money::from((100_000_i64, Currency::USD)),
+///         fees: Money::from((0_i64, Currency::USD)),
+///         debt_balance: Money::from((4_900_000_i64, Currency::USD)),
+///         accrued_interest: Money::from((5_000_i64, Currency::USD)),
 ///     });
 /// cs.totals.insert(period, CashflowBreakdown {
-///     interest_expense_cash: Money::new(10_000.0, Currency::USD),
+///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
 ///     interest_income_cash: None,
-///     interest_expense_pik: Money::new(2_500.0, Currency::USD),
-///     principal_payment: Money::new(100_000.0, Currency::USD),
-///     fees: Money::new(0.0, Currency::USD),
-///     debt_balance: Money::new(4_900_000.0, Currency::USD),
-///     accrued_interest: Money::new(5_000.0, Currency::USD),
+///     interest_expense_pik: Money::from((2_500_i64, Currency::USD)),
+///     principal_payment: Money::from((100_000_i64, Currency::USD)),
+///     fees: Money::from((0_i64, Currency::USD)),
+///     debt_balance: Money::from((4_900_000_i64, Currency::USD)),
+///     accrued_interest: Money::from((5_000_i64, Currency::USD)),
 /// });
 ///
 /// assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
@@ -153,13 +153,13 @@ impl CashflowBreakdown {
     /// Create a new breakdown with a specific currency.
     pub fn with_currency(currency: Currency) -> Self {
         Self {
-            interest_expense_cash: Money::new(0.0, currency),
-            interest_income_cash: Some(Money::new(0.0, currency)),
-            interest_expense_pik: Money::new(0.0, currency),
-            principal_payment: Money::new(0.0, currency),
-            fees: Money::new(0.0, currency),
-            debt_balance: Money::new(0.0, currency),
-            accrued_interest: Money::new(0.0, currency),
+            interest_expense_cash: Money::from((0_i64, currency)),
+            interest_income_cash: Some(Money::from((0_i64, currency))),
+            interest_expense_pik: Money::from((0_i64, currency)),
+            principal_payment: Money::from((0_i64, currency)),
+            fees: Money::from((0_i64, currency)),
+            debt_balance: Money::from((0_i64, currency)),
+            accrued_interest: Money::from((0_i64, currency)),
         }
     }
 
@@ -168,7 +168,7 @@ impl CashflowBreakdown {
     #[must_use]
     pub fn interest_income_cash_or_zero(&self) -> Money {
         self.interest_income_cash
-            .unwrap_or_else(|| Money::new(0.0, self.interest_expense_cash.currency()))
+            .unwrap_or_else(|| Money::from((0_i64, self.interest_expense_cash.currency())))
     }
 
     /// Cash interest expense net of cash interest received.
@@ -201,8 +201,8 @@ impl CashflowBreakdown {
     /// # use finstack_quant_core::money::Money;
     /// # use finstack_quant_core::currency::Currency;
     /// let cf = CashflowBreakdown {
-    ///     interest_expense_cash: Money::new(10_000.0, Currency::USD),
-    ///     interest_expense_pik: Money::new(2_500.0, Currency::USD),
+    ///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
+    ///     interest_expense_pik: Money::from((2_500_i64, Currency::USD)),
     ///     ..CashflowBreakdown::with_currency(Currency::USD)
     /// };
     /// assert_eq!(cf.interest_expense_total().unwrap().amount(), 12_500.0);
@@ -381,10 +381,10 @@ impl CapitalStructureCashflows {
     /// # use finstack_quant_core::money::Money;
     /// # use finstack_quant_core::currency::Currency;
     /// let mut cashflows = CapitalStructureCashflows::new();
-    /// let period = PeriodId::quarter(2025, 1);
+    /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// cashflows.by_instrument.insert(
     ///     "BOND-1".into(),
-    ///     [(period, CashflowBreakdown { interest_expense_cash: Money::new(5_000.0, Currency::USD), ..CashflowBreakdown::with_currency(Currency::USD) })]
+    ///     [(period, CashflowBreakdown { interest_expense_cash: Money::from((5_000_i64, Currency::USD)), ..CashflowBreakdown::with_currency(Currency::USD) })]
     ///         .into_iter()
     ///         .collect(),
     /// );
@@ -734,9 +734,9 @@ mod tests {
     #[test]
     fn test_cashflow_breakdown_interest_total() {
         let cf = CashflowBreakdown {
-            interest_expense_cash: Money::new(10_000.0, Currency::USD),
-            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
-            interest_expense_pik: Money::new(2_500.0, Currency::USD),
+            interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
+            interest_income_cash: Some(Money::from((0_i64, Currency::USD))),
+            interest_expense_pik: Money::from((2_500_i64, Currency::USD)),
             ..CashflowBreakdown::with_currency(Currency::USD)
         };
         assert_eq!(
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn validate_currency_invariant_catches_mismatch() {
         let mut cf = CashflowBreakdown::with_currency(Currency::USD);
-        cf.interest_expense_pik = Money::new(100.0, Currency::EUR);
+        cf.interest_expense_pik = Money::from((100_i64, Currency::EUR));
         let result = cf.validate_currency_invariant();
         assert!(result.is_err());
         let err_str = result.expect_err("expected mismatch error").to_string();
@@ -818,15 +818,15 @@ mod tests {
     fn test_capital_structure_cashflows_accessors() {
         let mut cs_cf = CapitalStructureCashflows::new();
 
-        let period_id = PeriodId::quarter(2025, 1);
+        let period_id = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let breakdown = CashflowBreakdown {
-            interest_expense_cash: Money::new(45_000.0, Currency::USD),
-            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
-            interest_expense_pik: Money::new(5_000.0, Currency::USD),
-            principal_payment: Money::new(100_000.0, Currency::USD),
-            debt_balance: Money::new(1_000_000.0, Currency::USD),
-            fees: Money::new(0.0, Currency::USD),
-            accrued_interest: Money::new(2_500.0, Currency::USD),
+            interest_expense_cash: Money::from((45_000_i64, Currency::USD)),
+            interest_income_cash: Some(Money::from((0_i64, Currency::USD))),
+            interest_expense_pik: Money::from((5_000_i64, Currency::USD)),
+            principal_payment: Money::from((100_000_i64, Currency::USD)),
+            debt_balance: Money::from((1_000_000_i64, Currency::USD)),
+            fees: Money::from((0_i64, Currency::USD)),
+            accrued_interest: Money::from((2_500_i64, Currency::USD)),
         };
 
         let mut period_map = IndexMap::new();
@@ -893,9 +893,9 @@ mod tests {
     #[test]
     fn cashflow_breakdown_serde_round_trips_and_denies_unknown_fields() {
         let cf = CashflowBreakdown {
-            interest_expense_cash: Money::new(10_000.0, Currency::USD),
-            interest_income_cash: Some(Money::new(0.0, Currency::USD)),
-            interest_expense_pik: Money::new(2_500.0, Currency::USD),
+            interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
+            interest_income_cash: Some(Money::from((0_i64, Currency::USD))),
+            interest_expense_pik: Money::from((2_500_i64, Currency::USD)),
             ..CashflowBreakdown::with_currency(Currency::USD)
         };
         let json = serde_json::to_string(&cf).expect("serialize");
@@ -918,11 +918,11 @@ mod tests {
     #[test]
     fn capital_structure_cashflows_serde_round_trips_and_denies_unknown_fields() {
         let mut cs = CapitalStructureCashflows::new();
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         cs.totals
             .insert(period, CashflowBreakdown::with_currency(Currency::USD));
         cs.equity_distribution
-            .insert(period, Money::new(680.0, Currency::USD));
+            .insert(period, Money::from((680_i64, Currency::USD)));
 
         let json = serde_json::to_string(&cs).expect("serialize");
         let back: CapitalStructureCashflows = serde_json::from_str(&json).expect("deserialize");
@@ -946,7 +946,7 @@ mod tests {
         cs.totals_by_currency.insert(Currency::USD, IndexMap::new());
         cs.totals_by_currency.insert(Currency::EUR, IndexMap::new());
 
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let err = cs.get_total_interest(&period);
         assert!(err.is_err());
     }

@@ -399,8 +399,8 @@ mod tests {
 
         RevolvingCredit {
             id: "TEST-RC".into(),
-            commitment_amount: Money::new(10_000_000.0, Currency::USD),
-            drawn_amount: Money::new(5_000_000.0, Currency::USD),
+            commitment_amount: Money::from((10_000_000_i64, Currency::USD)),
+            drawn_amount: Money::from((5_000_000_i64, Currency::USD)),
             commitment_date: start,
             maturity: end,
             base_rate_spec,
@@ -688,13 +688,13 @@ mod tests {
     fn test_apply_draw_repay_event_draw() {
         use super::super::types::DrawRepayEvent;
 
-        let balance = Money::new(5_000_000.0, Currency::USD);
-        let commitment = Money::new(10_000_000.0, Currency::USD);
+        let balance = Money::from((5_000_000_i64, Currency::USD));
+        let commitment = Money::from((10_000_000_i64, Currency::USD));
         let draw_date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
 
         let event = DrawRepayEvent {
             date: draw_date,
-            amount: Money::new(2_000_000.0, Currency::USD),
+            amount: Money::from((2_000_000_i64, Currency::USD)),
             is_draw: true,
         };
 
@@ -707,13 +707,13 @@ mod tests {
     fn test_apply_draw_repay_event_repay() {
         use super::super::types::DrawRepayEvent;
 
-        let balance = Money::new(5_000_000.0, Currency::USD);
-        let commitment = Money::new(10_000_000.0, Currency::USD);
+        let balance = Money::from((5_000_000_i64, Currency::USD));
+        let commitment = Money::from((10_000_000_i64, Currency::USD));
         let repay_date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
 
         let event = DrawRepayEvent {
             date: repay_date,
-            amount: Money::new(1_000_000.0, Currency::USD),
+            amount: Money::from((1_000_000_i64, Currency::USD)),
             is_draw: false,
         };
 
@@ -726,13 +726,13 @@ mod tests {
     fn test_apply_draw_repay_event_exceeds_commitment() {
         use super::super::types::DrawRepayEvent;
 
-        let balance = Money::new(8_000_000.0, Currency::USD);
-        let commitment = Money::new(10_000_000.0, Currency::USD);
+        let balance = Money::from((8_000_000_i64, Currency::USD));
+        let commitment = Money::from((10_000_000_i64, Currency::USD));
         let draw_date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
 
         let event = DrawRepayEvent {
             date: draw_date,
-            amount: Money::new(3_000_000.0, Currency::USD), // Would exceed commitment
+            amount: Money::from((3_000_000_i64, Currency::USD)), // Would exceed commitment
             is_draw: true,
         };
 

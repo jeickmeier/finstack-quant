@@ -30,7 +30,7 @@ fn composite_with_legs(count: usize) -> CompositeInstrument {
     CompositeSpec::new(
         format!("COMPOSITE-{count}"),
         Currency::USD,
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         legs,
         WeightingMethod::FixedQuantity,
         RebalanceRule::Manual,

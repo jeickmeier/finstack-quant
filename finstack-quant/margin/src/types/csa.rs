@@ -391,7 +391,7 @@ mod tests {
     fn usd_regulatory_csa() {
         let csa = CsaSpec::usd_regulatory().expect("registry should load");
         assert_eq!(csa.base_currency, Currency::USD);
-        assert_eq!(csa.vm_params.threshold, Money::new(0.0, Currency::USD));
+        assert_eq!(csa.vm_params.threshold, Money::from((0_i64, Currency::USD)));
         assert!(csa.requires_im());
     }
 
@@ -419,17 +419,17 @@ mod tests {
         let csa = CsaSpec::usd_regulatory()
             .expect("registry should load")
             .with_vm_threshold(
-                Money::new(300_000.0, Currency::USD),
-                Money::new(50_000.0, Currency::USD),
+                Money::from((300_000_i64, Currency::USD)),
+                Money::from((50_000_i64, Currency::USD)),
                 None,
-                Some(Money::new(100_000.0, Currency::USD)),
+                Some(Money::from((100_000_i64, Currency::USD))),
             )
             .expect("same-currency terms")
             .with_im(
                 ImMethodology::Schedule,
                 5,
-                Money::new(1_000_000.0, Currency::USD),
-                Money::new(0.0, Currency::USD),
+                Money::from((1_000_000_i64, Currency::USD)),
+                Money::from((0_i64, Currency::USD)),
                 true,
             )
             .expect("same-currency IM terms");
@@ -444,8 +444,8 @@ mod tests {
         let mismatch = CsaSpec::usd_regulatory()
             .expect("registry should load")
             .with_vm_threshold(
-                Money::new(1.0, Currency::EUR),
-                Money::new(0.0, Currency::USD),
+                Money::from((1_i64, Currency::EUR)),
+                Money::from((0_i64, Currency::USD)),
                 None,
                 None,
             );

@@ -110,7 +110,7 @@ fn bench_fx_swap_pv(c: &mut Criterion) {
             .quote_currency(Currency::USD)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
             .domestic_discount_curve_id("USD-OIS".into())
             .foreign_discount_curve_id("EUR-OIS".into())
             .build()
@@ -137,7 +137,7 @@ fn bench_fx_forward_pv(c: &mut Criterion) {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .maturity(maturity)
-            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
             .contract_rate_opt(Some(1.05))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
@@ -167,7 +167,7 @@ fn bench_fx_option_pv(c: &mut Criterion) {
             Currency::USD,
             1.10,
             expiry,
-            Money::new(1_000_000.0, Currency::EUR),
+            Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
             "EURUSD-VOL",
         )
         .unwrap();
@@ -191,7 +191,7 @@ fn bench_fx_option_greeks(c: &mut Criterion) {
         Currency::USD,
         1.10,
         expiry,
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         "EURUSD-VOL",
     )
     .unwrap();

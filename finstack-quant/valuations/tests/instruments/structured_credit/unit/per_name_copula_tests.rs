@@ -64,7 +64,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
     for i in 0..n_assets {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             format!("L{i}"),
-            Money::new(per_asset, Currency::USD),
+            Money::new(per_asset, Currency::USD).expect("valid money fixture"),
             0.07,
             maturity(),
             DayCount::Thirty360,
@@ -76,7 +76,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             0.0,
             80.0,
             TrancheSeniority::Senior,
-            Money::new(total * 0.80, Currency::USD),
+            Money::new(total * 0.80, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity(),
         )
@@ -86,7 +86,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             80.0,
             92.0,
             TrancheSeniority::Mezzanine,
-            Money::new(total * 0.12, Currency::USD),
+            Money::new(total * 0.12, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.08 },
             maturity(),
         )
@@ -96,7 +96,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             92.0,
             100.0,
             TrancheSeniority::Equity,
-            Money::new(total * 0.08, Currency::USD),
+            Money::new(total * 0.08, Currency::USD).expect("valid money fixture"),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity(),
         )

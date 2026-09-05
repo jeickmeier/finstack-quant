@@ -19,36 +19,66 @@ fn real_estate_noi_and_ncf_templates_compute_expected_values() {
                 .value(
                     "rent",
                     &[
-                        (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
-                        (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            AmountOrScalar::scalar(100.0),
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            AmountOrScalar::scalar(110.0),
+                        ),
                     ],
                 )
                 .value(
                     "other_income",
                     &[
-                        (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10.0)),
-                        (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(12.0)),
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            AmountOrScalar::scalar(10.0),
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            AmountOrScalar::scalar(12.0),
+                        ),
                     ],
                 )
                 .value(
                     "taxes",
                     &[
-                        (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(20.0)),
-                        (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(22.0)),
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            AmountOrScalar::scalar(20.0),
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            AmountOrScalar::scalar(22.0),
+                        ),
                     ],
                 )
                 .value(
                     "repairs",
                     &[
-                        (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5.0)),
-                        (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(6.0)),
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            AmountOrScalar::scalar(5.0),
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            AmountOrScalar::scalar(6.0),
+                        ),
                     ],
                 )
                 .value(
                     "capex",
                     &[
-                        (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(3.0)),
-                        (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(4.0)),
+                        (
+                            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                            AmountOrScalar::scalar(3.0),
+                        ),
+                        (
+                            PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                            AmountOrScalar::scalar(4.0),
+                        ),
                     ],
                 ),
             "total_revenue",
@@ -69,8 +99,8 @@ fn real_estate_noi_and_ncf_templates_compute_expected_values() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
 
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     let noi = results.get_node("noi").expect("noi node");
     let ncf = results.get_node("ncf").expect("ncf node");
@@ -96,13 +126,13 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
     let leases = vec![
         LeaseSpec {
             node_id: "lease_a".into(),
-            start: PeriodId::quarter(2025, 1),
-            end: Some(PeriodId::quarter(2025, 2)),
+            start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            end: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
             base_rent: 100.0,
             growth_rate: 0.0,
             growth_convention: LeaseGrowthConvention::PerPeriod,
             rent_steps: vec![RentStepSpec {
-                start: PeriodId::quarter(2025, 2),
+                start: PeriodId::quarter(2025, 2).expect("valid period fixture"),
                 rent: 120.0,
             }],
             free_rent_periods: 0,
@@ -118,8 +148,8 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
         },
         LeaseSpec {
             node_id: "lease_b".into(),
-            start: PeriodId::quarter(2025, 1),
-            end: Some(PeriodId::quarter(2025, 4)),
+            start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
             base_rent: 50.0,
             growth_rate: 0.0,
             growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -145,10 +175,10 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
 
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
-    let q3 = PeriodId::quarter(2025, 3);
-    let q4 = PeriodId::quarter(2025, 4);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+    let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
+    let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
     // Lease A contractual: Q1=100, Q2=120 (step), Q3 downtime, Q4 renewal starts at 120*1.10=132 but free at renewal start => 0.
     let a_pgi = results.get_node("lease_a.pgi").expect("a pgi node");
@@ -193,8 +223,8 @@ fn real_estate_rich_rent_roll_rejects_non_finite_growth_output() {
 
     let leases = vec![LeaseSpec {
         node_id: "lease_overflow".into(),
-        start: PeriodId::quarter(2025, 1),
-        end: Some(PeriodId::quarter(2025, 4)),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
         base_rent: 1.0e308,
         growth_rate: 1.0,
         growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -225,8 +255,8 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
     let leases = vec![
         LeaseSpec {
             node_id: "lease_a".into(),
-            start: PeriodId::quarter(2025, 1),
-            end: Some(PeriodId::quarter(2025, 2)),
+            start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            end: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
             base_rent: 100.0,
             growth_rate: 0.0,
             growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -238,8 +268,8 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
         },
         LeaseSpec {
             node_id: "lease_b".into(),
-            start: PeriodId::quarter(2025, 1),
-            end: Some(PeriodId::quarter(2025, 2)),
+            start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            end: Some(PeriodId::quarter(2025, 2).expect("valid period fixture")),
             base_rent: 50.0,
             growth_rate: 0.0,
             growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -260,29 +290,53 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
             .value(
                 "parking_income",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(10.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(10.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(10.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(10.0),
+                    ),
                 ],
             )
             .value(
                 "taxes",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(5.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(5.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(5.0),
+                    ),
                 ],
             )
             .value(
                 "repairs",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(2.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(2.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(2.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(2.0),
+                    ),
                 ],
             )
             .value(
                 "capex",
                 &[
-                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(3.0)),
-                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(3.0)),
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        AmountOrScalar::scalar(3.0),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        AmountOrScalar::scalar(3.0),
+                    ),
                 ],
             ),
         &leases,
@@ -302,8 +356,8 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
 
-    let q1 = PeriodId::quarter(2025, 1);
-    let q2 = PeriodId::quarter(2025, 2);
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     let egi = results.get_node("egi").expect("egi node");
     let noi = results.get_node("noi").expect("noi node");
@@ -334,8 +388,8 @@ fn real_estate_annual_escalator_bumps_on_lease_anniversary() {
 
     let leases = vec![LeaseSpec {
         node_id: "lease_ann".into(),
-        start: PeriodId::quarter(2025, 1),
-        end: Some(PeriodId::quarter(2026, 4)),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        end: Some(PeriodId::quarter(2026, 4).expect("valid period fixture")),
         base_rent: 100.0,
         growth_rate: 0.10,
         growth_convention: LeaseGrowthConvention::AnnualEscalator,
@@ -367,7 +421,7 @@ fn real_estate_annual_escalator_bumps_on_lease_anniversary() {
     // Year 1: periods 0..3 => exponent = floor(0/4)=0 => 100.0
     for q in 1..=4 {
         assert_eq!(
-            pgi[&PeriodId::quarter(2025, q)],
+            pgi[&PeriodId::quarter(2025, q).expect("valid period fixture")],
             100.0,
             "2025 Q{q} should be 100 (year 1, no escalation)"
         );
@@ -377,7 +431,8 @@ fn real_estate_annual_escalator_bumps_on_lease_anniversary() {
     for q in 1..=4 {
         let expected = 100.0 * 1.10;
         assert!(
-            (pgi[&PeriodId::quarter(2026, q)] - expected).abs() < 1e-10,
+            (pgi[&PeriodId::quarter(2026, q).expect("valid period fixture")] - expected).abs()
+                < 1e-10,
             "2026 Q{q} should be {expected} (year 2, 1 escalation)"
         );
     }
@@ -398,13 +453,13 @@ fn real_estate_annual_escalator_resets_at_rent_step() {
 
     let leases = vec![LeaseSpec {
         node_id: "lease_step".into(),
-        start: PeriodId::quarter(2025, 1),
-        end: Some(PeriodId::quarter(2026, 4)),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        end: Some(PeriodId::quarter(2026, 4).expect("valid period fixture")),
         base_rent: 100.0,
         growth_rate: 0.10,
         growth_convention: LeaseGrowthConvention::AnnualEscalator,
         rent_steps: vec![RentStepSpec {
-            start: PeriodId::quarter(2025, 3),
+            start: PeriodId::quarter(2025, 3).expect("valid period fixture"),
             rent: 200.0,
         }],
         free_rent_periods: 0,
@@ -432,25 +487,45 @@ fn real_estate_annual_escalator_resets_at_rent_step() {
         .expect("lease_step.pgi node");
 
     // Q1, Q2 2025: base segment, exponent 0 => 100
-    assert_eq!(pgi[&PeriodId::quarter(2025, 1)], 100.0);
-    assert_eq!(pgi[&PeriodId::quarter(2025, 2)], 100.0);
+    assert_eq!(
+        pgi[&PeriodId::quarter(2025, 1).expect("valid period fixture")],
+        100.0
+    );
+    assert_eq!(
+        pgi[&PeriodId::quarter(2025, 2).expect("valid period fixture")],
+        100.0
+    );
 
     // Q3, Q4 2025: new segment from Q3, 0 and 1 periods elapsed => exponent 0 => 200
-    assert_eq!(pgi[&PeriodId::quarter(2025, 3)], 200.0);
-    assert_eq!(pgi[&PeriodId::quarter(2025, 4)], 200.0);
+    assert_eq!(
+        pgi[&PeriodId::quarter(2025, 3).expect("valid period fixture")],
+        200.0
+    );
+    assert_eq!(
+        pgi[&PeriodId::quarter(2025, 4).expect("valid period fixture")],
+        200.0
+    );
 
     // Q1, Q2 2026: 2 and 3 periods from step start => exponent 0 => 200
-    assert_eq!(pgi[&PeriodId::quarter(2026, 1)], 200.0);
-    assert_eq!(pgi[&PeriodId::quarter(2026, 2)], 200.0);
+    assert_eq!(
+        pgi[&PeriodId::quarter(2026, 1).expect("valid period fixture")],
+        200.0
+    );
+    assert_eq!(
+        pgi[&PeriodId::quarter(2026, 2).expect("valid period fixture")],
+        200.0
+    );
 
     // Q3, Q4 2026: 4 and 5 periods from step start => exponent 1 => 200 * 1.10 = 220
     let expected_yr2 = 200.0 * 1.10;
     assert!(
-        (pgi[&PeriodId::quarter(2026, 3)] - expected_yr2).abs() < 1e-10,
+        (pgi[&PeriodId::quarter(2026, 3).expect("valid period fixture")] - expected_yr2).abs()
+            < 1e-10,
         "2026 Q3 should be {expected_yr2}"
     );
     assert!(
-        (pgi[&PeriodId::quarter(2026, 4)] - expected_yr2).abs() < 1e-10,
+        (pgi[&PeriodId::quarter(2026, 4).expect("valid period fixture")] - expected_yr2).abs()
+            < 1e-10,
         "2026 Q4 should be {expected_yr2}"
     );
 }
@@ -465,7 +540,7 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
     // Omitted serde field must deserialize as AnnualEscalator, not PerPeriod.
     let explicit = LeaseSpec {
         node_id: "lease_ser".into(),
-        start: PeriodId::quarter(2025, 1),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
         end: None,
         base_rent: 100.0,
         growth_rate: 0.03,
@@ -492,8 +567,8 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
     let nodes = RentRollOutputNodes::default();
     let leases = vec![LeaseSpec {
         node_id: "lease_def".into(),
-        start: PeriodId::quarter(2025, 1),
-        end: Some(PeriodId::quarter(2026, 4)),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        end: Some(PeriodId::quarter(2026, 4).expect("valid period fixture")),
         base_rent: 100.0,
         growth_rate: 0.03,
         growth_convention: LeaseGrowthConvention::default(),
@@ -523,7 +598,7 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
 
     for q in 1..=4 {
         assert_eq!(
-            pgi[&PeriodId::quarter(2025, q)],
+            pgi[&PeriodId::quarter(2025, q).expect("valid period fixture")],
             100.0,
             "2025 Q{q} should stay at base rent within the lease year"
         );
@@ -531,7 +606,8 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
     let year_two = 100.0 * 1.03;
     for q in 1..=4 {
         assert!(
-            (pgi[&PeriodId::quarter(2026, q)] - year_two).abs() < 1e-10,
+            (pgi[&PeriodId::quarter(2026, q).expect("valid period fixture")] - year_two).abs()
+                < 1e-10,
             "2026 Q{q} should be {year_two} after the anniversary bump"
         );
     }
@@ -546,8 +622,8 @@ fn real_estate_per_period_growth_convention_compounds_each_period() {
 
     let leases = vec![LeaseSpec {
         node_id: "lease_pp".into(),
-        start: PeriodId::quarter(2025, 1),
-        end: Some(PeriodId::quarter(2025, 4)),
+        start: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+        end: Some(PeriodId::quarter(2025, 4).expect("valid period fixture")),
         base_rent: 100.0,
         growth_rate: 0.10,
         growth_convention: LeaseGrowthConvention::PerPeriod,
@@ -578,9 +654,10 @@ fn real_estate_per_period_growth_convention_compounds_each_period() {
     for (q, n) in [(1u8, 0i32), (2, 1), (3, 2), (4, 3)] {
         let expected = 100.0 * 1.10_f64.powi(n);
         assert!(
-            (pgi[&PeriodId::quarter(2025, q)] - expected).abs() < 1e-10,
+            (pgi[&PeriodId::quarter(2025, q).expect("valid period fixture")] - expected).abs()
+                < 1e-10,
             "Q{q}: expected {expected}, got {}",
-            pgi[&PeriodId::quarter(2025, q)]
+            pgi[&PeriodId::quarter(2025, q).expect("valid period fixture")]
         );
     }
 }

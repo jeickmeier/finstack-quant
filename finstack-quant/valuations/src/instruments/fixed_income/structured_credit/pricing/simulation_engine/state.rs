@@ -184,11 +184,11 @@ impl StateTemplate {
                         deferred_flows: Vec::new(),
                         writedown_flows: Vec::new(),
                         final_balance: t.current_balance,
-                        total_interest: Money::new(0.0, base_currency),
-                        total_principal: Money::new(0.0, base_currency),
-                        total_pik: Money::new(0.0, base_currency),
-                        total_deferred: Money::new(0.0, base_currency),
-                        total_writedown: Money::new(0.0, base_currency),
+                        total_interest: Money::from((0_i64, base_currency)),
+                        total_principal: Money::from((0_i64, base_currency)),
+                        total_pik: Money::from((0_i64, base_currency)),
+                        total_deferred: Money::from((0_i64, base_currency)),
+                        total_writedown: Money::from((0_i64, base_currency)),
                     },
                 )
             })
@@ -225,7 +225,7 @@ impl StateTemplate {
 
         let total_pool_balance = pool
             .total_balance()
-            .unwrap_or(Money::new(0.0, base_currency));
+            .unwrap_or(Money::from((0_i64, base_currency)));
 
         // Performing balance excludes pre-defaulted assets. Used as denominator
         // for loss allocation — pre-defaulted assets are already priced into the
@@ -324,8 +324,8 @@ impl<'a> SimulationState<'a> {
             loss_alloc_order: template.loss_alloc_order.clone(),
             pool_wala_months: template.pool_wala_months,
             reserve_balance: pool.reserve_account,
-            spread_account: Money::new(0.0, template.base_currency),
-            principal_funding_account: Money::new(0.0, template.base_currency),
+            spread_account: Money::from((0_i64, template.base_currency)),
+            principal_funding_account: Money::from((0_i64, template.base_currency)),
             floating_rate_shift: 0.0,
         }
     }
@@ -364,10 +364,10 @@ impl<'a> SimulationState<'a> {
                 .tranche_balances
                 .get(tranche_id)
                 .copied()
-                .unwrap_or(Money::new(0.0, self.base_currency));
+                .unwrap_or(Money::from((0_i64, self.base_currency)));
             if final_balance.amount() < 0.0 && final_balance.amount().abs() <= WRITEDOWN_DE_MINIMIS
             {
-                final_balance = Money::new(0.0, self.base_currency);
+                final_balance = Money::from((0_i64, self.base_currency));
             }
             res.final_balance = final_balance;
 
@@ -404,7 +404,7 @@ impl<'a> SimulationState<'a> {
                     res.detailed_flows.push(CashFlow::new(
                         *date,
                         None,
-                        Money::new(-amount.amount(), amount.currency()),
+                        amount.checked_neg(),
                         CFKind::DefaultedNotional,
                         0.0,
                         None,

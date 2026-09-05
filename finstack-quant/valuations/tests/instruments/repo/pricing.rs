@@ -14,7 +14,7 @@ fn test_interest_calculation_act360() {
 
     let repo = Repo::builder()
         .id("INTEREST_360".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -34,7 +34,11 @@ fn test_interest_calculation_act360() {
 
     // 1,000,000 * 0.05 * (90/360) = 12,500
     let expected = 1_000_000.0 * 0.05 * (90.0 / 360.0);
-    assert_money_approx_eq(interest, Money::new(expected, Currency::USD), 0.01);
+    assert_money_approx_eq(
+        interest,
+        Money::new(expected, Currency::USD).expect("valid money fixture"),
+        0.01,
+    );
 }
 
 #[test]
@@ -43,7 +47,7 @@ fn test_interest_calculation_act365() {
 
     let repo = Repo::builder()
         .id("INTEREST_365".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -63,7 +67,11 @@ fn test_interest_calculation_act365() {
 
     // Act/365F: 90/365 * 0.05 * 1,000,000
     let expected = 1_000_000.0 * 0.05 * (90.0 / 365.0);
-    assert_money_approx_eq(interest, Money::new(expected, Currency::USD), 0.01);
+    assert_money_approx_eq(
+        interest,
+        Money::new(expected, Currency::USD).expect("valid money fixture"),
+        0.01,
+    );
 }
 
 #[test]
@@ -73,7 +81,7 @@ fn test_daycount_360_vs_365_difference() {
 
     let repo_360 = Repo::builder()
         .id("DC360".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral1)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -91,7 +99,7 @@ fn test_daycount_360_vs_365_difference() {
 
     let repo_365 = Repo::builder()
         .id("DC365".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral2)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -123,7 +131,7 @@ fn test_zero_rate_interest() {
 
     let repo = Repo::term(
         "ZERO_RATE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.0,
         date(2025, 1, 15),
@@ -134,7 +142,11 @@ fn test_zero_rate_interest() {
 
     let interest = repo.interest_amount().unwrap();
 
-    assert_money_approx_eq(interest, Money::new(0.0, Currency::USD), 0.01);
+    assert_money_approx_eq(
+        interest,
+        Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        0.01,
+    );
 }
 
 #[test]
@@ -143,7 +155,7 @@ fn test_high_rate_interest() {
 
     let repo = Repo::term(
         "HIGH_RATE",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.25, // 25% annual rate
         date(2025, 1, 15),
@@ -165,7 +177,7 @@ fn test_total_repayment() {
 
     let repo = Repo::term(
         "REPAYMENT",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -192,7 +204,7 @@ fn test_pv_before_start() {
 
     let repo = Repo::term(
         "PV_BEFORE_START",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -220,7 +232,7 @@ fn test_pv_at_start() {
 
     let repo = Repo::term(
         "PV_AT_START",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -242,7 +254,7 @@ fn test_pv_mid_term() {
 
     let repo = Repo::term(
         "PV_MID",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -266,7 +278,7 @@ fn test_pv_at_maturity() {
 
     let repo = Repo::term(
         "PV_AT_MAT",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -299,7 +311,7 @@ fn test_pv_with_flat_curve() {
 
     let repo = Repo::builder()
         .id("FLAT_CURVE".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
+        .cash_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .collateral(collateral)
         .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
         .start_date(date(2025, 1, 15))
@@ -334,7 +346,7 @@ fn test_pv_currency_matches_cash_currency() {
     // EUR repo
     let eur_repo = Repo::term(
         "EUR_REPO",
-        Money::new(1_000_000.0, Currency::EUR),
+        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
         collateral,
         0.035,
         date(2025, 1, 15),
@@ -357,7 +369,7 @@ fn test_special_collateral_affects_interest_not_pv_directly() {
 
     let repo_general = Repo::term(
         "GENERAL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         general_collateral,
         0.05,
         date(2025, 1, 15),
@@ -368,7 +380,7 @@ fn test_special_collateral_affects_interest_not_pv_directly() {
 
     let repo_special = Repo::term(
         "SPECIAL",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         special_collateral,
         0.05, // Same base rate
         date(2025, 1, 15),
@@ -402,7 +414,7 @@ fn test_overnight_repo_minimal_interest() {
 
     let repo = Repo::overnight(
         "OVERNIGHT",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 15),
@@ -425,7 +437,7 @@ fn test_long_term_repo_interest() {
 
     let repo = Repo::term(
         "LONG_TERM",
-        Money::new(1_000_000.0, Currency::USD),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         collateral,
         0.05,
         date(2025, 1, 1),
@@ -439,5 +451,9 @@ fn test_long_term_repo_interest() {
     // With Act/360: 365/360 = 1.0139 year fraction
     // Expected: 1M * 5% * (365/360) = $50,694.44
     let expected = 1_000_000.0 * 0.05 * (365.0 / 360.0);
-    assert_money_approx_eq(interest, Money::new(expected, Currency::USD), 0.01);
+    assert_money_approx_eq(
+        interest,
+        Money::new(expected, Currency::USD).expect("valid money fixture"),
+        0.01,
+    );
 }

@@ -56,7 +56,7 @@ fn test_spot_rate_default_notional() {
 #[test]
 fn test_spot_rate_zero_notional_errors() {
     let fx = sample_eurusd()
-        .with_notional(Money::new(0.0, Currency::EUR))
+        .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.20)
         .expect("test rate");
@@ -93,7 +93,7 @@ fn test_spot_rate_various_rates() {
 fn test_spot_rate_various_currencies() {
     // GBPUSD = 1.40
     let gbp_fx = sample_gbpusd()
-        .with_notional(Money::new(500_000.0, Currency::GBP))
+        .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
         .with_rate(1.40)
         .expect("test rate");
@@ -107,7 +107,7 @@ fn test_spot_rate_various_currencies() {
 
     // USDJPY = 110.0
     let jpy_fx = sample_usdjpy()
-        .with_notional(Money::new(100_000.0, Currency::USD))
+        .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
         .with_rate(110.0)
         .expect("test rate");

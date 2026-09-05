@@ -60,8 +60,8 @@ fn build_floored_loan() -> Bond {
 
     Bond::fixed(
         "LOAN-FLOOR-001",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.10), // 10% coupon
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"), // 10% coupon
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -195,8 +195,8 @@ fn min_moic_shortcut_equivalent_to_explicit_full_window_spec() {
     // Shortcut: .min_moic(1.25) → ProtectionWindow::Full
     let loan_shortcut = Bond::fixed(
         "LOAN-SHORTCUT",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.10),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -208,8 +208,8 @@ fn min_moic_shortcut_equivalent_to_explicit_full_window_spec() {
     // Explicit: ReturnFloorSpec::moic(1.25) with Full window
     let loan_explicit = Bond::fixed(
         "LOAN-EXPLICIT",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.10),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

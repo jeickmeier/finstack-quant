@@ -342,7 +342,7 @@ pub fn render_tree_ascii(tree: &DependencyTree) -> String {
 /// let tracer = DependencyTracer::new(&model, &graph);
 /// let tree = tracer.dependency_tree("gross_profit")?;
 ///
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let detailed = render_tree_detailed(&tree, &results, &period);
 /// println!("{}", detailed);
 /// // Output:
@@ -458,7 +458,7 @@ fn render_tree_with_values(
 /// let results = evaluator.evaluate(&model)?;
 ///
 /// let explainer = FormulaExplainer::new(&model, &results);
-/// let period = PeriodId::quarter(2025, 1);
+/// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 /// let explanation = explainer.explain("gross_profit", &period)?;
 ///
 /// println!("{}", explanation.to_string_detailed());
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_render_tree_detailed() {
-        let period = PeriodId::quarter(2025, 1);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("test should succeed")
@@ -840,8 +840,8 @@ mod tests {
 
     #[test]
     fn test_explain_value_node() {
-        let period = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("test should succeed")
@@ -872,8 +872,8 @@ mod tests {
 
     #[test]
     fn test_explain_calculated_node() {
-        let period = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("test should succeed")
@@ -908,8 +908,8 @@ mod tests {
 
     #[test]
     fn test_explain_to_string_detailed() {
-        let period = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("test should succeed")
@@ -941,8 +941,8 @@ mod tests {
 
     #[test]
     fn test_explain_nonexistent_node() {
-        let period = PeriodId::quarter(2025, 1);
-        let period2 = PeriodId::quarter(2025, 2);
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let period2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let model = ModelBuilder::new("test")
             .periods("2025Q1..Q2", None)
             .expect("test should succeed")

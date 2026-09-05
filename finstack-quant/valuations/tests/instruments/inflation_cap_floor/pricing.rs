@@ -25,7 +25,7 @@ fn test_caplet_intrinsic_after_fixing() {
     let start = as_of - Duration::days(60);
     let end = as_of + Duration::days(30);
 
-    let notional = Money::new(1_000_000.0, Currency::USD);
+    let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let disc = flat_discount("USD-OIS", as_of, 0.02).unwrap();
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
     let index = simple_index(
@@ -50,7 +50,7 @@ fn test_caplet_intrinsic_after_fixing() {
         .strike(Decimal::try_from(0.02).expect("valid decimal"))
         .start_date(start)
         .maturity(end)
-        .frequency(Tenor::new(3, TenorUnit::Months))
+        .frequency(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"))
         .day_count(DayCount::Act365F)
         .stub(StubKind::None)
         .business_day_convention(BusinessDayConvention::Following)
@@ -93,7 +93,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let start = as_of;
     let end = Date::from_calendar_date(2026, Month::January, 2).unwrap();
 
-    let notional = Money::new(5_000_000.0, Currency::USD);
+    let notional = Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
     let disc = flat_discount("USD-OIS", as_of, 0.01).unwrap();
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, -0.01).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
@@ -112,7 +112,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .strike(Decimal::try_from(0.0).expect("valid decimal"))
         .start_date(start)
         .maturity(end)
-        .frequency(Tenor::new(1, TenorUnit::Years))
+        .frequency(Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"))
         .day_count(DayCount::Act365F)
         .stub(StubKind::None)
         .business_day_convention(BusinessDayConvention::Following)
@@ -133,7 +133,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .strike(Decimal::try_from(0.0).expect("valid decimal"))
         .start_date(start)
         .maturity(end)
-        .frequency(Tenor::new(1, TenorUnit::Years))
+        .frequency(Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"))
         .day_count(DayCount::Act365F)
         .stub(StubKind::None)
         .business_day_convention(BusinessDayConvention::Following)
@@ -181,7 +181,7 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
     let as_of = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let start = Date::from_calendar_date(2026, Month::January, 2).unwrap();
     let end = Date::from_calendar_date(2027, Month::January, 2).unwrap();
-    let notional = Money::new(5_000_000.0, Currency::USD);
+    let notional = Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
 
     let build_caplet = |vol_surface_id: &str| {
         InflationCapFloor::builder()
@@ -193,7 +193,7 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
             .strike(Decimal::try_from(0.030).expect("valid decimal"))
             .start_date(start)
             .maturity(end)
-            .frequency(Tenor::new(1, TenorUnit::Years))
+            .frequency(Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"))
             .day_count(DayCount::Act365F)
             .stub(StubKind::None)
             .business_day_convention(BusinessDayConvention::Following)

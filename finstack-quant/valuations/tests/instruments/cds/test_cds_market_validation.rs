@@ -115,7 +115,7 @@ fn test_par_spread_approximation() {
 
     let mut cds = test_utils::cds_buy_protection(
         "PAR_SPREAD_APPROX",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -153,7 +153,7 @@ fn test_step_in_date_overrides_protection_start() {
 
     let mut cds = test_utils::cds_buy_protection(
         "STEP_IN_DATE",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -181,7 +181,7 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
 
     let mut cds = test_utils::cds_buy_protection(
         "CLEAN_DIRTY_UPFRONT",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -200,7 +200,7 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
         .expect("base cds metrics");
     let base_npv = base.value;
 
-    let upfront = Money::new(125_000.0, Currency::USD);
+    let upfront = Money::new(125_000.0, Currency::USD).expect("valid money fixture");
     cds.instrument_pricing_overrides
         .market_quotes
         .upfront_payment = Some(upfront);
@@ -249,7 +249,7 @@ fn test_risky_pv01_market_standard() {
 
     let mut cds = test_utils::cds_buy_protection(
         "RISKY_PV01_MKT",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -297,7 +297,7 @@ fn test_cs01_positive_for_protection_buyer() {
 
     let mut cds = test_utils::cds_buy_protection(
         "CS01_BUYER",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -349,7 +349,7 @@ fn test_hazard_rate_sensitivity_monotonic() {
 
         let mut cds = test_utils::cds_buy_protection(
             "HAZARD_SENS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -394,7 +394,7 @@ fn test_recovery_rate_sensitivity_monotonic() {
 
         let mut cds = test_utils::cds_buy_protection(
             "RECOVERY_SENS",
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             end,
@@ -448,7 +448,7 @@ fn test_expected_loss_formula_validation() {
 
     let mut cds = test_utils::cds_buy_protection(
         "EL_FORMULA_TEST",
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -516,7 +516,7 @@ fn test_jump_to_default_equals_lgd_times_notional() {
 
     let mut cds = test_utils::cds_buy_protection(
         "JTD_TEST",
-        Money::new(notional, Currency::USD),
+        Money::new(notional, Currency::USD).expect("valid money fixture"),
         100.0,
         as_of,
         end,
@@ -562,7 +562,7 @@ fn test_survival_probability_decreases_over_time() {
 
     let mut cds = test_utils::cds_buy_protection(
         "SURVIVAL_TEST",
-        Money::new(10_000_000.0, Currency::USD),
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         150.0,
         start,
         end,
@@ -619,7 +619,7 @@ fn test_standard_tenors_reasonable_par_spreads() {
     for (tenor_years, maturity) in tenors {
         let mut cds = test_utils::cds_buy_protection(
             format!("CDS_{}Y", tenor_years),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             maturity,
@@ -669,7 +669,7 @@ fn test_term_structure_upward_sloping_spreads() {
         let maturity = Date::from_calendar_date(2024 + years, time::Month::January, 1).unwrap();
         let mut cds = test_utils::cds_buy_protection(
             format!("TERM_{}Y", years),
-            Money::new(10_000_000.0, Currency::USD),
+            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             100.0,
             as_of,
             maturity,

@@ -113,8 +113,8 @@ fn test_par_cds_bump_reprices_credit_bond() {
     let market = MarketContext::new().insert(discount).insert(hazard);
     let mut bond = Bond::fixed(
         "CREDIT-BOND",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         base_date,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

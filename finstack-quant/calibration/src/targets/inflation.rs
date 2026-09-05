@@ -152,7 +152,7 @@ impl InflationCurveTarget {
             if let Some(frequency) = frequency {
                 let instrument = YoYInflationSwap::builder()
                     .id("CALIB_YOY".into())
-                    .notional(Money::new(self.params.notional, self.params.currency))
+                    .notional(Money::new(self.params.notional, self.params.currency)?)
                     .start_date(base_date)
                     .maturity(maturity)
                     .fixed_rate(Decimal::try_from(rate).map_err(|_| {
@@ -174,7 +174,7 @@ impl InflationCurveTarget {
             } else {
                 let instrument = InflationSwap::builder()
                     .id("CALIB_ZCIS".into())
-                    .notional(Money::new(self.params.notional, self.params.currency))
+                    .notional(Money::new(self.params.notional, self.params.currency)?)
                     .start_date(base_date)
                     .maturity(maturity)
                     .fixed_rate(Decimal::try_from(rate).map_err(|_| {

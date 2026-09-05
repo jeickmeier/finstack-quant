@@ -45,8 +45,8 @@ fn test_wal_bullet_equals_time_to_maturity() {
     let maturity = date!(2030 - 01 - 01);
     let bond = Bond::fixed(
         "WAL-BULLET",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         as_of,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,
@@ -71,8 +71,8 @@ fn test_wal_decreases_as_valuation_date_advances() {
     let maturity = date!(2030 - 01 - 01);
     let bond = Bond::fixed(
         "WAL-ADVANCE",
-        Money::new(1_000_000.0, Currency::USD),
-        finstack_quant_core::types::Rate::from_decimal(0.05),
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
         issue,
         maturity,
         finstack_quant_core::dates::StubKind::ShortFront,

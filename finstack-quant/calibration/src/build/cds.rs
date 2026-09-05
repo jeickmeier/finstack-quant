@@ -238,16 +238,18 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
     let credit_id = ctx.require_curve_id("credit")?.to_string();
 
     // Amount = Notional * pct; Date = Spot (Settlement)
-    let upfront_payment = upfront.map(|pct| {
-        (
-            dates.spot,
-            Money::new(ctx.notional() * pct, convention_key.currency),
-        )
-    });
+    let upfront_payment = upfront
+        .map(|pct| {
+            Ok::<_, finstack_quant_core::Error>((
+                dates.spot,
+                Money::new(ctx.notional() * pct, convention_key.currency)?,
+            ))
+        })
+        .transpose()?;
 
     let cds = CreditDefaultSwap {
         id: InstrumentId::new(id.as_str()),
-        notional: Money::new(ctx.notional(), convention_key.currency),
+        notional: Money::new(ctx.notional(), convention_key.currency)?,
         // Calibration instruments buy protection and pay premium.
         side: PayReceive::Pay,
         convention: conv.family,

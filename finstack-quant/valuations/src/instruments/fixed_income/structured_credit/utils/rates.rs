@@ -293,28 +293,37 @@ mod tests {
 
         // Bi-monthly (every 2 months) = 6 periods/year
         assert_eq!(
-            frequency_periods_per_year(finstack_quant_core::dates::Tenor::new(
-                2,
-                finstack_quant_core::dates::TenorUnit::Months
-            )),
+            frequency_periods_per_year(
+                finstack_quant_core::dates::Tenor::new(
+                    2,
+                    finstack_quant_core::dates::TenorUnit::Months
+                )
+                .expect("valid tenor fixture")
+            ),
             6.0
         );
 
         // Daily (252 business days common) -> 365/1 = 365
         assert_eq!(
-            frequency_periods_per_year(finstack_quant_core::dates::Tenor::new(
-                1,
-                finstack_quant_core::dates::TenorUnit::Days
-            )),
+            frequency_periods_per_year(
+                finstack_quant_core::dates::Tenor::new(
+                    1,
+                    finstack_quant_core::dates::TenorUnit::Days
+                )
+                .expect("valid tenor fixture")
+            ),
             365.0
         );
 
         // Weekly (every 7 days) -> 365/7 ≈ 52.14
         assert!(
-            (frequency_periods_per_year(finstack_quant_core::dates::Tenor::new(
-                7,
-                finstack_quant_core::dates::TenorUnit::Days
-            )) - 52.142857)
+            (frequency_periods_per_year(
+                finstack_quant_core::dates::Tenor::new(
+                    7,
+                    finstack_quant_core::dates::TenorUnit::Days
+                )
+                .expect("valid tenor fixture")
+            ) - 52.142857)
                 .abs()
                 < 0.001
         );

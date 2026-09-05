@@ -78,13 +78,15 @@ fn test_expected_loss_scales_with_notional() {
     tranche_10mm.notional = finstack_quant_core::money::Money::new(
         10_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     let mut tranche_20mm = mezzanine_tranche();
     tranche_20mm.notional = finstack_quant_core::money::Money::new(
         20_000_000.0,
         finstack_quant_core::currency::Currency::USD,
-    );
+    )
+    .expect("valid money fixture");
 
     // Act
     let el_10 = pricer

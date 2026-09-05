@@ -16,8 +16,8 @@ use crate::cashflow::builder::CashflowRepresentation;
 use super::types::Bond;
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
-    fn notional(&self) -> Option<Money> {
-        Some(self.notional)
+    fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
+        Ok(Some(self.notional))
     }
 
     fn raw_cashflow_schedule(

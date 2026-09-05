@@ -294,24 +294,35 @@ pub struct PeriodId {
 }
 
 impl PeriodId {
-    /// Build a daily identifier from an ordinal day (1..=366).
+    /// Identify the Gregorian or ISO period containing a valid date.
     ///
-    /// # Panics
+    /// # Arguments
     ///
-    /// Panics when `ordinal` is outside the actual Gregorian-year range. Use
-    /// [`Self::try_day`] for external or unchecked input.
-    pub fn day(year: i32, ordinal: u16) -> Self {
-        assert!(
-            (1..=days_in_year(year)).contains(&ordinal),
-            "daily period ordinal must be valid for the Gregorian year"
-        );
+    /// * `date` - Valid calendar date to assign to a period; weekly periods use its ISO week-year.
+    /// * `kind` - Calendar bucket granularity. Annual periods use the Gregorian year, not a fiscal label.
+    pub fn from_date(date: Date, kind: PeriodKind) -> Self {
+        let mut year = date.year();
+        let month = u16::from(date.month() as u8);
+        let index = match kind {
+            PeriodKind::Daily => date.ordinal(),
+            PeriodKind::Weekly => {
+                let (y, week, _) = date.to_iso_week_date();
+                year = y;
+                u16::from(week)
+            }
+            PeriodKind::Monthly => month,
+            PeriodKind::Quarterly => (month - 1) / 3 + 1,
+            PeriodKind::SemiAnnual => (month - 1) / 6 + 1,
+            PeriodKind::Annual => 1,
+        };
         Self {
             year,
-            index: ordinal,
-            kind: PeriodKind::Daily,
+            index,
+            kind,
             fiscal: false,
         }
     }
+
     /// Try to build a daily identifier from an ordinal day (1..=366).
     ///
     /// # Errors
@@ -322,23 +333,8 @@ impl PeriodId {
     ///
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `ordinal` - One-based day ordinal valid for the supplied Gregorian year.
-    pub fn try_day(year: i32, ordinal: u16) -> crate::Result<Self> {
+    pub fn day(year: i32, ordinal: u16) -> crate::Result<Self> {
         Self::try_new(year, ordinal, PeriodKind::Daily, days_in_year(year))
-    }
-    /// Build a quarterly identifier.
-    ///
-    /// # Panics
-    ///
-    /// Panics when `q` is not in `1..=4`. Use [`Self::try_quarter`] for
-    /// external or unchecked input.
-    pub fn quarter(year: i32, q: u8) -> Self {
-        assert!((1..=4).contains(&q), "quarter must be in 1..=4");
-        Self {
-            year,
-            index: u16::from(q),
-            kind: PeriodKind::Quarterly,
-            fiscal: false,
-        }
     }
     /// Try to build a quarterly identifier.
     ///
@@ -350,23 +346,8 @@ impl PeriodId {
     ///
     /// * `year` - Calendar or fiscal year containing the quarter.
     /// * `q` - One-based quarter number in the inclusive range `1..=4`.
-    pub fn try_quarter(year: i32, q: u8) -> crate::Result<Self> {
+    pub fn quarter(year: i32, q: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(q), PeriodKind::Quarterly, 4)
-    }
-    /// Build a monthly identifier.
-    ///
-    /// # Panics
-    ///
-    /// Panics when `m` is not in `1..=12`. Use [`Self::try_month`] for
-    /// external or unchecked input.
-    pub fn month(year: i32, m: u8) -> Self {
-        assert!((1..=12).contains(&m), "month must be in 1..=12");
-        Self {
-            year,
-            index: u16::from(m),
-            kind: PeriodKind::Monthly,
-            fiscal: false,
-        }
     }
     /// Try to build a monthly identifier.
     ///
@@ -378,29 +359,8 @@ impl PeriodId {
     ///
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `m` - One-based month number in the inclusive range `1..=12`.
-    pub fn try_month(year: i32, m: u8) -> crate::Result<Self> {
+    pub fn month(year: i32, m: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(m), PeriodKind::Monthly, 12)
-    }
-    /// Build a weekly identifier.
-    ///
-    /// Week numbers follow ISO week-year rules, so the valid upper bound is
-    /// 52 or 53 depending on `year`.
-    ///
-    /// # Panics
-    ///
-    /// Panics when `w` is not a valid ISO week for `year`. Use
-    /// [`Self::try_week`] for external or unchecked input.
-    pub fn week(year: i32, w: u8) -> Self {
-        assert!(
-            (1..=iso_weeks_in_year(year)).contains(&w),
-            "week must be valid for the ISO week-year"
-        );
-        Self {
-            year,
-            index: u16::from(w),
-            kind: PeriodKind::Weekly,
-            fiscal: false,
-        }
     }
     /// Try to build a weekly identifier for a Gregorian ISO week-year.
     ///
@@ -413,28 +373,13 @@ impl PeriodId {
     ///
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `w` - One-based ISO week number valid for the supplied ISO week-year.
-    pub fn try_week(year: i32, w: u8) -> crate::Result<Self> {
+    pub fn week(year: i32, w: u8) -> crate::Result<Self> {
         Self::try_new(
             year,
             u16::from(w),
             PeriodKind::Weekly,
             u16::from(iso_weeks_in_year(year)),
         )
-    }
-    /// Build a semi-annual identifier.
-    ///
-    /// # Panics
-    ///
-    /// Panics when `h` is not `1` or `2`. Use [`Self::try_half`] for external
-    /// or unchecked input.
-    pub fn half(year: i32, h: u8) -> Self {
-        assert!((1..=2).contains(&h), "half must be in 1..=2");
-        Self {
-            year,
-            index: u16::from(h),
-            kind: PeriodKind::SemiAnnual,
-            fiscal: false,
-        }
     }
     /// Try to build a semi-annual identifier.
     ///
@@ -446,7 +391,7 @@ impl PeriodId {
     ///
     /// * `year` - Calendar or fiscal year used to construct the period identifier.
     /// * `h` - One-based half-year number in the inclusive range `1..=2`.
-    pub fn try_half(year: i32, h: u8) -> crate::Result<Self> {
+    pub fn half(year: i32, h: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual, 2)
     }
     /// Build an annual identifier.
@@ -501,10 +446,10 @@ impl PeriodId {
     /// ```
     /// use finstack_quant_core::dates::PeriodId;
     ///
-    /// let q1 = PeriodId::quarter(2025, 1);
+    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// assert_eq!(q1.periods_per_year(), 4);
     ///
-    /// let m1 = PeriodId::month(2025, 1);
+    /// let m1 = PeriodId::month(2025, 1).expect("valid period fixture");
     /// assert_eq!(m1.periods_per_year(), 12);
     /// ```
     pub fn periods_per_year(&self) -> u16 {
@@ -517,13 +462,13 @@ impl PeriodId {
     /// ```
     /// use finstack_quant_core::dates::PeriodId;
     ///
-    /// let q1 = PeriodId::quarter(2025, 1);
+    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let q2 = q1.next().expect("Next period should exist");
-    /// assert_eq!(q2, PeriodId::quarter(2025, 2));
+    /// assert_eq!(q2, PeriodId::quarter(2025, 2).expect("valid period fixture"));
     ///
-    /// let q4 = PeriodId::quarter(2025, 4);
+    /// let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
     /// let next_q1 = q4.next().expect("Next period should exist");
-    /// assert_eq!(next_q1, PeriodId::quarter(2026, 1));
+    /// assert_eq!(next_q1, PeriodId::quarter(2026, 1).expect("valid period fixture"));
     /// ```
     ///
     /// # Errors
@@ -546,13 +491,13 @@ impl PeriodId {
     /// ```
     /// use finstack_quant_core::dates::PeriodId;
     ///
-    /// let q2 = PeriodId::quarter(2025, 2);
+    /// let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     /// let q1 = q2.prev().expect("Previous period should exist");
-    /// assert_eq!(q1, PeriodId::quarter(2025, 1));
+    /// assert_eq!(q1, PeriodId::quarter(2025, 1).expect("valid period fixture"));
     ///
-    /// let q1 = PeriodId::quarter(2025, 1);
+    /// let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let prev_q4 = q1.prev().expect("Previous period should exist");
-    /// assert_eq!(prev_q4, PeriodId::quarter(2024, 4));
+    /// assert_eq!(prev_q4, PeriodId::quarter(2024, 4).expect("valid period fixture"));
     /// ```
     ///
     /// # Errors
@@ -1447,7 +1392,7 @@ mod tests {
         assert!(msg.contains("'2024X9'"), "{msg}");
         assert!(msg.contains("2024Q1..Q4"), "{msg}");
 
-        let msg = PeriodId::try_month(2025, 13).expect_err("13").to_string();
+        let msg = PeriodId::month(2025, 13).expect_err("13").to_string();
         assert!(msg.contains("13") && msg.contains("1..=12"), "{msg}");
 
         let msg = build_periods("2024Q1..2024M06", None)
@@ -1480,14 +1425,23 @@ mod tests {
 
     #[test]
     fn next_rolls_to_next_iso_year_after_last_week() {
-        let next = PeriodId::week(2021, 52).next().expect("next week");
-        assert_eq!(next, PeriodId::week(2022, 1));
+        let next = PeriodId::week(2021, 52)
+            .expect("valid period fixture")
+            .next()
+            .expect("next week");
+        assert_eq!(next, PeriodId::week(2022, 1).expect("valid period fixture"));
     }
 
     #[test]
     fn prev_rolls_to_previous_iso_year_last_week() {
-        let prev = PeriodId::week(2022, 1).prev().expect("previous week");
-        assert_eq!(prev, PeriodId::week(2021, 52));
+        let prev = PeriodId::week(2022, 1)
+            .expect("valid period fixture")
+            .prev()
+            .expect("previous week");
+        assert_eq!(
+            prev,
+            PeriodId::week(2021, 52).expect("valid period fixture")
+        );
     }
 
     #[test]
@@ -1568,9 +1522,9 @@ mod tests {
         let q = PeriodId::from_str("2025Q3").expect("quarter");
         assert_eq!(q.to_string(), "2025Q3");
         let m = PeriodId::from_str("2025m06").expect("month lowercase");
-        assert_eq!(m, PeriodId::month(2025, 6));
+        assert_eq!(m, PeriodId::month(2025, 6).expect("valid period fixture"));
         let d = PeriodId::from_str("2025D059").expect("ordinal day");
-        assert_eq!(d, PeriodId::day(2025, 59));
+        assert_eq!(d, PeriodId::day(2025, 59).expect("valid period fixture"));
 
         let json = serde_json::to_string(&q).expect("serialize");
         let back: PeriodId = serde_json::from_str(&json).expect("deserialize");
@@ -1579,8 +1533,8 @@ mod tests {
 
     #[test]
     fn period_id_ordering_mixed_frequencies_same_year() {
-        let q1 = PeriodId::quarter(2025, 1);
-        let m1 = PeriodId::month(2025, 1);
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let m1 = PeriodId::month(2025, 1).expect("valid period fixture");
         assert!(q1 > m1);
     }
 
@@ -1713,9 +1667,10 @@ mod tests {
 
         assert_eq!(
             PeriodId::week(2025, 52)
+                .expect("valid period fixture")
                 .next()
                 .expect("ISO next remains Gregorian"),
-            PeriodId::week(2026, 1)
+            PeriodId::week(2026, 1).expect("valid period fixture")
         );
     }
 
@@ -1765,11 +1720,11 @@ mod tests {
 
     #[test]
     fn fallible_period_id_constructors_reject_invalid_indices() {
-        assert!(PeriodId::try_month(2025, 13).is_err());
-        assert!(PeriodId::try_quarter(2025, 0).is_err());
-        assert!(PeriodId::try_week(2021, 53).is_err());
-        assert!(PeriodId::try_day(2025, 366).is_err());
-        assert!(PeriodId::try_half(2025, 3).is_err());
+        assert!(PeriodId::month(2025, 13).is_err());
+        assert!(PeriodId::quarter(2025, 0).is_err());
+        assert!(PeriodId::week(2021, 53).is_err());
+        assert!(PeriodId::day(2025, 366).is_err());
+        assert!(PeriodId::half(2025, 3).is_err());
     }
 
     #[test]
@@ -1784,20 +1739,26 @@ mod tests {
 
     #[test]
     fn daily_next_rolls_year_on_last_ordinal() {
-        let last = PeriodId::day(2023, 365);
+        let last = PeriodId::day(2023, 365).expect("valid period fixture");
         let next = last.next().expect("next day");
-        assert_eq!(next, PeriodId::day(2024, 1));
+        assert_eq!(next, PeriodId::day(2024, 1).expect("valid period fixture"));
     }
 
     #[test]
     fn quarterly_semi_and_annual_stepping() {
         assert_eq!(
-            PeriodId::quarter(2025, 4).next().expect("nq"),
-            PeriodId::quarter(2026, 1)
+            PeriodId::quarter(2025, 4)
+                .expect("valid period fixture")
+                .next()
+                .expect("nq"),
+            PeriodId::quarter(2026, 1).expect("valid period fixture")
         );
         assert_eq!(
-            PeriodId::half(2025, 2).prev().expect("ph"),
-            PeriodId::half(2025, 1)
+            PeriodId::half(2025, 2)
+                .expect("valid period fixture")
+                .prev()
+                .expect("ph"),
+            PeriodId::half(2025, 1).expect("valid period fixture")
         );
         assert_eq!(
             PeriodId::annual(2025).next().expect("na"),
