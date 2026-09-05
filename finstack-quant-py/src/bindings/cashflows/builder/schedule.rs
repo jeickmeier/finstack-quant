@@ -237,7 +237,7 @@ fn is_missing(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
 /// ``date, amount, currency, kind`` and optional ``reset_date, accrual_factor, rate``.
 pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
     if let Ok(flows) = obj.extract::<Vec<PyRef<'_, PyCashFlow>>>() {
-        return Ok(flows.iter().map(|f| f.inner).collect());
+        return Ok(flows.iter().map(|f| f.inner.clone()).collect());
     }
     if obj.hasattr("columns")? {
         let missing = |name: &str| {
@@ -253,6 +253,8 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         let resets = frame_column(obj, "reset_date")?;
         let factors = frame_column(obj, "accrual_factor")?;
         let rates = frame_column(obj, "rate")?;
+        let accruals = frame_column(obj, "accrual")?;
+        let deltas = frame_column(obj, "principal_delta")?;
         let mut flows = Vec::with_capacity(dates.len());
         for (i, date) in dates.iter().enumerate() {
             let amount: f64 = amounts[i].extract()?;
@@ -269,14 +271,40 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 Some(r) if !is_missing(r)? => Some(r.extract()?),
                 _ => None,
             };
-            flows.push(CashFlow::new(
+            let mut flow = CashFlow::new(
                 extract_date(date)?,
                 reset,
                 Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
                 extract_cf_kind(&kinds[i])?,
                 accrual_factor,
                 rate,
-            ));
+            );
+            if let Some(value) = accruals.as_ref().map(|rows| &rows[i]) {
+                if !is_missing(value)? {
+                    let json = crate::bindings::module_utils::py_to_json_string(
+                        obj.py(),
+                        value,
+                        "CashFlowAccrual",
+                    )?;
+                    flow.accrual = Some(serde_json::from_str(&json).map_err(|e| {
+                        crate::errors::serde_json_to_py(e, "invalid CashFlowAccrual")
+                    })?);
+                }
+            }
+            if let Some(value) = deltas.as_ref().map(|rows| &rows[i]) {
+                if !is_missing(value)? {
+                    let json = crate::bindings::module_utils::py_to_json_string(
+                        obj.py(),
+                        value,
+                        "principal_delta",
+                    )?;
+                    flow.principal_delta = Some(serde_json::from_str(&json).map_err(|e| {
+                        crate::errors::serde_json_to_py(e, "invalid principal_delta")
+                    })?);
+                }
+            }
+            flow.validate().map_err(core_to_py)?;
+            flows.push(flow);
         }
         return Ok(flows);
     }
@@ -328,7 +356,7 @@ impl PyCashFlowSchedule {
         meta: PyRef<'_, PyCashFlowMeta>,
     ) -> Self {
         Self::from_inner(CashFlowSchedule::from_parts(
-            flows.iter().map(|f| f.inner).collect(),
+            flows.iter().map(|f| f.inner.clone()).collect(),
             notional.inner.clone(),
             day_count.inner,
             meta.inner.clone(),
@@ -432,7 +460,7 @@ impl PyCashFlowSchedule {
         self.inner
             .get_flows()
             .iter()
-            .map(|f| PyCashFlow::from_inner(*f))
+            .map(|f| PyCashFlow::from_inner(f.clone()))
             .collect()
     }
 
@@ -441,7 +469,7 @@ impl PyCashFlowSchedule {
     fn coupons(&self) -> Vec<PyCashFlow> {
         self.inner
             .coupons()
-            .map(|f| PyCashFlow::from_inner(*f))
+            .map(|f| PyCashFlow::from_inner(f.clone()))
             .collect()
     }
 
@@ -726,6 +754,20 @@ impl PyCashFlowSchedule {
         columns.set_item("currency", currencies)?;
         columns.set_item("accrual_factor", factors)?;
         columns.set_item("rate", rates)?;
+        columns.set_item(
+            "accrual",
+            crate::bindings::pandas_utils::serde_to_py(
+                py,
+                &flows.iter().map(|f| &f.accrual).collect::<Vec<_>>(),
+            )?,
+        )?;
+        columns.set_item(
+            "principal_delta",
+            crate::bindings::pandas_utils::serde_to_py(
+                py,
+                &flows.iter().map(|f| f.principal_delta).collect::<Vec<_>>(),
+            )?,
+        )?;
         if outstanding {
             let path = self.inner.outstanding_by_date().map_err(core_to_py)?;
             let balances: Vec<Option<f64>> = flows

@@ -405,7 +405,8 @@ impl PyAccrualIndex {
     /// Parameters
     /// ----------
     /// as_of : datetime.date or str
-    ///     Accrual cut-off date; dates outside all coupon periods return 0.
+    ///     Snapshot date; interest earns through accrual end and remains accrued
+    ///     until payment (exclusive), subject to ex-coupon entitlement.
     ///
     /// Returns
     /// -------
@@ -442,7 +443,8 @@ impl PyAccrualIndex {
 /// schedule : CashFlowSchedule
 ///     Canonical cashflow schedule.
 /// as_of : datetime.date or str
-///     Accrual cut-off date; dates outside all coupon periods return 0.
+///     Snapshot date; interest earns through accrual end and remains accrued
+///     until payment (exclusive), subject to ex-coupon entitlement.
 /// config : AccrualConfig, optional
 ///     Accrual method and ex-coupon configuration (default linear, PIK included).
 ///

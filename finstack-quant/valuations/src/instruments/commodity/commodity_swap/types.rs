@@ -491,6 +491,7 @@ impl CommoditySwap {
                     None,
                 )
                 .with_accrual(CashFlowAccrual {
+                    calendar_id: None,
                     start: accrual_start,
                     end: payment_date,
                     day_count: finstack_quant_core::dates::DayCount::Act365F,

@@ -119,6 +119,9 @@ impl<'a> DateProcessor<'a> {
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
         self.emit_amortization(self.ctx.issue, state)?;
+        if let Some((_, balance)) = state.outstanding_history.last_mut() {
+            *balance = state.outstanding;
+        }
         state
             .outstanding_after
             .insert(self.ctx.issue, state.outstanding);
@@ -158,14 +161,17 @@ impl<'a> DateProcessor<'a> {
                     CFKind::Amortization => ev.cash.amount(),
                     _ => -ev.cash.amount(),
                 };
-                state.flows.push(CashFlow::new(
-                    d,
-                    None,
-                    Money::new(flow_amount, ev.cash.currency())?,
-                    ev.kind,
-                    0.0,
-                    None,
-                ));
+                state.flows.push(
+                    CashFlow::new(
+                        d,
+                        None,
+                        Money::new(flow_amount, ev.cash.currency())?,
+                        ev.kind,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(ev.delta),
+                );
                 state.outstanding += f64_to_decimal(ev.delta.amount())?;
                 if state.outstanding < Decimal::ZERO {
                     return Err(finstack_quant_core::Error::Validation(format!(

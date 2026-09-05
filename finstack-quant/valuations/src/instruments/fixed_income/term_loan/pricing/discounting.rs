@@ -306,6 +306,7 @@ impl TermLoanDiscountingPricer {
             flow.kind == CFKind::Pik
                 && flow
                     .accrual
+                    .as_ref()
                     .map_or(flow.date <= as_of, |accrual| accrual.start < as_of)
         });
         if has_seasoned_pik {
@@ -384,7 +385,10 @@ impl TermLoanDiscountingPricer {
                 reset_date,
                 as_of,
             )?;
-            let accrual_start = flow.accrual.map_or(reset_date, |accrual| accrual.start);
+            let accrual_start = flow
+                .accrual
+                .as_ref()
+                .map_or(reset_date, |accrual| accrual.start);
             let active_delta_bp: i32 = margin_deltas
                 .range(..=accrual_start)
                 .map(|(_, delta_bp)| *delta_bp)

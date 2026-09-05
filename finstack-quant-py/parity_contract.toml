@@ -382,7 +382,7 @@ traits      = { python = "finstack_quant.cashflows.traits",      status = "missi
 
 [crates.cashflows.module_symbols.primitives]
 python_package = "finstack_quant.cashflows.primitives"
-public = ["CFKind", "CashFlow", "is_cash_settlement_kind"]
+public = ["CFKind", "CashFlow", "CashFlowAccrual", "is_cash_settlement_kind"]
 
 [crates.cashflows.module_symbols.builder]
 python_package = "finstack_quant.cashflows.builder"

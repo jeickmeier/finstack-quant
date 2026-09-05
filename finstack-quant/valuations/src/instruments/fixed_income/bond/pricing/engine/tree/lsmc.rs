@@ -1295,7 +1295,7 @@ impl ReplayTemplate {
                 if !matches!(flow.kind, CFKind::FloatReset | CFKind::Pik) || flow.date < as_of {
                     continue;
                 }
-                let Some(accrual) = flow.accrual else {
+                let Some(accrual) = &flow.accrual else {
                     continue;
                 };
                 if accrual.projected_index_rate.is_none() {
@@ -1680,6 +1680,7 @@ impl ReplayTemplate {
             }
             if let Some(accrual) = flow
                 .accrual
+                .as_ref()
                 .filter(|_| matches!(flow.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Pik))
             {
                 static_accruals.push(AccrualClaim {

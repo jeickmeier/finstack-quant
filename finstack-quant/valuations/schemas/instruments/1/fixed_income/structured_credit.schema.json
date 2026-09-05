@@ -2540,7 +2540,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period. With fixings `b_1..b_n` (where `b_n` is one\nbusiness day before the exclusive period end), the cut-off fixing is\n`b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the\nARRC SOFR FRN conventions.",
+          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nFreeze the last `lockout_days` business-day observations at the fixing\nimmediately preceding those days. For fixings `b_1..b_n`, the source is\n`b_{n-lockout}`. A positive lockout must leave a preceding fixing.\n\nReference: ARRC, December 3, 2021 Statement, Appendix A, definition of\n\"Lockout\": <https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/ARRC-Statement-LIBOR-tenors-Legislation.pdf>.",
           "properties": {
             "compounded_with_lockout": {
               "additionalProperties": false,

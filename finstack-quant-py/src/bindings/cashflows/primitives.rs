@@ -1,10 +1,13 @@
 //! Python bindings for `finstack_quant_cashflows::primitives`.
 
-use finstack_quant_cashflows::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
+use finstack_quant_cashflows::primitives::{
+    is_cash_settlement_kind, CFKind, CashFlow, CashFlowAccrual,
+};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
+use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
@@ -151,6 +154,85 @@ pub(crate) fn extract_cf_kind(obj: &Bound<'_, PyAny>) -> PyResult<CFKind> {
     Err(PyTypeError::new_err("expected CFKind or str"))
 }
 
+/// Contractual accrual boundaries and conventions, independent of payment date.
+#[pyclass(
+    name = "CashFlowAccrual",
+    module = "finstack_quant.cashflows.primitives",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyCashFlowAccrual {
+    pub(crate) inner: CashFlowAccrual,
+}
+
+#[pymethods]
+impl PyCashFlowAccrual {
+    /// Construct contractual coupon metadata.
+    ///
+    /// Parameters
+    /// ----------
+    /// start : datetime.date or str
+    ///     Inclusive accrual start.
+    /// end : datetime.date or str
+    ///     Exclusive accrual end, independent of payment lag.
+    /// day_count : DayCount
+    ///     Convention used to calculate the year fraction.
+    /// projected_index_rate : float, optional
+    ///     Decimal index rate before spread, gearing and constraints.
+    /// calendar_id : str, optional
+    ///     Registered calendar identifier; required for BUS/252 accrual.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If either date cannot be parsed.
+    #[new]
+    #[pyo3(signature = (start, end, day_count, projected_index_rate=None, calendar_id=None))]
+    fn new(
+        start: &Bound<'_, PyAny>,
+        end: &Bound<'_, PyAny>,
+        day_count: PyRef<'_, PyDayCount>,
+        projected_index_rate: Option<f64>,
+        calendar_id: Option<String>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: CashFlowAccrual {
+                start: py_to_date(start)?,
+                end: py_to_date(end)?,
+                day_count: day_count.inner,
+                projected_index_rate,
+                calendar_id,
+            },
+        })
+    }
+    /// Inclusive accrual start as a Python date.
+    #[getter]
+    fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.start)
+    }
+    /// Exclusive accrual end as a Python date.
+    #[getter]
+    fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.end)
+    }
+    /// Convention used to calculate accrual year fractions.
+    #[getter]
+    fn day_count(&self) -> PyDayCount {
+        PyDayCount::from_inner(self.inner.day_count)
+    }
+    /// Unconstrained decimal index rate, or None if unprojected.
+    #[getter]
+    fn projected_index_rate(&self) -> Option<f64> {
+        self.inner.projected_index_rate
+    }
+    /// Registered accrual calendar identifier, or None when unused.
+    #[getter]
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id.clone()
+    }
+}
+
 /// Wrapper for [`CashFlow`] exposed as `finstack_quant.cashflows.primitives.CashFlow`.
 #[pyclass(
     name = "CashFlow",
@@ -158,7 +240,7 @@ pub(crate) fn extract_cf_kind(obj: &Bound<'_, PyAny>) -> PyResult<CFKind> {
     frozen,
     skip_from_py_object
 )]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct PyCashFlow {
     /// Inner dated cashflow.
     pub(crate) inner: CashFlow,
@@ -256,6 +338,48 @@ impl PyCashFlow {
         self.inner.rate
     }
 
+    /// Contractual coupon metadata, or None for an unannotated row.
+    #[getter]
+    fn accrual(&self) -> Option<PyCashFlowAccrual> {
+        self.inner
+            .accrual
+            .clone()
+            .map(|inner| PyCashFlowAccrual { inner })
+    }
+    /// Explicit principal movement, or None when derived from kind and amount.
+    #[getter]
+    fn principal_delta(&self) -> Option<PyMoney> {
+        self.inner.principal_delta.map(PyMoney::from_inner)
+    }
+    /// Return a copy carrying the supplied contractual accrual metadata.
+    ///
+    /// Parameters
+    /// ----------
+    /// accrual : CashFlowAccrual
+    ///     Coupon boundaries, day count, calendar and projected index rate.
+    ///
+    /// Returns
+    /// -------
+    /// CashFlow
+    ///     A new row with the supplied metadata; call validate to check it.
+    fn with_accrual(&self, accrual: PyRef<'_, PyCashFlowAccrual>) -> Self {
+        Self::from_inner(self.inner.clone().with_accrual(accrual.inner.clone()))
+    }
+    /// Return a copy with a principal movement separate from settlement cash.
+    ///
+    /// Parameters
+    /// ----------
+    /// delta : Money
+    ///     Signed principal change in the cash currency; positive increases it.
+    ///
+    /// Returns
+    /// -------
+    /// CashFlow
+    ///     A new row with an explicit balance movement; call validate to check currency.
+    fn with_principal_delta(&self, delta: PyMoney) -> Self {
+        Self::from_inner(self.inner.clone().with_principal_delta(delta.inner))
+    }
+
     /// Validate amount, accrual factor, rate, and reset-date ordering.
     ///
     /// Raises
@@ -341,9 +465,18 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.add_class::<PyCFKind>()?;
     module.add_class::<PyCashFlow>()?;
+    module.add_class::<PyCashFlowAccrual>()?;
     module.add_function(wrap_pyfunction!(py_is_cash_settlement_kind, &module)?)?;
 
-    let all = PyList::new(py, ["CFKind", "CashFlow", "is_cash_settlement_kind"])?;
+    let all = PyList::new(
+        py,
+        [
+            "CFKind",
+            "CashFlow",
+            "CashFlowAccrual",
+            "is_cash_settlement_kind",
+        ],
+    )?;
     module.setattr("__all__", all)?;
 
     crate::bindings::module_utils::register_submodule(

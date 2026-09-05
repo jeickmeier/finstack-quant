@@ -157,11 +157,13 @@ fn apply_baseline_regime(
 /// test-only 128-estimator budget set by [`apply_baseline_regime`].
 const BASELINE_BOND_PV: f64 = 986_735.637_112_065;
 /// PV of the callable credit-risky term loan under the same regime after
-/// dirty-call settlement and survival-on-continuation rollback.
-const BASELINE_LOAN_PV: f64 = 9_862_618.652_354_98;
+/// dirty-call settlement and survival-on-continuation rollback. Accrued
+/// coupons remain payable through adjusted payment dates, including calls
+/// between an unadjusted coupon end and its delayed settlement.
+const BASELINE_LOAN_PV: f64 = 9_862_676.817_499_82;
 /// OAS (bp) recovered by re-solving at the term loan's own model price.
 /// Non-zero only by the clean/dirty accrued conversion inside the solve.
-const BASELINE_LOAN_OAS_BP: f64 = -1.191_513_994_3;
+const BASELINE_LOAN_OAS_BP: f64 = -1.191_277_146_1;
 
 #[test]
 fn callable_credit_bond_pv_baseline() {

@@ -88,12 +88,24 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
             (Some(_), None) => std::cmp::Ordering::Greater,
             (Some(x), Some(y)) => x.total_cmp(&y),
         })
-        .then_with(|| compare_accrual(a.accrual, b.accrual))
+        .then_with(|| {
+            compare_accrual(a.accrual.as_ref(), b.accrual.as_ref()).then_with(|| {
+                match (a.principal_delta, b.principal_delta) {
+                    (Some(x), Some(y)) => x
+                        .currency()
+                        .cmp(&y.currency())
+                        .then_with(|| x.amount().total_cmp(&y.amount())),
+                    (None, Some(_)) => std::cmp::Ordering::Less,
+                    (Some(_), None) => std::cmp::Ordering::Greater,
+                    _ => std::cmp::Ordering::Equal,
+                }
+            })
+        })
 }
 
 fn compare_accrual(
-    left: Option<CashFlowAccrual>,
-    right: Option<CashFlowAccrual>,
+    left: Option<&CashFlowAccrual>,
+    right: Option<&CashFlowAccrual>,
 ) -> std::cmp::Ordering {
     match (left, right) {
         (None, None) => std::cmp::Ordering::Equal,
@@ -103,6 +115,7 @@ fn compare_accrual(
             .start
             .cmp(&right.start)
             .then_with(|| left.end.cmp(&right.end))
+            .then_with(|| left.calendar_id.cmp(&right.calendar_id))
             .then_with(|| day_count_rank(left.day_count).cmp(&day_count_rank(right.day_count)))
             .then_with(
                 || match (left.projected_index_rate, right.projected_index_rate) {
@@ -472,6 +485,9 @@ impl CashFlowSchedule {
         }
         for flow in &mut self.flows {
             flow.amount *= scale;
+            if let Some(delta) = &mut flow.principal_delta {
+                *delta *= scale;
+            }
         }
         // Amount is a `compare_flows` key; re-sort after scaling.
         sort_flows(&mut self.flows);
@@ -511,47 +527,27 @@ impl CashFlowSchedule {
 
     fn validate_economic_invariants(&self) -> finstack_quant_core::Result<()> {
         let initial = self.notional.initial;
-        let expected_currency = initial.currency();
-        let initial_amount = initial.amount().abs();
-        let mut initial_funding_skipped = false;
-        let additional_funding = self.flows.iter().fold(0.0, |total, flow| {
-            if flow.amount.currency() != expected_currency
-                || !matches!(flow.kind, CFKind::Notional | CFKind::RevolvingDraw)
-                || flow.amount.amount() >= 0.0
-            {
-                return total;
-            }
-            let is_initial_funding = self.meta.issue_date.is_some_and(|issue_date| {
-                is_initial_funding_flow(flow, issue_date, initial_amount, initial_funding_skipped)
-            });
-            initial_funding_skipped |= is_initial_funding;
-            if is_initial_funding {
-                total
-            } else {
-                total + flow.amount.amount().abs()
-            }
-        });
-        let funded_principal = initial_amount + additional_funding;
-        let epsilon = (funded_principal * 1e-8).max(1e-6);
-        let total_amortization = self
-            .flows
-            .iter()
-            .filter(|flow| flow.kind == CFKind::Amortization)
-            .try_fold(0.0, |total, flow| {
-                if flow.amount.currency() != expected_currency {
+        // Validate dated balances, including capitalized interest and explicit
+        // principal deltas. Same-day cash/PIK splits are one accounting date.
+        if let Some(anchor) = self
+            .meta
+            .issue_date
+            .or_else(|| self.flows.first().map(|f| f.date))
+        {
+            let replay = self.replay_balances(anchor)?;
+            let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
+            for (position, (index, _, balance)) in replay.iter().enumerate() {
+                let date = self.flows[*index].date;
+                let date_finished = replay
+                    .get(position + 1)
+                    .is_none_or(|(next, _, _)| self.flows[*next].date != date);
+                if date_finished && initial.amount() >= 0.0 && balance.amount() < -epsilon {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "amortization flow currency ({}) must match initial notional currency ({})",
-                        flow.amount.currency(),
-                        expected_currency
+                        "principal repayments exceed outstanding on {date}: {}",
+                        balance.amount()
                     )));
                 }
-                Ok(total + flow.amount.amount().max(0.0))
-            })?;
-
-        if total_amortization > funded_principal + epsilon {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "total amortization ({total_amortization:.6}) exceeds funded principal ({funded_principal:.6})"
-            )));
+            }
         }
 
         if let Some(issue_date) = self.meta.issue_date {
@@ -586,16 +582,44 @@ impl CashFlowSchedule {
     }
 
     /// Internal future-flow filtering step for composed schedule normalization.
-    #[must_use]
-    pub(crate) fn filter_future(mut self, as_of: Date) -> Self {
+    pub(crate) fn filter_future(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
+        if let Some(anchor) = self
+            .meta
+            .issue_date
+            .or_else(|| self.flows.first().map(|f| f.date))
+        {
+            let initial = self.notional.initial;
+            let mut balance = initial;
+            let mut funding_skipped = false;
+            for flow in self.flows.iter().take_while(|flow| flow.date < as_of) {
+                // A composed multi-currency schedule has one representative
+                // notional; flows in other currencies do not change that balance.
+                if flow.amount.currency() != initial.currency() {
+                    continue;
+                }
+                let funding =
+                    is_initial_funding_flow(flow, anchor, initial.amount(), funding_skipped);
+                funding_skipped |= funding;
+                apply_flow_to_outstanding(&mut balance, flow, funding, true)?;
+            }
+            self.notional.initial = balance;
+        }
         retain_schedule_flows(&mut self, |cf| cf.date >= as_of);
-        self
+        Ok(self)
     }
 
     /// Internal PIK-omission step for composed schedule normalization.
     #[must_use]
     pub(crate) fn omit_pure_pik(mut self) -> Self {
-        retain_schedule_flows(&mut self, |cf| cf.kind != CFKind::Pik);
+        // Capitalization is not settlement cash, but its dated principal
+        // movement must survive in the canonical balance-replay surface.
+        for flow in &mut self.flows {
+            if flow.kind == CFKind::Pik {
+                flow.principal_delta = Some(flow.principal_delta.unwrap_or(flow.amount));
+                flow.amount = Money::from((0_i64, flow.amount.currency()));
+                flow.kind = CFKind::Notional;
+            }
+        }
         self
     }
 
@@ -603,14 +627,13 @@ impl CashFlowSchedule {
     ///
     /// Applies, in order:
     /// 1. Future-flow filtering (`date >= as_of`)
-    /// 2. Pure PIK omission
+    /// 2. Replace PIK capitalization with zero-cash principal movements
     /// 3. Re-sort (defensive, in case instrument code appended unsorted flows)
     /// 4. Preserve the representation attached by the raw schedule source
-    #[must_use]
-    pub(crate) fn normalize_public(self, as_of: Date) -> Self {
-        let mut normalized = self.filter_future(as_of).omit_pure_pik();
+    pub(crate) fn normalize_public(self, as_of: Date) -> finstack_quant_core::Result<Self> {
+        let mut normalized = self.filter_future(as_of)?.omit_pure_pik();
         sort_schedule_with_metadata(&mut normalized);
-        normalized
+        Ok(normalized)
     }
 
     /// Get an iterator over interest-like coupon cashflows.
@@ -962,7 +985,8 @@ fn is_initial_funding_flow(
     initial_amount: f64,
     already_skipped: bool,
 ) -> bool {
-    !already_skipped
+    cf.principal_delta.is_none()
+        && !already_skipped
         && cf.kind == CFKind::Notional
         && cf.amount.amount() < 0.0
         && initial_amount != 0.0
@@ -999,6 +1023,10 @@ fn apply_flow_to_outstanding(
     /// Tolerance below zero before a replayed balance is considered negative.
     const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
 
+    if let Some(delta) = cf.principal_delta {
+        *outstanding = outstanding.checked_add(delta)?;
+        return Ok(());
+    }
     match cf.kind {
         CFKind::Amortization | CFKind::PrePayment | CFKind::DefaultedNotional => {
             // Amortization amounts are stored as positive in the builder
@@ -1320,6 +1348,39 @@ mod tests {
     }
 
     #[test]
+    fn public_normalization_preserves_funding_and_pik_balances() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("issue");
+        let pik = issue.add_months(3);
+        let maturity = issue.add_months(6);
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                flow(issue, -98.0, CFKind::Notional)
+                    .with_principal_delta(Money::from((100_i64, Currency::USD))),
+                flow(pik, 5.0, CFKind::Pik),
+                flow(maturity, 105.0, CFKind::Notional),
+            ],
+            Notional::par(0.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        )
+        .normalize_public(issue.add_months(1))
+        .expect("normalize");
+        schedule.validate().expect("preserved principal");
+        assert_eq!(schedule.notional.initial.amount(), 100.0);
+        assert_eq!(schedule.flows[0].amount.amount(), 0.0);
+        assert_eq!(
+            schedule.flows[0].principal_delta.map(|m| m.amount()),
+            Some(5.0)
+        );
+        let balances = schedule.outstanding_by_date().expect("balances");
+        assert_eq!(balances[0].1.amount(), 105.0);
+        assert_eq!(balances[1].1.amount(), 0.0);
+    }
+
+    #[test]
     fn scale_amounts_restores_canonical_order_under_sign_flip() {
         let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let schedule = CashFlowSchedule::from_parts(
@@ -1412,6 +1473,7 @@ mod tests {
         let left = CashFlowSchedule::from_parts(
             vec![
                 flow(d2, 4.0, CFKind::Recovery).with_accrual(CashFlowAccrual {
+                    calendar_id: None,
                     start: d1,
                     end: d2,
                     day_count: DayCount::Thirty360,
@@ -1431,6 +1493,7 @@ mod tests {
         let right = CashFlowSchedule::from_parts(
             vec![
                 flow(d1, 10.0, CFKind::Amortization).with_accrual(CashFlowAccrual {
+                    calendar_id: None,
                     start: d1,
                     end: d2,
                     day_count: DayCount::Act360,
@@ -1466,11 +1529,17 @@ mod tests {
         );
         assert_eq!(merged.meta.issue_date, Some(d1));
         assert_eq!(
-            merged.flows[0].accrual.map(|accrual| accrual.day_count),
+            merged.flows[0]
+                .accrual
+                .as_ref()
+                .map(|accrual| accrual.day_count),
             Some(DayCount::Act360)
         );
         assert_eq!(
-            merged.flows[1].accrual.map(|accrual| accrual.day_count),
+            merged.flows[1]
+                .accrual
+                .as_ref()
+                .map(|accrual| accrual.day_count),
             Some(DayCount::Thirty360)
         );
     }
@@ -1614,6 +1683,7 @@ mod tests {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let accrual = CashFlowAccrual {
+            calendar_id: None,
             start: d1,
             end: d2,
             day_count: DayCount::Act360,
@@ -1621,14 +1691,15 @@ mod tests {
         };
         let schedule = CashFlowSchedule::from_parts(
             vec![
-                flow(d2, 12.5, CFKind::Fixed).with_accrual(accrual),
+                flow(d2, 12.5, CFKind::Fixed).with_accrual(accrual.clone()),
                 flow(d1, 100.0, CFKind::Notional),
             ],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta::default(),
         )
-        .filter_future(d2);
+        .filter_future(d2)
+        .expect("valid balance replay");
 
         assert_eq!(schedule.flows.len(), 1);
         assert_eq!(schedule.flows[0].accrual, Some(accrual));

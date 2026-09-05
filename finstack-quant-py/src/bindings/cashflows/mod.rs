@@ -410,7 +410,7 @@ fn schedule_from_classified_flows(
     day_count: PyRef<'_, PyDayCount>,
     opts: Option<PyRef<'_, PyScheduleBuildOpts>>,
 ) -> PyCashFlowSchedule {
-    let flows = flows.iter().map(|f| f.inner).collect();
+    let flows = flows.iter().map(|f| f.inner.clone()).collect();
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
     PyCashFlowSchedule::from_inner(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,

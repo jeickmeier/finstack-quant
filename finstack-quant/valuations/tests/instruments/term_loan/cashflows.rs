@@ -777,6 +777,7 @@ mod margin_stepup_period_semantics {
             .map(|cf| {
                 let accrual = cf
                     .accrual
+                    .as_ref()
                     .expect("interest flow should carry accrual metadata");
                 (accrual.start, accrual.end)
             })
@@ -822,7 +823,10 @@ mod margin_stepup_period_semantics {
                 .iter()
                 .filter(|cf| cf.kind.is_interest_like())
                 .map(|cf| {
-                    let accrual = cf.accrual.expect("interest flow should carry accrual");
+                    let accrual = cf
+                        .accrual
+                        .as_ref()
+                        .expect("interest flow should carry accrual");
                     (accrual.start, cf.amount.amount())
                 })
                 .collect();
@@ -876,7 +880,10 @@ mod margin_stepup_period_semantics {
             .iter()
             .filter(|cf| cf.kind.is_interest_like())
         {
-            let accrual = cf.accrual.expect("interest flow should carry accrual");
+            let accrual = cf
+                .accrual
+                .as_ref()
+                .expect("interest flow should carry accrual");
             let rate = cf.rate.expect("fixed coupon should carry its rate");
             let expected = if accrual.start < NEXT_PERIOD_START {
                 0.065

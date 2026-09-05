@@ -1277,6 +1277,17 @@
           "$ref": "#/$defs/CFKind",
           "description": "Category/kind of cash-flow."
         },
+        "principal_delta": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
+        },
         "rate": {
           "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
           "format": "double",
@@ -1310,6 +1321,13 @@
       "additionalProperties": false,
       "description": "Contractual accrual metadata attached to one cashflow.",
       "properties": {
+        "calendar_id": {
+          "description": "Calendar identifier for calendar-dependent day counts, including BUS/252.\nRequired for BUS/252; otherwise optional. Joint calendars use `+`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day-count convention used for the accrual factor."
@@ -6035,7 +6053,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period. With fixings `b_1..b_n` (where `b_n` is one\nbusiness day before the exclusive period end), the cut-off fixing is\n`b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the\nARRC SOFR FRN conventions.",
+          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nFreeze the last `lockout_days` business-day observations at the fixing\nimmediately preceding those days. For fixings `b_1..b_n`, the source is\n`b_{n-lockout}`. A positive lockout must leave a preceding fixing.\n\nReference: ARRC, December 3, 2021 Statement, Appendix A, definition of\n\"Lockout\": <https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/ARRC-Statement-LIBOR-tenors-Legislation.pdf>.",
           "properties": {
             "compounded_with_lockout": {
               "additionalProperties": false,

@@ -78,7 +78,7 @@
 
 /// Cash-flow primitives (`CashFlow`, `CFKind`).
 pub mod primitives {
-    pub use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    pub use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 
     /// Returns whether a classified flow represents a cash settlement.
     ///

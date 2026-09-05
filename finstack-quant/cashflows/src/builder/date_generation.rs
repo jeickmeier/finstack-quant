@@ -65,29 +65,30 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, frequenc
         || step_tenor(accrual_end, frequency, -1) == Some(accrual_start)
 }
 
-/// Regular coupon period used as the ACT/ACT ICMA reference for `[accrual_start, accrual_end)`.
-///
-/// Regular periods use themselves. Short front stubs use `(end − frequency, end)`;
-/// short back stubs use `(start, start + frequency)`; long stubs use the ending
-/// regular coupon `(end − frequency, end)` so
-/// [`finstack_quant_core::dates::act_act_isma_year_fraction_with_reference_period`]
-/// can recurse across the extra quasi-coupons.
+/// ACT/ACT ICMA quasi-coupon reference anchored on the contractual stub side.
 pub(crate) fn icma_coupon_period(
     accrual_start: Date,
     accrual_end: Date,
     frequency: Tenor,
+    stub: StubKind,
+    end_of_month: bool,
 ) -> Option<(Date, Date)> {
     if is_regular_period(accrual_start, accrual_end, frequency) {
         return Some((accrual_start, accrual_end));
     }
-    let prev_regular_start = step_tenor(accrual_end, frequency, -1)?;
-    let next_regular_end = step_tenor(accrual_start, frequency, 1)?;
-    if accrual_start >= prev_regular_start {
-        Some((prev_regular_start, accrual_end))
-    } else if accrual_end <= next_regular_end {
-        Some((accrual_start, next_regular_end))
-    } else {
-        Some((prev_regular_start, accrual_end))
+    let roll = |date: Date| {
+        if end_of_month {
+            date.end_of_month()
+        } else {
+            date
+        }
+    };
+    match stub {
+        StubKind::ShortBack | StubKind::LongBack => Some((
+            accrual_start,
+            roll(step_tenor(accrual_start, frequency, 1)?),
+        )),
+        _ => Some((roll(step_tenor(accrual_end, frequency, -1)?), accrual_end)),
     }
 }
 

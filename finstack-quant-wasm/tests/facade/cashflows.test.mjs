@@ -184,3 +184,53 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
 test('cashflows rejects malformed schedule JSON', () => {
   assert.throws(() => cashflows.validateCashflowScheduleJson('{not json'), /invalid/);
 });
+
+test('cashflows preserves principal deltas and accrual calendars through JSON', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue = '2025-01-01';
+  spec.maturity = '2025-04-01';
+  Object.assign(spec.coupon_program[0].spec, {
+    rate: '0.1',
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'bus_252',
+    business_day_convention: 'unadjusted',
+  });
+  spec.principal_events = [
+    {
+      date: '2025-02-01',
+      kind: 'notional',
+      delta: { amount: '100', currency: 'USD' },
+      cash: { amount: '98', currency: 'USD' },
+    },
+  ];
+  const raw = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
+  const built = JSON.parse(cashflows.validateCashflowScheduleJson(raw));
+  const draw = built.flows.find((flow) => flow.date === '2025-02-01');
+  assert.equal(Number(draw.principal_delta.amount), 100);
+  assert.equal(Number(draw.amount.amount), -98);
+  assert.equal(
+    built.flows.find((flow) => flow.kind === 'fixed').accrual.calendar_id,
+    'weekends_only'
+  );
+  assert.ok(
+    Math.abs(cashflows.accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8
+  );
+});
+
+test('cashflows retains earned accrual until the delayed payment', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue = '2025-01-01';
+  spec.maturity = '2025-07-01';
+  Object.assign(spec.coupon_program[0].spec, {
+    rate: '0.1',
+    frequency: { count: 6, unit: 'months' },
+    day_count: 'act_360',
+    business_day_convention: 'unadjusted',
+    payment_lag_days: 2,
+  });
+  const raw = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
+  assert.ok(
+    Math.abs(cashflows.accruedInterest(raw, '2025-07-02', null) - (100000 * 181) / 360) < 1e-8
+  );
+  assert.equal(cashflows.accruedInterest(raw, '2025-07-03', null), 0);
+});

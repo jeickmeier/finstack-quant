@@ -186,11 +186,12 @@ pub enum OvernightCompoundingMethod {
 
     /// Compounded in arrears with lockout (rate cut-off near end of period).
     ///
-    /// Uses the rate from `lockout_days` business days before period end for all
-    /// remaining days in the period. With fixings `b_1..b_n` (where `b_n` is one
-    /// business day before the exclusive period end), the cut-off fixing is
-    /// `b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the
-    /// ARRC SOFR FRN conventions.
+    /// Freeze the last `lockout_days` business-day observations at the fixing
+    /// immediately preceding those days. For fixings `b_1..b_n`, the source is
+    /// `b_{n-lockout}`. A positive lockout must leave a preceding fixing.
+    ///
+    /// Reference: ARRC, December 3, 2021 Statement, Appendix A, definition of
+    /// "Lockout": <https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/ARRC-Statement-LIBOR-tenors-Legislation.pdf>.
     CompoundedWithLockout {
         /// Number of business days before period end to freeze the rate.
         lockout_days: u32,

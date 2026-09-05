@@ -827,7 +827,7 @@ impl CDSIndexPricer {
                 };
                 let projected_premium = flow.amount.amount().abs() * projected_survival;
                 if projected_premium.abs() > f64::EPSILON {
-                    let mut projected_flow = flow;
+                    let mut projected_flow = flow.clone();
                     projected_flow.amount =
                         Money::new(projected_premium * premium_sign, flow.amount.currency())?;
                     projected_flows.push(projected_flow);
@@ -857,7 +857,7 @@ impl CDSIndexPricer {
                 previous_premium_date = flow.date;
                 prev_survival = current_survival;
             } else if flow.kind == CFKind::Fee {
-                let mut projected_flow = flow;
+                let mut projected_flow = flow.clone();
                 projected_flow.amount =
                     Money::new(flow.amount.amount() * premium_sign, flow.amount.currency())?;
                 projected_flows.push(projected_flow);

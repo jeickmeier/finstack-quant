@@ -400,7 +400,9 @@ impl PyOvernightCompoundingMethod {
         }
     }
 
-    /// Compounded in arrears with a rate lockout of ``lockout_days`` business days.
+    /// Freeze the last ``lockout_days`` business-day observations at the fixing
+    /// immediately preceding them (ARRC convention). Zero disables lockout;
+    /// schedule construction rejects a window with no preceding fixing.
     #[staticmethod]
     #[pyo3(text_signature = "(lockout_days)")]
     fn compounded_with_lockout(lockout_days: u32) -> Self {

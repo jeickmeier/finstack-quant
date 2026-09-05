@@ -371,5 +371,5 @@ def test_cashflows_reject_amortization_over_notional() -> None:
         "rate": None,
     })
 
-    with pytest.raises(ValueError, match="total amortization"):
+    with pytest.raises(ValueError, match="principal repayments exceed outstanding"):
         validate_cashflow_schedule_json(json.dumps(schedule))

@@ -240,7 +240,9 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
             rate
         );
         assert_eq!(
-            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            cf.accrual
+                .as_ref()
+                .and_then(|accrual| accrual.projected_index_rate),
             Some(0.0)
         );
     }
@@ -287,7 +289,9 @@ fn test_floating_rate_fallback_fixed_rate() {
             rate
         );
         assert_eq!(
-            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            cf.accrual
+                .as_ref()
+                .and_then(|accrual| accrual.projected_index_rate),
             Some(0.045)
         );
     }
@@ -379,6 +383,7 @@ fn test_floating_rate_default_fallback_with_curve() {
         let rate = cf.rate.expect("FloatReset should have a rate");
         let index_rate = cf
             .accrual
+            .as_ref()
             .and_then(|accrual| accrual.projected_index_rate)
             .expect("projected index rate should be stored on the flow");
         assert!(
@@ -440,7 +445,9 @@ fn test_pik_flow_metadata() {
             cf.accrual_factor
         );
         assert_eq!(
-            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            cf.accrual
+                .as_ref()
+                .and_then(|accrual| accrual.projected_index_rate),
             Some(0.0)
         );
     }
@@ -2194,7 +2201,7 @@ fn test_seasoned_overnight_coupon_prefers_fixing_on_curve_base_date() {
     );
 }
 
-/// Lockout (ISDA 2021 rate cut-off) over a fully seasoned window: the cut-off
+/// Lockout (ARRC preceding-fixing convention) over a fully seasoned window: the cut-off
 /// observation dates resolve from fixings. With constant fixings equal to a
 /// flat curve, the seasoned build must match an unseasoned build of the same
 /// instrument.

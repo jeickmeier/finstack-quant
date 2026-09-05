@@ -106,7 +106,9 @@ pub trait CashflowProvider: CashflowScheduleSource {
     /// The returned schedule:
     /// - Contains only flows with `date >= as_of`
     /// - Preserves fees, signed notionals, and all valid cash events
-    /// - Omits pure PIK accretion (notional capitalisation without cash movement)
+    /// - Represents PIK capitalization as zero-cash notional rows with explicit
+    ///   principal deltas, preserving dated balances without paying PIK as cash
+    /// - Carries the balance before `as_of` as the opening schedule notional
     /// - Is tagged `Projected` when amounts depend on market curve projection,
     ///   `Contractual` when all future amounts are fixed by contract terms
     ///
@@ -121,9 +123,8 @@ pub trait CashflowProvider: CashflowScheduleSource {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<crate::builder::CashFlowSchedule> {
-        Ok(self
-            .raw_cashflow_schedule(curves, as_of)?
-            .normalize_public(as_of))
+        self.raw_cashflow_schedule(curves, as_of)?
+            .normalize_public(as_of)
     }
 
     /// Convenience: return flattened `(Date, Money)` flows derived from the canonical schedule.
@@ -146,6 +147,7 @@ pub trait CashflowProvider: CashflowScheduleSource {
             .flows
             .iter()
             .filter(|cf| is_cash_settlement_kind(cf.kind))
+            .filter(|cf| cf.amount.amount() != 0.0 || cf.principal_delta.is_none())
             .map(|cf| (cf.date, cf.amount))
             .collect())
     }
@@ -406,11 +408,21 @@ mod tests {
             schedule.meta.representation,
             CashflowRepresentation::Projected
         );
-        assert_eq!(schedule.flows.len(), 3);
+        assert_eq!(schedule.flows.len(), 4);
         assert_eq!(schedule.flows[0].date, as_of);
         assert_eq!(schedule.flows[1].date, as_of + time::Duration::days(31));
         assert_eq!(schedule.flows[2].date, as_of + time::Duration::days(31));
         assert!(schedule.flows.iter().all(|flow| flow.kind != CFKind::Pik));
+        let capitalization = schedule
+            .flows
+            .iter()
+            .find(|f| f.principal_delta.is_some())
+            .expect("PIK principal movement");
+        assert_eq!(capitalization.amount.amount(), 0.0);
+        assert_eq!(
+            capitalization.principal_delta.map(|m| m.amount()),
+            Some(40.0)
+        );
 
         let dated = instrument
             .dated_cashflows(&curves, as_of)

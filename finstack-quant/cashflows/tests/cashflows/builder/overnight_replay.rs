@@ -107,7 +107,7 @@ fn lockout_freezes_only_from_the_contractual_cutoff() {
             .iter()
             .map(|slice| slice.observation_date.day())
             .collect::<Vec<_>>(),
-        vec![6, 7, 8, 9, 9]
+        vec![6, 7, 8, 8, 8]
     );
 
     let mut seen = Vec::new();

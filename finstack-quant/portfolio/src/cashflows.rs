@@ -383,7 +383,7 @@ pub fn aggregate_full_cashflows(
                     .map(|flow| {
                         position
                             .scale_value(flow.amount)
-                            .map(|amount| (*flow, amount))
+                            .map(|amount| (flow.clone(), amount))
                     })
                     .collect::<finstack_quant_core::Result<Vec<_>>>();
                 let (schedule, scaled_flows) = match scaled_flows {

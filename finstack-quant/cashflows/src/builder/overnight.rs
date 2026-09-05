@@ -115,9 +115,9 @@ impl OvernightObservationSchedule {
     ///
     /// Lookback moves each fixing date while retaining accrual-date weights.
     /// Observation shift moves both the observation window and its weights.
-    /// Lockout replaces observations from the contractual cut-off onward with
-    /// the cut-off observation, so partial replay does not create a premature
-    /// cut-off relative to the exercise date.
+    /// Lockout freezes the final observations at the preceding fixing. Its
+    /// boundary belongs to the full contractual period, so partial replay
+    /// does not introduce an earlier cut-off.
     ///
     /// # Arguments
     ///
@@ -170,7 +170,7 @@ impl OvernightObservationSchedule {
             compile_window(observation_start, observation_end, lookback_days, calendar)?;
 
         if let OvernightCompoundingMethod::CompoundedWithLockout { lockout_days } = method {
-            apply_lockout(&mut observations, &mut tenor_tracks_weight, lockout_days);
+            apply_lockout(&mut observations, &mut tenor_tracks_weight, lockout_days)?;
         }
 
         let accrual_days = non_negative_days(accrual_start, accrual_end, "accrual period")?;
@@ -416,17 +416,12 @@ impl OvernightObservationSchedule {
             let continuing = accumulator
                 .active_slice
                 .filter(|active| active.index == index);
-            if tracks_weight_tenor {
-                if let Some(active) = continuing {
-                    accumulator.remove(active);
-                }
+            // One fixing contributes one simple-interest factor, even when
+            // a checkpoint falls inside its weekend/holiday weight interval.
+            if let Some(active) = continuing {
+                accumulator.remove(active);
             }
-
-            let weight_start = if tracks_weight_tenor {
-                full_slice.weight_start
-            } else {
-                old_weight_end.max(full_slice.weight_start)
-            };
+            let weight_start = full_slice.weight_start;
             let weight_days = positive_days(weight_start, clipped_end, "observation slice")?;
             let (rate, constrained) = if !tracks_weight_tenor {
                 continuing
@@ -682,20 +677,24 @@ fn apply_lockout(
     observations: &mut [OvernightObservationSlice],
     tenor_tracks_weight: &mut [bool],
     lockout_days: u32,
-) {
-    if observations.is_empty() || lockout_days == 0 {
-        return;
+) -> Result<()> {
+    if lockout_days == 0 {
+        return Ok(());
     }
     let lockout = usize::try_from(lockout_days).unwrap_or(usize::MAX);
-    let lockout_start = observations.len().saturating_sub(lockout);
-    let source = observations[lockout_start];
+    if lockout >= observations.len() {
+        return Err(Error::Validation(
+            "lockout must leave at least one preceding fixing".into(),
+        ));
+    }
+    let lockout_start = observations.len() - lockout;
+    let source = observations[lockout_start - 1];
     for (offset, observation) in observations[lockout_start..].iter_mut().enumerate() {
         observation.observation_date = source.observation_date;
         observation.rate_tenor_days = source.rate_tenor_days;
-        if offset > 0 {
-            tenor_tracks_weight[lockout_start + offset] = false;
-        }
+        tenor_tracks_weight[lockout_start + offset] = false;
     }
+    Ok(())
 }
 
 fn shift_back(date: Date, shift_days: i32, calendar: &dyn HolidayCalendar) -> Result<Date> {

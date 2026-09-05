@@ -274,6 +274,12 @@ pub(crate) fn emit_fixed_coupons_on(
                         period.unadjusted_start,
                         period.unadjusted_end,
                         spec.schedule.frequency,
+                        if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                            spec.schedule.stub
+                        } else {
+                            finstack_quant_core::dates::StubKind::ShortBack
+                        },
+                        spec.schedule.end_of_month,
                     ),
                     end_is_termination_date: is_termination_date,
                 },
@@ -307,6 +313,7 @@ pub(crate) fn emit_fixed_coupons_on(
                         Some(rate_f64),
                     )
                     .with_accrual(CashFlowAccrual {
+                        calendar_id: Some(spec.schedule.calendar_id.clone()),
                         start: accrual_start,
                         end: accrual_end,
                         day_count: spec.schedule.day_count,
@@ -320,6 +327,7 @@ pub(crate) fn emit_fixed_coupons_on(
             if pik_added > 0.0 {
                 if let Some(flow) = out_flows.last_mut() {
                     flow.accrual = Some(CashFlowAccrual {
+                        calendar_id: Some(spec.schedule.calendar_id.clone()),
                         start: accrual_start,
                         end: accrual_end,
                         day_count: spec.schedule.day_count,
@@ -414,6 +422,12 @@ pub(crate) fn emit_float_coupons_on(
                         period.unadjusted_start,
                         period.unadjusted_end,
                         spec.schedule.frequency,
+                        if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                            spec.schedule.stub
+                        } else {
+                            finstack_quant_core::dates::StubKind::ShortBack
+                        },
+                        spec.schedule.end_of_month,
                     ),
                     end_is_termination_date: is_termination_date,
                 },
@@ -614,6 +628,7 @@ pub(crate) fn emit_float_coupons_on(
                         Some(total_rate),
                     )
                     .with_accrual(CashFlowAccrual {
+                        calendar_id: Some(spec.schedule.calendar_id.clone()),
                         start: accrual_start,
                         end: accrual_end,
                         day_count: spec.schedule.day_count,
@@ -627,6 +642,7 @@ pub(crate) fn emit_float_coupons_on(
             if pik_added > 0.0 {
                 if let Some(flow) = out_flows.last_mut() {
                     flow.accrual = Some(CashFlowAccrual {
+                        calendar_id: Some(spec.schedule.calendar_id.clone()),
                         start: accrual_start,
                         end: accrual_end,
                         day_count: spec.schedule.day_count,

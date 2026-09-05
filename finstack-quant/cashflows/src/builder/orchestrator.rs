@@ -147,23 +147,17 @@ fn derive_amortization_setup(
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
 ) -> finstack_quant_core::Result<AmortizationSetup> {
-    // Determine base cadence schedule for linear/percent amortization by
-    // borrowing the first available coupon leg. For multi-leg instruments with
-    // differing frequencies, amortization follows this first leg's cadence.
-    let amort_base: Option<&[Date]> = match notional.amort {
-        AmortizationSpec::LinearTo { .. } | AmortizationSpec::PercentOfOriginalPerPeriod { .. } => {
-            if let Some(schedule) = fixed_schedules.first() {
-                Some(schedule.dates.as_slice())
-            } else if let Some(schedule) = float_schedules.first() {
-                Some(schedule.dates.as_slice())
-            } else {
-                None
-            }
-        }
-        _ => None,
-    };
-
-    if amort_base.is_none()
+    // The compiler selects one coupon program per window. Rate groups and
+    // fixed/floating switches partition that program, not its amortization life.
+    let mut amort_base: Vec<Date> = fixed_schedules
+        .iter()
+        .flat_map(|s| s.dates.iter())
+        .chain(float_schedules.iter().flat_map(|s| s.dates.iter()))
+        .copied()
+        .collect();
+    amort_base.sort_unstable();
+    amort_base.dedup();
+    if amort_base.is_empty()
         && matches!(
             notional.amort,
             AmortizationSpec::LinearTo { .. } | AmortizationSpec::PercentOfOriginalPerPeriod { .. }
@@ -205,12 +199,7 @@ fn derive_amortization_setup(
 
     let (linear_delta, percent_per) = match &notional.amort {
         AmortizationSpec::LinearTo { final_notional } => {
-            let base = amort_base.ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "amortization_base_schedule".to_string(),
-                })
-            })?;
-            let steps = Decimal::from(base.len() as u64);
+            let steps = Decimal::from(amort_base.len() as u64);
             let initial = f64_to_decimal(notional.initial.amount())?;
             let final_notional = f64_to_decimal(final_notional.amount())?;
             let delta = (initial - final_notional) / steps;
@@ -239,9 +228,7 @@ fn derive_amortization_setup(
         _ => (None, None),
     };
 
-    let amort_dates: finstack_quant_core::HashSet<Date> = amort_base
-        .map(|v| v.iter().copied().collect())
-        .unwrap_or_default();
+    let amort_dates: finstack_quant_core::HashSet<Date> = amort_base.into_iter().collect();
 
     Ok(AmortizationSetup {
         amort_dates,
@@ -285,15 +272,24 @@ fn initialize_build_state(
                 CFKind::Amortization => ev.cash.amount(),
                 _ => -ev.cash.amount(),
             };
-            flows.push(CashFlow::new(
-                ev.date,
-                None,
-                Money::new(flow_amount, ev.cash.currency())?,
-                ev.kind,
-                0.0,
-                None,
-            ));
+            flows.push(
+                CashFlow::new(
+                    ev.date,
+                    None,
+                    Money::new(flow_amount, ev.cash.currency())?,
+                    ev.kind,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(ev.delta),
+            );
             outstanding += f64_to_decimal(ev.delta.amount())?;
+            if outstanding < Decimal::ZERO {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "principal event on {} would make outstanding balance negative ({outstanding})",
+                    ev.date
+                )));
+            }
         }
     }
 
@@ -495,10 +491,10 @@ impl CashFlowBuilder {
     ///   of its accrual start. Principal events strictly inside a period
     ///   change interest only from the next period (see
     ///   [`PrincipalEvent`]'s interest-base convention).
-    /// - **First leg wins:** on multi-leg instruments the redemption-date
-    ///   conventions (business-day adjustment, payment lag) and the cadence
-    ///   for `LinearTo` / `PercentOfOriginalPerPeriod` amortization follow the
-    ///   first fixed coupon leg, else the first floating leg.
+    /// - **Redemption conventions:** business-day adjustment and payment lag
+    ///   follow the first fixed coupon leg, else the first floating leg.
+    /// - **Amortization cadence:** `LinearTo` / `PercentOfOriginalPerPeriod`
+    ///   use all contractual coupon windows, including rate steps and fixed/float switches.
     /// - **Reporting day count:** the schedule's representative day count is
     ///   taken from the same first coupon leg; schedules with no coupon leg
     ///   default to Act/365F.
@@ -756,11 +752,9 @@ impl CompiledCashFlowPlan {
             Some(self.maturity),
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
-        Ok(CashFlowSchedule::from_parts(
-            flows,
-            self.notional.clone(),
-            out_day_count,
-            meta,
-        ))
+        let schedule =
+            CashFlowSchedule::from_parts(flows, self.notional.clone(), out_day_count, meta);
+        schedule.validate()?;
+        Ok(schedule)
     }
 }

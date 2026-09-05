@@ -851,7 +851,17 @@ class TestCashFlowSchedule:
 
         schedule = self._bond()
         df = schedule.to_dataframe()
-        assert list(df.columns) == ["date", "reset_date", "kind", "amount", "currency", "accrual_factor", "rate"]
+        assert list(df.columns) == [
+            "date",
+            "reset_date",
+            "kind",
+            "amount",
+            "currency",
+            "accrual_factor",
+            "rate",
+            "accrual",
+            "principal_delta",
+        ]
         assert str(df["date"].dtype).startswith("datetime64")
         assert "outstanding" in schedule.to_dataframe(outstanding=True).columns
         assert len(df) == 6
@@ -1298,3 +1308,60 @@ class TestTypedTwinsAndWire:
         restored = pickle.loads(pickle.dumps(agg))  # noqa: S301 - trusted in-process round trip
         assert restored.to_json() == agg.to_json()
         assert agg.to_dict()["2025Q1"]["USD"].amount == pytest.approx(100.0)
+
+
+def test_cashflow_metadata_dataframe_roundtrip() -> None:
+    import json
+
+    from finstack_quant.cashflows import build_cashflow_schedule
+    from finstack_quant.cashflows.accrual import accrued_interest_amount
+    from finstack_quant.cashflows.builder import CashFlowSchedule
+    from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
+    from finstack_quant.core.dates import DayCount
+
+    spec = {
+        "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
+        "issue": "2025-01-01",
+        "maturity": "2025-07-01",
+        "coupon_program": [
+            {
+                "kind": "fixed",
+                "spec": {
+                    "rate": "0.1",
+                    "frequency": {"count": 3, "unit": "months"},
+                    "day_count": "act_360",
+                    "business_day_convention": "unadjusted",
+                    "calendar_id": "weekends_only",
+                    "stub": "short_back",
+                    "payment_lag_days": 2,
+                },
+            }
+        ],
+        "principal_events": [
+            {
+                "date": "2025-02-01",
+                "kind": "notional",
+                "delta": {"amount": "100", "currency": "USD"},
+                "cash": {"amount": "98", "currency": "USD"},
+            }
+        ],
+    }
+    original = build_cashflow_schedule(spec)
+    rebuilt = CashFlowSchedule.from_flows(
+        original.to_dataframe(), original.get_notional(), original.get_day_count(), original.get_meta()
+    )
+    assert json.loads(rebuilt.to_json()) == json.loads(original.to_json())
+    assert accrued_interest_amount(rebuilt, "2025-05-01").amount == pytest.approx(
+        accrued_interest_amount(original, "2025-05-01").amount
+    )
+    coupon = original.coupons()[0]
+    assert coupon.accrual.start == dt.date(2025, 1, 1)
+    assert coupon.accrual.calendar_id == "weekends_only"
+    metadata = CashFlowAccrual(
+        "2025-01-01", "2025-04-01", DayCount.ACT_360, projected_index_rate=0.03, calendar_id="weekends_only"
+    )
+    row = CashFlow("2025-04-03", Money(25, "USD"), CFKind.FIXED).with_accrual(metadata)
+    assert row.accrual.projected_index_rate == 0.03
+    draw = CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL).with_principal_delta(Money(100, "USD"))
+    draw.validate()
+    assert CashFlow.from_json(draw.to_json()).principal_delta.amount == 100

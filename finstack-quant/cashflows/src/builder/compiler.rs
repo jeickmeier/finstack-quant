@@ -182,6 +182,7 @@ pub(crate) struct FloatSchedule {
 /// - `prev` (`HashMap<Date, SchedulePeriod>`): Period details keyed by payment date.
 #[derive(Clone)]
 pub(super) struct PeriodicFee {
+    pub(super) calendar_id: String,
     pub(super) base: FeeBase,
     pub(super) bp: Decimal,
     pub(super) day_count: DayCount,
@@ -298,6 +299,7 @@ pub(super) fn build_fee_schedules(
                 let calendar = resolve_calendar_strict(calendar_id)?;
                 let terminal = terminal_accrual_end(&prev);
                 periodic_fees.push(PeriodicFee {
+                    calendar_id: calendar_id.clone(),
                     base: base.clone(),
                     bp: *bp,
                     day_count: *day_count,

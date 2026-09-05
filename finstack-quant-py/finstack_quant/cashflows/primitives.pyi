@@ -35,8 +35,9 @@ from typing import Any
 import datetime
 
 from finstack_quant.core.money import Money
+from finstack_quant.core.dates import DayCount
 
-__all__ = ["CFKind", "CashFlow", "is_cash_settlement_kind"]
+__all__ = ["CFKind", "CashFlow", "CashFlowAccrual", "is_cash_settlement_kind"]
 
 class CFKind:
     """
@@ -162,6 +163,105 @@ class CFKind:
         Notes
         -----
         This method does not raise; it returns ``True`` or ``False``.
+        """
+        ...
+
+class CashFlowAccrual:
+    """Contractual coupon boundaries and conventions, independent of payment timing.
+
+    Examples
+    --------
+    >>> from finstack_quant.cashflows.primitives import CashFlowAccrual
+    >>> from finstack_quant.core.dates import DayCount
+    >>> a = CashFlowAccrual("2025-01-01", "2025-04-01", DayCount.BUS_252, calendar_id="weekends_only")
+    >>> a.calendar_id
+    'weekends_only'
+    """
+
+    def __init__(
+        self,
+        start: datetime.date | str,
+        end: datetime.date | str,
+        day_count: DayCount,
+        projected_index_rate: float | None = None,
+        calendar_id: str | None = None,
+    ) -> None:
+        """Create coupon accrual metadata.
+
+        Parameters
+        ----------
+        start : datetime.date or str
+            Inclusive accrual start, using an ISO date when supplied as text.
+        end : datetime.date or str
+            Exclusive accrual end, independent of the cash payment date.
+        day_count : DayCount
+            Convention used to compute year fractions.
+        projected_index_rate : float, optional
+            Decimal index rate before spread, gearing, floors and caps.
+        calendar_id : str, optional
+            Registered calendar identifier, including '+' joint identifiers.
+            Required for BUS/252 accrued interest; otherwise optional.
+
+        Raises
+        ------
+        ValueError
+            If a supplied date cannot be parsed. Call CashFlow.validate() after
+            attachment to check ordering and finite projected rates.
+        """
+        ...
+
+    @property
+    def start(self) -> datetime.date:
+        """Return the inclusive accrual start.
+
+        Returns
+        -------
+        datetime.date
+            First date earning interest. Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def end(self) -> datetime.date:
+        """Return the exclusive accrual end.
+
+        Returns
+        -------
+        datetime.date
+            Boundary where earning stops; payment may occur later. Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def day_count(self) -> DayCount:
+        """Return the coupon day-count convention.
+
+        Returns
+        -------
+        DayCount
+            Year-fraction convention. Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def projected_index_rate(self) -> float | None:
+        """Return the unconstrained decimal index rate.
+
+        Returns
+        -------
+        float or None
+            Rate before spread/gearing/constraints, or None if absent. Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def calendar_id(self) -> str | None:
+        """Return the calendar used for calendar-dependent accrual.
+
+        Returns
+        -------
+        str or None
+            Registered identifier, or None if unspecified. Access does not raise; no lookup is performed.
         """
         ...
 
@@ -316,6 +416,62 @@ class CashFlow:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def accrual(self) -> CashFlowAccrual | None:
+        """Return contractual coupon metadata.
+
+        Returns
+        -------
+        CashFlowAccrual or None
+            Boundaries, day count, calendar and index metadata, or None if absent.
+            Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def principal_delta(self) -> Money | None:
+        """Return an explicit principal change independent of settlement cash.
+
+        Returns
+        -------
+        Money or None
+            Positive increases outstanding; None means derive from kind and amount.
+            Access does not raise domain errors.
+        """
+        ...
+
+    def with_accrual(self, accrual: CashFlowAccrual) -> CashFlow:
+        """Attach contractual metadata to a copy of this row.
+
+        Parameters
+        ----------
+        accrual : CashFlowAccrual
+            Coupon boundaries, day count, calendar and optional projected index.
+
+        Returns
+        -------
+        CashFlow
+            New row carrying the metadata. This method does not validate it;
+            call validate() to check dates and finite rates. Attachment does not raise.
+        """
+        ...
+
+    def with_principal_delta(self, delta: Money) -> CashFlow:
+        """Attach a principal change to a copy of this row.
+
+        Parameters
+        ----------
+        delta : Money
+            Signed principal movement in the cashflow currency; positive increases it.
+
+        Returns
+        -------
+        CashFlow
+            New row with explicit principal movement. Call validate() to check
+            currency; attachment does not raise and performs no domain validation.
         """
         ...
 

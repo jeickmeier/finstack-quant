@@ -547,8 +547,8 @@ class AccrualIndex:
         Parameters
         ----------
         as_of : datetime.date or str
-            Accrual cut-off date; dates outside all coupon periods return
-            zero.
+            Snapshot date; interest earns through accrual end and remains accrued
+            until payment (exclusive), subject to ex-coupon entitlement.
 
         Returns
         -------
@@ -577,7 +577,8 @@ def accrued_interest_amount(
         Canonical cashflow schedule containing coupon, PIK, and notional
         flows.
     as_of : datetime.date or str
-        Accrual cut-off date; dates outside all coupon periods return zero.
+        Snapshot date; interest earns through accrual end and remains accrued
+        until payment (exclusive), subject to ex-coupon entitlement.
     config : AccrualConfig, optional
         Accrual method and ex-coupon configuration (default linear, PIK
         included).

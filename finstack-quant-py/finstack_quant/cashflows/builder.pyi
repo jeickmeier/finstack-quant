@@ -1389,7 +1389,9 @@ class CashFlowSchedule:
             One row per flow, in schedule order, with columns ``date``
             (``datetime64``), ``reset_date`` (``datetime64``, ``NaT`` when
             absent), ``kind``, ``amount`` (float), ``currency``,
-            ``accrual_factor``, ``rate`` (``NaN`` when absent) and optionally
+            ``accrual_factor``, ``rate`` (``NaN`` when absent), ``accrual``
+            (canonical metadata dict or None), ``principal_delta`` (canonical
+            money dict or None), and optionally
             ``outstanding``.
 
         Raises
@@ -1532,7 +1534,9 @@ class CashFlowSchedule:
             Typed rows, or a frame with columns ``date``, ``amount`` (float,
             native currency units), ``currency`` (ISO code), ``kind``
             (``CFKind`` label) and optional ``reset_date``,
-            ``accrual_factor``, ``rate`` (``NaN`` / ``None`` = absent).
+            ``accrual_factor``, ``rate`` (``NaN`` / ``None`` = absent),
+            ``accrual`` and ``principal_delta`` (canonical JSON-compatible dicts
+            or None). Exported metadata is preserved when rebuilding.
         notional : Notional
             Representative notional stamped on the schedule.
         day_count : DayCount
@@ -3681,7 +3685,10 @@ class OvernightCompoundingMethod:
         Parameters
         ----------
         lockout_days : int
-            Number of business days before period end to freeze the rate.
+            Number of final business-day observations to freeze at the fixing
+            immediately preceding them (ARRC convention). Zero disables lockout.
+            Building a schedule raises ValueError if a positive lockout leaves
+            no preceding fixing.
 
         Returns
         -------

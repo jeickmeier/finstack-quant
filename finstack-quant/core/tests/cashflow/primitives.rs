@@ -32,6 +32,7 @@ fn valid_cashflow() -> CashFlow {
         accrual_factor: 0.5,
         rate: Some(0.05),
         accrual: None,
+        principal_delta: None,
     }
 }
 
@@ -47,6 +48,7 @@ fn cashflow_fixed_construction() {
         accrual_factor: 0.25,
         rate: Some(0.05),
         accrual: None,
+        principal_delta: None,
     };
 
     assert_eq!(cf.date, d(2025, 1, 15));
@@ -69,6 +71,7 @@ fn cashflow_floating_construction() {
         accrual_factor: 0.25,
         rate: None,
         accrual: None,
+        principal_delta: None,
     };
 
     assert_eq!(cf.kind, CFKind::FloatReset);
@@ -294,6 +297,7 @@ fn cashflow_rejects_reset_date_after_payment() {
         accrual_factor: 0.25,
         rate: None,
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_err(),
@@ -314,6 +318,7 @@ fn cashflow_accepts_reset_date_before_payment() {
         accrual_factor: 0.25,
         rate: None,
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -333,6 +338,7 @@ fn cashflow_accepts_reset_date_equal_to_payment() {
         accrual_factor: 0.25,
         rate: None,
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -350,6 +356,7 @@ fn cashflow_accepts_no_reset_date() {
         accrual_factor: 0.25,
         rate: Some(0.05),
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -369,6 +376,7 @@ fn cashflow_valid_with_all_fields_populated() {
         accrual_factor: 0.25,
         rate: Some(0.0325),
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -389,6 +397,7 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
         accrual_factor: f64::INFINITY, // Invalid
         rate: Some(f64::NAN),          // Also invalid
         accrual: None,
+        principal_delta: None,
     };
     assert!(
         cf.validate().is_err(),
@@ -422,6 +431,7 @@ fn json_round_trips_without_optional_accrual_field() {
 #[test]
 fn accrual_metadata_round_trips() {
     let accrual = CashFlowAccrual {
+        calendar_id: None,
         start: d(2025, 3, 15),
         end: d(2025, 6, 15),
         day_count: DayCount::Act360,
@@ -435,7 +445,7 @@ fn accrual_metadata_round_trips() {
         0.25,
         Some(0.036),
     )
-    .with_accrual(accrual);
+    .with_accrual(accrual.clone());
 
     let encoded = serde_json::to_string(&flow).unwrap();
     let decoded: CashFlow = serde_json::from_str(&encoded).unwrap();

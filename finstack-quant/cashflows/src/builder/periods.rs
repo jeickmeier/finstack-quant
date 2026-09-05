@@ -126,6 +126,12 @@ fn enrich_period(
             period.unadjusted_start,
             period.unadjusted_end,
             params.frequency,
+            if matches!(params.roll_rule, RollRule::None) {
+                params.stub
+            } else {
+                StubKind::ShortBack
+            },
+            params.end_of_month,
         ),
         end_is_termination_date: period.accrual_end >= params.end,
     };

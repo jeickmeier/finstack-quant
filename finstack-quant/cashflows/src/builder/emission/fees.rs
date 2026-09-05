@@ -232,6 +232,7 @@ pub(in crate::builder) fn emit_fees_on(
                         Some(rate),
                     )
                     .with_accrual(CashFlowAccrual {
+                        calendar_id: Some(pf.calendar_id.clone()),
                         start: period.accrual_start,
                         end: period.accrual_end,
                         day_count: pf.day_count,
@@ -367,6 +368,7 @@ mod tests {
             },
         );
         PeriodicFee {
+            calendar_id: "weekends_only".to_owned(),
             base,
             bp,
             day_count: DayCount::Act360,
@@ -415,6 +417,7 @@ mod tests {
         assert!((fee - 1250.0).abs() < 0.01, "Expected ~1250.0, got {}", fee);
         let accrual = flows[0]
             .accrual
+            .as_ref()
             .expect("periodic fee should own its accrual metadata");
         assert_eq!((accrual.start, accrual.end), (start, end));
         assert_eq!(accrual.day_count, DayCount::Act360);

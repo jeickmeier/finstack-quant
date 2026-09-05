@@ -169,7 +169,7 @@ fn pik_capitalization_increases_outstanding() {
 }
 
 #[test]
-fn linear_amortization_uses_first_coupon_leg_cadence() {
+fn linear_amortization_spans_fixed_to_float_cadences() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let switch = Date::from_calendar_date(2025, Month::July, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
@@ -238,15 +238,18 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
         .map(|flow| flow.date)
         .collect();
 
-    assert!(!amortization_dates.is_empty());
+    assert_eq!(amortization_dates.len(), 8); // six monthly + two quarterly periods
+    assert!(amortization_dates.contains(&maturity));
     assert!(
-        amortization_dates.iter().all(|date| *date <= switch),
-        "linear amortization should follow the first coupon leg cadence"
+        amortization_dates.contains(&Date::from_calendar_date(2025, Month::October, 1).unwrap())
     );
-    assert!(
-        !amortization_dates.contains(&maturity),
-        "the later floating leg cadence is not used for linear amortization"
-    );
+    for flow in schedule
+        .get_flows()
+        .iter()
+        .filter(|f| f.kind == CFKind::Amortization)
+    {
+        assert!((flow.amount.amount() - 150.0).abs() < 1e-10);
+    }
 }
 
 /// A mid-horizon fixed-to-float conversion starts a fresh schedule at
@@ -310,7 +313,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .expect("post-switch coupon");
-    let accrual = first_float.accrual.expect("float coupon accrual");
+    let accrual = first_float.accrual.as_ref().expect("float coupon accrual");
     assert_eq!(
         accrual.start, switch,
         "float window must start a fresh schedule at switch, not continue the Jan-15 roll"

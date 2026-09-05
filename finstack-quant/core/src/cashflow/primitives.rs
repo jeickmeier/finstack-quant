@@ -329,7 +329,7 @@ impl CFKind {
 }
 
 /// Contractual accrual metadata attached to one cashflow.
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CashFlowAccrual {
@@ -346,13 +346,17 @@ pub struct CashFlowAccrual {
     /// Projected index rate before spread, gearing, caps, or floors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projected_index_rate: Option<f64>,
+    /// Calendar identifier for calendar-dependent day counts, including BUS/252.
+    /// Required for BUS/252; otherwise optional. Joint calendars use `+`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
 }
 
 /// A single dated cash-flow (payment or reset).
 ///
 /// Represents a monetary flow at a specific date with metadata
 /// for proper classification and risk calculation.
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CashFlow {
@@ -386,10 +390,25 @@ pub struct CashFlow {
     /// Optional contractual accrual metadata owned by this flow.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accrual: Option<CashFlowAccrual>,
+    /// Explicit change in outstanding principal, in the cashflow currency.
+    /// Positive increases outstanding. When absent, the flow kind and amount
+    /// determine the balance movement. Initial funding remains represented by
+    /// the schedule's initial notional rather than being counted twice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_delta: Option<Money>,
 }
 
 impl CashFlow {
     /// Construct a cashflow without optional contractual accrual metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Settlement/payment date of the cashflow.
+    /// * `reset_date` - Optional index observation date, no later than payment.
+    /// * `amount` - Signed settlement cash including its currency.
+    /// * `kind` - Classification controlling cash settlement and balance treatment.
+    /// * `accrual_factor` - Nonnegative coupon year fraction under its day count.
+    /// * `rate` - Optional decimal annual all-in coupon rate (0.05 means 5%).
     pub fn new(
         date: Date,
         reset_date: Option<Date>,
@@ -406,10 +425,28 @@ impl CashFlow {
             accrual_factor,
             rate,
             accrual: None,
+            principal_delta: None,
         }
     }
 
+    /// Attach a principal balance movement independently of settlement cash.
+    ///
+    /// # Arguments
+    ///
+    /// * `delta` - Signed change in outstanding, in the cashflow currency;
+    ///   positive values increase principal and negative values repay it.
+    #[must_use]
+    pub fn with_principal_delta(mut self, delta: Money) -> Self {
+        self.principal_delta = Some(delta);
+        self
+    }
+
     /// Attach contractual accrual metadata to this flow.
+    ///
+    /// # Arguments
+    ///
+    /// * `accrual` - Contractual coupon boundaries, day count, optional calendar,
+    ///   and projected decimal index rate, independent of payment timing.
     #[must_use]
     pub fn with_accrual(mut self, accrual: CashFlowAccrual) -> Self {
         self.accrual = Some(accrual);
@@ -496,7 +533,15 @@ impl CashFlow {
             }
         }
 
-        if let Some(accrual) = self.accrual {
+        if let Some(delta) = self.principal_delta {
+            if delta.currency() != self.amount.currency() {
+                return Err(crate::Error::CurrencyMismatch {
+                    expected: self.amount.currency(),
+                    actual: delta.currency(),
+                });
+            }
+        }
+        if let Some(accrual) = &self.accrual {
             if accrual.start >= accrual.end {
                 return Err(crate::Error::Validation(
                     "CashFlow: accrual start must be before accrual end".into(),
@@ -515,7 +560,7 @@ impl CashFlow {
         Ok(())
     }
 }
-// Compile-time size assertion (≤ 56 bytes)
+// Guard the inline record size.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -536,10 +581,10 @@ mod tests {
 
     #[test]
     fn cashflow_size_is_reasonable() {
-        // The optional, inline accrual value keeps CashFlow copyable without a
-        // heap allocation. Guard against accidental future growth.
+        // Calendar metadata owns its identifier; principal deltas remain inline.
+        // Guard against unintended record growth.
         let size = size_of::<CashFlow>();
-        assert!(size <= 104, "CashFlow grew to {size} bytes");
+        assert!(size <= 168, "CashFlow grew to {size} bytes");
     }
 
     #[test]
@@ -555,6 +600,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(cf.date, date);
         assert_eq!(cf.amount, amount);
@@ -594,6 +640,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(princ.kind, CFKind::Notional);
         assert!(princ.validate().is_ok());
@@ -606,6 +653,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(fee.kind, CFKind::Fee);
         assert!(fee.validate().is_ok());
@@ -618,6 +666,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(pik.kind, CFKind::Pik);
         assert!(pik.validate().is_ok());
@@ -630,6 +679,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());
@@ -645,6 +695,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert!(zero_cf.validate().is_ok());
     }
@@ -733,6 +784,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(im_post.kind, CFKind::InitialMarginPost);
         assert!(im_post.validate().is_ok());
@@ -746,6 +798,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(im_return.kind, CFKind::InitialMarginReturn);
         assert!(im_return.validate().is_ok());
@@ -759,6 +812,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(vm_receive.kind, CFKind::VariationMarginReceive);
         assert!(vm_receive.validate().is_ok());
@@ -772,6 +826,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(vm_pay.kind, CFKind::VariationMarginPay);
         assert!(vm_pay.validate().is_ok());
@@ -785,6 +840,7 @@ mod tests {
             accrual_factor: 0.25,
             rate: Some(0.05),
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(margin_int.kind, CFKind::MarginInterest);
         assert!(margin_int.validate().is_ok());
@@ -798,6 +854,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(sub_in.kind, CFKind::CollateralSubstitutionIn);
         assert!(sub_in.validate().is_ok());
@@ -811,6 +868,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
+            principal_delta: None,
         };
         assert_eq!(sub_out.kind, CFKind::CollateralSubstitutionOut);
         assert!(sub_out.validate().is_ok());

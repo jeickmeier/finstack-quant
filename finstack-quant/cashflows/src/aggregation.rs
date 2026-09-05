@@ -717,7 +717,11 @@ pub(crate) fn credit_adjusted_period_pv(
             CFKind::Amortization
             | CFKind::Notional
             | CFKind::PrePayment
-            | CFKind::RevolvingRepayment => r * (1.0 - sp),
+            | CFKind::RevolvingRepayment
+                if cf.amount.amount() > 0.0 =>
+            {
+                r * (1.0 - sp)
+            }
             _ => 0.0,
         }
     } else {
@@ -1790,7 +1794,12 @@ mod credit_pv_tests {
             flow(d(2025, 9, 1), 10_000.0, CFKind::Fee),
             flow(d(2025, 11, 1), 25_000.0, CFKind::Recovery),
         ];
-        let unsorted = vec![sorted[2], sorted[0], sorted[3], sorted[1]];
+        let unsorted = vec![
+            sorted[2].clone(),
+            sorted[0].clone(),
+            sorted[3].clone(),
+            sorted[1].clone(),
+        ];
 
         let sorted_result = pv_by_period_credit_adjusted_detailed_with_timing(
             &sorted,

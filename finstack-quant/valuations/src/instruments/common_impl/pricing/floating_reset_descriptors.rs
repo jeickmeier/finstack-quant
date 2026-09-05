@@ -126,7 +126,7 @@ pub(crate) fn build_node_coupons(
         if !future_reset {
             continue;
         }
-        let Some(accrual) = cf.accrual else {
+        let Some(accrual) = &cf.accrual else {
             continue;
         };
         // Fallback-projected coupons (SpreadOnly / FixedRate) carry no
