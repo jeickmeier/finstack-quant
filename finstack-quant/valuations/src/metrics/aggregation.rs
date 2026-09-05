@@ -67,7 +67,6 @@ pub fn metric_aggregation(metric_id: &MetricId) -> MetricAggregation {
         | "cross_gamma_fx_vol"
         | "cross_gamma_fx_rates"
         | "cross_gamma_credit_vol"
-        | "hazard_cs01"
         | "index_delta"
         | "fx_delta"
         | "foreign_rho"

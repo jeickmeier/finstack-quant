@@ -1,5 +1,0 @@
-output,input,window,unit
-performance,"3.1 native marks, trades, payments and external flows",2025-01-15 to 2025-10-15,decimal return; USD ledger
-attribution,3.4 native factor revaluation,2025-01-16 to 2025-02-16,USD P&L
-proxy risk,3.2/4.4 synthetic covariance method; current quantities,504 synthetic daily observations,USD model loss
-current holdings/stress,native pricing at report date; USD-OIS zero +100 bp,2025-10-15,USD PV/P&L
