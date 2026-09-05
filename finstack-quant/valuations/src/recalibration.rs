@@ -123,6 +123,11 @@ pub enum HazardRecalibrationAction {
     },
     /// Replay the stored spread-risk center without a shock.
     SpreadRiskCenterReplay,
+    /// Derive horizon-date par quotes from conditional survival on the rolled
+    /// target market and calibrate a fresh recipe with surviving dated pillars.
+    /// The source recipe is verified before rolling; expired quotes are removed.
+    /// Deal-level quote overrides are rejected for this action.
+    TimeRollReplay,
     /// Replay unchanged quotes against the target dependency market.
     DependencyMarketReplay,
     /// Replay unchanged quotes under a new recovery assumption.

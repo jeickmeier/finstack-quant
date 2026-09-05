@@ -406,7 +406,7 @@ impl HorizonResult {
     /// Total return as a decimal fraction (e.g. `0.05` = 5%).
     ///
     /// Computed as `total_pnl / initial_value`. Returns:
-    /// - `0.0` when `initial_value` is zero (to avoid division by zero),
+    /// - [`f64::NAN`] when `initial_value` is zero (return requires a positive capital base),
     /// - [`f64::NAN`] when `initial_value` and `total_pnl` are denominated in
     ///   different currencies. Multi-currency results require an explicit
     ///   base-currency conversion policy that this helper does not apply, and
@@ -420,11 +420,8 @@ impl HorizonResult {
             return f64::NAN;
         }
         let iv = self.initial_value.amount();
-        if iv < 0.0 {
+        if iv <= 0.0 {
             return f64::NAN;
-        }
-        if iv == 0.0 {
-            return 0.0;
         }
         self.attribution.total_pnl.amount() / iv
     }
@@ -456,10 +453,13 @@ impl HorizonResult {
 
     /// A single factor's P&L as a fraction of initial value.
     ///
-    /// Returns `0.0` if initial value is zero, and [`f64::NAN`] if the factor
+    /// Returns [`f64::NAN`] if initial value is zero or the factor
     /// P&L currency does not match the initial value currency or if initial
     /// value is negative (see [`total_return`](Self::total_return) for
     /// why a negative denominator is rejected rather than divided through).
+    ///
+    /// # Arguments
+    /// * `factor` - Attribution component whose P&L is divided by positive initial value.
     pub fn factor_contribution(&self, factor: &AttributionFactor) -> f64 {
         let factor_money = match factor {
             AttributionFactor::Carry => &self.attribution.carry,
@@ -476,11 +476,8 @@ impl HorizonResult {
             return f64::NAN;
         }
         let iv = self.initial_value.amount();
-        if iv < 0.0 {
+        if iv <= 0.0 {
             return f64::NAN;
-        }
-        if iv == 0.0 {
-            return 0.0;
         }
         factor_money.amount() / iv
     }
@@ -880,6 +877,18 @@ mod tests {
         assert!(gain_on_liability
             .factor_contribution(&AttributionFactor::Carry)
             .is_nan());
+    }
+
+    #[test]
+    fn zero_initial_value_has_undefined_return_even_with_pnl() {
+        for pnl in [0.0, 5.0, -5.0] {
+            let result = synthetic_result(Currency::USD, 0.0, Currency::USD, pnl, 30);
+            assert!(result.total_return().is_nan());
+            assert!(result
+                .factor_contribution(&AttributionFactor::Carry)
+                .is_nan());
+            assert!(result.annualized_return().is_none());
+        }
     }
 
     /// An unknown calendar identifier must fail loudly at compute time rather

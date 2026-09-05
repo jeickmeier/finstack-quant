@@ -25,7 +25,8 @@ use super::kinds::PyCompounding;
 ///     ``Compounding.continuous()``. The extracted rate is a decimal
 ///     annualized rate; only the compounding basis changes.
 /// day_count : DayCount, optional
-///     Typed day-count override. ``None`` uses the curve's native day count.
+///     Output quote day count. ``None`` uses the curve's native day count.
+///     Maturity dates and curve-implied accumulation factors are preserved.
 ///
 /// Raises
 /// ------

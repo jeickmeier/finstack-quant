@@ -183,8 +183,7 @@ impl PyHorizonResult {
     /// Total return as a decimal fraction (``0.05`` = +5%).
     ///
     /// ``nan`` when the initial value and total P&L are in different
-    /// currencies or the initial value is negative; ``0.0`` when the initial
-    /// value is zero.
+    /// currencies or the initial value is zero or negative.
     #[getter]
     fn total_return(&self) -> f64 {
         self.inner.total_return()

@@ -253,9 +253,9 @@ impl PyApplicationReport {
 /// Result of applying a scenario: the mutated market, the mutated model (when
 /// one was supplied), and the application report.
 ///
-/// Instruments passed to ``apply_scenario*`` are mutated in place by the Rust
-/// engine but are not returned; ``report.changes`` and
-/// ``report.carry_to_dataframe()`` describe what happened to them.
+/// The input objects are copied. ``instruments`` returns the shocked copies as
+/// canonical envelope JSON strings, accepted by subsequent scenario calls and
+/// instrument ``from_json`` constructors.
 #[pyclass(
     name = "ApplicationResult",
     module = "finstack_quant.scenarios",
@@ -266,6 +266,7 @@ pub struct PyApplicationResult {
     market: finstack_quant_core::market_data::context::MarketContext,
     model: Option<finstack_quant_statements::FinancialModelSpec>,
     report: ApplicationReport,
+    instruments: Option<Vec<Box<dyn Instrument>>>,
 }
 
 #[pymethods]
@@ -282,6 +283,35 @@ impl PyApplicationResult {
         self.model.as_ref().map(|inner| PyFinancialModelSpec {
             inner: inner.clone(),
         })
+    }
+
+    /// Shocked instrument copies as canonical envelope JSON strings in input
+    /// order, or ``None`` when no inventory was supplied. Raises ``ValueError``
+    /// if an instrument cannot be serialized.
+    #[getter]
+    fn instruments(&self) -> PyResult<Option<Vec<String>>> {
+        self.instruments
+            .as_ref()
+            .map(|inventory| {
+                inventory
+                    .iter()
+                    .map(|instrument| {
+                        let payload = instrument.to_instrument_json().ok_or_else(|| {
+                            value_error(format!(
+                                "Instrument '{}' does not support canonical serialization",
+                                instrument.id()
+                            ))
+                        })?;
+                        serde_json::to_string(
+                            &finstack_quant_valuations::instruments::InstrumentEnvelope::new(
+                                payload,
+                            ),
+                        )
+                        .map_err(display_to_py)
+                    })
+                    .collect()
+            })
+            .transpose()
     }
 
     /// What the scenario changed.
@@ -305,6 +335,7 @@ impl PyApplicationResult {
             self.report.clone(),
             &self.market,
             self.model.as_ref(),
+            self.instruments.as_deref(),
         )
         .map_err(display_to_py)?;
         serde_json::to_string(&envelope).map_err(display_to_py)
@@ -315,7 +346,15 @@ impl PyApplicationResult {
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
         let envelope: ApplicationEnvelope = serde_json::from_str(json).map_err(display_to_py)?;
-        let (market, model, report) = envelope.into_parts();
+        let (market, model, instruments, report) = envelope.into_parts();
+        let instruments = instruments
+            .map(|items| {
+                items
+                    .into_iter()
+                    .map(|envelope| envelope.into_boxed().map_err(crate::errors::core_to_py))
+                    .collect::<PyResult<Vec<_>>>()
+            })
+            .transpose()?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             serde_json::from_value(market).map_err(display_to_py)?;
         let model: Option<finstack_quant_statements::FinancialModelSpec> = model
@@ -326,6 +365,7 @@ impl PyApplicationResult {
             market,
             model,
             report,
+            instruments,
         })
     }
 
@@ -403,7 +443,7 @@ fn require_instruments(
 ///     Typed instruments (``Bond``, ``CreditDefaultSwap``, ...) or canonical
 ///     instrument-envelope JSON strings. Required when the scenario contains
 ///     instrument-scoped operations; also used for carry when the scenario
-///     contains ``time_roll_forward``. Mutations are not returned.
+///     contains ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
 /// config : FinstackConfig | str | None, default None
 ///     Library configuration (rounding policy stamped into ``report.meta``).
 ///     ``None`` uses the library default.
@@ -411,7 +451,7 @@ fn require_instruments(
 /// Returns
 /// -------
 /// ApplicationResult
-///     Typed result exposing ``market``, ``model`` and ``report``.
+///     Typed result exposing ``market``, ``model``, ``instruments`` and ``report``.
 ///
 /// Raises
 /// ------
@@ -462,6 +502,7 @@ fn apply_scenario(
         market,
         model: Some(model),
         report,
+        instruments,
     })
 }
 
@@ -478,7 +519,7 @@ fn apply_scenario(
 /// instruments : list[Instrument | str] | None, default None
 ///     Typed instruments or canonical envelope JSON strings; required for
 ///     instrument-scoped operations, used for carry under
-///     ``time_roll_forward``. Mutations are not returned.
+///     ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
 /// config : FinstackConfig | str | None, default None
 ///     Library configuration; ``None`` uses the default.
 ///
@@ -542,6 +583,7 @@ fn apply_scenario_to_market(
         market,
         model: None,
         report,
+        instruments,
     })
 }
 

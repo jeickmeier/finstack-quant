@@ -76,6 +76,19 @@ pub fn apply_time_roll_forward(
     period_str: &str,
     mode: TimeRollMode,
 ) -> Result<RollForwardReport> {
+    apply_time_roll_forward_with_credit(ctx, period_str, mode, &[], None)
+}
+
+pub(crate) fn apply_time_roll_forward_with_credit(
+    ctx: &mut ExecutionContext,
+    period_str: &str,
+    mode: TimeRollMode,
+    hazard_rolls: &[(
+        finstack_quant_core::types::CurveId,
+        finstack_quant_core::types::CurveId,
+    )],
+    provider: Option<&dyn finstack_quant_valuations::recalibration::RecalibrationProvider>,
+) -> Result<RollForwardReport> {
     use crate::error::Error;
 
     let old_date = ctx.as_of;
@@ -127,7 +140,28 @@ pub fn apply_time_roll_forward(
     // curves preserve hazard rates, forward curves preserve forwards,
     // inflation rebases CPI, price/vol-index curves set spot to the old
     // forward). Vol surfaces, FX spot, and fixings stay static.
-    let rolled_market = ctx.market.roll_forward(day_shift)?;
+    let mut rolled_market = ctx.market.roll_forward(day_shift)?;
+    for (hazard_id, discount_id) in hazard_rolls {
+        use finstack_quant_valuations::recalibration::{
+            HazardRecalibrationAction, HazardRecalibrationRequest,
+        };
+        let provider = provider.ok_or_else(|| {
+            Error::Core(finstack_quant_valuations::recalibration::provider_missing(
+                "hazard_horizon_replay",
+            ))
+        })?;
+        let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+            hazard: ctx.market.get_hazard(hazard_id)?,
+            source_market: std::sync::Arc::new(ctx.market.clone()),
+            target_market: std::sync::Arc::new(rolled_market.clone()),
+            discount_curve_id: discount_id.clone(),
+            doc_clause: None,
+            cds_valuation_convention: None,
+            deal_quote_override: None,
+            action: HazardRecalibrationAction::TimeRollReplay,
+        })?;
+        rolled_market = rolled_market.insert(rebuilt.as_ref().clone());
+    }
 
     // Carry uses PV(t0) and cashflows on the pre-roll market, and PV(t1) on
     // the rolled market — the same realized-forward theta as valuations.
@@ -178,7 +212,7 @@ type InstrumentPnlResult = (
 ///
 /// # Failure handling
 ///
-/// If either the start-date or end-date valuation returns an error, the
+/// If either endpoint valuation or cashflow collection returns an error, the
 /// instrument is recorded in the `failed_instruments` return slot with the
 /// underlying error message and is *excluded* from `instrument_carry` /
 /// `total_carry`. This prevents partial cashflow-only carry lines from
@@ -249,7 +283,13 @@ fn one_instrument_pnl(
             return InstrumentPnlRow::Failed(inst_id, format!("pv diff failed: {err}"));
         }
     }
-    for (ccy, flow) in collect_instrument_cashflows(instrument, market, old_date, new_date) {
+    let flows = match collect_instrument_cashflows(instrument, market, old_date, new_date) {
+        Ok(flows) => flows,
+        Err(err) => {
+            return InstrumentPnlRow::Failed(inst_id, format!("cashflow collection failed: {err}"))
+        }
+    };
+    for (ccy, flow) in flows {
         carry_by_currency
             .entry(ccy)
             .and_modify(|m| *m += flow)
@@ -328,10 +368,11 @@ fn collect_instrument_cashflows(
     market: &finstack_quant_core::market_data::context::MarketContext,
     start_date: finstack_quant_core::dates::Date,
     end_date: finstack_quant_core::dates::Date,
-) -> IndexMap<Currency, Money> {
+) -> Result<IndexMap<Currency, Money>> {
     let mut result: IndexMap<Currency, Money> = IndexMap::new();
 
-    if let Ok(flows) = instrument.dated_cashflows(market, start_date) {
+    {
+        let flows = instrument.dated_cashflows(market, start_date)?;
         for (date, money) in flows.into_iter() {
             if date > start_date && date <= end_date {
                 let ccy = money.currency();
@@ -343,7 +384,7 @@ fn collect_instrument_cashflows(
         }
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -362,6 +403,78 @@ mod tests {
     use finstack_quant_valuations::metrics::MetricId;
     use time::macros::date;
     use time::Month;
+
+    #[derive(Clone)]
+    struct MissingCashflows(Attributes);
+
+    impl finstack_quant_cashflows::CashflowScheduleSource for MissingCashflows {
+        fn raw_cashflow_schedule(
+            &self,
+            _: &MarketContext,
+            _: Date,
+        ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule>
+        {
+            Err(finstack_quant_core::Error::Validation(
+                "missing fixing for coupon".into(),
+            ))
+        }
+    }
+
+    impl Instrument for MissingCashflows {
+        fn id(&self) -> &str {
+            "missing-cashflows"
+        }
+        fn key(&self) -> finstack_quant_valuations::pricer::InstrumentType {
+            finstack_quant_valuations::pricer::InstrumentType::Bond
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+        fn attributes(&self) -> &Attributes {
+            &self.0
+        }
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.0
+        }
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+        fn base_value(&self, _: &MarketContext, _: Date) -> finstack_quant_core::Result<Money> {
+            Money::new(100.0, Currency::USD)
+        }
+        fn market_dependencies(
+            &self,
+        ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
+        {
+            Ok(Default::default())
+        }
+    }
+
+    #[test]
+    fn cashflow_failure_excludes_instrument_from_carry() {
+        let mut market = MarketContext::new();
+        let mut instruments: Vec<Box<dyn Instrument>> =
+            vec![Box::new(MissingCashflows(Attributes::new()))];
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: Some(&mut instruments),
+            rate_bindings: None,
+            calendar: None,
+            as_of: date!(2025 - 01 - 01),
+        };
+        let report =
+            apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays).expect("roll");
+        assert!(report.instrument_carry.is_empty());
+        assert!(report.total_carry.is_empty());
+        assert_eq!(report.failed_instruments.len(), 1);
+        assert!(report.failed_instruments[0]
+            .1
+            .contains("cashflow collection failed:"));
+    }
 
     #[test]
     fn roll_forward_report_keeps_only_live_fields() {

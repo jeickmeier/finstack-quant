@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::FinancialModelSpec;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
 use indexmap::IndexMap;
 
@@ -78,6 +78,13 @@ pub(crate) struct HazardApplyEnv<'a> {
     pub mode: HazardBumpMode,
     /// Quote-recalibration service shared by this immutable scenario batch.
     pub provider: Option<&'a dyn RecalibrationProvider>,
+    /// Dependency snapshots against which each current hazard recipe was calibrated.
+    pub source_markets: Option<
+        &'a IndexMap<
+            CurveId,
+            std::sync::Arc<finstack_quant_core::market_data::context::MarketContext>,
+        >,
+    >,
 }
 
 /// A concrete market-data target changed while applying a scenario.
@@ -285,6 +292,10 @@ pub struct ApplicationEnvelope {
     /// Mutated financial model, when a model was supplied.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<serde_json::Value>,
+    /// Mutated instruments in input order, encoded as canonical envelopes.
+    /// Absent when no inventory was supplied; an empty inventory stays empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instruments: Option<Vec<InstrumentEnvelope>>,
     /// Number of effects successfully applied.
     pub operations_applied: usize,
     /// Number of user-provided operations before expansion.
@@ -317,14 +328,36 @@ impl ApplicationEnvelope {
     ///   manifest are copied into the envelope.
     /// * `market` - Mutated market context.
     /// * `model` - Optional mutated statement model when present.
+    /// * `instruments` - Optional mutated inventory in input order. Every
+    ///   instrument must support its canonical JSON serializer; unsupported
+    ///   custom instruments return a serialization error.
     pub fn from_contexts(
         report: ApplicationReport,
         market: &finstack_quant_core::market_data::context::MarketContext,
         model: Option<&finstack_quant_statements::FinancialModelSpec>,
+        instruments: Option<&[Box<dyn Instrument>]>,
     ) -> serde_json::Result<Self> {
         Ok(Self {
             market: serde_json::to_value(market)?,
             model: model.map(serde_json::to_value).transpose()?,
+            instruments: instruments
+                .map(|inventory| {
+                    inventory
+                        .iter()
+                        .map(|instrument| {
+                            instrument
+                                .to_instrument_json()
+                                .map(InstrumentEnvelope::new)
+                                .ok_or_else(|| {
+                                    <serde_json::Error as serde::ser::Error>::custom(format!(
+                                        "Instrument '{}' does not support canonical serialization",
+                                        instrument.id()
+                                    ))
+                                })
+                        })
+                        .collect::<serde_json::Result<Vec<_>>>()
+                })
+                .transpose()?,
             operations_applied: report.operations_applied,
             user_operations: report.user_operations,
             expanded_operations: report.expanded_operations,
@@ -335,7 +368,7 @@ impl ApplicationEnvelope {
         })
     }
 
-    /// Split the envelope into its market JSON, optional model JSON, and the
+    /// Split the envelope into its market JSON, optional model JSON, instrument envelopes, and the
     /// [`ApplicationReport`] it was built from.
     ///
     /// This is the inverse of [`from_contexts`](Self::from_contexts) minus the
@@ -347,6 +380,7 @@ impl ApplicationEnvelope {
     ) -> (
         serde_json::Value,
         Option<serde_json::Value>,
+        Option<Vec<InstrumentEnvelope>>,
         ApplicationReport,
     ) {
         let report = ApplicationReport {
@@ -358,6 +392,6 @@ impl ApplicationEnvelope {
             meta: self.meta,
             time_roll: self.time_roll,
         };
-        (self.market, self.model, report)
+        (self.market, self.model, self.instruments, report)
     }
 }

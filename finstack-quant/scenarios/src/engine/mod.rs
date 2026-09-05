@@ -240,11 +240,6 @@ impl ScenarioEngine {
         // call this entry point without their own validation pass.
         spec.validate()?;
 
-        let env = HazardApplyEnv {
-            mode: spec.hazard_bump_mode,
-            provider: self.recalibration_provider.as_deref(),
-        };
-
         let mut applied = 0;
         let mut warnings: Vec<Warning> = Vec::new();
         let initial_as_of = ctx.as_of;
@@ -275,8 +270,41 @@ impl ScenarioEngine {
             } = op
             {
                 let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
-                let roll_report =
-                    crate::adapters::time_roll::apply_time_roll_forward(ctx, period, *roll_mode)?;
+                let mut hazard_rolls = Vec::new();
+                if *apply_shocks && spec.hazard_bump_mode == crate::HazardBumpMode::SolveToPar {
+                    for operation in expanded_ops.iter() {
+                        if let OperationSpec::CurveParallelBp {
+                            curve_kind: crate::CurveKind::ParCDS,
+                            curve_id,
+                            discount_curve_id,
+                            ..
+                        }
+                        | OperationSpec::CurveNodeBp {
+                            curve_kind: crate::CurveKind::ParCDS,
+                            curve_id,
+                            discount_curve_id,
+                            ..
+                        } = operation
+                        {
+                            if !hazard_rolls.iter().any(|(id, _)| id == curve_id) {
+                                let (discount_id, _) =
+                                    crate::adapters::curves::resolve_discount_curve_id(
+                                        ctx.market,
+                                        discount_curve_id.as_ref(),
+                                        Some(curve_id),
+                                    )?;
+                                hazard_rolls.push((curve_id.clone(), discount_id));
+                            }
+                        }
+                    }
+                }
+                let roll_report = crate::adapters::time_roll::apply_time_roll_forward_with_credit(
+                    ctx,
+                    period,
+                    *roll_mode,
+                    &hazard_rolls,
+                    self.recalibration_provider.as_deref(),
+                )?;
                 applied += 1;
 
                 // Valuation failures during the roll must not vanish: surface
@@ -312,6 +340,22 @@ impl ScenarioEngine {
         let mut deferred_stmts = Vec::new();
         let mut pending_bumps: Vec<MarketBump> = Vec::new();
 
+        // A direct rate bump changes replay dependencies without changing the
+        // hazard curve. Retain the calibration market for each hazard until
+        // that curve itself is rebuilt, including after a horizon requote.
+        let initial_market = Arc::new(ctx.market.clone());
+        let mut hazard_sources: indexmap::IndexMap<_, _> = ctx
+            .market
+            .iter_curves()
+            .filter(|(_, curve)| {
+                matches!(
+                    curve,
+                    finstack_quant_core::market_data::context::CurveStorage::Hazard(_)
+                )
+            })
+            .map(|(id, _)| (id.clone(), Arc::clone(&initial_market)))
+            .collect();
+
         // Phase 1: Generate effects and split into market bumps (intra-op
         // batched), curve replacements, instrument shocks, and deferred
         // statement ops. Bumps from the previous iteration are flushed before
@@ -342,18 +386,39 @@ impl ScenarioEngine {
                 // adapter's `ctx.market` reads reflect everything done so far.
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
 
+                let env = HazardApplyEnv {
+                    mode: spec.hazard_bump_mode,
+                    provider: self.recalibration_provider.as_deref(),
+                    source_markets: Some(&hazard_sources),
+                };
                 let run_len = independent_replace_curve_run_len(&expanded_ops[idx..]);
                 let run = &expanded_ops[idx..idx + run_len];
-                if should_parallel_replace_curves(run) {
+                let processed = if should_parallel_replace_curves(run) {
                     let batches = generate_replace_curve_effects_parallel(run, ctx, &env)?;
                     for (op, effects) in run.iter().zip(batches) {
                         apply_generated_effects(op, effects, ctx, &mut sink)?;
                     }
-                    idx += run_len;
+                    run_len
                 } else {
                     process_effects(&expanded_ops[idx], ctx, &env, &mut sink)?;
-                    idx += 1;
+                    1
+                };
+                for op in &expanded_ops[idx..idx + processed] {
+                    if let OperationSpec::CurveParallelBp {
+                        curve_kind: crate::CurveKind::ParCDS,
+                        curve_id,
+                        ..
+                    }
+                    | OperationSpec::CurveNodeBp {
+                        curve_kind: crate::CurveKind::ParCDS,
+                        curve_id,
+                        ..
+                    } = op
+                    {
+                        hazard_sources.insert(curve_id.clone(), Arc::new(ctx.market.clone()));
+                    }
                 }
+                idx += processed;
             }
 
             // Flush any remaining bumps before moving on to statements.

@@ -413,3 +413,68 @@ fn extrapolation_warning_includes_both_bounds_and_curve_id() {
     assert!(warning.contains("10.00Y"), "max bound missing: {warning}");
     assert!(warning.contains("USD-OIS"), "curve id missing: {warning}");
 }
+
+#[test]
+fn interpolate_delivers_overlapping_tenors_and_exact_pillars_together() {
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    for nodes in [
+        vec![("2Y", 100.0), ("4Y", 200.0)],
+        vec![("2Y", 100.0), ("3Y", 150.0), ("4Y", 200.0)],
+    ] {
+        let curve = ForwardCurve::builder("FWD", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::Linear)
+            .knots([(1.0, 0.04), (3.0, 0.04), (5.0, 0.04)])
+            .build()
+            .unwrap();
+        let mut market = MarketContext::new().insert(curve);
+        let spec = regression_scenario(
+            "overlapping",
+            vec![OperationSpec::CurveNodeBp {
+                curve_kind: CurveKind::Forward,
+                curve_id: "FWD".into(),
+                discount_curve_id: None,
+                nodes: nodes
+                    .iter()
+                    .map(|(tenor, bp)| (tenor.to_string(), *bp))
+                    .collect(),
+                match_mode: TenorMatchMode::Interpolate,
+            }],
+        );
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base,
+        };
+        ScenarioEngine::new().apply(&spec, &mut ctx).unwrap();
+        let shocked = market.get_forward("FWD").unwrap();
+        for (tenor, bp) in nodes {
+            let t = Tenor::parse(tenor)
+                .unwrap()
+                .to_years_with_context(
+                    base,
+                    None,
+                    BusinessDayConvention::Unadjusted,
+                    DayCount::Act365F,
+                )
+                .unwrap();
+            let t = if tenor == "3Y" { 3.0 } else { t };
+            assert!((shocked.rate(t) - 0.04 - bp * 1e-4).abs() < 1e-12);
+        }
+    }
+}
+
+fn regression_scenario(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
+    ScenarioSpec {
+        id: id.into(),
+        operations,
+        ..Default::default()
+    }
+}

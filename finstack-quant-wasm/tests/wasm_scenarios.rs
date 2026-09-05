@@ -49,7 +49,7 @@ fn apply_scenario_empty_spec() {
     let scenario = built_scenario_json(None);
     let market = empty_market_json();
     let model = empty_model_json();
-    let result = apply_scenario(&scenario, &market, &model, "2024-01-15").unwrap();
+    let result = apply_scenario(&scenario, &market, &model, "2024-01-15", None).unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     // `market`/`model` are nested objects now, not serialized strings: the
     // envelope used to hand back JSON-inside-JSON.
@@ -65,7 +65,7 @@ fn apply_scenario_empty_spec() {
 fn apply_scenario_to_market_empty_spec() {
     let scenario = built_scenario_json(None);
     let market = empty_market_json();
-    let result = apply_scenario_to_market(&scenario, &market, "2024-06-01").unwrap();
+    let result = apply_scenario_to_market(&scenario, &market, "2024-06-01", None).unwrap();
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     assert!(
         obj["market"].is_object(),
@@ -127,4 +127,59 @@ fn compose_scenarios_rejects_mixed_hazard_bump_modes_as_javascript_error() {
             && message.contains("solve_to_par"),
         "unexpected error: {message}"
     );
+}
+
+#[wasm_bindgen_test]
+fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
+    use finstack_quant_scenarios::{InstrumentType, OperationSpec, ScenarioSpec};
+    use finstack_quant_valuations::instruments::{Bond, Instrument, InstrumentEnvelope};
+    let bond = Bond::example().unwrap();
+    let inventory = serde_json::to_string(&vec![InstrumentEnvelope::new(
+        bond.to_instrument_json().unwrap(),
+    )])
+    .unwrap();
+    let scenario = ScenarioSpec {
+        id: "price".into(),
+        operations: vec![
+            OperationSpec::InstrumentPricePctByType {
+                instrument_types: vec![InstrumentType::Bond],
+                pct: -60.0,
+            },
+            OperationSpec::InstrumentPricePctByType {
+                instrument_types: vec![InstrumentType::Bond],
+                pct: -60.0,
+            },
+        ],
+        ..Default::default()
+    };
+    let scenario = serde_json::to_string(&scenario).unwrap();
+    assert!(apply_scenario_to_market(&scenario, &empty_market_json(), "2025-01-15", None).is_err());
+    for with_model in [false, true] {
+        let result = if with_model {
+            apply_scenario(
+                &scenario,
+                &empty_market_json(),
+                &empty_model_json(),
+                "2025-01-15",
+                Some(inventory.clone()),
+            )
+        } else {
+            apply_scenario_to_market(
+                &scenario,
+                &empty_market_json(),
+                "2025-01-15",
+                Some(inventory.clone()),
+            )
+        }
+        .unwrap();
+        let result: finstack_quant_scenarios::ApplicationEnvelope =
+            serde_wasm_bindgen::from_value(result).unwrap();
+        let returned = result.instruments.unwrap().remove(0).into_boxed().unwrap();
+        let shock = returned
+            .get_scenario_pricing_overrides()
+            .unwrap()
+            .scenario_price_shock_pct
+            .unwrap();
+        assert!((100.0 * (1.0 + shock) - 16.0).abs() < 1e-12);
+    }
 }

@@ -238,6 +238,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   Unsuffixed builders, composers, and template helpers return structured specs;
   JSON remains explicit through Python `to_json`/`from_json` or JSON-named inputs.
 
+Python `ApplicationResult.instruments` returns shocked copies as canonical
+instrument-envelope JSON strings in input order. WASM accepts the optional
+`instrumentsJson` array and returns the same envelopes as objects in
+`result.instruments`. Both hosts require an inventory for instrument shocks;
+input objects remain unchanged. JSON and Python pickle round trips retain the
+returned inventory.
+
+Sequential percentage price shocks compound; spread shocks add in basis points.
+Forecast operations and rate bindings preserve actual periods. Rate-binding day
+count changes the output quote basis while retaining the curve-implied
+accumulation factor at the same dates. Returns on zero or negative initial value
+are undefined (`NaN`); annualized return is absent.
+
+A combined time-roll and solve-to-par credit scenario derives new horizon-date
+par quotes from conditional survival and calibrates a fresh replay recipe using
+surviving contractual maturities. Later rate and credit shocks validate against
+the appropriate source dependency snapshot. Carry excludes instruments whose
+endpoint valuation or cashflow collection fails and reports the reason.
+
 ## Schemas
 
 This crate owns [`schemas/scenarios/1/scenario.schema.json`](schemas/scenarios/1),

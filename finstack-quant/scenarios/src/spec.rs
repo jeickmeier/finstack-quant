@@ -1122,7 +1122,9 @@ pub struct RateBindingSpec {
     #[serde(default)]
     pub compounding: Compounding,
 
-    /// Day-count convention override. If `None`, uses the curve's convention.
+    /// Output quote day-count convention. If `None`, uses the curve's convention.
+    /// Changes the annualized rate while preserving maturity dates and the
+    /// curve-implied accumulation factor; native curve query times are unchanged.
     #[serde(default)]
     pub day_count: Option<DayCount>,
 }

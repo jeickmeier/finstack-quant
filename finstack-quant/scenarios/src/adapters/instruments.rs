@@ -19,20 +19,26 @@ pub(crate) struct InstrumentShockOutcome {
     pub(crate) warnings: Vec<Warning>,
 }
 
-fn accumulate_optional_shock(current: Option<f64>, delta: f64) -> f64 {
-    current.unwrap_or(0.0) + delta
+fn accumulate_optional_shock(current: Option<f64>, delta: f64, kind: ShockKind) -> f64 {
+    let current = current.unwrap_or(0.0);
+    match kind {
+        ShockKind::Price if current == 0.0 => delta,
+        ShockKind::Price => (1.0 + current) * (1.0 + delta) - 1.0,
+        ShockKind::Spread => current + delta,
+    }
 }
 
 /// Accumulate a shock into an instrument's metadata map.
-fn accumulate_meta_shock(attrs: &mut Attributes, key: &str, delta: f64) {
+fn accumulate_meta_shock(attrs: &mut Attributes, kind: ShockKind, delta: f64) {
     let current = attrs
         .meta
-        .get(key)
+        .get(kind.meta_key())
         .and_then(|value| value.parse::<f64>().ok())
         .unwrap_or(0.0);
-    attrs
-        .meta
-        .insert(key.to_string(), format!("{}", current + delta));
+    attrs.meta.insert(
+        kind.meta_key().to_string(),
+        accumulate_optional_shock(Some(current), delta, kind).to_string(),
+    );
 }
 
 fn instrument_label(attrs: &Attributes) -> String {
@@ -207,6 +213,7 @@ fn apply_shock_to_matching_instrument(
                 overrides.scenario_price_shock_pct = Some(accumulate_optional_shock(
                     overrides.scenario_price_shock_pct,
                     delta,
+                    kind,
                 ));
             } else {
                 record_fallback(instrument, kind, delta, warnings);
@@ -220,6 +227,7 @@ fn apply_shock_to_matching_instrument(
                         overrides.scenario_spread_shock_bp = Some(accumulate_optional_shock(
                             overrides.scenario_spread_shock_bp,
                             delta,
+                            kind,
                         ));
                     })
                     .is_some();
@@ -238,7 +246,7 @@ fn record_fallback(
 ) {
     let label = instrument_label(instrument.attributes());
     let instrument_type = instrument.key();
-    accumulate_meta_shock(instrument.attributes_mut(), kind.meta_key(), delta);
+    accumulate_meta_shock(instrument.attributes_mut(), kind, delta);
     warnings.push(Warning::InstrumentShockFallback {
         shock_kind: kind.label().to_string(),
         inst_type: instrument_type,
@@ -340,6 +348,30 @@ fn normalise_filters(attrs: &indexmap::IndexMap<String, String>) -> Vec<(String,
 mod tests {
     use super::*;
     use finstack_quant_valuations::instruments::CompositeInstrument;
+
+    #[test]
+    fn sequential_price_losses_compound_and_spreads_remain_additive() {
+        let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
+            finstack_quant_valuations::instruments::Bond::example().expect("bond"),
+        )];
+        for _ in 0..2 {
+            apply_instrument_type_price_shock(&mut instruments, &[InstrumentType::Bond], -60.0);
+            apply_instrument_type_spread_shock(&mut instruments, &[InstrumentType::Bond], 25.0);
+        }
+        let overrides = instruments[0]
+            .get_scenario_pricing_overrides()
+            .expect("overrides");
+        let shock = overrides.scenario_price_shock_pct.expect("price shock");
+        assert!((100.0 * (1.0 + shock) - 16.0).abs() < 1e-12);
+        assert_eq!(overrides.scenario_spread_shock_bp, Some(50.0));
+        let mut attrs = Attributes::new();
+        accumulate_meta_shock(&mut attrs, ShockKind::Price, -0.6);
+        accumulate_meta_shock(&mut attrs, ShockKind::Price, -0.6);
+        let stored: f64 = attrs.meta["scenario_price_shock_pct"]
+            .parse()
+            .expect("stored shock");
+        assert!((100.0 * (1.0 + stored) - 16.0).abs() < 1e-12);
+    }
 
     #[test]
     fn type_shock_descends_into_composite_without_rebalancing() {

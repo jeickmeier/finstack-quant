@@ -1,5 +1,5 @@
 use super::hazard::{
-    bump_hazard_spread_risk_input_cached, bump_hazard_spreads_cached, hazard_spread_risk_buckets,
+    bump_hazard_spread_risk_input_cached, hazard_spread_risk_buckets,
     hazard_with_deal_quote_override, recalibrate_hazard_with_recovery,
     replay_hazard_on_dependency_market, replay_hazard_spread_risk_center, HazardRecalibrationCache,
 };
@@ -90,16 +90,16 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
         let doc_clause = request.doc_clause;
         let convention = request.cds_valuation_convention;
         match &request.action {
+            HazardRecalibrationAction::TimeRollReplay => {
+                super::hazard::replay_hazard_at_horizon(request).map(Arc::new)
+            }
             HazardRecalibrationAction::SpreadBump(bump) => {
                 bump.validate()?;
-                bump_hazard_spreads_cached(
-                    Some(&self.hazard),
+                super::hazard::bump_hazard_on_target_market(
+                    &self.hazard,
+                    request,
                     hazard.as_ref(),
-                    request.target_market.as_ref(),
                     bump,
-                    discount_id,
-                    doc_clause,
-                    convention,
                 )
             }
             HazardRecalibrationAction::ExactQuoteIndexBump {

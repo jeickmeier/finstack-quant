@@ -10707,6 +10707,10 @@ export interface ScenarioApplyResult {
    */
   market: Record<string, unknown>;
   /**
+   * Shocked canonical instrument envelopes in input order; absent when no inventory was supplied.
+   */
+  instruments?: Record<string, unknown>[];
+  /**
    * Mutated financial model, as an object. Absent when no model was supplied.
    */
   model?: Record<string, unknown>;
@@ -10752,6 +10756,10 @@ export interface ScenarioApplyMarketResult {
    * Mutated market context, as an object.
    */
   market: Record<string, unknown>;
+  /**
+   * Shocked canonical instrument envelopes in input order; absent when no inventory was supplied.
+   */
+  instruments?: Record<string, unknown>[];
   /**
    * Count of effects successfully applied. One operation can produce zero,
    * one, or many effects; inspect `changes` and `warnings` for coverage.
@@ -10974,39 +10982,41 @@ export interface ScenariosNamespace {
    * absent), and `time_roll` (a `RollForwardReport`, only present when the
    * scenario contained a `time_roll_forward` operation).
    *
-   * This entry point supplies no instrument portfolio and no holiday calendar
-   * to the engine: instrument-scoped operations (`instrument_price_pct_by_*`,
-   * `instrument_spread_bp_by_*`, correlation shocks) are inert and produce a
-   * warning, and `time_roll_forward` in `business_days` mode adjusts without
-   * holiday information.
+   * Optional instrument envelopes are copied and returned in `instruments`, in
+   * input order. Instrument-scoped operations require an inventory. No holiday
+   * calendar is supplied; business-day rolls use weekends-only adjustment.
    * @returns Mutated market and optional model after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param modelJson - JSON-serialized FinancialModelSpec that scenario operations may mutate.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
    * @throws Error - Rejects malformed scenario, market, or model JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, statement-model execution failures, failure to encode the mutated contexts, or failure to serialize the application envelope to JavaScript.
    */
   applyScenario(
     scenarioJson: string,
     marketJson: string,
     modelJson: string,
-    asOf: string
+    asOf: string,
+    instrumentsJson?: string
   ): ScenarioApplyResult;
   /**
    * Apply a scenario to a market context only (no model mutations).
    *
    * Returns the same envelope shape as [`apply_scenario`] minus `model`;
-   * the same caveats apply (no instrument portfolio, no holiday calendar).
+   * the same inventory and calendar rules apply.
    * @returns Mutated market after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
    * @throws Error - Rejects malformed scenario or market JSON, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, failure to encode the mutated market, or failure to serialize the application envelope to JavaScript.
    */
   applyScenarioToMarket(
     scenarioJson: string,
     marketJson: string,
-    asOf: string
+    asOf: string,
+    instrumentsJson?: string
   ): ScenarioApplyMarketResult;
   /**
    * Compute horizon total return under a scenario.

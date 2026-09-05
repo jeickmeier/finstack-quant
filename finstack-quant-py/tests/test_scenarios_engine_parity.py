@@ -341,3 +341,56 @@ def test_rate_binding_spec_equality_and_validation() -> None:
         RateBindingSpec("rate", "USD-OIS", "soon").validate()
     with pytest.raises(ValueError, match="Compounding"):
         RateBindingSpec("rate", "USD-OIS", "1Y", compounding="hourly")
+
+
+@pytest.mark.parametrize("with_model", [False, True])
+def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) -> None:
+    from finstack_quant.scenarios import apply_scenario
+    from finstack_quant.valuations.instruments import Bond
+
+    original = Bond.example()
+    before = original.to_json()
+    scenario = ScenarioSpec("losses", [OperationSpec.instrument_price_pct_by_type(["bond"], -60.0)] * 2)
+    if with_model:
+        result = apply_scenario(
+            scenario,
+            _market(),
+            json.dumps({
+                "schema_version": 1,
+                "id": "m",
+                "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+                "nodes": {},
+            }),
+            AS_OF,
+            instruments=[original],
+        )
+    else:
+        result = apply_scenario_to_market(scenario, _market(), AS_OF, instruments=[original])
+    assert original.to_json() == before
+    for restored in [result, ApplicationResult.from_json(result.to_json()), pickle.loads(pickle.dumps(result))]:  # noqa: S301 - own serialized result
+        assert restored.instruments is not None
+        assert len(restored.instruments) == 1
+        payload = json.loads(restored.instruments[0])
+        shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_pct"]
+        assert 100.0 * (1.0 + shock) == pytest.approx(16.0)
+        # Returned copies can be used directly in another scenario call.
+        next_result = apply_scenario_to_market(
+            ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
+            _market(),
+            AS_OF,
+            instruments=restored.instruments,
+        )
+        assert next_result.instruments is not None
+        next_shock = json.loads(next_result.instruments[0])["instrument"]["spec"]["scenario_pricing_overrides"][
+            "scenario_price_shock_pct"
+        ]
+        assert 100.0 * (1.0 + next_shock) == pytest.approx(8.0)
+    assert "instruments" in json.loads(result.to_json())
+
+
+def test_empty_inventory_is_distinct_from_absent_inventory() -> None:
+    spec = ScenarioSpec("empty", [])
+    assert apply_scenario_to_market(spec, _market(), AS_OF).instruments is None
+    result = apply_scenario_to_market(spec, _market(), AS_OF, instruments=[])
+    assert result.instruments == []
+    assert ApplicationResult.from_json(result.to_json()).instruments == []

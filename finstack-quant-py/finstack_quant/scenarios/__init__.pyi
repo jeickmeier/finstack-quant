@@ -1093,6 +1093,25 @@ class ApplicationResult:
         ...
 
     @property
+    def instruments(self) -> list[str] | None:
+        """Shocked copies of the supplied instrument inventory.
+
+        Returns
+        -------
+        list[str] or None
+            Canonical instrument-envelope JSON strings in input order, accepted
+            by subsequent scenario calls and instrument ``from_json`` constructors.
+            ``None`` means no inventory was supplied; an empty list stays empty.
+            The original Python objects are never mutated.
+
+        Raises
+        ------
+        ValueError
+            If an instrument cannot be serialized to its canonical envelope.
+        """
+        ...
+
+    @property
     def report(self) -> ApplicationReport:
         """
         What the scenario changed.
@@ -1211,8 +1230,8 @@ def apply_scenario(
         Typed instruments (``Bond``, ``CreditDefaultSwap``, ...) or canonical
         instrument-envelope JSON strings. Required when the scenario contains
         instrument-scoped operations; also used for carry under
-        ``time_roll_forward``. Mutations are not returned; inspect
-        ``report.changes`` and ``report.carry_to_dataframe()``.
+        ``time_roll_forward``. Shocked copies are returned as canonical envelope JSON strings in
+        ``ApplicationResult.instruments``.
     config : FinstackConfig | str | None, default None
         Library configuration (rounding policy stamped into ``report.meta``);
         ``None`` uses the library default.
@@ -1277,7 +1296,7 @@ def apply_scenario_to_market(
     instruments : Sequence[Instrument | str] | None, default None
         Typed instruments or canonical envelope JSON strings; required for
         instrument-scoped operations, used for carry under
-        ``time_roll_forward``. Mutations are not returned.
+        ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
     config : FinstackConfig | str | None, default None
         Library configuration; ``None`` uses the default.
 
@@ -1437,7 +1456,7 @@ class HorizonResult:
         float
             ``total_pnl / initial_value``; ``nan`` when the initial value and
             total P&L are in different currencies (no implicit FX) or the
-            initial value is negative, ``0.0`` when the initial value is zero.
+            initial value is zero or negative (no positive capital base).
 
         Notes
         -----
@@ -1530,7 +1549,8 @@ class HorizonResult:
         Returns
         -------
         float
-            Contribution of the given factor as a decimal fraction.
+            Contribution of the given factor as a decimal fraction. Returns ``nan``
+            for a zero or negative initial value, or mismatched currencies.
 
         Raises
         ------
@@ -2519,7 +2539,8 @@ class RateBindingSpec:
             (``"continuous"``, ``"annual"``, ...). Defaults to continuous.
             The extracted rate stays a decimal annualized rate.
         day_count : DayCount, optional
-            Typed day-count convention. Defaults to ``None`` (use curve default).
+            Output quote day-count convention; ``None`` uses the curve default.
+            Maturity dates and curve-implied accumulation factors are preserved.
 
         Raises
         ------

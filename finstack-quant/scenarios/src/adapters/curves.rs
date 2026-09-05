@@ -101,7 +101,6 @@ struct BumpTargetResult {
 struct InterpolateHit {
     t: f64,
     requested: f64,
-    neighbors: Vec<usize>,
 }
 
 /// Whether the bumped curve is rebuilt by solve-to-par recalibration
@@ -223,11 +222,10 @@ fn resolve_bump_targets(
                         ),
                     });
                 }
-                if result.weights.len() > 1 && delivery == BumpDelivery::Direct {
+                if delivery == BumpDelivery::Direct {
                     interpolate_hits.push(InterpolateHit {
                         t: use_years,
                         requested: add,
-                        neighbors: result.weights.iter().map(|(idx, _)| *idx).collect(),
                     });
                 }
                 for (idx, weight) in result.weights {
@@ -245,77 +243,7 @@ fn resolve_bump_targets(
     })
 }
 
-const INTERPOLANT_CALIBRATE_ITERS: usize = 8;
 const INTERPOLANT_CALIBRATE_TOL: f64 = 1e-12;
-
-/// Scale neighboring-pillar deltas so `evaluate_at_t(deltas)` hits `target`.
-fn scale_neighbor_deltas_to_hit<F>(
-    deltas: &mut [f64],
-    neighbor_idxs: &[usize],
-    target: f64,
-    curve_id: &str,
-    t: f64,
-    mut evaluate_at_t: F,
-) -> Result<()>
-where
-    F: FnMut(&[f64]) -> Result<f64>,
-{
-    const REL_EPS: f64 = 1e-6;
-    if neighbor_idxs.len() <= 1 {
-        return Ok(());
-    }
-
-    for _ in 0..INTERPOLANT_CALIBRATE_ITERS {
-        let value = evaluate_at_t(deltas)?;
-        let err = target - value;
-        if err.abs() <= INTERPOLANT_CALIBRATE_TOL {
-            return Ok(());
-        }
-
-        let all_near_zero = neighbor_idxs.iter().all(|&i| deltas[i].abs() < 1e-16);
-        let mut probed = deltas.to_vec();
-        if all_near_zero {
-            for &i in neighbor_idxs {
-                probed[i] = REL_EPS;
-            }
-            let value_eps = evaluate_at_t(&probed)?;
-            let deriv = (value_eps - value) / REL_EPS;
-            if !deriv.is_finite() || deriv.abs() < 1e-18 {
-                break;
-            }
-            let step = err / deriv;
-            for &i in neighbor_idxs {
-                deltas[i] = step;
-            }
-            continue;
-        }
-
-        for &i in neighbor_idxs {
-            probed[i] *= 1.0 + REL_EPS;
-        }
-        let value_eps = evaluate_at_t(&probed)?;
-        let deriv = (value_eps - value) / REL_EPS;
-        if !deriv.is_finite() || deriv.abs() < 1e-18 {
-            break;
-        }
-        let factor = 1.0 + err / deriv;
-        if !factor.is_finite() {
-            break;
-        }
-        for &i in neighbor_idxs {
-            deltas[i] *= factor;
-        }
-    }
-
-    let value = evaluate_at_t(deltas)?;
-    if (target - value).abs() <= INTERPOLANT_CALIBRATE_TOL {
-        return Ok(());
-    }
-    Err(Error::Validation(format!(
-        "Off-pillar interpolant delivery on '{curve_id}' at t={t:.6} did not converge \
-         (target {target:.12}, realized {value:.12})"
-    )))
-}
 
 fn indexed_to_dense(indexed: &[(usize, f64)], n: usize) -> Vec<f64> {
     let mut deltas = vec![0.0; n];
@@ -343,36 +271,62 @@ fn calibrate_native_interpolant<Eval, Target>(
     result: &mut BumpTargetResult,
     knots: &[f64],
     curve_id: &str,
-    mut quantity_at: Eval,
+    quantity_at: Eval,
     target_at: Target,
 ) -> Result<()>
 where
-    Eval: FnMut(&[f64], f64) -> Result<f64>,
+    Eval: Fn(&[f64], f64) -> Result<f64>,
     Target: Fn(f64, f64) -> Result<f64>,
 {
     if result.interpolate_hits.is_empty() {
         return Ok(());
     }
 
-    let mut deltas = indexed_to_dense(&result.indexed_targets, knots.len());
-    const OUTER: usize = 4;
-    for _ in 0..OUTER {
-        let mut max_err = 0.0_f64;
-        let hits: Vec<(f64, f64, Vec<usize>)> = result
-            .interpolate_hits
-            .iter()
-            .map(|h| (h.t, h.requested, h.neighbors.clone()))
-            .collect();
-        for (t, requested, neighbors) in &hits {
-            let target = target_at(*t, *requested)?;
-            scale_neighbor_deltas_to_hit(&mut deltas, neighbors, target, curve_id, *t, |d| {
-                quantity_at(d, *t)
-            })?;
-            let got = quantity_at(&deltas, *t)?;
-            max_err = max_err.max((got - target).abs());
+    // Solve all requests together: correcting one shared pillar must not
+    // invalidate a previously accepted tenor. Duplicate requests are additive.
+    let mut targets: Vec<(f64, f64)> = Vec::new();
+    for hit in &result.interpolate_hits {
+        if let Some((_, bump)) = targets.iter_mut().find(|(t, _)| (*t - hit.t).abs() < 1e-12) {
+            *bump += hit.requested;
+        } else {
+            targets.push((hit.t, hit.requested));
         }
-        if max_err <= INTERPOLANT_CALIBRATE_TOL {
-            break;
+    }
+    let targets = targets
+        .into_iter()
+        .map(|(t, bump)| Ok((t, target_at(t, bump)?)))
+        .collect::<Result<Vec<_>>>()?;
+    let initial = indexed_to_dense(&result.indexed_targets, knots.len());
+    let mut active: Vec<usize> = result.indexed_targets.iter().map(|(i, _)| *i).collect();
+    active.sort_unstable();
+    active.dedup();
+    let expand = |params: &[f64]| {
+        let mut deltas = vec![0.0; knots.len()];
+        for (&index, &value) in active.iter().zip(params) {
+            deltas[index] = value;
+        }
+        deltas
+    };
+    let residuals = |params: &[f64], out: &mut [f64]| {
+        let deltas = expand(params);
+        for ((t, target), residual) in targets.iter().zip(out) {
+            *residual = quantity_at(&deltas, *t).map_or(f64::NAN, |value| value - target);
+        }
+    };
+    let initial: Vec<f64> = active.iter().map(|&i| initial[i]).collect();
+    let solution = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+        .with_tolerance(INTERPOLANT_CALIBRATE_TOL * 0.1)
+        .solve_system_with_dim_stats(residuals, &initial, targets.len())?;
+    let deltas = expand(&solution.params);
+    // Solver termination alone is not acceptance: check every requested point
+    // against the final rebuilt native interpolant, including exact pillars.
+    for (t, target) in targets {
+        let realized = quantity_at(&deltas, t)?;
+        if !realized.is_finite() || (realized - target).abs() > INTERPOLANT_CALIBRATE_TOL {
+            return Err(Error::Validation(format!(
+                "Native interpolant delivery on '{curve_id}' at t={t:.6} did not converge \
+                 (target {target:.12}, realized {realized:.12})"
+            )));
         }
     }
 
@@ -540,7 +494,7 @@ fn check_vol_index_post_shock_positivity(
 /// single-curve fallback or an explicit-resolution error. Pass
 /// `discount_curve_id` explicitly when curve naming does not follow the
 /// `CCY...` convention.
-fn resolve_discount_curve_id(
+pub(crate) fn resolve_discount_curve_id(
     market: &finstack_quant_core::market_data::context::MarketContext,
     explicit_discount_curve_id: Option<&CurveId>,
     hint_curve_id: Option<&CurveId>,
@@ -651,11 +605,16 @@ fn par_cds_effects(
             })?;
             let (discount_id, warning) =
                 resolve_discount_curve_id(market, discount_curve_id, Some(curve_id))?;
-            let source_market = std::sync::Arc::new(market.clone());
+            let target_market = std::sync::Arc::new(market.clone());
+            let source_market = env
+                .source_markets
+                .and_then(|markets| markets.get(curve_id))
+                .cloned()
+                .unwrap_or_else(|| std::sync::Arc::clone(&target_market));
             let new_curve = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
                 hazard: base_curve,
                 source_market: std::sync::Arc::clone(&source_market),
-                target_market: source_market,
+                target_market,
                 discount_curve_id: discount_id,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -1132,6 +1091,7 @@ mod tests {
         HazardApplyEnv {
             mode: HazardBumpMode::SolveToPar,
             provider: Some(provider),
+            source_markets: None,
         }
     }
 

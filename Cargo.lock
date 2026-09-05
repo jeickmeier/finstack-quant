@@ -985,6 +985,7 @@ dependencies = [
  "criterion",
  "finstack-quant-attribution",
  "finstack-quant-calibration",
+ "finstack-quant-cashflows",
  "finstack-quant-core",
  "finstack-quant-models",
  "finstack-quant-statements",

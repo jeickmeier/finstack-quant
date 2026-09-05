@@ -2395,12 +2395,12 @@ schema = { python = "finstack_quant.scenarios.schema", status = "exists", note =
 # apply_scenario_to_market) accept `instruments: list[Instrument | str] | None`
 # and wire it into ExecutionContext.instruments; when a scenario
 # mutates_instruments() and none are supplied they raise ValueError instead of
-# silently producing warnings. Mutated instruments are not returned (there is
-# no dyn Instrument -> envelope serializer); report.changes and
-# report.carry_to_dataframe() describe the effect. rate_bindings/calendar stay
-# None in both hosts. WASM (applyScenario, applyScenarioToMarket) still
-# hardcodes instruments to None, so the six instrument-scoped variants are
-# inert there and only produce warnings.
+# silently producing warnings. ApplicationResult.instruments returns shocked
+# copies in input order as canonical envelope JSON strings, including JSON and
+# pickle round trips. WASM accepts instrumentsJson (an optional JSON array of
+# canonical envelopes) and returns those envelopes as objects in instruments.
+# Both hosts reject instrument-scoped operations without an inventory.
+# rate_bindings/calendar stay None in both hosts.
 
 [crates.scenarios.symbols]
 public = [

@@ -16,7 +16,13 @@ fn apply_with_context(
     market: &mut finstack_quant_core::market_data::context::MarketContext,
     model: Option<&mut finstack_quant_statements::FinancialModelSpec>,
     as_of: time::Date,
+    instruments: Option<&mut Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>,
 ) -> Result<finstack_quant_scenarios::engine::ApplicationReport, JsValue> {
+    if spec.mutates_instruments() && instruments.is_none() {
+        return Err(to_js_err(
+            "scenario contains instrument-scoped operations but no instruments were supplied",
+        ));
+    }
     let engine = finstack_quant_scenarios::ScenarioEngine::new().with_recalibration_provider(
         std::sync::Arc::new(
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
@@ -25,7 +31,7 @@ fn apply_with_context(
     let mut ctx = finstack_quant_scenarios::ExecutionContext {
         market,
         model,
-        instruments: None,
+        instruments,
         rate_bindings: None,
         calendar: None,
         as_of,
@@ -238,6 +244,20 @@ pub fn build_scenario_spec(
     crate::utils::to_js_value(&spec)
 }
 
+fn extract_instruments(
+    json: Option<String>,
+) -> Result<Option<Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>, JsValue> {
+    json.map(|json| {
+        let envelopes: Vec<finstack_quant_valuations::instruments::InstrumentEnvelope> =
+            serde_json::from_str(&json).map_err(to_js_err)?;
+        envelopes
+            .into_iter()
+            .map(|envelope| envelope.into_boxed().map_err(to_js_err))
+            .collect()
+    })
+    .transpose()
+}
+
 /// Apply a scenario to a market context and financial model.
 ///
 /// Returns a JavaScript object with `market` and `model` (the mutated
@@ -248,11 +268,9 @@ pub fn build_scenario_spec(
 /// absent), and `time_roll` (a `RollForwardReport`, only present when the
 /// scenario contained a `time_roll_forward` operation).
 ///
-/// This entry point supplies no instrument portfolio and no holiday calendar
-/// to the engine: instrument-scoped operations (`instrument_price_pct_by_*`,
-/// `instrument_spread_bp_by_*`, correlation shocks) are inert and produce a
-/// warning, and `time_roll_forward` in `business_days` mode adjusts without
-/// holiday information.
+/// Optional instrument envelopes are copied and returned in `instruments`, in
+/// input order. Instrument-scoped operations require an inventory. No holiday
+/// calendar is supplied; business-day rolls adjust without holiday information.
 ///
 /// # Errors
 ///
@@ -264,12 +282,14 @@ pub fn build_scenario_spec(
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param model_json - JSON-serialized FinancialModelSpec that scenario operations may mutate.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
 #[wasm_bindgen(js_name = applyScenario)]
 pub fn apply_scenario(
     scenario_json: &str,
     market_json: &str,
     model_json: &str,
     as_of: &str,
+    instruments_json: Option<String>,
 ) -> Result<JsValue, JsValue> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
@@ -278,17 +298,28 @@ pub fn apply_scenario(
     let mut model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;
-    let report = apply_with_context(&spec, &mut market, Some(&mut model), date)?;
-    let out =
-        finstack_quant_scenarios::ApplicationEnvelope::from_contexts(report, &market, Some(&model))
-            .map_err(to_js_err)?;
+    let mut instruments = extract_instruments(instruments_json)?;
+    let report = apply_with_context(
+        &spec,
+        &mut market,
+        Some(&mut model),
+        date,
+        instruments.as_mut(),
+    )?;
+    let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
+        report,
+        &market,
+        Some(&model),
+        instruments.as_deref(),
+    )
+    .map_err(to_js_err)?;
     crate::utils::to_js_value(&out)
 }
 
 /// Apply a scenario to a market context only (no model mutations).
 ///
 /// Returns the same envelope shape as [`apply_scenario`] minus `model`;
-/// the same caveats apply (no instrument portfolio, no holiday calendar).
+/// the same inventory and calendar rules apply.
 ///
 /// # Errors
 ///
@@ -299,20 +330,28 @@ pub fn apply_scenario(
 /// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
 #[wasm_bindgen(js_name = applyScenarioToMarket)]
 pub fn apply_scenario_to_market(
     scenario_json: &str,
     market_json: &str,
     as_of: &str,
+    instruments_json: Option<String>,
 ) -> Result<JsValue, JsValue> {
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;
-    let report = apply_with_context(&spec, &mut market, None, date)?;
-    let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(report, &market, None)
-        .map_err(to_js_err)?;
+    let mut instruments = extract_instruments(instruments_json)?;
+    let report = apply_with_context(&spec, &mut market, None, date, instruments.as_mut())?;
+    let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
+        report,
+        &market,
+        None,
+        instruments.as_deref(),
+    )
+    .map_err(to_js_err)?;
     crate::utils::to_js_value(&out)
 }
 

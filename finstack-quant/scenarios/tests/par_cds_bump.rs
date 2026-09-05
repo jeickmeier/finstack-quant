@@ -550,3 +550,135 @@ fn two_independent_par_cds_curves_match_separate_applies() {
             < 1e-12
     );
 }
+
+#[test]
+fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
+    use finstack_quant_calibration::{
+        api::{engine, schema::CalibrationEnvelope},
+        recalibration::CachedRecalibrationProvider,
+    };
+    use std::sync::Arc;
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .unwrap();
+    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let source = MarketContext::try_from(calibrated.result.final_market).unwrap();
+    let original = source.get_hazard("ISSUER-A-CDS").unwrap();
+    let base = original.base_date();
+    let engine = ScenarioEngine::new()
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
+    for (period, discount_bp) in [("1M", 0.0), ("2Y", 0.0), ("1M", 25.0)] {
+        let mut horizon_pars = Vec::new();
+        for bp in [0.0, 25.0] {
+            let mut market = source.clone();
+            let scenario = regression_scenario(
+                "roll-credit",
+                vec![
+                    OperationSpec::TimeRollForward {
+                        period: period.into(),
+                        apply_shocks: true,
+                        roll_mode: finstack_quant_scenarios::TimeRollMode::CalendarDays,
+                    },
+                    OperationSpec::CurveParallelBp {
+                        curve_kind: CurveKind::Discount,
+                        curve_id: "USD-OIS".into(),
+                        discount_curve_id: None,
+                        bp: discount_bp,
+                    },
+                    OperationSpec::CurveParallelBp {
+                        curve_kind: CurveKind::ParCDS,
+                        curve_id: "ISSUER-A-CDS".into(),
+                        discount_curve_id: Some("USD-OIS".into()),
+                        bp,
+                    },
+                ],
+            );
+            let mut ctx = ExecutionContext {
+                market: &mut market,
+                model: None,
+                instruments: None,
+                rate_bindings: None,
+                calendar: None,
+                as_of: base,
+            };
+            engine
+                .apply(&scenario, &mut ctx)
+                .expect("horizon credit scenario");
+            let mut independent = source.clone();
+            let mut independent_ctx = ExecutionContext {
+                market: &mut independent,
+                model: None,
+                instruments: None,
+                rate_bindings: None,
+                calendar: None,
+                as_of: base,
+            };
+            ScenarioEngine::new()
+                .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+                .apply(&scenario, &mut independent_ctx)
+                .expect("uncached horizon scenario");
+            let expected = independent.get_hazard("ISSUER-A-CDS").unwrap();
+            let actual = ctx.market.get_hazard("ISSUER-A-CDS").unwrap();
+            for (t, _) in expected.knot_points() {
+                assert!(
+                    (actual.sp(t) - expected.sp(t)).abs() < 1e-12,
+                    "cache must honor discount dependencies"
+                );
+            }
+            let horizon = ctx.as_of;
+            let curve = market.get_hazard("ISSUER-A-CDS").unwrap();
+            let recipe = curve.hazard_calibration().expect("fresh horizon recipe");
+            assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
+            assert!(recipe
+                .calibration_inputs
+                .iter()
+                .all(|input| input.pillar_date > horizon));
+            if bp == 0.0 && discount_bp == 0.0 {
+                let rolled = original
+                    .roll_forward((horizon - base).whole_days())
+                    .unwrap();
+                for (t, _) in rolled.knot_points() {
+                    assert!((curve.sp(t) - rolled.sp(t)).abs() < 1e-8);
+                }
+            }
+            horizon_pars.push(
+                recipe
+                    .spread_risk_inputs
+                    .iter()
+                    .map(|input| input.quote["spread_bp"].as_f64().unwrap())
+                    .collect::<Vec<_>>(),
+            );
+            // The returned recipe is usable by a subsequent independent request.
+            let repeat = regression_scenario(
+                "repeat",
+                vec![OperationSpec::CurveParallelBp {
+                    curve_kind: CurveKind::ParCDS,
+                    curve_id: "ISSUER-A-CDS".into(),
+                    discount_curve_id: Some("USD-OIS".into()),
+                    bp: 0.0,
+                }],
+            );
+            let mut ctx = ExecutionContext {
+                market: &mut market,
+                model: None,
+                instruments: None,
+                rate_bindings: None,
+                calendar: None,
+                as_of: horizon,
+            };
+            engine.apply(&repeat, &mut ctx).expect("independent replay");
+        }
+        for (base, bumped) in horizon_pars[0].iter().zip(&horizon_pars[1]) {
+            assert!((bumped - base - 25.0).abs() < 1e-8);
+        }
+    }
+}
+
+fn regression_scenario(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
+    ScenarioSpec {
+        id: id.into(),
+        operations,
+        ..Default::default()
+    }
+}

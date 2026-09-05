@@ -40,6 +40,7 @@ json-schema = [
 ]
 
 [dev-dependencies]
+finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
 finstack-quant-calibration = { path = "../calibration", version = "0.8.0" }
 criterion = { workspace = true }
 jsonschema = { version = "0.28", default-features = false }

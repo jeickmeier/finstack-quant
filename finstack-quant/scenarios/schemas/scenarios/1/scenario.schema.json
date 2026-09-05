@@ -2127,7 +2127,7 @@
             }
           ],
           "default": null,
-          "description": "Day-count convention override. If `None`, uses the curve's convention."
+          "description": "Output quote day-count convention. If `None`, uses the curve's convention.\nChanges the annualized rate while preserving maturity dates and the\ncurve-implied accumulation factor; native curve query times are unchanged."
         },
         "node_id": {
           "$ref": "#/$defs/NodeId",
