@@ -12,7 +12,7 @@ pub(crate) fn register_xccy_swap_metrics(
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaFxRates,
         Arc::new(CrossFactorCalculator::new(
             make_fx_bumper,

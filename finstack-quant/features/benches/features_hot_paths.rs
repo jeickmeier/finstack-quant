@@ -14,11 +14,11 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_features::{
-    clean_signal, neutralize, neutralize_and_zscore, normalize_signal, rank_to_weights,
-    risk_scaled_weights, rolling_regression_residual, transform_cross_sectional_grouped_with_op,
-    transform_cross_sectional_with_op, transform_panel, transform_panel_json,
-    transform_timeseries_pairwise_with_op, transform_timeseries_with_op, CrossSectionalOp,
-    PairwiseOp, PanelOperation, PanelTransformSpec, TimeSeriesOp,
+    neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
+    rolling_regression_residual, transform_cross_sectional,
+    transform_cross_sectional_grouped_with_op, transform_cross_sectional_with_op, transform_panel,
+    transform_panel_json, transform_timeseries_pairwise_with_op, transform_timeseries_with_op,
+    CrossSectionalOp, PairwiseOp, PanelOperation, PanelTransformSpec, TimeSeriesOp,
 };
 use fixtures::{hot_panel, span_params, window_params, FeaturePanel, HOT_WINDOW};
 use serde_json::{json, Value};
@@ -328,11 +328,21 @@ fn bench_multi(c: &mut Criterion) {
             )
         });
     });
-    c.bench_function("clean_signal 100x252", |b| {
-        b.iter(|| black_box(clean_signal(&panel.values, &panel.time_key, None).expect("clean")));
+    c.bench_function("cross_sectional winsorize 100x252", |b| {
+        b.iter(|| {
+            black_box(
+                transform_cross_sectional(&panel.values, &panel.time_key, "winsorize", None)
+                    .expect("clean"),
+            )
+        });
     });
-    c.bench_function("normalize_signal 100x252", |b| {
-        b.iter(|| black_box(normalize_signal(&panel.values, &panel.time_key, None).expect("norm")));
+    c.bench_function("cross_sectional zscore 100x252", |b| {
+        b.iter(|| {
+            black_box(
+                transform_cross_sectional(&panel.values, &panel.time_key, "zscore", None)
+                    .expect("norm"),
+            )
+        });
     });
 }
 

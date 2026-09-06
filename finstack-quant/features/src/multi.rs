@@ -373,60 +373,6 @@ pub fn risk_scaled_weights(
     transform_cross_sectional_with_op(&scaled, time_key, CrossSectionalOp::LongShortWeights, None)
 }
 
-/// Apply the default signal cleaning pass: cross-sectional quantile clipping.
-///
-/// Parameters are forwarded to `winsorize` (`lower`, `upper`).
-///
-/// # Arguments
-///
-/// * `values` - Row-aligned signal values to winsorize within each time
-///   partition.
-/// * `time_key` - Row-aligned labels defining the cross-sections to clean.
-/// * `params` - Optional `lower` and `upper` quantile bounds forwarded to
-///   `winsorize`.
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ or clipping parameters
-/// are malformed.
-pub fn clean_signal(
-    values: &[Option<f64>],
-    time_key: &[String],
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    transform_cross_sectional(values, time_key, "winsorize", params)
-}
-
-/// Normalize a signal cross-sectionally with a selected method.
-///
-/// `params.method` defaults to `zscore` and may name any single-column
-/// cross-sectional operation.
-///
-/// # Arguments
-///
-/// * `values` - Row-aligned raw signal values to normalize.
-/// * `time_key` - Row-aligned labels defining independent cross-sections.
-/// * `params` - Optional JSON configuration; `method` selects a
-///   cross-sectional operation and defaults to `"zscore"`.
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ, the method is
-/// unsupported, or operation parameters are malformed.
-pub fn normalize_signal(
-    values: &[Option<f64>],
-    time_key: &[String],
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    let method = string_param(params, "method", "zscore")?;
-    let op_params = params.and_then(|value| {
-        let mut object = value.as_object()?.clone();
-        object.remove("method");
-        Some(Value::Object(object))
-    });
-    transform_cross_sectional(values, time_key, method, op_params.as_ref())
-}
-
 /// Convert cross-sectional ranks into gross-normalized long/short weights.
 ///
 /// # Arguments
@@ -467,17 +413,6 @@ pub fn neutralize_and_zscore(
 ) -> Result<Vec<Option<f64>>> {
     let residual = neutralize(values, time_key, exposures, params)?;
     transform_cross_sectional(&residual, time_key, "zscore", None)
-}
-
-fn string_param<'a>(params: Option<&'a Value>, key: &str, default: &'a str) -> Result<&'a str> {
-    match params.and_then(|value| value.get(key)) {
-        Some(value) => value.as_str().ok_or_else(|| {
-            Error::Validation(format!(
-                "panel transform parameter '{key}' must be a string"
-            ))
-        }),
-        None => Ok(default),
-    }
 }
 
 fn validate_exposures(primary_len: usize, exposures: &[Vec<Option<f64>>]) -> Result<()> {

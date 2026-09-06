@@ -75,7 +75,7 @@ pub use schedule::{
 };
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultModelSpec,
-    FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
+    FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec,
     FloatingRateFallback, FloatingRateSpec, Notional, OvernightCompoundingMethod,
     OvernightIndexConstraintApplication, PrepaymentCurve, PrepaymentModelSpec, PrincipalExchange,
     RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,

@@ -172,6 +172,32 @@ mod tests {
     }
 
     #[test]
+    fn test_log_euler_mixed_shock_positivity() {
+        let params = GbmParams::new(0.05, 0.02, 0.5).unwrap(); // High vol
+        let process = GbmProcess::new(params);
+        let disc = LogEuler::new();
+
+        let t = 0.0;
+        let dt = 0.1; // Larger step
+        let mut x = vec![100.0];
+
+        // Test multiple large shocks
+        for shock in [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0] {
+            let z = vec![shock];
+            let mut work = vec![0.0; disc.work_size(&process)];
+
+            disc.step(&process, t, dt, &mut x, &z, &mut work);
+
+            // Log-Euler should maintain positivity
+            assert!(
+                x[0] > 0.0,
+                "State should remain positive with shock {}",
+                shock
+            );
+        }
+    }
+
+    #[test]
     fn test_euler_convergence() {
         // Test that Euler converges to expected mean as dt -> 0
         let params = GbmParams::new(0.05, 0.02, 0.2).unwrap();

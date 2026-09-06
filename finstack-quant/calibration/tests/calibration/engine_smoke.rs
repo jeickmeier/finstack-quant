@@ -84,7 +84,7 @@ fn test_v2_simple_usd_calibration() {
         quote_sets: quote_sets.into_iter().collect(),
         settings: CalibrationConfig {
             use_parallel: true,
-            solver: finstack_quant_calibration::SolverConfig::brent_default()
+            solver: finstack_quant_calibration::SolverConfig::default()
                 .with_tolerance(1e-12)
                 .with_max_iterations(250),
             ..Default::default()

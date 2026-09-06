@@ -653,9 +653,9 @@ impl PyPeerSet {
 /// y : str
 ///     Dependent metric: a canonical name (``"oas_bp"``), a custom key, or
 ///     ``"multiple:<name>"`` for a valuation multiple (``"multiple:ev_ebitda"``).
-/// x : list[str]
-///     Explanatory metrics in the same notation (empty for a distribution-only
-///     dimension). Default ``[]``.
+/// x : str | None
+///     Optional explanatory metric in the same notation. ``None`` (default)
+///     scores the dependent metric against its peer distribution.
 /// weight : float
 ///     Weight in the composite score. Default ``1.0``.
 /// direction : str
@@ -665,7 +665,7 @@ impl PyPeerSet {
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import ScoringDimension
-/// >>> ScoringDimension("Spread vs Leverage", "oas_bp", ["leverage"]).direction
+/// >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage").direction
 /// 'higher_is_cheap'
 #[pyclass(
     name = "ScoringDimension",
@@ -680,17 +680,14 @@ pub struct PyScoringDimension {
 #[pymethods]
 impl PyScoringDimension {
     #[new]
-    #[pyo3(signature = (label, y, x=Vec::new(), weight=1.0, direction="higher_is_cheap"))]
-    fn new(label: &str, y: &str, x: Vec<String>, weight: f64, direction: &str) -> PyResult<Self> {
+    #[pyo3(signature = (label, y, x=None, weight=1.0, direction="higher_is_cheap"))]
+    fn new(label: &str, y: &str, x: Option<&str>, weight: f64, direction: &str) -> PyResult<Self> {
         let direction: ScoreDirection = direction.parse().map_err(display_to_py)?;
         Ok(Self {
             inner: ScoringDimension {
                 label: label.to_string(),
                 y_extractor: parse_extractor(y)?,
-                x_extractors: x
-                    .iter()
-                    .map(|name| parse_extractor(name))
-                    .collect::<PyResult<Vec<_>>>()?,
+                x_extractor: x.map(parse_extractor).transpose()?,
                 weight,
                 direction,
             },
@@ -709,14 +706,10 @@ impl PyScoringDimension {
         extractor_label(&self.inner.y_extractor)
     }
 
-    /// Explanatory metrics in ``name`` / ``multiple:<name>`` notation.
+    /// Optional explanatory metric in ``name`` / ``multiple:<name>`` notation.
     #[getter]
-    fn x(&self) -> Vec<String> {
-        self.inner
-            .x_extractors
-            .iter()
-            .map(extractor_label)
-            .collect()
+    fn x(&self) -> Option<String> {
+        self.inner.x_extractor.as_ref().map(extractor_label)
     }
 
     /// Weight in the composite score.
@@ -1039,7 +1032,7 @@ impl PyDimensionScore {
 /// ... )
 /// >>> peers = [CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": 100.0 * i}) for i in (1, 2, 3)]
 /// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers)
-/// >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", ["leverage"])])
+/// >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage")])
 /// >>> result.company_id, result.peer_count
 /// ('SUBJ', 3)
 #[pyclass(

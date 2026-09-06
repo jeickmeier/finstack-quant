@@ -7242,7 +7242,7 @@ class RelativeValueResult:
     ... )
     >>> peers = [CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": 100.0 * i}) for i in (1, 2, 3)]
     >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers)
-    >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", ["leverage"])])
+    >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage")])
     >>> result.company_id, result.peer_count
     ('SUBJ', 3)
     """
@@ -7732,9 +7732,9 @@ class ScoringDimension:
     y : str
         Dependent metric: a canonical name (``"oas_bp"``), a custom key, or
         ``"multiple:<name>"`` for a valuation multiple (``"multiple:ev_ebitda"``).
-    x : list[str]
-        Explanatory metrics in the same notation (empty for a distribution-only
-        dimension). Default ``[]``.
+    x : str | None
+        Optional explanatory metric in the same notation. ``None`` (default)
+        scores the dependent metric against its peer distribution.
     weight : float
         Weight in the composite score. Default ``1.0``.
     direction : str
@@ -7749,11 +7749,11 @@ class ScoringDimension:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ScoringDimension
-    >>> ScoringDimension("Spread vs Leverage", "oas_bp", ["leverage"]).direction
+    >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage").direction
     'higher_is_cheap'
     """
     def __init__(
-        self, label: str, y: str, x: list[str] = ..., weight: float = 1.0, direction: str = "higher_is_cheap"
+        self, label: str, y: str, x: str | None = None, weight: float = 1.0, direction: str = "higher_is_cheap"
     ) -> None: ...
     @property
     def label(self) -> str:
@@ -7780,16 +7780,16 @@ class ScoringDimension:
             Dependent metric in ``name`` / ``multiple:<name>`` notation.
         """
     @property
-    def x(self) -> list[str]:
+    def x(self) -> str | None:
         """
-        Explanatory metrics in ``name`` / ``multiple:<name>`` notation.
+        Optional explanatory metric in ``name`` / ``multiple:<name>`` notation; None for distribution scoring.
 
         This property does not raise.
 
         Returns
         -------
-        list[str]
-            Explanatory metrics in ``name`` / ``multiple:<name>`` notation.
+        str | None
+            Optional explanatory metric in ``name`` / ``multiple:<name>`` notation; None for distribution scoring.
         """
     @property
     def weight(self) -> float:

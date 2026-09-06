@@ -221,9 +221,8 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
             {
                 "kind": "fixed_to_float",
                 "switch": "2026-01-01",
-                "fixed": {"rate": "0.04", "schedule": schedule},
+                "fixed": {"coupon_type": "cash", "rate": "0.04", **schedule},
                 "floating": floating,
-                "fixed_split": "cash",
             }
         ],
     }

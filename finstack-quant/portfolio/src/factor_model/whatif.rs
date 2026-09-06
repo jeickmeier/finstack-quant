@@ -5,7 +5,6 @@ use crate::error::{Error, Result};
 use crate::evaluation::{
     evaluate_raw_portfolio, PositionExecution, RawEvaluationInput, RawSelectiveSeed,
 };
-use crate::position::PositionSpec;
 use crate::sensitivity::SensitivityMatrix;
 use crate::types::PositionId;
 use crate::Portfolio;
@@ -66,17 +65,11 @@ pub struct StressResult {
 ///
 /// Serialized as an internally tagged object: `{"kind": "remove",
 /// "position_id": ...}`, `{"kind": "resize", "position_id": ...,
-/// "new_quantity": ...}` or `{"kind": "add", "position": <PositionSpec>}`.
+/// "new_quantity": ...}`.
 /// This is the wire shape every host binding accepts for what-if requests.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PositionChange {
-    /// Add a new position. This currently requires recomputing sensitivities from scratch.
-    Add {
-        /// Serializable specification of the position to add to the scenario
-        /// portfolio (instrument payload included).
-        position: Box<PositionSpec>,
-    },
     /// Remove an existing position by identifier.
     Remove {
         /// Position identifier to remove from the scenario.
@@ -126,13 +119,16 @@ impl<'a> WhatIfEngine<'a> {
     ///
     /// A removal zeroes that position's sensitivity row; a resize scales it in
     /// proportion to the original nonzero quantity. The method then recomputes
-    /// risk decomposition and credit residual risk. Adding a new position is
-    /// intentionally unsupported because it requires repricing fresh
-    /// sensitivities rather than reallocating existing rows.
+    /// risk decomposition and credit residual risk.
+    ///
+    /// # Arguments
+    ///
+    /// * `changes` - One final remove or resize operation per existing position.
+    ///   Resize quantities use the original position unit; removals zero its risk.
     ///
     /// # Errors
     ///
-    /// Returns an error for an unsupported add, unknown position, non-finite
+    /// Returns an error for an unknown position, non-finite
     /// replacement quantity, a proportional resize of a zero quantity, or
     /// multiple changes to one position. Propagates decomposition,
     /// portfolio-update, and credit-risk calculation errors.
@@ -143,11 +139,6 @@ impl<'a> WhatIfEngine<'a> {
         let mut changed = HashSet::default();
         for change in changes {
             match change {
-                PositionChange::Add { .. } => {
-                    return Err(Error::invalid_input(
-                        "PositionChange::Add is not supported yet; recompute sensitivities against a cloned Portfolio".to_string(),
-                    ));
-                }
                 PositionChange::Remove { position_id } => {
                     if !changed.insert(position_id) {
                         return Err(Error::invalid_input(format!(
@@ -489,49 +480,12 @@ mod tests {
     }
 
     #[test]
-    fn test_position_add_is_not_supported_yet() {
-        let setup = build_test_model();
-        assert!(setup.is_some());
-        let Some((model, portfolio, market)) = setup else {
-            return;
-        };
-        let base_result = model.analyze(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(base_result.is_ok());
-        let Ok(base) = base_result else {
-            return;
-        };
-        let sensitivities_result =
-            model.compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01));
-        assert!(sensitivities_result.is_ok());
-        let Ok(sensitivities) = sensitivities_result else {
-            return;
-        };
-
-        let added_position_result = Position::new(
-            "pos-2",
-            DUMMY_ENTITY_ID,
-            "inst-2",
-            Arc::new(MockInstrument::new("inst-2", "USD-OIS", 100.0)),
-            1.0,
-            PositionUnit::Units,
-        );
-        assert!(added_position_result.is_ok());
-        let Ok(added_position) = added_position_result else {
-            return;
-        };
-
-        let result = model
-            .what_if(
-                &base,
-                &sensitivities,
-                &portfolio,
-                &market,
-                date!(2024 - 01 - 01),
-            )
-            .position_what_if(&[PositionChange::Add {
-                position: Box::new(added_position.to_spec()),
-            }]);
-        assert!(result.is_err());
+    fn unsupported_position_add_is_rejected_at_deserialization() {
+        let error = serde_json::from_value::<PositionChange>(serde_json::json!({
+            "kind": "add", "position": {}
+        }))
+        .expect_err("unsupported position operation");
+        assert!(error.to_string().contains("unknown variant `add`"));
     }
 
     #[test]

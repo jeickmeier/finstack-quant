@@ -29,8 +29,6 @@
 pub enum InstrumentType {
     /// Fixed or floating-rate bond (plain vanilla, callable, amortizing).
     Bond = 1,
-    /// Term loan or bilateral lending facility.
-    Loan = 2,
     /// Credit Default Swap (single-name credit protection).
     #[serde(rename = "credit_default_swap")]
     Cds = 3,
@@ -200,7 +198,6 @@ impl InstrumentType {
     pub const fn as_str(self) -> &'static str {
         match self {
             InstrumentType::Bond => "bond",
-            InstrumentType::Loan => "loan",
             InstrumentType::Cds => "credit_default_swap",
             InstrumentType::CdsIndex => "cds_index",
             InstrumentType::CdsTranche => "cds_tranche",

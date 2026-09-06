@@ -91,7 +91,7 @@ pub(crate) fn register_cds_option_metrics(
     use std::sync::Arc;
 
     // Recovery01 (custom metric - recovery rate sensitivity)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Recovery01,
         Arc::new(recovery01::Recovery01Calculator),
         &[InstrumentType::CdsOption],

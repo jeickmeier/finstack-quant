@@ -6,8 +6,8 @@
 
 use crate::accrual::{accrued_interest_amount, AccrualConfig};
 use crate::builder::{
-    CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
-    Notional, PrincipalExchange, StepUpCouponSpec,
+    CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional,
+    PrincipalExchange, StepUpCouponSpec,
 };
 use crate::primitives::{is_cash_settlement_kind, CFKind};
 use finstack_quant_core::dates::{parse_iso_date, Date};
@@ -127,12 +127,10 @@ pub enum CouponLegSpec {
         )]
         /// Date on which the floating leg begins.
         switch: Date,
-        /// Fixed-rate quote and schedule before the switch.
-        fixed: FixedWindow,
+        /// Fixed coupon rate, settlement type, and schedule before the switch.
+        fixed: FixedCouponSpec,
         /// Floating coupon specification after the switch.
         floating: FloatingCouponSpec,
-        /// Settlement behavior for the fixed leg.
-        fixed_split: CouponType,
     },
     /// Consecutive floating-rate windows driven by dated margin steps.
     FloatingMarginProgram {
@@ -336,14 +334,8 @@ impl CashflowScheduleBuildSpec {
                     switch,
                     fixed,
                     floating,
-                    fixed_split,
                 } => {
-                    let _ = builder.fixed_to_float(
-                        *switch,
-                        fixed.clone(),
-                        floating.clone(),
-                        *fixed_split,
-                    );
+                    let _ = builder.fixed_to_float(*switch, fixed.clone(), floating.clone());
                 }
                 CouponLegSpec::FloatingMarginProgram { steps, base } => {
                     let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();

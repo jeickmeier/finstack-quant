@@ -16,17 +16,17 @@ use std::sync::Arc;
 pub(crate) fn register_commodity_asian_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Delta,
         Arc::new(greeks::AsianDeltaCalculator),
         &[InstrumentType::CommodityAsianOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Vega,
         Arc::new(greeks::AsianVegaCalculator),
         &[InstrumentType::CommodityAsianOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::commodity::commodity_asian_option::CommodityAsianOption,
@@ -35,7 +35,7 @@ pub(crate) fn register_commodity_asian_option_metrics(
         )),
         &[InstrumentType::CommodityAsianOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::commodity::commodity_asian_option::CommodityAsianOption,

@@ -291,7 +291,7 @@ fn test_instrument_type_operations_serde() {
             pct: -5.0,
         },
         OperationSpec::InstrumentSpreadBpByType {
-            instrument_types: vec![InstrumentType::Loan],
+            instrument_types: vec![InstrumentType::TermLoan],
             bp: 100.0,
         },
     ];

@@ -29,10 +29,8 @@ from importlib import import_module as _import_module
 from typing import Any
 
 from . import (
-    clean_signal as _clean_signal,
     neutralize as _neutralize,
     neutralize_and_zscore as _neutralize_and_zscore,
-    normalize_signal as _normalize_signal,
     rank_to_weights as _rank_to_weights,
     risk_scaled_weights as _risk_scaled_weights,
     rolling_regression_residual as _rolling_regression_residual,
@@ -47,12 +45,10 @@ TransformParams = dict[str, Any]
 KeySelector = str | int
 
 __all__ = [
-    "clean_signal",
     "cross_sectional",
     "grouped",
     "neutralize",
     "neutralize_and_zscore",
-    "normalize_signal",
     "pairwise",
     "panel",
     "rank_to_weights",
@@ -703,113 +699,6 @@ def risk_scaled_weights(
         _numeric_column(df, _require_column_name(volatility, "volatility")),
     )
     return _series(df, out, f"{value}_risk_scaled_weight")
-
-
-def clean_signal(
-    df: Any,
-    value: str,
-    time_key: KeySelector | None = None,
-    params: TransformParams | None = None,
-) -> Any:
-    """Apply the default cross-sectional signal-cleaning pass.
-
-    Forwards to :func:`finstack_quant.features.clean_signal`, clamping each
-    ``time_key`` partition to its ``lower``/``upper`` sample quantiles.
-
-    Args:
-        df: Source DataFrame.
-        value: Name of the signal column. ``NaN``/``None`` entries are treated as
-            missing.
-        time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
-        params: Optional quantile bounds ``lower`` (default ``0.01``) and
-            ``upper`` (default ``0.99``).
-
-    Returns:
-        pandas.Series: Cleaned values aligned to ``df.index`` and named
-        ``f"{value}_clean"``.
-
-    Raises:
-        ImportError: If pandas is not installed.
-        KeyError: If ``value`` is missing, or ``time_key`` is not a column or
-            index level (and no ``DatetimeIndex`` default applies).
-        ValueError: If ``time_key`` is ambiguous or quantile bounds violate
-            ``0 <= lower <= upper <= 1``.
-
-    Examples:
-    --------
-    >>> import pandas as pd
-    >>> from finstack_quant.features.dataframe import clean_signal
-    >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 3, "signal": [1.0, 2.0, 100.0]})
-    >>> clean_signal(frame, "signal", "date", {"lower": 0.0, "upper": 0.5}).tolist()
-    [1.0, 2.0, 2.0]
-    """
-    out = _clean_signal(
-        _numeric_column(df, value),
-        _key_column(
-            df,
-            time_key,
-            role="time_key",
-            default_datetime_index=True,
-        ),
-        params,
-    )
-    return _series(df, out, f"{value}_clean")
-
-
-def normalize_signal(
-    df: Any,
-    value: str,
-    time_key: KeySelector | None = None,
-    params: TransformParams | None = None,
-) -> Any:
-    """Normalize a DataFrame signal column cross-sectionally.
-
-    Forwards to :func:`finstack_quant.features.normalize_signal`, applying the
-    method named by ``params["method"]`` within each ``time_key`` partition.
-
-    Args:
-        df: Source DataFrame.
-        value: Name of the signal column. ``NaN``/``None`` entries are treated as
-            missing.
-        time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
-        params: Optional parameters. ``method`` selects any single-column
-            cross-sectional operation and defaults to ``"zscore"``; remaining
-            params are forwarded to that operation.
-
-    Returns:
-        pandas.Series: Normalized values aligned to ``df.index`` and named
-        ``f"{value}_normalized"``.
-
-    Raises:
-        ImportError: If pandas is not installed.
-        KeyError: If ``value`` is missing, or ``time_key`` is not a column or
-            index level (and no ``DatetimeIndex`` default applies).
-        ValueError: If ``time_key`` is ambiguous, ``method`` is unsupported, or
-            ``params`` are malformed.
-
-    Examples:
-    --------
-    >>> import pandas as pd
-    >>> from finstack_quant.features.dataframe import normalize_signal
-    >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 3, "signal": [1.0, 2.0, 100.0]})
-    >>> normalize_signal(frame, "signal", "date", {"method": "rank"}).tolist()
-    [0.0, 0.5, 1.0]
-    """
-    out = _normalize_signal(
-        _numeric_column(df, value),
-        _key_column(
-            df,
-            time_key,
-            role="time_key",
-            default_datetime_index=True,
-        ),
-        params,
-    )
-    return _series(df, out, f"{value}_normalized")
 
 
 def rank_to_weights(

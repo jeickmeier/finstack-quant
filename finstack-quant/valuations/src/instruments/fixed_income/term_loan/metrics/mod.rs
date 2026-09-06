@@ -130,58 +130,58 @@ pub(crate) fn register_term_loan_metrics(
     use crate::metrics::MetricId;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("all_in_rate"),
         Arc::new(AllInRateCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("oid_eir_amortization"),
         Arc::new(OidEirAmortizationCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Ytm,
         Arc::new(YtmCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DiscountMargin,
         Arc::new(DiscountMarginCalculator),
         &[InstrumentType::TermLoan],
     )?;
 
     // Callable-tree metrics
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Oas,
         Arc::new(OasCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::EmbeddedOptionValue,
         Arc::new(EmbeddedOptionValueCalculator),
         &[InstrumentType::TermLoan],
     )?;
 
     // Yield to first call (custom id: ytc)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("ytc"),
         Arc::new(YtcCalculator),
         &[InstrumentType::TermLoan],
     )?;
 
     // Yields to fixed horizons
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("yt2y"),
         Arc::new(Yt2yCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("yt3y"),
         Arc::new(Yt3yCalculator),
         &[InstrumentType::TermLoan],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("yt4y"),
         Arc::new(Yt4yCalculator),
         &[InstrumentType::TermLoan],

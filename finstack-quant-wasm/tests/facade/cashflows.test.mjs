@@ -146,9 +146,8 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
       {
         kind: 'fixed_to_float',
         switch: '2026-01-01',
-        fixed: { rate: '0.04', schedule },
+        fixed: { coupon_type: 'cash', rate: '0.04', ...schedule },
         floating,
-        fixed_split: 'cash',
       },
     ],
   });

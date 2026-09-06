@@ -734,3 +734,36 @@ fn schema_index_defaults_to_component() {
     let index = build_schema_index(COMPONENT).expect("index builds");
     assert_eq!(index["artifacts"][0]["kind"], json!("component"));
 }
+
+#[test]
+fn registry_selection_and_index_use_the_published_contract() {
+    const REGISTRY: &[SchemaArtifact] = &[SchemaArtifact::new::<SuffixProbe>(
+        "schemas/probe/1/component.schema.json",
+        "https://finstack_quant.dev/schemas/probe/1/component.schema.json",
+        "Component",
+        "A component schema.",
+    )];
+    let artifact = &REGISTRY[0];
+    for selector in [artifact.id, artifact.relative_path, "component.schema.json"] {
+        assert_eq!(
+            super::find_schema_artifact(REGISTRY, selector)
+                .expect("match")
+                .id,
+            artifact.id
+        );
+    }
+    for selector in ["", "json", ".schema.json", "ponent.schema.json"] {
+        assert!(
+            super::find_schema_artifact(REGISTRY, selector).is_err(),
+            "{selector:?}"
+        );
+    }
+    let schema = artifact.generate().expect("schema");
+    let index = build_schema_index(REGISTRY).expect("index");
+    assert_eq!(
+        index["artifacts"][0]["bytes"],
+        json!(super::deterministic_json_bytes(&schema)
+            .expect("bytes")
+            .len())
+    );
+}

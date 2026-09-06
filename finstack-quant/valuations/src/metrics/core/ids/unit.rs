@@ -67,7 +67,7 @@ impl MetricId {
     /// `bucketed_dv01`); a scalar key is returned unchanged.
     pub fn base(&self) -> MetricId {
         match self.as_str().split_once("::") {
-            Some((base, _)) => MetricId::custom(base),
+            Some((base, _)) => MetricId(std::borrow::Cow::Owned(base.to_string())),
             None => self.clone(),
         }
     }

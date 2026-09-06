@@ -27,14 +27,14 @@ pub(crate) fn register_ilb_metrics(
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
     // Custom metric: projected inflation-rate sensitivity per 1bp.
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Inflation01,
         Arc::new(Inflation01Calculator),
         &[InstrumentType::InflationLinkedBond],
     )?;
 
     // Custom metric: InflationConvexity (second-order inflation sensitivity)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::InflationConvexity,
         Arc::new(InflationConvexityCalculator),
         &[InstrumentType::InflationLinkedBond],

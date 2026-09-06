@@ -105,7 +105,7 @@ pub(crate) fn register_bermudan_swaption_metrics(
         ]
     }
     // Register custom ExerciseProbability metric separately
-    registry.replace_metric(
+    registry.register_metric(
         crate::metrics::MetricId::custom("exercise_probability"),
         std::sync::Arc::new(ExerciseProbabilityCalculator { hw }),
         &[InstrumentType::BermudanSwaption],

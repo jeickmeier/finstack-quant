@@ -20,42 +20,42 @@ pub(crate) fn register_fx_option_metrics(
     use std::sync::Arc;
 
     // Standard metrics for rho split by domestic/foreign.
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Rho,
         Arc::new(crate::metrics::OptionGreekCalculator::<
             crate::instruments::FxOption,
         >::rho()),
         &[InstrumentType::FxOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ForeignRho,
         Arc::new(crate::metrics::OptionGreekCalculator::<
             crate::instruments::FxOption,
         >::foreign_rho()),
         &[InstrumentType::FxOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DeltaForward,
         Arc::new(delta_conventions::DeltaForwardCalculator),
         &[InstrumentType::FxOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DeltaPremiumAdjustedSpot,
         Arc::new(delta_conventions::DeltaPremiumAdjustedSpotCalculator),
         &[InstrumentType::FxOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DeltaPremiumAdjustedForward,
         Arc::new(delta_conventions::DeltaPremiumAdjustedForwardCalculator),
         &[InstrumentType::FxOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaFxVol,
         Arc::new(CrossFactorCalculator::new(make_fx_bumper, make_vol_bumper)),
         &[InstrumentType::FxOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaFxRates,
         Arc::new(CrossFactorCalculator::new(
             make_fx_bumper,

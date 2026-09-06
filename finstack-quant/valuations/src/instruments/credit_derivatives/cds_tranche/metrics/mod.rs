@@ -56,7 +56,7 @@ pub(crate) fn register_cds_tranche_metrics(
             Arc::new(tail_dependence::TailDependenceCalculator),
         ),
     ] {
-        registry.replace_metric(id, calculator, &[InstrumentType::CdsTranche])?;
+        registry.register_metric(id, calculator, &[InstrumentType::CdsTranche])?;
     }
 
     // Standard metrics using macro

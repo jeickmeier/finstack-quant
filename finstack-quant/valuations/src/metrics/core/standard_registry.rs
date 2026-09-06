@@ -296,3 +296,11 @@ fn register_universal_metrics(
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn built_in_metric_owners_are_unique() {
+        super::build_standard_registry().expect("each built-in metric slot must have one owner");
+    }
+}

@@ -56,7 +56,7 @@ fn validation_config_carries_recovery_defaults() {
 #[test]
 fn calibration_config_rejects_solver_tolerance_looser_than_fit_tolerance() {
     let cfg = CalibrationConfig {
-        solver: SolverConfig::brent_default().with_tolerance(1e-4),
+        solver: SolverConfig::default().with_tolerance(1e-4),
         ..Default::default()
     };
 

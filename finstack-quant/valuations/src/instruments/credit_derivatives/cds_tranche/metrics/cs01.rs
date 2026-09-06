@@ -99,7 +99,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
         let cs01 = compute_parallel_cs01_with_context_raw(context, &hazard_id, &request, reval)?;
 
         context.computed.insert(
-            MetricId::custom(format!("cs01::{}", hazard_id.as_str())),
+            MetricId::composite(&MetricId::Cs01, &[hazard_id.as_str()]),
             cs01,
         );
 
@@ -166,7 +166,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
             }
         };
 
-        let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
+        let series_id = MetricId::composite(&MetricId::BucketedCs01, &[hazard_id.as_str()]);
 
         let request = Cs01Request::generic(
             bump_bp,

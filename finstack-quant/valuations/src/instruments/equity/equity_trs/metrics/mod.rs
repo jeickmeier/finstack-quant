@@ -32,29 +32,29 @@ pub(crate) fn register_equity_trs_metrics(
     let instruments = [InstrumentType::EquityTotalReturnSwap];
 
     // Equity TRS specific metrics
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dividend01,
         Arc::new(Dividend01Calculator),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::IndexDelta,
         Arc::new(EquityDeltaCalculator),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ParSpread,
         Arc::new(ParSpreadCalculator),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::FinancingAnnuity,
         Arc::new(FinancingAnnuityCalculator),
         &instruments,
     )?;
 
     // DV01 for financing leg sensitivity
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::equity::equity_trs::EquityTotalReturnSwap,
@@ -63,7 +63,7 @@ pub(crate) fn register_equity_trs_metrics(
         )),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::equity::equity_trs::EquityTotalReturnSwap,

@@ -5,10 +5,8 @@ import json
 import pytest
 
 from finstack_quant.features import (
-    clean_signal,
     neutralize,
     neutralize_and_zscore,
-    normalize_signal,
     rank_to_weights,
     risk_scaled_weights,
     rolling_regression_residual,
@@ -143,17 +141,18 @@ def test_finance_specific_transform_entrypoints() -> None:
 
 def test_pipeline_helper_entrypoints() -> None:
     time_key = ["2026-01-01"] * 3
-    cleaned = clean_signal(
+    cleaned = transform_cross_sectional(
         [1.0, 2.0, 100.0],
         time_key,
+        "winsorize",
         {"lower": 0.0, "upper": 0.5},
     )
     assert cleaned == [1.0, 2.0, 2.0]
 
-    normalized = normalize_signal(
+    normalized = transform_cross_sectional(
         [1.0, 2.0, 100.0],
         time_key,
-        {"method": "rank"},
+        "rank",
     )
     assert normalized == [0.0, 0.5, 1.0]
 

@@ -56,13 +56,17 @@ fn instrument_envelope_has_golden_canonical_bytes_hash_and_order_invariance() {
 fn calibration_envelope_has_golden_canonical_bytes_hash_and_order_invariance() {
     let first_bytes = document_with_replacement(
         include_str!("data/canonical/calibration.json"),
-        r#""quote_sets":{}"#,
+        r#""quote_sets":{"eur":[],"usd":[]}"#,
         r#""quote_sets":{"usd":[],"eur":[]}"#,
     );
     let second_bytes = document_with_replacement(
         include_str!("data/canonical/calibration.json"),
-        r#""quote_sets":{}"#,
         r#""quote_sets":{"eur":[],"usd":[]}"#,
+        r#""quote_sets":{"eur":[],"usd":[]}"#,
+    );
+    assert_ne!(
+        first_bytes, second_bytes,
+        "fixture must exercise different key orders"
     );
     let (first, first_report) =
         CalibrationEnvelope::from_slice_strict(&first_bytes, &LoadLimits::default())

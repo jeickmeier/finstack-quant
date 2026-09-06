@@ -159,7 +159,7 @@ fn swaption_vol_step_builds_and_inserts_surface() {
     quote_sets.insert("swpt".to_string(), cal_utils::quote_set_ids(&swpt_quotes));
 
     let settings = CalibrationConfig {
-        solver: finstack_quant_calibration::SolverConfig::brent_default()
+        solver: finstack_quant_calibration::SolverConfig::default()
             .with_tolerance(1e-10)
             .with_max_iterations(200),
         ..Default::default()
@@ -487,7 +487,7 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
             description: None,
             quote_sets: quote_sets.into_iter().collect(),
             settings: CalibrationConfig {
-                solver: finstack_quant_calibration::SolverConfig::brent_default()
+                solver: finstack_quant_calibration::SolverConfig::default()
                     .with_tolerance(1.0e-10)
                     .with_max_iterations(200),
                 ..Default::default()

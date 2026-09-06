@@ -374,7 +374,10 @@ impl PortfolioMarginAggregator {
         } else {
             let (im, simm_breakdown) =
                 if let Some(ref sensitivities) = netting_set.aggregated_sensitivities {
-                    let (im, breakdown) = self.calculate_simm_with_breakdown(sensitivities)?;
+                    let (total, breakdown) = self
+                        .simm_calculator
+                        .calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
+                    let im = Money::new(total, self.base_currency)?;
                     (im, Some((sensitivities.clone(), breakdown)))
                 } else {
                     (Money::from((0_i64, self.base_currency)), None)
@@ -511,22 +514,6 @@ impl PortfolioMarginAggregator {
     fn convert_to_base(&self, amount: Money, market: &MarketContext, as_of: Date) -> Result<f64> {
         crate::fx::convert_to_base(amount, as_of, market, self.base_currency).map(|m| m.amount())
     }
-
-    /// Calculate SIMM total IM and breakdown by risk class in a single pass.
-    ///
-    /// Returns (total_im, breakdown_by_risk_class). Uses the cached
-    /// `SimmCalculator` for efficiency.
-    fn calculate_simm_with_breakdown(
-        &self,
-        sensitivities: &SimmSensitivities,
-    ) -> finstack_quant_core::Result<(Money, finstack_quant_core::HashMap<String, Money>)> {
-        Ok({
-            let (total_im, breakdown) = self
-                .simm_calculator
-                .calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
-            (Money::new(total_im, self.base_currency)?, breakdown)
-        })
-    }
 }
 
 #[cfg(test)]
@@ -650,7 +637,7 @@ mod tests {
             _as_of: Date,
         ) -> finstack_quant_core::Result<SimmSensitivities> {
             let mut sensitivities = SimmSensitivities::new(self.mtm.currency());
-            sensitivities.add_ir_delta(self.mtm.currency(), "5y", self.ir_delta);
+            sensitivities.add_ir_delta(self.mtm.currency(), "5Y", self.ir_delta);
             Ok(sensitivities)
         }
 

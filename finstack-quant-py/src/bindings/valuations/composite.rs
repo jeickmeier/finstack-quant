@@ -359,9 +359,11 @@ impl PyWeightingMethod {
     /// WeightingMethod
     ///     Anchored metric-weighting policy.
     ///
-    /// Notes
-    /// -----
-    /// This factory does not raise; anchors and quantities are validated by ``CompositeSpec``.
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the metric key uses noncanonical composite encoding. Anchors and
+    ///     quantities are validated by ``CompositeSpec``.
     #[staticmethod]
     #[pyo3(signature = (metric, anchor_leg_id, anchor_quantity, neutralize=false))]
     fn metric_weighted(
@@ -369,15 +371,15 @@ impl PyWeightingMethod {
         anchor_leg_id: &str,
         anchor_quantity: f64,
         neutralize: bool,
-    ) -> Self {
-        Self {
+    ) -> PyResult<Self> {
+        Ok(Self {
             inner: WeightingMethod::MetricWeighted {
-                metric: MetricId::custom(metric),
+                metric: metric.parse().map_err(core_to_py)?,
                 anchor_leg_id: InstrumentId::new(anchor_leg_id),
                 anchor_quantity,
                 neutralize,
             },
-        }
+        })
     }
 
     /// Construct parallel-DV01-neutral weighting.
@@ -1219,8 +1221,9 @@ impl PyCompositeInstrument {
         let metrics = metrics
             .unwrap_or_default()
             .into_iter()
-            .map(MetricId::custom)
-            .collect::<Vec<_>>();
+            .map(MetricId::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(core_to_py)?;
         self.inner
             .primitive_exposure_report(&market, as_of, &metrics)
             .map(PyCompositeExposureReport::from_inner)
@@ -1718,7 +1721,7 @@ impl PyCompositeHistoryEngine {
     /// warmup : list[dict] | str | None
     ///     Optional strictly earlier complete observations used for weighting only.
     /// metrics : list[str] | None
-    ///     Optional additive primitive metrics included on every output row.
+    ///     Optional canonical additive metric keys included on every output row.
     ///
     /// Returns
     /// -------
@@ -1728,7 +1731,7 @@ impl PyCompositeHistoryEngine {
     /// Raises
     /// ------
     /// ValueError
-    ///     If observations, warmup, initialization, pricing, FX, or rebalancing fail.
+    ///     If metrics, observations, warmup, initialization, pricing, FX, or rebalancing fail.
     #[staticmethod]
     #[pyo3(signature = (spec, observations, warmup=None, metrics=None))]
     fn run_from_spec(
@@ -1743,8 +1746,9 @@ impl PyCompositeHistoryEngine {
         let metrics = metrics
             .unwrap_or_default()
             .into_iter()
-            .map(MetricId::custom)
-            .collect::<Vec<_>>();
+            .map(MetricId::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(core_to_py)?;
         CompositeHistoryEngine::run_from_spec(&spec.inner, &warmup, &observations, &metrics)
             .map(|inner| PyCompositeHistoryResult { inner })
             .map_err(core_to_py)
@@ -1763,7 +1767,7 @@ impl PyCompositeHistoryEngine {
     ///     Non-empty strictly increasing complete market-observation array
     ///     (list of dicts or JSON string).
     /// metrics : list[str] | None
-    ///     Optional additive primitive metrics included on every output row.
+    ///     Optional canonical additive metric keys included on every output row.
     ///
     /// Returns
     /// -------
@@ -1773,7 +1777,7 @@ impl PyCompositeHistoryEngine {
     /// Raises
     /// ------
     /// ValueError
-    ///     If state, observations, market inputs, pricing, FX, or rebalancing fail.
+    ///     If metrics, state, observations, market inputs, pricing, FX, or rebalancing fail.
     #[staticmethod]
     #[pyo3(signature = (instrument, observations, metrics=None))]
     fn run(
@@ -1786,8 +1790,9 @@ impl PyCompositeHistoryEngine {
         let metrics = metrics
             .unwrap_or_default()
             .into_iter()
-            .map(MetricId::custom)
-            .collect::<Vec<_>>();
+            .map(MetricId::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(core_to_py)?;
         CompositeHistoryEngine::run(&instrument.inner, &observations, &metrics)
             .map(|inner| PyCompositeHistoryResult { inner })
             .map_err(core_to_py)

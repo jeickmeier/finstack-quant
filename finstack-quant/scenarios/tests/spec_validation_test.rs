@@ -329,7 +329,7 @@ fn scenario_validate_accepts_mixed_valid_operations() {
                 },
             },
             OperationSpec::InstrumentSpreadBpByType {
-                instrument_types: vec![InstrumentType::Bond, InstrumentType::Loan],
+                instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],
                 bp: 25.0,
             },
             OperationSpec::HierarchyVolSurfaceParallelPct {

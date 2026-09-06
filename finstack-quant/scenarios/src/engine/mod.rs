@@ -218,27 +218,6 @@ impl ScenarioEngine {
         self.recalibration_provider.as_ref()
     }
 
-    /// Merge scenarios via [`ScenarioSpec::compose`].
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if `scenarios` contain conflicting
-    /// `hazard_bump_mode` values or more than one time-roll operation. Other
-    /// conflicts remain in the composed spec and are validated when
-    /// [`Self::apply`] is called.
-    ///
-    /// # Arguments
-    ///
-    /// * `scenarios` - Scenario specifications to merge in ascending priority
-    ///   order. Every non-empty input must use the same `hazard_bump_mode`;
-    ///   conflicting modes are rejected before composition.
-    pub fn try_compose(
-        &self,
-        scenarios: Vec<ScenarioSpec>,
-    ) -> std::result::Result<ScenarioSpec, crate::error::Error> {
-        ScenarioSpec::compose(scenarios)
-    }
-
     /// Apply a scenario specification to the execution context.
     ///
     /// Operations are applied in this order:

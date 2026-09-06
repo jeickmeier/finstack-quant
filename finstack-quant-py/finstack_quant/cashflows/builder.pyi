@@ -47,7 +47,6 @@ __all__ = [
     "FeeBase",
     "FeeSpec",
     "FixedCouponSpec",
-    "FixedWindow",
     "FloatingCouponSpec",
     "FloatingRateFallback",
     "FloatingRateSpec",
@@ -747,9 +746,8 @@ class CashFlowBuilder:
     def fixed_to_float(
         self,
         switch: datetime.date,
-        fixed_win: FixedWindow,
+        fixed: FixedCouponSpec,
         floating: FloatingCouponSpec,
-        fixed_split: CouponType,
     ) -> CashFlowBuilder:
         """
         Switch from a fixed coupon to a floating coupon at ``switch``.
@@ -759,12 +757,10 @@ class CashFlowBuilder:
         switch : datetime.date
             Date on which the floating leg begins (exclusive end of the
             fixed window).
-        fixed_win : FixedWindow
-            Fixed rate and schedule for the pre-switch window.
+        fixed : FixedCouponSpec
+            Fixed rate, settlement type, and schedule for the pre-switch window.
         floating : FloatingCouponSpec
             Floating coupon spec for the post-switch window.
-        fixed_split : CouponType
-            Cash / PIK / split settlement for the fixed window.
 
         Returns
         -------
@@ -2380,140 +2376,6 @@ class FeeSpec:
         >>> from finstack_quant.core.dates import DayCount
         >>> value = FeeSpec.periodic_bp(FeeBase.DRAWN, 25, "3M", DayCount.ACT_360, "weekends_only")
         >>> FeeSpec.from_json(value.to_json()).to_json() == value.to_json()
-        True
-        """
-        ...
-
-    def __reduce__(self) -> tuple[Any, tuple[str]]:
-        """
-        Pickle support via the JSON wire form (``from_json``, ``(to_json(),)``).
-
-        Returns
-        -------
-        tuple
-            ``(from_json, (json,))`` reconstructor pair.
-
-        Raises
-        ------
-        ValueError
-            If the value holds a non-finite float that JSON cannot carry.
-        """
-        ...
-
-class FixedWindow:
-    """
-    Fixed-rate coupon window with a shared schedule.
-
-    Pairs an annual coupon rate with the schedule conventions used for
-    that window. Pass this to :meth:`CashFlowBuilder.fixed_to_float` as
-    the pre-switch fixed leg.
-
-    Examples
-    --------
-    >>> from decimal import Decimal
-    >>> from finstack_quant.cashflows.builder import FixedWindow, ScheduleParams
-    >>> window = FixedWindow(Decimal("0.04"), ScheduleParams.semiannual_30360())
-    >>> window.rate
-    Decimal('0.04')
-    """
-
-    def __init__(self, rate: Decimal | float, schedule: ScheduleParams) -> None:
-        """
-        Construct a fixed-rate coupon window.
-
-        Parameters
-        ----------
-        rate : decimal.Decimal | float
-            Annual coupon rate as a decimal (``0.05`` for 5%).
-        schedule : ScheduleParams
-            Accrual and payment schedule conventions for the window.
-
-        Raises
-        ------
-        ValueError
-            If *rate* is not representable as a finite decimal value.
-        """
-        ...
-
-    @property
-    def rate(self) -> Decimal:
-        """
-        Annual coupon rate in decimal terms (``0.05`` is 5%).
-
-        Returns
-        -------
-        decimal.Decimal
-            The coupon rate as an exact decimal (e.g. ``Decimal("0.04")``).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def schedule(self) -> ScheduleParams:
-        """
-        Accrual and payment schedule conventions.
-
-        Returns
-        -------
-        ScheduleParams
-            The schedule-generation parameters for this window.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to the canonical JSON wire form.
-
-        Returns
-        -------
-        str
-            Strict-serde JSON document; round-trips through :meth:`from_json`.
-
-        Raises
-        ------
-        ValueError
-            If a field cannot be represented in JSON (non-finite float).
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FixedWindow, ScheduleParams
-        >>> isinstance(FixedWindow(0.05, ScheduleParams.quarterly_act360()).to_json(), str)
-        True
-        """
-        ...
-
-    @staticmethod
-    def from_json(json: str) -> FixedWindow:
-        """
-        Deserialize from the canonical JSON wire form (strict field names).
-
-        Parameters
-        ----------
-        json : str
-            JSON document produced by :meth:`to_json`.
-
-        Returns
-        -------
-        FixedWindow
-            Reconstructed value.
-
-        Raises
-        ------
-        ValueError
-            If the JSON is malformed or carries unknown fields.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FixedWindow, ScheduleParams
-        >>> value = FixedWindow(0.05, ScheduleParams.quarterly_act360())
-        >>> FixedWindow.from_json(value.to_json()).to_json() == value.to_json()
         True
         """
         ...

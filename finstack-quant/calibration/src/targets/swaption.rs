@@ -1330,7 +1330,7 @@ mod tests {
         }
 
         let config = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default().with_max_iterations(500),
+            solver: crate::solver::SolverConfig::default().with_max_iterations(500),
             ..CalibrationConfig::default()
         };
         let (cube, _report) = SwaptionVolTarget::solve(&p, &quotes, &ctx, &config).expect("solve");
@@ -1444,7 +1444,7 @@ mod tests {
         }
 
         let config = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default().with_max_iterations(500),
+            solver: crate::solver::SolverConfig::default().with_max_iterations(500),
             ..CalibrationConfig::default()
         };
 

@@ -15,7 +15,7 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_core::market_data::hierarchy::HierarchyTarget;
 use finstack_quant_scenarios::{
-    CurveKind, InstrumentType, OperationSpec, ScenarioEngine, TimeRollMode,
+    CurveKind, InstrumentType, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
 use fixtures::{
     apply_market, apply_with_instruments, compose_specs, hierarchy_hazard_market, hierarchy_market,
@@ -148,18 +148,13 @@ fn scaling_time_roll_instruments(c: &mut Criterion) {
 
 fn scaling_compose(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_compose");
-    let engine = ScenarioEngine::new();
 
     for n in [10_usize, 50, 200] {
         let scenarios = compose_specs(n);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
             b.iter(|| {
-                black_box(
-                    engine
-                        .try_compose(black_box(scenarios.clone()))
-                        .expect("compose"),
-                )
+                black_box(ScenarioSpec::compose(black_box(scenarios.clone())).expect("compose"))
             });
         });
     }

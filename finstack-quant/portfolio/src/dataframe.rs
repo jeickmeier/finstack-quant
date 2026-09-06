@@ -166,7 +166,7 @@ pub fn metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEnvelope> {
 
     for (position_id, position_metrics) in &metrics.by_position {
         for (metric_id, value) in &position_metrics.metrics {
-            metric_ids.push(metric_id.clone());
+            metric_ids.push(metric_id.to_string());
             position_ids.push(position_id.to_string());
             currencies.push(position_metrics.currency.to_string());
             values.push(*value);
@@ -210,7 +210,7 @@ pub fn aggregated_metrics_to_table(metrics: &PortfolioMetrics) -> Result<TableEn
     let mut totals: Vec<f64> = Vec::with_capacity(n);
 
     for (metric_id, agg_metric) in &metrics.aggregated {
-        metric_ids.push(metric_id.clone());
+        metric_ids.push(metric_id.to_string());
         totals.push(agg_metric.total);
     }
 

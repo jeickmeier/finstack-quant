@@ -375,7 +375,7 @@ pub fn price_instrument(
         .iter()
         .map(|metric| {
             MetricId::parse_strict(metric).or_else(|strict_error| {
-                let registered = MetricId::custom(metric);
+                let registered: MetricId = metric.parse()?;
                 if metric_registry.has_metric(registered.clone()) {
                     Ok(registered)
                 } else {

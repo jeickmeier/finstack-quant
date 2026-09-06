@@ -158,7 +158,7 @@ pub fn implied_vol_black(
         return Err(InputError::InvalidVolatility { value: -1.0 }.into());
     }
     // Price at intrinsic → vol is zero
-    if price <= intrinsic + f64::EPSILON * scale {
+    if price <= intrinsic {
         return Ok(0.0);
     }
 
@@ -172,7 +172,7 @@ pub fn implied_vol_black(
     }
 
     let (otm_price, otm_is_call) = to_otm(price, forward, strike, is_call);
-    if otm_price <= f64::EPSILON * scale {
+    if otm_price <= 0.0 {
         return Ok(0.0);
     }
 
@@ -545,7 +545,7 @@ fn check_residual(
     // just a safety net to catch genuine non-convergence.
     let tol = (target * 1e-8).max(scale * 1e-14);
 
-    if residual > tol {
+    if !sigma.is_finite() || !residual.is_finite() || residual > tol {
         return Err(InputError::VolatilityConversionFailed {
             tolerance: tol,
             residual,

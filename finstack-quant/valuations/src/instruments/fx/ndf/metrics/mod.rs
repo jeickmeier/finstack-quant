@@ -27,7 +27,7 @@ pub(crate) fn register_ndf_metrics(
     // automatically — the bump goes through the FX matrix, and `Ndf::value`
     // already reads spot in its own convention. The previous calculator's
     // regression tests are subsumed by the generic + canonical pricer path.
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Fx01,
         crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::Ndf],

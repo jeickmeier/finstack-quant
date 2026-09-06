@@ -68,19 +68,19 @@ pub(crate) fn register_revolving_credit_metrics(
     use crate::metrics::MetricId;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("utilization_rate"),
         Arc::new(UtilizationRateCalculator),
         &[InstrumentType::RevolvingCredit],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("available_capacity"),
         Arc::new(AvailableCapacityCalculator),
         &[InstrumentType::RevolvingCredit],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("weighted_average_cost"),
         Arc::new(ApproxWeightedAverageCostCalculator),
         &[InstrumentType::RevolvingCredit],

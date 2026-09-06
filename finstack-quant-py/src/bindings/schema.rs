@@ -103,8 +103,8 @@ fn index() -> PyResult<String> {
 fn get(selector: &str, profile: &str) -> PyResult<String> {
     let artifact = finstack_quant::schema::find(selector)
         .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
-    let value = crate::bindings::schema_registry::render_profile(artifact, profile)
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let value = finstack_quant::schema::render_profile(artifact, profile)
+        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
     serde_json::to_string_pretty(&value).map_err(|error| {
         pyo3::exceptions::PyValueError::new_err(format!("serialize schema: {error}"))
     })

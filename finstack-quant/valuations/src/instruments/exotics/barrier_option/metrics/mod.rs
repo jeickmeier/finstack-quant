@@ -14,25 +14,25 @@ pub(crate) fn register_barrier_option_metrics(
     use crate::metrics::{GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga};
     use crate::pricer::InstrumentType;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Delta,
         Arc::new(GenericFdDelta::<crate::instruments::BarrierOption>::default()),
         &[InstrumentType::BarrierOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Gamma,
         Arc::new(GenericFdGamma::<crate::instruments::BarrierOption>::default()),
         &[InstrumentType::BarrierOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Vanna,
         Arc::new(GenericFdVanna::<crate::instruments::BarrierOption>::default()),
         &[InstrumentType::BarrierOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Volga,
         Arc::new(GenericFdVolga::<crate::instruments::BarrierOption>::default()),
         &[InstrumentType::BarrierOption],

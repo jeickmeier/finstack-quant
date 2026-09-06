@@ -13,13 +13,13 @@ mod tests;
 
 pub use externalize::{externalize_schema_definitions, ExternalSchemaDefinition};
 pub use generator::{
-    deterministic_json_bytes, run_schema_generator, run_schema_index_generator,
-    SchemaGenerationCommand, SchemaGenerationMode, SCHEMA_INDEX_VERSION,
+    build_schema_index, deterministic_json_bytes, run_schema_generator, run_schema_index_generator,
+    schema_index_row, SchemaGenerationCommand, SchemaGenerationMode, SCHEMA_INDEX_VERSION,
 };
 pub use llm::{project_llm, LlmProfile, DEFAULT_MAX_INLINE_BYTES, RESOLVES_FROM_KEYWORD};
 pub use registry::{
-    generated_schema, SchemaArtifact, SchemaKind, SerdeSchema, COMMON_SCHEMA_BASE,
-    COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
+    find_schema_artifact, generated_schema, SchemaArtifact, SchemaKind, SerdeSchema,
+    COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
 };
 
 /// A valid but empty market snapshot.

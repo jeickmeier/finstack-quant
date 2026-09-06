@@ -326,7 +326,7 @@ function candidateDocumentation(node, interfaceName, file, raw) {
     return source?.members.get(`${scope}:${name}`) ?? null;
   }
   if (interfaceName.endsWith('Namespace')) {
-    return raw.functions.get(name) ?? null;
+    return ts.isMethodSignature(node) ? (raw.functions.get(name) ?? null) : null;
   }
   const source = raw.classes.get(interfaceName);
   return source?.members.get(`instance:${name}`) ?? null;

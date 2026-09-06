@@ -149,15 +149,24 @@ fn stochastic_summary_measures(result: &StochasticPricingResult) -> IndexMap<Met
 
     for tranche in &result.tranche_results {
         measures.insert(
-            MetricId::custom(format!("tranche_npv::{}", tranche.tranche_id)),
+            MetricId::composite(
+                &MetricId::custom("tranche_npv"),
+                &[tranche.tranche_id.as_str()],
+            ),
             tranche.npv.amount(),
         );
         measures.insert(
-            MetricId::custom(format!("tranche_expected_loss::{}", tranche.tranche_id)),
+            MetricId::composite(
+                &MetricId::custom("tranche_expected_loss"),
+                &[tranche.tranche_id.as_str()],
+            ),
             tranche.expected_loss.amount(),
         );
         measures.insert(
-            MetricId::custom(format!("tranche_wal::{}", tranche.tranche_id)),
+            MetricId::composite(
+                &MetricId::custom("tranche_wal"),
+                &[tranche.tranche_id.as_str()],
+            ),
             tranche.average_life,
         );
     }

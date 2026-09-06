@@ -145,7 +145,6 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
             "FeeBase",
             "FeeSpec",
             "FixedCouponSpec",
-            "FixedWindow",
             "FloatingCouponSpec",
             "FloatingRateFallback",
             "FloatingRateSpec",

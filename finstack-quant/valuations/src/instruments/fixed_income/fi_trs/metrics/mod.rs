@@ -34,24 +34,24 @@ pub(crate) fn register_fi_trs_metrics(
     // Duration-based yield sensitivity. Registered under DurationDv01 (not IndexDelta)
     // because this measures yield sensitivity (N × D × 1bp), which is conceptually
     // distinct from equity IndexDelta (dV/dS per unit of index level change).
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DurationDv01,
         Arc::new(DurationDv01Calculator),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ParSpread,
         Arc::new(ParSpreadCalculator),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::FinancingAnnuity,
         Arc::new(FinancingAnnuityCalculator),
         &instruments,
     )?;
 
     // DV01 for financing leg sensitivity
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,
@@ -60,7 +60,7 @@ pub(crate) fn register_fi_trs_metrics(
         )),
         &instruments,
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,

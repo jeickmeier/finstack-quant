@@ -985,11 +985,6 @@
           "type": "string"
         },
         {
-          "const": "loan",
-          "description": "Term loan or bilateral lending facility.",
-          "type": "string"
-        },
-        {
           "const": "credit_default_swap",
           "description": "Credit Default Swap (single-name credit protection).",
           "type": "string"
@@ -1863,7 +1858,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Instrument price shock by type.\n\n`pct` may be `<= -100`: legitimate write-down stress.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, InstrumentType};\n\nlet op = OperationSpec::InstrumentPricePctByType {\n    instrument_types: vec![InstrumentType::Bond, InstrumentType::Loan],\n    pct: -5.0,\n};\n```",
+          "description": "Instrument price shock by type.\n\n`pct` may be `<= -100`: legitimate write-down stress.\n\n# Example\n```rust\nuse finstack_quant_scenarios::{OperationSpec, InstrumentType};\n\nlet op = OperationSpec::InstrumentPricePctByType {\n    instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],\n    pct: -5.0,\n};\n```",
           "properties": {
             "instrument_types": {
               "description": "Instrument types to shock.",
@@ -2167,7 +2162,7 @@
     },
     "ScenarioSpec": {
       "additionalProperties": false,
-      "description": "A complete scenario specification with metadata and ordered operations.\n\n# Fields\n- `id`: Stable identifier used for persistence and reporting.\n- `name`: Optional display name for UI or logs.\n- `description`: Optional text describing the intent of the scenario.\n- `operations`: Ordered list of [`OperationSpec`] values to execute.\n- `priority`: Used by [`ScenarioEngine::try_compose`](crate::engine::ScenarioEngine::try_compose)\n  to determine merge ordering (lower numbers run first).\n- `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree\n  levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].\n- `hazard_bump_mode`: ParCDS delivery. Defaults to\n  [`HazardBumpMode::SolveToPar`].\n\n# Examples\n\n```rust\nuse finstack_quant_scenarios::{HazardBumpMode, ScenarioSpec, OperationSpec, CurveKind};\nuse finstack_quant_core::market_data::hierarchy::ResolutionMode;\n\nlet scenario = ScenarioSpec {\n    id: \"stress_test\".into(),\n    name: Some(\"Q1 Stress\".into()),\n    description: Some(\"Rate shock scenario\".into()),\n    operations: vec![\n        OperationSpec::CurveParallelBp {\n            curve_kind: CurveKind::Discount,\n            curve_id: \"USD_SOFR\".into(),\n            discount_curve_id: None,\n            bp: 50.0,\n        },\n    ],\n    priority: 0,\n    resolution_mode: ResolutionMode::default(),\n    hazard_bump_mode: HazardBumpMode::default(),\n};\n```",
+      "description": "A complete scenario specification with metadata and ordered operations.\n\n# Fields\n- `id`: Stable identifier used for persistence and reporting.\n- `name`: Optional display name for UI or logs.\n- `description`: Optional text describing the intent of the scenario.\n- `operations`: Ordered list of [`OperationSpec`] values to execute.\n- `priority`: Used by [`ScenarioSpec::compose`](crate::spec::ScenarioSpec::compose)\n  to determine merge ordering (lower numbers run first).\n- `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree\n  levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].\n- `hazard_bump_mode`: ParCDS delivery. Defaults to\n  [`HazardBumpMode::SolveToPar`].\n\n# Examples\n\n```rust\nuse finstack_quant_scenarios::{HazardBumpMode, ScenarioSpec, OperationSpec, CurveKind};\nuse finstack_quant_core::market_data::hierarchy::ResolutionMode;\n\nlet scenario = ScenarioSpec {\n    id: \"stress_test\".into(),\n    name: Some(\"Q1 Stress\".into()),\n    description: Some(\"Rate shock scenario\".into()),\n    operations: vec![\n        OperationSpec::CurveParallelBp {\n            curve_kind: CurveKind::Discount,\n            curve_id: \"USD_SOFR\".into(),\n            discount_curve_id: None,\n            bp: 50.0,\n        },\n    ],\n    priority: 0,\n    resolution_mode: ResolutionMode::default(),\n    hazard_bump_mode: HazardBumpMode::default(),\n};\n```",
       "properties": {
         "description": {
           "default": null,

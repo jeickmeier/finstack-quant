@@ -1,52 +1,5 @@
 {
   "$defs": {
-    "BrentSolver": {
-      "additionalProperties": false,
-      "description": "Brent's method solver (bracketing required).\n\nImplements Brent's root-finding algorithm, which combines bisection,\nsecant method, and inverse quadratic interpolation.\n\n# Algorithm\n\nBrent's method maintains a bracketing interval [a, b] where f(a) and f(b)\nhave opposite signs. At each iteration, it chooses between:\n1. **Inverse quadratic interpolation**: Fast when applicable\n2. **Secant method**: Reliable fallback\n3. **Bisection**: bracket-preserving progress\n\nThe algorithm selects the step type from the current bracket and convergence\ncriteria.\n\n# Convergence\n\n- **Rate**: Superlinear (order ≈ 1.618)\n- **Bracket condition**: Requires a finite sign-changing bracket\n- **Derivative-free**: Does not require smooth derivatives\n\n# Use Cases\n\nUse instead of Newton-Raphson when:\n- Function has discontinuous derivatives (e.g., piecewise functions)\n- Initial guess quality is uncertain\n- A sign-changing bracket is available\n- Function evaluation is cheap relative to derivative computation\n\nCommon applications:\n- Bond yield-to-maturity (when price/yield curve is complex)\n- Option implied volatility with exotic payoffs\n- Credit curve calibration\n\n# Examples\n\n```rust\nuse finstack_quant_core::math::solver::{BrentSolver, Solver};\n\nlet solver = BrentSolver::new();\n\n// Solve x^3 - 2x - 5 = 0\nlet f = |x: f64| x.powi(3) - 2.0 * x - 5.0;\nlet root = solver.solve(f, 2.0).expect(\"Root finding should succeed\");\n\nassert!((f(root)).abs() < 1e-10);\nassert!((root - 2.0946).abs() < 1e-4);\n```\n\n# References\n\n- Brent, R. P. (1973). *Algorithms for Minimization without Derivatives*.\n  Prentice-Hall. Chapter 4. `docs/REFERENCES.md#brent-1973`\n- Press, W. H., et al. (2007). *Numerical Recipes: The Art of Scientific Computing*\n  (3rd ed.). Cambridge University Press. Section 9.3. `docs/REFERENCES.md#press-numerical-recipes`\n- Forsythe, G. E., Malcolm, M. A., & Moler, C. B. (1977). *Computer Methods\n  for Mathematical Computations*. Prentice-Hall.",
-      "properties": {
-        "bracket_expansion": {
-          "default": 2.0,
-          "description": "Bracket expansion factor",
-          "format": "double",
-          "type": "number"
-        },
-        "bracket_max": {
-          "default": 1000000.0,
-          "description": "Maximum bound for bracket search (default: 1e6)",
-          "format": "double",
-          "type": "number"
-        },
-        "bracket_min": {
-          "default": -1000000.0,
-          "description": "Minimum bound for bracket search (default: -1e6)",
-          "format": "double",
-          "type": "number"
-        },
-        "initial_bracket_size": {
-          "default": null,
-          "description": "Initial bracket size (adaptive to initial guess if None)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "max_iterations": {
-          "default": 100,
-          "description": "Maximum iterations",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "tolerance": {
-          "default": 1e-12,
-          "description": "Convergence tolerance.\n\nConvergence uses dual tolerances: the residual (`|f(x)| < tol`) and the\nbracket/step size. The default `1e-12` is stricter than the `1e-8`\ncommonly used by market-facing wrappers such as IRR/XIRR and is intended\nfor generic core numerical solving.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
     "CalibrationConfig": {
       "additionalProperties": false,
       "description": "Global configuration for the calibration subsystem.\n\nThis struct consolidates all settings for solvers, validation, and market-regime\nspecific bounds. It is typically derived from a `FinstackConfig` extension section.\nPublic callers should treat it as the behavioral contract for calibration\nexecution policy: solver choice, convergence settings, validation thresholds,\nrate-bound policy, and curve-specific numerical guardrails.\n\n# Tolerance Semantics\n\nCalibration involves two distinct tolerance concepts:\n\n1. **Solver Tolerance** ([`solver.tolerance()`](SolverConfig::tolerance)):\n   Controls when the numerical solver (Brent/Newton) terminates. This is an\n   algorithmic convergence criterion in x-space (parameter space). The solver\n   stops when successive parameter estimates differ by less than this tolerance.\n\n2. **Validation Tolerance** (e.g., [`discount_curve.validation_tolerance`](DiscountCurveSolveConfig::validation_tolerance)\n   for PV-per-notional curve residuals, or [`vol_surface.validation_tolerance`](VolSurfaceSolveConfig::validation_tolerance)\n   for decimal implied-vol residuals):\n   Controls whether calibration is considered *successful*. After the solver\n   converges, the final residuals are compared against this tolerance. If any\n   residual exceeds `validation_tolerance`, the calibration is marked as failed\n   even if the solver converged.\n\n**Why two tolerances?**\n- Solver tolerance ensures numerical convergence but doesn't guarantee economic fit.\n- Validation tolerance ensures the calibrated curve actually prices instruments correctly.\n- For well-behaved problems, solver tolerance of `1e-12` with validation tolerance of\n  `1e-8` works well: the solver finds a precise root, and we verify it prices accurately.\n\n# Configuration Hierarchy\n\nSettings can be specified at multiple levels with the following precedence:\n\n1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides\n2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults\n3. **Finstack config extensions** (`calibration.config.v1`): application defaults\n4. **Global defaults** (`CalibrationConfig::default()`): fallback values\n\nStep-level settings always take precedence over plan-level settings.\nIn other words, this struct provides default policy, but explicit plan steps\nremain authoritative when both are supplied.\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::CalibrationConfig;\n\n// Create a default config\nlet config = CalibrationConfig::default();\n\n// Customize tolerance settings\nlet custom = CalibrationConfig::default()\n    .with_tolerance(1e-14)  // Solver convergence tolerance\n    .with_max_iterations(200);\n```\n\n# References\n\n- Multi-curve construction context: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- Curve interpolation context: `docs/REFERENCES.md#hagan-west-monotone-convex`",
@@ -153,10 +106,6 @@
         "solver": {
           "$ref": "#/$defs/SolverConfig",
           "default": {
-            "bracket_expansion": 2.0,
-            "bracket_max": 1000000.0,
-            "bracket_min": -1000000.0,
-            "initial_bracket_size": null,
             "max_iterations": 100,
             "tolerance": 1e-12
           },
@@ -318,10 +267,6 @@
             },
             "rate_bounds_policy": "auto_currency",
             "solver": {
-              "bracket_expansion": 2.0,
-              "bracket_max": 1000000.0,
-              "bracket_min": -1000000.0,
-              "initial_bracket_size": null,
               "max_iterations": 100,
               "tolerance": 1e-12
             },
@@ -4856,8 +4801,24 @@
       ]
     },
     "SolverConfig": {
-      "$ref": "#/$defs/BrentSolver",
-      "description": "Serializable solver configuration for calibration.\n\nWraps the Brent 1D solver used by the bootstrap path. Serializes transparently\nas the underlying [`BrentSolver`] fields.\n\n# Examples\n\n```\nuse finstack_quant_calibration::SolverConfig;\n\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet config = SolverConfig::brent_default().with_tolerance(1e-12).with_max_iterations(200);\nlet json = serde_json::to_string(&config)?;\n# let _ = json;\n# Ok(())\n# }\n```"
+      "additionalProperties": false,
+      "description": "Serializable convergence settings for calibration.\n\nCalibration owns its bracket search. This configuration contains only the\ntolerance and iteration budget consumed by its numerical solvers.\n\n# Examples\n\n```\nuse finstack_quant_calibration::SolverConfig;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\nlet config = SolverConfig::default().with_tolerance(1e-12).with_max_iterations(200);\nlet json = serde_json::to_string(&config)?;\n# let _ = json;\n# Ok(())\n# }\n```",
+      "properties": {
+        "max_iterations": {
+          "default": 100,
+          "description": "Maximum iterations available to each solver invocation.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tolerance": {
+          "default": 1e-12,
+          "description": "Numerical convergence tolerance; distinct from economic fit acceptance.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "type": "object"
     },
     "SurfaceExtrapolationPolicy": {
       "description": "Extrapolation policy for volatility surface construction.",
@@ -5187,10 +5148,6 @@
           },
           "rate_bounds_policy": "auto_currency",
           "solver": {
-            "bracket_expansion": 2.0,
-            "bracket_max": 1000000.0,
-            "bracket_min": -1000000.0,
-            "initial_bracket_size": null,
             "max_iterations": 100,
             "tolerance": 1e-12
           },

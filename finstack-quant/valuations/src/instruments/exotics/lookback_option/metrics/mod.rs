@@ -15,25 +15,25 @@ pub(crate) fn register_lookback_option_metrics(
     use crate::metrics::{GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga};
     use crate::pricer::InstrumentType;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Delta,
         Arc::new(GenericFdDelta::<crate::instruments::LookbackOption>::default()),
         &[InstrumentType::LookbackOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Gamma,
         Arc::new(GenericFdGamma::<crate::instruments::LookbackOption>::default()),
         &[InstrumentType::LookbackOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Vanna,
         Arc::new(GenericFdVanna::<crate::instruments::LookbackOption>::default()),
         &[InstrumentType::LookbackOption],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Volga,
         Arc::new(GenericFdVolga::<crate::instruments::LookbackOption>::default()),
         &[InstrumentType::LookbackOption],

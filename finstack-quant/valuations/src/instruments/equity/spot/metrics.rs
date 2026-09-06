@@ -71,7 +71,7 @@ impl MetricCalculator for DeltaCalculator {
         let delta = equity.shares.unwrap_or(1.0);
 
         context.computed.insert(
-            MetricId::custom(format!("delta::{}", equity.ticker.as_str())),
+            MetricId::composite(&MetricId::Delta, &[equity.ticker.as_str()]),
             delta,
         );
 

@@ -222,7 +222,7 @@ impl MetricCalculator for BondCs01Calculator {
 
         context
             .computed
-            .insert(MetricId::custom(format!("cs01::{}", inst_id)), cs01);
+            .insert(MetricId::composite(&MetricId::Cs01, &[&inst_id]), cs01);
 
         Ok(cs01)
     }

@@ -13,7 +13,7 @@
 
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CashFlowBuilder, CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec,
-    FixedWindow, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
+    FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
     OvernightIndexConstraintApplication, PrincipalEvent, ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_core::cashflow::CFKind;
@@ -971,17 +971,13 @@ fn full_horizon_coupon_programs_are_order_independent() {
             .payment_split_program(&[(switch, CouponType::Pik)]);
     });
 
-    let fixed_window = || FixedWindow {
+    let fixed_window = || FixedCouponSpec {
+        coupon_type: CouponType::Cash,
         rate: dec!(0.04),
         schedule: ScheduleParams::semiannual_30360(),
     };
     assert_program_order_independent(principal, issue, maturity, |builder| {
-        let _ = builder.fixed_to_float(
-            switch,
-            fixed_window(),
-            order_independence_float_spec(),
-            CouponType::Cash,
-        );
+        let _ = builder.fixed_to_float(switch, fixed_window(), order_independence_float_spec());
     });
     assert_program_order_independent(principal, issue, maturity, |builder| {
         let _ =

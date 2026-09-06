@@ -235,32 +235,10 @@ pub const SCHEMA_INDEX_VERSION: u64 = 1;
 /// # Errors
 ///
 /// Returns [`Error::Internal`] if an artifact cannot be generated or rendered.
-pub(super) fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
+pub fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
     let mut rows = BTreeMap::new();
     for artifact in artifacts {
-        let rendered = deterministic_json_bytes(&artifact.generate()?)?;
-        let mut row = Map::new();
-        row.insert("$id".to_string(), Value::String(artifact.id.to_string()));
-        row.insert(
-            "bytes".to_string(),
-            Value::Number(serde_json::Number::from(rendered.len())),
-        );
-        row.insert(
-            "kind".to_string(),
-            Value::String(artifact.kind.as_str().to_string()),
-        );
-        row.insert(
-            "path".to_string(),
-            Value::String(artifact.relative_path.to_string()),
-        );
-        row.insert(
-            "summary".to_string(),
-            Value::String(artifact.index_summary().to_string()),
-        );
-        row.insert(
-            "title".to_string(),
-            Value::String(artifact.title.to_string()),
-        );
+        let row = schema_index_row(artifact, &artifact.generate()?)?;
         if rows
             .insert(artifact.relative_path, Value::Object(row))
             .is_some()
@@ -282,6 +260,44 @@ pub(super) fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> 
         Value::Number(serde_json::Number::from(SCHEMA_INDEX_VERSION)),
     );
     Ok(Value::Object(document))
+}
+
+/// Render canonical metadata for a schema index row.
+///
+/// # Arguments
+///
+/// * `artifact` - Registry entry supplying the row's identity and description.
+/// * `rendered` - Canonical generated schema; byte size includes pretty JSON and
+///   the trailing newline emitted by the checked-in schema generator.
+///
+/// # Errors
+///
+/// Returns an error if the schema cannot be encoded as JSON.
+pub fn schema_index_row(artifact: &SchemaArtifact, rendered: &Value) -> Result<Map<String, Value>> {
+    let bytes = deterministic_json_bytes(rendered)?;
+    let mut row = Map::new();
+    row.insert("$id".to_string(), Value::String(artifact.id.to_string()));
+    row.insert(
+        "bytes".to_string(),
+        Value::Number(serde_json::Number::from(bytes.len())),
+    );
+    row.insert(
+        "kind".to_string(),
+        Value::String(artifact.kind.as_str().to_string()),
+    );
+    row.insert(
+        "path".to_string(),
+        Value::String(artifact.relative_path.to_string()),
+    );
+    row.insert(
+        "summary".to_string(),
+        Value::String(artifact.index_summary().to_string()),
+    );
+    row.insert(
+        "title".to_string(),
+        Value::String(artifact.title.to_string()),
+    );
+    Ok(row)
 }
 
 /// Write or verify the schema index for one crate's registry.

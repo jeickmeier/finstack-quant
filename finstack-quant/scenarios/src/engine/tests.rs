@@ -8,8 +8,7 @@ use finstack_quant_statements::FinancialModelSpec;
 use time::macros::date;
 
 #[test]
-fn try_compose_rejects_two_time_rolls() {
-    let engine = ScenarioEngine::new();
+fn compose_rejects_two_time_rolls() {
     let s1 = ScenarioSpec {
         id: "roll_6m".into(),
         name: Some("Roll 6M".into()),
@@ -37,16 +36,14 @@ fn try_compose_rejects_two_time_rolls() {
         hazard_bump_mode: Default::default(),
     };
 
-    let err = engine
-        .try_compose(vec![s1, s2])
+    let err = ScenarioSpec::compose(vec![s1, s2])
         .expect_err("duplicate TimeRollForward must error at compose time");
     let msg = format!("{err}");
     assert!(msg.contains("TimeRollForward"));
 }
 
 #[test]
-fn try_compose_preserves_source_ids_and_names() {
-    let engine = ScenarioEngine::new();
+fn compose_preserves_source_ids_and_names() {
     let scenarios = vec![
         ScenarioSpec {
             id: "rates_up".into(),
@@ -74,7 +71,7 @@ fn try_compose_preserves_source_ids_and_names() {
         },
     ];
 
-    let strict = engine.try_compose(scenarios).expect("valid compose");
+    let strict = ScenarioSpec::compose(scenarios).expect("valid compose");
 
     assert_eq!(strict.id.as_str(), "credit_down+rates_up");
     assert_eq!(strict.name.as_deref(), Some("credit_down + Rates Up"));
@@ -84,8 +81,7 @@ fn try_compose_preserves_source_ids_and_names() {
 }
 
 #[test]
-fn try_compose_keeps_agreed_first_order_hazard_mode() {
-    let engine = ScenarioEngine::new();
+fn compose_keeps_agreed_first_order_hazard_mode() {
     let s1 = ScenarioSpec {
         id: "a".into(),
         name: None,
@@ -104,7 +100,7 @@ fn try_compose_keeps_agreed_first_order_hazard_mode() {
         resolution_mode: Default::default(),
         hazard_bump_mode: crate::HazardBumpMode::FirstOrderShift,
     };
-    let composed = engine.try_compose(vec![s1, s2]).expect("compose");
+    let composed = ScenarioSpec::compose(vec![s1, s2]).expect("compose");
     assert_eq!(
         composed.hazard_bump_mode,
         crate::HazardBumpMode::FirstOrderShift
@@ -112,8 +108,7 @@ fn try_compose_keeps_agreed_first_order_hazard_mode() {
 }
 
 #[test]
-fn try_compose_falls_back_to_solve_to_par_when_modes_disagree() {
-    let engine = ScenarioEngine::new();
+fn compose_falls_back_to_solve_to_par_when_modes_disagree() {
     let s1 = ScenarioSpec {
         id: "a".into(),
         name: None,
@@ -132,9 +127,8 @@ fn try_compose_falls_back_to_solve_to_par_when_modes_disagree() {
         resolution_mode: Default::default(),
         hazard_bump_mode: crate::HazardBumpMode::SolveToPar,
     };
-    let error = engine
-        .try_compose(vec![s1, s2])
-        .expect_err("mixed hazard bump modes must be rejected");
+    let error =
+        ScenarioSpec::compose(vec![s1, s2]).expect_err("mixed hazard bump modes must be rejected");
     let message = error.to_string();
     assert!(message.contains("a"), "unexpected error: {message}");
     assert!(message.contains("b"), "unexpected error: {message}");

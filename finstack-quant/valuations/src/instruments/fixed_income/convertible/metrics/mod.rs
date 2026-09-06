@@ -38,48 +38,48 @@ pub(crate) fn register_convertible_metrics(
     use std::sync::Arc;
 
     // Custom metrics (not in standard MetricId enum)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("parity"),
         Arc::new(parity::ParityCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("conversion_premium"),
         Arc::new(conversion_premium::ConversionPremiumCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("conversion_value"),
         Arc::new(conversion_value::ConversionValueCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Accrued,
         Arc::new(accrued_interest::AccruedInterestCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CleanPrice,
         Arc::new(accrued_interest::CleanPriceCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dividend01,
         Arc::new(dividend_risk::DividendRiskCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Conversion01,
         Arc::new(conversion01::Conversion01Calculator),
         &[InstrumentType::Convertible],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Oas,
         Arc::new(oas::OasCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaSpotVol,
         Arc::new(CrossFactorCalculator::new(
             make_spot_bumper,
@@ -87,7 +87,7 @@ pub(crate) fn register_convertible_metrics(
         )),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaSpotCredit,
         Arc::new(CrossFactorCalculator::new(
             make_spot_bumper,
@@ -95,7 +95,7 @@ pub(crate) fn register_convertible_metrics(
         )),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaRatesCredit,
         Arc::new(CrossFactorCalculator::new(
             make_rates_bumper,
@@ -103,7 +103,7 @@ pub(crate) fn register_convertible_metrics(
         )),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaCreditVol,
         Arc::new(CrossFactorCalculator::new(
             make_credit_bumper,
@@ -111,12 +111,12 @@ pub(crate) fn register_convertible_metrics(
         )),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("bond_floor"),
         Arc::new(bond_floor::BondFloorCalculator),
         &[InstrumentType::Convertible],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ImpliedVol,
         Arc::new(implied_vol::ImpliedVolCalculator),
         &[InstrumentType::Convertible],

@@ -46,7 +46,7 @@ fn test_cashflow_report_types_roundtrip() {
     assert_roundtrip_value(&CashflowExtractionIssue {
         position_id: position_id.clone(),
         instrument_id: "LOAN_B".to_string(),
-        instrument_type: InstrumentType::Loan,
+        instrument_type: InstrumentType::TermLoan,
         kind: CashflowExtractionIssueKind::BuildFailed,
         message: "missing forward curve".to_string(),
     });

@@ -26,7 +26,7 @@ save and diff a `main` baseline, failing above a 10% median regression.
 
 | Group | Cases |
 |-------|-------|
-| `scenario_composition` | `try_compose` over 10 specs |
+| `scenario_composition` | `compose` over 10 specs |
 | `curve_parallel_shock` | `single_curve` — 50 bp discount-curve shift |
 | `curve_node_shock` | `5_nodes` key-rate bumps |
 | `hazard_curve_shock` | `parallel_ig`, `node_hy` par-CDS shifts |
@@ -51,7 +51,7 @@ save and diff a `main` baseline, failing above a 10% median regression.
 | `scaling_hierarchy_par_cds` | 2 / 4 / 8 hazard curves under one ParCDS hierarchy shock | Expansion + N solve-to-par CDS bootstraps |
 | `scaling_instrument_spread` | 50 / 200 / 500 bonds | Instrument-spread dispatch |
 | `scaling_time_roll_instruments` | 10 / 40 / 80 bonds | Time-roll carry (Rayon above 64) |
-| `scaling_compose` | 10 / 50 / 200 specs | `try_compose` |
+| `scaling_compose` | 10 / 50 / 200 specs | `compose` |
 
 Most groups rebuild the market context inside `b.iter` so the measurement
 includes the engine's own clone/bump path; `scenario_composition` deliberately

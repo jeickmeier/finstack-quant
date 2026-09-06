@@ -532,7 +532,7 @@ fn test_instrument_type_serde_roundtrip() {
 fn test_instrument_type_repr_values() {
     // Verify repr values for ABI stability
     assert_eq!(InstrumentType::Bond as u16, 1);
-    assert_eq!(InstrumentType::Loan as u16, 2);
+    assert_eq!(InstrumentType::TermLoan as u16, 41);
     assert_eq!(InstrumentType::Cds as u16, 3);
     assert_eq!(InstrumentType::StructuredCredit as u16, 26);
     assert_eq!(InstrumentType::PrivateMarketsFund as u16, 30);

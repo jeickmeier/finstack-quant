@@ -77,47 +77,47 @@ pub(crate) fn register_structured_credit_metrics(
     use std::sync::Arc;
 
     // Model-specific risk metrics (custom metrics)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Recovery01,
         Arc::new(risk::recovery01::Recovery01Calculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Prepayment01,
         Arc::new(risk::prepayment01::Prepayment01Calculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Default01,
         Arc::new(risk::default01::Default01Calculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Severity01,
         Arc::new(risk::severity01::Severity01Calculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CloWarf,
         Arc::new(pool::CloWarfCalculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CmbsDscr,
         Arc::new(deal_specific::CmbsDscrCalculator::new()),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CloWas,
         Arc::new(pool::CloWasCalculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::AbsChargeOff,
         Arc::new(deal_specific::AbsChargeOffCalculator),
         &[InstrumentType::StructuredCredit],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::AbsCreditEnhancement,
         Arc::new(deal_specific::AbsCreditEnhancementCalculator),
         &[InstrumentType::StructuredCredit],

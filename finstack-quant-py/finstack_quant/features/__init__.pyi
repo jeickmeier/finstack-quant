@@ -33,11 +33,9 @@ __all__ = [
     "PanelTransformResult",
     "PanelTransformSpec",
     "TimeSeriesOp",
-    "clean_signal",
     "dataframe",
     "neutralize",
     "neutralize_and_zscore",
-    "normalize_signal",
     "rank_to_weights",
     "risk_scaled_weights",
     "rolling_regression_residual",
@@ -1161,92 +1159,6 @@ def risk_scaled_weights(
     >>> from finstack_quant.features import risk_scaled_weights
     >>> risk_scaled_weights([1.0, 2.0, 2.0, 4.0], ["2026-01-01"] * 4, [1.0, 2.0, 1.0, 2.0])
     [-0.25, -0.25, 0.25, 0.25]
-    """
-    ...
-
-def clean_signal(
-    values: list[float | None],
-    time_key: KeyColumn,
-    params: TransformParams | None = None,
-) -> list[float | None]:
-    """
-    Apply the default cross-sectional signal-cleaning pass.
-
-    Delegates to :func:`transform_cross_sectional` with the
-    ``"winsorize"`` operation, clamping each timestamp partition to its
-    ``lower``/``upper`` sample quantiles.
-
-    Parameters
-    ----------
-    values : list[float | None]
-        Signal column. ``None`` represents missing data.
-    time_key : list[str]
-        Cross-sectional partition key for each row; length must match
-        ``values``.
-    params : TransformParams or None
-        Optional quantile bounds ``lower`` (default ``0.01``) and
-        ``upper`` (default ``0.99``).
-
-    Returns
-    -------
-    list[float | None]
-        Cleaned column aligned to ``values``. The output length always matches
-        the input length.
-
-    Raises
-    ------
-    ValueError
-        If lengths differ or quantile bounds do not satisfy
-        ``0 <= lower <= upper <= 1``.
-
-    Examples
-    --------
-    >>> from finstack_quant.features import clean_signal
-    >>> clean_signal([1.0, 2.0, 100.0], ["2026-01-01"] * 3, {"lower": 0.0, "upper": 0.5})
-    [1.0, 2.0, 2.0]
-    """
-    ...
-
-def normalize_signal(
-    values: list[float | None],
-    time_key: KeyColumn,
-    params: TransformParams | None = None,
-) -> list[float | None]:
-    """
-    Normalize a signal cross-sectionally with a selected method.
-
-    Applies a single-column cross-sectional operation independently within each
-    ``time_key`` partition.
-
-    Parameters
-    ----------
-    values : list[float | None]
-        Signal column. ``None`` represents missing data.
-    time_key : list[str]
-        Cross-sectional partition key for each row; length must match
-        ``values``.
-    params : TransformParams or None
-        Optional parameters. ``method`` selects any single-column
-        operation accepted by :func:`transform_cross_sectional` and defaults
-        to ``"zscore"``; remaining params are forwarded to that operation.
-
-    Returns
-    -------
-    list[float | None]
-        Normalized column aligned to ``values``. The output length always
-        matches the input length.
-
-    Raises
-    ------
-    ValueError
-        If lengths differ, ``method`` is unsupported, or params are
-        malformed.
-
-    Examples
-    --------
-    >>> from finstack_quant.features import normalize_signal
-    >>> normalize_signal([1.0, 2.0, 100.0], ["2026-01-01"] * 3, {"method": "rank"})
-    [0.0, 0.5, 1.0]
     """
     ...
 

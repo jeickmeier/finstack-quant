@@ -11,9 +11,8 @@
 //! - **`BsGreeks`**: Struct holding per-unit Greeks with both domestic and foreign rho
 //!
 //! [`bs_greeks`] computes every Greek in one pass and takes an explicit
-//! `theta_days_per_year` for day-count control. Crate-internal callers that need
-//! only vega (for example implied-vol solvers) use `bs_vega_unchecked`. Both use
-//! the same scaling conventions: vega per 1% vol, rho per 1% rate.
+//! `theta_days_per_year` for day-count control. Vega is per 1% vol and rho
+//! is per 1% rate.
 //!
 //! # Model
 //!
@@ -45,8 +44,7 @@
 //!
 
 use crate::types::OptionType;
-use crate::volatility::black::{d1, d1_d2};
-use finstack_quant_core::math::special_functions::norm_pdf;
+use crate::volatility::black::d1_d2;
 use finstack_quant_core::{Error, Result};
 use std::fmt;
 
@@ -575,65 +573,6 @@ pub fn bs_greeks(
     Ok(greeks)
 }
 
-/// Black-Scholes vega (same for both calls and puts).
-///
-/// Vega measures the sensitivity of the option price to changes in implied
-/// volatility. Not technically a "Greek" letter, but universally called vega.
-///
-/// # Formula
-///
-/// ```text
-/// ν = S · e^(-qT) · √T · φ(d₁)
-/// ```
-///
-/// # Interpretation
-///
-/// - **Volatility exposure**: Change in option value per 1% change in volatility
-/// - **Always positive**: Long options have positive vega (benefit from vol increases)
-/// - **Time decay**: Vega decreases as expiration approaches
-/// - **Peaks at ATM**: Maximum vega when spot ≈ strike
-///
-/// # Convention
-///
-/// Vega is typically quoted per 1% (0.01) change in volatility. Some systems
-/// quote per 1bp (0.0001) change, so verify conventions.
-///
-/// # Arguments
-///
-/// * `spot` - Current spot price S
-/// * `strike` - Exercise price K in the same units as the underlying spot.
-/// * `time` - Time to expiration T (in years)
-/// * `rate` - Risk-free rate r (continuously compounded)
-/// * `div_yield` - Dividend yield q (continuously compounded)
-/// * `vol` - Volatility σ (annualized)
-///
-/// # Returns
-///
-/// Vega value (per 1% change in volatility). Returns 0.0 at expiration.
-///
-#[must_use]
-pub(crate) fn bs_vega_unchecked(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-) -> f64 {
-    // At expiry, or at zero/negative volatility, the option value is the
-    // deterministic intrinsic — it carries no volatility sensitivity, so vega
-    // is exactly 0. The `vol <= 0` guard is required because `d1_d2` returns a
-    // finite `d1 = 0` for an ATM option at `σ = 0`, and `norm_pdf(0) ≈ 0.399`
-    // would otherwise yield a spurious non-zero vega. This mirrors the
-    // `vol <= 0` guard already present in `bs_gamma`.
-    if time <= 0.0 || vol <= 0.0 {
-        return 0.0;
-    }
-
-    let d1_val = d1(spot, strike, rate, vol, time, div_yield);
-    0.01 * spot * (-div_yield * time).exp() * time.sqrt() * norm_pdf(d1_val)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1016,24 +955,16 @@ mod tests {
     }
 
     #[test]
-    fn bs_vega_is_zero_for_zero_sigma() {
-        // Exactly-ATM, zero vol: the failure case from the audit.
-        let v_atm = bs_vega_unchecked(100.0, 100.0, 1.0, 0.05, 0.02, 0.0);
-        assert_eq!(v_atm, 0.0, "σ=0 ATM vega must be 0, got {v_atm}");
-
-        // The guard must be consistent across moneyness, not just ATM.
-        assert_eq!(bs_vega_unchecked(100.0, 90.0, 1.0, 0.05, 0.02, 0.0), 0.0);
-        assert_eq!(bs_vega_unchecked(100.0, 110.0, 1.0, 0.05, 0.02, 0.0), 0.0);
-        // Negative vol is also non-physical and must be guarded.
-        assert_eq!(bs_vega_unchecked(100.0, 100.0, 1.0, 0.05, 0.02, -0.1), 0.0);
-
-        // The aggregator must apply the same guard.
-        let call = bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.0, 1.0, OptionType::Call, 365.0);
-        let put = bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.0, 1.0, OptionType::Put, 365.0);
-        assert_eq!(call.vega, 0.0, "σ=0 call aggregator vega must be 0");
-        assert_eq!(put.vega, 0.0, "σ=0 put aggregator vega must be 0");
-
-        // Positive vol still yields a strictly positive vega (no over-zealous guard).
-        assert!(bs_vega_unchecked(100.0, 100.0, 1.0, 0.05, 0.02, 0.2) > 0.0);
+    fn bs_greeks_requires_positive_sigma() {
+        for strike in [90.0, 100.0, 110.0] {
+            for option in [OptionType::Call, OptionType::Put] {
+                assert!(bs_greeks(100.0, strike, 0.05, 0.02, 0.0, 1.0, option, 365.0).is_err());
+                assert!(bs_greeks(100.0, strike, 0.05, 0.02, -0.1, 1.0, option, 365.0).is_err());
+            }
+        }
+        assert!(
+            bs_greeks_unchecked(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, OptionType::Call, 365.0).vega
+                > 0.0
+        );
     }
 }

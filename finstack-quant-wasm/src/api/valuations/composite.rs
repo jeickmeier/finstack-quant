@@ -46,9 +46,7 @@ fn parse_metrics(metrics: Option<JsValue>) -> Result<Vec<MetricId>, JsValue> {
     match metrics {
         None => Ok(Vec::new()),
         Some(value) if value.is_null() || value.is_undefined() => Ok(Vec::new()),
-        Some(value) => serde_wasm_bindgen::from_value::<Vec<String>>(value)
-            .map(|values| values.into_iter().map(MetricId::custom).collect())
-            .map_err(to_js_err),
+        Some(value) => serde_wasm_bindgen::from_value::<Vec<MetricId>>(value).map_err(to_js_err),
     }
 }
 
@@ -242,7 +240,7 @@ pub fn composite_execution_trades(
 /// # Errors
 ///
 /// Throws for empty, duplicate, or unordered observations; overlapping warmup;
-/// initialization/rebalance failures; or missing market/history inputs.
+/// noncanonical metric keys; initialization/rebalance failures; or missing market/history inputs.
 #[wasm_bindgen(js_name = compositeHistoryFromSpec)]
 pub fn composite_history_from_spec(
     spec_json: &str,

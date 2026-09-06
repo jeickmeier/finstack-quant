@@ -123,6 +123,8 @@ pub struct ImMethodDefaults {
 #[derive(Debug, Clone)]
 pub struct TimingDefaults {
     /// Standard bilateral timing defaults.
+    // Retained in the registry record for schema examples.
+    #[cfg_attr(not(feature = "json-schema"), allow(dead_code))]
     pub standard: MarginCallTiming,
     /// Regulatory VM timing defaults.
     pub regulatory_vm: MarginCallTiming,

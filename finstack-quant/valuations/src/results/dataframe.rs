@@ -142,7 +142,10 @@ mod tests {
             MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS", "10y"]),
             3.0,
         );
-        measures.insert(MetricId::custom("bucketed_dv01::USD_x2dOIS::5y"), 4.0);
+        measures.insert(
+            MetricId::composite(&MetricId::BucketedDv01, &["USD-OIS", "5y"]),
+            4.0,
+        );
         let rows = ValuationResult::stamped("L", jan15(), Money::from((1_i64, Currency::USD)))
             .with_measures(measures)
             .to_long_rows();

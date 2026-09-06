@@ -39,15 +39,15 @@ pub(crate) fn register_repo_metrics(
 
     let accrued_calc: Arc<dyn MetricCalculator> =
         Arc::new(accrued_interest::AccruedInterestCalculator);
-    registry.replace_metric(MetricId::Accrued, accrued_calc, &[InstrumentType::Repo])?;
+    registry.register_metric(MetricId::Accrued, accrued_calc, &[InstrumentType::Repo])?;
 
     // Repo-specific risk metrics (custom metrics)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CollateralHaircut01,
         Arc::new(haircut01::Haircut01Calculator),
         &[InstrumentType::Repo],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CollateralPrice01,
         Arc::new(collateral_price01::CollateralPrice01Calculator),
         &[InstrumentType::Repo],

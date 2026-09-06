@@ -318,6 +318,13 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
     with pytest.raises(KeyError, match="debt_to_ebitda"):
         covenants.forecast_covenant(spec, frame.rename(columns={"debt_to_ebitda": "other"}))
 
+    explicit = covenants.CovenantSpec(
+        covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "adjusted"),
+        "adjusted_leverage",
+    )
+    with pytest.raises(KeyError, match="adjusted_leverage"):
+        covenants.forecast_covenant(explicit, frame)
+
     engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
     projections = pd.DataFrame(
         {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},

@@ -726,7 +726,7 @@ pub trait StochasticProcess: Send + Sync {
 /// - Do **not** implement on CIR, OU, Heston variance, jump-diffusion, or
 ///   any stochastic-volatility variance state. None of these satisfy the
 ///   contract.
-/// - When in doubt, omit the impl. Milstein/`LogMilstein` are bounded on
+/// - When in doubt, omit the impl. `Milstein` is bounded on
 ///   `ProportionalDiffusion`, so omitting the impl yields a compile error
 ///   rather than a silently-biased run.
 ///

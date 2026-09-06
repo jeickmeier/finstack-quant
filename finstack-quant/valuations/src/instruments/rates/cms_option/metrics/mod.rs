@@ -45,7 +45,7 @@ pub(crate) fn register_cms_option_metrics(
     }
 
     // Convexity adjustment risk (custom metric)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ConvexityAdjustmentRisk,
         Arc::new(ConvexityAdjustmentRiskCalculator::<CmsOption>(
             std::marker::PhantomData,

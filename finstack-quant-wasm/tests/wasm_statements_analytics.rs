@@ -118,6 +118,44 @@ fn compute_multiple_uses_canonical_company_metric_fields() {
 }
 
 #[wasm_bindgen_test]
+fn scoring_accepts_one_optional_predictor_and_rejects_vectors() {
+    use finstack_quant_statements_analytics::analysis::{CompanyMetrics, PeerSet, PeriodBasis};
+    use serde_json::json;
+    let mut subject = CompanyMetrics::new("subject");
+    subject.oas_bp = Some(250.0);
+    subject.leverage = Some(2.0);
+    let peers = [1.0, 2.0, 3.0].map(|x| {
+        let mut peer = CompanyMetrics::new(format!("peer-{x}"));
+        peer.oas_bp = Some(x * 100.0);
+        peer.leverage = Some(x);
+        peer
+    });
+    let peers = PeerSet::new(subject, peers.to_vec(), PeriodBasis::Ltm);
+    for predictor in [json!(null), json!({"named": "leverage"})] {
+        let dimensions = json!([{
+            "label": "spread", "y_extractor": {"named": "oas_bp"},
+            "x_extractor": predictor, "weight": 1.0
+        }]);
+        let result = score_relative_value(
+            serde_wasm_bindgen::to_value(&peers).expect("peers"),
+            js_sys::JSON::parse(&dimensions.to_string()).expect("dimensions"),
+        )
+        .expect("supported predictor shape");
+        let result: serde_json::Value = serde_wasm_bindgen::from_value(result).expect("score");
+        assert!(result["composite_score"].as_f64().expect("score") > 0.0);
+    }
+    let dimensions = json!([{
+        "label": "spread", "y_extractor": {"named": "oas_bp"},
+        "x_extractors": [{"named": "leverage"}], "weight": 1.0
+    }]);
+    assert!(score_relative_value(
+        serde_wasm_bindgen::to_value(&peers).expect("peers"),
+        js_sys::JSON::parse(&dimensions.to_string()).expect("dimensions"),
+    )
+    .is_err());
+}
+
+#[wasm_bindgen_test]
 fn run_checks_returns_structured_report() {
     let spec = serde_json::json!({
         "name": "formula suite",

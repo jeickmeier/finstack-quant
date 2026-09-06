@@ -263,13 +263,15 @@ fn cashflows_json_bridge_builds_step_up_with_payment_program() {
 
 #[wasm_bindgen_test]
 fn cashflows_json_bridge_builds_fixed_to_float_and_explicit_windows() {
+    let mut fixed = canonical_schedule_params_json();
+    fixed["coupon_type"] = serde_json::json!("cash");
+    fixed["rate"] = serde_json::json!("0.04");
     let fixed_to_float = canonical_program_spec_json(
         serde_json::json!([{
             "kind": "fixed_to_float",
             "switch": "2026-01-01",
-            "fixed": {"rate": "0.04", "schedule": canonical_schedule_params_json()},
+            "fixed": fixed,
             "floating": canonical_floating_coupon_json(),
-            "fixed_split": "cash",
         }]),
         serde_json::json!([]),
     );

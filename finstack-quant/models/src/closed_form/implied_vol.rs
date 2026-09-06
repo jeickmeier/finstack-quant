@@ -1,6 +1,6 @@
 //! Implied volatility solvers for vanilla option models.
 //!
-//! Provides robust, monotonic bisection-based solvers for implied volatility under:
+//! Provides economic adapters to the shared Black implied-volatility solver:
 //! - Black–Scholes / Garman–Kohlhagen (spot-based, with `r` and `q`)
 //! - Black-76 (forward-based, with discount factor `df`)
 //!
@@ -9,44 +9,11 @@
 
 use finstack_quant_core::Result;
 
-use crate::closed_form::vanilla::bs_price_unchecked;
-use crate::closed_form::vanilla::bs_vega_unchecked;
 use crate::types::OptionType;
-
-/// Error returned when implied volatility cannot be bracketed (target price may exceed arbitrage bounds).
-///
-/// Kept for the rare paths where the cause is genuinely ambiguous (e.g. NaN
-/// price at the upper bracket). Most call sites build a more specific message
-/// indicating whether the issue is arbitrage violation, MAX_VOL exhaustion,
-/// or a non-finite intermediate.
-const UNBRACKETED_MSG: &str =
-    "Cannot bracket implied volatility: price may exceed arbitrage bounds";
+use crate::volatility::implied_vol_black;
 
 /// Error returned when implied volatility inputs contain non-finite values.
 const NON_FINITE_MSG: &str = "Implied volatility solver received non-finite input parameters";
-
-/// Error returned when the bisection fallback exhausts its iteration budget
-/// without the price residual falling within tolerance.
-///
-/// Reaching this means the root was bracketed but the solve still failed to
-/// converge — the solver must surface that explicitly rather than returning the
-/// last (unconverged) midpoint as if it were a valid answer.
-const NON_CONVERGENCE_MSG: &str =
-    "Implied volatility solver exhausted its iteration budget without converging \
-     to the requested price tolerance";
-
-/// Minimum volatility (annualized) used for bracketing.
-const MIN_VOL: f64 = 1e-8;
-/// Maximum volatility (annualized) allowed during bracketing.
-const MAX_VOL: f64 = 10.0;
-/// Default absolute tolerance on price during solve (per-unit price).
-const PRICE_TOL: f64 = 1e-10;
-/// Default maximum solver iterations.
-const MAX_ITER: usize = 200;
-/// Maximum Newton-Raphson iterations before falling back to bisection.
-const MAX_NEWTON_ITER: usize = 15;
-/// Minimum vega for Newton step to be accepted (avoid division by near-zero).
-const MIN_VEGA: f64 = 1e-15;
 
 /// Solve for Black–Scholes / Garman–Kohlhagen implied volatility.
 ///
@@ -114,119 +81,20 @@ pub fn bs_implied_vol(
         return Err(finstack_quant_core::Error::Validation(format!(
             "Implied vol: target price {target_price:.6} is at or below intrinsic value \
              {intrinsic:.6} for spot={spot}, strike={strike}, rate={rate}, div_yield={div_yield}, expiry={expiry}. \
-             This is an arbitrage violation — the option cannot be worth less than its \
-             intrinsic. Check the input price."
+             A positive-volatility inversion requires a premium strictly above discounted intrinsic."
         )));
     }
 
-    let price_at = |sigma: f64| -> f64 {
-        bs_price_unchecked(spot, strike, rate, div_yield, sigma, expiry, option_type)
-    };
-
-    // Bracket the solution (monotone increasing in sigma for vanilla options).
-    let mut lo = MIN_VOL;
-    let mut hi = 0.3_f64.max(MIN_VOL);
-    let f_lo = price_at(lo) - target_price;
-    let mut f_hi = price_at(hi) - target_price;
-
-    // Expand hi until we cross the target, or give up.
-    let mut tries = 0usize;
-    while f_hi < 0.0 && hi < MAX_VOL && tries < 50 {
-        hi = (hi * 1.5).min(MAX_VOL);
-        f_hi = price_at(hi) - target_price;
-        tries += 1;
-    }
-    if !f_hi.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Implied vol: BS price became non-finite at upper bracket sigma={hi:.6} \
-             (target={target_price:.6}, spot={spot}, strike={strike}, expiry={expiry}). \
-             Likely cause: numeric overflow at extreme moneyness; check input scale."
-        )));
-    }
-    if f_hi < 0.0 {
-        let bs_at_max = price_at(MAX_VOL);
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Implied vol: target price {target_price:.6} exceeds BS price at MAX_VOL \
-             (sigma={MAX_VOL:.1}) which is {bs_at_max:.6} (spot={spot}, strike={strike}, \
-             expiry={expiry}). The implied volatility either exceeds {MAX_VOL:.1} or the input \
-             price violates arbitrage bounds. Verify the price quote."
-        )));
-    }
-    if !f_lo.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Implied vol: BS price became non-finite at lower bracket sigma={lo:.2e} \
-             (spot={spot}, strike={strike}, expiry={expiry})."
-        )));
-    }
-    if f_lo > 0.0 {
-        // Target sits below the lower bracket — this is effectively another
-        // arbitrage violation (price below floor at MIN_VOL).
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Implied vol: target price {target_price:.6} is below the BS floor at \
-             sigma={lo:.2e} (spot={spot}, strike={strike}, expiry={expiry}). Likely an arbitrage \
-             violation in the input quote."
-        )));
-    }
-
-    // Newton-Raphson with bisection fallback.
-    // bs_vega returns dPrice/dSigma scaled by 0.01, so multiply by 100 for raw vega.
-    let raw_vega_at = |sigma: f64| -> f64 {
-        bs_vega_unchecked(spot, strike, expiry, rate, div_yield, sigma) * 100.0
-    };
-
-    let mut mid = 0.5 * (lo + hi);
-
-    // Phase 1: Newton-Raphson (quadratic convergence near root)
-    for _ in 0..MAX_NEWTON_ITER {
-        let f_mid = price_at(mid) - target_price;
-        if f_mid.abs() < PRICE_TOL {
-            return Ok(mid);
-        }
-        let vega = raw_vega_at(mid);
-        if vega.abs() < MIN_VEGA {
-            break; // vega too small; fall through to bisection
-        }
-        let step = f_mid / vega;
-        let candidate = mid - step;
-        if candidate <= lo || candidate >= hi || !candidate.is_finite() {
-            break; // Newton step out of bracket; fall through to bisection
-        }
-        if f_mid > 0.0 {
-            hi = mid;
-        } else {
-            lo = mid;
-        }
-        mid = candidate;
-    }
-
-    // Phase 2: Bisection fallback (guaranteed convergence)
-    for _ in 0..MAX_ITER {
-        mid = 0.5 * (lo + hi);
-        let f_mid = price_at(mid) - target_price;
-        if !f_mid.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                UNBRACKETED_MSG.into(),
-            ));
-        }
-        // Converged: either the price residual is within tolerance, or the
-        // bracket has collapsed to machine precision (sigma pinned as tightly
-        // as f64 allows — a legitimate convergence, not a failure).
-        if f_mid.abs() < PRICE_TOL || (hi - lo) < 1e-12 {
-            return Ok(mid);
-        }
-        if f_mid > 0.0 {
-            hi = mid;
-        } else {
-            lo = mid;
-        }
-    }
-
-    // Iteration budget exhausted without the bracket collapsing or the price
-    // residual reaching tolerance. Surface this as an explicit non-convergence
-    // error instead of returning the last unconverged midpoint as `Ok`.
-    Err(finstack_quant_core::Error::Validation(
-        NON_CONVERGENCE_MSG.into(),
-    ))
+    // Black prices are homogeneous in forward and strike. Discounting both
+    // coordinates keeps the target in its original premium units and avoids
+    // constructing a potentially overflowing forward S * exp((r - q) * T).
+    implied_vol_black(
+        target_price,
+        spot * (-div_yield * expiry).exp(),
+        strike * (-rate * expiry).exp(),
+        expiry,
+        option_type == OptionType::Call,
+    )
 }
 
 /// Solve for Black-76 implied volatility (forward-based).
@@ -283,109 +151,24 @@ pub fn black76_implied_vol(
     };
     if target_price <= intrinsic {
         return Err(finstack_quant_core::Error::Validation(
-            UNBRACKETED_MSG.into(),
+            "Implied vol requires a premium strictly above discounted intrinsic".into(),
         ));
     }
 
-    let price_at = |sigma: f64| -> f64 {
-        df * bs_price_unchecked(forward, strike, 0.0, 0.0, sigma, expiry, option_type)
-    };
-
-    let mut lo = MIN_VOL;
-    let mut hi = 0.3_f64.max(MIN_VOL);
-    let f_lo = price_at(lo) - target_price;
-    let mut f_hi = price_at(hi) - target_price;
-
-    let mut tries = 0usize;
-    while f_hi < 0.0 && hi < MAX_VOL && tries < 50 {
-        hi = (hi * 1.5).min(MAX_VOL);
-        f_hi = price_at(hi) - target_price;
-        tries += 1;
-    }
-    if f_hi < 0.0 || !f_hi.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            UNBRACKETED_MSG.into(),
-        ));
-    }
-    if f_lo > 0.0 || !f_lo.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            UNBRACKETED_MSG.into(),
-        ));
-    }
-
-    // Newton-Raphson with bisection fallback.
-    // For Black-76: vega = df * d(bs_price(F,K,0,0,sigma,expiry))/d(sigma)
-    let raw_vega_at = |sigma: f64| -> f64 {
-        df * bs_vega_unchecked(forward, strike, expiry, 0.0, 0.0, sigma) * 100.0
-    };
-
-    let mut mid = 0.5 * (lo + hi);
-
-    for _ in 0..MAX_NEWTON_ITER {
-        let f_mid = price_at(mid) - target_price;
-        if f_mid.abs() < PRICE_TOL {
-            return Ok(mid);
-        }
-        let vega = raw_vega_at(mid);
-        if vega.abs() < MIN_VEGA {
-            break;
-        }
-        let candidate = mid - f_mid / vega;
-        if candidate <= lo || candidate >= hi || !candidate.is_finite() {
-            break;
-        }
-        if f_mid > 0.0 {
-            hi = mid;
-        } else {
-            lo = mid;
-        }
-        mid = candidate;
-    }
-
-    for _ in 0..MAX_ITER {
-        mid = 0.5 * (lo + hi);
-        let f_mid = price_at(mid) - target_price;
-        if !f_mid.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                UNBRACKETED_MSG.into(),
-            ));
-        }
-        // Converged: price residual within tolerance, or bracket collapsed to
-        // machine precision (a legitimate convergence — see `bs_implied_vol`).
-        if f_mid.abs() < PRICE_TOL || (hi - lo) < 1e-12 {
-            return Ok(mid);
-        }
-        if f_mid > 0.0 {
-            hi = mid;
-        } else {
-            lo = mid;
-        }
-    }
-
-    // Iteration budget exhausted without converging — surface explicitly rather
-    // than returning the last unconverged midpoint as `Ok`.
-    Err(finstack_quant_core::Error::Validation(
-        NON_CONVERGENCE_MSG.into(),
-    ))
+    implied_vol_black(
+        target_price,
+        df * forward,
+        df * strike,
+        expiry,
+        option_type == OptionType::Call,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::closed_form::vanilla::bs_price_unchecked;
 
-    /// Audit item 7: the bisection fallback previously returned `Ok(mid)` after
-    /// exhausting its iteration budget, claiming a converged solution that was
-    /// never verified.
-    ///
-    /// Failure mode locked in by [`bisection_reports_non_convergence_explicitly`]
-    /// below: a non-converged bisection must surface an explicit
-    /// `Error::Validation` ([`NON_CONVERGENCE_MSG`]), never a silent `Ok`.
-    ///
-    /// This test pins the contract that *every* `Ok(sigma)` the solver returns
-    /// is genuinely converged — re-pricing at `sigma` lands within a sane
-    /// tolerance of the requested target. A regression that restores an
-    /// unverified post-loop `Ok(mid)` (or any other unconverged success) would
-    /// break this round-trip check.
     #[test]
     fn solver_only_returns_ok_for_genuinely_converged_solutions() {
         let cases = [
@@ -402,8 +185,6 @@ mod tests {
                 let solved = bs_implied_vol(spot, strike, r, q, t, option_type, target)
                     .expect("a price generated from a real vol must invert");
                 let repriced = bs_price_unchecked(spot, strike, r, q, solved, t, option_type);
-                // Round-trip price error must be tiny; a non-converged `Ok`
-                // (the audited defect) would fail this with a large residual.
                 assert!(
                     (repriced - target).abs() <= 1e-6 * target.max(1.0),
                     "solver returned a non-converged Ok: vol={vol} solved={solved} \
@@ -413,15 +194,8 @@ mod tests {
         }
     }
 
-    /// Audit item 7: confirms the non-convergence error path is wired and that
-    /// the solver still rejects genuinely unsolvable requests with an explicit
-    /// `Error::Validation` rather than a silent `Ok`.
-    ///
-    /// A target price strictly below intrinsic is an arbitrage violation and
-    /// cannot be matched by any volatility; the solver must return `Err`.
     #[test]
-    fn bisection_reports_non_convergence_explicitly() {
-        // Sub-intrinsic target — unsolvable, must error (never silent Ok).
+    fn sub_intrinsic_prices_are_rejected() {
         let intrinsic =
             (100.0_f64 * (-0.0_f64 * 1.0).exp() - 80.0_f64 * (-0.05_f64 * 1.0).exp()).max(0.0);
         let err = bs_implied_vol(
@@ -438,12 +212,36 @@ mod tests {
             matches!(err, finstack_quant_core::Error::Validation(_)),
             "non-solvable implied-vol request must be a Validation error, got {err:?}"
         );
+    }
 
-        // The explicit non-convergence message is a distinct, well-formed
-        // diagnostic (guards against an empty/placeholder error string).
-        assert!(
-            NON_CONVERGENCE_MSG.contains("without converging"),
-            "non-convergence diagnostic must describe the failure"
-        );
+    #[test]
+    fn economic_adapters_share_the_black_kernel_across_scales() {
+        for scale in [1e-12, 1.0, 1e12] {
+            for (rate, carry, expiry, vol) in [
+                (-0.05, 0.02, 0.01, 0.4),
+                (0.08, -0.02, 1.0, 0.2),
+                (0.02, 0.03, 2.0, 1.5),
+            ] {
+                for option in [OptionType::Call, OptionType::Put] {
+                    let spot = 100.0 * scale;
+                    let strike = 105.0 * scale;
+                    let price = bs_price_unchecked(spot, strike, rate, carry, vol, expiry, option);
+                    let bs = bs_implied_vol(spot, strike, rate, carry, expiry, option, price)
+                        .expect("BS inverse");
+                    let df = (-rate * expiry).exp();
+                    let forward = spot * ((rate - carry) * expiry).exp();
+                    let black = black76_implied_vol(forward, strike, df, expiry, option, price)
+                        .expect("Black inverse");
+                    assert!((bs - vol).abs() < 1e-10, "{bs} vs {vol}");
+                    assert!((black - vol).abs() < 1e-10, "{black} vs {vol}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn adapters_reject_nonfinite_transformed_coordinates() {
+        assert!(bs_implied_vol(100.0, 100.0, -1000.0, 0.0, 1.0, OptionType::Put, 10.0).is_err());
+        assert!(black76_implied_vol(1e308, 1e308, 10.0, 1.0, OptionType::Call, 1.0).is_err());
     }
 }

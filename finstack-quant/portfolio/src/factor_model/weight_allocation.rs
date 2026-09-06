@@ -34,8 +34,6 @@ pub struct WeightAllocationSpec {
     pub strategies: Vec<StrategyAllocationInput>,
     /// Optional covariance matrix for `risk_budget`, row-major as nested lists.
     pub covariance: Option<Vec<Vec<f64>>>,
-    /// Optional target volatility. Unsupported in v1 because weights are fully invested.
-    pub target_volatility: Option<f64>,
     /// Number of decimal places for capital rounding.
     #[serde(default = "default_money_decimal_places")]
     pub money_decimal_places: u32,
@@ -234,17 +232,6 @@ impl WeightAllocationSpec {
                 "allocation money_decimal_places must be <= 12",
             ));
         }
-        if let Some(target_volatility) = self.target_volatility {
-            if !target_volatility.is_finite() || target_volatility <= 0.0 {
-                return Err(Error::validation(
-                    "allocation target_volatility must be positive and finite",
-                ));
-            }
-            return Err(Error::validation(
-                "allocation target_volatility leverage scaling is unsupported in v1",
-            ));
-        }
-
         let mut ids = std::collections::BTreeSet::new();
         for strategy in &self.strategies {
             if strategy.id.trim().is_empty() {
@@ -607,6 +594,16 @@ mod tests {
     }
 
     #[test]
+    fn unsupported_target_volatility_is_rejected_at_deserialization() {
+        let error = serde_json::from_value::<WeightAllocationSpec>(serde_json::json!({
+            "scheme": "equal", "total_capital": 100.0, "strategies": [],
+            "covariance": null, "target_volatility": null
+        }))
+        .expect_err("unsupported allocation control");
+        assert!(error.to_string().contains("target_volatility"));
+    }
+
+    #[test]
     fn risk_budget_scheme_drops_zero_budget_strategies() {
         // A zero risk budget is a valid request ("no risk to this sleeve")
         // and must yield weight 0, not a solver failure: with weight 0 the
@@ -626,7 +623,6 @@ mod tests {
                 vec![0.01, 0.09, 0.0],
                 vec![0.0, 0.0, 0.04],
             ]),
-            target_volatility: None,
             money_decimal_places: 2,
         };
 
@@ -669,7 +665,6 @@ mod tests {
                 },
             ],
             covariance: None,
-            target_volatility: None,
             money_decimal_places: 2,
         };
 

@@ -310,6 +310,18 @@ def test_position_what_if_uses_combined_baseline_analysis() -> None:
     assert len(result.delta) == 1
 
 
+def test_position_what_if_rejects_unsupported_add() -> None:
+    portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
+    with pytest.raises(ValueError, match=r"unknown variant.*add"):
+        position_what_if(
+            portfolio,
+            _market(),
+            _factor_model_config_json(),
+            AS_OF.isoformat(),
+            [{"kind": "add", "position": {}}],
+        )
+
+
 def test_large_twrr_parse_link_and_serialize_release_gil() -> None:
     returns_json = json.dumps([0.000001] * 200_000)
 

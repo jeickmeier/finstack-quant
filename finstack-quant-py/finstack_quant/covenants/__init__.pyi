@@ -3096,7 +3096,8 @@ def forecast_covenant(
     Forecast one numeric covenant across a date-indexed projection frame.
 
     Each frame row is a forecast test date. The metric is resolved from the
-    spec's ``metric_id``, then the covenant type's conventional metric name,
+    spec's explicit ``metric_id`` exclusively when present; otherwise it uses
+    the covenant type's conventional metric name,
     then a custom covenant's ``metric``. Threshold schedules and springing
     conditions are honoured (the activation metric must be a frame column).
 

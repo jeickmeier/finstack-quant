@@ -21,7 +21,7 @@ pub(crate) fn register_fx_forward_metrics(
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Fx01,
         crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::FxForward],

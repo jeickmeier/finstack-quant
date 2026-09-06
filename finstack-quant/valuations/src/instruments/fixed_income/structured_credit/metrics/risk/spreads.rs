@@ -688,7 +688,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         let total: f64 = bucket_pnl.iter().sum();
 
         context.store_bucketed_series(
-            MetricId::custom(format!("bucketed_cs01::{}", disc_curve_id.as_str())),
+            MetricId::composite(&MetricId::BucketedCs01, &[disc_curve_id.as_str()]),
             series,
         );
         Ok(total)

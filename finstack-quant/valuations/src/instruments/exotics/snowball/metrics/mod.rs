@@ -10,7 +10,7 @@ pub(crate) fn register_snowball_metrics(
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(UnifiedDv01Calculator::<super::Snowball>::new(
             Dv01CalculatorConfig::parallel_combined(),

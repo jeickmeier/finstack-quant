@@ -563,7 +563,7 @@ where
         let cs01 = compute_parallel_cs01_with_context_raw(context, &hazard_id, &request, reval)?;
 
         context.computed.insert(
-            MetricId::custom(format!("cs01::{}", hazard_id.as_str())),
+            MetricId::composite(&MetricId::Cs01, &[hazard_id.as_str()]),
             cs01,
         );
 
@@ -600,7 +600,7 @@ where
 
         let reval = cs01_reval(context);
 
-        let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
+        let series_id = MetricId::composite(&MetricId::BucketedCs01, &[hazard_id.as_str()]);
 
         let request = Cs01Request::generic(
             bump_bp,
@@ -782,7 +782,7 @@ where
                 reval,
             )?;
             context.computed.insert(
-                MetricId::custom(format!("cs01::{}", prepared.hazard_id.as_str())),
+                MetricId::composite(&MetricId::Cs01, &[prepared.hazard_id.as_str()]),
                 cs01,
             );
             Ok(cs01)
@@ -818,7 +818,7 @@ where
             )?;
             let bump_bp = defaults.credit_spread_bump_bp;
             let series_id =
-                MetricId::custom(format!("bucketed_cs01::{}", prepared.hazard_id.as_str()));
+                MetricId::composite(&MetricId::BucketedCs01, &[prepared.hazard_id.as_str()]);
             let cds_cache = match context.instrument_as::<
                     crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
                 >() {

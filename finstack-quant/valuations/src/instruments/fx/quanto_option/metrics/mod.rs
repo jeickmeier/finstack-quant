@@ -49,7 +49,7 @@ pub(crate) fn register_quanto_option_metrics(
             Arc::new(correlation01::Correlation01Calculator),
         ),
     ] {
-        registry.replace_metric(id, calculator, &[InstrumentType::QuantoOption])?;
+        registry.register_metric(id, calculator, &[InstrumentType::QuantoOption])?;
     }
     Ok(())
 }

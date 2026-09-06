@@ -59,7 +59,7 @@ where
     serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
-/// One-dimensional (Brent) solver settings shared by the bootstrap steps.
+/// Numerical convergence settings shared by calibration solvers.
 ///
 /// Examples
 /// --------
@@ -150,7 +150,7 @@ impl PySolverConfig {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``json`` is malformed.
+    ///     If ``json`` is malformed or contains unknown solver fields.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)

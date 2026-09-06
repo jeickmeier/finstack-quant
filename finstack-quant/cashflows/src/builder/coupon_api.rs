@@ -13,8 +13,7 @@ use super::compiler::{
 };
 use super::orchestrator::CashFlowBuilder;
 use super::specs::{
-    CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec, ScheduleParams,
-    StepUpCouponSpec,
+    CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, ScheduleParams, StepUpCouponSpec,
 };
 
 impl CashFlowBuilder {
@@ -522,9 +521,8 @@ impl CashFlowBuilder {
     /// # Arguments
     ///
     /// * `switch` - Date when coupon switches from fixed to floating
-    /// * `fixed_win` - Fixed rate and schedule for pre-switch period
-    /// * `float_spec` - Canonical floating coupon spec for the post-switch period
-    /// * `fixed_split` - Payment type for the fixed pre-switch period
+    /// * `fixed` - Annual decimal rate, settlement type, and schedule for the pre-switch period
+    /// * `floating` - Canonical floating coupon spec for the post-switch period
     ///
     /// # Example
     ///
@@ -536,7 +534,7 @@ impl CashFlowBuilder {
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
     /// use finstack_quant_cashflows::builder::{
-    ///     CashFlowSchedule, CouponType, FixedWindow, FloatingCouponSpec, FloatingRateSpec,
+    ///     CashFlowSchedule, CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
     ///     OvernightIndexConstraintApplication, ScheduleParams,
     /// };
     /// use rust_decimal_macros::dec;
@@ -548,12 +546,13 @@ impl CashFlowBuilder {
     /// let maturity = Date::from_calendar_date(2030, Month::January, 1)?;
     ///
     /// // Pay 5% fixed for 2 years, then SOFR + 250bps floating
-    /// let fixed_win = FixedWindow {
+    /// let fixed = FixedCouponSpec {
+    ///     coupon_type: CouponType::Cash,
     ///     rate: dec!(0.05),
     ///     schedule: ScheduleParams::semiannual_30360(),
     /// };
     ///
-    /// let float_spec = FloatingCouponSpec {
+    /// let floating = FloatingCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate_spec: FloatingRateSpec {
     ///         index_id: CurveId::new("USD-SOFR"),
@@ -586,7 +585,7 @@ impl CashFlowBuilder {
     ///
     /// let schedule = CashFlowSchedule::builder()
     ///     .principal(Money::from((10_000_000_i64, Currency::USD)), issue, maturity)
-    ///     .fixed_to_float(switch, fixed_win, float_spec, CouponType::Cash)
+    ///     .fixed_to_float(switch, fixed, floating)
     ///     .build(Some(&market))?;
     ///
     /// assert!(!schedule.get_flows().is_empty());
@@ -597,31 +596,28 @@ impl CashFlowBuilder {
     pub fn fixed_to_float(
         &mut self,
         switch: Date,
-        fixed_win: FixedWindow,
-        float_spec: FloatingCouponSpec,
-        fixed_split: CouponType,
+        fixed: FixedCouponSpec,
+        floating: FloatingCouponSpec,
     ) -> &mut Self {
         let _ = self.push_coupon_program(
             ProgramWindow {
                 start: WindowBound::Issue,
                 end: WindowBound::Date(switch),
             },
-            fixed_win.schedule,
-            CouponSpec::Fixed {
-                rate: fixed_win.rate,
-            },
-            fixed_split,
+            fixed.schedule,
+            CouponSpec::Fixed { rate: fixed.rate },
+            fixed.coupon_type,
         );
         let _ = self.push_coupon_program(
             ProgramWindow {
                 start: WindowBound::Date(switch),
                 end: WindowBound::Maturity,
             },
-            float_spec.schedule.clone(),
+            floating.schedule.clone(),
             CouponSpec::Float {
-                rate_spec: float_spec.rate_spec,
+                rate_spec: floating.rate_spec,
             },
-            float_spec.coupon_type,
+            floating.coupon_type,
         );
         self
     }

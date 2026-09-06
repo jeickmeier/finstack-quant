@@ -594,96 +594,6 @@ fn risk_scaled_weights(
         .map_err(core_to_py)
 }
 
-/// Apply the default signal cleaning pass (cross-sectional winsorization).
-///
-/// Parameters
-/// ----------
-/// values : list[float | None]
-///     Row-aligned signal values.
-/// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
-/// params : dict, optional
-///     ``lower`` / ``upper`` quantiles (defaults 0.01 / 0.99). Unknown keys
-///     raise ``ValueError``.
-///
-/// Returns
-/// -------
-/// list[float | None]
-///     Winsorized values per row.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If lengths differ or parameters are malformed.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.features import clean_signal
-/// >>> len(clean_signal([1.0, 2.0, 100.0], ["d"] * 3))
-/// 3
-#[pyfunction]
-#[pyo3(
-    signature = (values, time_key, params=None),
-    text_signature = "(values, time_key, params=None)"
-)]
-fn clean_signal(
-    py: Python<'_>,
-    values: Vec<Option<f64>>,
-    time_key: &Bound<'_, PyAny>,
-    params: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Vec<Option<f64>>> {
-    let time_key = extract_keys(time_key, "time_key")?;
-    let params = parse_params(py, params, "clean signal params")?;
-    py.detach(move || finstack_quant_features::clean_signal(&values, &time_key, params.as_ref()))
-        .map_err(core_to_py)
-}
-
-/// Normalize a signal cross-sectionally.
-///
-/// Parameters
-/// ----------
-/// values : list[float | None]
-///     Row-aligned signal values.
-/// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
-/// params : dict, optional
-///     ``method`` selects the cross-sectional op (default ``"zscore"``);
-///     remaining keys are passed to that op and must be keys it reads.
-///
-/// Returns
-/// -------
-/// list[float | None]
-///     Normalized values per row.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If lengths differ, ``method`` is unknown, or parameters are malformed.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.features import normalize_signal
-/// >>> normalize_signal([1.0, 3.0], ["d", "d"], {"method": "rank"})
-/// [0.0, 1.0]
-#[pyfunction]
-#[pyo3(
-    signature = (values, time_key, params=None),
-    text_signature = "(values, time_key, params=None)"
-)]
-fn normalize_signal(
-    py: Python<'_>,
-    values: Vec<Option<f64>>,
-    time_key: &Bound<'_, PyAny>,
-    params: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Vec<Option<f64>>> {
-    let time_key = extract_keys(time_key, "time_key")?;
-    let params = parse_params(py, params, "normalize signal params")?;
-    py.detach(move || {
-        finstack_quant_features::normalize_signal(&values, &time_key, params.as_ref())
-    })
-    .map_err(core_to_py)
-}
-
 /// Convert ranks into dollar-neutral long/short weights per timestamp.
 ///
 /// Parameters
@@ -1109,8 +1019,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(transform_timeseries_pairwise, &m)?)?;
     m.add_function(wrap_pyfunction!(rolling_regression_residual, &m)?)?;
     m.add_function(wrap_pyfunction!(risk_scaled_weights, &m)?)?;
-    m.add_function(wrap_pyfunction!(clean_signal, &m)?)?;
-    m.add_function(wrap_pyfunction!(normalize_signal, &m)?)?;
     m.add_function(wrap_pyfunction!(rank_to_weights, &m)?)?;
     m.add_function(wrap_pyfunction!(neutralize_and_zscore, &m)?)?;
     m.add_function(wrap_pyfunction!(transform_panel, &m)?)?;
@@ -1123,10 +1031,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PanelTransformResult",
             "PanelTransformSpec",
             "TimeSeriesOp",
-            "clean_signal",
             "neutralize",
             "neutralize_and_zscore",
-            "normalize_signal",
             "rank_to_weights",
             "risk_scaled_weights",
             "rolling_regression_residual",

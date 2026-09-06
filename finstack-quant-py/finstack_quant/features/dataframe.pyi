@@ -11,7 +11,7 @@ Examples
 --------
 >>> from finstack_quant.features import dataframe
 >>> sorted(dataframe.__all__)[0]
-'clean_signal'
+'cross_sectional'
 """
 
 from __future__ import annotations
@@ -23,12 +23,10 @@ TransformParams = dict[str, Any]
 KeySelector = str | int
 
 __all__ = [
-    "clean_signal",
     "cross_sectional",
     "grouped",
     "neutralize",
     "neutralize_and_zscore",
-    "normalize_signal",
     "pairwise",
     "panel",
     "rank_to_weights",
@@ -475,95 +473,6 @@ def risk_scaled_weights(
     ... })
     >>> risk_scaled_weights(frame, "signal", "date", "vol").tolist()
     [-0.25, -0.25, 0.25, 0.25]
-    """
-    ...
-
-def clean_signal(
-    df: Any,
-    value: str,
-    time_key: KeySelector | None = None,
-    params: TransformParams | None = None,
-) -> Any:
-    """
-    Apply the default cross-sectional signal-cleaning pass.
-
-    Forwards to :func:`finstack_quant.features.clean_signal`, clamping each
-    ``time_key`` partition to its ``lower``/``upper`` sample quantiles.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Source DataFrame.
-    value : str
-        Signal column.
-    time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
-    params : dict, optional
-        Quantile bounds ``lower`` (default ``0.01``) and ``upper``
-        (default ``0.99``).
-
-    Returns
-    -------
-    pandas.Series
-        Winsorized signal aligned to ``df.index``.
-
-    Raises
-    ------
-    ValueError
-        If a key is ambiguous or a required column is missing.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> from finstack_quant.features.dataframe import clean_signal
-    >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 3, "signal": [1.0, 2.0, 100.0]})
-    >>> clean_signal(frame, "signal", "date", {"lower": 0.0, "upper": 0.5}).tolist()
-    [1.0, 2.0, 2.0]
-    """
-    ...
-
-def normalize_signal(
-    df: Any,
-    value: str,
-    time_key: KeySelector | None = None,
-    params: TransformParams | None = None,
-) -> Any:
-    """
-    Normalize a DataFrame signal column cross-sectionally.
-
-    Forwards to :func:`finstack_quant.features.normalize_signal`, applying
-    the method named by ``params["method"]`` within each ``time_key``
-    partition.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Source DataFrame.
-    value : str
-        Signal column.
-    time_key : str or int, optional
-        Cross-section partition key. Omit for a ``DatetimeIndex``.
-    params : dict, optional
-        ``method`` selects the normalization operation; remaining entries
-        are forwarded to it.
-
-    Returns
-    -------
-    pandas.Series
-        Normalized signal aligned to ``df.index``.
-
-    Raises
-    ------
-    ValueError
-        If a key is ambiguous or a required column is missing.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> from finstack_quant.features.dataframe import normalize_signal
-    >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 3, "signal": [1.0, 2.0, 100.0]})
-    >>> normalize_signal(frame, "signal", "date", {"method": "rank"}).tolist()
-    [0.0, 0.5, 1.0]
     """
     ...
 

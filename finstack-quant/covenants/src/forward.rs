@@ -4,7 +4,7 @@
 //! this crate has no statements dependency.
 
 use crate::engine::{
-    headroom_for, is_covenant_breached, spec_metric_names, springing_condition_met, BoundKind,
+    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, BoundKind,
     CovenantSpec, CovenantType, SpringingCondition,
 };
 use finstack_quant_core::dates::{Date, PeriodId};
@@ -150,10 +150,11 @@ pub trait ModelTimeSeries: Send + Sync {
 /// Forecast one numeric covenant across supplied model periods.
 ///
 /// The adapter supplies an end date and scalar metric for each [`PeriodId`].
-/// The forecast uses an explicit covenant `metric_id` first, then the
-/// conventional metric name for the covenant type, and finally a custom metric
-/// name where applicable. A threshold schedule overrides the covenant's static
-/// threshold from its effective date onward. A covenant with an unmet springing
+/// The forecast uses the explicit covenant `metric_id` when provided; missing
+/// data for that identifier is an error. Without an explicit identifier it uses
+/// the conventional metric name for the covenant type, or its custom metric
+/// name. A threshold schedule overrides the covenant's static threshold from
+/// its effective date onward. A covenant with an unmet springing
 /// condition is inactive for that period and receives no headroom or breach
 /// probability.
 ///
@@ -259,7 +260,7 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         activation_flags.push(is_active);
 
         let v = metric_value_for_spec(covenant, model, pid).ok_or_else(|| {
-            let looked_up = spec_metric_names(covenant).join("', '");
+            let looked_up = spec_metric_name(covenant).unwrap_or("<unspecified>");
             Error::from(finstack_quant_core::InputError::NotFound {
                 id: format!(
                     "metric for covenant '{description}' in period {pid}; \
@@ -524,10 +525,8 @@ fn metric_value_for_spec<MTS: ModelTimeSeries>(
     model: &MTS,
     period: &PeriodId,
 ) -> Option<f64> {
-    for name in spec_metric_names(spec) {
-        if let Some(value) = model.get_scalar(name, period) {
-            return Some(value);
-        }
+    if let Some(name) = spec_metric_name(spec) {
+        return model.get_scalar(name, period);
     }
     match &spec.covenant.covenant_type {
         CovenantType::Negative { .. } | CovenantType::Affirmative { .. } => Some(1.0),
@@ -736,6 +735,30 @@ mod tests {
 
     fn q(year: i32, q: u8) -> PeriodId {
         PeriodId::quarter(year, q).expect("valid period fixture")
+    }
+
+    #[test]
+    fn explicit_missing_metric_never_falls_back_to_type_default() {
+        let spec = CovenantSpec::with_metric(
+            crate::Covenant::new(
+                CovenantType::MaxDebtToEbitda { threshold: 5.0 },
+                finstack_quant_core::dates::Tenor::quarterly(),
+                "leverage",
+            ),
+            "adjusted_leverage",
+        );
+        let period = q(2025, 1);
+        let model = MockTs::new().with("debt_to_ebitda", period, 4.0);
+        let error =
+            forecast_covenant_generic(&spec, &model, &[period], CovenantForecastConfig::default())
+                .expect_err("explicit missing metric");
+        assert!(error.to_string().contains("adjusted_leverage"));
+        let mut engine = crate::CovenantEngine::new();
+        engine.add_spec(spec);
+        let metrics = crate::HashMapMetricSource::from_pairs([("debt_to_ebitda", 4.0)]);
+        assert!(engine
+            .evaluate_and_track(&metrics, model.period_end_date(&period))
+            .is_err());
     }
 
     #[test]

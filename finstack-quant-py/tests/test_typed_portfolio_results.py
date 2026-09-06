@@ -162,7 +162,6 @@ _ALLOCATION_SPEC = json.dumps({
         {"id": "S2", "fixed_weight": None, "returns": [0.002, -0.001, 0.003, 0.001], "risk_budget": None},
     ],
     "covariance": None,
-    "target_volatility": None,
 })
 
 
@@ -478,6 +477,13 @@ def test_allocate_weights_returns_typed_result() -> None:
     assert [row["id"] for row in result.allocations] == ["S1", "S2"]
     assert result.diagnostics["weights_sum"] == pytest.approx(expected["diagnostics"]["weights_sum"])
     assert _frame_columns(result) == ["id", "weight", "capital", "volatility", "risk_contribution"]
+
+
+def test_allocation_rejects_unsupported_target_volatility() -> None:
+    spec = json.loads(_ALLOCATION_SPEC)
+    spec["target_volatility"] = None
+    with pytest.raises(ValueError, match="target_volatility"):
+        pf.allocate_weights(json.dumps(spec))
 
 
 # ---------------------------------------------------------------------------

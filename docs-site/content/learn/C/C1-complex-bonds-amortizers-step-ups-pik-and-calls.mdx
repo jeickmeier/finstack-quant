@@ -149,7 +149,7 @@ The native schedule builder emits fixed and floating cashflow kinds. The JSON br
 {/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-fixed-float" role="build" */}
 ```python exec id=c1-fixed-float role=build
 from decimal import Decimal
-from finstack_quant.cashflows.builder import (CashFlowSchedule,FixedCouponSpec,FixedWindow,
+from finstack_quant.cashflows.builder import (CashFlowSchedule,FixedCouponSpec,
     FloatingCouponSpec,FloatingRateSpec,CouponType,ScheduleParams,AmortizationSpec)
 from finstack_quant.cashflows.primitives import CFKind
 from finstack_quant.core.money import Money
@@ -157,8 +157,8 @@ from finstack_quant.valuations.instruments import bond_from_cashflows_json
 floating=FloatingCouponSpec(rate_spec=FloatingRateSpec(index_id="USD-SOFR-3M",
     spread_bp=Decimal("200"),reset_frequency="3M"),schedule=ScheduleParams.quarterly_act360())
 fixed_float=(CashFlowSchedule.builder().principal(Money(1_000_000.,"USD"),AS_OF,date(2027,1,15))
-    .fixed_to_float(date(2026,1,15),FixedWindow(Decimal("0.06"),ScheduleParams.semiannual_30360()),
-                    floating,CouponType.CASH).build(credit_market))
+    .fixed_to_float(date(2026,1,15),FixedCouponSpec(Decimal("0.06"),ScheduleParams.semiannual_30360()),
+                    floating).build(credit_market))
 fixed_float_json=bond_from_cashflows_json("FIXED-TO-FLOAT",fixed_float.to_json(),"USD-OIS")
 validate_instrument_json(fixed_float_json)
 fixed_float_value=price_instrument(fixed_float_json,credit_market,AS_OF).value.amount
@@ -280,7 +280,7 @@ print({"fixed_call_usd":callable_value,"make_whole_usd":make_whole_pv,
 
 <Exercise id="c1-toggle" title="Interpret the toggle and enforce model scope" question="Which issuer elects PIK more often, and why? Show that the full amortizing contract is rejected by the bullet-only Monte Carlo path.">
 
-The weaker issuer crosses the chosen threshold more often. The negative test prevents an apparently valid number from being produced by a model that would ignore contractual principal repayments. Read the exception as a supported-domain boundary.
+The weaker issuer crosses the chosen threshold more often. The negative test requires the Merton engine to reject embedded call and put rights that it cannot price, before checking amortization. Read the exception as a supported-domain boundary.
 
 {/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="c1-exercise-toggle" role="exercise" */}
 ```python exec id=c1-exercise-toggle role=exercise

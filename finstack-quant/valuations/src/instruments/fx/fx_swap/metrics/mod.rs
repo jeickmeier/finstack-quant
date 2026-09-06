@@ -49,7 +49,7 @@ pub(crate) fn register_fx_swap_metrics(
         ),
         (MetricId::Dv01Foreign, Arc::new(ir01_foreign::ForeignIR01)),
     ] {
-        registry.replace_metric(id, calculator, &[InstrumentType::FxSwap])?;
+        registry.register_metric(id, calculator, &[InstrumentType::FxSwap])?;
     }
 
     // Standard metrics using macro

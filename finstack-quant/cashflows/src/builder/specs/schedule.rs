@@ -1,7 +1,6 @@
 //! Schedule parameter types for cashflow generation.
 
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
-use rust_decimal::Decimal;
 
 /// Roll-date rule applied when generating schedule anchors.
 ///
@@ -547,20 +546,4 @@ impl ScheduleParams {
         }
         Ok(())
     }
-}
-
-/// Fixed-rate coupon window with a shared schedule.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct FixedWindow {
-    /// Annual coupon rate as a decimal, for example `0.05` for 5%.
-    #[serde(with = "finstack_quant_core::wire::decimal")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DecimalWire")
-    )]
-    pub rate: Decimal,
-    /// Schedule-generation parameters for this fixed-rate window.
-    pub schedule: ScheduleParams,
 }

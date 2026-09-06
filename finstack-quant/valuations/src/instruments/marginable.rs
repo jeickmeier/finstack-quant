@@ -74,7 +74,10 @@ fn repriced_bucketed_dv01(
     };
     let mut out = Vec::new();
     for (&tenor, label) in TENORS.iter().zip(LABELS.iter()) {
-        let key = format!("bucketed_dv01::{curve_id}::{label}");
+        let key = crate::metrics::MetricId::composite(
+            &crate::metrics::MetricId::BucketedDv01,
+            &[curve_id, label],
+        );
         if let Some(&dv01) = result.measures.get(key.as_str()) {
             out.push((tenor, dv01));
         }

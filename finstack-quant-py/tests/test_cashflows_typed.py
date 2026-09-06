@@ -689,8 +689,7 @@ class TestCashFlowBuilder:
 
         from finstack_quant.cashflows.builder import (
             CashFlowSchedule,
-            CouponType,
-            FixedWindow,
+            FixedCouponSpec,
             FloatingCouponSpec,
             FloatingRateFallback,
             FloatingRateSpec,
@@ -713,9 +712,8 @@ class TestCashFlowBuilder:
             .principal(Money(1_000_000.0, "USD"), dt.date(2025, 1, 15), dt.date(2027, 1, 15))
             .fixed_to_float(
                 dt.date(2026, 1, 15),
-                FixedWindow(Decimal("0.04"), ScheduleParams.semiannual_30360()),
+                FixedCouponSpec(Decimal("0.04"), ScheduleParams.semiannual_30360()),
                 floating,
-                CouponType.CASH,
             )
             .build(None)
         )

@@ -765,7 +765,6 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
 fn every_canonical_coupon_and_payment_variant_round_trips() {
     let fixed = canonical_fixed_coupon("0.04");
     let floating = canonical_floating_coupon("150");
-    let schedule = canonical_schedule_params();
     let coupon_variants = vec![
         json!({"kind": "fixed", "spec": fixed}),
         json!({"kind": "floating", "spec": floating}),
@@ -800,9 +799,8 @@ fn every_canonical_coupon_and_payment_variant_round_trips() {
         json!({
             "kind": "fixed_to_float",
             "switch": "2026-01-01",
-            "fixed": {"rate": "0.04", "schedule": schedule},
+            "fixed": canonical_fixed_coupon("0.04"),
             "floating": canonical_floating_coupon("150"),
-            "fixed_split": "cash"
         }),
         json!({
             "kind": "floating_margin_program",
@@ -902,9 +900,8 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
             vec![json!({
                 "kind": "fixed_to_float",
                 "switch": "2026-01-01",
-                "fixed": {"rate": "0.04", "schedule": canonical_schedule_params()},
+                "fixed": canonical_fixed_coupon("0.04"),
                 "floating": canonical_floating_coupon("150"),
-                "fixed_split": "cash"
             })],
         ),
         (

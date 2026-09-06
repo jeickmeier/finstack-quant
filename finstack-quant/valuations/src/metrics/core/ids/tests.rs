@@ -247,17 +247,38 @@ fn composite_codec_matches_only_the_exact_base_identifier() {
 }
 
 #[test]
-fn composite_codec_decodes_legacy_fully_escaped_keys() {
-    let legacy = MetricId::custom("pv01::USD_x2dOIS");
-    assert_eq!(
-        legacy.decode_components(&MetricId::Pv01),
-        Some(vec!["USD-OIS".to_string()])
-    );
-    let legacy = MetricId::custom("bucketed_dv01::usd_x5fois::10y");
-    assert_eq!(
-        legacy.decode_components(&MetricId::BucketedDv01),
-        Some(vec!["usd_ois".to_string(), "10y".to_string()])
-    );
+fn wire_ingestion_rejects_noncanonical_composite_keys() {
+    for key in [
+        "pv01::USD_x2dOIS",
+        "pv01::usd_x5fois",
+        "pv01::curve_xray",
+        "pv01::",
+        "pv01::USD:OIS",
+        "pv01::USD_x3AOIS",
+    ] {
+        assert!(key.parse::<MetricId>().is_err(), "{key}");
+        assert!(
+            serde_json::from_value::<MetricId>(serde_json::json!(key)).is_err(),
+            "{key}"
+        );
+    }
+    for component in [
+        "USD-OIS",
+        "usd_ois",
+        "_empty",
+        "",
+        "Δ",
+        "USD::OIS",
+        "curve_x2d",
+        "curve_xray",
+    ] {
+        let key = MetricId::composite(&MetricId::Pv01, &[component]);
+        assert_eq!(key.as_str().parse::<MetricId>().expect("canonical"), key);
+        assert_eq!(
+            serde_json::from_value::<MetricId>(serde_json::json!(key)).expect("serde"),
+            key
+        );
+    }
 }
 
 #[test]
@@ -276,7 +297,7 @@ fn composite_codec_writes_ordinary_identifiers_literally() {
 }
 
 #[test]
-fn composite_codec_preserves_legacy_and_malformed_escape_markers_literally() {
+fn custom_labels_encode_literal_escape_markers() {
     for component in ["curve_xray", "curve_x", "curve_xg1", "curve_x2"] {
         let key = MetricId::custom(format!("bucketed_dv01::{component}"));
         assert_eq!(
@@ -304,4 +325,19 @@ fn composite_codec_decodes_a_genuine_escaped_delimiter_component() {
         key.decode_components(&MetricId::BucketedDv01),
         Some(vec!["USD::OIS".to_string()])
     );
+}
+
+#[test]
+fn literal_custom_bases_and_nested_coordinates_roundtrip() {
+    for name in ["", "a:", "_empty", "curve_xray", "Δ", "a::b"] {
+        let base = MetricId::custom(name);
+        assert_eq!(base.as_str().parse::<MetricId>().expect("base"), base);
+        let key = MetricId::composite(&base, &["USD::OIS", "_empty"]);
+        assert_eq!(key.base(), base.base());
+        assert_eq!(key.as_str().parse::<MetricId>().expect("composite"), key);
+        assert_eq!(
+            key.decode_components(&base),
+            Some(vec!["USD::OIS".to_string(), "_empty".to_string()])
+        );
+    }
 }

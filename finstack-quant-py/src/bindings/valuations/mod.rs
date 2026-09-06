@@ -210,9 +210,8 @@ impl PyValuationResult {
     /// Parameters
     /// ----------
     /// key : str
-    ///     Metric key (``"ytm"``, ``"dv01"``, ``"pv01::USD-OIS"``). A legacy
-    ///     escaped composite key (``"pv01::USD_x2dOIS"``) resolves to the same
-    ///     measure as its literal form.
+    ///     Canonical metric key (``"ytm"``, ``"dv01"``, ``"pv01::USD-OIS"``).
+    ///     Lookup matches the stored wire key exactly.
     ///
     /// Returns
     /// -------
@@ -220,7 +219,7 @@ impl PyValuationResult {
     ///     Metric value, or ``None`` if the key is not present.
     #[pyo3(text_signature = "($self, key)")]
     fn get_metric(&self, key: &str) -> Option<f64> {
-        self.inner.metric_str_decoded(key)
+        self.inner.metric_str(key)
     }
 
     /// ``result[key]``: scalar measure by key.
@@ -231,7 +230,7 @@ impl PyValuationResult {
     ///     If ``key`` is not a measure of this result; the message lists the
     ///     five closest keys present.
     fn __getitem__(&self, key: &str) -> PyResult<f64> {
-        self.inner.metric_str_decoded(key).ok_or_else(|| {
+        self.inner.metric_str(key).ok_or_else(|| {
             let closest = self.inner.closest_metric_keys(key, 5);
             let hint = if closest.is_empty() {
                 String::new()
@@ -245,9 +244,9 @@ impl PyValuationResult {
         })
     }
 
-    /// ``key in result``: whether a measure with this key (literal or legacy form) is present.
+    /// ``key in result``: whether a measure with this key (canonical wire form) is present.
     fn __contains__(&self, key: &str) -> bool {
-        self.inner.metric_str_decoded(key).is_some()
+        self.inner.metric_str(key).is_some()
     }
 
     /// Decoded component vectors and values for a composite base metric.
@@ -257,18 +256,22 @@ impl PyValuationResult {
     /// ``pandas.Series``; use ``metric_series_dataframe`` for the tabular
     /// form.
     ///
-    /// Results preserve the underlying ``measures`` insertion order. Legacy
-    /// malformed escapes remain literal, and decoded-coordinate collisions
-    /// fall back to literal wire components so every value remains visible.
+    /// Results preserve the underlying ``measures`` insertion order. Canonical
+    /// wire keys decode to unique coordinate vectors.
     ///
     /// Parameters
     /// ----------
     /// base : str
     ///     Unqualified base metric such as ``"bucketed_dv01"`` or ``"pv01"``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the base metric key is not canonically encoded.
     #[pyo3(text_signature = "($self, base)")]
-    fn metric_series(&self, base: &str) -> Vec<(Vec<String>, f64)> {
-        let base = finstack_quant_valuations::metrics::MetricId::custom(base);
-        self.inner.metric_series(&base)
+    fn metric_series(&self, base: &str) -> PyResult<Vec<(Vec<String>, f64)>> {
+        let base = base.parse().map_err(crate::errors::core_to_py)?;
+        Ok(self.inner.metric_series(&base))
     }
 
     /// Tidy ``DataFrame`` of one composite base metric.

@@ -60,6 +60,40 @@ test('synchronizer check mode detects stale declarations', () => {
   assert.match(stale.stderr, /facade JSDoc is not synchronized/);
 });
 
+test('namespace properties do not inherit same-named function contracts', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'finstack-typescript-docs-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const facade = join(directory, 'facade.d.ts');
+  const raw = join(directory, 'raw.d.ts');
+  writeFileSync(
+    facade,
+    `export interface ModelsNamespace {
+  /** Credit correlation models. */
+  correlation: CorrelationNamespace;
+}
+export interface MathNamespace {
+  /** Compute sample correlation. */
+  correlation(values: number[]): number;
+}
+`
+  );
+  writeFileSync(
+    raw,
+    `/**
+ * Compute sample correlation.
+ * @returns Sample correlation in [-1, 1].
+ */
+export function correlation(values: number[]): number;
+`
+  );
+  const result = run('sync-facade-jsdoc.mjs', `--facade=${facade}`, `--raw=${raw}`, '--write');
+  assert.equal(result.status, 0, result.stderr);
+  const updated = readFileSync(facade, 'utf8');
+  const [models, math] = updated.split('export interface MathNamespace');
+  assert.doesNotMatch(models, /@returns/);
+  assert.match(math, /@returns Sample correlation in \[-1, 1\]/);
+});
+
 test('completer removes only legacy fabricated documentation', (t) => {
   const declaration = temporaryFixture(t, 'checker.legacy.d.ts');
   const result = run('complete-facade-jsdoc.mjs', `--declaration=${declaration}`, '--write');

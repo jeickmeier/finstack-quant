@@ -900,9 +900,8 @@ impl SimmCalculator {
     ///
     /// Specialised variant of [`Self::calculate_from_sensitivities`] for Rust
     /// callers that aggregate many netting sets and do not want an
-    /// [`ImResult`] envelope. It performs no validation; call
-    /// [`SimmSensitivities::validate`] first when the container comes from
-    /// untrusted data.
+    /// [`ImResult`] envelope. Validates the sensitivity container before
+    /// aggregation, so invalid buckets cannot silently contribute zero margin.
     ///
     /// # Arguments
     ///
@@ -949,6 +948,7 @@ impl SimmCalculator {
         sensitivities: &SimmSensitivities,
         currency: Currency,
     ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>)> {
+        sensitivities.validate()?;
         let mut breakdown = HashMap::default();
         let mut risk_class_margins = HashMap::default();
 
@@ -1180,7 +1180,7 @@ impl SimmCalculator {
     /// bucket errors instead of silently pricing to zero margin, then stamps
     /// the methodology, MPOR and calculation date. Use
     /// [`Self::calculate_from_sensitivities_parts`] for the raw
-    /// `(total, breakdown)` tuple without validation or stamping.
+    /// `(total, breakdown)` tuple with the same validation and no result stamping.
     ///
     /// # Arguments
     ///
@@ -1200,7 +1200,6 @@ impl SimmCalculator {
         currency: Currency,
         as_of: Date,
     ) -> Result<ImResult> {
-        sensitivities.validate()?;
         let (amount, breakdown) =
             self.calculate_from_sensitivities_parts(sensitivities, currency)?;
         Ok(ImResult::with_breakdown(
@@ -1239,24 +1238,14 @@ impl ImCalculator for SimmCalculator {
         let mtm = instrument.mtm_for_vm(context, as_of)?;
         let currency = mtm.currency();
         let sensitivities = instrument.simm_sensitivities(context, as_of)?;
-        sensitivities.validate()?;
-        let (total_im, breakdown) =
-            self.calculate_from_sensitivities_parts(&sensitivities, currency)?;
-
+        let result = self.calculate_from_sensitivities(&sensitivities, currency, as_of)?;
         debug!(
             instrument = instrument.id(),
-            total_im,
-            risk_classes = breakdown.len(),
+            total_im = result.amount.amount(),
+            risk_classes = result.breakdown.len(),
             "SIMM IM calculated"
         );
-
-        Ok(ImResult::with_breakdown(
-            Money::new(total_im, currency)?,
-            ImMethodology::Simm,
-            as_of,
-            self.mpor_days(),
-            breakdown,
-        ))
+        Ok(result)
     }
 
     fn methodology(&self) -> ImMethodology {
@@ -2039,6 +2028,10 @@ mod tests {
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("date");
         let mut sens = SimmSensitivities::new(Currency::USD);
         sens.add_ir_delta(Currency::USD, "7Y", 50_000.0);
+        let error = calc
+            .calculate_from_sensitivities_parts(&sens, Currency::USD)
+            .expect_err("parts must reject unknown tenors too");
+        assert!(error.to_string().contains("7Y"));
         let err = calc
             .calculate_from_sensitivities(&sens, Currency::USD, as_of)
             .expect_err("7Y must be rejected");
@@ -2051,5 +2044,15 @@ mod tests {
             .expect("valid tenor prices");
         assert!(result.amount.amount() > 0.0);
         assert_eq!(result.mpor_days, calc.mpor_days());
+        let (amount, breakdown) = calc
+            .calculate_from_sensitivities_parts(&good, Currency::USD)
+            .expect("valid parts");
+        assert_eq!(amount, result.amount.amount());
+        assert_eq!(
+            breakdown
+                .into_iter()
+                .collect::<std::collections::BTreeMap<_, _>>(),
+            result.breakdown
+        );
     }
 }

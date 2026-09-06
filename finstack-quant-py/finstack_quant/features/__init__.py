@@ -20,10 +20,8 @@ PairwiseOp = _features.PairwiseOp
 PanelTransformResult = _features.PanelTransformResult
 PanelTransformSpec = _features.PanelTransformSpec
 TimeSeriesOp = _features.TimeSeriesOp
-clean_signal = _features.clean_signal
 neutralize = _features.neutralize
 neutralize_and_zscore = _features.neutralize_and_zscore
-normalize_signal = _features.normalize_signal
 rank_to_weights = _features.rank_to_weights
 risk_scaled_weights = _features.risk_scaled_weights
 rolling_regression_residual = _features.rolling_regression_residual
@@ -42,11 +40,9 @@ __all__: list[str] = [
     "PanelTransformResult",
     "PanelTransformSpec",
     "TimeSeriesOp",
-    "clean_signal",
     "dataframe",
     "neutralize",
     "neutralize_and_zscore",
-    "normalize_signal",
     "rank_to_weights",
     "risk_scaled_weights",
     "rolling_regression_residual",

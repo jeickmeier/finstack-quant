@@ -24,7 +24,6 @@ use crate::valuation::PortfolioValuation;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::HashSet;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
@@ -86,7 +85,7 @@ pub struct AggregatedMetric {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioMetrics {
     /// Aggregated metrics (summable only)
-    pub aggregated: IndexMap<String, AggregatedMetric>,
+    pub aggregated: IndexMap<MetricId, AggregatedMetric>,
 
     /// Raw metrics by position (all metrics), with explicit native currency context.
     pub by_position: IndexMap<PositionId, PositionMetrics>,
@@ -129,11 +128,11 @@ pub struct PositionMetrics {
     /// Native currency for this position's valuation and non-summable metrics.
     pub currency: Currency,
     /// Raw metric values for the position.
-    pub metrics: IndexMap<String, f64>,
+    pub metrics: IndexMap<MetricId, f64>,
 }
 
 impl std::ops::Deref for PositionMetrics {
-    type Target = IndexMap<String, f64>;
+    type Target = IndexMap<MetricId, f64>;
 
     fn deref(&self) -> &Self::Target {
         &self.metrics
@@ -141,8 +140,8 @@ impl std::ops::Deref for PositionMetrics {
 }
 
 impl<'a> IntoIterator for &'a PositionMetrics {
-    type Item = (&'a String, &'a f64);
-    type IntoIter = indexmap::map::Iter<'a, String, f64>;
+    type Item = (&'a MetricId, &'a f64);
+    type IntoIter = indexmap::map::Iter<'a, MetricId, f64>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.metrics.iter()
@@ -180,22 +179,19 @@ impl PortfolioMetrics {
     /// Return decoded components and aggregate payloads for a composite metric.
     ///
     /// Entries retain the deterministic insertion order of [`Self::aggregated`].
-    /// The scalar aggregate stored directly under `base` is excluded. Malformed
-    /// legacy escape markers remain literal, and decoded-coordinate collisions
-    /// fall back to literal wire components so all aggregate entries survive.
+    /// The scalar aggregate stored directly under `base` is excluded. Typed
+    /// canonical metric keys prevent aliases between distinct coordinates.
     ///
     /// # Arguments
     ///
     /// * `base` - Composite metric identifier whose decoded series components
     ///   should be collected from [`Self::aggregated`].
     pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, &AggregatedMetric)> {
-        let metric_ids: Vec<MetricId> = self.aggregated.keys().map(MetricId::custom).collect();
-        let components = MetricId::decode_series_components(base, &metric_ids);
         self.aggregated
-            .values()
-            .zip(components)
-            .filter_map(|(aggregate, components)| {
-                components.map(|components| (components, aggregate))
+            .iter()
+            .filter_map(|(key, aggregate)| {
+                key.decode_components(base)
+                    .map(|components| (components, aggregate))
             })
             .collect()
     }
@@ -260,7 +256,9 @@ impl Default for PortfolioMetrics {
 /// `true` when the metric is safe to sum across positions after any required
 /// FX conversion.
 pub(crate) fn is_summable(metric_id: &str) -> bool {
-    finstack_quant_valuations::metrics::is_additive_metric(&MetricId::custom(metric_id))
+    metric_id
+        .parse::<MetricId>()
+        .is_ok_and(|id| finstack_quant_valuations::metrics::is_additive_metric(&id))
 }
 
 /// Aggregate metrics from portfolio valuation results.
@@ -471,16 +469,12 @@ struct PositionMetricData {
 
 /// Aggregate collected position metric data into portfolio metrics.
 fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioMetrics {
-    use std::sync::Arc;
-
     let n = collected.len();
     let mut by_position: IndexMap<PositionId, PositionMetrics> = IndexMap::with_capacity(n);
 
-    let mut intern: HashMap<String, Arc<str>> = HashMap::default();
-
     // IndexMap keeps aggregated/by_entity insertion order stable for snapshots.
-    let mut metric_values: IndexMap<Arc<str>, Vec<f64>> = IndexMap::new();
-    let mut entity_values: IndexMap<Arc<str>, IndexMap<EntityId, Vec<f64>>> = IndexMap::new();
+    let mut metric_values: IndexMap<MetricId, Vec<f64>> = IndexMap::new();
+    let mut entity_values: IndexMap<MetricId, IndexMap<EntityId, Vec<f64>>> = IndexMap::new();
     let mut skipped_metrics: Vec<SkippedMetric> = Vec::new();
     let mut unaggregated: HashSet<String> = HashSet::default();
 
@@ -508,20 +502,15 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
                     continue;
                 }
 
-                let key = Arc::clone(
-                    intern
-                        .entry(metric_name.to_string())
-                        .or_insert_with(|| Arc::from(metric_name)),
-                );
                 let value_base = *value * fx_rate;
 
                 metric_values
-                    .entry(Arc::clone(&key))
+                    .entry(metric_id.clone())
                     .or_default()
                     .push(value_base);
 
                 entity_values
-                    .entry(key)
+                    .entry(metric_id.clone())
                     .or_default()
                     .entry(entity_id.clone())
                     .or_default()
@@ -533,16 +522,12 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
             data.position_id,
             PositionMetrics {
                 currency: data.currency,
-                metrics: data
-                    .metrics
-                    .into_iter()
-                    .map(|(id, value)| (id.as_str().to_string(), value))
-                    .collect(),
+                metrics: data.metrics,
             },
         );
     }
 
-    let mut aggregated: IndexMap<String, AggregatedMetric> =
+    let mut aggregated: IndexMap<MetricId, AggregatedMetric> =
         IndexMap::with_capacity(metric_values.len());
 
     for (metric_id, values) in metric_values {
@@ -558,9 +543,9 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
             })
             .collect();
 
-        let metric_string: String = (*metric_id).to_string();
+        let metric_string = metric_id.to_string();
         aggregated.insert(
-            metric_string.clone(),
+            metric_id,
             AggregatedMetric {
                 metric_id: metric_string,
                 total,
@@ -599,6 +584,21 @@ mod tests {
     use time::macros::date;
 
     #[test]
+    fn portfolio_metric_maps_reject_noncanonical_wire_keys() {
+        let invalid = "bucketed_dv01::USD_x2dOIS::10y";
+        let aggregate = serde_json::json!({
+            "aggregated": {invalid: {"metric_id": invalid, "total": 1.0, "by_entity": {}}},
+            "by_position": {}
+        });
+        assert!(serde_json::from_value::<PortfolioMetrics>(aggregate).is_err());
+        let position = serde_json::json!({
+            "aggregated": {},
+            "by_position": {"POS": {"currency": "USD", "metrics": {invalid: 1.0}}}
+        });
+        assert!(serde_json::from_value::<PortfolioMetrics>(position).is_err());
+    }
+
+    #[test]
     fn test_is_summable() {
         assert!(is_summable("dv01"));
         assert!(is_summable("cs01"));
@@ -624,12 +624,12 @@ mod tests {
         let mut aggregated = IndexMap::new();
         for (metric_id, total) in [
             ("bucketed_dv01", -3.0),
-            ("bucketed_dv01::USD_x2dOIS::10y", -1.0),
+            ("bucketed_dv01::USD-OIS::10y", -1.0),
             ("bucketed_cs01::ACME", 8.0),
-            ("bucketed_dv01::EUR_x2fUSD::_empty", -2.0),
+            ("bucketed_dv01::EUR/USD::", -2.0),
         ] {
             aggregated.insert(
-                metric_id.to_string(),
+                MetricId::custom(metric_id),
                 AggregatedMetric {
                     metric_id: metric_id.to_string(),
                     total,
@@ -651,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn portfolio_metric_series_preserves_legacy_collision_entries() {
+    fn portfolio_metric_series_preserves_literal_escape_coordinates() {
         let mut aggregated = IndexMap::new();
         for (metric_id, total) in [
             ("bucketed_dv01::curve-ray", -1.0),
@@ -659,7 +659,7 @@ mod tests {
             ("bucketed_dv01::curve_xray", -3.0),
         ] {
             aggregated.insert(
-                metric_id.to_string(),
+                MetricId::custom(metric_id),
                 AggregatedMetric {
                     metric_id: metric_id.to_string(),
                     total,

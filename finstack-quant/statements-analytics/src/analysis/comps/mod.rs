@@ -87,6 +87,17 @@ mod tests {
     // Percentile rank tests
 
     #[test]
+    fn scoring_rejects_obsolete_predictor_vectors() {
+        let error = serde_json::from_value::<ScoringDimension>(serde_json::json!({
+            "label": "spread", "y_extractor": {"named": "oas_bp"},
+            "x_extractors": [{"named": "leverage"}, {"named": "ebitda_margin"}],
+            "weight": 1.0
+        }))
+        .expect_err("predictor vectors must not silently discard inputs");
+        assert!(error.to_string().contains("x_extractors"));
+    }
+
+    #[test]
     fn percentile_rank_correctness() {
         let values = [100.0, 200.0, 300.0, 400.0, 500.0];
 
@@ -462,7 +473,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread Level".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![],
+            x_extractor: None,
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -487,7 +498,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread vs Leverage".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -516,7 +527,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread vs Leverage".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -550,21 +561,21 @@ mod tests {
             ScoringDimension {
                 label: "Spread vs Leverage".to_string(),
                 y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-                x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+                x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
                 weight: 0.5,
                 direction: ScoreDirection::default(),
             },
             ScoringDimension {
                 label: "Spread Level".to_string(),
                 y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-                x_extractors: vec![],
+                x_extractor: None,
                 weight: 0.3,
                 direction: ScoreDirection::default(),
             },
             ScoringDimension {
                 label: "EV/EBITDA".to_string(),
                 y_extractor: MetricExtractor::Multiple(Multiple::EvEbitda),
-                x_extractors: vec![],
+                x_extractor: None,
                 weight: 0.2,
                 direction: ScoreDirection::default(),
             },
@@ -629,7 +640,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread vs Leverage".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -690,7 +701,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread vs Leverage".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -724,7 +735,7 @@ mod tests {
         let dimensions = vec![ScoringDimension {
             label: "Spread vs Leverage".to_string(),
             y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            x_extractor: Some(MetricExtractor::Named("leverage".to_string())),
             weight: 1.0,
             direction: ScoreDirection::default(),
         }];
@@ -748,19 +759,19 @@ mod tests {
         let universe = make_universe();
         let subject = make_company("SUBJECT", "Energy", "BB", "US", 4.0, 500.0, 6_500.0);
 
-        for x_extractors in [vec![], vec![MetricExtractor::Named("leverage".to_string())]] {
+        for x_extractor in [None, Some(MetricExtractor::Named("leverage".to_string()))] {
             let peer_set = PeerSet::new(subject.clone(), universe.clone(), PeriodBasis::Ltm);
             let dims_cheap = vec![ScoringDimension {
                 label: "dim".to_string(),
                 y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-                x_extractors: x_extractors.clone(),
+                x_extractor: x_extractor.clone(),
                 weight: 1.0,
                 direction: ScoreDirection::HigherIsCheap,
             }];
             let dims_rich = vec![ScoringDimension {
                 label: "dim".to_string(),
                 y_extractor: MetricExtractor::Named("oas_bp".to_string()),
-                x_extractors: x_extractors.clone(),
+                x_extractor: x_extractor.clone(),
                 weight: 1.0,
                 direction: ScoreDirection::HigherIsRich,
             }];
@@ -787,7 +798,7 @@ mod tests {
         let json = r#"{
             "label": "dim",
             "y_extractor": {"named": "oas_bp"},
-            "x_extractors": [],
+            "x_extractor": null,
             "weight": 1.0
         }"#;
         let dim: ScoringDimension = serde_json::from_str(json).expect("deserialize");

@@ -536,7 +536,6 @@ fn scenario_with_resolution_mode_json_round_trip() {
 #[test]
 fn compose_preserves_resolution_mode_when_inputs_agree() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
-    use finstack_quant_scenarios::ScenarioEngine;
 
     let s1 = ScenarioSpec {
         id: "one".into(),
@@ -557,16 +556,13 @@ fn compose_preserves_resolution_mode_when_inputs_agree() {
         hazard_bump_mode: Default::default(),
     };
 
-    let composed = ScenarioEngine::new()
-        .try_compose(vec![s1, s2])
-        .expect("compose should succeed");
+    let composed = ScenarioSpec::compose(vec![s1, s2]).expect("compose should succeed");
     assert_eq!(composed.resolution_mode, ResolutionMode::Cumulative);
 }
 
 #[test]
 fn compose_with_mixed_resolution_modes_defaults_to_cumulative() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
-    use finstack_quant_scenarios::ScenarioEngine;
 
     let most_specific = ScenarioSpec {
         id: "one".into(),
@@ -587,9 +583,8 @@ fn compose_with_mixed_resolution_modes_defaults_to_cumulative() {
         hazard_bump_mode: Default::default(),
     };
 
-    let composed = ScenarioEngine::new()
-        .try_compose(vec![most_specific, cumulative])
-        .expect("compose should succeed");
+    let composed =
+        ScenarioSpec::compose(vec![most_specific, cumulative]).expect("compose should succeed");
     assert_eq!(composed.resolution_mode, ResolutionMode::Cumulative);
 }
 

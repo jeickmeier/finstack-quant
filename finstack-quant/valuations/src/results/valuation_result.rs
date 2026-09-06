@@ -586,44 +586,15 @@ impl ValuationResult {
     /// composite entries retain the insertion order of the [`IndexMap`] in
     /// [`Self::measures`], which is also their deterministic serde wire order.
     /// Components are decoded with the canonical [`MetricId`] composite-key
-    /// codec. Malformed legacy escape markers remain literal. When distinct
-    /// wire keys would decode to duplicate coordinates, all members of that
-    /// collision group retain their literal wire components so no value is
-    /// omitted or deduplicated.
+    /// codec. Canonical key ingestion prevents aliases between coordinates.
     pub fn metric_series(&self, base: &MetricId) -> Vec<(Vec<String>, f64)> {
-        let components = MetricId::decode_series_components(base, self.measures.keys());
         self.measures
             .iter()
-            .zip(components)
-            .filter_map(|((_, value), components)| {
-                components.map(|components| (components, *value))
+            .filter_map(|(key, value)| {
+                key.decode_components(base)
+                    .map(|components| (components, *value))
             })
             .collect()
-    }
-
-    /// Look up a measure by string key, tolerating the legacy escaped wire form.
-    ///
-    /// Tries an exact match first (`metric_str`). On a miss the composite
-    /// keys with the same base are compared on their decoded components, so a
-    /// caller holding a key persisted by an earlier release
-    /// (`pv01::USD_x2dOIS`) still resolves the literal key written today
-    /// (`pv01::USD-OIS`), and vice versa. Scalar keys never match anything
-    /// but themselves.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Metric key in either the literal (`pv01::USD-OIS`) or legacy
-    ///   escaped (`pv01::USD_x2dOIS`) composite form, or a scalar metric name.
-    pub fn metric_str_decoded(&self, id: &str) -> Option<f64> {
-        if let Some(value) = self.metric_str(id) {
-            return Some(value);
-        }
-        let requested = MetricId::custom(id);
-        let base = requested.base();
-        let wanted = requested.decode_components(&base)?;
-        self.measures.iter().find_map(|(key, value)| {
-            (key.decode_components(&base).as_ref() == Some(&wanted)).then_some(*value)
-        })
     }
 
     /// Measure keys ranked by case-folded similarity to `id`, best first.
@@ -633,7 +604,7 @@ impl ValuationResult {
     ///
     /// # Arguments
     ///
-    /// * `id` - The key the caller asked for (any case, literal or legacy form).
+    /// * `id` - The key the caller asked for (any case, in canonical wire form).
     /// * `limit` - Maximum number of keys returned.
     pub fn closest_metric_keys(&self, id: &str, limit: usize) -> Vec<String> {
         crate::metrics::closest_metric_names(id, self.measures.keys().map(MetricId::as_str), limit)
@@ -878,7 +849,7 @@ mod tests {
     use time::macros::date;
 
     #[test]
-    fn metric_str_decoded_matches_literal_and_legacy_escaped_keys() {
+    fn metric_str_matches_only_the_exact_canonical_wire_key() {
         let mut measures = IndexMap::new();
         measures.insert(MetricId::Dv01, 1.0);
         measures.insert(MetricId::composite(&MetricId::Pv01, &["USD-OIS"]), 2.0);
@@ -890,12 +861,12 @@ mod tests {
         )
         .with_measures(measures);
 
-        assert_eq!(result.metric_str_decoded("dv01"), Some(1.0));
-        assert_eq!(result.metric_str_decoded("pv01::USD-OIS"), Some(2.0));
-        assert_eq!(result.metric_str_decoded("pv01::USD_x2dOIS"), Some(2.0));
-        assert_eq!(result.metric_str_decoded("pv01::EUR-OIS"), Some(3.0));
-        assert_eq!(result.metric_str_decoded("pv01::GBP-OIS"), None);
-        assert_eq!(result.metric_str_decoded("dv02"), None);
+        assert_eq!(result.metric_str("dv01"), Some(1.0));
+        assert_eq!(result.metric_str("pv01::USD-OIS"), Some(2.0));
+        assert_eq!(result.metric_str("pv01::USD_x2dOIS"), None);
+        assert_eq!(result.metric_str("pv01::EUR_x5fx2dOIS"), Some(3.0));
+        assert_eq!(result.metric_str("pv01::GBP-OIS"), None);
+        assert_eq!(result.metric_str("dv02"), None);
         assert_eq!(
             result.closest_metric_keys("DV01", 1),
             vec!["dv01".to_string()]
@@ -958,7 +929,7 @@ mod tests {
     }
 
     #[test]
-    fn metric_series_preserves_all_legacy_and_escaped_collision_entries() {
+    fn metric_series_preserves_distinct_literal_escape_labels() {
         let mut measures = IndexMap::new();
         measures.insert(MetricId::custom("bucketed_dv01::curve-ray"), -1.0);
         measures.insert(MetricId::custom("bucketed_dv01::curve_x2dray"), -2.0);
@@ -982,7 +953,7 @@ mod tests {
     }
 
     #[test]
-    fn metric_series_resolves_transitive_legacy_escape_collisions() {
+    fn metric_series_preserves_nested_literal_escape_labels() {
         let mut measures = IndexMap::new();
         measures.insert(MetricId::custom("bucketed_dv01::curve-ray"), -1.0);
         measures.insert(MetricId::custom("bucketed_dv01::curve_x2dray"), -2.0);

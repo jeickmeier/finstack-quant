@@ -16,25 +16,25 @@ pub(crate) fn register_range_accrual_metrics(
     use crate::metrics::{GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga};
     use crate::pricer::InstrumentType;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Delta,
         Arc::new(GenericFdDelta::<crate::instruments::RangeAccrual>::default()),
         &[InstrumentType::RangeAccrual],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Gamma,
         Arc::new(GenericFdGamma::<crate::instruments::RangeAccrual>::default()),
         &[InstrumentType::RangeAccrual],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Vanna,
         Arc::new(GenericFdVanna::<crate::instruments::RangeAccrual>::default()),
         &[InstrumentType::RangeAccrual],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Volga,
         Arc::new(GenericFdVolga::<crate::instruments::RangeAccrual>::default()),
         &[InstrumentType::RangeAccrual],

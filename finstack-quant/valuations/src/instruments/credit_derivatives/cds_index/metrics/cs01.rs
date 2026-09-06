@@ -93,7 +93,7 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
         let discount_id = index.premium.discount_curve_id;
         let mut total = NeumaierAccumulator::new();
         for credit_id in credit_ids {
-            let series_id = MetricId::custom(format!("bucketed_cs01::{}", credit_id.as_str()));
+            let series_id = MetricId::composite(&MetricId::BucketedCs01, &[credit_id.as_str()]);
             let reval = cs01_reval(context);
             let request = Cs01Request::generic(bump_bp, discount_id.clone());
             total.add(compute_key_rate_cs01_series_with_context_raw(

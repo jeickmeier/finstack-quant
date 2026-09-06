@@ -398,7 +398,7 @@ note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the 
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
-    "FeeSpec", "FixedCouponSpec", "FixedWindow", "FloatingCouponSpec", "FloatingRateFallback",
+    "FeeSpec", "FixedCouponSpec", "FloatingCouponSpec", "FloatingRateFallback",
     "FloatingRateSpec", "Notional", "OvernightCompoundingMethod",
     "OvernightIndexConstraintApplication", "PrepaymentModelSpec", "PrincipalEvent",
     "PrincipalExchange",
@@ -1867,11 +1867,9 @@ public = [
     "PanelTransformResult",
     "PanelTransformSpec",
     "TimeSeriesOp",
-    "clean_signal",
     "neutralize",
     "risk_scaled_weights",
     "neutralize_and_zscore",
-    "normalize_signal",
     "rank_to_weights",
     "rolling_regression_residual",
     "transform_cross_sectional",
@@ -1906,10 +1904,8 @@ python_only = [
     "transform_panel",
 ]
 root_exports = [
-    "cleanSignal",
     "neutralize",
     "neutralizeAndZscore",
-    "normalizeSignal",
     "rankToWeights",
     "riskScaledWeights",
     "rollingRegressionResidual",
@@ -1921,10 +1917,8 @@ root_exports = [
 ]
 
 [wasm_features_subset.python_js_map]
-clean_signal = "cleanSignal"
 neutralize = "neutralize"
 neutralize_and_zscore = "neutralizeAndZscore"
-normalize_signal = "normalizeSignal"
 rank_to_weights = "rankToWeights"
 risk_scaled_weights = "riskScaledWeights"
 rolling_regression_residual = "rollingRegressionResidual"

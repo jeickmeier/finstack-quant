@@ -4128,32 +4128,6 @@ export interface FeaturesNamespace {
     params?: FeatureParams | null
   ): FeatureValue[];
   /**
-   * Apply the default signal cleaning pass.
-   * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values` and `time_key` lengths, malformed clipping bounds, or a result that cannot be serialized to JavaScript.
-   */
-  cleanSignal(
-    values: FeatureValue[],
-    timeKey: string[],
-    params?: FeatureParams | null
-  ): FeatureValue[];
-  /**
-   * Normalize a signal cross-sectionally.
-   * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values` and `time_key` lengths, a non-string or unsupported normalization method, malformed operation parameters, or a result that cannot be serialized to JavaScript.
-   */
-  normalizeSignal(
-    values: FeatureValue[],
-    timeKey: string[],
-    params?: FeatureParams | null
-  ): FeatureValue[];
-  /**
    * Convert ranks into long/short weights.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
@@ -9482,7 +9456,7 @@ export interface StatementsAnalyticsNamespace {
    * Composite rich/cheap scoring across multiple dimensions.
    * @returns Composite rich/cheap score with per-dimension diagnostics.
    * @param peerSet - Comparable-company metric records used to score relative value.
-   * @param dimensions - Metric dimensions and weights included in the relative-value score.
+   * @param dimensions - Metric dimensions and weights; each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
    * @throws Error - Rejects when `peer_set` or `dimensions` cannot be decoded into its declared schema, when no scoring dimensions are supplied, or when the result cannot be serialized to JavaScript.
    */
   scoreRelativeValue(peerSet: unknown, dimensions: unknown[]): RelativeValueResultJson;

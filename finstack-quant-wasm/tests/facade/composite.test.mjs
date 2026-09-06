@@ -102,3 +102,14 @@ test('composite facade initializes, decomposes, and reports flat history', () =>
     [0, 0, 0]
   );
 });
+
+test('composite metric requests reject obsolete wire spellings', () => {
+  const initialized = facade.valuations.composite.initialize(spec, market, '2025-01-01');
+  assert.throws(
+    () =>
+      facade.valuations.composite.primitiveExposures(initialized.instrument, market, '2025-01-01', [
+        'pv01::USD_x2dOIS',
+      ]),
+    /noncanonical/
+  );
+});

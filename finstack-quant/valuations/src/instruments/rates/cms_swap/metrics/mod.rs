@@ -28,7 +28,7 @@ pub(crate) fn register_cms_swap_metrics(
         ]
     }
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ConvexityAdjustmentRisk,
         Arc::new(
             crate::instruments::rates::cms_common::ConvexityAdjustmentRiskCalculator::<

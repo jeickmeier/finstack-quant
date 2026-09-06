@@ -16,7 +16,7 @@
 
 use crate::helpers::financial_tolerance;
 use finstack_quant_cashflows::builder::specs::{
-    CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec, FloatingRateFallback,
+    CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback,
     FloatingRateSpec, OvernightIndexConstraintApplication,
 };
 use finstack_quant_cashflows::builder::{AmortizationSpec, CashFlowSchedule, PrincipalExchange};
@@ -156,7 +156,8 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let init = Money::new(1_200.0, Currency::USD).expect("valid money fixture");
 
-    let monthly_fixed = FixedWindow {
+    let monthly_fixed = FixedCouponSpec {
+        coupon_type: CouponType::Cash,
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
             frequency: Tenor::monthly(),
@@ -209,7 +210,7 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
         .amortization(AmortizationSpec::LinearTo {
             final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         })
-        .fixed_to_float(switch, monthly_fixed, quarterly_float, CouponType::Cash);
+        .fixed_to_float(switch, monthly_fixed, quarterly_float);
     let schedule = builder.build(None).unwrap();
 
     let amortization_dates: Vec<Date> = schedule
@@ -253,7 +254,8 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
         adjust_accrual_dates: false,
         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
     };
-    let fixed = FixedWindow {
+    let fixed = FixedCouponSpec {
+        coupon_type: CouponType::Cash,
         rate: Decimal::try_from(0.05).expect("valid"),
         schedule: quarterly.clone(),
     };
@@ -281,12 +283,9 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     };
 
     let mut builder = CashFlowSchedule::builder();
-    let _ = builder.principal(init, issue, maturity).fixed_to_float(
-        switch,
-        fixed,
-        floating,
-        CouponType::Cash,
-    );
+    let _ = builder
+        .principal(init, issue, maturity)
+        .fixed_to_float(switch, fixed, floating);
     let schedule = builder.build(None).expect("fixed-to-float schedule");
 
     let first_float = schedule

@@ -23,7 +23,7 @@ instrument effects — live in `finstack-quant-statements-analytics` instead.
 |------|------|
 | `ScenarioSpec` | `id`, optional `name`/`description`, ordered `operations`, `priority`, `resolution_mode` |
 | `OperationSpec` | One shock or roll; 24 variants across market, instrument, statement, and time families |
-| `ScenarioEngine` | `new` / `with_config`, `try_compose`, `apply` |
+| `ScenarioEngine` | `new` / `with_config`, `apply` |
 | `ExecutionContext<'a>` | `&mut MarketContext`, optional `&mut FinancialModelSpec`, optional instruments, optional `rate_bindings`, optional calendar, `as_of` |
 | `ApplicationReport` | Operation counters, `ScenarioChangeManifest`, `Warning`s, `ResultsMeta` stamp, optional `RollForwardReport` |
 | `ApplicationEnvelope` | JSON envelope of the mutated market/model plus the report (used by bindings) |
@@ -113,7 +113,7 @@ copies.
 
 ## Composition
 
-`ScenarioEngine::try_compose` merges specs with a stable sort on `priority`
+`ScenarioSpec::compose` merges specs with a stable sort on `priority`
 (lower runs first), concatenates their operations, joins ids with `+`, and
 returns a validation error if the merge would produce more than one
 `TimeRollForward`. `resolution_mode` is preserved when all inputs agree and

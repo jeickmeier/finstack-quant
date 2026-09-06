@@ -62,10 +62,10 @@ def test_dataframe_pipeline_helpers_delegate_to_feature_transforms() -> None:
         "beta": [0.0, 1.0, 0.0, 1.0],
     })
 
-    cleaned = fdf.clean_signal(df, "signal", "date", {"lower": 0.0, "upper": 0.5})
+    cleaned = fdf.cross_sectional(df, "signal", "date", "winsorize", {"lower": 0.0, "upper": 0.5})
     assert cleaned.tolist() == [1.0, 2.0, 2.0, 2.0]
 
-    normalized = fdf.normalize_signal(df, "signal", "date", {"method": "rank"})
+    normalized = fdf.cross_sectional(df, "signal", "date", "rank")
     assert normalized.tolist() == [0.0, 1.0 / 3.0, 1.0 / 3.0, 1.0]
 
     weights = fdf.rank_to_weights(df, "signal", "date")

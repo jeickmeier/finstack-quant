@@ -52,12 +52,12 @@ pub(crate) fn register_inflation_swap_metrics(
             Arc::new(inflation_convexity::InflationConvexityCalculator),
         ),
     ] {
-        registry.replace_metric(id, calculator, &[InstrumentType::InflationSwap])?;
+        registry.register_metric(id, calculator, &[InstrumentType::InflationSwap])?;
     }
     // Note: `Npv01` is intentionally NOT registered — it was an exact
     // duplicate of `Dv01` (same `parallel_combined` config). Use `Dv01`.
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Inflation01,
         Arc::new(yoy_inflation01::YoYInflation01Calculator),
         &[InstrumentType::YoYInflationSwap],

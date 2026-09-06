@@ -18,7 +18,7 @@
 //!   cross-sectional operations. Entry point: [`transform_panel_json`] /
 //!   [`transform_panel`].
 //! - **Multi** — Pairwise and grouped transforms, signal cleaning, and
-//!   neutralization helpers. Entry point: [`neutralize`], [`clean_signal`],
+//!   neutralization helpers. Entry point: [`neutralize`],
 //!   [`transform_timeseries_pairwise`], [`transform_cross_sectional_grouped`].
 //!
 //! # Quick Start
@@ -91,8 +91,8 @@ pub use cross_sectional::{
     transform_cross_sectional, transform_cross_sectional_with_op, CrossSectionalOp,
 };
 pub use multi::{
-    clean_signal, neutralize, neutralize_and_zscore, normalize_signal, rank_to_weights,
-    risk_scaled_weights, rolling_regression_residual, transform_cross_sectional_grouped,
+    neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
+    rolling_regression_residual, transform_cross_sectional_grouped,
     transform_cross_sectional_grouped_with_op, transform_timeseries_pairwise,
     transform_timeseries_pairwise_with_op, PairwiseOp,
 };

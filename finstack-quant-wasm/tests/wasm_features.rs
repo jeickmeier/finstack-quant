@@ -3,9 +3,9 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_quant_wasm::api::features::{
-    clean_signal, neutralize, neutralize_and_zscore, normalize_signal, rank_to_weights,
-    risk_scaled_weights, transform_cross_sectional, transform_cross_sectional_grouped,
-    transform_panel_json, transform_timeseries, transform_timeseries_pairwise,
+    neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
+    transform_cross_sectional, transform_cross_sectional_grouped, transform_panel_json,
+    transform_timeseries, transform_timeseries_pairwise,
 };
 use serde_json::json;
 use wasm_bindgen_test::*;
@@ -160,7 +160,8 @@ fn pipeline_helper_feature_ops_return_js_arrays() {
         .expect("time key");
     let params =
         serde_wasm_bindgen::to_value(&json!({"lower": 0.0, "upper": 0.5})).expect("params");
-    let cleaned = clean_signal(values, time_key, Some(params)).expect("cleaned");
+    let cleaned =
+        transform_cross_sectional(values, time_key, "winsorize", Some(params)).expect("cleaned");
     let cleaned: Vec<Option<f64>> = serde_wasm_bindgen::from_value(cleaned).expect("cleaned vec");
     assert_eq!(cleaned, vec![Some(1.0), Some(2.0), Some(2.0)]);
 
@@ -168,8 +169,7 @@ fn pipeline_helper_feature_ops_return_js_arrays() {
         serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(100.0)]).expect("values");
     let time_key = serde_wasm_bindgen::to_value(&vec!["2026-01-01", "2026-01-01", "2026-01-01"])
         .expect("time key");
-    let params = serde_wasm_bindgen::to_value(&json!({"method": "rank"})).expect("params");
-    let normalized = normalize_signal(values, time_key, Some(params)).expect("normalized");
+    let normalized = transform_cross_sectional(values, time_key, "rank", None).expect("normalized");
     let normalized: Vec<Option<f64>> =
         serde_wasm_bindgen::from_value(normalized).expect("normalized vec");
     assert_eq!(normalized, vec![Some(0.0), Some(0.5), Some(1.0)]);

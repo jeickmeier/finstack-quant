@@ -2539,9 +2539,7 @@ class PortfolioMetrics:
         """
         Return decoded components, total, and entity values in wire order.
 
-        Entity mappings preserve Rust ``IndexMap`` insertion order. Malformed
-        legacy escapes remain literal; decoded coordinate collisions use
-        literal wire components so no aggregate entry is lost.
+        Entity mappings preserve Rust ``IndexMap`` insertion order. Canonical wire keys decode to unique coordinates.
 
         Parameters
         ----------
@@ -2556,8 +2554,12 @@ class PortfolioMetrics:
 
         Notes
         -----
-        This method does not raise for a documented *base* string; an unknown
-        prefix returns an empty list.
+        An unknown canonical prefix returns an empty list.
+
+        Raises
+        ------
+        ValueError
+            If the base metric key is not canonically encoded.
         """
         ...
 
@@ -8938,8 +8940,6 @@ def position_what_if(
         ``{"kind": "remove", "position_id": "..."}``; resize changes use
         ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
         Supply at most one final change per position; duplicate IDs raise ValueError.
-        Add changes are not supported by this JSON-shaped Python helper
-        because adding requires a typed Rust position object.
 
     Returns
     -------
@@ -8950,7 +8950,7 @@ def position_what_if(
     ------
     ValueError
         If a change kind is unknown, resize omits
-        ``new_quantity``, add is requested, JSON/config parsing fails, or
+        ``new_quantity``, JSON/config parsing fails, or
         Rust factor-model evaluation fails.
     TypeError
         If ``portfolio`` or ``market`` cannot be converted to the

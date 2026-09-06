@@ -125,12 +125,15 @@ pub fn compute_multiple(
 /// schema, when no scoring dimensions are supplied, or when the result cannot
 /// be serialized to JavaScript.
 /// @param peer_set - Comparable-company metric records used to score relative value.
-/// @param dimensions - Metric dimensions and weights included in the relative-value score.
+/// @param dimensions - Metric dimensions and weights; each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
 #[wasm_bindgen(js_name = scoreRelativeValue)]
 pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<JsValue, JsValue> {
     let ps: fc::PeerSet = serde_wasm_bindgen::from_value(peer_set).map_err(to_js_err)?;
-    let dims: Vec<fc::ScoringDimension> =
+    // Decode the full object before the typed contract: serde-wasm-bindgen's
+    // struct visitor reads declared properties and can omit unknown fields.
+    let dimensions: serde_json::Value =
         serde_wasm_bindgen::from_value(dimensions).map_err(to_js_err)?;
+    let dims: Vec<fc::ScoringDimension> = serde_json::from_value(dimensions).map_err(to_js_err)?;
     let result = fc::score_relative_value(&ps, &dims).map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
 }

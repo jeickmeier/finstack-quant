@@ -13,7 +13,7 @@ pub(crate) fn register_tarn_metrics(
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(UnifiedDv01Calculator::<super::Tarn>::new(
             Dv01CalculatorConfig::parallel_combined(),

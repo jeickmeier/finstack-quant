@@ -27,7 +27,7 @@ pub use exact::{ExactGbm, ExactMultiGbm, ExactMultiGbmCorrelated};
 pub use exact_gbm_dividends::ExactGbmWithDividends;
 pub use exact_hw1f::ExactHullWhite1F;
 pub use lmm_predictor_corrector::LmmPredictorCorrector;
-pub use milstein::{LogMilstein, Milstein};
+pub use milstein::Milstein;
 pub use qe_cir::QeCir;
 pub use qe_heston::QeHeston;
 pub use rough_bergomi::RoughBergomiEuler;

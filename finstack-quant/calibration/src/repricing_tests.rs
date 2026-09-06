@@ -143,7 +143,7 @@ fn discount_curve_deposit_repricing() {
     quote_sets.insert("mm".to_string(), cal_utils::quote_set_ids(&mm_quotes));
 
     let settings = CalibrationConfig {
-        solver: crate::SolverConfig::brent_default()
+        solver: crate::SolverConfig::default()
             .with_tolerance(1e-12)
             .with_max_iterations(200),
         ..Default::default()
@@ -259,7 +259,7 @@ fn discount_curve_swap_repricing() {
     quote_sets.insert("disc".to_string(), cal_utils::quote_set_ids(&disc_quotes));
 
     let settings = CalibrationConfig {
-        solver: crate::SolverConfig::brent_default()
+        solver: crate::SolverConfig::default()
             .with_tolerance(1e-12)
             .with_max_iterations(200),
         ..Default::default()
@@ -390,7 +390,7 @@ fn forward_curve_fra_repricing() {
     );
 
     let settings = CalibrationConfig {
-        solver: crate::SolverConfig::brent_default()
+        solver: crate::SolverConfig::default()
             .with_tolerance(1e-12)
             .with_max_iterations(200),
         ..Default::default()

@@ -120,23 +120,29 @@ def test_metric_keys_have_no_rust_escaping() -> None:
     assert round_trip.metric_keys() == keys
     assert round_trip == result
 
-    # Legacy escaped keys still resolve to the literal measure.
-    assert result.get_metric("pv01::USD_x2dOIS") == result.get_metric("pv01::USD-OIS")
-    assert result["pv01::USD_x2dOIS"] == result["pv01::USD-OIS"]
-    assert "pv01::USD_x2dOIS" in result
+    assert result.get_metric("pv01::USD_x2dOIS") is None
+    assert "pv01::USD_x2dOIS" not in result
+    with pytest.raises(KeyError):
+        result["pv01::USD_x2dOIS"]
 
 
-def test_legacy_escaped_keys_from_json_still_decode() -> None:
+@pytest.mark.parametrize("key", ["pv01::USD_x2dOIS", "pv01::curve_xray", "bucketed_dv01::"])
+def test_noncanonical_keys_from_json_are_rejected(key: str) -> None:
     result = price_instrument(_bond(), _market(), AS_OF)
     payload = json.loads(result.to_json())
-    payload["measures"] = {"pv01::USD_x2dOIS": 12.5, "bucketed_dv01::USD_x2dOIS::10y": -1.0}
-    legacy = ValuationResult.from_json(json.dumps(payload))
+    payload["measures"] = {key: 12.5}
+    with pytest.raises(ValueError, match="noncanonical"):
+        ValuationResult.from_json(json.dumps(payload))
 
-    assert legacy.get_metric("pv01::USD-OIS") == 12.5
-    assert legacy.metric_series("bucketed_dv01") == [(["USD-OIS", "10y"], -1.0)]
-    long = legacy.to_long_dataframe()
-    assert list(long.columns) == ["metric", "curve", "bucket", "value"]
-    assert long.iloc[1].tolist() == ["bucketed_dv01", "USD-OIS", "10y", -1.0]
+
+def test_canonical_keys_preserve_distinct_escape_labels() -> None:
+    result = price_instrument(_bond(), _market(), AS_OF)
+    payload = json.loads(result.to_json())
+    payload["measures"] = {"pv01::USD-OIS": 12.5, "pv01::USD_x5fx2dOIS": 3.0}
+    restored = ValuationResult.from_json(json.dumps(payload))
+    assert restored.metric_series("pv01") == [(["USD-OIS"], 12.5), (["USD_x2dOIS"], 3.0)]
+    assert restored.get_metric("pv01::USD-OIS") == 12.5
+    assert restored.get_metric("pv01::USD_x5fx2dOIS") == 3.0
 
 
 # ValuationResult ergonomics

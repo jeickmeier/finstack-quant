@@ -22,7 +22,7 @@ pub(crate) fn register_vol_index_future_metrics(
     use std::sync::Arc;
 
     // Register custom DeltaVol metric (not a standard MetricId)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::DeltaVol,
         Arc::new(delta_vol::DeltaVolCalculator),
         &[InstrumentType::VolatilityIndexFuture],

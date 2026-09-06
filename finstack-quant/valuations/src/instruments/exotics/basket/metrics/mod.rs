@@ -30,12 +30,12 @@ pub(crate) fn register_basket_metrics(
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
     // Custom metrics for basket-specific risks
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::ConstituentDelta,
         Arc::new(ConstituentDeltaCalculator),
         &[InstrumentType::Basket],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("weight_risk"),
         Arc::new(WeightRiskCalculator),
         &[InstrumentType::Basket],

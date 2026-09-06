@@ -200,7 +200,7 @@ impl MetricCalculator for BucketedCs01Calculator {
         }
 
         context.store_bucketed_series(
-            MetricId::custom(format!("bucketed_cs01::{series_key}")),
+            MetricId::composite(&MetricId::BucketedCs01, &[&series_key]),
             series,
         );
         Ok(total)

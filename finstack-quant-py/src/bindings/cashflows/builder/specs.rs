@@ -2,8 +2,8 @@
 
 use finstack_quant_cashflows::builder::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase, FeeSpec,
-    FixedCouponSpec, FixedWindow, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
-    Notional, OvernightCompoundingMethod, OvernightIndexConstraintApplication, PrepaymentModelSpec,
+    FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec, Notional,
+    OvernightCompoundingMethod, OvernightIndexConstraintApplication, PrepaymentModelSpec,
     PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_cashflows::serde_defaults;
@@ -779,66 +779,6 @@ impl PyScheduleParams {
     /// Python-style field summary.
     fn __repr__(&self) -> String {
         repr_from_serde("ScheduleParams", &self.inner)
-    }
-}
-
-/// Fixed-rate coupon window with a shared schedule.
-///
-/// Parameters
-/// ----------
-/// rate : Decimal, float or str
-///     Annual coupon rate as a decimal (``0.05`` for 5%).
-/// schedule : ScheduleParams
-///     Accrual and payment schedule conventions for the window.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.cashflows.builder import FixedWindow, ScheduleParams
-/// >>> FixedWindow(0.05, ScheduleParams.quarterly_act360()).rate
-/// Decimal('0.05')
-#[pyclass(
-    name = "FixedWindow",
-    module = "finstack_quant.cashflows.builder",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone, Debug)]
-pub struct PyFixedWindow {
-    /// Inner fixed-rate window.
-    pub(crate) inner: FixedWindow,
-}
-
-wire_methods!(PyFixedWindow, FixedWindow, "FixedWindow");
-
-#[pymethods]
-impl PyFixedWindow {
-    /// Construct a fixed window; see the class docstring for parameters.
-    #[new]
-    #[pyo3(text_signature = "(rate, schedule)")]
-    fn new(rate: &Bound<'_, PyAny>, schedule: PyRef<'_, PyScheduleParams>) -> PyResult<Self> {
-        Ok(Self {
-            inner: FixedWindow {
-                rate: decimal_from_any(rate)?,
-                schedule: schedule.inner.clone(),
-            },
-        })
-    }
-
-    /// Annual coupon rate as ``decimal.Decimal``.
-    #[getter]
-    fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        decimal_to_py(py, self.inner.rate)
-    }
-
-    /// Schedule conventions for this window.
-    #[getter]
-    fn schedule(&self) -> PyScheduleParams {
-        PyScheduleParams::from_inner(self.inner.schedule.clone())
-    }
-
-    /// Python-style field summary.
-    fn __repr__(&self) -> String {
-        repr_from_serde("FixedWindow", &self.inner)
     }
 }
 
@@ -2177,7 +2117,6 @@ pub(crate) fn add_classes(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyFloatingRateFallback>()?;
     module.add_class::<PyFeeAccrualBasis>()?;
     module.add_class::<PyScheduleParams>()?;
-    module.add_class::<PyFixedWindow>()?;
     module.add_class::<PyFixedCouponSpec>()?;
     module.add_class::<PyFloatingRateSpec>()?;
     module.add_class::<PyFloatingCouponSpec>()?;

@@ -244,7 +244,7 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
         description: None,
         quote_sets: quote_sets.into_iter().collect(),
         settings: CalibrationConfig {
-            solver: finstack_quant_calibration::SolverConfig::brent_default()
+            solver: finstack_quant_calibration::SolverConfig::default()
                 .with_tolerance(tolerances::BASE_CORR_SOLVER_TOL)
                 .with_max_iterations(500),
             ..Default::default()

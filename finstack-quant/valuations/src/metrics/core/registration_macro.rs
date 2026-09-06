@@ -4,11 +4,10 @@
 
 /// Simplifies instrument-specific metric registration by providing a declarative syntax.
 ///
-/// Instrument modules are authoritative for their `(metric, instrument)` pairs,
-/// so the macro uses the registry's explicit replacement operation. This lets a
-/// specialized calculator deliberately supersede a generic bootstrap entry while
-/// direct [`MetricRegistry::register_metric`](crate::metrics::MetricRegistry::register_metric)
-/// calls continue to reject accidental duplicates.
+/// Each `(metric, instrument)` pair has one owner. Checked registration rejects
+/// accidental duplicates while allowing a specialized calculator alongside the
+/// registry's universal default. Intentional caller overrides use
+/// [`MetricRegistry::replace_metric`](crate::metrics::MetricRegistry::replace_metric).
 ///
 /// See unit tests and `examples/` for usage.
 #[macro_export]
@@ -24,7 +23,7 @@ macro_rules! register_metrics {
         use std::sync::Arc;
 
         $(
-            $registry.replace_metric(
+            $registry.register_metric(
                 MetricId::$metric_id,
                 Arc::new($calculator),
                 &[$instrument],
@@ -44,6 +43,30 @@ mod tests {
         fn calculate(&self, _context: &mut MetricContext) -> Result<f64> {
             Ok(42.0)
         }
+    }
+
+    #[test]
+    fn macro_rejects_duplicate_instrument_owner() {
+        fn register(
+            registry: &mut MetricRegistry,
+        ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
+            register_metrics! {
+                registry: registry,
+                instrument: InstrumentType::Bond,
+                metrics: [(Accrued, DummyCalculator)]
+            }
+            Ok(())
+        }
+
+        let mut registry = MetricRegistry::new();
+        register(&mut registry).expect("first owner");
+        assert!(matches!(
+            register(&mut registry),
+            Err(crate::metrics::MetricRegistryError::DuplicateRegistration {
+                metric,
+                instrument: Some(InstrumentType::Bond),
+            }) if metric == MetricId::Accrued
+        ));
     }
 
     #[test]

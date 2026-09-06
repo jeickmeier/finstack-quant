@@ -131,37 +131,37 @@ impl MetricCalculator for SpreadVegaCalculator {
 pub(crate) fn register_commodity_spread_option_metrics(
     registry: &mut MetricRegistry,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Delta,
         Arc::new(SpreadDeltaCalculator { leg: 1 }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Vega,
         Arc::new(SpreadVegaCalculator { leg: None }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("delta::leg1"),
         Arc::new(SpreadDeltaCalculator { leg: 1 }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("delta::leg2"),
         Arc::new(SpreadDeltaCalculator { leg: 2 }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("vega::leg1"),
         Arc::new(SpreadVegaCalculator { leg: Some(1) }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::custom("vega::leg2"),
         Arc::new(SpreadVegaCalculator { leg: Some(2) }),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(
             crate::metrics::UnifiedDv01Calculator::<CommoditySpreadOption>::new(
@@ -170,7 +170,7 @@ pub(crate) fn register_commodity_spread_option_metrics(
         ),
         &[InstrumentType::CommoditySpreadOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(
             crate::metrics::UnifiedDv01Calculator::<CommoditySpreadOption>::new(

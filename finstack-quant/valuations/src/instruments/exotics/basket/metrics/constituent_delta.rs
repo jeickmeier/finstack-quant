@@ -193,7 +193,6 @@ fn asset_type_for_instrument_key(key: crate::pricer::InstrumentType) -> AssetTyp
         | InstrumentType::AgencyMbsPassthrough
         | InstrumentType::AgencyTba
         | InstrumentType::AgencyCmo
-        | InstrumentType::Loan
         | InstrumentType::TermLoan
         | InstrumentType::RevolvingCredit
         | InstrumentType::Deposit

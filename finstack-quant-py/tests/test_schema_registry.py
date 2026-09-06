@@ -186,3 +186,18 @@ def test_validate_always_uses_the_canonical_contract() -> None:
     example = json.loads(valuations_schema.get("bond.schema.json"))["examples"][0]
 
     assert json.loads(valuations_schema.validate("bond.schema.json", json.dumps(example))) == []
+
+
+@pytest.mark.parametrize("namespace", NAMESPACES)
+@pytest.mark.parametrize("selector", ["", "json", ".schema.json"])
+def test_registry_rejects_partial_selectors(namespace: ModuleType, selector: str) -> None:
+    with pytest.raises(KeyError):
+        namespace.get(selector)
+    with pytest.raises(KeyError):
+        namespace.validate(selector, "{}")
+
+
+@pytest.mark.parametrize("namespace", NAMESPACES)
+def test_registry_byte_count_matches_canonical_schema_file(namespace: ModuleType) -> None:
+    row = json.loads(namespace.index())["artifacts"][0]
+    assert row["bytes"] == len(namespace.get(row["$id"]).encode("utf-8")) + 1

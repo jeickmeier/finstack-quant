@@ -198,7 +198,7 @@ impl ImProfile {
 ///
 /// # Errors
 ///
-/// Returns an error if `decay` or `time_grid` fails validation.
+/// Returns an error if `decay`, `time_grid`, or `sensitivities` fails validation.
 ///
 /// # References
 ///
@@ -213,7 +213,6 @@ pub fn im_profile_from_simm(
 ) -> finstack_quant_core::Result<ImProfile> {
     decay.validate()?;
     validate_time_grid(time_grid)?;
-    sensitivities.validate()?;
     let (base_im, _breakdown) =
         calculator.calculate_from_sensitivities_parts(sensitivities, currency)?;
     let profile = ImProfile {

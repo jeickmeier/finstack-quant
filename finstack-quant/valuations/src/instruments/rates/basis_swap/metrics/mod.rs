@@ -41,7 +41,7 @@ pub(crate) fn register_basis_swap_metrics(
         (MetricId::PvPrimary, Arc::new(PvCalculator::primary())),
         (MetricId::PvReference, Arc::new(PvCalculator::reference())),
     ] {
-        registry.replace_metric(id, calculator, &[InstrumentType::BasisSwap])?;
+        registry.register_metric(id, calculator, &[InstrumentType::BasisSwap])?;
     }
 
     // DV01 using GenericParallelDv01 in PerCurve mode

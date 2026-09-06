@@ -847,7 +847,7 @@ mod tests {
     #[test]
     fn aggregated_report_uses_dimensionless_tolerance_ratios() {
         let cfg = crate::config::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default().with_tolerance(1e-12),
+            solver: crate::solver::SolverConfig::default().with_tolerance(1e-12),
             ..Default::default()
         };
         let mut state = ExecutionState::new();

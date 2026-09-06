@@ -26,13 +26,13 @@ pub(crate) fn register_inflation_cap_floor_metrics(
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Inflation01,
         Arc::new(inflation01::Inflation01Calculator),
         &[InstrumentType::InflationCapFloor],
     )?;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Gamma,
         Arc::new(gamma::GammaCalculator),
         &[InstrumentType::InflationCapFloor],

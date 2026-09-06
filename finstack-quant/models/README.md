@@ -89,7 +89,7 @@ applies it to the raw shocks unless the scheme reports
 | `discretization::exact_gbm_dividends` | `ExactGbmWithDividends` |
 | `discretization::exact_hw1f` | `ExactHullWhite1F` |
 | `discretization::euler` | `EulerMaruyama`, `LogEuler` |
-| `discretization::milstein` | `Milstein`, `LogMilstein` |
+| `discretization::milstein` | `Milstein` |
 | `discretization::qe_heston` | `QeHeston` |
 | `discretization::qe_cir` | `QeCir` |
 | `discretization::schwartz_smith` | `ExactSchwartzSmith` |

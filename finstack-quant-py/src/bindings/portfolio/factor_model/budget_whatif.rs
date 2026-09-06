@@ -15,7 +15,7 @@ use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::contributions::PyRiskDecomposition;
 
 /// Deserialize what-if position changes straight into the canonical Rust
-/// `PositionChange` wire shape (`{"kind": "remove" | "resize" | "add", ...}`).
+/// `PositionChange` wire shape (`{"kind": "remove" | "resize", ...}`).
 fn parse_position_changes(
     py: Python<'_>,
     changes: &Bound<'_, PyAny>,

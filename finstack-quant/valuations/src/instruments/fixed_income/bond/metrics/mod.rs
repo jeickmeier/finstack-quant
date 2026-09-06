@@ -178,7 +178,7 @@ pub(crate) fn register_bond_metrics(
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::CrossGammaRatesCredit,
         Arc::new(CrossFactorCalculator::new(
             make_rates_bumper,

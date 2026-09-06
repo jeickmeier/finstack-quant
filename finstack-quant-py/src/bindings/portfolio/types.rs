@@ -1103,9 +1103,14 @@ impl PyPortfolioMetrics {
     /// Despite the ``_series`` suffix (which mirrors the Rust name) this is a
     /// plain ``list`` of tuples, not a :class:`pandas.Series`. Use
     /// :meth:`to_dataframe` for the tabular view.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the base metric key is not canonically encoded.
     #[pyo3(text_signature = "(self, base)")]
     fn metric_series(&self, py: Python<'_>, base: &str) -> PyResult<Vec<PyMetricSeriesEntry>> {
-        let base = finstack_quant_valuations::metrics::MetricId::custom(base);
+        let base = base.parse().map_err(core_to_py)?;
         self.inner
             .metric_series(&base)
             .into_iter()

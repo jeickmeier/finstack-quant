@@ -336,9 +336,11 @@ class WeightingMethod:
         --------
         >>> _metric = WeightingMethod.metric_weighted("delta", "A", 1.0, True)
 
-        Notes
-        -----
-        This factory does not raise; anchors and quantities are validated by ``CompositeSpec``.
+        Raises
+        ------
+        ValueError
+            If the metric key uses noncanonical composite encoding. Anchors and
+            quantities are validated by ``CompositeSpec``.
         """
         ...
 
@@ -1919,7 +1921,7 @@ class CompositeHistoryEngine:
         warmup : list[dict[str, Any]] | str | None
             Optional strictly earlier complete observations used for weighting only.
         metrics : list[str] | None
-            Optional additive primitive metrics included on every output row.
+            Optional canonical additive metric keys included on every output row.
 
         Returns
         -------
@@ -1929,7 +1931,7 @@ class CompositeHistoryEngine:
         Raises
         ------
         ValueError
-            If observations, warmup, initialization, pricing, FX, or rebalancing fail.
+            If metrics, observations, warmup, initialization, pricing, FX, or rebalancing fail.
 
         Examples
         --------
@@ -1990,7 +1992,7 @@ class CompositeHistoryEngine:
             Non-empty strictly increasing complete market-observation array
             (list of dicts or JSON string).
         metrics : list[str] | None
-            Optional additive primitive metrics included on every output row.
+            Optional canonical additive metric keys included on every output row.
 
         Returns
         -------
@@ -2000,7 +2002,7 @@ class CompositeHistoryEngine:
         Raises
         ------
         ValueError
-            If state, observations, market inputs, pricing, FX, or rebalancing fail.
+            If metrics, state, observations, market inputs, pricing, FX, or rebalancing fail.
 
         Examples
         --------

@@ -44,21 +44,37 @@ pub(crate) use suggest::{closest_metric_names, MAX_METRIC_SUGGESTIONS};
 /// See unit tests and `examples/` for usage.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "String")]
 pub struct MetricId(Cow<'static, str>);
 
 impl MetricId {
     /// Creates a custom metric ID.
     ///
     /// Use this for user-defined metrics that aren't part of the standard set.
-    /// Custom metrics are stored as strings and can have any identifier.
+    /// `id` supplies literal labels, separated by `::` for composite coordinates.
+    /// Reserved escape markers and empty coordinates are encoded canonically.
+    /// Use `str::parse` to read an already encoded wire key, and
+    /// [`Self::composite`] when a coordinate itself contains `::`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Literal custom metric name, optionally followed by `::`-separated
+    ///   coordinate labels. Existing `_xHH` text is treated literally.
     pub fn custom(id: impl Into<String>) -> Self {
-        MetricId(Cow::Owned(id.into()))
+        let id = id.into();
+        let mut key = String::with_capacity(id.len());
+        for (index, component) in id.split("::").enumerate() {
+            if index > 0 {
+                key.push_str("::");
+            }
+            composite::encode_component(&mut key, component);
+        }
+        Self(Cow::Owned(key))
     }
 
-    /// Converts to string representation for compatibility.
+    /// Returns the canonical wire representation.
     ///
-    /// Returns a lowercase, snake_case string that can be used for
-    /// serialization, logging, or API interfaces.
+    /// Standard names are lowercase snake_case; custom coordinates retain case.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -102,7 +118,7 @@ impl MetricId {
     /// # Custom metrics via FromStr
     ///
     /// To accept custom metrics, use `FromStr::from_str`
-    /// or the `.parse()` method which never fails:
+    /// or the `.parse()` method, which validates canonical composite encoding:
     ///
     /// ```
     /// use finstack_quant_valuations::metrics::MetricId;
@@ -160,11 +176,12 @@ fn metric_lookup() -> &'static HashMap<String, MetricId> {
 }
 
 impl FromStr for MetricId {
-    type Err = (); // Never fails since we have a catch-all Custom variant
+    type Err = finstack_quant_core::Error;
 
     /// Parses a string into a MetricId (permissive mode).
     ///
-    /// This method never fails - any unrecognized string becomes a custom metric.
+    /// Unknown scalar names become custom metrics. Composite keys must use
+    /// canonical escaping; obsolete or malformed encodings return an error.
     /// Standard metrics are matched by their exact snake_case identifiers.
     ///
     /// **For user-provided inputs**, prefer `MetricId::parse_strict()` which
@@ -181,7 +198,7 @@ impl FromStr for MetricId {
     /// assert_eq!(dv01, MetricId::Dv01);
     /// assert!(!dv01.is_custom());
     ///
-    /// // Unknown metric - becomes custom (no error)
+    /// // Unknown scalar names become custom metrics
     /// let custom = MetricId::from_str("my_metric").unwrap();
     /// assert!(custom.is_custom());
     /// ```
@@ -189,10 +206,19 @@ impl FromStr for MetricId {
         if let Some(id) = metric_lookup().get(s) {
             Ok(id.clone())
         } else {
-            Ok(MetricId::custom(s))
+            Self::validate_wire(s)?;
+            Ok(Self(Cow::Owned(s.to_string())))
         }
     }
 }
 
 #[cfg(test)]
 mod tests;
+
+impl TryFrom<String> for MetricId {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}

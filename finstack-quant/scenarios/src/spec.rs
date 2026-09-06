@@ -48,7 +48,7 @@ pub use finstack_quant_statements::types::NodeId;
 /// - `name`: Optional display name for UI or logs.
 /// - `description`: Optional text describing the intent of the scenario.
 /// - `operations`: Ordered list of [`OperationSpec`] values to execute.
-/// - `priority`: Used by [`ScenarioEngine::try_compose`](crate::engine::ScenarioEngine::try_compose)
+/// - `priority`: Used by [`ScenarioSpec::compose`](crate::spec::ScenarioSpec::compose)
 ///   to determine merge ordering (lower numbers run first).
 /// - `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree
 ///   levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].
@@ -746,7 +746,7 @@ pub enum OperationSpec {
     /// use finstack_quant_scenarios::{OperationSpec, InstrumentType};
     ///
     /// let op = OperationSpec::InstrumentPricePctByType {
-    ///     instrument_types: vec![InstrumentType::Bond, InstrumentType::Loan],
+    ///     instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],
     ///     pct: -5.0,
     /// };
     /// ```

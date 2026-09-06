@@ -50,13 +50,15 @@ impl FromStr for ScoreDirection {
 
 /// Configuration for a single rich/cheap scoring dimension.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScoringDimension {
     /// Human-readable label (e.g., "Spread vs Leverage").
     pub label: String,
     /// How to extract the Y variable (dependent) from CompanyMetrics.
     pub y_extractor: MetricExtractor,
-    /// How to extract the X variable(s) (explanatory) from CompanyMetrics.
-    pub x_extractors: Vec<MetricExtractor>,
+    /// Optional explanatory metric for single-factor regression.
+    /// Omit it to score the dependent metric against its peer distribution.
+    pub x_extractor: Option<MetricExtractor>,
     /// Weight of this dimension in the composite score (0.0 to 1.0).
     pub weight: f64,
     /// Rich/cheap sign convention for the Y metric (default:
@@ -191,13 +193,11 @@ pub fn score_relative_value(
         let pctile = percentile_rank(peer_vals, subject_val).unwrap_or(0.5);
         let zs = z_score(peer_vals, subject_val).unwrap_or(0.0);
 
-        let (reg_residual, r_sq, std_residual) = if !dim.x_extractors.is_empty() {
-            // Run single-factor regression using the first X extractor.
+        let (reg_residual, r_sq, std_residual) = if let Some(x_extractor) = &dim.x_extractor {
             // Extract (x, y) pairwise per peer so a peer missing one metric
             // drops the *pair* instead of misaligning the two vectors.
-            let (peer_x, peer_y_aligned) =
-                extract_pairs(peer_set, &dim.x_extractors[0], &dim.y_extractor);
-            let subject_x = extract_subject_value(peer_set, &dim.x_extractors[0]);
+            let (peer_x, peer_y_aligned) = extract_pairs(peer_set, x_extractor, &dim.y_extractor);
+            let subject_x = extract_subject_value(peer_set, x_extractor);
             match subject_x {
                 Some(sx) if peer_x.len() >= 3 => {
                     match regression_fair_value(&peer_x, &peer_y_aligned, sx, subject_val) {

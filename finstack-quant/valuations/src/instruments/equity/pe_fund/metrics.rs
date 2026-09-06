@@ -230,17 +230,17 @@ pub(crate) fn register_private_markets_fund_metrics(
     use std::sync::Arc;
 
     // Private markets fund-specific risk metrics (custom metrics)
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Nav01,
         Arc::new(nav01::Nav01Calculator),
         &[InstrumentType::PrivateMarketsFund],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Carry01,
         Arc::new(carry01::Carry01Calculator),
         &[InstrumentType::PrivateMarketsFund],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Hurdle01,
         Arc::new(hurdle01::Hurdle01Calculator),
         &[InstrumentType::PrivateMarketsFund],

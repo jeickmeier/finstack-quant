@@ -1061,14 +1061,6 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "cleanSignal(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
-    ));
-    assert!(contains_signature(
-        features,
-        "normalizeSignal(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
-    ));
-    assert!(contains_signature(
-        features,
         "rankToWeights(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(

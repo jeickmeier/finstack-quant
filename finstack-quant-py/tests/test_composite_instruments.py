@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from functools import partial
 import json
 
 import pytest
@@ -106,3 +107,19 @@ def test_fixed_composite_history_reconciles_flat_market() -> None:
     assert len(rows) == 3
     assert [row["return_index"] for row in rows] == [100.0, 100.0, 100.0]
     assert [float(row["pnl"]["amount"]) for row in rows] == [0.0, 0.0, 0.0]
+
+
+@pytest.mark.parametrize("entry_point", ["exposures", "from_spec", "run"])
+def test_composite_metric_requests_reject_noncanonical_keys(entry_point: str) -> None:
+    market = MarketContext()
+    spec = fixed_spec()
+    resolved = spec.initialize(market, dt.date(2025, 1, 1)).instrument
+    observations = json.dumps([{"date": "2025-01-01", "state": json.loads(market.to_json())}])
+    metrics = ["pv01::USD_x2dOIS"]
+    calls = {
+        "exposures": partial(resolved.primitive_exposures, market, dt.date(2025, 1, 1), metrics),
+        "from_spec": partial(CompositeHistoryEngine.run_from_spec, spec, observations, metrics=metrics),
+        "run": partial(CompositeHistoryEngine.run, resolved, observations, metrics=metrics),
+    }
+    with pytest.raises(ValueError, match="noncanonical"):
+        calls[entry_point]()

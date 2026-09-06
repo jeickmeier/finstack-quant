@@ -564,7 +564,7 @@ class TestCompsBindings:
                 {
                     "label": "Spread vs Leverage",
                     "y_extractor": {"named": "oas_bp"},
-                    "x_extractors": [{"named": "leverage"}],
+                    "x_extractor": {"named": "leverage"},
                     "weight": 1.0,
                 }
             ],
@@ -586,7 +586,7 @@ class TestCompsBindings:
             {
                 "label": "Leverage",
                 "y_extractor": {"named": "leverage"},
-                "x_extractors": [],
+                "x_extractor": None,
                 "weight": 1.0,
             }
         ]
@@ -620,7 +620,7 @@ class TestCompsBindings:
             spec = {
                 "label": "pe",
                 "y_extractor": {"custom": "pe"},
-                "x_extractors": [],
+                "x_extractor": None,
                 "weight": 1.0,
             }
             if direction is not None:
@@ -648,7 +648,7 @@ class TestCompsBindings:
                     {
                         "label": "pe",
                         "y_extractor": {"custom": "pe"},
-                        "x_extractors": [],
+                        "x_extractor": None,
                         "weight": 1.0,
                         "direction": "down_is_up",
                     }
@@ -671,7 +671,7 @@ class TestCompsBindings:
                 {
                     "label": "EV/EBITDA",
                     "y_extractor": {"multiple": "ev_ebitda"},
-                    "x_extractors": [],
+                    "x_extractor": None,
                     "weight": 1.0,
                 }
             ],
@@ -692,7 +692,7 @@ class TestCompsBindings:
                     {
                         "label": "oas_bp",
                         "y_extractor": {"named": "oas_bp"},
-                        "x_extractors": [],
+                        "x_extractor": None,
                         "weight": 1.0,
                     }
                 ],

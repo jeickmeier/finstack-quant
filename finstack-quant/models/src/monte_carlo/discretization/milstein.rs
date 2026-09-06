@@ -109,53 +109,6 @@ impl<P: StochasticProcess + ProportionalDiffusion> Discretization<P> for Milstei
     }
 }
 
-/// Log-space discretization for GBM (proportional diffusion).
-///
-/// Evolves log(X) directly, guaranteeing positivity:
-///
-/// ```text
-/// ln(X_{t+Δt}) = ln(X_t) + (μ/X - ½(σ/X)²)Δt + (σ/X)√Δt Z
-/// ```
-///
-/// For GBM, σ(X)/X = σ_const, so the Milstein correction dσ/d(log X)
-/// is exactly zero and the scheme reduces to the exact log-Euler step.
-#[derive(Debug, Clone, Default)]
-pub struct LogMilstein;
-
-impl LogMilstein {
-    /// Create a new log-Milstein discretization.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl<P: StochasticProcess + ProportionalDiffusion> Discretization<P> for LogMilstein {
-    fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
-        let dim = process.dim();
-
-        // Compute drift and diffusion in original space
-        process.drift(t, x, &mut work[0..dim]);
-        process.diffusion(t, x, &mut work[dim..2 * dim]);
-
-        let sqrt_dt = dt.sqrt();
-
-        for i in 0..dim {
-            let x_safe = x[i].max(f64::MIN_POSITIVE);
-            let mu_x = work[i] / x_safe;
-            let sigma_x = work[dim + i] / x_safe;
-
-            let drift_term = (mu_x - 0.5 * sigma_x * sigma_x) * dt;
-            let diffusion_term = sigma_x * sqrt_dt * z[i];
-
-            x[i] *= (drift_term + diffusion_term).exp();
-        }
-    }
-
-    fn work_size(&self, process: &P) -> usize {
-        2 * process.dim()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::super::process::gbm::{GbmParams, GbmProcess};
@@ -179,32 +132,6 @@ mod tests {
         assert!(x[0] > 0.0);
         // Should have moved up (positive drift + positive shock)
         assert!(x[0] > 100.0);
-    }
-
-    #[test]
-    fn test_log_milstein_positivity() {
-        let params = GbmParams::new(0.05, 0.02, 0.5).unwrap(); // High vol
-        let process = GbmProcess::new(params);
-        let disc = LogMilstein::new();
-
-        let t = 0.0;
-        let dt = 0.1; // Larger step
-        let mut x = vec![100.0];
-
-        // Test multiple large shocks
-        for shock in [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0] {
-            let z = vec![shock];
-            let mut work = vec![0.0; disc.work_size(&process)];
-
-            disc.step(&process, t, dt, &mut x, &z, &mut work);
-
-            // Log-Milstein should maintain positivity
-            assert!(
-                x[0] > 0.0,
-                "State should remain positive with shock {}",
-                shock
-            );
-        }
     }
 
     #[test]

@@ -299,9 +299,8 @@ class ValuationResult:
         Parameters
         ----------
         key : str
-            Metric identifier (``"ytm"``, ``"dv01"``, ``"pv01::USD-OIS"``). A
-            legacy escaped composite key (``"pv01::USD_x2dOIS"``) resolves to
-            the same measure as its literal form.
+            Canonical metric identifier (``"ytm"``, ``"dv01"``, ``"pv01::USD-OIS"``).
+            Lookup matches the stored wire key exactly.
 
         Returns
         -------
@@ -321,7 +320,7 @@ class ValuationResult:
         Parameters
         ----------
         key : str
-            Metric key in literal or legacy escaped form.
+            Metric key in canonical wire form; lookup is exact.
 
         Returns
         -------
@@ -343,7 +342,7 @@ class ValuationResult:
         Parameters
         ----------
         key : str
-            Metric key in literal or legacy escaped form.
+            Metric key in canonical wire form; lookup is exact.
 
         Returns
         -------
@@ -382,9 +381,7 @@ class ValuationResult:
 
         Entries retain the deterministic insertion order of the serialized
         ``measures`` map. The scalar aggregate stored directly under ``base``
-        is excluded. Malformed legacy escapes remain literal; decoded
-        coordinate collisions fall back to literal wire components so no
-        entries are dropped or deduplicated.
+        is excluded. Canonical wire keys decode to unique coordinates.
 
         Parameters
         ----------
@@ -398,9 +395,10 @@ class ValuationResult:
             Ordered ``(coordinate_components, value)`` pairs for matching
             composite metrics; the scalar aggregate stored at ``base`` is omitted.
 
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the base metric key is not canonically encoded.
         """
         ...
 

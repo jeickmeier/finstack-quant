@@ -23,7 +23,7 @@ pub(crate) fn register_commodity_swaption_metrics(
         ]
     }
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::CommoditySwaption,
@@ -32,7 +32,7 @@ pub(crate) fn register_commodity_swaption_metrics(
         )),
         &[InstrumentType::CommoditySwaption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::CommoditySwaption,

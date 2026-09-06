@@ -834,7 +834,7 @@ mod w40_tests {
             eps,
         };
         let cfg = crate::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-6) // tolerance >> eps, so the local min is "in tolerance"
                 .with_max_iterations(200),
             ..crate::CalibrationConfig::default()
@@ -957,7 +957,7 @@ mod w40_tests {
             eps,
         };
         let cfg = crate::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(tolerance)
                 .with_max_iterations(200),
             ..crate::CalibrationConfig::default()
@@ -1012,7 +1012,7 @@ mod w40_tests {
             eps,
         };
         let cfg = crate::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-12) // tight: min |f| = eps = 1e-8 never < tol
                 .with_max_iterations(200),
             ..crate::CalibrationConfig::default()
@@ -1057,7 +1057,7 @@ mod w40_tests {
             eps,
         };
         let cfg = crate::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(tolerance)
                 .with_max_iterations(200),
             ..crate::CalibrationConfig::default()
@@ -1137,7 +1137,7 @@ mod w40_tests {
             eps,
         };
         let cfg = crate::CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(tolerance)
                 .with_max_iterations(200),
             ..crate::CalibrationConfig::default()
@@ -1254,7 +1254,7 @@ mod solver_tests {
             infeasible_below: None,
         };
         let cfg = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-10)
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
@@ -1283,7 +1283,7 @@ mod solver_tests {
             infeasible_below: Some(0.0),
         };
         let cfg = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-10)
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
@@ -1313,7 +1313,7 @@ mod solver_tests {
             infeasible_below: None,
         };
         let cfg = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-10)
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
@@ -1406,7 +1406,7 @@ mod solver_tests {
             scale: 1.0e4,
         };
         let cfg = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-10)
                 .with_max_iterations(200),
             ..CalibrationConfig::default()
@@ -1467,7 +1467,7 @@ mod solver_tests {
             infeasible_below: None,
         };
         let cfg = CalibrationConfig {
-            solver: crate::solver::SolverConfig::brent_default()
+            solver: crate::solver::SolverConfig::default()
                 .with_tolerance(1e-12)
                 .with_max_iterations(200),
             ..CalibrationConfig::default()

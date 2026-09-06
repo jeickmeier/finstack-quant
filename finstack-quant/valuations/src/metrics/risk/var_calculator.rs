@@ -804,8 +804,8 @@ fn compute_taylor_sensitivities(
 
     let computed = registry.compute(&metrics, &mut context)?;
 
-    let dv01 = collect_bucketed_series(&context.computed_series, MetricId::BucketedDv01.as_str());
-    let cs01 = collect_bucketed_series(&context.computed_series, MetricId::BucketedCs01.as_str());
+    let dv01 = collect_bucketed_series(&context.computed_series, &MetricId::BucketedDv01);
+    let cs01 = collect_bucketed_series(&context.computed_series, &MetricId::BucketedCs01);
 
     let ir_convexity = required_metric(
         &computed,
@@ -1063,17 +1063,17 @@ fn required_metric(
 
 fn collect_bucketed_series(
     series_map: &HashMap<MetricId, Vec<(String, f64)>>,
-    base_id: &str,
+    base_id: &MetricId,
 ) -> BucketedSeries {
     let mut result = BucketedSeries::default();
 
-    // Build the strip prefix once rather than reformatting it for every entry.
-    let prefix = format!("{base_id}::");
     for (metric_id, series) in series_map {
-        let id_str = metric_id.as_str();
-        if id_str == base_id {
+        if metric_id == base_id {
             result.fallback = series.iter().cloned().collect();
-        } else if let Some(curve_id) = id_str.strip_prefix(&prefix) {
+        } else if let Some(components) = metric_id.decode_components(base_id) {
+            let [curve_id] = components.as_slice() else {
+                continue;
+            };
             let entry = result
                 .per_curve
                 .entry(curve_id.to_string())
@@ -1212,6 +1212,21 @@ mod tests {
         usd_ois_market,
     };
     use time::macros::date;
+
+    #[test]
+    fn bucketed_series_uses_decoded_curve_coordinates() {
+        let mut series = HashMap::default();
+        for (curve, value) in [("USD-OIS", 1.0), ("USD_x2dOIS", 2.0), ("USD::OIS", 3.0)] {
+            series.insert(
+                MetricId::composite(&MetricId::BucketedDv01, &[curve]),
+                vec![("5y".to_string(), value)],
+            );
+        }
+        let collected = collect_bucketed_series(&series, &MetricId::BucketedDv01);
+        assert_eq!(collected.per_curve["USD-OIS"]["5y"], 1.0);
+        assert_eq!(collected.per_curve["USD_x2dOIS"]["5y"], 2.0);
+        assert_eq!(collected.per_curve["USD::OIS"]["5y"], 3.0);
+    }
 
     #[test]
     fn var_config_wire_contract_is_strict_and_bounded() {

@@ -339,7 +339,7 @@ where
 
         context
             .computed
-            .insert(MetricId::custom(format!("cs01::{}", inst_id)), cs01);
+            .insert(MetricId::composite(&MetricId::Cs01, &[inst_id]), cs01);
         Ok(cs01)
     }
 }
@@ -406,7 +406,7 @@ where
         validate_buckets_strictly_increasing(&buckets)?;
 
         let inst_id = instrument.id();
-        let series_id = MetricId::custom(format!("bucketed_cs01::{}", inst_id));
+        let series_id = MetricId::composite(&MetricId::BucketedCs01, &[inst_id]);
 
         if cached.is_empty() {
             context.store_bucketed_series(

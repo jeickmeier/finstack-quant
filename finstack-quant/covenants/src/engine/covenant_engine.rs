@@ -1,5 +1,5 @@
 use super::helpers::{
-    headroom_for, is_covenant_breached, spec_metric_names, springing_condition_met,
+    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met,
     InstrumentMutator, SpecEvaluation,
 };
 use super::types::{
@@ -534,7 +534,7 @@ impl CovenantEngine {
             })
             .unwrap_or(base_threshold);
 
-        let Some(metric_name) = spec_metric_names(spec).into_iter().next() else {
+        let Some(metric_name) = spec_metric_name(spec) else {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "covenant '{}' has a threshold but no metric name",
                 spec.covenant.description(),

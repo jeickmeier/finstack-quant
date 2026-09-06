@@ -36,7 +36,7 @@ pub(crate) fn register_commodity_option_metrics(
         ]
     }
 
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Dv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::CommodityOption,
@@ -45,7 +45,7 @@ pub(crate) fn register_commodity_option_metrics(
         )),
         &[InstrumentType::CommodityOption],
     )?;
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::BucketedDv01,
         Arc::new(crate::metrics::UnifiedDv01Calculator::<
             crate::instruments::CommodityOption,

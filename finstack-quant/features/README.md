@@ -135,8 +135,6 @@ otherwise.
 | `transform_timeseries_pairwise_with_op` | Typed-op variant of `transform_timeseries_pairwise` |
 | `rolling_regression_residual` | Per-entity rolling OLS residuals; rank-deficient windows emit `None` (unlike `neutralize`) |
 | `risk_scaled_weights` | Inverse-vol scale, demean, then gross-normalize so each cross-section is dollar-neutral |
-| `clean_signal` | Default cross-sectional signal cleaning via quantile clipping |
-| `normalize_signal` | Normalize with a selected cross-sectional op (`method`, default `zscore`) |
 | `rank_to_weights` | Convert ranks into gross-normalized long/short weights |
 | `neutralize_and_zscore` | Residualize against exposures, then cross-sectional z-score |
 
@@ -290,7 +288,7 @@ The spec uses `serde(deny_unknown_fields)`; unrecognized keys are rejected.
   namespace ([`exports/features.js`](../../finstack-quant-wasm/exports/features.js)):
   `transformTimeseries`, `transformCrossSectional`, `transformPanelJson`,
   `transformTimeseriesPairwise`, `transformCrossSectionalGrouped`,
-  `neutralize`, `neutralizeAndZscore`, `normalizeSignal`, `cleanSignal`,
+  `neutralize`, `neutralizeAndZscore`,
   `rankToWeights`, `riskScaledWeights`, `rollingRegressionResidual`. JavaScript
   callers pass `number | null` arrays for values and plain objects for params.
 

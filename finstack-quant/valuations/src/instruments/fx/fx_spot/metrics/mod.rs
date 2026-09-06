@@ -28,7 +28,7 @@ pub(crate) fn register_fx_spot_metrics(
     // FxDelta and Fx01 are the same quantity (PV change per 1% relative spot
     // move) and share the generic calculator; both ids are kept because
     // consumers ask for either name.
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::FxDelta,
         crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::FxSpot],
@@ -36,7 +36,7 @@ pub(crate) fn register_fx_spot_metrics(
     // FX01 now uses the shared `GenericFx01Calculator` (1% relative spot
     // move) instead of the per-instrument trivial `notional * 0.0001` shim.
     // This aligns the unit convention with every attribution consumer.
-    registry.replace_metric(
+    registry.register_metric(
         MetricId::Fx01,
         crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::FxSpot],

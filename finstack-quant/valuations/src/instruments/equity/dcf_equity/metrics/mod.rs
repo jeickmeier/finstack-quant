@@ -132,7 +132,7 @@ pub(crate) fn register_dcf_metrics(
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
     use std::sync::Arc;
-    registry.replace_metric(
+    registry.register_metric(
         crate::metrics::MetricId::custom("dcf::wacc01"),
         Arc::new(crate::metrics::RfComponentDv01Calculator::<
             crate::instruments::equity::dcf_equity::DiscountedCashFlow,

@@ -201,21 +201,7 @@ fn build_validator(schema: &Value) -> Result<jsonschema::Validator> {
 /// assert_eq!(artifact.title, "bond");
 /// ```
 pub fn find(selector: &str) -> Result<&'static SchemaArtifact> {
-    let anchored = format!("/{selector}");
-    let artifacts = artifacts();
-    let count = artifacts.len();
-    artifacts
-        .into_iter()
-        .find(|artifact| {
-            artifact.id == selector
-                || artifact.relative_path == selector
-                || artifact.relative_path.ends_with(&anchored)
-        })
-        .ok_or_else(|| {
-            Error::Internal(format!(
-                "no schema matches {selector:?}; call index() for the {count} published artifacts"
-            ))
-        })
+    finstack_quant_core::schema::find_schema_artifact(artifacts(), selector)
 }
 
 /// List every schema the workspace publishes, across all ten domains.
@@ -245,18 +231,9 @@ pub fn index() -> Result<Value> {
         let rendered = corpus.get(artifact.id).ok_or_else(|| {
             Error::Internal(format!("{} missing from rendered corpus", artifact.id))
         })?;
-        let bytes = serde_json::to_vec(rendered)
-            .map_err(|error| Error::Internal(format!("measure {}: {error}", artifact.id)))?
-            .len();
-        rows.push(serde_json::json!({
-            "$id": artifact.id,
-            "bytes": bytes,
-            "domain": domain,
-            "kind": artifact.kind.as_str(),
-            "path": artifact.relative_path,
-            "summary": artifact.index_summary(),
-            "title": artifact.title,
-        }));
+        let mut row = finstack_quant_core::schema::schema_index_row(artifact, rendered)?;
+        row.insert("domain".to_string(), Value::String(domain.to_string()));
+        rows.push(Value::Object(row));
     }
     rows.sort_by(|left, right| {
         (left["domain"].as_str(), left["path"].as_str())
@@ -264,8 +241,38 @@ pub fn index() -> Result<Value> {
     });
     Ok(serde_json::json!({
         "artifacts": rows,
-        "schema_index_version": 1,
+        "schema_index_version": finstack_quant_core::schema::SCHEMA_INDEX_VERSION,
     }))
+}
+
+/// Render a published schema in canonical or LLM projection form.
+///
+/// # Arguments
+///
+/// * `artifact` - Published schema selected from a domain or workspace registry.
+/// * `profile` - `"canonical"` for the validation contract or `"llm"` for a
+///   self-contained projection intended for structured-output generation.
+///
+/// # Errors
+///
+/// Returns an error for unknown profiles, failed schema generation, or failed
+/// corpus rendering or projection. A partial corpus is never substituted.
+pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value> {
+    match profile {
+        "canonical" => artifact.generate(),
+        "llm" => {
+            let corpus = corpus()?;
+            let canonical = artifact.generate()?;
+            finstack_quant_core::schema::project_llm(
+                &canonical,
+                &|id: &str| corpus.get(id).cloned(),
+                &finstack_quant_core::schema::LlmProfile::default(),
+            )
+        }
+        other => Err(Error::Validation(format!(
+            "unknown schema profile {other:?}; expected canonical or llm"
+        ))),
+    }
 }
 
 /// One validation failure, located by JSON Pointer into the payload.

@@ -50,30 +50,18 @@ pub(crate) fn springing_condition_met(metric: &str, value: f64, test: ThresholdT
     }
 }
 
-/// Ordered metric names for a spec: explicit id, then type default, then
-/// Custom/Basket name. The engine uses only the first name (missing is an
-/// error). Forecast tries each name until one resolves.
-pub(crate) fn spec_metric_names(spec: &CovenantSpec) -> Vec<&str> {
-    let mut names = Vec::new();
-    if let Some(id) = &spec.metric_id {
-        names.push(id.as_str());
-    }
-    if let Some(name) = spec.covenant.covenant_type.default_metric_name() {
-        if !names.contains(&name) {
-            names.push(name);
-        }
-    }
-    let extra = match &spec.covenant.covenant_type {
-        CovenantType::Custom { metric, .. } => Some(metric.as_str()),
-        CovenantType::Basket { name, .. } => Some(name.as_str()),
-        _ => None,
-    };
-    if let Some(name) = extra {
-        if !names.contains(&name) {
-            names.push(name);
-        }
-    }
-    names
+/// Resolve the metric selected by a covenant. An explicit identifier owns the
+/// lookup; only specs without one use their type's conventional metric name.
+pub(crate) fn spec_metric_name(spec: &CovenantSpec) -> Option<&str> {
+    spec.metric_id
+        .as_ref()
+        .map(|id| id.as_str())
+        .or_else(|| spec.covenant.covenant_type.default_metric_name())
+        .or(match &spec.covenant.covenant_type {
+            CovenantType::Custom { metric, .. } => Some(metric.as_str()),
+            CovenantType::Basket { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
 }
 
 /// Shared point-in-time and forecast breach convention.

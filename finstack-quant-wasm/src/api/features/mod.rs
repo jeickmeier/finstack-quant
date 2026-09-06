@@ -260,55 +260,6 @@ pub fn risk_scaled_weights(
     to_js_value(&result)
 }
 
-/// Apply the default signal cleaning pass.
-///
-/// # Errors
-///
-/// Rejects values that cannot be decoded into the declared arrays or JSON
-/// parameters, unequal `values` and `time_key` lengths, malformed clipping
-/// bounds, or a result that cannot be serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-/// @param params - Operation-specific parameter object defining transformation settings.
-#[wasm_bindgen(js_name = cleanSignal)]
-pub fn clean_signal(
-    values: JsValue,
-    time_key: JsValue,
-    params: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let params = parse_params(params)?;
-    let result = finstack_quant_features::clean_signal(&values, &time_key, params.as_ref())
-        .map_err(to_js_err)?;
-    to_js_value(&result)
-}
-
-/// Normalize a signal cross-sectionally.
-///
-/// # Errors
-///
-/// Rejects values that cannot be decoded into the declared arrays or JSON
-/// parameters, unequal `values` and `time_key` lengths, a non-string or
-/// unsupported normalization method, malformed operation parameters, or a
-/// result that cannot be serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-/// @param params - Operation-specific parameter object defining transformation settings.
-#[wasm_bindgen(js_name = normalizeSignal)]
-pub fn normalize_signal(
-    values: JsValue,
-    time_key: JsValue,
-    params: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let values: Vec<Option<f64>> = serde_wasm_bindgen::from_value(values).map_err(to_js_err)?;
-    let time_key: Vec<String> = serde_wasm_bindgen::from_value(time_key).map_err(to_js_err)?;
-    let params = parse_params(params)?;
-    let result = finstack_quant_features::normalize_signal(&values, &time_key, params.as_ref())
-        .map_err(to_js_err)?;
-    to_js_value(&result)
-}
-
 /// Convert ranks into long/short weights.
 ///
 /// # Errors

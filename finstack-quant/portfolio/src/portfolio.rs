@@ -13,7 +13,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::HashMap;
 use indexmap::IndexMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_EVALUATION_STATE_ID: AtomicU64 = AtomicU64::new(1);
@@ -81,28 +81,6 @@ pub struct Portfolio {
     /// the same immutable position state. Clones retain the identity until a
     /// public position mutation assigns a fresh state ID.
     pub(crate) evaluation_state_id: u64,
-}
-
-impl Serialize for Portfolio {
-    fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        Err(serde::ser::Error::custom(
-            "direct Portfolio serialization is unsupported because positions contain runtime instruments; use Portfolio::to_spec() or PortfolioSpec",
-        ))
-    }
-}
-
-impl<'de> Deserialize<'de> for Portfolio {
-    fn deserialize<D>(_deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Err(serde::de::Error::custom(
-            "direct Portfolio deserialization is unsupported because positions require runtime instruments; use Portfolio::from_spec(PortfolioSpec)",
-        ))
-    }
 }
 
 /// Serializable portfolio specification.
@@ -506,29 +484,6 @@ mod tests {
             .expect("test should succeed");
 
         assert!(portfolio.validate().is_ok());
-    }
-
-    #[test]
-    fn minor2_direct_portfolio_serde_fails_fast() {
-        let portfolio = Portfolio::builder("FUND_A")
-            .base_currency(Currency::USD)
-            .as_of(date!(2024 - 01 - 01))
-            .build()
-            .expect("test portfolio should build");
-
-        let err = serde_json::to_string(&portfolio)
-            .expect_err("minor 2: direct Portfolio serialization must fail");
-        assert!(
-            err.to_string().contains("PortfolioSpec"),
-            "minor 2: error should point callers at PortfolioSpec, got {err}"
-        );
-
-        let err = serde_json::from_str::<Portfolio>(r#"{"id":"FUND_A"}"#)
-            .expect_err("minor 2: direct Portfolio deserialization must fail");
-        assert!(
-            err.to_string().contains("PortfolioSpec"),
-            "minor 2: error should point callers at PortfolioSpec, got {err}"
-        );
     }
 
     #[test]

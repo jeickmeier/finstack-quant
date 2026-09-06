@@ -653,7 +653,7 @@ fn test_instrument_shock_multiple_types() {
         name: None,
         description: None,
         operations: vec![OperationSpec::InstrumentPricePctByType {
-            instrument_types: vec![InstrumentType::Bond, InstrumentType::Loan],
+            instrument_types: vec![InstrumentType::Bond, InstrumentType::TermLoan],
             pct: -10.0,
         }],
         priority: 0,

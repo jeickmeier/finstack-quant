@@ -13,7 +13,7 @@
 //! ```rust
 //! # use finstack_quant_calibration::SolverConfig;
 //! // Create a Brent solver config with default tolerances
-//! let solver = SolverConfig::brent_default();
+//! let solver = SolverConfig::default();
 //! ```
 //!
 //! # See Also

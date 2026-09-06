@@ -11,7 +11,7 @@ use crate::errors::core_to_py;
 use super::schedule::PyCashFlowSchedule;
 use super::specs::{
     date_decimal_pairs, PyAmortizationSpec, PyCouponType, PyFeeSpec, PyFixedCouponSpec,
-    PyFixedWindow, PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
+    PyFloatingCouponSpec, PyPrincipalExchange, PyStepUpCouponSpec,
 };
 
 /// Wrapper for [`PrincipalEvent`]
@@ -295,27 +295,21 @@ impl PyCashFlowBuilder {
     /// switch : datetime.date
     ///     Date on which the floating leg begins (exclusive end of the
     ///     fixed window).
-    /// fixed_win : FixedWindow
-    ///     Fixed rate and schedule for the pre-switch window.
+    /// fixed : FixedCouponSpec
+    ///     Fixed rate, settlement type, and schedule for the pre-switch window.
     /// floating : FloatingCouponSpec
     ///     Floating coupon spec for the post-switch window.
-    /// fixed_split : CouponType
-    ///     Cash / PIK / split settlement for the fixed window.
-    #[pyo3(text_signature = "(self, switch, fixed_win, floating, fixed_split)")]
+    #[pyo3(text_signature = "(self, switch, fixed, floating)")]
     fn fixed_to_float<'py>(
         mut slf: PyRefMut<'py, Self>,
         switch: &Bound<'py, PyAny>,
-        fixed_win: PyRef<'py, PyFixedWindow>,
+        fixed: PyRef<'py, PyFixedCouponSpec>,
         floating: PyRef<'py, PyFloatingCouponSpec>,
-        fixed_split: PyRef<'py, PyCouponType>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let switch = py_to_date(switch)?;
-        let _ = slf.inner.fixed_to_float(
-            switch,
-            fixed_win.inner.clone(),
-            floating.inner.clone(),
-            fixed_split.inner,
-        );
+        let _ = slf
+            .inner
+            .fixed_to_float(switch, fixed.inner.clone(), floating.inner.clone());
         Ok(slf)
     }
 

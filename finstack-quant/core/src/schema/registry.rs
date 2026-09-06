@@ -388,3 +388,33 @@ pub(super) fn generate_artifact<T: SerdeSchema>(artifact: &SchemaArtifact) -> Re
     }
     Ok(schema)
 }
+
+/// Find an artifact by exact identifier, path, or complete trailing filename.
+///
+/// # Arguments
+///
+/// * `artifacts` - Registry entries to search in their published order.
+/// * `selector` - Exact schema `$id`, relative path, or trailing filename.
+///   Empty strings and partial filename suffixes do not match.
+///
+/// # Errors
+///
+/// Returns an error when no entry matches the selector.
+pub fn find_schema_artifact<'a>(
+    artifacts: impl IntoIterator<Item = &'a SchemaArtifact>,
+    selector: &str,
+) -> Result<&'a SchemaArtifact> {
+    let anchored = format!("/{selector}");
+    artifacts
+        .into_iter()
+        .find(|artifact| {
+            artifact.id == selector
+                || artifact.relative_path == selector
+                || artifact.relative_path.ends_with(&anchored)
+        })
+        .ok_or_else(|| {
+            Error::Internal(format!(
+                "no schema matches {selector:?}; call index() for published artifacts"
+            ))
+        })
+}

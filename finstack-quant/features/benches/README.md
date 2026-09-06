@@ -31,7 +31,7 @@ missing. Rolling windows default to 63; neutralize uses 3 factors.
 | `bench_timeseries_rolling` | `rolling_mean` at w=21 and w=63, `rolling_std`, `rolling_zscore`, `rolling_min` |
 | `bench_timeseries_advanced` | `rolling_rank`, `rolling_quantile`, `rolling_skew`, `rolling_sharpe`, `rolling_winsorize`, `hampel_filter`, `exp_decay_weights` |
 | `bench_cross_sectional` | `zscore`, `rank`, `winsorize`, `robust_zscore`, `long_short_weights`, `normal_score` |
-| `bench_multi` | `rolling_corr`, `rolling_beta`, `grouped zscore`, `neutralize`, `neutralize_and_zscore`, `rolling_regression_residual`, `rank_to_weights`, `risk_scaled_weights`, `clean_signal`, `normalize_signal` |
+| `bench_multi` | `rolling_corr`, `rolling_beta`, `grouped zscore`, `neutralize`, `neutralize_and_zscore`, `rolling_regression_residual`, `rank_to_weights`, `risk_scaled_weights`, `cross_sectional winsorize`, `cross_sectional zscore` |
 | `bench_panel_pipeline` | typed `transform_panel` and JSON `transform_panel_json` for returns + rolling std + rank |
 
 `lag` is the cheap O(n) baseline after the shared entity/order sort. Compare it

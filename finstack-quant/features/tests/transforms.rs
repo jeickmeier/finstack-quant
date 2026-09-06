@@ -1,12 +1,11 @@
 //! Vectorized panel transform API tests.
 
 use finstack_quant_features::{
-    clean_signal, neutralize, neutralize_and_zscore, normalize_signal, rank_to_weights,
-    risk_scaled_weights, rolling_regression_residual, transform_cross_sectional,
-    transform_cross_sectional_grouped, transform_cross_sectional_with_op, transform_panel,
-    transform_panel_json, transform_timeseries, transform_timeseries_pairwise,
-    transform_timeseries_with_op, CrossSectionalOp, PanelOperation, PanelTransformSpec,
-    TimeSeriesOp,
+    neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
+    rolling_regression_residual, transform_cross_sectional, transform_cross_sectional_grouped,
+    transform_cross_sectional_with_op, transform_panel, transform_panel_json, transform_timeseries,
+    transform_timeseries_pairwise, transform_timeseries_with_op, CrossSectionalOp, PanelOperation,
+    PanelTransformSpec, TimeSeriesOp,
 };
 use serde_json::json;
 
@@ -700,16 +699,17 @@ fn pipeline_helpers_compose_cleaning_normalization_and_neutralization() {
         "2026-01-01".to_string(),
         "2026-01-01".to_string(),
     ];
-    let cleaned = clean_signal(
+    let cleaned = transform_cross_sectional(
         &values,
         &time_key,
+        "winsorize",
         Some(&json!({"lower": 0.0, "upper": 0.5})),
     )
     .expect("clean signal");
     assert_eq!(cleaned, vec![Some(1.0), Some(2.0), Some(2.0)]);
 
-    let normalized = normalize_signal(&values, &time_key, Some(&json!({"method": "rank"})))
-        .expect("normalize signal");
+    let normalized =
+        transform_cross_sectional(&values, &time_key, "rank", None).expect("normalize signal");
     assert_eq!(normalized, vec![Some(0.0), Some(0.5), Some(1.0)]);
 
     let weights = rank_to_weights(&values, &time_key).expect("rank to weights");
