@@ -14,7 +14,7 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 }
 
 /// Minimal instrument recording which consequences were applied.
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct MockInstrument {
     in_default: bool,
     distributions_blocked: bool,
@@ -43,6 +43,13 @@ impl InstrumentMutator for MockInstrument {
         self.distributions_blocked = blocked;
         Ok(())
     }
+    fn require_collateral(
+        &mut self,
+        _description: &str,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<()> {
+        Ok(())
+    }
     fn set_maturity(&mut self, _new_maturity: Date) -> finstack_quant_core::Result<()> {
         Ok(())
     }
@@ -64,11 +71,16 @@ fn project_finance_lockup_breach_blocks_distributions_without_default() {
         ("dscr", 1.15),
         ("liquidity", 10_000_000.0),
         ("net_debt_to_ebitda", 3.0),
+        ("ebitda", 100.0),
     ]);
 
     let test_date = d(2025, 3, 31);
     let reports = engine
-        .evaluate_and_track(&metrics, test_date)
+        .evaluate_and_track(
+            &metrics,
+            test_date,
+            finstack_quant_covenants::CovenantScope::Maintenance,
+        )
         .expect("evaluation should succeed");
 
     // Both MinDscr covenants are present under distinct keys.
@@ -251,12 +263,14 @@ fn persistent_breach_is_one_episode_with_one_consequence_application() {
         .evaluate_and_track(
             &HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]),
             first_date,
+            finstack_quant_covenants::CovenantScope::Maintenance,
         )
         .expect("first breach should track");
     engine
         .evaluate_and_track(
             &HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.5)]),
             second_date,
+            finstack_quant_covenants::CovenantScope::Maintenance,
         )
         .expect("persistent breach should evaluate");
 
@@ -301,12 +315,14 @@ fn recovery_before_cure_deadline_marks_breach_cured() {
         .evaluate_and_track(
             &HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]),
             d(2025, 3, 31),
+            finstack_quant_covenants::CovenantScope::Maintenance,
         )
         .expect("breach should track");
     engine
         .evaluate_and_track(
             &HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.5)]),
             d(2025, 4, 15),
+            finstack_quant_covenants::CovenantScope::Maintenance,
         )
         .expect("recovery should evaluate");
 

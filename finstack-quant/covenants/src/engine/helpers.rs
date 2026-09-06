@@ -31,19 +31,8 @@ pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64)
     }
 }
 
-/// Whether a springing trigger is met, including the NaN-activates convention.
-///
-/// `NaN <= t` and `NaN >= t` are both false, which would deactivate the
-/// covenant and report a pass on undefined data. A NaN trigger therefore
-/// activates so the covenant's own NaN handling decides the outcome.
-pub(crate) fn springing_condition_met(metric: &str, value: f64, test: ThresholdTest) -> bool {
-    if value.is_nan() {
-        tracing::warn!(
-            metric,
-            "springing condition metric is NaN; activating the covenant"
-        );
-        return true;
-    }
+/// Whether a springing trigger is met.
+pub(crate) fn springing_condition_met(value: f64, test: ThresholdTest) -> bool {
     match test {
         ThresholdTest::Maximum(threshold) => value <= threshold,
         ThresholdTest::Minimum(threshold) => value >= threshold,
@@ -64,22 +53,51 @@ pub(crate) fn spec_metric_name(spec: &CovenantSpec) -> Option<&str> {
         })
 }
 
+fn is_negative_gross_leverage(covenant_type: &CovenantType, value: f64) -> bool {
+    matches!(
+        covenant_type,
+        CovenantType::MaxDebtToEbitda { .. }
+            | CovenantType::MaxTotalLeverage { .. }
+            | CovenantType::MaxSeniorLeverage { .. }
+    ) && value < 0.0
+}
+
 /// Shared point-in-time and forecast breach convention.
 pub(crate) fn is_covenant_breached(
     covenant_type: &CovenantType,
     value: f64,
     threshold: f64,
 ) -> bool {
-    if value.is_nan() {
-        return true;
-    }
-    if covenant_type.is_ratio_max() && value < 0.0 {
+    if value.is_nan() || is_negative_gross_leverage(covenant_type, value) {
         return true;
     }
     match covenant_type.bound_kind() {
         Some(BoundKind::AtMost) => value > threshold,
         Some(BoundKind::AtLeast) => value < threshold,
         None => false,
+    }
+}
+
+pub(crate) fn validate_metric(name: &str, value: f64) -> finstack_quant_core::Result<()> {
+    if !value.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "metric '{name}' must be finite"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn validated_ratio_value(
+    spec: &CovenantSpec,
+    value: f64,
+    denominator: Option<f64>,
+) -> f64 {
+    if denominator.is_some_and(|d| d <= 0.0)
+        || is_negative_gross_leverage(&spec.covenant.covenant_type, value)
+    {
+        f64::NAN
+    } else {
+        value
     }
 }
 
@@ -100,6 +118,23 @@ pub trait InstrumentMutator: Send + Sync {
 
     /// Block distributions.
     fn set_distribution_block(&mut self, blocked: bool) -> finstack_quant_core::Result<()>;
+
+    /// Record or execute an additional collateral requirement.
+    ///
+    /// # Arguments
+    ///
+    /// * `description` - Contractual collateral requirement to record on the target.
+    /// * `as_of` - Effective date of the requirement.
+    ///
+    /// # Errors
+    ///
+    /// Return an error when the target cannot represent the requirement; the
+    /// engine then leaves this consequence outstanding for a later retry.
+    fn require_collateral(
+        &mut self,
+        description: &str,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<()>;
 
     /// Change maturity date.
     fn set_maturity(&mut self, new_maturity: Date) -> finstack_quant_core::Result<()>;

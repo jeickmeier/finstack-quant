@@ -72,9 +72,9 @@ pub fn evaluate_engine(
 
 /// Standard leveraged-buyout covenant package as JSON.
 /// @param initial_leverage - Maximum leverage ratio permitted at the initial test date.
-/// @param interest_coverage - Minimum EBITDA-to-cash-interest coverage ratio.
+/// @param interest_coverage - Minimum EBIT-to-interest coverage ratio in turns.
 /// @param fixed_charge_coverage - Minimum EBITDA-to-fixed-charges coverage ratio.
-/// @param max_capex - Maximum capital expenditure amount or ratio in the covenant convention.
+/// @param max_capex - Maximum annual capital expenditure amount in the caller's reporting currency.
 ///
 /// # Errors
 ///

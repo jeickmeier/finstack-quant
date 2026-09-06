@@ -6,10 +6,10 @@
 //!   descriptive metadata only: the engine evaluates whenever the caller
 //!   invokes [`CovenantEngine::evaluate`] with a `test_date` and does not
 //!   itself generate or enforce a testing schedule.
-//! - **Equity cures are not modeled.** A breach can only be neutralized via
-//!   a [`CovenantWaiver`] (full waiver or amended threshold) or by the metric
-//!   recovering before the cure deadline; there is no mechanism for injecting
-//!   sponsor equity into the tested metric.
+//! - **Equity cures are not modeled.** Numerical compliance with the effective
+//!   threshold before the cure deadline can cure an episode. A full waiver or
+//!   an inactive test does not itself cure history; there is no mechanism for
+//!   injecting sponsor equity into the tested metric.
 //! - **Metric values are taken as-is (LTM contract).** The engine performs no
 //!   trailing-twelve-month or other window aggregation. If a covenant is
 //!   defined on an LTM basis (as most leverage/coverage covenants are), the
@@ -24,7 +24,8 @@ mod types;
 pub use covenant_engine::CovenantEngine;
 pub use helpers::InstrumentMutator;
 pub(crate) use helpers::{
-    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met,
+    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
+    validated_ratio_value,
 };
 pub use types::{
     BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
@@ -42,10 +43,8 @@ mod tests {
         Date::from_calendar_date(y, time::Month::try_from(m).unwrap(), d).unwrap()
     }
 
-    /// A NaN springing metric activates the covenant rather than treating an
-    /// undefined trigger as unmet and reporting a pass.
     #[test]
-    fn nan_springing_metric_activates_rather_than_silently_passing() {
+    fn nan_springing_metric_is_rejected() {
         let covenant = Covenant::new(
             CovenantType::MaxDebtToEbitda { threshold: 4.5 },
             Tenor::quarterly(),
@@ -63,30 +62,10 @@ mod tests {
             ("revolver_utilization", f64::NAN),
             ("debt_to_ebitda", 3.2),
         ]);
-        let reports = engine.evaluate(&metrics, date(2024, 3, 31)).unwrap();
-        let report = &reports["springing_leverage"];
-        assert_eq!(
-            report.actual_value,
-            Some(3.2),
-            "the covenant must be ACTIVATED and evaluated, not skipped; details {:?}",
-            report.details
-        );
-        assert_ne!(
-            report.details.as_deref(),
-            Some("Springing condition not met"),
-            "a NaN springing metric must not be reported as an unmet condition"
-        );
-
-        let breaching = HashMapMetricSource::from_pairs([
-            ("revolver_utilization", f64::NAN),
-            ("debt_to_ebitda", 5.0),
-        ]);
-        let reports = engine.evaluate(&breaching, date(2024, 3, 31)).unwrap();
-        let report = &reports["springing_leverage"];
-        assert!(
-            !report.passed,
-            "NaN springing + breaching metric must report a breach, not a pass"
-        );
+        let error = engine
+            .evaluate(&metrics, date(2024, 3, 31))
+            .expect_err("non-finite trigger must fail");
+        assert!(error.to_string().contains("must be finite"));
     }
 
     #[test]
@@ -409,7 +388,7 @@ mod tests {
         engine.add_spec(spec);
         let metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
         let reports = engine
-            .evaluate_and_track(&metrics, date(2024, 3, 31))
+            .evaluate_and_track(&metrics, date(2024, 3, 31), CovenantScope::Maintenance)
             .unwrap();
         assert!(!reports["max_debt_ebitda"].passed);
         assert_eq!(engine.breach_history.len(), 1);
@@ -430,13 +409,13 @@ mod tests {
         engine.add_spec(spec);
         let metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
         engine
-            .evaluate_and_track(&metrics, date(2024, 3, 31))
+            .evaluate_and_track(&metrics, date(2024, 3, 31), CovenantScope::Maintenance)
             .unwrap();
         assert_eq!(engine.breach_history.len(), 1);
         assert!(!engine.breach_history[0].is_cured);
         let metrics2 = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.0)]);
         engine
-            .evaluate_and_track(&metrics2, date(2024, 5, 15))
+            .evaluate_and_track(&metrics2, date(2024, 5, 15), CovenantScope::Maintenance)
             .unwrap();
         assert!(engine.breach_history[0].is_cured);
     }

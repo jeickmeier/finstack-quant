@@ -88,15 +88,20 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
 
 /// Read a date-indexed metrics frame into ``(date, [(metric, value)])`` rows.
 ///
-/// ``NaN`` cells are dropped so a metric that is genuinely missing for a date
-/// surfaces as the engine's ``KeyError`` (or as an uncovered period in the
-/// forecast batch) rather than as a silent breach.
+/// Cells are preserved for canonical Rust validation. Duplicate metric
+/// columns are rejected rather than silently overwriting observations.
 pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<MetricFrameRows> {
     let columns: Vec<String> = frame
         .getattr("columns")?
         .call_method0("tolist")?
         .extract()
         .map_err(|_| value_error("metrics frame columns must be metric-id strings"))?;
+    let unique: std::collections::HashSet<_> = columns.iter().collect();
+    if unique.len() != columns.len() {
+        return Err(value_error(
+            "metrics frame contains duplicate metric columns",
+        ));
+    }
     let index = frame.getattr("index")?.call_method0("tolist")?;
     let dates = index
         .try_iter()?
@@ -120,7 +125,6 @@ pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<MetricF
             let pairs = columns
                 .iter()
                 .zip(row)
-                .filter(|(_, value)| !value.is_nan())
                 .map(|(name, value)| (name.clone(), value))
                 .collect();
             (date, pairs)
@@ -229,20 +233,25 @@ impl PyCovenantEngine {
     /// covenant without an active breach gains a breach record (with its cure
     /// deadline), and a later pass inside the cure period marks it cured.
     ///
+    /// ``scope`` must be ``maintenance`` for scheduled testing or ``incurrence``
+    /// for a completed action assessed using pro forma metrics. Inactive and
+    /// waived reports do not cure historical breaches.
     /// Raises the same exceptions as ``evaluate``; on error the history is
-    /// left untouched.
-    #[pyo3(text_signature = "(metrics, as_of)")]
+    /// left untouched. Invalid scope raises ``ValueError``.
+    #[pyo3(text_signature = "(metrics, as_of, scope)")]
     fn evaluate_and_track<'py>(
         &mut self,
         py: Python<'py>,
         metrics: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
+        scope: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
+        let scope = super::spec::parse_scope(scope)?;
         let as_of = extract_date(as_of)?;
         let source = HashMapMetricSource::from_pairs(extract_metrics(metrics)?);
         let reports = py.detach(|| {
             self.inner
-                .evaluate_and_track(&source, as_of)
+                .evaluate_and_track(&source, as_of, scope)
                 .map_err(core_to_py)
         })?;
         reports_to_pydict(py, reports)
@@ -251,7 +260,7 @@ impl PyCovenantEngine {
     /// Evaluate the engine on every row of a date-indexed metrics frame.
     ///
     /// ``metrics`` is a ``pandas.DataFrame`` whose index holds the test dates
-    /// and whose columns are metric ids; ``NaN`` cells are treated as absent.
+    /// and whose columns are unique metric ids; required cells must be finite.
     /// Returns a long frame with one row per (date, covenant) and columns
     /// ``as_of`` (ISO string), ``covenant`` (label), ``covenant_type``,
     /// ``passed``, ``actual_value``, ``threshold``, ``headroom``, ``details``.
@@ -432,6 +441,17 @@ impl PyCovenantBreach {
     #[getter]
     fn is_cured(&self) -> bool {
         self.inner.is_cured
+    }
+
+    /// Consequences captured from the effective covenant when this breach began.
+    #[getter]
+    fn consequences(&self) -> Vec<super::spec::PyCovenantConsequence> {
+        self.inner
+            .consequences
+            .iter()
+            .cloned()
+            .map(super::spec::PyCovenantConsequence::from_inner)
+            .collect()
     }
 
     /// Consequences already applied for this breach.

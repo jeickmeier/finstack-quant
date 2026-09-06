@@ -11,7 +11,7 @@ use finstack_quant_covenants::{
     CovenantForecastConfig, CovenantSpec, FutureBreach, ModelTimeSeries,
 };
 use finstack_quant_statements::evaluator::StatementResult;
-use finstack_quant_statements::types::{FinancialModelSpec, ForecastMethod};
+use finstack_quant_statements::types::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde_json::json;
 use time::Month;
@@ -98,7 +98,7 @@ fn approximate_period_end(period: &PeriodId) -> Date {
             ));
             let week_end =
                 iso_week1_monday.saturating_add(time::Duration::days(period.index as i64 * 7 - 1));
-            (week_end.month(), week_end.day())
+            return week_end;
         }
     };
     Date::from_calendar_date(period.year, month, day).unwrap_or_else(|_| {
@@ -128,15 +128,14 @@ fn last_day_of_month(year: i32, month: Month) -> u8 {
 
 /// Forecast a single covenant's future compliance using statement results.
 ///
-/// If `config.volatility` is absent, this helper tries to infer a volatility and
-/// random seed from the covenant's default statement driver when that driver is
-/// configured with a Normal or LogNormal forecast.
+/// Stochastic forecasts require explicit annualized log-volatility of the
+/// covenant metric in `config.volatility`. Earnings-level deviations are not
+/// interchangeable with ratio volatility and are never inferred from drivers.
 ///
 /// # Arguments
 ///
 /// * `covenant` - Covenant specification to simulate
-/// * `model` - Source statement model used for date resolution and optional
-///   volatility inference
+/// * `model` - Source statement model used to resolve inclusive period-end dates
 /// * `base_case` - Evaluated base-case statement results
 /// * `periods` - Future periods to test
 /// * `config` - Forecasting configuration for simulation horizon and
@@ -150,8 +149,8 @@ fn last_day_of_month(year: i32, month: Month) -> u8 {
 /// # Errors
 ///
 /// Returns an error if the covenant engine rejects the input series, if model
-/// periods cannot be resolved consistently, or if inferred volatility
-/// parameters are malformed.
+/// periods cannot be resolved consistently, or if explicit volatility
+/// parameters are missing or malformed for a stochastic forecast.
 ///
 /// # References
 ///
@@ -164,18 +163,7 @@ pub fn forecast_covenant(
     config: CovenantForecastConfig,
 ) -> Result<CovenantForecast> {
     let adapter = StatementsAdapter::new(base_case, Some(model));
-    let mut cfg = config;
-    if cfg.volatility.is_none() {
-        if let Some(driver) = default_driver_node_id(covenant) {
-            if let Some((sigma, seed)) = extract_sigma_and_seed(model, driver) {
-                cfg.volatility = Some(sigma);
-                if cfg.random_seed.is_none() {
-                    cfg.random_seed = Some(seed);
-                }
-            }
-        }
-    }
-    forecast_covenant_generic(covenant, &adapter, periods, cfg)
+    forecast_covenant_generic(covenant, &adapter, periods, config)
 }
 
 /// Forecast covenant breaches based on statement results.
@@ -215,72 +203,6 @@ pub fn forecast_breaches(
 
     let adapter = StatementsAdapter::new(results, model);
     forecast_breaches_generic(covenants, &adapter, &periods, config)
-}
-
-/// Map a covenant variant to the statement-model node id that most
-/// naturally drives its stochastic volatility in the breach forecast.
-///
-/// These defaults are pragmatic, not normative: they define which
-/// primary driver gets shocked when the caller hasn't supplied one
-/// explicitly. Variants that don't map to a single monetary/ratio
-/// driver (Negative, Affirmative, Custom, Basket, MinAssetCoverage,
-/// MaxCapex, MinLiquidity) return `None` so the forecast engine
-/// falls back to deterministic projection.
-fn default_driver_node_id(spec: &CovenantSpec) -> Option<&'static str> {
-    use finstack_quant_covenants::CovenantType;
-    match &spec.covenant.covenant_type {
-        // Leverage ratios: EBITDA is the usual denominator and the
-        // dominant source of volatility; gross and net debt variants
-        // share this driver.
-        CovenantType::MaxDebtToEbitda { .. }
-        | CovenantType::MaxTotalLeverage { .. }
-        | CovenantType::MaxSeniorLeverage { .. }
-        | CovenantType::MaxNetDebtToEbitda { .. } => Some("ebitda"),
-
-        // Coverage ratios: numerator is earnings-based. EBIT for
-        // interest coverage, EBITDA for fixed-charge and DSCR (which
-        // typically nets capex/cash rent from EBITDA in the full
-        // formula — callers who want a dedicated `dscr` driver should
-        // pass it explicitly).
-        CovenantType::MinInterestCoverage { .. } => Some("ebit"),
-        CovenantType::MinFixedChargeCoverage { .. } | CovenantType::MinDscr { .. } => {
-            Some("ebitda")
-        }
-
-        // No single monetary driver — forecasting engine degrades to a
-        // deterministic projection.
-        CovenantType::MinAssetCoverage { .. }
-        | CovenantType::Negative { .. }
-        | CovenantType::Affirmative { .. }
-        | CovenantType::Custom { .. }
-        | CovenantType::Basket { .. }
-        | CovenantType::MaxCapex { .. }
-        | CovenantType::MinLiquidity { .. } => None,
-    }
-}
-
-/// Extract the driver volatility (annualized) and seed from a forecast spec.
-///
-/// Forecast specs quote `std_dev` **per model period**, while
-/// [`CovenantForecastConfig::volatility`] is consumed as an **annualized**
-/// GBM volatility (the forward engine scales shocks by `sigma * sqrt(T_years)`).
-/// The per-period standard deviation is therefore annualized here as
-/// `sigma_annual = sigma_per_period * sqrt(periods_per_year)`, with
-/// `periods_per_year` derived from the model's period cadence
-/// ([`PeriodKind`], e.g. 4 for quarterly, 12 for monthly).
-fn extract_sigma_and_seed(model: &FinancialModelSpec, node_id: &str) -> Option<(f64, u64)> {
-    let node = model.nodes.get(node_id)?;
-    let spec = node.forecast.as_ref()?;
-    match spec.method {
-        ForecastMethod::Normal | ForecastMethod::LogNormal => {
-            let sigma_per_period = spec.params.get("std_dev")?.as_f64()?;
-            let seed = spec.params.get("seed")?.as_u64()?;
-            let periods_per_year = f64::from(model.periods.first()?.id.kind().periods_per_year());
-            let sigma_annual = sigma_per_period * periods_per_year.sqrt();
-            Some((sigma_annual, seed))
-        }
-        _ => None,
-    }
 }
 
 /// Convert a covenant forecast into a serializable table for downstream analysis.
@@ -345,6 +267,15 @@ mod tests {
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
     use time::Month;
+
+    #[test]
+    fn iso_week_end_preserves_calendar_year() {
+        let week = PeriodId::week(2020, 53).expect("valid ISO week");
+        assert_eq!(
+            approximate_period_end(&week),
+            time::macros::date!(2021 - 01 - 03)
+        );
+    }
 
     #[test]
     fn approximate_period_end_quarterly() {
@@ -418,41 +349,65 @@ mod tests {
     }
 
     #[test]
-    fn extract_sigma_annualizes_per_period_std_dev() {
+    fn covenant_volatility_is_not_inferred_from_earnings_drivers() {
         use finstack_quant_core::dates::Period;
-        use finstack_quant_statements::types::{ForecastSpec, NodeSpec, NodeType};
+        use finstack_quant_statements::types::{ForecastMethod, ForecastSpec, NodeSpec, NodeType};
 
-        // Quarterly model: annualized sigma must be std_dev * sqrt(4) = 2x.
         let period = Period {
-            id: PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            id: PeriodId::quarter(2025, 1).expect("valid period"),
             start: time::macros::date!(2025 - 01 - 01),
             end: time::macros::date!(2025 - 04 - 01),
-            is_actual: true,
+            is_actual: false,
         };
-        let mut model = FinancialModelSpec::new("vol_test", vec![period]);
-
-        let mut params = IndexMap::new();
-        params.insert("std_dev".to_string(), serde_json::json!(0.1));
-        params.insert("seed".to_string(), serde_json::json!(7));
-        let node = NodeSpec::new("ebitda", NodeType::Mixed).with_forecast(ForecastSpec {
-            method: ForecastMethod::Normal,
-            params,
-        });
-        model.nodes.insert("ebitda".into(), node);
-
-        let (sigma, seed) =
-            extract_sigma_and_seed(&model, "ebitda").expect("sigma should be extracted");
-        assert_eq!(seed, 7);
-        assert!(
-            (sigma - 0.2).abs() < 1e-12,
-            "quarterly per-period std_dev 0.1 must annualize to 0.2, got {sigma}"
+        let periods = [period.id];
+        let mut model = FinancialModelSpec::new("volatility", vec![period]);
+        let results = StatementResult {
+            nodes: IndexMap::from([("leverage".into(), IndexMap::from([(periods[0], 3.0)]))]),
+            ..Default::default()
+        };
+        let covenant = CovenantSpec::with_metric(
+            Covenant::new(
+                CovenantType::MaxDebtToEbitda { threshold: 4.0 },
+                Tenor::quarterly(),
+                "leverage",
+            ),
+            "leverage",
         );
+        for method in [ForecastMethod::Normal, ForecastMethod::LogNormal] {
+            let driver = NodeSpec::new("ebitda", NodeType::Mixed).with_forecast(ForecastSpec {
+                method,
+                params: IndexMap::from([
+                    ("std_dev".into(), json!(10_000_000.0)),
+                    ("seed".into(), json!(7)),
+                ]),
+            });
+            model.nodes.insert("ebitda".into(), driver);
+            let config = CovenantForecastConfig {
+                stochastic: true,
+                reference_date: Some(time::macros::date!(2024 - 03 - 31)),
+                ..Default::default()
+            };
+            assert!(
+                forecast_covenant(&covenant, &model, &results, &periods, config.clone()).is_err()
+            );
+            let forecast = forecast_covenant(
+                &covenant,
+                &model,
+                &results,
+                &periods,
+                CovenantForecastConfig {
+                    volatility: Some(0.2),
+                    ..config
+                },
+            )
+            .expect("explicit metric volatility");
+            assert!(forecast.breach_probability[0] > 0.0);
+            assert!(forecast.breach_probability[0] < 0.5);
+        }
     }
 
     #[test]
     fn forecast_breaches_with_partial_metric_coverage() {
-        // The period union contains a period the covenant metric doesn't
-        // cover; the forecast must skip it rather than hard-fail.
         let mut engine = CovenantEngine::new();
         engine.add_spec(CovenantSpec {
             covenant: Covenant::new(
@@ -461,6 +416,7 @@ mod tests {
                 "max_debt_ebitda",
             ),
             metric_id: Some(CovenantMetricId::from("NetDebtEbitda")),
+            denominator_metric_id: None,
             threshold_schedule: None,
         });
 
@@ -481,12 +437,9 @@ mod tests {
             ..StatementResult::default()
         };
 
-        let breaches =
-            forecast_breaches(&results, &engine, None, CovenantForecastConfig::default())
-                .expect("partial coverage must not hard-fail");
-
-        assert_eq!(breaches.len(), 1);
-        assert_eq!(breaches[0].projected_value, Some(4.5));
+        assert!(
+            forecast_breaches(&results, &engine, None, CovenantForecastConfig::default()).is_err()
+        );
     }
 
     #[test]
@@ -500,6 +453,7 @@ mod tests {
         let spec = CovenantSpec {
             covenant,
             metric_id: Some(CovenantMetricId::from("NetDebtEbitda")),
+            denominator_metric_id: None,
             threshold_schedule: None,
         };
         engine.add_spec(spec);

@@ -18,9 +18,9 @@ Ratio metrics and thresholds are in turns (``4.5`` means 4.5x); rate-style
 custom metrics such as debt yield or LTV are decimal fractions (``0.08`` is
 8%); amount metrics (capex, liquidity, baskets) are bare numbers in the
 caller's reporting currency. The engine tests whenever you call ``evaluate``
-— ``test_frequency`` is descriptive metadata. A NaN metric on a leverage-type
-maximum covenant is treated as a breach; a *missing* metric raises
-``KeyError``.
+— ``test_frequency`` is descriptive metadata. Required metric observations must be finite (``ValueError`` otherwise);
+a missing required metric raises ``KeyError``. Net-debt tests also require
+positive earnings, selected by ``denominator_metric_id`` (default ``ebitda``).
 
 The JSON surface shared with WASM is kept: the ``validate_covenant_*_json``
 validators, ``evaluate_engine`` on an engine document, and the ``*_json``
@@ -1476,7 +1476,8 @@ class CovenantSpec:
 
     def __init__(self, covenant: Covenant, metric_id: str | None = None) -> None:
         """
-        Pair a covenant with its metric.
+        Pair a covenant with its metric; net debt/EBITDA also selects ``ebitda``
+        as its required earnings denominator.
 
         Inputs are stored verbatim, so this constructor does not raise.
 
@@ -1491,6 +1492,36 @@ class CovenantSpec:
             ``total_leverage``, ``senior_leverage``, ``asset_coverage``,
             ``dscr``, ``net_debt_to_ebitda``, ``capex``, ``liquidity``) or to
             the ``metric`` / ``name`` of a custom or basket covenant.
+        """
+
+    def with_denominator_metric(self, metric_id: str) -> CovenantSpec:
+        """Return a copy using the named earnings denominator for a leverage test.
+
+        This method stores the identifier and does not raise.
+
+        Parameters
+        ----------
+        metric_id : str
+            Finite earnings metric for the same reporting period as the ratio.
+            Net-debt constructors default to ``ebitda``. Non-positive earnings
+            produce a breach with no meaningful ratio or headroom.
+
+        Returns
+        -------
+        CovenantSpec
+            Copy with the selected denominator metric.
+        """
+
+    @property
+    def denominator_metric_id(self) -> str | None:
+        """Earnings metric used to distinguish net cash from non-positive earnings.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Selected denominator, or ``None`` when no separate denominator is used.
         """
 
     def with_threshold_schedule(self, schedule: ThresholdSchedule) -> CovenantSpec:
@@ -1604,7 +1635,7 @@ class CovenantBreach:
     --------
     >>> from finstack_quant.covenants import CovenantEngine, cov_lite
     >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
-    >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31")
+    >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
     >>> breach = engine.breach_history[0]
     >>> breach.covenant_id, breach.breach_date.isoformat(), breach.is_cured
     ('max_total_leverage', '2026-03-31', False)
@@ -1633,7 +1664,7 @@ class CovenantBreach:
         Examples
         --------
         >>> from finstack_quant.covenants import CovenantBreach
-        >>> raw = '{"covenant_id": "x", "covenant_type": "DSCR >= 1.20x", "breach_date": "2026-03-31", "actual_value": 1.1, "threshold": 1.2, "cure_deadline": null, "is_cured": false, "applied_consequences": []}'
+        >>> raw = '{"covenant_id": "x", "covenant_type": "DSCR >= 1.20x", "breach_date": "2026-03-31", "actual_value": 1.1, "threshold": 1.2, "cure_deadline": null, "is_cured": false, "consequences": [], "applied_consequences": []}'
         >>> CovenantBreach.from_json(raw).threshold
         1.2
         """
@@ -1742,6 +1773,18 @@ class CovenantBreach:
         -------
         bool
             ``True`` once cured.
+        """
+
+    @property
+    def consequences(self) -> list[CovenantConsequence]:
+        """Original ordered consequences captured when the breach began.
+
+        This property does not raise.
+
+        Returns
+        -------
+        list[CovenantConsequence]
+            Captured actions; ``applied_consequences`` is the completed prefix.
         """
 
     @property
@@ -1911,13 +1954,16 @@ class CovenantEngine:
         (True, 0.3333)
         """
 
-    def evaluate_and_track(self, metrics: dict[str, float] | str, as_of: DateLike) -> dict[str, CovenantReport]:
+    def evaluate_and_track(
+        self, metrics: dict[str, float] | str, as_of: DateLike, scope: str
+    ) -> dict[str, CovenantReport]:
         """
         Evaluate like :meth:`evaluate` and update :attr:`breach_history`.
 
         A failing covenant without an active breach gains a
         :class:`CovenantBreach` (with its cure deadline); a later pass inside
-        the cure period marks the breach cured. Repeated failures of a
+        the cure period marks the breach cured. Inactive or waived reports do not
+        establish recovery. Repeated failures of a
         still-active breach add no duplicate record.
 
         Parameters
@@ -1926,6 +1972,9 @@ class CovenantEngine:
             Metric values keyed by metric id (or a JSON object string).
         as_of : datetime.date | str
             Test date.
+        scope : str
+            ``maintenance`` for scheduled tests or ``incurrence`` for a completed
+            action evaluated using pro forma metrics. Only that scope is tracked.
 
         Returns
         -------
@@ -1937,14 +1986,14 @@ class CovenantEngine:
         KeyError
             If a required metric is missing; the history is left untouched.
         ValueError
-            If the engine or a metric value is invalid.
+            If scope, terms, or finite metric inputs are invalid, or the cure date overflows.
 
         Examples
         --------
         >>> from finstack_quant.covenants import CovenantEngine, cov_lite
         >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
-        >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31")
-        >>> _ = engine.evaluate_and_track({"total_leverage": 6.5, "senior_leverage": 3.0}, "2026-04-15")
+        >>> _ = engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
+        >>> _ = engine.evaluate_and_track({"total_leverage": 6.5, "senior_leverage": 3.0}, "2026-04-15", "incurrence")
         >>> engine.breach_history[0].is_cured
         True
         """
@@ -1957,8 +2006,7 @@ class CovenantEngine:
         ----------
         metrics : pd.DataFrame
             Index holds the test dates (``datetime.date``, ``Timestamp`` or
-            ISO strings); columns are metric ids; ``NaN`` cells are treated as
-            absent.
+            ISO strings); columns are metric ids; required cells must be finite. Duplicate metric columns are rejected.
 
         Returns
         -------
@@ -2365,7 +2413,8 @@ class CovenantForecastConfig:
             Use the lognormal stochastic overlay instead of deterministic
             pass/fail probabilities.
         num_paths : int
-            Monte Carlo path count; ``0`` selects the closed-form analytic mode.
+            Monte Carlo path count; ``0`` selects analytic mode. MC requires at
+            least two independent samples, or two antithetic pairs.
         volatility : float | None
             Annualized lognormal volatility of the metric; required when
             ``stochastic`` is true.
@@ -2387,6 +2436,38 @@ class CovenantForecastConfig:
             If ``reference_date`` is a non-ISO string. Other invalid
             combinations (missing volatility, antithetic without paths,
             threshold outside ``[0, 1]``) raise ``ValueError`` at forecast time.
+        """
+
+    def with_scope(self, scope: str) -> CovenantForecastConfig:
+        """Return a copy selecting the covenant scope for batch forecasts.
+
+        Parameters
+        ----------
+        scope : str
+            ``maintenance`` for scheduled compliance or ``incurrence`` for
+            hypothetical action capacity. The default is ``maintenance``.
+
+        Returns
+        -------
+        CovenantForecastConfig
+            Configuration with the selected batch scope.
+
+        Raises
+        ------
+        ValueError
+            If scope is neither ``maintenance`` nor ``incurrence``.
+        """
+
+    @property
+    def scope(self) -> str:
+        """Scope selected by batch forecasts; single-spec forecasts ignore it.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            ``maintenance`` or ``incurrence``.
         """
 
     @staticmethod
@@ -2413,7 +2494,7 @@ class CovenantForecastConfig:
         --------
         >>> from finstack_quant.covenants import CovenantForecastConfig
         >>> CovenantForecastConfig.from_json(
-        ...     '{"stochastic": false, "num_paths": 0, "volatility": null, "random_seed": null}'
+        ...     '{"scope": "maintenance", "stochastic": false, "num_paths": 0, "volatility": null, "random_seed": null}'
         ... ).antithetic
         False
         """
@@ -2782,13 +2863,13 @@ class FutureBreach:
     Examples
     --------
     >>> import pandas as pd
-    >>> from finstack_quant.covenants import CovenantEngine, cov_lite, forecast_breaches
+    >>> from finstack_quant.covenants import CovenantEngine, CovenantForecastConfig, cov_lite, forecast_breaches
     >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
     >>> frame = pd.DataFrame(
     ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 3.5]},
     ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
     ... )
-    >>> breaches = forecast_breaches(engine, frame)
+    >>> breaches = forecast_breaches(engine, frame, CovenantForecastConfig().with_scope("incurrence"))
     >>> [(b.covenant_id, b.breach_date.isoformat()) for b in breaches]
     [('max_total_leverage', '2026-06-30')]
     """
@@ -3153,14 +3234,14 @@ def forecast_breaches(
     Forecast every active numeric covenant in an engine and collect the
     dates whose breach probability reaches the config threshold.
 
-    Dates on which a covenant's metric is absent are skipped for that
-    covenant rather than failing the batch; non-numeric covenants are
-    skipped.
+    Effective windows, waivers, schedules, and scope are honored. Missing or
+    non-finite required observations fail the entire batch. Inactive and
+    non-numeric covenants are skipped. Deterministic breaches are always retained.
 
     Parameters
     ----------
     engine : CovenantEngine
-        Engine whose top-level specs are forecast.
+        Engine whose effective specifications and amendments are forecast.
     metrics : pd.DataFrame
         Index holds forecast dates; columns are metric ids.
     config : CovenantForecastConfig | None
@@ -3170,24 +3251,34 @@ def forecast_breaches(
     Returns
     -------
     list[FutureBreach]
-        Breaches in spec order then date order; empty when nothing breaches.
+        Breaches sorted by date then covenant id; empty when no applicable test breaches.
 
     Raises
     ------
+    KeyError
+        If any active numeric test lacks a required metric at a requested date.
     ValueError
-        If the frame is empty, the engine is invalid, or the config is
-        invalid.
+        If the frame is empty, has duplicate metric columns or non-finite required
+        observations, or the engine, date ordering, or configuration is invalid.
 
     Examples
     --------
     >>> import pandas as pd
-    >>> from finstack_quant.covenants import CovenantEngine, breaches_to_dataframe, cov_lite, forecast_breaches
+    >>> from finstack_quant.covenants import (
+    ...     CovenantEngine,
+    ...     CovenantForecastConfig,
+    ...     breaches_to_dataframe,
+    ...     cov_lite,
+    ...     forecast_breaches,
+    ... )
     >>> engine = CovenantEngine.from_specs(cov_lite(7.0, 4.5))
     >>> frame = pd.DataFrame(
     ...     {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},
     ...     index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
     ... )
-    >>> breaches_to_dataframe(forecast_breaches(engine, frame))["covenant_id"].tolist()
+    >>> breaches_to_dataframe(forecast_breaches(engine, frame, CovenantForecastConfig().with_scope("incurrence")))[
+    ...     "covenant_id"
+    ... ].tolist()
     ['max_senior_leverage', 'max_total_leverage']
     """
 

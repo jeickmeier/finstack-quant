@@ -33,10 +33,18 @@ fn threshold_test_parts(test: ThresholdTest) -> (&'static str, f64) {
     }
 }
 
-fn scope_name(scope: &CovenantScope) -> &'static str {
+pub(crate) fn scope_name(scope: &CovenantScope) -> &'static str {
     match scope {
         CovenantScope::Maintenance => "maintenance",
         CovenantScope::Incurrence => "incurrence",
+    }
+}
+
+pub(crate) fn parse_scope(scope: &str) -> PyResult<CovenantScope> {
+    match scope {
+        "maintenance" => Ok(CovenantScope::Maintenance),
+        "incurrence" => Ok(CovenantScope::Incurrence),
+        _ => Err(value_error("scope must be maintenance or incurrence")),
     }
 }
 
@@ -887,10 +895,33 @@ impl PyCovenantSpec {
             None => CovenantSpec {
                 covenant: covenant.inner.clone(),
                 metric_id: None,
+                denominator_metric_id: matches!(
+                    covenant.inner.covenant_type,
+                    CovenantType::MaxNetDebtToEbitda { .. }
+                )
+                .then(|| "ebitda".into()),
                 threshold_schedule: None,
             },
         };
         Self::from_inner(inner)
+    }
+
+    /// Return a copy selecting the finite earnings denominator for a leverage ratio.
+    ///
+    /// ``metric_id`` identifies earnings for the same period as the ratio;
+    /// non-positive earnings produce a breach with no meaningful headroom.
+    #[pyo3(text_signature = "(metric_id)")]
+    fn with_denominator_metric(&self, metric_id: String) -> Self {
+        Self::from_inner(self.inner.clone().with_denominator_metric(metric_id))
+    }
+
+    /// Earnings denominator metric id; net-debt constructors default to ``ebitda``.
+    #[getter]
+    fn denominator_metric_id(&self) -> Option<&str> {
+        self.inner
+            .denominator_metric_id
+            .as_ref()
+            .map(|id| id.as_str())
     }
 
     /// Return a copy whose threshold follows ``schedule`` (step-downs) instead

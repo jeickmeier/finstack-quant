@@ -185,6 +185,10 @@ fn covenant_breach_roundtrip() {
         threshold: Some(5.0),
         cure_deadline: Some(date(2025, 4, 30)),
         is_cured: false,
+        consequences: vec![
+            CovenantConsequence::RateIncrease { bp_increase: 100.0 },
+            CovenantConsequence::BlockDistributions,
+        ],
         applied_consequences: vec![
             CovenantConsequence::RateIncrease { bp_increase: 100.0 },
             CovenantConsequence::BlockDistributions,
@@ -230,6 +234,7 @@ fn covenant_engine_roundtrip() {
         threshold: Some(5.0),
         cure_deadline: None,
         is_cured: true,
+        consequences: vec![],
         applied_consequences: vec![],
     });
 
@@ -322,6 +327,7 @@ fn consequence_application_roundtrip() {
 #[test]
 fn covenant_forecast_config_roundtrip() {
     let config = CovenantForecastConfig {
+        scope: finstack_quant_covenants::CovenantScope::Maintenance,
         stochastic: true,
         num_paths: 10_000,
         volatility: Some(0.25),
@@ -520,6 +526,7 @@ fn complex_covenant_package_roundtrip() {
         threshold: Some(5.0),
         cure_deadline: Some(date(2025, 1, 30)),
         is_cured: true,
+        consequences: vec![],
         applied_consequences: vec![],
     });
 

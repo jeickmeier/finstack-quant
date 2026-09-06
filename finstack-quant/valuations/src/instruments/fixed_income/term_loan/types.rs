@@ -1178,6 +1178,16 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
         Ok(())
     }
 
+    fn require_collateral(
+        &mut self,
+        _description: &str,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<()> {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Term loan '{}' cannot execute a collateral requirement without a typed collateral agreement", self.id.as_str()
+        )))
+    }
+
     fn set_maturity(&mut self, new_maturity: Date) -> finstack_quant_core::Result<()> {
         // Re-validate: shortening or extending maturity can strand
         // amortization, call, covenant, or DDTL dates outside the loan life.

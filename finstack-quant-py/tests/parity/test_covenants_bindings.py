@@ -246,13 +246,13 @@ def test_springing_condition_gates_evaluation() -> None:
 
 def test_evaluate_and_track_records_and_cures_breaches() -> None:
     engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
-    engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31")
+    engine.evaluate_and_track({"total_leverage": 7.5, "senior_leverage": 3.0}, "2026-03-31", "incurrence")
     breach = engine.breach_history[0]
     assert breach.covenant_id == "max_total_leverage"
     assert breach.breach_date == datetime.date(2026, 3, 31)
     assert breach.cure_deadline == datetime.date(2026, 4, 30)
     assert breach.is_cured is False
-    engine.evaluate_and_track({"total_leverage": 6.5, "senior_leverage": 3.0}, "2026-04-15")
+    engine.evaluate_and_track({"total_leverage": 6.5, "senior_leverage": 3.0}, "2026-04-15", "incurrence")
     assert engine.breach_history[0].is_cured is True
     assert pickle.loads(pickle.dumps(breach)) == breach  # noqa: S301
 
@@ -330,7 +330,9 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
         {"total_leverage": [6.0, 7.5], "senior_leverage": [3.0, 5.0]},
         index=pd.to_datetime(["2026-03-31", "2026-06-30"]),
     )
-    breaches = covenants.forecast_breaches(engine, projections)
+    breaches = covenants.forecast_breaches(
+        engine, projections, covenants.CovenantForecastConfig().with_scope("incurrence")
+    )
     # Rust sorts breaches by (breach_date, covenant_id), not by spec order.
     assert [(b.covenant_id, b.breach_date) for b in breaches] == [
         ("max_senior_leverage", datetime.date(2026, 6, 30)),
@@ -338,3 +340,100 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
     ]
     assert covenants.breaches_to_dataframe(breaches)["breach_date"].tolist() == ["2026-06-30", "2026-06-30"]
     assert next(iter(covenants.breaches_to_dataframe([]).columns)) == "covenant_id"
+
+
+def test_forecast_rejects_duplicate_columns_and_incomplete_observations() -> None:
+    spec = covenants.CovenantSpec(
+        covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "leverage"), "x"
+    )
+    engine = covenants.CovenantEngine.from_specs([spec])
+    index = pd.to_datetime(["2026-03-31"])
+    duplicate = pd.DataFrame([[8.0, 2.0]], columns=["x", "x"], index=index)
+    for call in (lambda: engine.evaluate_series(duplicate), lambda: covenants.forecast_covenant(spec, duplicate)):
+        with pytest.raises(ValueError, match="duplicate metric columns"):
+            call()
+    for value in (math.nan, math.inf, -math.inf):
+        frame = pd.DataFrame({"x": [value]}, index=index)
+        with pytest.raises(ValueError, match="finite"):
+            engine.evaluate({"x": value}, "2026-03-31")
+        with pytest.raises(ValueError, match="finite"):
+            covenants.evaluate_engine(engine.to_json(), {"x": value}, "2026-03-31")
+        with pytest.raises(ValueError, match="finite"):
+            covenants.forecast_breaches(engine, frame)
+    with pytest.raises(KeyError):
+        covenants.forecast_breaches(engine, pd.DataFrame({"other": [1.0]}, index=index))
+
+
+def test_window_terms_and_waivers_reconcile_spot_forecast_and_history() -> None:
+    spec = covenants.CovenantSpec(
+        covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "leverage").with_consequence(
+            covenants.CovenantConsequence.rate_increase(100.0)
+        ),
+        "x",
+    )
+    engine = covenants.CovenantEngine.from_json(
+        json.dumps({
+            "specs": [],
+            "windows": [{"start": "2026-01-01", "end": "2026-12-31", "covenants": [json.loads(spec.to_json())]}],
+        })
+    )
+    engine.evaluate_and_track({"x": 5.0}, "2026-03-31", "maintenance")
+    breach = engine.breach_history[0]
+    assert breach.cure_deadline == datetime.date(2026, 4, 30)
+    assert [c.kind for c in breach.consequences] == ["rate_increase"]
+    assert covenants.CovenantEngine.from_json(engine.to_json()) == engine
+    frame = pd.DataFrame({"x": [5.0]}, index=pd.to_datetime(["2026-06-30"]))
+    assert len(covenants.forecast_breaches(engine, frame)) == 1
+    engine.add_waiver(covenants.CovenantWaiver("leverage", "2026-06-01", amended_threshold=6.0))
+    assert engine.evaluate({"x": 5.0}, "2026-06-30")["leverage"].passed
+    assert covenants.forecast_breaches(engine, frame) == []
+    engine.add_waiver(covenants.CovenantWaiver("leverage", "2026-07-01", amended_threshold=4.0))
+    with pytest.raises(ValueError, match="overlapping waivers"):
+        engine.validate()
+
+
+def test_net_cash_and_negative_earnings_have_distinct_outcomes() -> None:
+    spec = covenants.CovenantSpec(
+        covenants.Covenant(covenants.CovenantType.max_net_debt_to_ebitda(4.5), "3M", "net"), "net_ratio"
+    ).with_denominator_metric("adjusted_ebitda")
+    assert spec.denominator_metric_id == "adjusted_ebitda"
+    engine = covenants.CovenantEngine.from_specs([spec])
+    for earnings in (50.0, -50.0, 0.0):
+        metrics = {"net_ratio": -1.0, "adjusted_ebitda": earnings}
+        spot = engine.evaluate(metrics, "2026-03-31")["net"]
+        assert spot.passed == (earnings > 0)
+        assert (spot.headroom is not None) == (earnings > 0)
+        assert covenants.evaluate_engine(engine.to_json(), metrics, "2026-03-31")["net"] == spot
+        forecast = covenants.forecast_covenant(spec, pd.DataFrame([metrics], index=pd.to_datetime(["2026-03-31"])))
+        assert forecast.breach_probability == [0.0 if earnings > 0 else 1.0]
+    with pytest.raises(KeyError):
+        engine.evaluate({"net_ratio": -1.0}, "2026-03-31")
+
+
+def test_invalid_trigger_and_inactive_forecast_cannot_create_false_decisions() -> None:
+    covenant = covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "leverage")
+    invalid = covenant.with_springing_condition(covenants.SpringingCondition("utilization", "minimum", math.nan))
+    with pytest.raises(ValueError, match="threshold finite"):
+        covenants.CovenantEngine.from_specs([covenants.CovenantSpec(invalid, "x")]).validate()
+    raw = json.loads(covenants.CovenantSpec(covenant, "x").to_json())
+    raw["covenant"]["is_active"] = False
+    inactive = covenants.CovenantSpec.from_json(json.dumps(raw))
+    frame = pd.DataFrame({"other": [1.0]}, index=pd.to_datetime(["2026-03-31"]))
+    forecast = covenants.forecast_covenant(inactive, frame)
+    assert forecast.breach_probability == [0.0]
+    assert forecast.projected_values == [None]
+
+
+def test_forecast_scope_and_mc_boundaries() -> None:
+    engine = covenants.CovenantEngine.from_specs(covenants.cov_lite(7.0, 4.5))
+    frame = pd.DataFrame({"total_leverage": [8.0], "senior_leverage": [5.0]}, index=pd.to_datetime(["2026-03-31"]))
+    assert covenants.forecast_breaches(engine, frame) == []
+    config = covenants.CovenantForecastConfig().with_scope("incurrence")
+    assert config.scope == "incurrence"
+    assert len(covenants.forecast_breaches(engine, frame, config)) == 2
+    with pytest.raises(ValueError, match="scope"):
+        config.with_scope("invalid")
+    with pytest.raises(ValueError, match="independent samples"):
+        covenants.forecast_breaches(
+            engine, frame, covenants.CovenantForecastConfig(stochastic=True, volatility=0.2, num_paths=1)
+        )

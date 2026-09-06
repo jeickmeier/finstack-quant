@@ -79,3 +79,47 @@ test('covenants facade rejects unknown validation fields', () => {
 
   assert.throws(() => covenants.validateCovenantEngineJson(engine), /unknown field/);
 });
+
+test('net cash requires a positive earnings denominator across the JSON bridge', () => {
+  const spec = JSON.parse(covenants.lboStandardJson(5, 1.5, 1.2, 1000))[0];
+  spec.covenant.covenant_type = { max_net_debt_to_ebitda: { threshold: 4.5 } };
+  spec.metric_id = 'net_debt_to_ebitda';
+  spec.denominator_metric_id = 'ebitda';
+  const engine = JSON.stringify({ specs: [spec] });
+  for (const ebitda of [50, 0, -50]) {
+    const reports = covenants.evaluateEngine(
+      engine,
+      JSON.stringify({ net_debt_to_ebitda: -1, ebitda }),
+      '2026-03-31'
+    );
+    const report = reports[spec.covenant.label];
+    assert.equal(report.passed, ebitda > 0);
+    assert.equal(report.headroom != null, ebitda > 0);
+  }
+  assert.throws(() =>
+    covenants.evaluateEngine(engine, JSON.stringify({ net_debt_to_ebitda: -1 }), '2026-03-31')
+  );
+});
+
+test('engine validation rejects overlapping amendments and invalid sweep fractions', () => {
+  const spec = JSON.parse(covenants.lboStandardJson(5, 1.5, 1.2, 1000))[0];
+  const waiver = {
+    covenant_id: spec.covenant.label,
+    effective_date: '2026-01-01',
+    expiry_date: null,
+    amended_threshold: 6,
+    description: 'amendment',
+  };
+  assert.throws(
+    () =>
+      covenants.validateCovenantEngineJson(
+        JSON.stringify({
+          specs: [spec],
+          waivers: [waiver, { ...waiver, effective_date: '2026-02-01' }],
+        })
+      ),
+    /overlapping waivers/
+  );
+  spec.covenant.consequences = [{ cash_sweep: { sweep_percentage: 1.5 } }];
+  assert.throws(() => covenants.validateCovenantSpecJson(JSON.stringify(spec)), /sweep/);
+});

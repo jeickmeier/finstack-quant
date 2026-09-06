@@ -117,6 +117,7 @@ impl PyCovenantForecastConfig {
         breach_probability_threshold: f64,
     ) -> PyResult<Self> {
         Ok(Self::from_inner(CovenantForecastConfig {
+            scope: finstack_quant_covenants::CovenantScope::Maintenance,
             stochastic,
             num_paths,
             volatility,
@@ -144,6 +145,23 @@ impl PyCovenantForecastConfig {
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_json = py.get_type::<Self>().getattr("from_json")?;
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    /// Return a copy selecting maintenance compliance or hypothetical incurrence capacity.
+    /// ``scope`` must be ``maintenance`` or ``incurrence``; other strings raise ``ValueError``.
+    #[pyo3(text_signature = "(scope)")]
+    fn with_scope(&self, scope: &str) -> PyResult<Self> {
+        Ok(Self::from_inner(
+            self.inner
+                .clone()
+                .with_scope(super::spec::parse_scope(scope)?),
+        ))
+    }
+
+    /// Scope selected by batch forecasts: maintenance or hypothetical incurrence capacity.
+    #[getter]
+    fn scope(&self) -> &'static str {
+        super::spec::scope_name(&self.inner.scope)
     }
 
     /// Whether breach probabilities use the stochastic overlay.
@@ -472,7 +490,7 @@ impl PyFutureBreach {
 /// Forecast one numeric covenant across a date-indexed projection frame.
 ///
 /// ``metrics`` is a ``pandas.DataFrame`` indexed by forecast date with one
-/// column per metric id (``NaN`` cells are absent); every row is a test date.
+/// unique column per metric id; required cells must be finite and every row is a test date.
 /// ``config`` defaults to a deterministic forecast.
 ///
 /// Raises ``KeyError`` when the covenant's metric is missing on any date,
@@ -501,9 +519,10 @@ pub(crate) fn forecast_covenant(
 /// whose breach probability reaches ``config.breach_probability_threshold``.
 ///
 /// ``metrics`` is a date-indexed ``pandas.DataFrame`` as for
-/// ``forecast_covenant``. Dates on which a covenant's metric is absent are
-/// skipped for that covenant rather than failing the batch; non-numeric
-/// covenants are skipped.
+/// ``forecast_covenant``. Effective windows and waivers are honored. Missing
+/// required metrics raise ``KeyError``; non-finite observations and duplicate
+/// columns raise ``ValueError``. Default scope is maintenance; ``with_scope``
+/// selects hypothetical incurrence capacity. Non-numeric covenants are skipped.
 ///
 /// Raises ``ValueError`` for an empty frame, an invalid engine, or an
 /// invalid config.

@@ -4,7 +4,7 @@ use finstack_quant_core::dates::Date;
 use serde::{Deserialize, Serialize};
 
 /// Whether a covenant is tested periodically or only upon an action.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CovenantScope {
     /// Tested on a schedule (e.g., quarterly leverage tests).
@@ -119,6 +119,22 @@ impl Covenant {
             return Err(finstack_quant_core::Error::Validation(
                 "cure_period_days must be non-negative".to_string(),
             ));
+        }
+        if self.label.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "covenant label must not be empty".into(),
+            ));
+        }
+        if let Some(condition) = &self.springing_condition {
+            let (ThresholdTest::Minimum(value) | ThresholdTest::Maximum(value)) = condition.test;
+            if condition.metric_id.as_str().trim().is_empty() || !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "springing metric must be named and its threshold finite".into(),
+                ));
+            }
+        }
+        for consequence in &self.consequences {
+            consequence.validate()?;
         }
         self.covenant_type.validate()
     }
@@ -356,18 +372,9 @@ impl CovenantType {
         }
     }
 
-    /// Returns true for built-in maximum covenants whose metric is a ratio
-    /// with an earnings-style denominator (leverage-type tests).
-    ///
-    /// For these covenants a *negative* metric value almost always means the
-    /// denominator (EBITDA) has gone negative, i.e. the ratio is not
-    /// meaningful ("NM" in rating-agency parlance) rather than extraordinarily
-    /// good. A naive `value <= threshold` test would let a distressed,
-    /// negative-EBITDA borrower pass a max-leverage covenant with huge
-    /// apparent headroom. The engine therefore treats negative values on
-    /// these covenants as breaches. `Custom` maximum covenants are *not*
-    /// included: their metric semantics are caller-defined and negative
-    /// values may be legitimate.
+    /// Whether the covenant is a built-in maximum leverage ratio.
+    /// Gross leverage cannot be negative. Net leverage can be negative when
+    /// eligible cash exceeds debt and requires an explicit earnings denominator.
     pub(crate) fn is_ratio_max(&self) -> bool {
         matches!(
             self,
@@ -433,6 +440,23 @@ pub enum CovenantConsequence {
     },
 }
 
+impl CovenantConsequence {
+    pub(crate) fn validate(&self) -> finstack_quant_core::Result<()> {
+        let valid = match self {
+            Self::RateIncrease { bp_increase } => bp_increase.is_finite() && *bp_increase >= 0.0,
+            Self::CashSweep { sweep_percentage } => (0.0..=1.0).contains(sweep_percentage),
+            Self::RequireCollateral { description } => !description.trim().is_empty(),
+            Self::Default | Self::BlockDistributions | Self::AccelerateMaturity { .. } => true,
+        };
+        if !valid {
+            return Err(finstack_quant_core::Error::Validation(
+                "consequence requires a finite non-negative rate increase, a sweep fraction in [0, 1], or a non-empty collateral description".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// A covenant waiver or amendment granted by lenders.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -458,6 +482,12 @@ pub struct CovenantSpec {
     pub covenant: Covenant,
     /// Metric ID to use for evaluation (for financial covenants)
     pub metric_id: Option<CovenantMetricId>,
+    /// Earnings denominator used to validate a leverage ratio. Required for net
+    /// debt/EBITDA, where a negative ratio can mean net cash or negative earnings.
+    /// Values must be finite and in the same reporting-period convention as the
+    /// ratio. A non-positive denominator makes the test a breach with no headroom.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub denominator_metric_id: Option<CovenantMetricId>,
     /// Time-varying threshold schedule that overrides the static threshold in
     /// [`CovenantType`] when present. Enables leverage step-down schedules.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -465,11 +495,24 @@ pub struct CovenantSpec {
 }
 
 impl CovenantSpec {
-    /// Create a new covenant spec with a standard metric.
+    /// Create a covenant spec with an explicit metric identifier.
+    /// Net-debt/EBITDA also selects `ebitda` as its denominator metric.
+    ///
+    /// # Arguments
+    ///
+    /// * `covenant` - Contractual threshold, scope, cure, and consequence terms.
+    /// * `metric_id` - Identifier of the precomputed covenant ratio in turns or
+    ///   monetary amount in the same currency and period as the threshold.
     pub fn with_metric(covenant: Covenant, metric_id: impl Into<CovenantMetricId>) -> Self {
+        let denominator_metric_id = matches!(
+            covenant.covenant_type,
+            CovenantType::MaxNetDebtToEbitda { .. }
+        )
+        .then(|| CovenantMetricId::from("ebitda"));
         Self {
             covenant,
             metric_id: Some(metric_id.into()),
+            denominator_metric_id,
             threshold_schedule: None,
         }
     }
@@ -481,8 +524,48 @@ impl CovenantSpec {
         self
     }
 
+    /// Select the earnings denominator used to validate a built-in leverage ratio.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_id` - Identifier of the finite earnings amount for the same period
+    ///   as the ratio. Net-debt constructors default to `ebitda`; use this to
+    ///   select adjusted or covenant-specific earnings. Non-positive earnings
+    ///   produce an indeterminate ratio breach rather than apparent headroom.
+    #[must_use]
+    pub fn with_denominator_metric(mut self, metric_id: impl Into<CovenantMetricId>) -> Self {
+        self.denominator_metric_id = Some(metric_id.into());
+        self
+    }
+
     pub(crate) fn validate(&self) -> finstack_quant_core::Result<()> {
-        self.covenant.validate()
+        self.covenant.validate()?;
+        if self
+            .metric_id
+            .as_ref()
+            .is_some_and(|id| id.as_str().trim().is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "metric_id must not be empty".into(),
+            ));
+        }
+        if matches!(
+            self.covenant.covenant_type,
+            CovenantType::MaxNetDebtToEbitda { .. }
+        ) && self.denominator_metric_id.is_none()
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "net debt/EBITDA requires denominator_metric_id".into(),
+            ));
+        }
+        if let Some(id) = &self.denominator_metric_id {
+            if id.as_str().trim().is_empty() || !self.covenant.covenant_type.is_ratio_max() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "denominator_metric_id must name an earnings metric for a built-in leverage covenant".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -517,7 +600,10 @@ pub struct CovenantBreach {
     pub cure_deadline: Option<Date>,
     /// Whether the breach has been cured
     pub is_cured: bool,
-    /// Applied consequences
+    /// Consequences captured from the effective specification at the breach date.
+    /// This immutable execution order survives later amendments and window changes.
+    pub consequences: Vec<CovenantConsequence>,
+    /// Successfully applied prefix of `consequences`; retries resume after it.
     pub applied_consequences: Vec<CovenantConsequence>,
 }
 

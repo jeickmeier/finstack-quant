@@ -4,8 +4,9 @@
 //! this crate has no statements dependency.
 
 use crate::engine::{
-    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, BoundKind,
-    CovenantSpec, CovenantType, SpringingCondition,
+    headroom_for, is_covenant_breached, spec_metric_name, springing_condition_met, validate_metric,
+    validated_ratio_value, BoundKind, CovenantScope, CovenantSpec, CovenantType,
+    SpringingCondition,
 };
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::math::norm_cdf;
@@ -22,6 +23,9 @@ pub(crate) const DEFAULT_MC_SEED: u64 = 0;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CovenantForecastConfig {
+    /// Scope selected by batch forecasts: maintenance by default. Incurrence
+    /// forecasts are hypothetical capacity checks, not actual breach events.
+    pub scope: CovenantScope,
     /// Whether to use stochastic (as opposed to deterministic) breach probabilities.
     pub stochastic: bool,
     /// Selects the stochastic sub-mode: closed-form analytic vs. Monte Carlo.
@@ -65,6 +69,7 @@ pub struct CovenantForecastConfig {
 impl Default for CovenantForecastConfig {
     fn default() -> Self {
         Self {
+            scope: CovenantScope::Maintenance,
             stochastic: false,
             num_paths: 0,
             volatility: None,
@@ -73,6 +78,20 @@ impl Default for CovenantForecastConfig {
             reference_date: None,
             breach_probability_threshold: default_breach_probability_threshold(),
         }
+    }
+}
+
+impl CovenantForecastConfig {
+    /// Select the scope included in batch breach forecasts.
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - Maintenance compliance or hypothetical incurrence capacity.
+    ///   Single-covenant forecasts always evaluate the explicitly supplied spec.
+    #[must_use]
+    pub fn with_scope(mut self, scope: CovenantScope) -> Self {
+        self.scope = scope;
+        self
     }
 }
 
@@ -94,8 +113,8 @@ pub struct CovenantForecast {
     pub test_dates: Vec<Date>,
     /// Projected metric values at each test date.
     ///
-    /// `None` means the projected value was not representable as finite JSON
-    /// (for example NaN or ±∞).
+    /// `None` means the covenant is inactive or its earnings denominator makes
+    /// the ratio indeterminate. Non-finite caller observations are rejected.
     pub projected_values: Vec<Option<f64>>,
     /// Covenant thresholds at each test date
     pub thresholds: Vec<f64>,
@@ -104,7 +123,7 @@ pub struct CovenantForecast {
     /// `None` means the covenant is inactive for the period or the headroom is
     /// not meaningful under the applicable covenant convention.
     pub headroom: Vec<Option<f64>>,
-    /// Probability of breach at each test date (stochastic mode).
+    /// Marginal breach probability at each test date; not a first-passage probability.
     pub breach_probability: Vec<f64>,
     /// Standard error of the breach probability estimate.
     ///
@@ -174,10 +193,10 @@ pub trait ModelTimeSeries: Send + Sync {
 ///   2003, *Monte Carlo Methods in Financial Engineering*, §4.1).
 ///   `breach_probability_stderr` carries the Monte Carlo standard error.
 ///
-/// Both sub-modes fall back to the deterministic convention for a
-/// non-positive or non-finite metric because a multiplicative lognormal
-/// shock is not meaningful in that regime. A `NaN` metric is treated as an
-/// indeterminate breach, matching point-in-time engine evaluation.
+/// Both sub-modes use deterministic decisions for finite non-positive metrics,
+/// where a multiplicative shock is not meaningful. Supplied non-finite data is
+/// rejected. A non-positive earnings denominator is an indeterminate ratio breach
+/// with no projected value or headroom. Inactive tests require no observations.
 ///
 /// # Arguments
 ///
@@ -195,20 +214,26 @@ pub trait ModelTimeSeries: Send + Sync {
 /// Returns a validation error for an empty period set, invalid forecast
 /// configuration, missing stochastic volatility, or a non-numeric covenant
 /// without a bound and threshold. Returns `NotFound` when a required metric is
-/// absent for any requested period, and propagates errors raised while
-/// evaluating a springing condition. The caller should use
-/// [`forecast_breaches_generic`] when a batch should skip uncovered periods
-/// rather than fail as a whole.
+/// absent for any active period, and rejects non-finite observations, unordered
+/// dates, dates before the reference date, and fewer than two independent MC
+/// samples. Inactive tests skip metric and springing lookups.
 pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     covenant: &CovenantSpec,
     model: &MTS,
     periods: &[PeriodId],
     config: CovenantForecastConfig,
 ) -> Result<CovenantForecast> {
-    if periods.is_empty() {
-        return Err(Error::Validation("no periods provided".to_string()));
-    }
+    forecast_covenant_impl(covenant, model, periods, config, None).map(|(forecast, _, _)| forecast)
+}
 
+fn forecast_covenant_impl<MTS: ModelTimeSeries>(
+    covenant: &CovenantSpec,
+    model: &MTS,
+    periods: &[PeriodId],
+    config: CovenantForecastConfig,
+    engine: Option<&crate::CovenantEngine>,
+) -> Result<(CovenantForecast, Vec<bool>, Vec<bool>)> {
+    validate_periods(model, periods, config.reference_date)?;
     validate_config(&config)?;
     covenant.validate()?;
 
@@ -248,26 +273,34 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         let date = model.period_end_date(pid);
         test_dates.push(date);
 
-        let thr = covenant
-            .threshold_schedule
-            .as_ref()
-            .and_then(|s| s.threshold_for(date))
+        let thr = engine
+            .and_then(|e| e.effective_threshold(covenant, date))
+            .or_else(|| {
+                covenant
+                    .threshold_schedule
+                    .as_ref()
+                    .and_then(|s| s.threshold_for(date))
+            })
             .unwrap_or(base_threshold);
         thresholds.push(thr);
 
-        let is_active =
-            springing_condition_active(covenant.covenant.springing_condition.as_ref(), model, pid)?;
+        let waived = engine
+            .and_then(|e| e.active_waiver(&covenant.covenant.label, date))
+            .is_some_and(|w| w.amended_threshold.is_none());
+        let is_active = covenant.covenant.is_active
+            && !waived
+            && springing_condition_active(
+                covenant.covenant.springing_condition.as_ref(),
+                model,
+                pid,
+            )?;
         activation_flags.push(is_active);
 
-        let v = metric_value_for_spec(covenant, model, pid).ok_or_else(|| {
-            let looked_up = spec_metric_name(covenant).unwrap_or("<unspecified>");
-            Error::from(finstack_quant_core::InputError::NotFound {
-                id: format!(
-                    "metric for covenant '{description}' in period {pid}; \
-                     looked for '{looked_up}'"
-                ),
-            })
-        })?;
+        let v = if is_active {
+            metric_value_for_spec(covenant, model, pid)?
+        } else {
+            f64::NAN
+        };
         values.push(v);
     }
 
@@ -276,9 +309,7 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         .zip(thresholds.iter())
         .map(|(&v, &t)| {
             let raw = headroom_for(covenant.covenant.covenant_type.bound_kind(), v, t);
-            raw.is_finite()
-                .then_some(raw)
-                .filter(|_| !(covenant.covenant.covenant_type.is_ratio_max() && v < 0.0))
+            raw.is_finite().then_some(raw)
         })
         .collect();
 
@@ -338,7 +369,12 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
                 continue;
             }
 
-            let t_years = (test_dates[i] - ref_date).whole_days().max(0) as f64 / 365.25;
+            let t_years = (test_dates[i] - ref_date).whole_days() as f64 / 365.25;
+            if t_years < 0.0 {
+                return Err(Error::Validation(
+                    "forecast dates must be on or after the resolved reference date".into(),
+                ));
+            }
             if sigma <= 0.0 || t_years <= 0.0 {
                 breach_probability[i] =
                     if is_covenant_breached(&covenant.covenant.covenant_type, base, thr) {
@@ -399,53 +435,55 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
 
     let projected_values = values.iter().map(|v| v.is_finite().then_some(*v)).collect();
 
-    Ok(CovenantForecast {
-        covenant_id: id,
-        covenant_description: description,
-        comparator,
-        test_dates,
-        projected_values,
-        thresholds,
-        headroom,
-        breach_probability,
-        breach_probability_stderr,
-        first_breach_date,
-        min_headroom_date,
-        min_headroom_value,
-    })
+    let deterministic_breaches = deterministic_breach_prob
+        .iter()
+        .map(|&p| p >= 1.0)
+        .collect();
+    Ok((
+        CovenantForecast {
+            covenant_id: id,
+            covenant_description: description,
+            comparator,
+            test_dates,
+            projected_values,
+            thresholds,
+            headroom,
+            breach_probability,
+            breach_probability_stderr,
+            first_breach_date,
+            min_headroom_date,
+            min_headroom_value,
+        },
+        deterministic_breaches,
+        activation_flags,
+    ))
 }
 
-/// Forecast breaches for all active numeric covenants in an engine.
+/// Forecast breaches using the effective engine terms at each supplied date.
 ///
-/// For each covenant the period set is restricted to the periods where its
-/// metric actually resolves in the model; periods where the metric is missing
-/// are skipped (with a `tracing::warn!`) instead of failing the whole batch.
-/// A covenant whose projected metric is NaN in a period is reported as a
-/// breach in that period, mirroring the point-in-time engine convention.
-/// Non-numeric covenants are skipped because they lack a comparable threshold.
-/// The result is ordered first by breach date and then by stable covenant
-/// instance identifier. In stochastic mode, a period is included when the
-/// analytic probability reaches `breach_probability_threshold`; deterministic
-/// breaches are always included.
+/// Window replacements, waivers, schedules, activation, and `config.scope` are
+/// resolved before requiring observations. Missing or non-finite required inputs
+/// fail the whole batch. Non-numeric descriptive covenants are not forecast.
+/// Deterministic breaches are always included; stochastic mode additionally
+/// includes active dates reaching `breach_probability_threshold`. Output is
+/// sorted by breach date then covenant id. Incurrence output describes hypothetical
+/// capacity, not a record of an executed prohibited action.
 ///
 /// # Arguments
 ///
-/// * `engine` - Covenant engine whose active numeric specifications are
-///   considered for breach forecasting.
-/// * `model` - Time-series model providing metric values and condition inputs
-///   across the requested periods.
-/// * `periods` - Reporting periods to inspect; uncovered metric periods are
-///   skipped per covenant rather than failing the entire batch.
-/// * `config` - Forecast policy including stochastic settings and the breach
-///   probability threshold.
+/// * `engine` - Valid engine whose effective specifications and amendments are forecast.
+/// * `model` - Model supplying finite covenant metrics and any earnings denominator
+///   and springing inputs, with dates consistent with the reporting periods.
+/// * `periods` - Non-empty periods with strictly increasing test dates. Every active
+///   numeric test must have its required observations; dates cannot precede the reference date.
+/// * `config` - Scope, annualized metric log-volatility, horizon, sampling, and
+///   reporting-cutoff policy. Maintenance is the default scope.
 ///
 /// # Errors
 ///
-/// Returns configuration, stochastic-volatility, and springing-condition
-/// errors from [`forecast_covenant_generic`]. Missing metrics do not fail the
-/// batch: the affected period is omitted for that covenant and logged at warn
-/// level. The function returns an empty vector when no active numeric covenant
-/// has a covered period that meets the breach criterion.
+/// Returns validation errors for invalid terms, dates, stochastic settings, or
+/// non-finite inputs, and `NotFound` for missing required metrics. No partial
+/// breach list is returned on error.
 pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     engine: &crate::engine::CovenantEngine,
     model: &MTS,
@@ -455,57 +493,54 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     validate_config(&config)?;
     engine.validate()?;
 
+    validate_periods(model, periods, config.reference_date)?;
+    // Window replacements are distinct spec objects; group by identity.
+    let mut groups: Vec<(&CovenantSpec, Vec<PeriodId>)> = Vec::new();
+    for period in periods {
+        for spec in engine.applicable_specs(model.period_end_date(period)) {
+            if spec.covenant.scope != config.scope
+                || spec.covenant.covenant_type.bound_kind().is_none()
+            {
+                continue;
+            }
+            if let Some((_, dates)) = groups
+                .iter_mut()
+                .find(|(existing, _)| std::ptr::eq(*existing, spec))
+            {
+                dates.push(*period);
+            } else {
+                groups.push((spec, vec![*period]));
+            }
+        }
+    }
+    let mut config = config;
+    if config.reference_date.is_none() {
+        config.reference_date = Some(
+            periods[0]
+                .prev()
+                .ok()
+                .map(|p| model.period_end_date(&p))
+                .unwrap_or_else(|| model.period_end_date(&periods[0])),
+        );
+    }
     let mut breaches = Vec::new();
-
-    for spec in &engine.specs {
-        if !spec.covenant.is_active {
-            continue;
-        }
-        if spec.covenant.covenant_type.bound_kind().is_none()
-            || spec.covenant.covenant_type.threshold_value().is_none()
-        {
-            tracing::warn!(
-                covenant = %spec.covenant.description(),
-                "non-numeric covenant skipped in breach forecast batch",
-            );
-            continue;
-        }
-
-        // Restrict to periods where this covenant's metric resolves. The
-        // caller-supplied set is typically the union over all model nodes, so
-        // a metric covering fewer periods must not hard-fail the batch.
-        let covered: Vec<PeriodId> = periods
-            .iter()
-            .filter(|pid| metric_value_for_spec(spec, model, pid).is_some())
-            .copied()
-            .collect();
-        if covered.len() < periods.len() {
-            tracing::warn!(
-                covenant = %spec.covenant.description(),
-                skipped = periods.len() - covered.len(),
-                total = periods.len(),
-                "covenant metric missing for some periods — skipping them in breach forecast",
-            );
-        }
-        if covered.is_empty() {
-            continue;
-        }
-
-        let forecast = forecast_covenant_generic(spec, model, &covered, config.clone())?;
-
-        for (i, &headroom) in forecast.headroom.iter().enumerate() {
-            let is_breach = forecast.breach_probability[i] >= 1.0;
-            let prob = forecast.breach_probability[i];
-
-            if is_breach || (config.stochastic && prob >= config.breach_probability_threshold) {
+    for (spec, dates) in groups {
+        let (forecast, deterministic, active) =
+            forecast_covenant_impl(spec, model, &dates, config.clone(), Some(engine))?;
+        for i in 0..dates.len() {
+            let probability = forecast.breach_probability[i];
+            if active[i]
+                && (deterministic[i]
+                    || (config.stochastic && probability >= config.breach_probability_threshold))
+            {
                 breaches.push(FutureBreach {
                     covenant_id: forecast.covenant_id.clone(),
                     covenant_description: forecast.covenant_description.clone(),
                     breach_date: forecast.test_dates[i],
                     projected_value: forecast.projected_values[i],
                     threshold: forecast.thresholds[i],
-                    headroom,
-                    breach_probability: prob,
+                    headroom: forecast.headroom[i],
+                    breach_probability: probability,
                 });
             }
         }
@@ -524,14 +559,46 @@ fn metric_value_for_spec<MTS: ModelTimeSeries>(
     spec: &CovenantSpec,
     model: &MTS,
     period: &PeriodId,
-) -> Option<f64> {
-    if let Some(name) = spec_metric_name(spec) {
-        return model.get_scalar(name, period);
+) -> Result<f64> {
+    let name = spec_metric_name(spec)
+        .ok_or_else(|| Error::Validation("numeric covenant requires a metric".into()))?;
+    let lookup = |name: &str| -> Result<f64> {
+        let value = model.get_scalar(name, period).ok_or_else(|| {
+            Error::from(InputError::NotFound {
+                id: format!("metric '{name}' in period {period}"),
+            })
+        })?;
+        validate_metric(name, value)?;
+        Ok(value)
+    };
+    let value = lookup(name)?;
+    let denominator = spec
+        .denominator_metric_id
+        .as_ref()
+        .map(|id| lookup(id.as_str()))
+        .transpose()?;
+    Ok(validated_ratio_value(spec, value, denominator))
+}
+
+fn validate_periods<MTS: ModelTimeSeries>(
+    model: &MTS,
+    periods: &[PeriodId],
+    reference: Option<Date>,
+) -> Result<()> {
+    if periods.is_empty() {
+        return Err(Error::Validation("no periods provided".into()));
     }
-    match &spec.covenant.covenant_type {
-        CovenantType::Negative { .. } | CovenantType::Affirmative { .. } => Some(1.0),
-        _ => None,
+    let mut previous = None;
+    for period in periods {
+        let date = model.period_end_date(period);
+        if previous.is_some_and(|p| date <= p) || reference.is_some_and(|r| date < r) {
+            return Err(Error::Validation(
+                "forecast dates must be strictly increasing and on or after reference_date".into(),
+            ));
+        }
+        previous = Some(date);
     }
+    Ok(())
 }
 
 fn validate_config(config: &CovenantForecastConfig) -> Result<()> {
@@ -552,6 +619,17 @@ fn validate_config(config: &CovenantForecastConfig) -> Result<()> {
             return Err(Error::Validation(
                 "stochastic covenant forecast volatility must be finite and non-negative"
                     .to_string(),
+            ));
+        }
+        let independent_samples = if config.antithetic {
+            config.num_paths.div_ceil(2)
+        } else {
+            config.num_paths
+        };
+        if config.num_paths > 0 && independent_samples < 2 {
+            return Err(Error::Validation(
+                "Monte Carlo requires at least two independent samples (two antithetic pairs)"
+                    .into(),
             ));
         }
         if config.antithetic && config.num_paths == 0 {
@@ -631,7 +709,7 @@ fn mc_breach_probabilities(
         let mut t_prev = 0.0_f64;
 
         for k in 0..n_dates {
-            let dt = (horizons[k] - t_prev).max(0.0);
+            let dt = horizons[k] - t_prev;
             let step = dt.sqrt() * rng.normal(0.0, 1.0);
             w_pos += step;
             w_neg -= step;
@@ -688,7 +766,8 @@ fn springing_condition_active<MTS: ModelTimeSeries>(
                 id: format!("springing_metric:{metric_name}"),
             })
         })?;
-        Ok(springing_condition_met(metric_name, value, cond.test))
+        validate_metric(metric_name, value)?;
+        Ok(springing_condition_met(value, cond.test))
     } else {
         Ok(true)
     }
@@ -757,7 +836,11 @@ mod tests {
         engine.add_spec(spec);
         let metrics = crate::HashMapMetricSource::from_pairs([("debt_to_ebitda", 4.0)]);
         assert!(engine
-            .evaluate_and_track(&metrics, model.period_end_date(&period))
+            .evaluate_and_track(
+                &metrics,
+                model.period_end_date(&period),
+                crate::CovenantScope::Maintenance
+            )
             .is_err());
     }
 
@@ -808,6 +891,7 @@ mod tests {
         let mts = MockTs::new().with("debt_to_ebitda", periods[0], 1.0);
 
         let cfg = CovenantForecastConfig {
+            scope: crate::CovenantScope::Maintenance,
             stochastic: true,
             num_paths: 10_000,
             volatility: Some(0.25),
@@ -822,9 +906,7 @@ mod tests {
         assert!(p > 0.2 && p < 0.8, "unexpected breach probability: {p}");
     }
     #[test]
-    fn nan_metric_is_breached_deterministic() {
-        // EBITDA through zero → ratio NaN. Must mirror the engine convention:
-        // NaN ⇒ breached (probability 1), not a clean 0% path.
+    fn nan_metric_is_rejected_deterministic() {
         let spec = CovenantSpec::with_metric(
             crate::engine::Covenant::new(
                 CovenantType::MaxDebtToEbitda { threshold: 4.0 },
@@ -841,21 +923,17 @@ mod tests {
             f64::NAN,
         );
 
-        let fc =
-            forecast_covenant_generic(&spec, &mts, &periods, CovenantForecastConfig::default())
-                .expect("forecast should succeed");
-
-        assert_eq!(fc.breach_probability[0], 0.0);
-        assert_eq!(fc.breach_probability[1], 1.0, "NaN metric must be breached");
-        assert_eq!(
-            fc.first_breach_date,
-            Some(mts.period_end_date(&periods[1])),
-            "NaN period must register as the first breach"
-        );
+        assert!(forecast_covenant_generic(
+            &spec,
+            &mts,
+            &periods,
+            CovenantForecastConfig::default()
+        )
+        .is_err());
     }
 
     #[test]
-    fn nan_metric_is_breached_stochastic() {
+    fn nan_metric_is_rejected_stochastic() {
         let spec = CovenantSpec::with_metric(
             crate::engine::Covenant::new(
                 CovenantType::MaxDebtToEbitda { threshold: 4.0 },
@@ -869,6 +947,7 @@ mod tests {
         let mts = MockTs::new().with("debt_to_ebitda", periods[0], f64::NAN);
 
         let cfg = CovenantForecastConfig {
+            scope: crate::CovenantScope::Maintenance,
             stochastic: true,
             num_paths: 1_000,
             volatility: Some(0.25),
@@ -877,12 +956,7 @@ mod tests {
             reference_date: None,
             breach_probability_threshold: default_breach_probability_threshold(),
         };
-        let fc =
-            forecast_covenant_generic(&spec, &mts, &periods, cfg).expect("forecast should succeed");
-        assert_eq!(
-            fc.breach_probability[0], 1.0,
-            "NaN base must produce stochastic breach probability 1.0"
-        );
+        assert!(forecast_covenant_generic(&spec, &mts, &periods, cfg).is_err());
     }
 
     #[test]
@@ -902,7 +976,7 @@ mod tests {
         let deterministic =
             forecast_covenant_generic(&spec, &mts, &periods, CovenantForecastConfig::default())
                 .expect("forecast should succeed");
-        assert_eq!(deterministic.projected_values[0], Some(-10.0));
+        assert_eq!(deterministic.projected_values[0], None);
         assert_eq!(
             deterministic.headroom[0], None,
             "NM leverage headroom must not report positive cushion"
@@ -918,6 +992,7 @@ mod tests {
             &mts,
             &periods,
             CovenantForecastConfig {
+                scope: crate::CovenantScope::Maintenance,
                 stochastic: true,
                 num_paths: 1_000,
                 volatility: Some(0.25),
@@ -929,7 +1004,7 @@ mod tests {
     }
 
     #[test]
-    fn forecast_breaches_generic_reports_nan_periods_as_breaches() {
+    fn forecast_breaches_generic_rejects_nan_periods() {
         use crate::engine::CovenantEngine;
 
         let mut engine = CovenantEngine::new();
@@ -949,21 +1024,19 @@ mod tests {
                 .with("debt_to_ebitda", p1, 3.0)
                 .with("debt_to_ebitda", p2, f64::NAN);
 
-        let breaches =
-            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
-                .expect("forecast should succeed");
-
-        assert_eq!(breaches.len(), 1, "NaN period must be reported as breach");
-        assert!(breaches[0].projected_value.is_none());
-        assert_eq!(breaches[0].breach_probability, 1.0);
+        assert!(forecast_breaches_generic(
+            &engine,
+            &mts,
+            &[p1, p2],
+            CovenantForecastConfig::default()
+        )
+        .is_err());
     }
 
     #[test]
-    fn forecast_breaches_generic_skips_uncovered_periods() {
+    fn forecast_breaches_generic_rejects_uncovered_periods() {
         use crate::engine::CovenantEngine;
 
-        // Two covenants on different metrics with different period coverage:
-        // the union period set must not hard-fail the narrower covenant.
         let mut engine = CovenantEngine::new();
         engine.add_spec(CovenantSpec::with_metric(
             crate::engine::Covenant::new(
@@ -991,15 +1064,13 @@ mod tests {
             .with("debt_to_ebitda", p2, 5.0)
             .with("interest_coverage", p1, 1.5);
 
-        let breaches =
-            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
-                .expect("partial metric coverage must not hard-fail");
-
-        assert_eq!(breaches.len(), 2);
-        assert!(breaches
-            .iter()
-            .any(|b| b.covenant_id == "min_interest_coverage"));
-        assert!(breaches.iter().any(|b| b.covenant_id == "max_debt_ebitda"));
+        assert!(forecast_breaches_generic(
+            &engine,
+            &mts,
+            &[p1, p2],
+            CovenantForecastConfig::default()
+        )
+        .is_err());
     }
 
     #[test]
@@ -1017,9 +1088,13 @@ mod tests {
             .with("total_leverage", p1, 6.5)
             .with("senior_leverage", p1, 3.0);
 
-        let breaches =
-            forecast_breaches_generic(&engine, &mts, &[p1], CovenantForecastConfig::default())
-                .expect("non-numeric covenants must be skipped, not batch-fail");
+        let breaches = forecast_breaches_generic(
+            &engine,
+            &mts,
+            &[p1],
+            CovenantForecastConfig::default().with_scope(CovenantScope::Incurrence),
+        )
+        .expect("non-numeric covenants must be skipped, not batch-fail");
 
         assert_eq!(breaches.len(), 1);
         assert_eq!(breaches[0].covenant_id, "max_total_leverage");
@@ -1038,6 +1113,7 @@ mod tests {
         let spec = CovenantSpec {
             covenant,
             metric_id: Some(crate::CovenantMetricId::from("NetDebtEbitda")),
+            denominator_metric_id: None,
             threshold_schedule: None,
         };
         engine.add_spec(spec);
@@ -1078,6 +1154,7 @@ mod tests {
 
     fn mc_config(num_paths: usize, antithetic: bool, seed: u64) -> CovenantForecastConfig {
         CovenantForecastConfig {
+            scope: crate::CovenantScope::Maintenance,
             stochastic: true,
             num_paths,
             volatility: Some(0.25),
@@ -1176,7 +1253,7 @@ mod tests {
 
     #[test]
     fn mc_keeps_deterministic_conventions_for_degenerate_bases() {
-        // NaN base => breached with probability 1 in MC mode too.
+        // Invalid gross leverage remains a breach in MC mode.
         let spec = CovenantSpec::with_metric(
             crate::engine::Covenant::new(
                 CovenantType::MaxDebtToEbitda { threshold: 4.0 },
@@ -1186,7 +1263,7 @@ mod tests {
             "debt_to_ebitda",
         );
         let periods = vec![q(2025, 1)];
-        let mts = MockTs::new().with("debt_to_ebitda", periods[0], f64::NAN);
+        let mts = MockTs::new().with("debt_to_ebitda", periods[0], -10.0);
         let fc = forecast_covenant_generic(&spec, &mts, &periods, mc_config(1_000, false, 42))
             .expect("forecast");
         assert_eq!(fc.breach_probability[0], 1.0);

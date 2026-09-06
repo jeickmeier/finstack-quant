@@ -114,7 +114,8 @@ rather than silently overwriting.
   and overlapping windows.
 - `CovenantWaiver` grants a full waiver or an amended threshold over a date
   range; `expiry_date: None` is a permanent amendment. Validation rejects an
-  expiry before the effective date and a non-finite amended threshold.
+  expiry before the effective date, a non-finite amended threshold, and overlapping
+  waivers for one label. End an earlier amendment before adding its replacement.
 - `SpringingCondition` keeps a covenant inactive until its trigger metric
   crosses a bound; an inactive covenant reports as passing with no threshold or
   headroom.
@@ -130,24 +131,30 @@ active waiver's `amended_threshold`, then the schedule entry with the largest
 date <= the test date, then the covenant's static threshold. A test date before
 the schedule's first entry therefore falls back to the static threshold.
 
-Forward projection resolves schedule entry, then static threshold — it does
-**not** consult waivers. A covenant under an amended-threshold waiver will
-therefore forecast against its unamended limit.
+Batch forward projection uses the same effective windows, waivers, and
+threshold precedence as spot evaluation. Single-spec forecasting has no engine
+waiver context; it honors the supplied spec and its active/springing flags.
 
 Construction — and deserialization, which routes through `new` — rejects
 non-finite values and duplicate dates.
 
 ## Breach tracking and consequences
 
-`evaluate_and_track` evaluates and maintains `breach_history`. One continuous
+`evaluate_and_track(context, date, scope)` evaluates the explicitly selected
+maintenance or completed-action incurrence scope and maintains `breach_history`. One continuous
 uncured breach of a covenant instance is one breach episode: the cure deadline
 is anchored to the **original** breach date, and metric recovery on or before
-that deadline marks the episode cured rather than opening a new one.
+that deadline marks the episode cured rather than opening a new one. Inactive
+and waived tests are not recovery evidence. Cure terms and consequences are
+captured from the effective specification, including window-only covenants.
 
-`apply_consequences(&mut instrument, &breaches, as_of)` acts only on breaches
-that are uncured and past their cure deadline, and skips any breach whose
-consequences were already applied. The target must implement
-`InstrumentMutator`. `CovenantConsequence` variants:
+`apply_consequences(&mut instrument, &breaches, as_of)` resolves snapshots to
+current history and acts only on uncured breaches after their cure deadline.
+Each successful action is recorded individually, so retries resume at the first
+unfinished action. The target implements `InstrumentMutator + Clone`: each
+action is committed from a clone only after success. Unsupported collateral
+requirements remain outstanding instead of being reported as applied.
+`CovenantConsequence` variants:
 
 | Variant | Payload |
 |---------|---------|
@@ -180,12 +187,14 @@ to a whole number of pairs; it is rejected during validation when
 `num_paths == 0`, where it would be inert. `volatility` is annualized and
 required in stochastic mode. `reference_date` anchors the `sqrt(T)` shock
 scaling; when `None`, the end date of the period immediately preceding the first
-forecast period is used so the first point still has a non-zero horizon. A
-non-positive or non-finite metric falls back to the deterministic convention in
-both stochastic sub-modes, because a multiplicative lognormal shock is not
-meaningful there; `NaN` is treated as an indeterminate breach, matching
-point-in-time evaluation. `breach_probability_threshold` (default `0.05`) is the
-minimum probability a date must reach to appear in batch breach output.
+forecast period is used so the first point still has a non-zero horizon. Finite non-positive metrics use deterministic decisions because multiplicative
+lognormal shocks are not meaningful there. Missing or non-finite required inputs
+fail the whole forecast. MC requires at least two independent samples (two
+antithetic pairs); dates must be strictly increasing and cannot precede the
+reference date. `breach_probability_threshold` (default `0.05`) adds stochastic-risk dates to
+batch output; deterministic breaches are always included. Batch scope defaults
+to maintenance; `config.with_scope(CovenantScope::Incurrence)` selects hypothetical
+action capacity. It does not record an executed incurrence breach.
 
 Forecast ids are `Covenant::instance_key()`; the display string travels
 separately in `covenant_description`. Nullable forecast fields
@@ -228,12 +237,18 @@ non-overlapping windows, and valid threshold schedules.
   thresholds carry no currency; the caller is responsible for keeping metric and
   threshold in the same reporting currency. Currency-typed thresholds are not
   part of this crate's surface.
+- **Net-debt denominators are explicit.** Net debt/EBITDA specs require
+  `denominator_metric_id`, defaulting to `ebitda` in constructors and templates.
+  `with_denominator_metric` selects adjusted earnings. Positive earnings permit
+  a negative net-cash ratio; non-positive earnings produce an indeterminate
+  ratio breach with no headroom. Cash eligibility and netting remain upstream.
 - **Equity cures are not modeled.** Use a `CovenantWaiver` for a full waiver or
   an amended threshold.
 - **Headroom is relative, not absolute.** It is signed distance to the threshold
   divided by `|threshold|` — `(threshold - value) / |threshold|` for an at-most
   bound, `(value - threshold) / |threshold|` for at-least. Positive is a passing
-  cushion, negative a deficit, `NaN` when either input is non-finite. A zero
+  cushion, negative a deficit. Undefined ratio headroom is `None`; non-finite
+  caller observations are rejected. A zero
   threshold uses a denominator of `1.0`.
 - **Result stamping.** Every `CovenantReport` carries
   `finstack_quant_core::config::ResultsMeta` (numeric mode, rounding context, FX

@@ -5010,9 +5010,9 @@ export interface CovenantsNamespace {
    * Standard leveraged-buyout covenant package as JSON.
    * @returns Standard leveraged-buyout covenant package as canonical JSON.
    * @param initialLeverage - Maximum leverage ratio permitted at the initial test date.
-   * @param interestCoverage - Minimum EBITDA-to-cash-interest coverage ratio.
+   * @param interestCoverage - Minimum EBIT-to-interest coverage ratio in turns.
    * @param fixedChargeCoverage - Minimum EBITDA-to-fixed-charges coverage ratio.
-   * @param maxCapex - Maximum capital expenditure amount or ratio in the covenant convention.
+   * @param maxCapex - Maximum annual capital expenditure amount in the caller's reporting currency.
    * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
    */
   lboStandardJson(
