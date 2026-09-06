@@ -212,6 +212,15 @@ def test_lookback_floating_strike_call_positive() -> None:
     assert p > 0.0
 
 
+@pytest.mark.parametrize(
+    ("strike_type", "is_call", "expected"),
+    [("fixed", True, 24.326644378668), ("floating", False, 21.429719498063)],
+)
+def test_seasoned_lookback_matches_extremum_payoff(strike_type: str, is_call: bool, expected: float) -> None:
+    price = lookback_option_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, 120.0, strike_type, is_call)
+    assert price == pytest.approx(expected, abs=1e-8, rel=0)
+
+
 def test_quanto_option_price_call_positive() -> None:
     p = quanto_option_price(
         spot=100.0,

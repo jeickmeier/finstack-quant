@@ -1,7 +1,6 @@
 //! Discretization schemes for Schwartz-Smith two-factor commodity model.
 //!
-//! Uses exact solutions for both components where possible, with correlation
-//! handled via Cholesky decomposition.
+//! Uses the exact joint Gaussian transition for both components.
 //!
 //! # Exact Solutions
 //!
@@ -10,21 +9,21 @@
 //!   + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
 //! - **Y (ABM)**: Y_{t+Δt} = Y_t + μ_Y Δt + σ_Y √Δt Z_Y
 //!
-//! With correlation ρ, the shocks Z_X and Z_Y are correlated.
+//! The integrated shocks have covariance
+//! `ρ σ_X σ_Y (1 − exp(−κ_X Δt)) / κ_X`. Their correlation differs
+//! from the instantaneous Brownian correlation ρ when Δt is positive.
 
 use super::super::process::schwartz_smith::SchwartzSmithProcess;
 use super::super::traits::Discretization;
-use finstack_quant_core::math::linalg::{cholesky_correlation, CholeskyError};
 
 /// Exact discretization for Schwartz-Smith process.
 ///
 /// Uses analytical solutions for both X (OU) and Y (arithmetic Brownian motion)
-/// with correlation handled via pivoted Cholesky decomposition.
+/// with the analytical 2×2 Cholesky factor of the integrated covariance.
 #[derive(Debug, Clone)]
 pub struct ExactSchwartzSmith {
-    /// Precomputed Cholesky factor for 2×2 correlation matrix [[1, ρ], [ρ, 1]].
-    /// Stored in original variable order via `CorrelationFactor`.
-    cholesky_factor: finstack_quant_core::math::linalg::CorrelationFactor,
+    /// Instantaneous correlation of the driving Brownian motions.
+    rho: f64,
     /// Per-run cache of the `dt`-dependent X-leg constants, populated by
     /// [`Discretization::prepare`]. `None` until prepared (e.g. stepped
     /// directly without the engine), in which case constants are computed inline.
@@ -33,15 +32,19 @@ pub struct ExactSchwartzSmith {
 
 /// Path-independent Schwartz-Smith step constants for a fixed step size.
 ///
-/// All quantities depend only on `(κ_X, σ_X, Δt)`, so they are identical on
+/// All quantities depend only on `(κ_X, σ_X, ρ, Δt)`, so they are identical on
 /// every step of a uniform grid and across every path.
 #[derive(Debug, Clone, Copy)]
 struct SsStepConstants {
     dt: f64,
+    kappa_x: f64,
+    sigma_x: f64,
     exp_kappa_dt: f64,
     one_minus_exp_over_kappa: f64,
     x_std: f64,
     sqrt_dt: f64,
+    transition_rho: f64,
+    independent_weight: f64,
 }
 
 impl SsStepConstants {
@@ -49,20 +52,23 @@ impl SsStepConstants {
     /// [`ExactSchwartzSmith::step`] exactly so cached and inline paths are
     /// bit-identical.
     #[inline]
-    fn compute(kappa_x: f64, sigma_x: f64, dt: f64) -> Self {
+    fn compute(kappa_x: f64, sigma_x: f64, rho: f64, dt: f64) -> Self {
         let exp_kappa_dt = (-kappa_x * dt).exp();
         let one_minus_exp_over_kappa = -(-kappa_x * dt).exp_m1() / kappa_x;
-        let x_std = if (kappa_x * dt).abs() < 1e-8 {
-            sigma_x * dt.sqrt() * (1.0 - kappa_x * dt / 2.0)
-        } else {
-            sigma_x * ((1.0 - (-2.0 * kappa_x * dt).exp()) / (2.0 * kappa_x)).sqrt()
-        };
+        let x_time_std = (-(-2.0 * kappa_x * dt).exp_m1() / (2.0 * kappa_x)).sqrt();
+        let sqrt_dt = dt.sqrt();
+        let transition_rho =
+            (rho * (one_minus_exp_over_kappa / x_time_std / sqrt_dt)).clamp(-1.0, 1.0);
         Self {
             dt,
+            kappa_x,
+            sigma_x,
             exp_kappa_dt,
             one_minus_exp_over_kappa,
-            x_std,
-            sqrt_dt: dt.sqrt(),
+            x_std: sigma_x * x_time_std,
+            sqrt_dt,
+            transition_rho,
+            independent_weight: ((1.0 - transition_rho) * (1.0 + transition_rho)).sqrt(),
         }
     }
 }
@@ -72,32 +78,26 @@ impl ExactSchwartzSmith {
     ///
     /// # Arguments
     ///
-    /// * `rho` - Correlation between X and Y Brownian motions
+    /// * `rho` - Instantaneous correlation between X and Y Brownian motions;
+    ///   must be finite and in `[-1, 1]`.
     ///
-    /// The discretization stores a factorization of the two Brownian shocks and
+    /// The discretization stores the instantaneous Brownian correlation and
     /// applies the exact Gaussian transition for the mean-reverting short-term
     /// factor and long-term equilibrium factor. It does not own the economic
     /// process parameters; supply those to [`Discretization::step`].
     ///
     /// # Errors
     ///
-    /// Returns an error if `rho` cannot form a positive-semidefinite 2×2
-    /// correlation matrix (including non-finite or out-of-range values).
+    /// Returns an input error for non-finite or out-of-range correlation.
     pub fn new(rho: f64) -> finstack_quant_core::Result<Self> {
-        // Build 2x2 correlation matrix: [[1.0, rho], [rho, 1.0]]
-        let corr_matrix = vec![1.0, rho, rho, 1.0];
-        let chol = cholesky_correlation(&corr_matrix, 2).map_err(|e| match e {
-            CholeskyError::NotPositiveDefinite { .. } => {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid)
-            }
-            CholeskyError::DimensionMismatch { .. } => finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::DimensionMismatch,
-            ),
-            _ => finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid),
-        })?;
+        if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
+            return Err(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::Invalid,
+            ));
+        }
 
         Ok(Self {
-            cholesky_factor: chol,
+            rho,
             prepared: None,
         })
     }
@@ -108,9 +108,13 @@ impl ExactSchwartzSmith {
     /// same discretization can be reused only with processes using compatible
     /// two-factor shock conventions.
     ///
+    /// # Arguments
+    ///
+    /// * `process` - Process supplying the instantaneous Brownian correlation.
+    ///
     /// # Errors
     ///
-    /// Returns the same correlation-factorization error as [`Self::new`].
+    /// Returns the same invalid-correlation error as [`Self::new`].
     pub fn from_process(process: &SchwartzSmithProcess) -> finstack_quant_core::Result<Self> {
         Self::new(process.params().rho)
     }
@@ -126,6 +130,9 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         z: &[f64],
         _work: &mut [f64],
     ) {
+        if dt == 0.0 {
+            return;
+        }
         let params = process.params();
         let kappa_x = params.kappa_x;
         let sigma_x = params.sigma_x;
@@ -133,28 +140,23 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         let mu_y = params.mu_y;
         let sigma_y = params.sigma_y;
 
-        // Apply correlation to independent shocks via CorrelationFactor::apply.
-        // This avoids manual slot indexing and is robust to future pivoting changes.
-        let mut z_corr = [0.0; 2];
-        let _ = self.cholesky_factor.apply(z, &mut z_corr);
-
-        // Exact solution for X (OU process with constant drift shift −λ_X)
-        // X_{t+Δt} = X_t e^{-κ_X Δt} − (λ_X/κ_X)(1 − e^{-κ_X Δt})
-        //          + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
-        // The `dt`-dependent constants (e^{-κΔt}, (1−e^{-κΔt})/κ, the X std-dev,
-        // and √Δt) are reused from the prepared cache when this step's `dt`
-        // matches (exact bit match → identical value); otherwise computed inline
-        // so unprepared/non-uniform grids stay bit-identical.
+        // Reuse the prepared `dt`-dependent constants on an exact bit match;
+        // otherwise compute inline for unprepared or non-uniform grids.
         let consts = match self.prepared {
-            Some(c) if c.dt.to_bits() == dt.to_bits() => c,
-            _ => SsStepConstants::compute(kappa_x, sigma_x, dt),
+            Some(c)
+                if c.dt.to_bits() == dt.to_bits()
+                    && c.kappa_x.to_bits() == kappa_x.to_bits()
+                    && c.sigma_x.to_bits() == sigma_x.to_bits() =>
+            {
+                c
+            }
+            _ => SsStepConstants::compute(kappa_x, sigma_x, self.rho, dt),
         };
         let x_mean = x[0] * consts.exp_kappa_dt - lambda_x * consts.one_minus_exp_over_kappa;
-        x[0] = x_mean + consts.x_std * z_corr[0];
+        x[0] = x_mean + consts.x_std * z[0];
 
-        // Exact solution for Y (arithmetic Brownian motion)
-        // Y_{t+Δt} = Y_t + μ_Y Δt + σ_Y √Δt Z_Y
-        x[1] = x[1] + mu_y * dt + sigma_y * consts.sqrt_dt * z_corr[1];
+        let y_shock = consts.transition_rho * z[0] + consts.independent_weight * z[1];
+        x[1] = x[1] + mu_y * dt + sigma_y * consts.sqrt_dt * y_shock;
     }
 
     fn prepare(
@@ -169,6 +171,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         self.prepared = Some(SsStepConstants::compute(
             params.kappa_x,
             params.sigma_x,
+            self.rho,
             time_grid.dt(0),
         ));
     }
@@ -189,10 +192,12 @@ mod tests {
 
     #[test]
     fn test_exact_schwartz_smith_creation() {
-        let _params = SchwartzSmithParams::new(2.0, 0.30, 0.02, 0.15, -0.5);
-        let disc = ExactSchwartzSmith::new(-0.5).expect("should succeed");
-
-        assert_eq!(disc.cholesky_factor.factor_matrix().len(), 4);
+        for rho in [-1.0, -0.5, 0.0, 1.0] {
+            assert!(ExactSchwartzSmith::new(rho).is_ok());
+        }
+        for rho in [f64::NAN, f64::INFINITY, -1.01, 1.01] {
+            assert!(ExactSchwartzSmith::new(rho).is_err());
+        }
     }
 
     #[test]

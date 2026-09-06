@@ -582,7 +582,7 @@ pub fn asian_option_price(
 /// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to expiry in years.
-/// @param extremum - Observed running minimum for a call or maximum for a put, in spot-price units.
+/// @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
 /// @param strike_type - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
 ///

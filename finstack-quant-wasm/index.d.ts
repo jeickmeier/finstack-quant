@@ -8026,7 +8026,7 @@ export interface ModelsNamespace {
    * @param divYield - Continuous dividend yield or foreign rate, expressed as a decimal.
    * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
    * @param expiry - Time to expiry in years.
-   * @param extremum - Observed running minimum for a call or maximum for a put, in spot-price units.
+   * @param extremum - Observed maximum for fixed calls or floating puts, minimum for fixed puts or floating calls, including current spot; in spot-price units.
    * @param strikeType - Lookback payoff convention: `"fixed"` (default) or `"floating"`.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
    * @throws Error - Throws a JavaScript exception if `strikeType` is not `"fixed"` or `"floating"`, or the supplied model inputs produce a non-finite option price.

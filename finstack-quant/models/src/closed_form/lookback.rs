@@ -35,31 +35,8 @@
 
 use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
 
-/// Tolerance for the r = q (b = r − q → 0) degeneracy.
-///
-/// The reflection-principle correction term contains (σ²/(2b)) which diverges
-/// as b → 0. Standard references (Haug 2007 §6; Goldman, Sosin & Gatto 1979)
-/// use a d-value `d₃ = a₁ − 2b√T/σ` in the reflection bracket, making the
-/// bracket vanish at b = 0 and yielding a clean 0/0 L'Hôpital form.
-///
-/// **Implementation note:** The general-case reflection bracket uses `d₃ = a₁ − 2b√T/σ`
-/// as defined in Goldman, Sosin & Gatto (1979) / Haug (2007). The limiting forms
-/// at b → 0 are derived via L'Hôpital's rule and are independent of the d₃ vs a₂
-/// distinction (both collapse to a₁ at b = 0).
-///
-/// The threshold must be small enough that the general and limiting forms
-/// agree to within 0.1% at the crossover point. At 1e-7 the σ²/(2b) factor
-/// in the general form is still well-conditioned and the L'Hôpital limiting
-/// form is sufficiently accurate. Previous values of 1e-2 and 1e-4 created
-/// visible price discontinuities at the switching boundary.
-///
-/// **Note:** an early audit recommendation was to scale the threshold relative
-/// to `max(|r|, |q|)` to absorb curve-interpolation noise around `b = r - q`.
-/// That premise is mathematically wrong here: what matters for the limiting
-/// form's accuracy is whether `|b|` is small in **absolute** terms (so that
-/// σ²/(2b) is finite enough that the general form has not yet collapsed). At
-/// `|b| ≈ 5e-7` (5× the floor) the general form is still well-conditioned and
-/// the limiting form mis-prices by O(20%) — so we keep an absolute floor.
+/// Absolute carry threshold for the L'Hôpital limit of the reflection term.
+/// Below this threshold, evaluating the general 0/0 expression loses precision.
 const RATE_EQ_DIV_TOL: f64 = 1e-7;
 
 /// Price a fixed-strike lookback call option (continuous monitoring).
@@ -82,19 +59,10 @@ const RATE_EQ_DIV_TOL: f64 = 1e-7;
 ///
 /// # Formula (Conze & Viswanathan, 1991; Haug, 2007 Chapter 6)
 ///
-/// The fixed-strike lookback call is decomposed using the relationship with floating-strike:
-///
-/// For M ≥ K (observed max exceeds strike):
-/// ```text
-/// C_fixed = e^(-rT)(M - K) + C_floating(S, T, r, q, σ, M)
-/// ```
-/// where C_floating is the floating-strike lookback call with current observed minimum = M.
-///
-/// For M < K (observed max below strike), we use the floating-strike formula evaluated at
-/// a synthetic minimum equal to K.
-///
-/// This decomposition ensures the lookback premium is always positive and the price
-/// is always greater than or equal to the vanilla option.
+/// Let H = max(K, M), where M is the observed maximum. The payoff is
+/// `(M - K).max(0) + (future_max - H).max(0)`. Price the locked-in first
+/// term at the risk-free discount factor and the second using the
+/// continuous-maximum formula at threshold H.
 pub fn fixed_strike_lookback_call(
     spot: f64,
     strike: f64,
@@ -115,56 +83,34 @@ pub fn fixed_strike_lookback_call(
     let s_max = spot_max.max(spot); // Ensure S_max ≥ S
     let df = (-rate * time).exp();
 
-    if s_max >= strike {
-        // Case: M >= K (in-the-money based on observed maximum)
-        // Decomposition: intrinsic + floating-strike call starting from M
-        // The floating-strike call captures the value of exceeding the current max
-        let intrinsic_pv = (s_max - strike) * df;
+    let intrinsic_pv = (s_max - strike).max(0.0) * df;
+    let strike = strike.max(s_max);
+    let sqrt_t = time.sqrt();
+    let vol_sqrt_t = vol * sqrt_t;
+    let vol2 = vol * vol;
+    let df_q = (-div_yield * time).exp();
+    let b = rate - div_yield;
+    let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
+    let d2 = d1 - vol_sqrt_t;
 
-        // The floating-strike lookback call with "minimum" = s_max gives the
-        // additional value from potentially exceeding s_max. However, we need
-        // to be careful: for a call, we want max(S_T - s_max, 0) which is a
-        // floating-strike call with minimum = s_max.
-        // But note: if S < s_max, the intrinsic of the floating part is negative.
-        // We use the full floating-strike formula which handles S <= S_min correctly.
-        let floating_premium =
-            floating_strike_lookback_call(spot, time, rate, div_yield, vol, s_max);
-
-        (intrinsic_pv + floating_premium).max(0.0)
+    let term1 = spot * df_q * norm_cdf(d1);
+    let term2 = -strike * df * norm_cdf(d2);
+    let term3 = if b.abs() < RATE_EQ_DIV_TOL {
+        // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
+        let log_ratio = (spot / strike).ln();
+        spot * df
+            * (vol * sqrt_t * norm_pdf(d1)
+                + log_ratio * norm_cdf(d1)
+                + 0.5 * vol2 * time * norm_cdf(d1))
     } else {
-        // Case: M < K (out-of-the-money based on observed maximum). Exact
-        // Conze-Viswanathan (1991) fixed-strike lookback call for K ≥ M:
-        //   c = S·e^{-qT}·N(d1) − K·e^{-rT}·N(d2)
-        //     + S·e^{-rT}·(σ²/2b)·[−(S/K)^{-2b/σ²}·N(d1 − 2b√T/σ) + e^{bT}·N(d1)]
-        // The observed maximum M does not appear: while M < K it carries no
-        // intrinsic value, so the price depends only on the future max crossing K.
-        let sqrt_t = time.sqrt();
-        let vol_sqrt_t = vol * sqrt_t;
-        let vol2 = vol * vol;
-        let df_q = (-div_yield * time).exp();
-        let b = rate - div_yield;
-        let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
-        let d2 = d1 - vol_sqrt_t;
+        let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
+        let d_corr = d1 - 2.0 * b * sqrt_t / vol;
+        spot * df
+            * (vol2 / (2.0 * b))
+            * (-ratio_power * norm_cdf(d_corr) + (b * time).exp() * norm_cdf(d1))
+    };
 
-        let term1 = spot * df_q * norm_cdf(d1);
-        let term2 = -strike * df * norm_cdf(d2);
-        let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-            // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
-            let log_ratio = (spot / strike).ln();
-            spot * df
-                * (vol * sqrt_t * norm_pdf(d1)
-                    + log_ratio * norm_cdf(d1)
-                    + 0.5 * vol2 * time * norm_cdf(d1))
-        } else {
-            let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
-            let d_corr = d1 - 2.0 * b * sqrt_t / vol;
-            spot * df
-                * (vol2 / (2.0 * b))
-                * (-ratio_power * norm_cdf(d_corr) + (b * time).exp() * norm_cdf(d1))
-        };
-
-        (term1 + term2 + term3).max(0.0)
-    }
+    (intrinsic_pv + term1 + term2 + term3).max(0.0)
 }
 
 /// Price a fixed-strike lookback put option (continuous monitoring).
@@ -187,16 +133,10 @@ pub fn fixed_strike_lookback_call(
 ///
 /// # Formula (Conze & Viswanathan, 1991; Haug, 2007 Chapter 6)
 ///
-/// The fixed-strike lookback put is decomposed using the relationship with floating-strike:
-///
-/// For m ≤ K (observed min below strike):
-/// ```text
-/// P_fixed = e^(-rT)(K - m) + P_floating(S, T, r, q, σ, m)
-/// ```
-/// where P_floating is the floating-strike lookback put with current observed maximum = m.
-///
-/// For m > K (observed min above strike), we use the floating-strike formula evaluated at
-/// a synthetic maximum equal to K.
+/// Let H = min(K, m), where m is the observed minimum. The payoff is
+/// `(K - m).max(0) + (H - future_min).max(0)`. Price the locked-in first
+/// term at the risk-free discount factor and the second using the
+/// continuous-minimum formula at threshold H.
 pub fn fixed_strike_lookback_put(
     spot: f64,
     strike: f64,
@@ -217,52 +157,34 @@ pub fn fixed_strike_lookback_put(
     let s_min = spot_min.min(spot); // Ensure S_min ≤ S
     let df = (-rate * time).exp();
 
-    if s_min <= strike {
-        // Case: m <= K (in-the-money based on observed minimum)
-        // Decomposition: intrinsic + floating-strike put starting from m
-        // The floating-strike put captures the value of going below the current min
-        let intrinsic_pv = (strike - s_min) * df;
+    let intrinsic_pv = (strike - s_min).max(0.0) * df;
+    let strike = strike.min(s_min);
+    let sqrt_t = time.sqrt();
+    let vol_sqrt_t = vol * sqrt_t;
+    let vol2 = vol * vol;
+    let df_q = (-div_yield * time).exp();
+    let b = rate - div_yield;
+    let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
+    let d2 = d1 - vol_sqrt_t;
 
-        // The floating-strike lookback put with "maximum" = s_min gives the
-        // additional value from potentially going below s_min.
-        let floating_premium =
-            floating_strike_lookback_put(spot, time, rate, div_yield, vol, s_min);
-
-        (intrinsic_pv + floating_premium).max(0.0)
+    let term1 = strike * df * norm_cdf(-d2);
+    let term2 = -spot * df_q * norm_cdf(-d1);
+    let term3 = if b.abs() < RATE_EQ_DIV_TOL {
+        // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
+        let log_ratio = (spot / strike).ln();
+        spot * df
+            * (vol * sqrt_t * norm_pdf(d1)
+                - log_ratio * norm_cdf(-d1)
+                - 0.5 * vol2 * time * norm_cdf(-d1))
     } else {
-        // Case: m > K (out-of-the-money based on observed minimum). Exact
-        // Conze-Viswanathan (1991) fixed-strike lookback put for K ≤ m:
-        //   p = K·e^{-rT}·N(−d2) − S·e^{-qT}·N(−d1)
-        //     + S·e^{-rT}·(σ²/2b)·[(S/K)^{-2b/σ²}·N(−d1 + 2b√T/σ) − e^{bT}·N(−d1)]
-        // The observed minimum m does not appear: while m > K it carries no
-        // intrinsic value, so the price depends only on the future min crossing K.
-        let sqrt_t = time.sqrt();
-        let vol_sqrt_t = vol * sqrt_t;
-        let vol2 = vol * vol;
-        let df_q = (-div_yield * time).exp();
-        let b = rate - div_yield;
-        let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
-        let d2 = d1 - vol_sqrt_t;
+        let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
+        let d_corr = d1 - 2.0 * b * sqrt_t / vol;
+        spot * df
+            * (vol2 / (2.0 * b))
+            * (ratio_power * norm_cdf(-d_corr) - (b * time).exp() * norm_cdf(-d1))
+    };
 
-        let term1 = strike * df * norm_cdf(-d2);
-        let term2 = -spot * df_q * norm_cdf(-d1);
-        let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-            // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
-            let log_ratio = (spot / strike).ln();
-            spot * df
-                * (vol * sqrt_t * norm_pdf(d1)
-                    - log_ratio * norm_cdf(-d1)
-                    - 0.5 * vol2 * time * norm_cdf(-d1))
-        } else {
-            let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
-            let d_corr = d1 - 2.0 * b * sqrt_t / vol;
-            spot * df
-                * (vol2 / (2.0 * b))
-                * (ratio_power * norm_cdf(-d_corr) - (b * time).exp() * norm_cdf(-d1))
-        };
-
-        (term1 + term2 + term3).max(0.0)
-    }
+    (intrinsic_pv + term1 + term2 + term3).max(0.0)
 }
 
 /// Price a floating-strike lookback call option (continuous monitoring).
@@ -288,13 +210,13 @@ pub fn fixed_strike_lookback_put(
 ///
 /// ```text
 /// C_float = S·e^(-qT)·N(a1) - S_min·e^(-rT)·N(a1 - σ√T)
-///         + S·e^(-rT)·(σ²/(2b))·[(S/S_min)^(-2b/σ²)·N(-a2) - e^(bT)·N(-a1)]
+///         + S·e^(-rT)·(σ²/(2b))·[(S/S_min)^(-2b/σ²)·N(-a3) - e^(bT)·N(-a1)]
 /// ```
 ///
 /// where b = r - q and:
 /// ```text
 /// a1 = [ln(S/S_min) + (b + σ²/2)T] / (σ√T)
-/// a2 = [ln(S/S_min) + (b - σ²/2)T] / (σ√T)  (= a1 - σ√T)
+/// a3 = a1 - 2b√T/σ
 /// ```
 ///
 /// When r = q, uses the limiting form to avoid division by zero.
@@ -320,34 +242,15 @@ pub fn floating_strike_lookback_call(
     let vol2 = vol * vol;
     let df = (-rate * time).exp();
     let df_q = (-div_yield * time).exp();
-    let b = rate - div_yield; // drift
+    let b = rate - div_yield;
 
-    // Haug notation: a1 and a2
     let a1 = ((spot / s_min).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
-    let a2 = a1 - vol_sqrt_t; // = [ln(S/S_min) + (b - σ²/2)T] / (σ√T)
+    let a2 = a1 - vol_sqrt_t;
 
     let term1 = spot * df_q * norm_cdf(a1);
-    let term2 = -s_min * df * norm_cdf(a2); // a2 = a1 - σ√T
-
-    // Reflection-principle correction (third term).
-    // General form: S·e^{-rT}·(σ²/(2b))·[R^{-2b/σ²}·N(-d₃) - e^{bT}·N(-a₁)]
-    // where d₃ = a₁ - 2b√T/σ (Goldman, Sosin & Gatto 1979; Haug 2007 §6).
+    let term2 = -s_min * df * norm_cdf(a2);
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-        // L'Hôpital limiting form as b = r − q → 0.
-        //
-        // The general bracket is:
-        //   (σ²/(2b))·[R^{-2b/σ²}·N(-d₃) − e^{bT}·N(−a₁)]
-        // where R = S/S_min, d₃ = a₁ − 2b√T/σ.
-        //
-        // Taylor-expanding to first order in b:
-        //   R^{-2b/σ²} ≈ 1 − (2b/σ²)·ln R
-        //   N(-d₃) = N(-a₁ + 2b√T/σ) ≈ N(-a₁) + φ(a₁)·(2b√T/σ)
-        //   e^{bT}  ≈ 1 + bT
-        //
-        // Collecting O(b) terms in the bracket and dividing by 2b/σ² gives:
-        //   σ√T·φ(a₁) − ln(R)·N(−a₁) − (σ²/2)·T·N(−a₁)
-        //
-        // Hence term3 = S·e^{-rT}·[σ√T·φ(a₁) − log_ratio·N(−a₁) − (σ²/2)·T·N(−a₁)]
+        // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
         let log_ratio = (spot / s_min).ln();
         spot * df
             * (vol * sqrt_t * norm_pdf(a1)
@@ -355,9 +258,7 @@ pub fn floating_strike_lookback_call(
                 - 0.5 * vol2 * time * norm_cdf(-a1))
     } else {
         let d3 = a1 - 2.0 * b * sqrt_t / vol;
-        let power = -2.0 * b / vol2;
-        let ratio_power = (spot / s_min).powf(power);
-
+        let ratio_power = (spot / s_min).powf(-2.0 * b / vol2);
         spot * df
             * (vol2 / (2.0 * b))
             * (ratio_power * norm_cdf(-d3) - (b * time).exp() * norm_cdf(-a1))
@@ -385,20 +286,13 @@ pub fn floating_strike_lookback_call(
 ///
 /// Option price
 ///
-/// # Formula (Goldman, Sosin & Gatto, 1979; Haug, 2007)
+/// # Payoff identity
 ///
-/// ```text
-/// P_float = S_max·e^(-rT)·N(b1) - S·e^(-qT)·N(b1 - σ√T)
-///         + S·e^(-rT)·(σ²/(2b))·[(S/S_max)^(-2b/σ²)·N(b2) - e^(bT)·N(b1)]
-/// ```
-///
-/// where b = r - q and:
-/// ```text
-/// b1 = [ln(S_max/S) + (-b + σ²/2)T] / (σ√T)
-/// b2 = [ln(S_max/S) + (-b - σ²/2)T] / (σ√T)  (= b1 - σ√T)
-/// ```
-///
-/// When r = q, uses the limiting form to avoid division by zero.
+/// With observed maximum M (including spot), the future maximum satisfies
+/// `max(M, future_max) - S_T = (future_max - M).max(0) + M - S_T`.
+/// Thus the price is a fixed-strike lookback call struck at M plus
+/// `M exp(-r T) - S exp(-q T)`. The fixed-strike formula also supplies
+/// the continuous zero-carry limit when r = q.
 pub fn floating_strike_lookback_put(
     spot: f64,
     time: f64,
@@ -416,56 +310,9 @@ pub fn floating_strike_lookback_put(
     }
 
     let s_max = spot_max.max(spot);
-    let sqrt_t = time.sqrt();
-    let vol_sqrt_t = vol * sqrt_t;
-    let vol2 = vol * vol;
-    let df = (-rate * time).exp();
-    let df_q = (-div_yield * time).exp();
-    let b = rate - div_yield;
-
-    // Haug notation for put: b1 and b2
-    // b1 = [ln(S_max/S) + (-b + σ²/2)T] / (σ√T)
-    let b1 = ((s_max / spot).ln() + (-b + 0.5 * vol2) * time) / vol_sqrt_t;
-    let b2 = b1 - vol_sqrt_t; // = [ln(S_max/S) + (-b - σ²/2)T] / (σ√T)
-
-    let term1 = s_max * df * norm_cdf(b1);
-    let term2 = -spot * df_q * norm_cdf(b2);
-
-    // Reflection-principle correction — put tracks the maximum, so the reflected
-    // drift is -b, giving d₃' = b₁ + 2b√T/σ (sign opposite to the call's d₃).
-    let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-        // L'Hôpital limiting form as b = r − q → 0 (symmetric to the call).
-        //
-        // The general put bracket is:
-        //   (σ²/(2b))·[R_put^{-2b/σ²}·N(d₃') − e^{bT}·N(b₁)]
-        // where R_put = S/S_max, d₃' = b₁ + 2b√T/σ.
-        //
-        // Taylor-expanding to first order in b (same algebra as call):
-        //   R_put^{-2b/σ²} ≈ 1 − (2b/σ²)·ln(S/S_max)
-        //   N(d₃') = N(b₁ + 2b√T/σ) ≈ N(b₁) + φ(b₁)·(2b√T/σ)
-        //   e^{bT}  ≈ 1 + bT
-        //
-        // Collecting O(b) terms and noting ln(S/S_max) = −ln(S_max/S):
-        //   σ√T·φ(b₁) + ln(S_max/S)·N(b₁) − (σ²/2)·T·N(b₁)
-        //
-        // Hence term3 = S·e^{-rT}·[σ√T·φ(b₁) − log_ratio·N(b₁) − (σ²/2)·T·N(b₁)]
-        // where log_ratio = ln(S/S_max) so −log_ratio = ln(S_max/S).
-        let log_ratio = (spot / s_max).ln(); // negative since S ≤ S_max
-        spot * df
-            * (vol * sqrt_t * norm_pdf(b1)
-                - log_ratio * norm_cdf(b1)
-                - 0.5 * vol2 * time * norm_cdf(b1))
-    } else {
-        let d3_put = b1 + 2.0 * b * sqrt_t / vol;
-        let power = -2.0 * b / vol2;
-        let ratio_power = (spot / s_max).powf(power);
-
-        spot * df
-            * (vol2 / (2.0 * b))
-            * (ratio_power * norm_cdf(d3_put) - (b * time).exp() * norm_cdf(b1))
-    };
-
-    (term1 + term2 + term3).max(0.0)
+    let maximum_premium =
+        fixed_strike_lookback_call(spot, s_max, time, rate, div_yield, vol, s_max);
+    (maximum_premium + s_max * (-rate * time).exp() - spot * (-div_yield * time).exp()).max(0.0)
 }
 
 #[cfg(test)]

@@ -17,6 +17,26 @@ test('COS rejects an empty expansion', () => {
   assert.throws(() => facade.models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, 0));
 });
 
+test('seasoned lookbacks match independent continuous-maximum payoff values', () => {
+  for (const [strikeType, isCall, expected] of [
+    ['fixed', true, 24.326644378668],
+    ['floating', false, 21.429719498063],
+  ]) {
+    const price = facade.models.lookbackOptionPrice(
+      100,
+      100,
+      0.05,
+      0.02,
+      0.2,
+      1,
+      120,
+      strikeType,
+      isCall
+    );
+    assert.ok(Math.abs(price - expected) < 1e-8, `${strikeType}: ${price} vs ${expected}`);
+  }
+});
+
 test('tranche ES preserves empirical tail probability under replication', () => {
   const losses = [0, 0, 10, 20];
   const result = facade.models.correlation.trancheLossStatistics(losses, 0.75, 0, 1, 100);

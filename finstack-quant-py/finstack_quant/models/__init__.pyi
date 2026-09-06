@@ -1093,8 +1093,8 @@ def lookback_option_price(
     Examples
     --------
     >>> from finstack_quant.models import lookback_option_price
-    >>> round(lookback_option_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 90.0), 4)
-    17.2168
+    >>> round(lookback_option_price(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, 100.0), 4)
+    19.1676
 
     Sources
     -------
