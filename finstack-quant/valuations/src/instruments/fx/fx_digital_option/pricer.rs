@@ -104,7 +104,7 @@ impl FxDigitalOptionCalculator {
             return Ok(FxDigitalOptionGreeks::default());
         }
 
-        Ok(greeks_digital(
+        greeks_digital(
             spot,
             inst.strike,
             r_d,
@@ -116,7 +116,7 @@ impl FxDigitalOptionCalculator {
             inst.payout_amount.amount(),
             inst.notional.amount(),
             self.theta_days_per_year,
-        ))
+        )
     }
 
     pub(crate) fn collect_inputs(
@@ -258,7 +258,7 @@ fn greeks_digital(
     payout_amount: f64,
     notional: f64,
     theta_days_per_year: f64,
-) -> FxDigitalOptionGreeks {
+) -> Result<FxDigitalOptionGreeks> {
     let (d1, d2) = d1_d2(spot, strike, r_d, sigma, t, r_f);
     let exp_rd_t = (-r_d * t).exp();
     let exp_rf_t = (-r_f * t).exp();
@@ -268,12 +268,65 @@ fn greeks_digital(
     let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
     let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
     let sigma_sqrt_t = sigma * sqrt_t;
+    // One-day finite difference, including a possible change in exercise state.
+    let asset_theta = |base_pv: f64| {
+        let t_minus = (t - 1.0 / theta_days_per_year).max(0.0);
+        let pv_t_minus = if t_minus > 0.0 {
+            price_digital(
+                spot,
+                strike,
+                r_d,
+                r_f,
+                sigma,
+                t_minus,
+                option_type,
+                payout_type,
+                payout_amount,
+                notional,
+            )
+        } else {
+            match option_type {
+                OptionType::Call if spot > strike => spot * notional,
+                OptionType::Put if spot < strike => spot * notional,
+                _ => 0.0,
+            }
+        };
+        pv_t_minus - base_pv
+    };
 
     if sigma_sqrt_t <= 0.0 {
-        return FxDigitalOptionGreeks::default();
+        // Spot/rate derivatives do not exist at the binary discontinuity.
+        if d1 == 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxDigitalOption Greeks are undefined at zero volatility when the deterministic forward equals the strike"
+                    .to_string(),
+            ));
+        }
+        let itm = match option_type {
+            OptionType::Call => d1 > 0.0,
+            OptionType::Put => d1 < 0.0,
+        };
+        return Ok(match payout_type {
+            DigitalPayoutType::CashOrNothing => {
+                let pv = if itm { exp_rd_t * payout_amount } else { 0.0 };
+                FxDigitalOptionGreeks {
+                    theta: r_d * pv / theta_days_per_year,
+                    rho_domestic: -t * pv / 100.0,
+                    ..Default::default()
+                }
+            }
+            DigitalPayoutType::AssetOrNothing => {
+                let delta = if itm { exp_rf_t * notional } else { 0.0 };
+                FxDigitalOptionGreeks {
+                    delta,
+                    theta: asset_theta(spot * delta),
+                    ..Default::default()
+                }
+            }
+        });
     }
 
-    match payout_type {
+    Ok(match payout_type {
         DigitalPayoutType::CashOrNothing => {
             let delta_sign = match option_type {
                 OptionType::Call => 1.0,
@@ -382,38 +435,7 @@ fn greeks_digital(
             );
             let vega = (pv_vol_up - pv_base) / (vol_bump * 100.0);
 
-            // 1-day finite-difference decay: V(τ−1/365) − V(τ).
-            // This is a P&L-attribution approximation, not the analytic ∂V/∂τ.
-            // The analytic asset-or-nothing theta requires higher-order partial
-            // derivatives and is not yet implemented; the finite-difference
-            // form is documented explicitly here (W-46).
-            let dt = 1.0 / theta_days_per_year;
-            let t_minus = (t - dt).max(0.0);
-            let pv_t_minus = if t_minus > 0.0 {
-                price_digital(
-                    spot,
-                    strike,
-                    r_d,
-                    r_f,
-                    sigma,
-                    t_minus,
-                    option_type,
-                    payout_type,
-                    payout_amount,
-                    notional,
-                )
-            } else {
-                let itm = match option_type {
-                    OptionType::Call => spot > strike,
-                    OptionType::Put => spot < strike,
-                };
-                if itm {
-                    spot * notional
-                } else {
-                    0.0
-                }
-            };
-            let theta = pv_t_minus - pv_base;
+            let theta = asset_theta(pv_base);
 
             let rate_bump = 0.0001;
             let pv_rate_up = price_digital(
@@ -438,7 +460,7 @@ fn greeks_digital(
                 rho_domestic,
             }
         }
-    }
+    })
 }
 
 #[cfg(test)]
@@ -511,6 +533,169 @@ mod tests {
             .attributes(Attributes::new())
             .build()
             .expect("fx digital option")
+    }
+
+    #[test]
+    fn zero_vol_digital_greeks_match_price_sensitivities() {
+        let spot = 1.20_f64;
+        let t = 1.0;
+        let cases = [
+            (OptionType::Call, DigitalPayoutType::CashOrNothing),
+            (OptionType::Call, DigitalPayoutType::AssetOrNothing),
+            (OptionType::Put, DigitalPayoutType::CashOrNothing),
+            (OptionType::Put, DigitalPayoutType::AssetOrNothing),
+        ];
+        for r_d in [0.03_f64, -0.02_f64] {
+            for strike in [1.10, 1.30] {
+                for (option_type, payout_type) in cases {
+                    let price = |s, r, vol, time| {
+                        price_digital(
+                            s,
+                            strike,
+                            r,
+                            0.01,
+                            vol,
+                            time,
+                            option_type,
+                            payout_type,
+                            100_000.0,
+                            1_000_000.0,
+                        )
+                    };
+                    let greeks = greeks_digital(
+                        spot,
+                        strike,
+                        r_d,
+                        0.01,
+                        0.0,
+                        t,
+                        option_type,
+                        payout_type,
+                        100_000.0,
+                        1_000_000.0,
+                        365.0,
+                    )
+                    .expect("greeks");
+                    let h = 1e-5;
+                    let pv = price(spot, r_d, 0.0, t);
+                    let spot_bump = 0.001;
+                    let up = price(spot + spot_bump, r_d, 0.0, t);
+                    let down = price(spot - spot_bump, r_d, 0.0, t);
+                    let delta = (up - down) / (2.0 * spot_bump);
+                    let gamma = (up - 2.0 * pv + down) / (spot_bump * spot_bump);
+                    let rho = (price(spot, r_d + h, 0.0, t) - price(spot, r_d - h, 0.0, t))
+                        / (2.0 * h * 100.0);
+                    let vega = (price(spot, r_d, h, t) - pv) / (h * 100.0);
+                    let theta = match payout_type {
+                        DigitalPayoutType::CashOrNothing => {
+                            (price(spot, r_d, 0.0, t - h) - price(spot, r_d, 0.0, t + h))
+                                / (2.0 * h * 365.0)
+                        }
+                        DigitalPayoutType::AssetOrNothing => {
+                            price(spot, r_d, 0.0, t - 1.0 / 365.0) - pv
+                        }
+                    };
+                    assert!((greeks.delta - delta).abs() < 1e-4);
+                    assert!((greeks.gamma - gamma).abs() < 1e-3);
+                    assert!((greeks.rho_domestic - rho).abs() < 1e-5);
+                    assert!((greeks.vega - vega).abs() < 1e-5);
+                    assert!((greeks.theta - theta).abs() < 1e-5);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn zero_vol_asset_digital_theta_includes_exercise_state_change() {
+        let spot = 1.20_f64;
+        let t = 1.0;
+        let strike = spot * (0.02_f64 * (t - 0.5 / 365.0)).exp();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let greeks = greeks_digital(
+                spot,
+                strike,
+                0.03,
+                0.01,
+                0.0,
+                t,
+                option_type,
+                DigitalPayoutType::AssetOrNothing,
+                100_000.0,
+                1_000_000.0,
+                365.0,
+            )
+            .expect("greeks");
+            let expected = match option_type {
+                OptionType::Call => -spot * (-0.01_f64 * t).exp() * 1_000_000.0,
+                OptionType::Put => spot * (-0.01_f64 * (t - 1.0 / 365.0)).exp() * 1_000_000.0,
+            };
+            assert!((greeks.theta - expected).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn zero_vol_asset_digital_reports_nonzero_delta_through_metrics() {
+        let as_of = date!(2024 - 01 - 01);
+        let mut option = build_option(date!(2025 - 01 - 01));
+        option.payout_type = DigitalPayoutType::AssetOrNothing;
+        option.strike = 1.10;
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        let market = build_market(as_of);
+        let result = option
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[crate::metrics::MetricId::Delta],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("metric result");
+        let expected = option.notional.amount()
+            * market
+                .get_discount("EUR-OIS")
+                .expect("foreign curve")
+                .df_between_dates(as_of, option.expiry)
+                .expect("DF");
+        assert!((result.measures["delta"] - expected).abs() < 1e-8);
+    }
+
+    #[test]
+    fn zero_vol_forward_at_strike_rejects_undefined_greeks() {
+        let as_of = date!(2024 - 01 - 01);
+        let market = build_market(as_of);
+        let mut option = build_option(date!(2025 - 01 - 01));
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        let (spot, r_d, r_f, _, t) = FxDigitalOptionCalculator::default()
+            .collect_inputs(&option, &market, as_of)
+            .expect("inputs");
+        option.strike = spot * ((r_d - r_f) * t).exp();
+        for payout_type in [
+            DigitalPayoutType::CashOrNothing,
+            DigitalPayoutType::AssetOrNothing,
+        ] {
+            option.payout_type = payout_type;
+            assert!(option
+                .value(&market, as_of)
+                .expect("price")
+                .amount()
+                .is_finite());
+            let error = option
+                .price_with_metrics(
+                    &market,
+                    as_of,
+                    &[crate::metrics::MetricId::Delta],
+                    crate::instruments::PricingOptions::default(),
+                )
+                .expect_err("undefined greeks");
+            assert!(error
+                .to_string()
+                .contains("deterministic forward equals the strike"));
+        }
     }
 
     /// W-46: FX digital theta was a finite forward difference mislabelled as
@@ -595,7 +780,8 @@ mod tests {
             payout_amount,
             notional,
             theta_days_per_year,
-        );
+        )
+        .expect("cash digital Greeks");
 
         let theta_abs_err = (greeks.theta - analytic_theta_call).abs();
         assert!(
@@ -633,7 +819,8 @@ mod tests {
             payout_amount,
             notional,
             theta_days_per_year,
-        );
+        )
+        .expect("put digital Greeks");
         let theta_put_abs_err = (greeks_put.theta - analytic_theta_put).abs();
         assert!(
             theta_put_abs_err < 1e-8,

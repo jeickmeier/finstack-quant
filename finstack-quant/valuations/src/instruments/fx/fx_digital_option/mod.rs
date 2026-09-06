@@ -34,6 +34,15 @@
 //! - Asset-or-nothing call + put = discounted forward value
 //! - A vanilla call = asset-or-nothing call - K × cash-or-nothing call
 //!
+//! # Greeks
+//!
+//! - Zero-volatility Greeks use deterministic forward moneyness
+//! - In-the-money asset digitals retain spot delta; cash digitals retain
+//!   discount-rate sensitivity
+//! - Requests fail when the deterministic forward equals the strike
+//! - Cash digital theta is an analytic daily derivative; asset digital theta
+//!   uses a one-day finite difference, including exercise-state changes
+//!
 //! # References
 //!
 //! - Reiner, E., & Rubinstein, M. (1991). "Unscrambling the Binary Code."

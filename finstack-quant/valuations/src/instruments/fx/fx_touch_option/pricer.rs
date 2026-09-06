@@ -37,6 +37,12 @@ impl FxTouchOptionCalculator {
                 "FxTouchOption requires monitoring_start_date".to_string(),
             )
         })?;
+        if as_of < start {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxTouchOption analytical pricing requires monitoring_start_date on or before as_of; future monitoring windows are unsupported"
+                    .to_string(),
+            ));
+        }
         if as_of > start && as_of <= inst.expiry && inst.observed_touch.is_none() {
             return Err(finstack_quant_core::Error::Validation(
                 "Seasoned FX touch option requires observed_touch after monitoring starts"
@@ -184,7 +190,25 @@ fn price_touch(
     let sqrt_t = t.sqrt();
     let sigma_sqrt_t = sigma * sqrt_t;
     if sigma_sqrt_t <= 0.0 || t <= 0.0 {
-        return Ok(0.0);
+        let hit = finstack_quant_models::closed_form::barrier::barrier_touch_probability(
+            spot,
+            barrier,
+            t,
+            r_d,
+            r_f,
+            0.0,
+            barrier_direction == BarrierDirection::Up,
+        ) > 0.0;
+        let payment_time = match (touch_type, hit, payout_timing) {
+            (TouchType::OneTouch, true, PayoutTiming::AtHit) => {
+                // Hitting time of S(τ) = S(0) exp((r_d - r_f) τ).
+                ((barrier / spot).ln() / (r_d - r_f)).clamp(0.0, t)
+            }
+            (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
+            | (TouchType::NoTouch, false, _) => t,
+            _ => return Ok(0.0),
+        };
+        return Ok(payout * (-r_d * payment_time).exp());
     }
 
     let mu = (r_d - r_f - sigma2 / 2.0) / sigma2;
@@ -354,5 +378,115 @@ mod tests {
         let error = build_no_touch(expiry, PayoutTiming::AtHit)
             .expect_err("no-touch at-hit must be rejected");
         assert!(error.to_string().contains("must be at_expiry"));
+    }
+
+    #[test]
+    fn future_touch_monitoring_is_rejected_before_market_lookup() {
+        let as_of = date!(2024 - 01 - 01);
+        let mut option = build_option(date!(2025 - 01 - 01));
+        option.monitoring_start_date = Some(option.expiry);
+        for observed in [None, Some(false), Some(true)] {
+            option.observed_touch = observed;
+            let error = option
+                .value(&MarketContext::new(), as_of)
+                .expect_err("future monitoring");
+            assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
+            assert!(error.to_string().contains("future monitoring windows"));
+        }
+    }
+
+    #[test]
+    fn zero_vol_no_touch_preserves_certain_payment() {
+        let as_of = date!(2024 - 01 - 01);
+        let expiry = date!(2025 - 01 - 01);
+        let market = build_market(as_of).insert(
+            DiscountCurve::builder("EUR-OIS")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+                .build()
+                .expect("flat curve"),
+        );
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .df_between_dates(as_of, expiry)
+            .expect("payment DF");
+        let mut option = build_option(expiry);
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        for (direction, barrier) in [(BarrierDirection::Down, 1.10), (BarrierDirection::Up, 1.30)] {
+            option.barrier_direction = direction;
+            option.barrier_level = barrier;
+            option.touch_type = TouchType::NoTouch;
+            let no_touch = option.value(&market, as_of).expect("no touch").amount();
+            assert!((no_touch - 100_000.0 * df).abs() < 1e-8);
+            option.touch_type = TouchType::OneTouch;
+            assert_eq!(
+                option.value(&market, as_of).expect("one touch").amount(),
+                0.0
+            );
+        }
+    }
+
+    #[test]
+    fn zero_vol_touch_uses_drift_and_contractual_payment_time() {
+        let as_of = date!(2024 - 01 - 01);
+        let expiry = date!(2025 - 01 - 01);
+        for (direction, domestic, foreign) in [
+            (BarrierDirection::Up, 0.03_f64, 0.01_f64),
+            (BarrierDirection::Down, 0.01_f64, 0.03_f64),
+        ] {
+            let mut market = build_market(as_of);
+            for (id, rate) in [("USD-OIS", domestic), ("EUR-OIS", foreign)] {
+                market = market.insert(
+                    DiscountCurve::builder(id)
+                        .base_date(as_of)
+                        .day_count(DayCount::Act365F)
+                        .knots([(0.0, 1.0), (1.0, (-rate).exp())])
+                        .build()
+                        .expect("flat curve"),
+                );
+            }
+            let mut option = build_option(expiry);
+            option.barrier_direction = direction;
+            option.barrier_level = 1.20 * ((domestic - foreign) * 0.5).exp();
+            option
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility = Some(0.0);
+            option.payout_timing = PayoutTiming::AtHit;
+            let at_hit = option.value(&market, as_of).expect("hit payment").amount();
+            assert!((at_hit - 100_000.0 * (-domestic * 0.5).exp()).abs() < 1e-7);
+            option.payout_timing = PayoutTiming::AtExpiry;
+            let df = market
+                .get_discount("USD-OIS")
+                .expect("curve")
+                .df_between_dates(as_of, expiry)
+                .expect("DF");
+            let at_expiry = option
+                .value(&market, as_of)
+                .expect("expiry payment")
+                .amount();
+            assert!((at_expiry - 100_000.0 * df).abs() < 1e-8);
+            assert!(at_hit > at_expiry);
+            option.touch_type = TouchType::NoTouch;
+            assert_eq!(
+                option.value(&market, as_of).expect("no touch").amount(),
+                0.0
+            );
+
+            // Move the trigger beyond the expiry horizon: the payout flips
+            // back to the no-touch while the two expiry payouts still sum to DF*Q.
+            option.barrier_level = 1.20 * ((domestic - foreign) * 2.0).exp();
+            assert!(
+                (option.value(&market, as_of).expect("survival").amount() - 100_000.0 * df).abs()
+                    < 1e-8
+            );
+            option.touch_type = TouchType::OneTouch;
+            assert_eq!(option.value(&market, as_of).expect("miss").amount(), 0.0);
+        }
     }
 }

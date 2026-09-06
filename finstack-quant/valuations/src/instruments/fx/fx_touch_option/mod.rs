@@ -23,6 +23,10 @@
 //! - z' = ln(H/S)/(σ√T) - λσ√T
 //! - η = +1 for down barrier, -1 for up barrier
 //!
+//! Monitoring must start on or before the valuation date. At zero volatility
+//! the deterministic FX path determines whether the payout is due, discounted
+//! to its contractual hit or expiry time.
+//!
 //! # Key Properties
 //!
 //! - One-touch + No-touch = discounted payout (put-call parity for touch options)

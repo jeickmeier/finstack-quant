@@ -578,6 +578,17 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             ));
         }
 
+        if fx_barrier
+            .monitoring_start_date
+            .is_some_and(|start| start > as_of)
+        {
+            return Err(PricingError::invalid_input_with_context(
+                "Future FX barrier monitoring requires the Monte Carlo pricer; the analytical \
+                 Reiner-Rubinstein pricer requires monitoring_start_date on or before as_of.",
+                context,
+            ));
+        }
+
         let (fx_spot, t) = collect_fx_barrier_expiry_state(fx_barrier, market, as_of)
             .map_err(|error| PricingError::from_core(error, context.clone()))?;
 
@@ -699,6 +710,77 @@ mod tests {
             .curve_ids
             .contains(&inst.domestic_discount_curve_id.to_string()));
         assert!(context.curve_ids.contains(&inst.vol_surface_id.to_string()));
+    }
+
+    #[test]
+    fn analytical_barrier_rejects_future_monitoring_before_market_lookup() {
+        let mut inst = FxBarrierOption::example();
+        let as_of = inst.monitoring_start_date.expect("example start");
+        inst.monitoring_start_date = Some(inst.expiry);
+        let error = FxBarrierOptionAnalyticalPricer::new()
+            .price_dyn(&inst, &MarketContext::new(), as_of)
+            .expect_err("future monitoring");
+        assert!(error.to_string().contains("Future FX barrier monitoring"));
+        let PricingError::InvalidInput { context, .. } = error else {
+            panic!("expected invalid-input error");
+        };
+        assert_eq!(context.model, Some(ModelKey::FxBarrierBSContinuous));
+        assert_eq!(context.instrument_id.as_deref(), Some(inst.id.as_str()));
+        let default_error = inst
+            .value(&MarketContext::new(), as_of)
+            .expect_err("future monitoring");
+        assert!(default_error
+            .to_string()
+            .contains("Future FX barrier monitoring"));
+    }
+
+    #[test]
+    fn mc_expiry_only_down_out_call_matches_vanilla() {
+        let mut inst = FxBarrierOption::example();
+        let as_of = inst.monitoring_start_date.expect("example start");
+        inst.expiry = as_of + finstack_quant_core::dates::Duration::days(365);
+        inst.monitoring_start_date = Some(inst.expiry);
+        inst.barrier_type = BarrierType::DownAndOut;
+        inst.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.15);
+        let mut market =
+            MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.20));
+        for id in ["USD-OIS", "EUR-OIS"] {
+            market = market.insert(
+                DiscountCurve::builder(id)
+                    .base_date(as_of)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+                    .build()
+                    .expect("flat curve"),
+            );
+        }
+        let pricer = FxBarrierOptionMcPricer {
+            config: PathDependentPricerConfig {
+                num_paths: 65_536,
+                steps_per_year: 1.0,
+                min_steps: 1,
+                ..Default::default()
+            },
+        };
+        // K > H makes the terminal barrier redundant for a call. Include a
+        // barrier already breached today to detect any pre-start monitoring.
+        for (strike, barrier) in [(1.15, 1.10), (1.25, 1.21)] {
+            inst.strike = strike;
+            inst.barrier = barrier;
+            let result = pricer.price_dyn(&inst, &market, as_of).expect("mc price");
+            let Some(crate::results::ValuationDetails::MonteCarlo(diagnostics)) = result.details
+            else {
+                panic!("mc diagnostics");
+            };
+            let expected = inst.notional.amount()
+                * (-0.03_f64).exp()
+                * finstack_quant_models::closed_form::black_call(1.20, strike, 0.15, 1.0);
+            assert!((result.value.amount() - expected).abs() < 5.0 * diagnostics.standard_error,
+                "expiry-only barrier must equal vanilla within MC uncertainty: actual={}, expected={expected}, stderr={}",
+                result.value.amount(), diagnostics.standard_error);
+        }
     }
 
     #[test]

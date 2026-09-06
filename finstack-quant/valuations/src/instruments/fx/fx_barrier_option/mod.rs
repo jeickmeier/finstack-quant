@@ -17,6 +17,10 @@
 //! - **Analytical**: Reiner-Rubinstein formulas adapted for FX
 //! - **Discrete barriers**: Monte Carlo with adjustment
 //!
+//! The analytical model requires monitoring to have started by the valuation
+//! date. Future monitoring windows must use `ModelKey::MonteCarloGBM`, whose
+//! simulation grid includes the contractual monitoring start date.
+//!
 //! # References
 //!
 //! - Reiner, E., & Rubinstein, M. (1991). "Breaking Down the Barriers."
