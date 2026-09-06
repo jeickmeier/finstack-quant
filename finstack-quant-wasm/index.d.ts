@@ -4014,13 +4014,16 @@ export type FeatureParams = Record<string, unknown>;
 export interface FeaturesNamespace {
   /**
    * Transform a time-series panel column per entity.
+   * Rolling windows count rows including gaps; min_periods counts finite inputs.
+   * Aggregates may emit at missing rows. EWMA span must be at least 1; mature
+   * constant series have zero volatility. String keys need consistent UTC and precision.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
    * @param entity - Entity identifier used to group ordered time-series observations.
    * @param order - Observation-order key used to sort each entity time series.
    * @param op - Transformation operation identifier supported by the feature-engineering API.
    * @param params - Operation-specific parameter object. `rolling_sharpe` accepts optional `risk_free` (default `0.0`, same units as the return series).
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, an unsupported `op`, malformed operation parameters, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, an unsupported `op`, malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   transformTimeseries(
     values: FeatureValue[],
@@ -4031,12 +4034,14 @@ export interface FeaturesNamespace {
   ): FeatureValue[];
   /**
    * Transform a cross-section per timestamp.
+   * cap_weights constrains final absolute weights with zero net and unit gross
+   * exposure, preserving centered-signal signs; infeasible caps fail.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
    * @param op - Transformation operation identifier supported by the feature-engineering API.
    * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values` and `time_key` lengths, an unsupported `op`, malformed operation parameters, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values` and `time_key` lengths, an unsupported `op`, malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   transformCrossSectional(
     values: FeatureValue[],
@@ -4068,7 +4073,7 @@ export interface FeaturesNamespace {
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
    * @param exposures - Factor-exposure matrix aligned with the supplied observations.
    * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, a non-boolean `fit_intercept`, a singular or underdetermined cross-section, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, a non-boolean `fit_intercept`, a singular or underdetermined cross-section, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   neutralize(
     values: FeatureValue[],
@@ -4084,7 +4089,7 @@ export interface FeaturesNamespace {
    * @param entity - Entity identifier used to group ordered time-series observations.
    * @param order - Lexicographic observation-order key; use ISO-8601 for calendar chronology.
    * @param op - Transformation operation identifier supported by the feature-engineering API.
-   * @param params - Operation-specific parameter object. `window` and `min_periods` count finite paired rows.
+   * @param params - Operation-specific parameter object. `window` counts rows including gaps; `min_periods <= window` counts complete pairs.
    * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, an unsupported `op`, non-positive or non-integer `window` or `min_periods` parameters, or a result that cannot be serialized to JavaScript.
    */
   transformTimeseriesPairwise(
@@ -4097,13 +4102,15 @@ export interface FeaturesNamespace {
   ): FeatureValue[];
   /**
    * Return rolling OLS residuals per entity.
+   * window counts rows including gaps; min_periods counts complete rows.
+   * Missing current responses or exposures and rank-deficient windows yield null.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
    * @param exposures - Factor-exposure matrix aligned with the supplied observations.
    * @param entity - Entity identifier used to group ordered time-series observations.
    * @param order - Observation-order key used to sort each entity time series.
    * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, malformed `window`, `min_periods`, or `fit_intercept` parameters, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, malformed `window`, `min_periods`, or `fit_intercept` parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   rollingRegressionResidual(
     values: FeatureValue[],
@@ -4117,37 +4124,34 @@ export interface FeaturesNamespace {
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric signal observations aligned with `timeKey` and `volatility`.
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param volatility - Row-aligned risk estimates used as `signal / volatility`; zero, missing, or non-finite values yield missing weights.
-   * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal `values`, `time_key`, and `volatility` lengths, or a result that cannot be serialized to JavaScript.
-   * @param params - Optional parameters; omit to use defaults.
+   * @param volatility - Row-aligned nonnegative risk estimates in a common horizon and units, used as `signal / volatility`; negative estimates fail, while zero, missing, or non-finite values yield missing weights.
+   * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal `values`, `time_key`, and `volatility` lengths, negative volatility, or a result that cannot be serialized to JavaScript.
    */
   riskScaledWeights(
     values: FeatureValue[],
     timeKey: string[],
-    volatility: FeatureValue[],
-    params?: FeatureParams | null
+    volatility: FeatureValue[]
   ): FeatureValue[];
   /**
    * Convert ranks into long/short weights.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal `values` and `time_key` lengths, or a result that cannot be serialized to JavaScript.
-   * @param params - Optional parameters; omit to use defaults.
+   * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal `values` and `time_key` lengths, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   rankToWeights(
     values: FeatureValue[],
-    timeKey: string[],
-    params?: FeatureParams | null
+    timeKey: string[]
   ): FeatureValue[];
   /**
    * Neutralize a signal and z-score residuals.
+   * fit_intercept must be true (the default) to preserve exposure neutrality.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
    * @param values - Numeric observations in the shape and order required by the selected transformation.
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
    * @param exposures - Factor-exposure matrix aligned with the supplied observations.
    * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, a non-boolean `fit_intercept`, or a result that cannot be serialized to JavaScript.
+   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, a false or non-boolean `fit_intercept`, or a result that cannot be serialized to JavaScript.
    */
   neutralizeAndZscore(
     values: FeatureValue[],
@@ -4159,7 +4163,7 @@ export interface FeaturesNamespace {
    * Apply a JSON panel transform pipeline.
    * @returns JSON panel after applying the transform pipeline.
    * @param specJson - Canonical panel-transformation JSON. Each operation may set optional `input` (`undefined` default: previous column, or raw `values` for the first op).
-   * @throws Error - Rejects malformed JSON or panel specifications, blank, reserved (`values`), or duplicate operation names, unknown `input` columns, missing partition columns, unequal row counts, malformed operation parameters, operations that cannot be evaluated, or a result that cannot be serialized to JSON.
+   * @throws Error - Rejects malformed JSON or panel specifications, blank, reserved (`values`), or duplicate operation names, unknown `input` columns, missing partition columns, unequal row counts, malformed operation parameters, operations that cannot be evaluated, non-finite arithmetic, or a result that cannot be serialized to JSON.
    */
   transformPanelJson(specJson: string): string;
 }

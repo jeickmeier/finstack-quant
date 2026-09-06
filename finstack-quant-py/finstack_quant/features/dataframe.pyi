@@ -70,7 +70,10 @@ def cross_sectional(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``op`` is omitted.
 
@@ -122,7 +125,10 @@ def timeseries(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``op`` is omitted.
 
@@ -229,7 +235,10 @@ def grouped(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``op`` or ``groups`` is omitted.
 
@@ -242,7 +251,7 @@ def grouped(
     ...     "group": ["x", "x", "y", "y"],
     ...     "signal": [1.0, 3.0, 10.0, 14.0],
     ... })
-    >>> grouped(frame, "signal", "date", "group", "zscore").tolist()
+    >>> [round(value, 3) for value in grouped(frame, "signal", "date", "group", "zscore").tolist()]
     [-1.0, 1.0, -1.0, 1.0]
     """
     ...
@@ -281,7 +290,10 @@ def neutralize(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``exposures`` is omitted.
 
@@ -294,7 +306,7 @@ def neutralize(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> neutralize(frame, "signal", "date", ["factor"]).tolist()
+    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", ["factor"]).tolist()]
     [-0.5, -1.0, 0.5, 1.0]
     """
     ...
@@ -340,7 +352,10 @@ def pairwise(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``op`` is omitted.
 
@@ -396,7 +411,8 @@ def rolling_regression_residual(
     order : str or int, optional
         Sort key within each entity. Omit for a ``DatetimeIndex``.
     params : dict, optional
-        Parameters forwarded to the compiled transform (e.g. ``window``).
+        Row-window parameters: positive ``window`` and ``min_periods`` complete
+        rows, with ``min_periods <= window``; ``fit_intercept`` defaults to true.
 
     Returns
     -------
@@ -406,7 +422,10 @@ def rolling_regression_residual(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
 
     Examples
     --------
@@ -448,7 +467,9 @@ def risk_scaled_weights(
     time_key : str or int, optional
         Cross-section partition key. Omit for a ``DatetimeIndex``.
     volatility : str
-        Risk-estimate column aligned to ``value`` (required).
+        Nonnegative volatility column in common units and horizon (required).
+        Zero, missing, and non-finite estimates produce missing weights;
+        negative estimates raise ``ValueError``.
 
     Returns
     -------
@@ -458,7 +479,10 @@ def risk_scaled_weights(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``volatility`` is omitted.
 
@@ -504,7 +528,10 @@ def rank_to_weights(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
 
     Examples
     --------
@@ -541,7 +568,8 @@ def neutralize_and_zscore(
     exposures : Sequence[str]
         Exposure columns regressed against ``value`` (required).
     params : dict, optional
-        Parameters forwarded to the neutralization step.
+        OLS parameters; ``fit_intercept`` must be true (the default) so
+        z-scoring preserves exposure neutrality.
 
     Returns
     -------
@@ -551,7 +579,10 @@ def neutralize_and_zscore(
     Raises
     ------
     ValueError
-        If a key is ambiguous or a required column is missing.
+        If a key is ambiguous, parameters are invalid, keys mix aware and
+        naive datetimes, or numeric validation fails.
+    KeyError
+        If a required column is missing.
     TypeError
         If ``exposures`` is omitted.
 

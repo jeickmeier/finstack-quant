@@ -131,14 +131,16 @@ def _key_column(
     *,
     role: str,
     default_datetime_index: bool = False,
-) -> list[str]:
+) -> list[Any]:
     values = _key_values(
         df,
         key,
         role=role,
         default_datetime_index=default_datetime_index,
     )
-    return values.astype(str).tolist()
+    # The binding owns key coercion, including UTC normalization and timestamp
+    # precision. Stringifying here would lose those semantics before dispatch.
+    return values.tolist()
 
 
 def _require_operation(op: str | None) -> str:
@@ -190,8 +192,7 @@ def cross_sectional(
         value: Name of the numeric column to transform. ``NaN``/``None`` entries
             are treated as missing.
         time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
+            position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
         op: Cross-sectional operation name (e.g. ``"zscore"``, ``"rank"``,
             ``"winsorize"``). See ``transform_cross_sectional`` for the full set.
         params: Optional operation parameters.
@@ -248,9 +249,9 @@ def timeseries(
         value: Name of the numeric column to transform. ``NaN``/``None`` entries
             are treated as missing.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries are coerced to strings.
+            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries are coerced to strings.
+            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
             Omit when ``df.index`` is a ``DatetimeIndex``.
         op: Time-series operation name (e.g. ``"returns"``, ``"rolling_mean"``,
             ``"ewma_mean"``). See ``transform_timeseries`` for the full set.
@@ -306,7 +307,7 @@ def panel(
     Args:
         df: Source DataFrame.
         value: Name of the numeric column shared by every operation.
-            ``NaN``/``None`` entries are treated as missing.
+            NaN, infinity and ``None`` entries are treated as missing.
         operations: Sequence of operation mappings, each with ``name``,
             ``family`` (``"timeseries"`` or ``"cross_sectional"``), ``op``,
             optional ``params``, and optional ``input`` (default: previous
@@ -314,14 +315,13 @@ def panel(
             be unique, non-empty, and must not be the reserved name
             ``values``.
         entity: Column or index level name for the entity key; required when any
-            operation has ``family="timeseries"``. Entries are coerced to
-            strings.
+            operation has ``family="timeseries"``. Aware datetimes normalize to UTC; strings remain opaque.
         order: Column or index level name for the sort key; required when any
             operation has ``family="timeseries"`` unless ``df.index`` is a
-            ``DatetimeIndex``. Entries are coerced to strings.
+            ``DatetimeIndex``. Aware datetimes normalize to UTC; strings remain opaque.
         time_key: Column or index level name for the partition key; required when
             any operation has ``family="cross_sectional"`` unless ``df.index`` is
-            a ``DatetimeIndex``. Entries are coerced to strings.
+            a ``DatetimeIndex``. Aware datetimes normalize to UTC; strings remain opaque.
 
     Returns:
         pandas.DataFrame: One column per operation ``name``, in the order given,
@@ -391,7 +391,7 @@ def grouped(
         value: Name of the numeric column to transform. ``NaN``/``None`` entries
             are treated as missing.
         time_key: Column name, index level name, or integer index level
-            position for the primary partition. Entries are coerced to strings.
+            position for the primary partition. Aware datetimes normalize to UTC; strings remain opaque.
             Omit when ``df.index`` is a ``DatetimeIndex``.
         groups: Column name, index level name, or integer index level position
             for the secondary partition combined with ``time_key``. Entries are
@@ -422,7 +422,7 @@ def grouped(
     ...     "group": ["x", "x", "y", "y"],
     ...     "signal": [1.0, 3.0, 10.0, 14.0],
     ... })
-    >>> grouped(frame, "signal", "date", "group", "zscore").tolist()
+    >>> [round(value, 3) for value in grouped(frame, "signal", "date", "group", "zscore").tolist()]
     [-1.0, 1.0, -1.0, 1.0]
     """
     op = _require_operation(op)
@@ -458,8 +458,7 @@ def neutralize(
         value: Name of the signal column to neutralize. ``NaN``/``None`` entries
             are treated as missing.
         time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
+            position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
         exposures: Names of the exposure columns regressed against ``value``.
         params: Optional parameters. ``fit_intercept`` (default ``True``) adds an
             intercept term.
@@ -485,7 +484,7 @@ def neutralize(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> neutralize(frame, "signal", "date", ["factor"]).tolist()
+    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", ["factor"]).tolist()]
     [-0.5, -1.0, 0.5, 1.0]
     """
     out = _neutralize(
@@ -523,13 +522,14 @@ def pairwise(
             treated as missing.
         other: Name of the second numeric column paired with ``value``.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries are coerced to strings.
+            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries are coerced to strings.
+            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
             Omit when ``df.index`` is a ``DatetimeIndex``.
         op: Pairwise operation name: ``"rolling_cov"``, ``"rolling_corr"``, or
             ``"rolling_beta"``.
-        params: Optional parameters ``window`` and ``min_periods``.
+        params: ``window`` spans rows, including gaps; ``min_periods <= window``
+            counts complete pairs within that window.
 
     Returns:
         pandas.Series: Result aligned to ``df.index`` and named
@@ -597,9 +597,9 @@ def rolling_regression_residual(
             missing.
         exposures: Names of the exposure columns regressed against ``value``.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries are coerced to strings.
+            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries are coerced to strings.
+            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
             Omit when ``df.index`` is a ``DatetimeIndex``.
         params: Optional parameters ``window``, ``min_periods``, and
             ``fit_intercept``.
@@ -658,8 +658,7 @@ def risk_scaled_weights(
         value: Name of the signal column. ``NaN``/``None`` entries are treated as
             missing.
         time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
+            position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
         volatility: Name of the risk-estimate column aligned to ``value``.
             Values are used as ``signal / volatility``; non-positive magnitudes
             map to missing weights.
@@ -674,7 +673,7 @@ def risk_scaled_weights(
         KeyError: If ``value`` or ``volatility`` is missing, or ``time_key`` is
             not a column or index level (and no ``DatetimeIndex`` default
             applies).
-        ValueError: If ``time_key`` is ambiguous.
+        ValueError: If volatility is negative or arithmetic is non-finite. If ``time_key`` is ambiguous.
 
     Examples:
     --------
@@ -716,8 +715,7 @@ def rank_to_weights(
         value: Name of the signal column. ``NaN``/``None`` entries are treated as
             missing.
         time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
+            position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
 
     Returns:
         pandas.Series: Weights aligned to ``df.index`` and named
@@ -767,8 +765,7 @@ def neutralize_and_zscore(
         value: Name of the signal column. ``NaN``/``None`` entries are treated as
             missing.
         time_key: Column name, index level name, or integer index level
-            position that partitions the cross-section. Entries are coerced to
-            strings. Omit when ``df.index`` is a ``DatetimeIndex``.
+            position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
         exposures: Names of the exposure columns regressed against ``value``.
         params: Optional parameters forwarded to ``neutralize``;
             ``fit_intercept`` (default ``True``).
@@ -783,7 +780,7 @@ def neutralize_and_zscore(
         KeyError: If ``value`` or any exposure column is missing, or ``time_key``
             is not a column or index level (and no ``DatetimeIndex`` default
             applies).
-        ValueError: If ``time_key`` is ambiguous or ``params`` are malformed.
+        ValueError: If ``fit_intercept=False`` or arithmetic is non-finite. If ``time_key`` is ambiguous or ``params`` are malformed.
 
     Examples:
     --------

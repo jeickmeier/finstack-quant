@@ -1057,11 +1057,11 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "riskScaledWeights(values: FeatureValue[], timeKey: string[], volatility: FeatureValue[], params?: FeatureParams | null): FeatureValue[];"
+        "riskScaledWeights(values: FeatureValue[], timeKey: string[], volatility: FeatureValue[]): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
-        "rankToWeights(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
+        "rankToWeights(values: FeatureValue[], timeKey: string[]): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,

@@ -2,7 +2,7 @@
 
 use crate::types::{
     f64_param, finite, mean, op_from_str, population_std, quantile_cont, reject_unknown_params,
-    usize_param, validate_lengths, ZERO_TOLERANCE,
+    scaled_centered, usize_param, validate_lengths, validate_output,
 };
 use finstack_quant_core::math::standard_normal_inv_cdf;
 use finstack_quant_core::{Error, Result};
@@ -16,7 +16,7 @@ use std::str::FromStr;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CrossSectionalOp {
-    /// Population z-score within each partition; `0.0` when std ≤ `1e-12`.
+    /// Population z-score within each partition; `0.0` for constant values.
     Zscore,
     /// Closed-interval percentile rank in `[0, 1]`; ties share the lowest rank.
     Rank,
@@ -38,7 +38,7 @@ pub enum CrossSectionalOp {
     NormalScoreTransform,
     /// Demean signal values and normalize by gross absolute exposure.
     LongShortWeights,
-    /// Cap absolute centered weights before gross normalization.
+    /// Dollar-neutral, unit-gross weights with a final absolute position cap.
     CapWeights,
     /// Fill missing and non-finite values with a constant.
     FillMissing,
@@ -116,6 +116,11 @@ impl CrossSectionalOp {
 
 /// Transform a value column across entities within each time partition.
 ///
+/// `cap_weights` requires `0 < max_abs <= 1` (default 1). It preserves
+/// demeaned-signal signs, allocates gross 0.5 to each side, and redistributes
+/// capped exposure proportionally on that side. Infeasible side capacity fails;
+/// constant signals produce zeros. Signed zeros tie in all rank operations.
+///
 /// # Arguments
 ///
 /// * `values` - Row-aligned numeric input values; `None` and non-finite values
@@ -130,7 +135,8 @@ impl CrossSectionalOp {
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
-/// or operation parameters are malformed.
+/// operation parameters are malformed, a cap is infeasible, or arithmetic
+/// produces a non-finite result.
 pub fn transform_cross_sectional(
     values: &[Option<f64>],
     time_key: &[String],
@@ -154,8 +160,8 @@ pub fn transform_cross_sectional(
 ///
 /// # Errors
 ///
-/// Returns a validation error when input lengths differ or operation parameters
-/// are malformed.
+/// Returns a validation error when input lengths differ, operation parameters
+/// are malformed, a cap is infeasible, or arithmetic produces a non-finite result.
 pub fn transform_cross_sectional_with_op(
     values: &[Option<f64>],
     time_key: &[String],
@@ -164,13 +170,63 @@ pub fn transform_cross_sectional_with_op(
 ) -> Result<Vec<Option<f64>>> {
     validate_lengths(values.len(), &[("time_key", time_key.len())])?;
     reject_unknown_params(params, &op.name(), op.param_keys())?;
+    validate_params(op, params)?;
     let partitions = crate::index::partition_by_key(time_key);
 
     let mut output = vec![None; values.len()];
     for indices in partitions.values() {
         apply_cross_sectional_op(values, indices, op, params, &mut output)?;
     }
+    validate_output(&output)?;
     Ok(output)
+}
+
+pub(crate) fn validate_params(op: CrossSectionalOp, params: Option<&Value>) -> Result<()> {
+    match op {
+        CrossSectionalOp::QuantileBucket => {
+            usize_param(params, "buckets", 10)?;
+        }
+        CrossSectionalOp::Clip | CrossSectionalOp::Winsorize => {
+            let quantiles = matches!(op, CrossSectionalOp::Winsorize);
+            let lower = f64_param(
+                params,
+                "lower",
+                if quantiles { 0.01 } else { f64::NEG_INFINITY },
+            )?;
+            let upper = f64_param(
+                params,
+                "upper",
+                if quantiles { 0.99 } else { f64::INFINITY },
+            )?;
+            if lower > upper
+                || (quantiles && (!(0.0..=1.0).contains(&lower) || !(0.0..=1.0).contains(&upper)))
+            {
+                return Err(Error::Validation(
+                    "invalid lower/upper bounds for cross-sectional transform".into(),
+                ));
+            }
+        }
+        CrossSectionalOp::ClipBySigma => {
+            if f64_param(params, "sigma", 3.0)? < 0.0 {
+                return Err(Error::Validation(
+                    "clip_by_sigma requires sigma >= 0".into(),
+                ));
+            }
+        }
+        CrossSectionalOp::CapWeights => {
+            let max_abs = f64_param(params, "max_abs", 1.0)?;
+            if !(0.0 < max_abs && max_abs <= 1.0) {
+                return Err(Error::Validation(
+                    "cap_weights requires 0 < max_abs <= 1".into(),
+                ));
+            }
+        }
+        CrossSectionalOp::FillMissing => {
+            f64_param(params, "value", 0.0)?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 pub(crate) fn apply_cross_sectional_op(
@@ -192,7 +248,7 @@ pub(crate) fn apply_cross_sectional_op(
         CrossSectionalOp::ClipBySigma => clip_by_sigma(values, indices, params, output)?,
         CrossSectionalOp::Winsorize => winsorize(values, indices, params, output)?,
         CrossSectionalOp::NormalScoreTransform => normal_score_transform(values, indices, output),
-        CrossSectionalOp::LongShortWeights => long_short_weights(values, indices, None, output)?,
+        CrossSectionalOp::LongShortWeights => long_short_weights(values, indices, output),
         CrossSectionalOp::CapWeights => cap_weights(values, indices, params, output)?,
         CrossSectionalOp::FillMissing => fill_missing(values, indices, params, output)?,
         CrossSectionalOp::IsFinite => is_finite(values, indices, output),
@@ -214,17 +270,15 @@ fn zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>])
         .iter()
         .map(|(_, value)| *value)
         .collect::<Vec<_>>();
-    let Some(mean) = mean(&sample) else {
+    let (_, centered) = scaled_centered(&sample);
+    let Some(std) = population_std(&centered) else {
         return;
     };
-    let Some(std) = population_std(&sample) else {
-        return;
-    };
-    for (idx, value) in finite_values {
-        output[idx] = if std <= ZERO_TOLERANCE {
+    for ((idx, _), value) in finite_values.iter().zip(centered) {
+        output[*idx] = if std <= 0.0 {
             Some(0.0)
         } else {
-            Some((value - mean) / std)
+            Some(value / std)
         };
     }
 }
@@ -324,6 +378,15 @@ fn robust_zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option
         .iter()
         .map(|(_, value)| *value)
         .collect::<Vec<_>>();
+    let scale = sample
+        .iter()
+        .copied()
+        .map(f64::abs)
+        .fold(0.0, f64::max)
+        .max(f64::MIN_POSITIVE);
+    for value in &mut sample {
+        *value /= scale;
+    }
     sample.sort_by(f64::total_cmp);
     let Some(center) = quantile_cont(&sample, 0.5) else {
         return;
@@ -337,10 +400,10 @@ fn robust_zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option
         return;
     };
     for (idx, value) in finite_values {
-        output[idx] = if mad <= ZERO_TOLERANCE {
+        output[idx] = if mad <= 0.0 {
             Some(0.0)
         } else {
-            Some(crate::types::PHI_INV_075 * (value - center) / mad)
+            Some(crate::types::PHI_INV_075 * (value / scale - center) / mad)
         };
     }
 }
@@ -350,18 +413,23 @@ fn minmax_scale(values: &[Option<f64>], indices: &[usize], output: &mut [Option<
     let Some(((_, first), rest)) = finite_values.split_first() else {
         return;
     };
-    let mut min_value = *first;
-    let mut max_value = *first;
+    let scale = finite_values
+        .iter()
+        .map(|(_, v)| v.abs())
+        .fold(0.0, f64::max);
+    let scale = if scale > 0.0 { scale } else { 1.0 };
+    let mut min_value = *first / scale;
+    let mut max_value = *first / scale;
     for (_, value) in rest {
-        min_value = min_value.min(*value);
-        max_value = max_value.max(*value);
+        min_value = min_value.min(*value / scale);
+        max_value = max_value.max(*value / scale);
     }
     let range = max_value - min_value;
     for (idx, value) in finite_values {
-        output[idx] = if range <= ZERO_TOLERANCE {
+        output[idx] = if range <= 0.0 {
             Some(0.0)
         } else {
-            Some((value - min_value) / range)
+            Some((value / scale - min_value) / range)
         };
     }
 }
@@ -410,6 +478,9 @@ fn clip_by_sigma(
     };
     let lower = center - sigma * std;
     let upper = center + sigma * std;
+    if !lower.is_finite() || !upper.is_finite() {
+        return Err(Error::Validation("non-finite clip_by_sigma bounds".into()));
+    }
     for (idx, value) in finite_values {
         output[idx] = Some(value.clamp(lower, upper));
     }
@@ -422,42 +493,14 @@ fn normal_score_transform(values: &[Option<f64>], indices: &[usize], output: &mu
     }
 }
 
-fn long_short_weights(
-    values: &[Option<f64>],
-    indices: &[usize],
-    cap: Option<f64>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
+fn long_short_weights(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
     let finite_values = finite_partition(values, indices);
-    let sample = finite_values
-        .iter()
-        .map(|(_, value)| *value)
-        .collect::<Vec<_>>();
-    let Some(center) = mean(&sample) else {
-        return Ok(());
-    };
-
-    let centered = finite_values
-        .iter()
-        .map(|(idx, value)| {
-            let mut weight = *value - center;
-            if let Some(max_abs) = cap {
-                weight = weight.clamp(-max_abs, max_abs);
-            }
-            (*idx, weight)
-        })
-        .collect::<Vec<_>>();
-    let gross = centered.iter().map(|(_, weight)| weight.abs()).sum::<f64>();
-    if gross <= ZERO_TOLERANCE {
-        for (idx, _) in centered {
-            output[idx] = Some(0.0);
-        }
-        return Ok(());
+    let sample: Vec<_> = finite_values.iter().map(|(_, value)| *value).collect();
+    let (_, centered) = scaled_centered(&sample);
+    let gross = centered.iter().map(|value| value.abs()).sum::<f64>();
+    for ((idx, _), weight) in finite_values.iter().zip(centered) {
+        output[*idx] = Some(if gross > 0.0 { weight / gross } else { 0.0 });
     }
-    for (idx, weight) in centered {
-        output[idx] = Some(weight / gross);
-    }
-    Ok(())
 }
 
 fn cap_weights(
@@ -467,12 +510,43 @@ fn cap_weights(
     output: &mut [Option<f64>],
 ) -> Result<()> {
     let max_abs = f64_param(params, "max_abs", 1.0)?;
-    if max_abs < 0.0 {
-        return Err(Error::Validation(
-            "cap_weights requires max_abs >= 0".to_string(),
-        ));
+    let finite_values = finite_partition(values, indices);
+    let sample: Vec<_> = finite_values.iter().map(|(_, value)| *value).collect();
+    let (_, centered) = scaled_centered(&sample);
+    let mut long = Vec::new();
+    let mut short = Vec::new();
+    for ((idx, _), value) in finite_values.iter().zip(centered) {
+        output[*idx] = Some(0.0);
+        if value > 0.0 {
+            long.push((*idx, value));
+        } else if value < 0.0 {
+            short.push((*idx, -value));
+        }
     }
-    long_short_weights(values, indices, Some(max_abs), output)
+    if long.is_empty() && short.is_empty() {
+        return Ok(());
+    }
+    // Keep the centered signal's signs, with half the gross on each side.
+    for (side, sign) in [(&mut long, 1.0), (&mut short, -1.0)] {
+        if (side.len() as f64) * max_abs < 0.5 {
+            return Err(Error::Validation(
+                "cap_weights is infeasible: each signal side must support gross exposure 0.5 at max_abs".into(),
+            ));
+        }
+        side.sort_by(|left, right| right.1.total_cmp(&left.1));
+        // Suffix sums avoid cancellation when a dominant position is capped.
+        let mut suffix = vec![0.0; side.len() + 1];
+        for i in (0..side.len()).rev() {
+            suffix[i] = suffix[i + 1] + side[i].1;
+        }
+        let mut remaining = 0.5;
+        for (i, &(idx, magnitude)) in side.iter().enumerate() {
+            let weight = (remaining * (magnitude / suffix[i])).min(max_abs);
+            output[idx] = Some(sign * weight);
+            remaining = (remaining - weight).max(0.0);
+        }
+    }
+    Ok(())
 }
 
 fn fill_missing(

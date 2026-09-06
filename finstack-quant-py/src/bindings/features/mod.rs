@@ -4,7 +4,9 @@
 //! Rust kernel, and returns a list of ``float | None`` aligned to the input.
 //! Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept any
 //! sequence of strings, ints, dates, timestamps or other objects: each entry
-//! is coerced with ``isoformat()`` when available, else ``str()``.
+//! uses UTC and fixed nanosecond precision for aware datetimes; naive datetimes
+//! retain wall time. Other date-like objects use ``isoformat()``, else ``str()``.
+//! Mixed aware/naive datetime keys fail; opaque strings retain caller ordering.
 
 use crate::bindings::module_utils::{py_to_json_value, register_submodule, ParentNameSource};
 use crate::errors::core_to_py;
@@ -17,11 +19,15 @@ use serde_json::Value;
 
 /// Coerce one key-column sequence into strings.
 ///
-/// Strings pass through; objects exposing ``isoformat`` (``datetime.date``,
-/// ``datetime.datetime``, ``pandas.Timestamp``) use it so calendar order is
-/// lexicographic; everything else (ints, floats, ...) uses ``str()``.
+/// Strings pass through. Aware datetimes normalize to UTC; datetimes and
+/// pandas timestamps use fixed nanosecond precision. Dates use ``isoformat``;
+/// other keys use ``str()``. Aware and naive datetimes must not be mixed.
 fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
     let mut keys = Vec::new();
+    let datetime = obj.py().import("datetime")?;
+    let datetime_type = datetime.getattr("datetime")?;
+    let utc = datetime.getattr("timezone")?.getattr("utc")?;
+    let mut aware_kind = None;
     for item in obj.try_iter().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
             "{role} must be a sequence of str, int, or date-like values"
@@ -30,6 +36,20 @@ fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
         let item = item?;
         if let Ok(text) = item.extract::<String>() {
             keys.push(text);
+        } else if item.is_instance(&datetime_type)? {
+            let aware = !item.call_method0("utcoffset")?.is_none();
+            if aware_kind.is_some_and(|previous| previous != aware) {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "{role} must not mix timezone-aware and naive datetimes"
+                )));
+            }
+            aware_kind = Some(aware);
+            let normalized = if aware {
+                item.call_method1("astimezone", (&utc,))?
+            } else {
+                item.clone()
+            };
+            keys.push(datetime_key(&normalized, aware)?);
         } else if item.hasattr("isoformat")? {
             keys.push(item.call_method0("isoformat")?.extract()?);
         } else {
@@ -37,6 +57,27 @@ fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
         }
     }
     Ok(keys)
+}
+
+/// Fixed nanosecond precision preserves both datetime and pandas Timestamp order.
+fn datetime_key(value: &Bound<'_, PyAny>, aware: bool) -> PyResult<String> {
+    let year: i32 = value.getattr("year")?.extract()?;
+    let month: u32 = value.getattr("month")?.extract()?;
+    let day: u32 = value.getattr("day")?.extract()?;
+    let hour: u32 = value.getattr("hour")?.extract()?;
+    let minute: u32 = value.getattr("minute")?.extract()?;
+    let second: u32 = value.getattr("second")?.extract()?;
+    let microsecond: u32 = value.getattr("microsecond")?.extract()?;
+    let nanosecond: u32 = if value.hasattr("nanosecond")? {
+        value.getattr("nanosecond")?.extract()?
+    } else {
+        0
+    };
+    let fraction = microsecond * 1000 + nanosecond;
+    let suffix = if aware { "+00:00" } else { "" };
+    Ok(format!(
+        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{fraction:09}{suffix}"
+    ))
 }
 
 fn parse_params(
@@ -201,9 +242,13 @@ fn extract_op_name<T: pyo3::PyClass + Clone>(
 /// Transform a time-series panel column per entity.
 ///
 /// Rows are grouped by ``entity`` and ordered lexicographically by ``order``
-/// (use ISO-8601 dates or date objects for calendar order). ``None`` / NaN
-/// inputs produce ``None`` outputs; ``periods`` counts finite observations,
-/// rolling ``window``s span rows and require ``min_periods`` finite rows.
+/// (use date objects or uniform-timezone, fixed-precision ISO strings).
+/// ``periods`` counts finite observations; rolling ``window``s span rows and
+/// require ``min_periods <= window`` finite rows. Rolling aggregates may emit
+/// at missing current rows; current-value transforms require finite inputs.
+/// EWMA requires ``span >= 1`` and uses centered biased variance; volatility
+/// is missing initially and zero for constant series after two finite rows.
+/// Rolling slope uses row positions, retaining gaps from missing values.
 ///
 /// Parameters
 /// ----------
@@ -211,7 +256,7 @@ fn extract_op_name<T: pyo3::PyClass + Clone>(
 ///     Row-aligned observations (levels for ``returns``/``drawdown``,
 ///     returns for EWMA and Sharpe ops).
 /// entity : sequence
-///     Row-aligned entity keys (str, int or date-like; coerced to str).
+///     Row-aligned entity keys (str, int or date-like; aware datetimes normalize to UTC; strings stay opaque).
 /// order : sequence
 ///     Row-aligned sort keys within each entity (ISO strings, dates, ints).
 /// op : str or TimeSeriesOp
@@ -229,8 +274,8 @@ fn extract_op_name<T: pyo3::PyClass + Clone>(
 /// Raises
 /// ------
 /// ValueError
-///     If lengths differ, ``op`` is unknown (the message lists accepted
-///     ops), or a parameter is malformed or not read by ``op``.
+///     If lengths differ, ``op`` is unknown, a parameter is malformed or not
+///     read by ``op``, keys mix aware/naive datetimes, or arithmetic is non-finite.
 ///
 /// Examples
 /// --------
@@ -268,12 +313,16 @@ fn transform_timeseries(
 
 /// Transform a cross-section per timestamp.
 ///
+/// ``cap_weights`` enforces final absolute caps with zero net and unit gross
+/// exposure. ``0 < max_abs <= 1``; each demeaned-signal side must support
+/// gross 0.5 at that cap or the call fails. Constant signals produce zeros.
+///
 /// Parameters
 /// ----------
 /// values : list[float | None]
 ///     Row-aligned observations; ``None`` / NaN are skipped.
 /// time_key : sequence
-///     Row-aligned partition keys (str, int or date-like; coerced to str).
+///     Row-aligned partition keys (str, int or date-like; aware datetimes normalize to UTC; strings stay opaque).
 /// op : str or CrossSectionalOp
 ///     Operation name, e.g. ``"zscore"``, ``"rank"``, ``"winsorize"``.
 /// params : dict, optional
@@ -324,9 +373,9 @@ fn transform_cross_sectional(
 /// values : list[float | None]
 ///     Row-aligned observations.
 /// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
+///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 /// groups : sequence
-///     Row-aligned group labels (sector, country, ...; coerced to str).
+///     Row-aligned group labels (sector, country, ...; aware datetimes normalize to UTC; strings stay opaque).
 /// op : str or CrossSectionalOp
 ///     Cross-sectional operation name.
 /// params : dict, optional
@@ -383,7 +432,7 @@ fn transform_cross_sectional_grouped(
 /// values : list[float | None]
 ///     Row-aligned signal values.
 /// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
+///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 /// exposures : list[list[float | None]]
 ///     One row-aligned column per exposure (beta, size, sector dummies, ...).
 /// params : dict, optional
@@ -435,7 +484,7 @@ fn neutralize(
 /// other : list[float | None]
 ///     Row-aligned right series (e.g. benchmark returns).
 /// entity : sequence
-///     Row-aligned entity keys (coerced to str).
+///     Row-aligned entity keys (aware datetimes normalize to UTC; strings stay opaque).
 /// order : sequence
 ///     Row-aligned sort keys within each entity.
 /// op : str or PairwiseOp
@@ -500,7 +549,7 @@ fn transform_timeseries_pairwise(
 /// exposures : list[list[float | None]]
 ///     One row-aligned regressor column each.
 /// entity : sequence
-///     Row-aligned entity keys (coerced to str).
+///     Row-aligned entity keys (aware datetimes normalize to UTC; strings stay opaque).
 /// order : sequence
 ///     Row-aligned sort keys within each entity.
 /// params : dict, optional
@@ -558,26 +607,27 @@ fn rolling_regression_residual(
 /// values : list[float | None]
 ///     Row-aligned signal values.
 /// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
+///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 /// volatility : list[float | None]
-///     Row-aligned positive volatility estimates; rows with missing or
-///     non-positive volatility get ``None``.
+///     Row-aligned nonnegative volatility estimates in common units and horizon.
+///     Zero, missing, and non-finite volatility produce ``None``; negative values fail.
 ///
 /// Returns
 /// -------
 /// list[float | None]
-///     Dollar-neutral weights per timestamp (long and short legs each sum to 1).
+///     Dollar-neutral weights per timestamp (long and short legs each have gross 0.5).
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If lengths differ.
+///     If lengths differ, volatility is negative, keys mix aware/naive
+///     datetimes, or arithmetic produces a non-finite result.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.features import risk_scaled_weights
 /// >>> risk_scaled_weights([1.0, -1.0], ["d", "d"], [0.1, 0.1])
-/// [1.0, -1.0]
+/// [0.5, -0.5]
 #[pyfunction]
 #[pyo3(
     signature = (values, time_key, volatility),
@@ -601,12 +651,12 @@ fn risk_scaled_weights(
 /// values : list[float | None]
 ///     Row-aligned signal values (ranked internally).
 /// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
+///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 ///
 /// Returns
 /// -------
 /// list[float | None]
-///     Weights per row; long and short legs each sum to 1 within a timestamp.
+///     Weights per row; long and short legs each have gross 0.5 within a timestamp.
 ///
 /// Raises
 /// ------
@@ -617,7 +667,7 @@ fn risk_scaled_weights(
 /// --------
 /// >>> from finstack_quant.features import rank_to_weights
 /// >>> rank_to_weights([1.0, 2.0, 3.0], ["d"] * 3)
-/// [-1.0, 0.0, 1.0]
+/// [-0.5, 0.0, 0.5]
 #[pyfunction]
 #[pyo3(signature = (values, time_key), text_signature = "(values, time_key)")]
 fn rank_to_weights(
@@ -630,28 +680,33 @@ fn rank_to_weights(
         .map_err(core_to_py)
 }
 
-/// Neutralize a signal against exposures and z-score the residuals.
+/// Neutralize a signal with an intercept and z-score residuals.
+///
+/// ``fit_intercept=False`` raises ``ValueError`` because subsequent demeaning
+/// would reintroduce factor exposure. Exact-fit roundoff residuals become zero.
 ///
 /// Parameters
 /// ----------
 /// values : list[float | None]
 ///     Row-aligned signal values.
 /// time_key : sequence
-///     Row-aligned partition keys (coerced to str).
+///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 /// exposures : list[list[float | None]]
 ///     One row-aligned exposure column each.
 /// params : dict, optional
-///     ``fit_intercept`` (bool, default True). Unknown keys raise ``ValueError``.
+///     ``fit_intercept`` must be True (default); False or unknown keys raise
+///     ``ValueError`` to preserve neutrality after standardization.
 ///
 /// Returns
 /// -------
 /// list[float | None]
-///     Z-scored residuals per row.
+///     Z-scored residuals per row; exact fits produce zero signals.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If lengths differ or a partition cannot be fitted.
+///     If lengths differ, a partition cannot be fitted, ``fit_intercept`` is
+///     False, datetime keys mix awareness, or arithmetic is non-finite.
 ///
 /// Examples
 /// --------
@@ -688,13 +743,13 @@ fn neutralize_and_zscore(
 /// Parameters
 /// ----------
 /// values : list[float | None]
-///     Input value column; ``None`` / NaN is missing.
+///     Input value column; ``None``, NaN and infinity are missing.
 /// operations : list[dict]
 ///     Ordered operations, each ``{"name", "family" ("timeseries" |
 ///     "cross_sectional"), "op", "params"?, "input"?}``. ``input`` selects
 ///     ``"values"`` or an earlier operation name (default: previous column).
 /// entity : sequence, optional
-///     Row-aligned entity keys (required for time-series ops; coerced to str).
+///     Row-aligned entity keys (required for time-series ops; aware datetimes normalize to UTC; strings stay opaque).
 /// order : sequence, optional
 ///     Row-aligned sort keys (required for time-series ops).
 /// time_key : sequence, optional
@@ -745,7 +800,10 @@ impl PyPanelTransformSpec {
         })?;
         Ok(Self {
             inner: PanelTransformSpec {
-                values,
+                values: values
+                    .into_iter()
+                    .map(|value| value.filter(|v| v.is_finite()))
+                    .collect(),
                 entity: entity.map(|e| extract_keys(e, "entity")).transpose()?,
                 order: order.map(|o| extract_keys(o, "order")).transpose()?,
                 time_key: time_key.map(|t| extract_keys(t, "time_key")).transpose()?,
@@ -959,14 +1017,45 @@ impl PyPanelTransformResult {
 #[pyfunction]
 #[pyo3(text_signature = "(spec)")]
 fn transform_panel(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPanelTransformResult> {
-    let spec: PanelTransformSpec =
-        if let Ok(typed) = spec.extract::<PyRef<'_, PyPanelTransformSpec>>() {
-            typed.inner.clone()
-        } else {
-            let json = py_to_json_value(py, spec, "panel transform spec")?;
-            serde_json::from_value(json)
-                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid panel transform spec"))?
-        };
+    let spec: PanelTransformSpec = if let Ok(typed) =
+        spec.extract::<PyRef<'_, PyPanelTransformSpec>>()
+    {
+        typed.inner.clone()
+    } else if let Ok(json) = spec.extract::<String>() {
+        serde_json::from_str(&json).map_err(|error| {
+            crate::errors::serde_json_to_py(error, "invalid panel transform spec")
+        })?
+    } else {
+        let mapping = spec.cast::<PyDict>()?;
+        for key in mapping.keys() {
+            let key: String = key.extract()?;
+            if !["values", "operations", "entity", "order", "time_key"].contains(&key.as_str()) {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "unknown panel transform field '{key}'"
+                )));
+            }
+        }
+        let values = mapping.get_item("values")?.ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err("panel transform values is required")
+        })?;
+        let operations = mapping.get_item("operations")?.ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err("panel transform operations is required")
+        })?;
+        let entity = mapping.get_item("entity")?.filter(|value| !value.is_none());
+        let order = mapping.get_item("order")?.filter(|value| !value.is_none());
+        let time_key = mapping
+            .get_item("time_key")?
+            .filter(|value| !value.is_none());
+        PyPanelTransformSpec::new(
+            py,
+            values.extract()?,
+            &operations,
+            entity.as_ref(),
+            order.as_ref(),
+            time_key.as_ref(),
+        )?
+        .inner
+    };
     py.detach(move || finstack_quant_features::transform_panel(&spec))
         .map(|inner| PyPanelTransformResult { inner })
         .map_err(core_to_py)

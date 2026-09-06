@@ -741,10 +741,12 @@ def transform_timeseries(
     The input is a flat panel column. Rows are grouped by ``entity``, sorted by
     ``order`` within each group, transformed, and returned in the original input
     order. ``order`` is lexicographic; use ISO-8601 for calendar chronology.
-    ``window``, ``periods``, ``half_life``, and EWMA ``span`` count finite
-    observations (pandas ``skipna``); missing rows do not decay. ``None`` and
-    non-finite numeric values are treated as missing and produce ``None``
-    where the requested transform cannot be evaluated.
+    ``window`` spans rows, including missing rows; ``min_periods`` counts
+    finite observations within that window and must not exceed ``window``.
+    ``periods``, ``half_life``, and EWMA ``span`` use finite observation time.
+    Aggregates may emit at missing current rows; current-value transforms
+    require finite current inputs. NaN and infinities are treated as missing.
+    Non-finite calculation results raise ``ValueError`` on every entry point.
 
     Parameters
     ----------
@@ -754,7 +756,10 @@ def transform_timeseries(
         Entity key for each row; length must match ``values``.
     order : list[str]
         Sort key for each row within an entity; length must match
-        ``values``. Ties preserve input order.
+        ``values``. Ties preserve input order. Aware datetimes normalize to
+        UTC at fixed nanosecond precision; naive datetimes retain wall time.
+        Mixing aware and naive datetimes raises ``ValueError``. Opaque strings
+        require a consistent timezone and precision for chronological order.
     op : str
         Operation name. Supported values are ``"returns"``,
         ``"log_returns"``, ``"diff"``, ``"lag"``,
@@ -772,7 +777,7 @@ def transform_timeseries(
         rolling operations (defaults ``1`` and ``window``); optional
         ``risk_free`` for ``rolling_sharpe`` (default ``0.0``, same units
         as the return series, no annualization); required
-        positive finite pandas ``span`` for EWMA operations (not a
+        finite pandas ``span >= 1`` for EWMA operations (not a
         RiskMetrics ``lambda``); required positive finite ``half_life``
         for ``exponential_decay_weights``.
 
@@ -787,18 +792,21 @@ def transform_timeseries(
     ValueError
         If lengths differ, ``op`` is unsupported, or params are
         malformed. Integer params must be positive. EWMA operations require
-        a positive finite ``span``.
+        a finite ``span >= 1``.
 
     Notes
     -----
     ``returns`` and ``log_returns`` return ``None`` when the prior value is
-    missing or has magnitude at or below ``1e-12``. ``rolling_std`` and
+    missing or zero. ``rolling_std`` and
     ``rolling_zscore`` use sample standard deviation and require at least
     two finite observations. ``ewma_mean``, ``ewma_vol``, and
     ``ewma_zscore`` expect a **return** series and share one pandas
     ``adjust=False`` centered-variance recursion. The first finite
-    observation has vol ``None`` and z-score ``0.0``. Missing rows skip
-    without decaying.     ``rolling_sharpe`` is a period feature
+    observation has vol ``None`` and z-score ``0.0``. After two finite rows,
+    constant series have volatility ``0.0``. Variance is biased, equivalent
+    to ``adjust=False, ignore_na=True, bias=True`` on observed rows. Missing
+    rows skip without decaying. Rolling slope is measured per row position,
+    retaining missing-row gaps. ``rolling_sharpe`` is a period feature
     ``(mean - risk_free) / sample_std`` on returns, not the annualized
     ``analytics`` / GIPS Sharpe. ``risk_free`` defaults to ``0.0`` in the
     same units as the return series. ``drawdown`` takes a **level**
@@ -831,7 +839,9 @@ def transform_cross_sectional(
         Numeric input column. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     op : str
         Operation name. Supported values are ``"zscore"``, ``"rank"``,
         ``"percentile_rank"``, ``"quantile_bucket"``, ``"demean"``,
@@ -846,7 +856,8 @@ def transform_cross_sectional(
         ``buckets``; ``clip`` accepts explicit ``lower`` and ``upper``;
         ``clip_by_sigma`` accepts ``sigma``; ``winsorize`` accepts ``lower``
         and ``upper`` quantile
-        probabilities; ``cap_weights`` accepts ``max_abs``;
+        probabilities; ``cap_weights`` accepts a final weight cap ``max_abs``
+        (default 1.0, must satisfy ``0 < max_abs <= 1``);
         ``fill_missing`` accepts ``value``.
 
     Returns
@@ -861,15 +872,20 @@ def transform_cross_sectional(
         If lengths differ, ``op`` is unsupported, params are
         malformed, explicit clip bounds are inverted, ``sigma`` is
         negative, or quantile bounds do not satisfy
-        ``0 <= lower <= upper <= 1``.
+        ``0 <= lower <= upper <= 1``, a final weight cap is infeasible,
+        or arithmetic produces a non-finite result.
 
     Notes
     -----
     ``zscore`` uses population standard deviation and returns ``0.0`` for
-    finite rows when partition standard deviation is at or below ``1e-12``.
+    finite rows when the partition is constant. Signed zeros always tie.
     ``rank`` returns percentile ranks in ``[0, 1]``; ties share the lowest
     tied rank and a single finite row maps to ``0.0``. ``percentile_rank``
-    returns open-interval ranks using average tied positions.
+    returns open-interval ranks using average tied positions. ``cap_weights``
+    retains demeaned-signal signs, allocates gross 0.5 to each side, and
+    redistributes capped exposure proportionally within each side. A side
+    with insufficient capacity raises ``ValueError``. Constant signals give
+    zero weights; other feasible partitions have zero net and unit gross.
 
     Examples
     --------
@@ -899,7 +915,9 @@ def transform_cross_sectional_grouped(
         Numeric input column. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     groups : list[str]
         Secondary partition key combined with ``time_key``; length must
         match ``values``.
@@ -924,12 +942,13 @@ def transform_cross_sectional_grouped(
     Examples
     --------
     >>> from finstack_quant.features import transform_cross_sectional_grouped
-    >>> transform_cross_sectional_grouped(
+    >>> scores = transform_cross_sectional_grouped(
     ...     [1.0, 3.0, 10.0, 14.0],
     ...     ["2026-01-01"] * 4,
     ...     ["tech", "tech", "finance", "finance"],
     ...     "zscore",
     ... )
+    >>> [round(value, 3) for value in scores]
     [-1.0, 1.0, -1.0, 1.0]
     """
     ...
@@ -954,7 +973,9 @@ def neutralize(
         Signal column to neutralize. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     exposures : list[list[float | None]]
         Exposure columns, each aligned to ``values`` (same length and
         row order).
@@ -978,7 +999,8 @@ def neutralize(
     Examples
     --------
     >>> from finstack_quant.features import neutralize
-    >>> neutralize([1.0, 2.0, 2.0, 4.0], ["2026-01-01"] * 4, [[0.0, 1.0, 0.0, 1.0]])
+    >>> residuals = neutralize([1.0, 2.0, 2.0, 4.0], ["2026-01-01"] * 4, [[0.0, 1.0, 0.0, 1.0]])
+    >>> [round(value, 3) for value in residuals]
     [-0.5, -1.0, 0.5, 1.0]
     """
     ...
@@ -996,9 +1018,10 @@ def transform_timeseries_pairwise(
 
     Rows are grouped by ``entity`` and sorted by ``order`` within each group.
     ``order`` is lexicographic; use ISO-8601 for calendar chronology. Each
-    output row is computed from the trailing ``window`` of paired finite
-    ``(values, other)`` observations. ``window`` counts finite pairs, not
-    calendar days (pandas ``skipna``).
+    output row uses complete finite pairs within the trailing ``window``
+    rows, including missing rows. ``min_periods <= window`` counts complete
+    pairs; the current row may be missing if enough pairs remain. Neither
+    parameter counts calendar days.
 
     Parameters
     ----------
@@ -1010,7 +1033,10 @@ def transform_timeseries_pairwise(
         Entity key for each row; length must match ``values``.
     order : list[str]
         Sort key for each row within an entity; length must match
-        ``values``. Ties preserve input order.
+        ``values``. Ties preserve input order. Aware datetimes normalize to
+        UTC at fixed nanosecond precision; naive datetimes retain wall time.
+        Mixing aware and naive datetimes raises ``ValueError``. Opaque strings
+        require a consistent timezone and precision for chronological order.
     op : str
         Operation name. Supported values are ``"rolling_cov"``,
         ``"rolling_corr"``, and ``"rolling_beta"``.
@@ -1063,8 +1089,8 @@ def rolling_regression_residual(
 
     Rows are grouped by ``entity`` and sorted by ``order``. For each row, an OLS
     fit of ``values`` on the exposure columns is computed over the trailing
-    ``window`` of complete rows, and the row's residual from that fit is
-    returned.
+    ``window`` rows, retaining missing-row gaps and fitting only complete
+    rows within it. A missing current response or exposure yields ``None``.
 
     Parameters
     ----------
@@ -1077,7 +1103,10 @@ def rolling_regression_residual(
         Entity key for each row; length must match ``values``.
     order : list[str]
         Sort key for each row within an entity; length must match
-        ``values``. Ties preserve input order.
+        ``values``. Ties preserve input order. Aware datetimes normalize to
+        UTC at fixed nanosecond precision; naive datetimes retain wall time.
+        Mixing aware and naive datetimes raises ``ValueError``. Opaque strings
+        require a consistent timezone and precision for chronological order.
     params : TransformParams or None
         Optional parameters. ``window`` (default ``1``); ``min_periods``
         (default ``window``) is the minimum number of complete rows required
@@ -1123,7 +1152,7 @@ def risk_scaled_weights(
     """
     Convert a signal to dollar-neutral inverse-risk-scaled weights.
 
-    Within each ``time_key`` partition, finite rows with ``|vol| > 1e-12``
+    Within each ``time_key`` partition, finite rows with ``vol > 0``
     become ``raw = signal / vol``, then ``centered = raw - mean(raw)``,
     then ``weight = centered / sum(|centered|)``.
 
@@ -1133,10 +1162,13 @@ def risk_scaled_weights(
         Signal column. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     volatility : list[float | None]
-        Risk estimate per row, aligned to ``values``. A magnitude at
-        or below ``1e-12`` is treated as missing.
+        Nonnegative risk estimate per row, aligned to ``values``, with a
+        common horizon and units. Negative estimates raise ``ValueError``;
+        zero, missing and non-finite estimates produce missing weights.
     Returns
     -------
     list[float | None]
@@ -1146,13 +1178,12 @@ def risk_scaled_weights(
     Raises
     ------
     ValueError
-        If lengths differ.
+        If lengths differ, volatility is negative, or arithmetic is non-finite.
 
     Notes
     -----
-    Rows with missing ``values`` or ``|volatility| <= 1e-12`` map to
-    ``None``. A partition whose centered gross is at or below ``1e-12``
-    emits ``0.0`` for those finite rows.
+    Rows with missing ``values`` or zero/missing/non-finite volatility map
+    to ``None``. A partition with zero centered gross emits ``0.0``.
 
     Examples
     --------
@@ -1179,7 +1210,9 @@ def rank_to_weights(
         Signal column. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     Returns
     -------
     list[float | None]
@@ -1218,13 +1251,16 @@ def neutralize_and_zscore(
         Signal column. ``None`` represents missing data.
     time_key : list[str]
         Cross-sectional partition key for each row; length must match
-        ``values``.
+        ``values``. Aware datetime keys normalize to UTC with fixed precision,
+        so different offsets for the same instant share a partition. Mixing
+        aware and naive datetimes raises ``ValueError``; strings stay opaque.
     exposures : list[list[float | None]]
         Exposure columns, each aligned to ``values`` (same length and
         row order).
     params : TransformParams or None
         Optional parameters forwarded to :func:`neutralize`;
-        ``fit_intercept`` (default ``True``).
+        ``fit_intercept`` defaults to ``True`` and must remain true to preserve
+        exposure neutrality after demeaning.
 
     Returns
     -------
@@ -1236,7 +1272,7 @@ def neutralize_and_zscore(
     ------
     ValueError
         If lengths differ, an exposure column has the wrong length,
-        params are malformed, or a ``time_key`` partition is singular
+        params are malformed, ``fit_intercept=False``, or a ``time_key`` partition is singular
         or underdetermined (the error names that ``time_key``).
 
     Examples

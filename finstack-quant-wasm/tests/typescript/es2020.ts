@@ -1,6 +1,7 @@
 import {
   analytics,
   core,
+  features,
   models,
   portfolio,
   type MaterializationPhases,
@@ -96,3 +97,10 @@ void factorAttribution;
 void materializationParseNanos;
 void materializationTimingAvailable;
 void materializationDependencies;
+
+features.riskScaledWeights([1, -1], ['d', 'd'], [0.1, 0.1]);
+features.rankToWeights([1, 2], ['d', 'd']);
+// @ts-expect-error This helper does not accept transform parameters.
+features.riskScaledWeights([1, -1], ['d', 'd'], [0.1, 0.1], {});
+// @ts-expect-error This helper does not accept transform parameters.
+features.rankToWeights([1, 2], ['d', 'd'], {});

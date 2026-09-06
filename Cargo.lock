@@ -868,6 +868,7 @@ version = "0.8.0"
 dependencies = [
  "criterion",
  "finstack-quant-core",
+ "nalgebra",
  "schemars",
  "serde",
  "serde_json",

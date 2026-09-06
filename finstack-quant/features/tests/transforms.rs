@@ -548,16 +548,8 @@ fn transform_cross_sectional_supports_weight_and_missing_ops() {
         Some(&json!({"max_abs": 0.5})),
     )
     .expect("cap weights");
-    assert_close_options(
-        &capped,
-        &[
-            Some(-1.0 / 3.0),
-            Some(-1.0 / 3.0),
-            Some(1.0 / 3.0),
-            None,
-            None,
-        ],
-    );
+    // A 50% final cap leaves these already-neutral weights unchanged.
+    assert_close_options(&capped, &long_short);
 
     let filled = transform_cross_sectional(
         &values,

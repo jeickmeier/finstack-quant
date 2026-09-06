@@ -57,9 +57,6 @@ pub(crate) fn reject_unknown_params(
     Ok(())
 }
 
-/// Numerical tolerance used for zero-denominator checks.
-pub(crate) const ZERO_TOLERANCE: f64 = 1e-12;
-
 /// Φ⁻¹(0.75). Reciprocal of [`MAD_NORMAL_CONSISTENCY`].
 pub(crate) const PHI_INV_075: f64 = 0.674_489_750_196_081_7;
 
@@ -67,7 +64,10 @@ pub(crate) const PHI_INV_075: f64 = 0.674_489_750_196_081_7;
 pub(crate) const MAD_NORMAL_CONSISTENCY: f64 = 1.482_602_218_505_602;
 
 pub(crate) fn finite(value: Option<f64>) -> Option<f64> {
-    value.filter(|inner| inner.is_finite())
+    // Signed zeros are numerically equal, including for total-ordered ranks.
+    value
+        .filter(|inner| inner.is_finite())
+        .map(|v| if v.abs() <= 0.0 { 0.0 } else { v })
 }
 
 pub(crate) fn validate_lengths(primary: usize, others: &[(&str, usize)]) -> Result<()> {
@@ -135,11 +135,58 @@ pub(crate) fn bool_param(params: Option<&Value>, key: &str, default: bool) -> Re
     }
 }
 
+/// Row-window length and required finite count, independent of input readiness.
+pub(crate) fn window_params(params: Option<&Value>) -> Result<(usize, usize)> {
+    let window = usize_param(params, "window", 1)?;
+    let min_periods = usize_param(params, "min_periods", window)?;
+    if min_periods > window {
+        return Err(Error::Validation(
+            "min_periods must not exceed window".into(),
+        ));
+    }
+    Ok((window, min_periods))
+}
+
+/// Reject numerical failures instead of letting JSON turn them into missing data.
+pub(crate) fn validate_output(values: &[Option<f64>]) -> Result<()> {
+    if let Some(idx) = values
+        .iter()
+        .position(|value| value.is_some_and(|v| !v.is_finite()))
+    {
+        return Err(Error::Validation(format!(
+            "non-finite feature result at row {idx}"
+        )));
+    }
+    Ok(())
+}
+
+/// Scale before centering so moments do not depend on the input's units.
+pub(crate) fn scaled_centered(values: &[f64]) -> (f64, Vec<f64>) {
+    let scale = values.iter().copied().map(f64::abs).fold(0.0, f64::max);
+    if scale <= 0.0 {
+        return (0.0, vec![0.0; values.len()]);
+    }
+    let mut centered: Vec<_> = values.iter().map(|value| value / scale).collect();
+    let center = finstack_quant_core::math::summation::kahan_sum(centered.iter().copied())
+        / values.len() as f64;
+    for value in &mut centered {
+        *value -= center;
+    }
+    (scale, centered)
+}
+
 pub(crate) fn mean(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
         return None;
     }
-    Some(values.iter().sum::<f64>() / values.len() as f64)
+    let scale = values.iter().copied().map(f64::abs).fold(0.0, f64::max);
+    if scale <= 0.0 {
+        return Some(0.0);
+    }
+    let normalized =
+        finstack_quant_core::math::summation::kahan_sum(values.iter().map(|value| value / scale))
+            / values.len() as f64;
+    Some(normalized.clamp(-1.0, 1.0) * scale)
 }
 
 /// Return the Type-7 continuous quantile of an ascending, total-ordered slice.
@@ -156,39 +203,28 @@ pub(crate) fn quantile_cont(sorted: &[f64], probability: f64) -> Option<f64> {
     let weight = pos - lower_idx as f64;
     let lower = sorted[lower_idx];
     let upper = sorted[upper_idx];
-    Some(lower + weight * (upper - lower))
+    Some((1.0 - weight) * lower + weight * upper)
 }
 
 pub(crate) fn sample_std(values: &[f64]) -> Option<f64> {
     if values.len() < 2 {
         return None;
     }
-    let mean = mean(values)?;
-    let variance = values
-        .iter()
-        .map(|value| {
-            let centered = *value - mean;
-            centered * centered
-        })
-        .sum::<f64>()
-        / (values.len() - 1) as f64;
-    Some(variance.sqrt())
+    Some(std(values, values.len() - 1))
 }
 
 pub(crate) fn population_std(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
         return None;
     }
-    let mean = mean(values)?;
-    let variance = values
-        .iter()
-        .map(|value| {
-            let centered = *value - mean;
-            centered * centered
-        })
-        .sum::<f64>()
-        / values.len() as f64;
-    Some(variance.sqrt())
+    Some(std(values, values.len()))
+}
+
+fn std(values: &[f64], denominator: usize) -> f64 {
+    let (scale, centered) = scaled_centered(values);
+    let sum_sq =
+        finstack_quant_core::math::summation::kahan_sum(centered.iter().map(|value| value * value));
+    (sum_sq / denominator as f64).sqrt() * scale
 }
 
 #[cfg(test)]

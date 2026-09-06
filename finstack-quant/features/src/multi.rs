@@ -7,13 +7,13 @@
 use crate::cross_sectional::apply_cross_sectional_op;
 use crate::index::{sorted_indices, try_for_each_entity, try_for_each_trailing_window};
 use crate::types::{
-    bool_param, finite, op_from_str, reject_unknown_params, usize_param, validate_lengths,
-    ZERO_TOLERANCE,
+    bool_param, finite, mean, op_from_str, reject_unknown_params, scaled_centered,
+    validate_lengths, validate_output, window_params,
 };
 use crate::{transform_cross_sectional, transform_cross_sectional_with_op, CrossSectionalOp};
-use finstack_quant_core::math::linalg::{cholesky_decomposition, cholesky_solve};
 use finstack_quant_core::math::stats::{covariance, variance};
 use finstack_quant_core::{Error, Result};
+use nalgebra::{DMatrix, DVector};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
@@ -120,12 +120,14 @@ pub fn transform_cross_sectional_grouped_with_op(
         &[("time_key", time_key.len()), ("groups", groups.len())],
     )?;
     reject_unknown_params(params, &op.name(), op.param_keys())?;
+    crate::cross_sectional::validate_params(op, params)?;
     let partitions = crate::index::partition_by_pair(time_key, groups);
 
     let mut output = vec![None; values.len()];
     for indices in partitions.values() {
         apply_cross_sectional_op(values, indices, op, params, &mut output)?;
     }
+    validate_output(&output)?;
     Ok(output)
 }
 
@@ -133,7 +135,9 @@ pub fn transform_cross_sectional_grouped_with_op(
 ///
 /// `exposures` is a slice of columns, each aligned to `values`. Parameters:
 /// `fit_intercept` (default `true`). Equal-weighted OLS; a singular or
-/// underdetermined design in any time partition fails the call.
+/// underdetermined design in any time partition fails the call. Scaled SVD
+/// avoids dependence on exposure units. Residuals within numerical roundoff
+/// of an exact fit are set to zero.
 ///
 /// # Arguments
 ///
@@ -148,7 +152,7 @@ pub fn transform_cross_sectional_grouped_with_op(
 ///
 /// Returns a validation error when input lengths differ, exposure shapes are
 /// malformed, parameters are malformed, or a time partition has fewer complete
-/// rows than columns or a singular `X'X` (the error names that `time_key`).
+/// rows than columns or a rank-deficient scaled design (the error names that `time_key`).
 pub fn neutralize(
     values: &[Option<f64>],
     time_key: &[String],
@@ -165,13 +169,15 @@ pub fn neutralize(
     for (key, indices) in &partitions {
         residualize_partition(values, exposures, key, indices, fit_intercept, &mut output)?;
     }
+    validate_output(&output)?;
     Ok(output)
 }
 
 /// Transform two value columns per entity with a rolling pairwise operation.
 ///
-/// `window` and `min_periods` count paired finite observations, not calendar
-/// days. Missing rows do not expand the window (pandas `skipna`).
+/// `window` spans trailing entity rows, including missing rows; `min_periods`
+/// counts complete finite pairs within it. Aggregates may emit at a missing
+/// current row when enough pairs remain. Neither parameter counts calendar days.
 ///
 /// # Arguments
 ///
@@ -186,7 +192,7 @@ pub fn neutralize(
 /// * `op` - Canonical operation name: `"rolling_cov"`, `"rolling_corr"`, or
 ///   `"rolling_beta"`.
 /// * `params` - Optional JSON parameters; `window` defaults to 1 and
-///   `min_periods` defaults to `window`. Both count finite paired rows.
+///   `min_periods` defaults to `window`. `window` counts rows, `min_periods` counts finite pairs and cannot exceed `window`.
 ///
 /// # Errors
 ///
@@ -212,7 +218,8 @@ pub fn transform_timeseries_pairwise(
 
 /// Transform two value columns per entity with a typed rolling pairwise op.
 ///
-/// `window` counts paired finite observations (pandas `skipna`).
+/// `window` spans trailing rows, including missing rows. `min_periods` counts
+/// finite pairs within that window and cannot exceed its length.
 ///
 /// # Arguments
 ///
@@ -248,8 +255,7 @@ pub fn transform_timeseries_pairwise_with_op(
         ],
     )?;
     reject_unknown_params(params, &op.name(), op.param_keys())?;
-    let window = usize_param(params, "window", 1)?;
-    let min_periods = usize_param(params, "min_periods", window)?;
+    let (window, min_periods) = window_params(params)?;
     let required = min_periods.max(2);
     let mut output = vec![None; values.len()];
     let indices = sorted_indices(entity, order);
@@ -270,13 +276,14 @@ pub fn transform_timeseries_pairwise_with_op(
             Ok(())
         })
     })?;
+    validate_output(&output)?;
     Ok(output)
 }
 
 /// Return rolling OLS residuals per entity using aligned exposure columns.
 ///
 /// Parameters: `window`, `min_periods` (default `window`), and `fit_intercept`
-/// (default `true`). `window` counts complete finite rows (pandas `skipna`).
+/// (default `true`). `window` spans rows, including missing rows.
 /// Rank-deficient windows emit `None` for that row; that is intentional and
 /// unlike [`neutralize`], which fails the call.
 ///
@@ -290,7 +297,7 @@ pub fn transform_timeseries_pairwise_with_op(
 /// * `order` - Row-aligned sortable keys that establish rolling chronology.
 ///   Time order is lexicographic; use ISO-8601 for calendar chronology.
 /// * `params` - Optional JSON controls for `window`, `min_periods`, and
-///   `fit_intercept`. `window` counts complete finite rows.
+///   `fit_intercept`. `window` spans rows; `min_periods` counts complete rows within it and must not exceed `window`.
 ///
 /// # Errors
 ///
@@ -313,8 +320,7 @@ pub fn rolling_regression_residual(
         "rolling_regression_residual",
         &["window", "min_periods", "fit_intercept"],
     )?;
-    let window = usize_param(params, "window", 1)?;
-    let min_periods = usize_param(params, "min_periods", window)?;
+    let (window, min_periods) = window_params(params)?;
     let fit_intercept = bool_param(params, "fit_intercept", true)?;
     let mut output = vec![None; values.len()];
     let indices = sorted_indices(entity, order);
@@ -323,20 +329,21 @@ pub fn rolling_regression_residual(
             if count_complete_rows(values, exposures, window_indices) < min_periods {
                 return Ok(());
             }
-            if let Some(beta) = fit_ols(values, exposures, window_indices, fit_intercept) {
-                output[idx] = residual_for_idx(values, exposures, idx, fit_intercept, &beta);
+            if let Some(fit) = fit_ols(values, exposures, window_indices, fit_intercept)? {
+                output[idx] = residual_for_idx(values, exposures, idx, &fit);
             }
             Ok(())
         })
     })?;
+    validate_output(&output)?;
     Ok(output)
 }
 
 /// Convert a signal to dollar-neutral inverse-risk-scaled weights per time key.
 ///
-/// Finite rows with `|vol| > 1e-12` become `raw = signal / vol`, then
+/// Finite rows with `vol > 0` become `raw = signal / vol`, then
 /// `centered = raw - mean(raw)`, then `weight = centered / sum(|centered|)`.
-/// If that gross is at or below `1e-12`, finite rows emit `0.0`. Missing
+/// If that gross is zero, finite rows emit `0.0`. Negative volatility fails. Missing
 /// signal or volatility stays missing.
 ///
 /// # Arguments
@@ -344,12 +351,14 @@ pub fn rolling_regression_residual(
 /// * `values` - Row-aligned raw signal values to convert into portfolio weights.
 /// * `time_key` - Row-aligned labels defining independently normalized
 ///   cross-sections.
-/// * `volatility` - Row-aligned risk estimates; zero, missing, or non-finite
-///   values produce missing output weights.
+/// * `volatility` - Row-aligned nonnegative risk estimates using a common horizon
+///   and units; negative values fail, while zero, missing, or non-finite values
+///   produce missing output weights.
 ///
 /// # Errors
 ///
-/// Returns a validation error when input lengths differ.
+/// Returns a validation error when input lengths differ, volatility is negative,
+/// or scaling produces a non-finite result.
 pub fn risk_scaled_weights(
     values: &[Option<f64>],
     time_key: &[String],
@@ -362,14 +371,21 @@ pub fn risk_scaled_weights(
             ("volatility", volatility.len()),
         ],
     )?;
+    if volatility
+        .iter()
+        .any(|vol| finite(*vol).is_some_and(|v| v < 0.0))
+    {
+        return Err(Error::Validation("volatility must not be negative".into()));
+    }
     let scaled = values
         .iter()
         .zip(volatility.iter())
         .map(|(signal, vol)| match (finite(*signal), finite(*vol)) {
-            (Some(signal), Some(vol)) if vol.abs() > ZERO_TOLERANCE => Some(signal / vol),
+            (Some(signal), Some(vol)) if vol > 0.0 => Some(signal / vol),
             _ => None,
         })
         .collect::<Vec<_>>();
+    validate_output(&scaled)?;
     transform_cross_sectional_with_op(&scaled, time_key, CrossSectionalOp::LongShortWeights, None)
 }
 
@@ -399,18 +415,24 @@ pub fn rank_to_weights(values: &[Option<f64>], time_key: &[String]) -> Result<Ve
 ///   regressions and z-scores.
 /// * `exposures` - Explanatory-variable columns, each aligned to `values`.
 /// * `params` - Optional neutralization controls; `fit_intercept` defaults to
-///   `true`.
+///   `true` and must remain true to preserve exposure neutrality after demeaning.
 ///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, exposure shapes are
-/// malformed, or neutralization parameters are malformed.
+/// malformed, a partition is singular, `fit_intercept` is false, or arithmetic fails.
 pub fn neutralize_and_zscore(
     values: &[Option<f64>],
     time_key: &[String],
     exposures: &[Vec<Option<f64>>],
     params: Option<&Value>,
 ) -> Result<Vec<Option<f64>>> {
+    if !bool_param(params, "fit_intercept", true)? {
+        return Err(Error::Validation(
+            "neutralize_and_zscore requires fit_intercept=true to preserve exposure neutrality"
+                .into(),
+        ));
+    }
     let residual = neutralize(values, time_key, exposures, params)?;
     transform_cross_sectional(&residual, time_key, "zscore", None)
 }
@@ -428,29 +450,27 @@ fn validate_exposures(primary_len: usize, exposures: &[Vec<Option<f64>>]) -> Res
 }
 
 fn pairwise_value(left: &[f64], right: &[f64], op: PairwiseOp) -> Option<f64> {
-    let cov = covariance(left, right);
-    if !cov.is_finite() {
-        return None;
-    }
+    let (left_scale, left) = scaled_centered(left);
+    let (right_scale, right) = scaled_centered(right);
+    let cov = covariance(&left, &right);
     match op {
-        PairwiseOp::RollingCov => Some(cov),
+        PairwiseOp::RollingCov => Some((cov * left_scale) * right_scale),
         PairwiseOp::RollingCorr => {
-            let left_var = variance(left);
-            let right_var = variance(right);
-            let denom = (left_var * right_var).sqrt();
-            if denom <= ZERO_TOLERANCE {
-                Some(0.0)
+            let left_std = variance(&left).sqrt();
+            let right_std = variance(&right).sqrt();
+            Some(if left_std > 0.0 && right_std > 0.0 {
+                ((cov / left_std) / right_std).clamp(-1.0, 1.0)
             } else {
-                Some(cov / denom)
-            }
+                0.0
+            })
         }
         PairwiseOp::RollingBeta => {
-            let right_var = variance(right);
-            if right_var <= ZERO_TOLERANCE {
-                Some(0.0)
+            let right_var = variance(&right);
+            Some(if right_var > 0.0 {
+                ((cov / right_var) * left_scale) / right_scale
             } else {
-                Some(cov / right_var)
-            }
+                0.0
+            })
         }
     }
 }
@@ -463,13 +483,13 @@ fn residualize_partition(
     fit_intercept: bool,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let beta = fit_ols(values, exposures, indices, fit_intercept).ok_or_else(|| {
+    let fit = fit_ols(values, exposures, indices, fit_intercept)?.ok_or_else(|| {
         Error::Validation(format!(
             "neutralize OLS failed for time_key '{time_key}': singular or underdetermined design"
         ))
     })?;
     for &idx in indices {
-        output[idx] = residual_for_idx(values, exposures, idx, fit_intercept, &beta);
+        output[idx] = residual_for_idx(values, exposures, idx, &fit);
     }
     Ok(())
 }
@@ -490,90 +510,132 @@ fn count_complete_rows(
         .count()
 }
 
+/// A fitted model evaluated in the scaled coordinates used by the solver.
+struct OlsFit {
+    beta: Vec<f64>,
+    scales: Vec<f64>,
+    centers: Vec<f64>,
+    spreads: Vec<f64>,
+    response_scale: f64,
+    fit_intercept: bool,
+    roundoff: f64,
+}
+
 fn fit_ols(
     values: &[Option<f64>],
     exposures: &[Vec<Option<f64>>],
     indices: &[usize],
     fit_intercept: bool,
-) -> Option<Vec<f64>> {
+) -> Result<Option<OlsFit>> {
     let width = exposures.len() + usize::from(fit_intercept);
-    if width == 0 {
-        return None;
-    }
-    let complete_rows = count_complete_rows(values, exposures, indices);
-    if complete_rows < width {
-        return None;
-    }
-
-    let mut gram = vec![0.0; width * width];
-    let mut rhs = vec![0.0; width];
-    for &idx in indices {
-        let Some(y) = finite(values[idx]) else {
-            continue;
-        };
-        let mut row = Vec::with_capacity(width);
-        if fit_intercept {
-            row.push(1.0);
-        }
-        let mut complete = true;
-        for exposure in exposures {
-            if let Some(value) = finite(exposure[idx]) {
-                row.push(value);
-            } else {
-                complete = false;
-                break;
-            }
-        }
-        if !complete {
-            continue;
-        }
-        for i in 0..width {
-            rhs[i] += row[i] * y;
-            for j in 0..width {
-                gram[i * width + j] += row[i] * row[j];
-            }
-        }
-    }
-
-    let chol = cholesky_decomposition(&gram, width).ok()?;
-    if cholesky_factor_is_singular(&chol, width) {
-        return None;
-    }
-    let mut beta = vec![0.0; width];
-    cholesky_solve(&chol, &rhs, &mut beta).ok()?;
-    Some(beta)
-}
-
-fn cholesky_factor_is_singular(chol: &[f64], width: usize) -> bool {
-    let max_diag_sq = (0..width)
-        .map(|i| {
-            let diag = chol[i * width + i];
-            diag * diag
+    let complete: Vec<_> = indices
+        .iter()
+        .copied()
+        .filter(|&idx| {
+            finite(values[idx]).is_some() && exposures.iter().all(|col| finite(col[idx]).is_some())
         })
-        .fold(0.0, f64::max);
-    let threshold = ZERO_TOLERANCE * max_diag_sq.max(1.0);
-    (0..width).any(|i| {
-        let diag = chol[i * width + i];
-        diag * diag <= threshold
-    })
+        .collect();
+    if width == 0 || complete.len() < width {
+        return Ok(None);
+    }
+    let mut design = DMatrix::zeros(complete.len(), width);
+    if fit_intercept {
+        design.column_mut(0).fill(1.0);
+    }
+    let mut fit = OlsFit {
+        beta: Vec::new(),
+        scales: Vec::new(),
+        centers: Vec::new(),
+        spreads: Vec::new(),
+        response_scale: complete
+            .iter()
+            .map(|&idx| values[idx].unwrap_or(0.0).abs())
+            .fold(0.0, f64::max),
+        fit_intercept,
+        roundoff: 8.0 * f64::EPSILON * complete.len().max(width) as f64,
+    };
+    if fit.response_scale <= 0.0 {
+        fit.response_scale = 1.0;
+    }
+    for (col, exposure) in exposures.iter().enumerate() {
+        let scale = complete
+            .iter()
+            .map(|&idx| exposure[idx].unwrap_or(0.0).abs())
+            .fold(0.0, f64::max);
+        if scale <= 0.0 {
+            return Ok(None);
+        }
+        let normalized: Vec<_> = complete
+            .iter()
+            .map(|&idx| exposure[idx].unwrap_or(0.0) / scale)
+            .collect();
+        let center = if fit_intercept {
+            mean(&normalized).unwrap_or(0.0)
+        } else {
+            0.0
+        };
+        let spread = normalized
+            .iter()
+            .map(|value| (value - center).abs())
+            .fold(0.0, f64::max);
+        if spread <= 0.0 {
+            return Ok(None);
+        }
+        for (row, value) in normalized.iter().enumerate() {
+            design[(row, col + usize::from(fit_intercept))] = (value - center) / spread;
+        }
+        fit.scales.push(scale);
+        fit.centers.push(center);
+        fit.spreads.push(spread);
+    }
+    let response = DVector::from_iterator(
+        complete.len(),
+        complete
+            .iter()
+            .map(|&idx| values[idx].unwrap_or(0.0) / fit.response_scale),
+    );
+    // Scale columns before SVD; do not square the design's condition number
+    // by forming X'X. Truly rank-deficient windows remain explicitly missing.
+    let svd = nalgebra::linalg::SVD::try_new(design, true, true, f64::EPSILON, 1000)
+        .ok_or_else(|| Error::Validation("feature OLS SVD did not converge".into()))?;
+    let max_singular = svd.singular_values.iter().copied().fold(0.0, f64::max);
+    let cutoff = f64::EPSILON * complete.len().max(width) as f64 * max_singular;
+    if svd.rank(cutoff) < width {
+        return Ok(None);
+    }
+    let beta = svd
+        .solve(&response, cutoff)
+        .map_err(|message| Error::Validation(format!("feature OLS solve failed: {message}")))?;
+    if beta.iter().any(|value| !value.is_finite()) {
+        return Err(Error::Validation(
+            "non-finite feature OLS coefficients".into(),
+        ));
+    }
+    fit.beta = beta.as_slice().to_vec();
+    Ok(Some(fit))
 }
 
 fn residual_for_idx(
     values: &[Option<f64>],
     exposures: &[Vec<Option<f64>>],
     idx: usize,
-    fit_intercept: bool,
-    beta: &[f64],
+    fit: &OlsFit,
 ) -> Option<f64> {
-    let y = finite(values[idx])?;
-    let mut fitted = 0.0;
-    let mut offset = 0;
-    if fit_intercept {
-        fitted += beta[0];
-        offset = 1;
+    let y = finite(values[idx])? / fit.response_scale;
+    let offset = usize::from(fit.fit_intercept);
+    let mut fitted = if fit.fit_intercept { fit.beta[0] } else { 0.0 };
+    let mut magnitude = y.abs() + fitted.abs();
+    for (col, exposure) in exposures.iter().enumerate() {
+        let x = (finite(exposure[idx])? / fit.scales[col] - fit.centers[col]) / fit.spreads[col];
+        let term = fit.beta[col + offset] * x;
+        fitted += term;
+        magnitude += term.abs();
     }
-    for (exposure_idx, exposure) in exposures.iter().enumerate() {
-        fitted += beta[offset + exposure_idx] * finite(exposure[idx])?;
-    }
-    Some(y - fitted)
+    let residual = y - fitted;
+    // Do not amplify solver roundoff into unit-variance signals for an exact fit.
+    Some(if residual.abs() <= fit.roundoff * magnitude {
+        0.0
+    } else {
+        residual * fit.response_scale
+    })
 }

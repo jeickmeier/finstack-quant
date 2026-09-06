@@ -3,8 +3,9 @@
 //! This crate turns a flat value column plus grouping keys into derived feature
 //! columns, either backward-looking per entity (time-series) or partitioned per
 //! timestamp (cross-sectional). Values are `Option<f64>`; `None` and non-finite
-//! inputs are skipped and produce `None` outputs, so callers can carry missing
-//! data through a pipeline without sentinel values.
+//! inputs are excluded. Rolling aggregates may emit at a missing row when
+//! the trailing row window has enough finite observations. Current-value
+//! transforms require a finite current input; fill/mask ops handle missing rows.
 //!
 //! # Module Guide
 //!
@@ -41,9 +42,9 @@
 //! # Conventions
 //!
 //! - Keys are opaque; time order is lexicographic (use ISO-8601 for calendar
-//!   chronology).
+//!   chronology, with one timezone and fixed precision).
 //! - `periods` (`returns`, `log_returns`, `diff`, `lag`) counts finite
-//!   observations (pandas `skipna`): a `None` row never advances the lag, so
+//!   observations (observation time): a `None` row never advances the lag, so
 //!   `v_t` is compared with the `periods`-th finite value before it. Missing
 //!   rows do not decay EWMA or half-life. Rolling `window`s span the trailing
 //!   `window` rows of the entity; only finite rows inside the window
@@ -52,9 +53,14 @@
 //!   `"windows"`) is rejected instead of silently falling back to the default.
 //! - Outputs preserve input order and length; element `i` of the output
 //!   corresponds to element `i` of `values`.
-//! - `None` and non-finite inputs are skipped; they produce `None` outputs.
+//! - Missing inputs are excluded; rolling aggregates can still emit at missing
+//!   rows. Non-finite arithmetic results are validation errors on every surface.
 //! - Rolling operations require `min_periods` finite points in the window
-//!   before emitting a value.
+//!   before emitting a value; `min_periods` cannot exceed `window`.
+//! - EWMA requires `span >= 1` and uses centered biased variance. Volatility
+//!   is missing on the first finite observation, then zero for constant data.
+//! - `cap_weights` enforces final caps, zero net and unit gross; infeasible
+//!   sign-preserving allocations fail. `neutralize_and_zscore` requires an intercept.
 //! - `drawdown` takes a level series; `rolling_sharpe` is a period feature,
 //!   not the `analytics` Sharpe. `transform_panel_json` is sequential.
 //! - String/JSON entry points are retained for Python and WASM bindings; Rust

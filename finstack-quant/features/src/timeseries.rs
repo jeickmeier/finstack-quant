@@ -3,8 +3,8 @@
 mod advanced;
 
 use crate::types::{
-    finite, op_from_str, reject_unknown_params, required_f64_param, sample_std, usize_param,
-    validate_lengths, ZERO_TOLERANCE,
+    f64_param, finite, mean, op_from_str, reject_unknown_params, required_f64_param, sample_std,
+    scaled_centered, usize_param, validate_lengths, validate_output, window_params,
 };
 use advanced::{drawdown, exponential_decay_weights, rolling_advanced, AdvancedRollingOp};
 use finstack_quant_core::{Error, Result};
@@ -17,7 +17,7 @@ use std::str::FromStr;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum TimeSeriesOp {
-    /// Simple return `v_t / v_{t-periods} - 1`; `None` near zero prior values.
+    /// Simple return `v_t / v_{t-periods} - 1`; `None` for zero prior values.
     Returns,
     /// Log return `ln(v_t / v_{t-periods})`; `None` when the ratio is not positive.
     LogReturns,
@@ -147,9 +147,11 @@ impl TimeSeriesOp {
 ///
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
-/// `periods`, `half_life`, and EWMA `span` count finite observations (pandas
-/// `skipna`); missing rows do not advance the lag or decay. Rolling `window`s
+/// `periods`, `half_life`, and EWMA `span` count finite observations (observation time); missing rows do not advance the lag or decay. Rolling `window`s
 /// span the trailing `window` rows and require `min_periods` finite rows.
+/// EWMA `span` must be at least 1; centered biased variance is used. Volatility
+/// is missing initially, then zero for constant data. Rolling slope uses row
+/// positions, preserving gaps. Aggregates can emit at missing current rows.
 /// `drawdown` expects a level series. `rolling_sharpe` is a period feature, not the `analytics`
 /// Sharpe; optional JSON `risk_free` defaults to `0.0` in the same units as
 /// the return series.
@@ -171,7 +173,7 @@ impl TimeSeriesOp {
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, `op` is unsupported,
-/// or operation parameters are malformed.
+/// or operation parameters are malformed, or arithmetic produces a non-finite result.
 pub fn transform_timeseries(
     values: &[Option<f64>],
     entity: &[String],
@@ -186,7 +188,7 @@ pub fn transform_timeseries(
 ///
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
-/// `periods` and EWMA spans count finite observations (pandas `skipna`);
+/// `periods` and EWMA spans count finite observations (observation time);
 /// rolling windows span rows and require `min_periods` finite rows.
 /// Parameter keys are strict: see [`TimeSeriesOp::param_keys`].
 ///
@@ -205,7 +207,7 @@ pub fn transform_timeseries(
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ or operation parameters
-/// are malformed.
+/// are malformed or arithmetic produces a non-finite result.
 pub fn transform_timeseries_with_op(
     values: &[Option<f64>],
     entity: &[String],
@@ -218,12 +220,58 @@ pub fn transform_timeseries_with_op(
         &[("entity", entity.len()), ("order", order.len())],
     )?;
     reject_unknown_params(params, &op.name(), op.param_keys())?;
+    validate_params(op, params)?;
     let mut output = vec![None; values.len()];
     let indices = crate::index::sorted_indices(entity, order);
     crate::index::try_for_each_entity(entity, &indices, |entity_indices| {
         transform_entity(values, entity_indices, op, params, &mut output)
     })?;
+    validate_output(&output)?;
     Ok(output)
+}
+
+fn validate_params(op: TimeSeriesOp, params: Option<&Value>) -> Result<()> {
+    let keys = op.param_keys();
+    if keys.contains(&"min_periods") {
+        window_params(params)?;
+    } else if keys.contains(&"window") {
+        usize_param(params, "window", 1)?;
+    }
+    if keys.contains(&"periods") {
+        usize_param(params, "periods", 1)?;
+    }
+    if keys.contains(&"span") {
+        ewma_alpha(params)?;
+    }
+    if keys.contains(&"half_life") && required_f64_param(params, "half_life")? <= 0.0 {
+        return Err(Error::Validation("half_life must be positive".into()));
+    }
+    match op {
+        TimeSeriesOp::RollingQuantile => {
+            advanced::probability_param(params, "quantile", 0.5)?;
+        }
+        TimeSeriesOp::RollingWinsorize => {
+            let lower = advanced::probability_param(params, "lower", 0.01)?;
+            let upper = advanced::probability_param(params, "upper", 0.99)?;
+            if lower > upper {
+                return Err(Error::Validation(
+                    "rolling_winsorize requires lower <= upper".into(),
+                ));
+            }
+        }
+        TimeSeriesOp::RollingSharpe => {
+            f64_param(params, "risk_free", 0.0)?;
+        }
+        TimeSeriesOp::HampelFilter => {
+            if f64_param(params, "threshold", 3.0)? < 0.0 {
+                return Err(Error::Validation(
+                    "hampel_filter requires threshold >= 0".into(),
+                ));
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn transform_entity(
@@ -283,7 +331,7 @@ fn transform_entity(
 }
 
 /// Visit each entity row with the current finite value and the value `periods`
-/// finite observations earlier (pandas `skipna`). Missing rows do not advance
+/// finite observations earlier (observation time). Missing rows do not advance
 /// the lag and are visited as `(None, None)`.
 fn for_each_finite_lag(
     values: &[Option<f64>],
@@ -317,11 +365,15 @@ fn shifted_ratio(
     let periods = usize_param(params, "periods", 1)?;
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = match (current, previous) {
-            (Some(current), Some(previous)) if previous.abs() > ZERO_TOLERANCE => {
+            (Some(current), Some(previous)) if previous.abs() > 0.0 => {
                 let ratio = current / previous;
                 if log_return {
-                    if ratio > 0.0 {
+                    if ratio > 0.0 && ratio.is_finite() {
                         Some(ratio.ln())
+                    } else if current.abs() > 0.0
+                        && current.is_sign_positive() == previous.is_sign_positive()
+                    {
+                        Some(current.abs().ln() - previous.abs().ln())
                     } else {
                         None
                     }
@@ -381,8 +433,7 @@ fn rolling(
     output: &mut [Option<f64>],
     op: RollingOp,
 ) -> Result<()> {
-    let window = usize_param(params, "window", 1)?;
-    let min_periods = usize_param(params, "min_periods", window)?;
+    let (window, min_periods) = window_params(params)?;
     let required = match op {
         RollingOp::Std | RollingOp::Zscore => min_periods.max(2),
         _ => min_periods,
@@ -397,18 +448,19 @@ fn rolling(
             return Ok(());
         }
         output[idx] = match op {
-            RollingOp::Mean => Some(finite_values.iter().sum::<f64>() / finite_values.len() as f64),
+            RollingOp::Mean => mean(&finite_values),
             RollingOp::Sum => Some(finite_values.iter().sum()),
             RollingOp::Std => sample_std(&finite_values),
             RollingOp::Min => finite_values.into_iter().reduce(f64::min),
             RollingOp::Max => finite_values.into_iter().reduce(f64::max),
             RollingOp::Zscore => {
                 let current = finite(values[idx]);
-                let mean = finite_values.iter().sum::<f64>() / finite_values.len() as f64;
-                let std = sample_std(&finite_values);
+                let (scale, centered) = scaled_centered(&finite_values);
+                let center = mean(&finite_values).unwrap_or(0.0);
+                let std = sample_std(&centered);
                 match (current, std) {
-                    (Some(current), Some(std)) if std > ZERO_TOLERANCE => {
-                        Some((current - mean) / std)
+                    (Some(current), Some(std)) if std > 0.0 => {
+                        Some((current / scale - center / scale) / std)
                     }
                     (Some(_), Some(_)) => Some(0.0),
                     _ => None,
@@ -421,9 +473,9 @@ fn rolling(
 
 fn ewma_alpha(params: Option<&Value>) -> Result<f64> {
     let span = required_f64_param(params, "span")?;
-    if span <= 0.0 {
+    if span < 1.0 {
         return Err(Error::Validation(
-            "panel transform parameter 'span' must be positive".to_string(),
+            "panel transform parameter 'span' must be at least 1".to_string(),
         ));
     }
     Ok(2.0 / (span + 1.0))
@@ -433,37 +485,45 @@ fn ewma_alpha(params: Option<&Value>) -> Result<f64> {
 #[derive(Clone, Copy)]
 struct EwmaState {
     mean: f64,
-    variance: f64,
+    std_dev: f64,
+    mature: bool,
 }
 
 impl EwmaState {
     fn first(value: f64) -> Self {
         Self {
             mean: value,
-            variance: 0.0,
+            std_dev: 0.0,
+            mature: false,
         }
     }
 
     fn update(self, value: f64, alpha: f64) -> Self {
+        let old_weight = 1.0 - alpha;
+        let cross_weight = old_weight.sqrt() * alpha.sqrt();
         let diff = value - self.mean;
         Self {
-            mean: self.mean + alpha * diff,
-            variance: (1.0 - alpha) * (self.variance + alpha * diff * diff),
+            mean: if diff.is_finite() {
+                self.mean + alpha * diff
+            } else {
+                old_weight * self.mean + alpha * value
+            },
+            // The centered variance recursion in standard-deviation form;
+            // hypot avoids overflow/underflow from squaring observations.
+            std_dev: (old_weight.sqrt() * self.std_dev)
+                .hypot(cross_weight * value - cross_weight * self.mean),
+            mature: true,
         }
     }
 
     fn vol(self) -> Option<f64> {
-        if self.variance > ZERO_TOLERANCE {
-            Some(self.variance.sqrt())
-        } else {
-            None
-        }
+        self.mature.then_some(self.std_dev)
     }
 
     fn zscore(self, value: f64) -> f64 {
         match self.vol() {
-            Some(vol) => (value - self.mean) / vol,
-            None => 0.0,
+            Some(vol) if vol > 0.0 => (value - self.mean) / vol,
+            _ => 0.0,
         }
     }
 }
@@ -484,6 +544,11 @@ fn ewma_scan(
                     Some(prev) => prev.update(value, alpha),
                     None => EwmaState::first(value),
                 };
+                if !next.mean.is_finite() || !next.std_dev.is_finite() {
+                    return Err(Error::Validation(format!(
+                        "non-finite EWMA state at row {idx}"
+                    )));
+                }
                 state = Some(next);
                 project(next, value)
             }

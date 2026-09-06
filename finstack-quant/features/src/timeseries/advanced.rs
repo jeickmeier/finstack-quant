@@ -1,7 +1,8 @@
 //! Advanced rolling time-series helpers.
 
 use crate::types::{
-    f64_param, finite, quantile_cont, required_f64_param, sample_std, usize_param, ZERO_TOLERANCE,
+    f64_param, finite, mean, quantile_cont, required_f64_param, sample_std, scaled_centered,
+    usize_param, window_params,
 };
 use finstack_quant_core::{Error, Result};
 use serde_json::Value;
@@ -25,8 +26,7 @@ pub(super) fn rolling_advanced(
     output: &mut [Option<f64>],
     op: AdvancedRollingOp,
 ) -> Result<()> {
-    let window = usize_param(params, "window", 1)?;
-    let min_periods = usize_param(params, "min_periods", window)?;
+    let (window, min_periods) = window_params(params)?;
     let required = match op {
         AdvancedRollingOp::Skew => min_periods.max(3),
         AdvancedRollingOp::Kurtosis => min_periods.max(4),
@@ -50,7 +50,7 @@ pub(super) fn rolling_advanced(
             }
             AdvancedRollingOp::Skew => skewness(&finite_values),
             AdvancedRollingOp::Kurtosis => excess_kurtosis(&finite_values),
-            AdvancedRollingOp::Slope => rolling_slope(&finite_values),
+            AdvancedRollingOp::Slope => rolling_slope(values, window_indices),
             AdvancedRollingOp::Sharpe => {
                 let risk_free = f64_param(params, "risk_free", 0.0)?;
                 rolling_sharpe(&finite_values, risk_free)
@@ -92,7 +92,7 @@ pub(super) fn drawdown(
     let mut peak: Option<f64> = None;
     for &idx in indices {
         output[idx] = match finite(values[idx]) {
-            Some(value) if value > ZERO_TOLERANCE => {
+            Some(value) if value > 0.0 => {
                 let peak_value = peak.map_or(value, |prev| prev.max(value));
                 peak = Some(peak_value);
                 Some(value / peak_value - 1.0)
@@ -135,7 +135,7 @@ pub(super) fn exponential_decay_weights(
     Ok(())
 }
 
-fn probability_param(params: Option<&Value>, key: &str, default: f64) -> Result<f64> {
+pub(super) fn probability_param(params: Option<&Value>, key: &str, default: f64) -> Result<f64> {
     let value = f64_param(params, key, default)?;
     if !(0.0..=1.0).contains(&value) {
         return Err(Error::Validation(format!(
@@ -162,18 +162,18 @@ fn skewness(values: &[f64]) -> Option<f64> {
     if n < 3 {
         return None;
     }
-    let mean = values.iter().sum::<f64>() / n as f64;
-    let (sum_sq, sum_cubed) = values
+    let (_, centered) = scaled_centered(values);
+    let (sum_sq, sum_cubed) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_cubed), value| {
-            let centered = *value - mean;
+            let centered = *value;
             (
                 sum_sq + centered * centered,
                 sum_cubed + centered * centered * centered,
             )
         });
     let sample_var = sum_sq / (n - 1) as f64;
-    if sample_var <= ZERO_TOLERANCE {
+    if sample_var <= 0.0 {
         return Some(0.0);
     }
     let sample_std = sample_var.sqrt();
@@ -186,16 +186,16 @@ fn excess_kurtosis(values: &[f64]) -> Option<f64> {
     if n < 4 {
         return None;
     }
-    let mean = values.iter().sum::<f64>() / n as f64;
-    let (sum_sq, sum_fourth) = values
+    let (_, centered) = scaled_centered(values);
+    let (sum_sq, sum_fourth) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_fourth), value| {
-            let centered = *value - mean;
+            let centered = *value;
             let squared = centered * centered;
             (sum_sq + squared, sum_fourth + squared * squared)
         });
     let sample_var = sum_sq / (n - 1) as f64;
-    if sample_var <= ZERO_TOLERANCE {
+    if sample_var <= 0.0 {
         return Some(0.0);
     }
     let n = n as f64;
@@ -204,30 +204,37 @@ fn excess_kurtosis(values: &[f64]) -> Option<f64> {
     Some(g2_leading * sum_fourth / sample_var.powi(2) - g2_correction)
 }
 
-fn rolling_slope(values: &[f64]) -> Option<f64> {
-    if values.len() < 2 {
-        return None;
-    }
-    let x_mean = (values.len() - 1) as f64 / 2.0;
-    let y_mean = values.iter().sum::<f64>() / values.len() as f64;
-    let (cov, var) = values
+fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option<f64> {
+    let pairs: Vec<_> = indices
         .iter()
         .enumerate()
-        .fold((0.0, 0.0), |(cov, var), (idx, value)| {
-            let x = idx as f64 - x_mean;
-            (cov + x * (*value - y_mean), var + x * x)
-        });
-    if var <= ZERO_TOLERANCE {
+        .filter_map(|(pos, &idx)| finite(values[idx]).map(|value| (pos as f64, value)))
+        .collect();
+    if pairs.len() < 2 {
+        return None;
+    }
+    let x_mean = pairs.iter().map(|(pos, _)| pos).sum::<f64>() / pairs.len() as f64;
+    let (scale, centered) =
+        scaled_centered(&pairs.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+    let (cov, var) =
+        pairs
+            .iter()
+            .zip(centered)
+            .fold((0.0, 0.0), |(cov, var), ((pos, _), value)| {
+                let x = pos - x_mean;
+                (cov + x * value, var + x * x)
+            });
+    if var <= 0.0 {
         Some(0.0)
     } else {
-        Some(cov / var)
+        Some((cov / var) * scale)
     }
 }
 
 fn rolling_sharpe(values: &[f64], risk_free: f64) -> Option<f64> {
-    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let mean = mean(values)?;
     match sample_std(values) {
-        Some(std) if std > ZERO_TOLERANCE => Some((mean - risk_free) / std),
+        Some(std) if std > 0.0 => Some((mean - risk_free) / std),
         Some(_) => Some(0.0),
         None => None,
     }
@@ -251,19 +258,20 @@ fn hampel_value(
     let Some(median) = quantile_cont(sample, 0.5) else {
         return Ok(None);
     };
+    let scale = sample.iter().copied().map(f64::abs).fold(0.0, f64::max);
+    if scale <= 0.0 {
+        return Ok(Some(current));
+    }
     let mut deviations = sample
         .iter()
-        .map(|value| (*value - median).abs())
+        .map(|value| (*value / scale - median / scale).abs())
         .collect::<Vec<_>>();
     deviations.sort_by(f64::total_cmp);
     let Some(mad) = quantile_cont(&deviations, 0.5) else {
         return Ok(None);
     };
-    if mad <= ZERO_TOLERANCE {
-        return Ok(Some(current));
-    }
     let scaled_mad = crate::types::MAD_NORMAL_CONSISTENCY * mad;
-    if (current - median).abs() > threshold * scaled_mad {
+    if (current / scale - median / scale).abs() > threshold * scaled_mad {
         Ok(Some(median))
     } else {
         Ok(Some(current))
