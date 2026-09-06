@@ -1,7 +1,7 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
-//! All rolling functions share O(n) sliding-window kernels and return a
+//! All rolling functions use incremental kernels with window rebuilds and return a
 //! [`DatedSeries`] aligned to window-end dates.
 
 use crate::dates::Date;
@@ -15,8 +15,13 @@ use super::return_based::{invalid_annualization_factor, sharpe};
 /// The rolling kernels update their moments incrementally on each slide,
 /// which accumulates floating-point drift over time. Every
 /// `ROLLING_KERNEL_RECOMPUTE_INTERVAL` steps we recompute those values
-/// over the full window to restore precision.
+/// over the full window to restore precision. Risk kernels also rebuild
+/// earlier when the risk sum collapses relative to its scale since the last
+/// rebuild, because removing an outlier can expose accumulated roundoff.
 pub(crate) const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
+
+/// Relative cancellation threshold for rebuilding, never for zeroing risk.
+const RISK_REBUILD_RELATIVE_TOLERANCE: f64 = 1.490_116_119_384_765_6e-8; // sqrt(f64::EPSILON)
 
 #[inline]
 fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
@@ -250,6 +255,7 @@ where
 
     let window_n = window as f64;
     let (mut mean, mut m2) = recompute_mean_m2(&returns[..window]);
+    let mut m2_scale = m2;
     emit(mean, m2);
     let mut steps_since_recompute = 0_usize;
     for i in window..n {
@@ -257,17 +263,24 @@ where
         let rem = returns[i - window];
 
         let keep_n = window_n - 1.0;
-        let mean_after_rem = (window_n * mean - rem) / keep_n;
+        let mean_after_rem = mean - (rem - mean) / keep_n;
         let m2_after_rem = m2 - (rem - mean) * (rem - mean_after_rem);
 
         let delta = add - mean_after_rem;
         mean = mean_after_rem + delta / window_n;
-        m2 = (m2_after_rem + delta * (add - mean)).max(0.0);
+        m2 = m2_after_rem + delta * (add - mean);
+        m2_scale = m2_scale.max(m2);
 
         steps_since_recompute += 1;
-        if steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL {
+        if !mean.is_finite()
+            || !m2.is_finite()
+            || m2 < 0.0
+            || (m2_scale > 0.0 && m2 <= RISK_REBUILD_RELATIVE_TOLERANCE * m2_scale)
+            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+        {
             let start = i + 1 - window;
             (mean, m2) = recompute_mean_m2(&returns[start..=i]);
+            m2_scale = m2;
             steps_since_recompute = 0;
         }
         emit(mean, m2);
@@ -276,13 +289,14 @@ where
 
 /// Kernel for the Sortino sliding window.
 ///
-/// Maintains `(sum, sum_ds)` where `sum_ds = Σ min(r,0)²` and calls
+/// Maintains `(sum, sum_ds)` where `sum_ds = Σ min(r - mar,0)²` and calls
 /// `emit(sum, sum_ds)` for every completed window.
 fn rolling_sortino_kernel<F>(returns: &[f64], n: usize, window: usize, mar: f64, mut emit: F)
 where
     F: FnMut(f64, f64),
 {
     let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
+    let mut downside_scale = sum_ds;
     emit(sum, sum_ds);
     let mut steps_since_recompute = 0_usize;
     for i in window..n {
@@ -293,15 +307,21 @@ where
             let d = mar - add;
             sum_ds += d * d;
         }
+        downside_scale = downside_scale.max(sum_ds);
         if rem < mar {
             let d = mar - rem;
             sum_ds -= d * d;
         }
-        sum_ds = sum_ds.max(0.0); // guard against floating-point underflow
         steps_since_recompute += 1;
-        if steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL {
+        if !sum.is_finite()
+            || !sum_ds.is_finite()
+            || sum_ds < 0.0
+            || (downside_scale > 0.0 && sum_ds <= RISK_REBUILD_RELATIVE_TOLERANCE * downside_scale)
+            || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+        {
             let start = i + 1 - window;
             (sum, sum_ds) = recompute_sum_sum_ds(&returns[start..=i], mar);
+            downside_scale = sum_ds;
             steps_since_recompute = 0;
         }
         emit(sum, sum_ds);

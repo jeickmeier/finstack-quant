@@ -1,6 +1,8 @@
 //! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::correlation::{nearest_correlation_matrix, NearestCorrelationOpts};
-use finstack_quant_analytics::{max_drawdown, sharpe, sortino, Performance, ReturnKind};
+use finstack_quant_analytics::{
+    max_drawdown, sharpe, sortino, volatility, Performance, ReturnKind,
+};
 use finstack_quant_core::dates::{Date, Duration, Month, PeriodKind};
 use serde_json::json;
 
@@ -22,6 +24,83 @@ fn panel(returns: Vec<f64>, frequency: PeriodKind) -> Performance {
 
 fn close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
+}
+
+fn assert_rolling_risk_matches(actual: f64, expected: f64) {
+    if expected == 0.0 || !expected.is_finite() {
+        assert_eq!(actual, expected);
+    } else {
+        assert!(
+            (actual / expected - 1.0).abs() < 1e-8,
+            "rolling={actual}, fresh={expected}"
+        );
+    }
+}
+
+fn assert_rolling_ratio_matches(actual: f64, expected: f64) {
+    if expected.abs() < 1e-8 {
+        close(actual, expected);
+    } else {
+        assert_rolling_risk_matches(actual, expected);
+    }
+}
+
+#[test]
+fn rolling_risk_recovers_after_outliers_leave_constant_windows() {
+    for window in [2, 3, 21, 63, 252] {
+        for level in [0.0, 0.001, 0.01, -0.01] {
+            let mut returns = vec![level; window + 1100];
+            returns[0] = -0.1;
+            returns[1] = -0.2;
+            // Cross a scheduled rebuild and then resume varying returns.
+            returns.extend([0.02, -0.03, 0.01, -0.01]);
+            let perf = panel(returns.clone(), PeriodKind::Daily);
+            let vol = perf.rolling_volatility(0, window).unwrap();
+            let ratio = perf.rolling_sharpe(0, window, 0.0).unwrap();
+            assert_eq!(vol.dates, dates(returns.len())[window - 1..]);
+            assert_eq!(ratio.dates, vol.dates);
+            for (start, slice) in returns.windows(window).enumerate() {
+                assert_rolling_risk_matches(vol.values[start], volatility(slice, 252.0));
+                assert_rolling_ratio_matches(ratio.values[start], sharpe(slice, 0.0, 252.0));
+            }
+        }
+    }
+}
+
+#[test]
+fn rolling_risk_preserves_small_nonzero_variance_after_outliers_leave() {
+    for movement in [1e-10, 1e-18] {
+        let returns = vec![0.1, -0.1, movement, 2.0 * movement, 3.0 * movement];
+        let perf = panel(returns.clone(), PeriodKind::Daily);
+        assert_rolling_risk_matches(
+            perf.rolling_volatility(0, 3).unwrap().values[2],
+            volatility(&returns[2..], 252.0),
+        );
+        assert_rolling_risk_matches(
+            perf.rolling_sharpe(0, 3, 0.0).unwrap().values[2],
+            sharpe(&returns[2..], 0.0, 252.0),
+        );
+    }
+}
+
+#[test]
+fn rolling_risk_sortino_recovers_after_large_losses_leave() {
+    for window in [2, 3, 21, 63, 252] {
+        for mar in [0.0, 0.005] {
+            for tail in [0.001, 0.0, -1e-10, -1e-18] {
+                let mut returns = vec![mar + tail; window + 1100];
+                returns[0] = mar - 0.03;
+                returns[1] = mar - 0.01;
+                returns.extend([mar - 0.02, mar + 0.03, mar - 0.01]);
+                let perf = panel(returns.clone(), PeriodKind::Daily);
+                let rolling = perf.rolling_sortino(0, window, mar).unwrap();
+                assert_eq!(rolling.dates, dates(returns.len())[window - 1..]);
+                for (start, slice) in returns.windows(window).enumerate() {
+                    assert_rolling_ratio_matches(rolling.values[start], sortino(slice, mar, 252.0));
+                }
+            }
+        }
+    }
 }
 
 #[test]
