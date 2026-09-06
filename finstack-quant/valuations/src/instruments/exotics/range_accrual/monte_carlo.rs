@@ -195,7 +195,6 @@ impl Payoff for RangeAccrualPayoff {
                     break;
                 }
             } else {
-                // Haven't reached next observation date yet
                 break;
             }
         }
@@ -203,23 +202,16 @@ impl Payoff for RangeAccrualPayoff {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            // Include both historical and simulated observations
-            let total_in_range = self.past_in_range + self.days_in_range;
-            let total_obs = self.total_past_observations + self.total_observations;
+        let total_in_range = self.past_in_range + self.days_in_range;
+        let total_obs = self.total_past_observations + self.total_observations;
 
-            if total_obs == 0 {
-                return Ok(Money::from((0_i64, currency)));
-            }
+        if total_obs == 0 {
+            return Ok(Money::from((0_i64, currency)));
+        }
 
-            // Compute accrual fraction: total_in_range / total_observations
-            let accrual_fraction = total_in_range as f64 / total_obs as f64;
-
-            // Payoff = coupon_rate * accrual_fraction * notional
-            let payoff = self.coupon_rate * accrual_fraction * self.notional;
-
-            Money::new(payoff, currency)?
-        })
+        let accrual_fraction = total_in_range as f64 / total_obs as f64;
+        let payoff = self.coupon_rate * accrual_fraction * self.notional;
+        Money::new(payoff, currency)
     }
 
     fn reset(&mut self) {

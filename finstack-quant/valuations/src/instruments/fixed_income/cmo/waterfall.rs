@@ -118,16 +118,14 @@ pub fn execute_waterfall_with_pac(
     available_interest: f64,
     pac_context: Option<&PacContext>,
 ) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
-    Ok({
-        execute_waterfall_with_principal_breakdown(
-            waterfall,
-            available_principal,
-            0.0,
-            available_interest,
-            1.0,
-            pac_context,
-        )?
-    })
+    execute_waterfall_with_principal_breakdown(
+        waterfall,
+        available_principal,
+        0.0,
+        available_interest,
+        1.0,
+        pac_context,
+    )
 }
 
 /// Execute waterfall while preserving scheduled-principal vs prepayment buckets.
@@ -178,269 +176,267 @@ pub fn execute_waterfall_with_principal_breakdown(
     collateral_factor: f64,
     pac_context: Option<&PacContext>,
 ) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
-    Ok({
-        let mut remaining_principal = scheduled_principal + prepayment_principal;
-        let mut remaining_interest = available_interest;
+    let mut remaining_principal = scheduled_principal + prepayment_principal;
+    let mut remaining_interest = available_interest;
 
-        // Accretion phase: determined at period start — an accrual (Z) tranche
-        // capitalizes interest while any current-pay (non-accrual) principal
-        // tranche is still outstanding.
-        let accretion_phase = waterfall.tranches.iter().any(|t| {
-            t.receives_principal()
-                && t.tranche_type != CmoTrancheType::Accrual
-                && t.current_face.amount() > 0.0
-        });
+    // Accretion phase: determined at period start — an accrual (Z) tranche
+    // capitalizes interest while any current-pay (non-accrual) principal
+    // tranche is still outstanding.
+    let accretion_phase = waterfall.tranches.iter().any(|t| {
+        t.receives_principal()
+            && t.tranche_type != CmoTrancheType::Accrual
+            && t.current_face.amount() > 0.0
+    });
 
-        // First pass: distribute interest to interest-bearing tranches.
-        // Iterate in ascending `priority` order (lower priority value = paid
-        // first) so that on an interest shortfall senior tranches are paid
-        // before juniors, matching the principal pass which sorts by priority.
-        // Use a stable sort so tranches sharing a priority keep insertion order.
-        // Interest is always capped at what the collateral delivered
-        // (`remaining_interest`); any unmet coupon demand is recorded as a
-        // per-tranche shortfall.
-        let mut interest_allocations: HashMap<String, f64> = HashMap::default();
-        let mut interest_shortfalls: HashMap<String, f64> = HashMap::default();
+    // First pass: distribute interest to interest-bearing tranches.
+    // Iterate in ascending `priority` order (lower priority value = paid
+    // first) so that on an interest shortfall senior tranches are paid
+    // before juniors, matching the principal pass which sorts by priority.
+    // Use a stable sort so tranches sharing a priority keep insertion order.
+    // Interest is always capped at what the collateral delivered
+    // (`remaining_interest`); any unmet coupon demand is recorded as a
+    // per-tranche shortfall.
+    let mut interest_allocations: HashMap<String, f64> = HashMap::default();
+    let mut interest_shortfalls: HashMap<String, f64> = HashMap::default();
 
-        let mut interest_order: Vec<&CmoTranche> = waterfall.tranches.iter().collect();
-        interest_order.sort_by_key(|t| t.priority);
+    let mut interest_order: Vec<&CmoTranche> = waterfall.tranches.iter().collect();
+    interest_order.sort_by_key(|t| t.priority);
 
-        for tranche in interest_order {
-            if !tranche.is_interest_bearing() {
+    for tranche in interest_order {
+        if !tranche.is_interest_bearing() {
+            continue;
+        }
+        // Accrual (Z) tranches receive no cash interest during the accretion
+        // phase; their accrual is capitalized after this loop.
+        if accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual {
+            continue;
+        }
+        // An IO strip's notional is not a principal balance — it amortizes
+        // with the collateral factor (the IO references a slice of the pool's
+        // interest, which shrinks as the pool pays down).
+        let notional = if tranche.tranche_type == CmoTrancheType::InterestOnly {
+            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
+        } else {
+            tranche.current_face.amount()
+        };
+        if notional <= 0.0 {
+            continue;
+        }
+        // Interest = notional × coupon / 12
+        let monthly_interest = notional * tranche.coupon / 12.0;
+        let allocated_interest = monthly_interest.min(remaining_interest);
+        remaining_interest -= allocated_interest;
+        interest_allocations.insert(tranche.id.clone(), allocated_interest);
+        interest_shortfalls.insert(
+            tranche.id.clone(),
+            (monthly_interest - allocated_interest).max(0.0),
+        );
+    }
+
+    // Accretion pass: fund each accrual (Z) tranche's period accrual from the
+    // interest remaining after the current-pay coupons. The funded accrual is
+    // capitalized into the Z balance (applied in the output loop below) and an
+    // equal cash amount joins the principal pool as accretion-directed
+    // principal — interest collections redirected, not new money, so per-period
+    // cash is conserved. An unfunded remainder is reported as
+    // `interest_shortfall` and is NOT capitalized (accrete only what is
+    // funded).
+    let mut accretion_amounts: HashMap<String, f64> = HashMap::default();
+    let mut accretion_directed = 0.0;
+    if accretion_phase {
+        let mut accrual_order: Vec<&CmoTranche> = waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.tranche_type == CmoTrancheType::Accrual)
+            .collect();
+        accrual_order.sort_by_key(|t| t.priority);
+        for tranche in accrual_order {
+            let balance = tranche.current_face.amount();
+            if balance <= 0.0 || tranche.coupon <= 0.0 {
                 continue;
             }
-            // Accrual (Z) tranches receive no cash interest during the accretion
-            // phase; their accrual is capitalized after this loop.
-            if accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual {
-                continue;
-            }
-            // An IO strip's notional is not a principal balance — it amortizes
-            // with the collateral factor (the IO references a slice of the pool's
-            // interest, which shrinks as the pool pays down).
-            let notional = if tranche.tranche_type == CmoTrancheType::InterestOnly {
-                tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
-            } else {
-                tranche.current_face.amount()
-            };
-            if notional <= 0.0 {
-                continue;
-            }
-            // Interest = notional × coupon / 12
-            let monthly_interest = notional * tranche.coupon / 12.0;
-            let allocated_interest = monthly_interest.min(remaining_interest);
-            remaining_interest -= allocated_interest;
-            interest_allocations.insert(tranche.id.clone(), allocated_interest);
-            interest_shortfalls.insert(
-                tranche.id.clone(),
-                (monthly_interest - allocated_interest).max(0.0),
+            let accrual = balance * tranche.coupon / 12.0;
+            let funded = accrual.min(remaining_interest);
+            remaining_interest -= funded;
+            accretion_directed += funded;
+            accretion_amounts.insert(tranche.id.clone(), funded);
+            interest_shortfalls.insert(tranche.id.clone(), (accrual - funded).max(0.0));
+        }
+        remaining_principal += accretion_directed;
+    }
+
+    // Second pass: distribute principal based on tranche type and priority
+    // Group tranches by priority. During the accretion phase accrual (Z)
+    // tranches are locked out of principal — they only receive principal via
+    // the sweep below once every current-pay tranche is retired.
+    let mut priority_groups: HashMap<u32, Vec<&CmoTranche>> = HashMap::default();
+    for tranche in &waterfall.tranches {
+        if tranche.receives_principal()
+            && !(accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual)
+        {
+            priority_groups
+                .entry(tranche.priority)
+                .or_default()
+                .push(tranche);
+        }
+    }
+
+    let mut priorities: Vec<u32> = priority_groups.keys().cloned().collect();
+    priorities.sort();
+
+    let mut principal_allocations: HashMap<String, f64> = HashMap::default();
+
+    // PO strips are NOT senior to all other classes. A PO strip is a
+    // principal strip of a defined collateral slice that pays down at its
+    // own priority position, so it flows through the normal priority-group
+    // allocation below like any other principal-receiving tranche
+    // (`receives_principal()` is true for `PrincipalOnly`).
+    for priority in priorities {
+        if remaining_principal <= 0.0 {
+            break;
+        }
+
+        // Priority groups are built from tranches above, so get() always succeeds
+        if let Some(tranches) = priority_groups.get(&priority) {
+            // Determine allocation mode for this priority group
+            let allocation = allocate_principal_to_group(
+                tranches,
+                remaining_principal,
+                waterfall.pro_rata_same_priority,
+                pac_context,
             );
-        }
 
-        // Accretion pass: fund each accrual (Z) tranche's period accrual from the
-        // interest remaining after the current-pay coupons. The funded accrual is
-        // capitalized into the Z balance (applied in the output loop below) and an
-        // equal cash amount joins the principal pool as accretion-directed
-        // principal — interest collections redirected, not new money, so per-period
-        // cash is conserved. An unfunded remainder is reported as
-        // `interest_shortfall` and is NOT capitalized (accrete only what is
-        // funded).
-        let mut accretion_amounts: HashMap<String, f64> = HashMap::default();
-        let mut accretion_directed = 0.0;
-        if accretion_phase {
-            let mut accrual_order: Vec<&CmoTranche> = waterfall
-                .tranches
-                .iter()
-                .filter(|t| t.tranche_type == CmoTrancheType::Accrual)
-                .collect();
-            accrual_order.sort_by_key(|t| t.priority);
-            for tranche in accrual_order {
-                let balance = tranche.current_face.amount();
-                if balance <= 0.0 || tranche.coupon <= 0.0 {
-                    continue;
-                }
-                let accrual = balance * tranche.coupon / 12.0;
-                let funded = accrual.min(remaining_interest);
-                remaining_interest -= funded;
-                accretion_directed += funded;
-                accretion_amounts.insert(tranche.id.clone(), funded);
-                interest_shortfalls.insert(tranche.id.clone(), (accrual - funded).max(0.0));
-            }
-            remaining_principal += accretion_directed;
-        }
-
-        // Second pass: distribute principal based on tranche type and priority
-        // Group tranches by priority. During the accretion phase accrual (Z)
-        // tranches are locked out of principal — they only receive principal via
-        // the sweep below once every current-pay tranche is retired.
-        let mut priority_groups: HashMap<u32, Vec<&CmoTranche>> = HashMap::default();
-        for tranche in &waterfall.tranches {
-            if tranche.receives_principal()
-                && !(accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual)
-            {
-                priority_groups
-                    .entry(tranche.priority)
-                    .or_default()
-                    .push(tranche);
+            for (id, amount) in allocation {
+                remaining_principal -= amount;
+                principal_allocations.insert(id, amount);
             }
         }
+    }
 
-        let mut priorities: Vec<u32> = priority_groups.keys().cloned().collect();
-        priorities.sort();
-
-        let mut principal_allocations: HashMap<String, f64> = HashMap::default();
-
-        // PO strips are NOT senior to all other classes. A PO strip is a
-        // principal strip of a defined collateral slice that pays down at its
-        // own priority position, so it flows through the normal priority-group
-        // allocation below like any other principal-receiving tranche
-        // (`receives_principal()` is true for `PrincipalOnly`).
-        for priority in priorities {
-            if remaining_principal <= 0.0 {
+    // Broken-structure sweep (finding 16): when the regular allocation leaves
+    // principal undistributed while tranches are still outstanding (e.g. a
+    // broken PAC whose supports are exhausted, leaving the PAC capped at its
+    // schedule), the excess accelerates the remaining tranches beyond their
+    // schedules in priority order, balance-capped. Principal is conserved:
+    // `residual_principal` is non-zero only when every principal-receiving
+    // tranche is fully retired.
+    if remaining_principal > 1e-12 {
+        // Accrual (Z) tranches sort behind every current-pay tranche: they
+        // absorb leftover principal only after all current-pay balances are
+        // exhausted (e.g. the transition period in which the last senior
+        // retires). A Z's capacity includes the accretion capitalized this
+        // period, which has not yet been applied to `current_face`.
+        let mut sweep_order: Vec<&CmoTranche> = waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.receives_principal())
+            .collect();
+        sweep_order.sort_by_key(|t| (t.tranche_type == CmoTrancheType::Accrual, t.priority));
+        for tranche in sweep_order {
+            if remaining_principal <= 1e-12 {
                 break;
             }
-
-            // Priority groups are built from tranches above, so get() always succeeds
-            if let Some(tranches) = priority_groups.get(&priority) {
-                // Determine allocation mode for this priority group
-                let allocation = allocate_principal_to_group(
-                    tranches,
-                    remaining_principal,
-                    waterfall.pro_rata_same_priority,
-                    pac_context,
-                );
-
-                for (id, amount) in allocation {
-                    remaining_principal -= amount;
-                    principal_allocations.insert(id, amount);
-                }
+            let already = principal_allocations
+                .get(&tranche.id)
+                .copied()
+                .unwrap_or(0.0);
+            let accreted = accretion_amounts.get(&tranche.id).copied().unwrap_or(0.0);
+            let capacity = (tranche.current_face.amount() + accreted - already).max(0.0);
+            let extra = capacity.min(remaining_principal);
+            if extra > 0.0 {
+                *principal_allocations
+                    .entry(tranche.id.clone())
+                    .or_insert(0.0) += extra;
+                remaining_principal -= extra;
             }
         }
+    }
 
-        // Broken-structure sweep (finding 16): when the regular allocation leaves
-        // principal undistributed while tranches are still outstanding (e.g. a
-        // broken PAC whose supports are exhausted, leaving the PAC capped at its
-        // schedule), the excess accelerates the remaining tranches beyond their
-        // schedules in priority order, balance-capped. Principal is conserved:
-        // `residual_principal` is non-zero only when every principal-receiving
-        // tranche is fully retired.
-        if remaining_principal > 1e-12 {
-            // Accrual (Z) tranches sort behind every current-pay tranche: they
-            // absorb leftover principal only after all current-pay balances are
-            // exhausted (e.g. the transition period in which the last senior
-            // retires). A Z's capacity includes the accretion capitalized this
-            // period, which has not yet been applied to `current_face`.
-            let mut sweep_order: Vec<&CmoTranche> = waterfall
-                .tranches
-                .iter()
-                .filter(|t| t.receives_principal())
-                .collect();
-            sweep_order.sort_by_key(|t| (t.tranche_type == CmoTrancheType::Accrual, t.priority));
-            for tranche in sweep_order {
-                if remaining_principal <= 1e-12 {
-                    break;
-                }
-                let already = principal_allocations
-                    .get(&tranche.id)
-                    .copied()
-                    .unwrap_or(0.0);
-                let accreted = accretion_amounts.get(&tranche.id).copied().unwrap_or(0.0);
-                let capacity = (tranche.current_face.amount() + accreted - already).max(0.0);
-                let extra = capacity.min(remaining_principal);
-                if extra > 0.0 {
-                    *principal_allocations
-                        .entry(tranche.id.clone())
-                        .or_insert(0.0) += extra;
-                    remaining_principal -= extra;
-                }
-            }
-        }
+    // Attribute scheduled vs prepayment principal AT SOURCE rather than by
+    // draining a single shared counter in priority order. A PAC tranche's
+    // collar allocation is scheduled principal by construction (capped by
+    // the PAC schedule); any excess above the PAC schedule is prepayment.
+    // The remaining pool scheduled/prepayment is then split pro-rata across
+    // every other tranche's allocation, which is order-independent and
+    // conserves both pool buckets exactly.
+    // Accretion-directed principal joins the scheduled bucket: it is a
+    // deterministic coupon-driven redirection of interest collections, not a
+    // function of prepayment behavior (see function docs).
+    let scheduled_attribution = attribute_scheduled_principal(
+        waterfall,
+        &principal_allocations,
+        scheduled_principal + accretion_directed,
+        prepayment_principal,
+        pac_context,
+    );
 
-        // Attribute scheduled vs prepayment principal AT SOURCE rather than by
-        // draining a single shared counter in priority order. A PAC tranche's
-        // collar allocation is scheduled principal by construction (capped by
-        // the PAC schedule); any excess above the PAC schedule is prepayment.
-        // The remaining pool scheduled/prepayment is then split pro-rata across
-        // every other tranche's allocation, which is order-independent and
-        // conserves both pool buckets exactly.
-        // Accretion-directed principal joins the scheduled bucket: it is a
-        // deterministic coupon-driven redirection of interest collections, not a
-        // function of prepayment behavior (see function docs).
-        let scheduled_attribution = attribute_scheduled_principal(
-            waterfall,
-            &principal_allocations,
-            scheduled_principal + accretion_directed,
+    // Iterate tranches in a deterministic priority order for output.
+    let mut priority_order: Vec<usize> = (0..waterfall.tranches.len()).collect();
+    priority_order.sort_by_key(|&i| waterfall.tranches[i].priority);
+
+    let mut total_principal = 0.0;
+    let mut total_scheduled_principal = 0.0;
+    let mut total_prepayment_principal = 0.0;
+    let mut total_interest = 0.0;
+    let mut allocations = Vec::with_capacity(waterfall.tranches.len());
+
+    for &idx in &priority_order {
+        let tranche = &mut waterfall.tranches[idx];
+        let principal = principal_allocations
+            .get(&tranche.id)
+            .cloned()
+            .unwrap_or(0.0);
+        let interest = interest_allocations
+            .get(&tranche.id)
+            .cloned()
+            .unwrap_or(0.0);
+        let interest_shortfall = interest_shortfalls.get(&tranche.id).cloned().unwrap_or(0.0);
+        let (scheduled_principal, prepayment_principal) = scheduled_attribution
+            .get(&tranche.id)
+            .cloned()
+            .unwrap_or((0.0, 0.0));
+
+        let accreted_interest = accretion_amounts.get(&tranche.id).cloned().unwrap_or(0.0);
+
+        let beginning = tranche.current_face.amount();
+        // IO strips receive no principal: their notional amortizes with the
+        // collateral factor instead of via principal payments. An accrual (Z)
+        // tranche's balance grows by the funded accrual capitalized this
+        // period before any principal paydown.
+        let ending = if tranche.tranche_type == CmoTrancheType::InterestOnly {
+            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
+        } else {
+            (beginning + accreted_interest - principal).max(0.0)
+        };
+
+        tranche.current_face = Money::new(ending, tranche.current_face.currency())?;
+
+        allocations.push(TrancheAllocation {
+            tranche_id: tranche.id.clone(),
+            principal,
+            scheduled_principal,
             prepayment_principal,
-            pac_context,
-        );
+            interest,
+            interest_shortfall,
+            accreted_interest,
+            beginning_balance: beginning,
+            ending_balance: ending,
+        });
 
-        // Iterate tranches in a deterministic priority order for output.
-        let mut priority_order: Vec<usize> = (0..waterfall.tranches.len()).collect();
-        priority_order.sort_by_key(|&i| waterfall.tranches[i].priority);
+        total_principal += principal;
+        total_scheduled_principal += scheduled_principal;
+        total_prepayment_principal += prepayment_principal;
+        total_interest += interest;
+    }
 
-        let mut total_principal = 0.0;
-        let mut total_scheduled_principal = 0.0;
-        let mut total_prepayment_principal = 0.0;
-        let mut total_interest = 0.0;
-        let mut allocations = Vec::with_capacity(waterfall.tranches.len());
-
-        for &idx in &priority_order {
-            let tranche = &mut waterfall.tranches[idx];
-            let principal = principal_allocations
-                .get(&tranche.id)
-                .cloned()
-                .unwrap_or(0.0);
-            let interest = interest_allocations
-                .get(&tranche.id)
-                .cloned()
-                .unwrap_or(0.0);
-            let interest_shortfall = interest_shortfalls.get(&tranche.id).cloned().unwrap_or(0.0);
-            let (scheduled_principal, prepayment_principal) = scheduled_attribution
-                .get(&tranche.id)
-                .cloned()
-                .unwrap_or((0.0, 0.0));
-
-            let accreted_interest = accretion_amounts.get(&tranche.id).cloned().unwrap_or(0.0);
-
-            let beginning = tranche.current_face.amount();
-            // IO strips receive no principal: their notional amortizes with the
-            // collateral factor instead of via principal payments. An accrual (Z)
-            // tranche's balance grows by the funded accrual capitalized this
-            // period before any principal paydown.
-            let ending = if tranche.tranche_type == CmoTrancheType::InterestOnly {
-                tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
-            } else {
-                (beginning + accreted_interest - principal).max(0.0)
-            };
-
-            tranche.current_face = Money::new(ending, tranche.current_face.currency())?;
-
-            allocations.push(TrancheAllocation {
-                tranche_id: tranche.id.clone(),
-                principal,
-                scheduled_principal,
-                prepayment_principal,
-                interest,
-                interest_shortfall,
-                accreted_interest,
-                beginning_balance: beginning,
-                ending_balance: ending,
-            });
-
-            total_principal += principal;
-            total_scheduled_principal += scheduled_principal;
-            total_prepayment_principal += prepayment_principal;
-            total_interest += interest;
-        }
-
-        CmoWaterfallPeriodResult {
-            allocations,
-            total_principal,
-            total_scheduled_principal,
-            total_prepayment_principal,
-            total_interest,
-            residual_principal: remaining_principal,
-            residual_interest: remaining_interest,
-        }
+    Ok(CmoWaterfallPeriodResult {
+        allocations,
+        total_principal,
+        total_scheduled_principal,
+        total_prepayment_principal,
+        total_interest,
+        residual_principal: remaining_principal,
+        residual_interest: remaining_interest,
     })
 }
 

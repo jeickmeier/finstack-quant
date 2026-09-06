@@ -127,16 +127,14 @@ pub(crate) fn scalar_with_numeric_value(
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::scalars::MarketScalar> {
-    Ok({
-        match template {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value)
-            }
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                    finstack_quant_core::money::Money::new(value, money.currency())?,
-                )
-            }
+    Ok(match template {
+        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value)
+        }
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(
+                finstack_quant_core::money::Money::new(value, money.currency())?,
+            )
         }
     })
 }
@@ -148,11 +146,9 @@ pub(crate) fn replace_scalar_value(
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
-    Ok({
-        context
-            .clone()
-            .insert_price(scalar_id, scalar_with_numeric_value(template, value)?)
-    })
+    Ok(context
+        .clone()
+        .insert_price(scalar_id, scalar_with_numeric_value(template, value)?))
 }
 
 /// Compute a central difference normalized by the full bump width.

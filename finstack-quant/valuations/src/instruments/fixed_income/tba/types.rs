@@ -371,12 +371,10 @@ impl AgencyTba {
 
     /// Calculate trade value (notional × price).
     pub fn trade_value(&self) -> finstack_quant_core::Result<Money> {
-        Ok({
-            Money::new(
-                self.notional.amount() * self.trade_price / 100.0,
-                self.notional.currency(),
-            )?
-        })
+        Money::new(
+            self.notional.amount() * self.trade_price / 100.0,
+            self.notional.currency(),
+        )
     }
 }
 

@@ -240,57 +240,55 @@ fn schedule_from_projection(
     mbs: &AgencyMbsPassthrough,
     projected: &[MbsCashflow],
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
-    Ok({
-        let mut flows = Vec::with_capacity(projected.len() * 3);
+    let mut flows = Vec::with_capacity(projected.len() * 3);
 
-        for cf in projected {
-            if cf.interest.abs() > f64::EPSILON {
-                flows.push(CashFlow::new(
-                    cf.payment_date,
-                    None,
-                    Money::new(cf.interest, mbs.current_face.currency())?,
-                    CFKind::Fixed,
-                    0.0,
-                    Some(mbs.pass_through_rate),
-                ));
-            }
-            if cf.scheduled_principal.abs() > f64::EPSILON {
-                flows.push(CashFlow::new(
-                    cf.payment_date,
-                    None,
-                    Money::new(cf.scheduled_principal, mbs.current_face.currency())?,
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ));
-            }
-            if cf.prepayment.abs() > f64::EPSILON {
-                flows.push(CashFlow::new(
-                    cf.payment_date,
-                    None,
-                    Money::new(cf.prepayment, mbs.current_face.currency())?,
-                    CFKind::PrePayment,
-                    0.0,
-                    None,
-                ));
-            }
+    for cf in projected {
+        if cf.interest.abs() > f64::EPSILON {
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.interest, mbs.current_face.currency())?,
+                CFKind::Fixed,
+                0.0,
+                Some(mbs.pass_through_rate),
+            ));
         }
+        if cf.scheduled_principal.abs() > f64::EPSILON {
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.scheduled_principal, mbs.current_face.currency())?,
+                CFKind::Amortization,
+                0.0,
+                None,
+            ));
+        }
+        if cf.prepayment.abs() > f64::EPSILON {
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.prepayment, mbs.current_face.currency())?,
+                CFKind::PrePayment,
+                0.0,
+                None,
+            ));
+        }
+    }
 
-        crate::cashflow::traits::schedule_from_classified_flows(
-            flows,
-            mbs.day_count,
-            crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(mbs.current_face),
-                meta: CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                    calendar_ids: Vec::new(),
-                    facility_limit: None,
-                    issue_date: Some(mbs.issue_date),
-                    maturity_date: None,
-                },
+    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        flows,
+        mbs.day_count,
+        crate::cashflow::traits::ScheduleBuildOpts {
+            notional_hint: Some(mbs.current_face),
+            meta: CashFlowMeta {
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                calendar_ids: Vec::new(),
+                facility_limit: None,
+                issue_date: Some(mbs.issue_date),
+                maturity_date: None,
             },
-        )
-    })
+        },
+    ))
 }
 
 fn end_of_month(date: Date) -> Result<Date> {

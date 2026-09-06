@@ -272,38 +272,36 @@ fn aggregate_paths(
     base_currency: Currency,
     paths: &[PortfolioPrimitivePath],
 ) -> finstack_quant_core::Result<Vec<PortfolioPrimitiveAggregate>> {
-    Ok({
-        let mut aggregates = BTreeMap::<String, PortfolioPrimitiveAggregate>::new();
-        for path in paths {
-            let aggregate = aggregates
-                .entry(path.instrument_id.to_string())
-                .or_insert_with(|| PortfolioPrimitiveAggregate {
-                    instrument_id: path.instrument_id.clone(),
-                    instrument_type: path.instrument_type.clone(),
-                    net_quantity: 0.0,
-                    gross_quantity: 0.0,
-                    net_value: Money::from((0_i64, base_currency)),
-                    gross_value: Money::from((0_i64, base_currency)),
-                    net_measures: IndexMap::new(),
-                    gross_measures: IndexMap::new(),
-                });
-            aggregate.net_quantity += path.quantity;
-            aggregate.gross_quantity += path.quantity.abs();
-            aggregate.net_value = Money::new(
-                aggregate.net_value.amount() + path.value.amount(),
-                base_currency,
-            )?;
-            aggregate.gross_value = Money::new(
-                aggregate.gross_value.amount() + path.value.amount().abs(),
-                base_currency,
-            )?;
-            for (metric, amount) in &path.measures {
-                *aggregate.net_measures.entry(metric.clone()).or_default() += *amount;
-                *aggregate.gross_measures.entry(metric.clone()).or_default() += amount.abs();
-            }
+    let mut aggregates = BTreeMap::<String, PortfolioPrimitiveAggregate>::new();
+    for path in paths {
+        let aggregate = aggregates
+            .entry(path.instrument_id.to_string())
+            .or_insert_with(|| PortfolioPrimitiveAggregate {
+                instrument_id: path.instrument_id.clone(),
+                instrument_type: path.instrument_type.clone(),
+                net_quantity: 0.0,
+                gross_quantity: 0.0,
+                net_value: Money::from((0_i64, base_currency)),
+                gross_value: Money::from((0_i64, base_currency)),
+                net_measures: IndexMap::new(),
+                gross_measures: IndexMap::new(),
+            });
+        aggregate.net_quantity += path.quantity;
+        aggregate.gross_quantity += path.quantity.abs();
+        aggregate.net_value = Money::new(
+            aggregate.net_value.amount() + path.value.amount(),
+            base_currency,
+        )?;
+        aggregate.gross_value = Money::new(
+            aggregate.gross_value.amount() + path.value.amount().abs(),
+            base_currency,
+        )?;
+        for (metric, amount) in &path.measures {
+            *aggregate.net_measures.entry(metric.clone()).or_default() += *amount;
+            *aggregate.gross_measures.entry(metric.clone()).or_default() += amount.abs();
         }
-        aggregates.into_values().collect()
-    })
+    }
+    Ok(aggregates.into_values().collect())
 }
 
 #[cfg(test)]

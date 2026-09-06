@@ -431,28 +431,26 @@ impl CDSIndex {
     /// produces the same dollar leg PVs as `IndexPricing::SingleCurve` mode
     /// on the index itself.
     pub fn to_synthetic_cds(&self) -> finstack_quant_core::Result<CreditDefaultSwap> {
-        Ok({
-            CreditDefaultSwap {
-                id: self.id.to_owned(),
-                notional: Money::new(
-                    self.notional.amount() * self.index_factor,
-                    self.notional.currency(),
-                )?,
-                side: self.side,
-                convention: self.convention,
-                premium: self.premium_with_standard_defaults(),
-                protection: self.protection_with_standard_defaults(),
-                instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
-                metric_pricing_overrides: self.metric_pricing_overrides.clone(),
-                scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
-                valuation_convention:
-                    crate::instruments::credit_derivatives::cds::CdsValuationConvention::default(),
-                upfront: None,
-                doc_clause: None,
-                protection_effective_date: None,
-                margin_spec: self.margin_spec.clone(),
-                attributes: self.attributes.clone(),
-            }
+        Ok(CreditDefaultSwap {
+            id: self.id.to_owned(),
+            notional: Money::new(
+                self.notional.amount() * self.index_factor,
+                self.notional.currency(),
+            )?,
+            side: self.side,
+            convention: self.convention,
+            premium: self.premium_with_standard_defaults(),
+            protection: self.protection_with_standard_defaults(),
+            instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
+            metric_pricing_overrides: self.metric_pricing_overrides.clone(),
+            scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
+            valuation_convention:
+                crate::instruments::credit_derivatives::cds::CdsValuationConvention::default(),
+            upfront: None,
+            doc_clause: None,
+            protection_effective_date: None,
+            margin_spec: self.margin_spec.clone(),
+            attributes: self.attributes.clone(),
         })
     }
 

@@ -490,13 +490,11 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok({
-            // Equity notional is shares * price (market value)
-            // If price not quoted, return None to avoid incorrect estimation
-            self.price_quote
-                .map(|p| Money::new(self.effective_shares() * p, self.currency))
-                .transpose()?
-        })
+        // Equity notional is shares * price (market value)
+        // If price not quoted, return None to avoid incorrect estimation
+        self.price_quote
+            .map(|p| Money::new(self.effective_shares() * p, self.currency))
+            .transpose()
     }
 
     fn raw_cashflow_schedule(

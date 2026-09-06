@@ -1501,10 +1501,8 @@ mod correlation_regression {
                 Ok(())
             }
             fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-                Ok({
-                    let payoff = (self.s0 - self.s1 - self.strike).max(0.0);
-                    Money::new(payoff, currency)?
-                })
+                let payoff = (self.s0 - self.s1 - self.strike).max(0.0);
+                Money::new(payoff, currency)
             }
             fn reset(&mut self) {
                 self.s0 = 0.0;

@@ -149,23 +149,21 @@ impl StructuredCredit {
         &self,
         mut result: StochasticPricingResult,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
-        Ok({
-            let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
-                return Ok(result);
-            };
-            let factor = 1.0 + shock;
-            result.npv = Money::new(result.npv.amount() * factor, result.npv.currency())?;
-            result.clean_price *= factor;
-            result.dirty_price *= factor;
-            result.pv_std_error *= factor.abs();
-            let lo = result.pv_confidence_interval.0 * factor;
-            let hi = result.pv_confidence_interval.1 * factor;
-            result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
-            for tranche in &mut result.tranche_results {
-                tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency())?;
-            }
-            result
-        })
+        let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
+            return Ok(result);
+        };
+        let factor = 1.0 + shock;
+        result.npv = Money::new(result.npv.amount() * factor, result.npv.currency())?;
+        result.clean_price *= factor;
+        result.dirty_price *= factor;
+        result.pv_std_error *= factor.abs();
+        let lo = result.pv_confidence_interval.0 * factor;
+        let hi = result.pv_confidence_interval.1 * factor;
+        result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
+        for tranche in &mut result.tranche_results {
+            tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency())?;
+        }
+        Ok(result)
     }
 
     fn run_stochastic_pricer(

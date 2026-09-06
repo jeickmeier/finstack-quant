@@ -312,55 +312,41 @@ impl FactorAccumulator {
         base_currency: Currency,
         by_position: IndexMap<PositionId, PnlAttribution>,
     ) -> finstack_quant_core::Result<PortfolioAttribution> {
-        Ok({
-            PortfolioAttribution {
-                total_pnl: Money::new(self.total(FactorBucket::TotalPnl), base_currency)?,
-                carry: Money::new(self.total(FactorBucket::Carry), base_currency)?,
-                rates_curves_pnl: Money::new(
-                    self.total(FactorBucket::RatesCurvesPnl),
-                    base_currency,
-                )?,
-                credit_curves_pnl: Money::new(
-                    self.total(FactorBucket::CreditCurvesPnl),
-                    base_currency,
-                )?,
-                inflation_curves_pnl: Money::new(
-                    self.total(FactorBucket::InflationCurvesPnl),
-                    base_currency,
-                )?,
-                correlations_pnl: Money::new(
-                    self.total(FactorBucket::CorrelationsPnl),
-                    base_currency,
-                )?,
-                fx_pnl: Money::new(self.total(FactorBucket::FxPnl), base_currency)?,
-                fx_translation_pnl: Money::new(
-                    self.total(FactorBucket::FxTranslationPnl),
-                    base_currency,
-                )?,
-                cross_factor_pnl: Money::new(
-                    self.total(FactorBucket::CrossFactorPnl),
-                    base_currency,
-                )?,
-                vol_pnl: Money::new(self.total(FactorBucket::VolPnl), base_currency)?,
-                model_params_pnl: Money::new(
-                    self.total(FactorBucket::ModelParamsPnl),
-                    base_currency,
-                )?,
-                market_scalars_pnl: Money::new(
-                    self.total(FactorBucket::MarketScalarsPnl),
-                    base_currency,
-                )?,
-                residual: Money::new(self.total(FactorBucket::Residual), base_currency)?,
-                by_position,
-                rates_detail: None,
-                credit_detail: None,
-                inflation_detail: None,
-                correlations_detail: None,
-                fx_detail: None,
-                vol_detail: None,
-                scalars_detail: None,
-                result_invalid: self.result_invalid,
-            }
+        Ok(PortfolioAttribution {
+            total_pnl: Money::new(self.total(FactorBucket::TotalPnl), base_currency)?,
+            carry: Money::new(self.total(FactorBucket::Carry), base_currency)?,
+            rates_curves_pnl: Money::new(self.total(FactorBucket::RatesCurvesPnl), base_currency)?,
+            credit_curves_pnl: Money::new(
+                self.total(FactorBucket::CreditCurvesPnl),
+                base_currency,
+            )?,
+            inflation_curves_pnl: Money::new(
+                self.total(FactorBucket::InflationCurvesPnl),
+                base_currency,
+            )?,
+            correlations_pnl: Money::new(self.total(FactorBucket::CorrelationsPnl), base_currency)?,
+            fx_pnl: Money::new(self.total(FactorBucket::FxPnl), base_currency)?,
+            fx_translation_pnl: Money::new(
+                self.total(FactorBucket::FxTranslationPnl),
+                base_currency,
+            )?,
+            cross_factor_pnl: Money::new(self.total(FactorBucket::CrossFactorPnl), base_currency)?,
+            vol_pnl: Money::new(self.total(FactorBucket::VolPnl), base_currency)?,
+            model_params_pnl: Money::new(self.total(FactorBucket::ModelParamsPnl), base_currency)?,
+            market_scalars_pnl: Money::new(
+                self.total(FactorBucket::MarketScalarsPnl),
+                base_currency,
+            )?,
+            residual: Money::new(self.total(FactorBucket::Residual), base_currency)?,
+            by_position,
+            rates_detail: None,
+            credit_detail: None,
+            inflation_detail: None,
+            correlations_detail: None,
+            fx_detail: None,
+            vol_detail: None,
+            scalars_detail: None,
+            result_invalid: self.result_invalid,
         })
     }
 }

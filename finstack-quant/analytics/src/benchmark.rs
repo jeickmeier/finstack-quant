@@ -38,12 +38,13 @@ const ROLLING_GREEKS_RECOMPUTE_INTERVAL: usize = 64;
 /// away most of the mantissa before the division ever happens.
 ///
 /// Because covariance and variance are invariant to a constant shift, computing
-/// the sums about a fixed origin near the data leaves beta mathematically
+/// the sums about an origin near the current window leaves beta mathematically
 /// unchanged while making the cancelled quantities `O(variation)` instead of
 /// `O(level)`. This is the standard shifted-data formulation for one-pass
 /// variance (Chan, Golub & LeVeque 1983, "Algorithms for Computing the Sample
 /// Variance"); it costs one subtraction per element and preserves the O(n)
-/// sliding-window update, which centring per window would not.
+/// sliding-window update between rebuilds. Rebuilds reset both origins to the
+/// first observation in the current window, including after variance collapses.
 ///
 /// The mean-dependent parts of alpha need the unshifted sums; the caller
 /// reconstructs them as `sr + w*shift_r`, which involves no cancellation.
@@ -631,9 +632,8 @@ pub(crate) fn rolling_greeks(
 
     // Incremental O(n) sliding-window OLS via running sums.
     //
-    // The sums are kept about fixed origins near the data (see
-    // `recompute_rolling_greeks_sums`) so the normal-equation differences below
-    // cancel at the scale of the *variation* rather than the *level*.
+    // Recenter on rebuilds so that observations which have left the window
+    // cannot set the scale of cancellation indefinitely.
     //
     // They accumulate differences (`new − old`) and pass near zero when returns
     // cancel, so the increment can exceed the running total in magnitude — the
@@ -641,8 +641,8 @@ pub(crate) fn rolling_greeks(
     // `current()`, which returns `sum + compensation`; reading the bare sum
     // would discard the correction.
     let w = window as f64;
-    let shift_r = returns[0];
-    let shift_b = benchmark[0];
+    let mut shift_r = returns[0];
+    let mut shift_b = benchmark[0];
     let (seed_sr, seed_sb, seed_srb, seed_sb2) =
         recompute_rolling_greeks_sums(&returns[..window], &benchmark[..window], shift_r, shift_b);
     let mut acc_sr = seeded_accumulator(seed_sr);
@@ -650,20 +650,50 @@ pub(crate) fn rolling_greeks(
     let mut acc_srb = seeded_accumulator(seed_srb);
     let mut acc_sb2 = seeded_accumulator(seed_sb2);
     let mut steps_since_recompute = 0usize;
+    let mut variance_scale = 0.0_f64;
 
     for i in window..=n {
         // Shifted sums: correct for beta (shift-invariant) as they stand.
-        let (sr, sb, srb, sb2) = (
+        let (mut sr, mut sb, mut srb, mut sb2) = (
             acc_sr.current(),
             acc_sb.current(),
             acc_srb.current(),
             acc_sb2.current(),
         );
-        let denom = w * sb2 - sb * sb;
+        let mut denom = w * sb2 - sb * sb;
+        // Remember the largest power-sum scale since the last rebuild:
+        // removing an outlier can leave rounding residue even when the
+        // remaining sums themselves are tiny. This relative trigger rebuilds
+        // the window; it never declares small but nonzero variance invalid.
+        variance_scale = variance_scale.max((w * sb2).abs() + sb * sb);
+        let cancellation = variance_scale > 0.0 && denom <= f64::EPSILON.sqrt() * variance_scale;
+        let sums_non_finite =
+            !(sr.is_finite() && sb.is_finite() && srb.is_finite() && sb2.is_finite());
+        if cancellation
+            || sums_non_finite
+            || steps_since_recompute >= ROLLING_GREEKS_RECOMPUTE_INTERVAL
+        {
+            let start = i - window;
+            shift_r = returns[start];
+            shift_b = benchmark[start];
+            (sr, sb, srb, sb2) = recompute_rolling_greeks_sums(
+                &returns[start..i],
+                &benchmark[start..i],
+                shift_r,
+                shift_b,
+            );
+            acc_sr = seeded_accumulator(sr);
+            acc_sb = seeded_accumulator(sb);
+            acc_srb = seeded_accumulator(srb);
+            acc_sb2 = seeded_accumulator(sb2);
+            steps_since_recompute = 0;
+            variance_scale = (w * sb2).abs() + sb * sb;
+            denom = w * sb2 - sb * sb;
+        }
         // Degenerate window (e.g. constant benchmark or NaN inputs) cannot
         // identify a beta; emit a sentinel `NaN` for both greeks so callers
         // see "do not use this point" instead of a plausible-looking 0.
-        let (alpha, beta) = if denom.abs() < 1e-30 {
+        let (alpha, beta) = if window < 2 || denom <= 0.0 || !denom.is_finite() {
             (f64::NAN, f64::NAN)
         } else {
             let beta = (w * srb - sb * sr) / denom;
@@ -693,32 +723,6 @@ pub(crate) fn rolling_greeks(
             acc_srb.add(new_r * new_b - old_r * old_b);
             acc_sb2.add(new_b * new_b - old_b * old_b);
             steps_since_recompute += 1;
-            // A non-finite value entering or leaving the window poisons the
-            // running sums permanently (`x − NaN = NaN`), so recompute
-            // immediately whenever any sum is non-finite. Windows that still
-            // contain the non-finite value recompute to NaN (and emit NaN);
-            // the first all-finite window after it exits recovers exact sums
-            // instead of staying NaN until the next scheduled recompute.
-            // Checked on the compensated totals, since a non-finite value
-            // corrupts the compensation term as well as the raw sum.
-            let sums_non_finite = !(acc_sr.current().is_finite()
-                && acc_sb.current().is_finite()
-                && acc_srb.current().is_finite()
-                && acc_sb2.current().is_finite());
-            if sums_non_finite || steps_since_recompute >= ROLLING_GREEKS_RECOMPUTE_INTERVAL {
-                let start = i + 1 - window;
-                let (sr, sb, srb, sb2) = recompute_rolling_greeks_sums(
-                    &returns[start..=i],
-                    &benchmark[start..=i],
-                    shift_r,
-                    shift_b,
-                );
-                acc_sr = seeded_accumulator(sr);
-                acc_sb = seeded_accumulator(sb);
-                acc_srb = seeded_accumulator(srb);
-                acc_sb2 = seeded_accumulator(sb2);
-                steps_since_recompute = 0;
-            }
         }
     }
 

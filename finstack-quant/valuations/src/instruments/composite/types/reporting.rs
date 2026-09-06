@@ -210,40 +210,38 @@ pub(super) fn aggregate_primitive_paths(
     reporting_currency: Currency,
     paths: Vec<PrimitiveExposure>,
 ) -> finstack_quant_core::Result<CompositeExposureReport> {
-    Ok({
-        let mut aggregate = BTreeMap::<String, PrimitiveAggregate>::new();
-        for path in &paths {
-            let entry = aggregate
-                .entry(path.instrument_id.to_string())
-                .or_insert_with(|| PrimitiveAggregate {
-                    instrument_id: path.instrument_id.clone(),
-                    instrument_type: path.instrument_type.clone(),
-                    net_quantity: 0.0,
-                    gross_quantity: 0.0,
-                    net_value: Money::from((0_i64, reporting_currency)),
-                    gross_value: Money::from((0_i64, reporting_currency)),
-                    net_measures: IndexMap::new(),
-                    gross_measures: IndexMap::new(),
-                });
-            entry.net_quantity += path.quantity;
-            entry.gross_quantity += path.quantity.abs();
-            entry.net_value = Money::new(
-                entry.net_value.amount() + path.value.amount(),
-                reporting_currency,
-            )?;
-            entry.gross_value = Money::new(
-                entry.gross_value.amount() + path.value.amount().abs(),
-                reporting_currency,
-            )?;
-            for (metric, value) in &path.measures {
-                *entry.net_measures.entry(metric.clone()).or_default() += *value;
-                *entry.gross_measures.entry(metric.clone()).or_default() += value.abs();
-            }
-        }
-        CompositeExposureReport {
+    let mut aggregate = BTreeMap::<String, PrimitiveAggregate>::new();
+    for path in &paths {
+        let entry = aggregate
+            .entry(path.instrument_id.to_string())
+            .or_insert_with(|| PrimitiveAggregate {
+                instrument_id: path.instrument_id.clone(),
+                instrument_type: path.instrument_type.clone(),
+                net_quantity: 0.0,
+                gross_quantity: 0.0,
+                net_value: Money::from((0_i64, reporting_currency)),
+                gross_value: Money::from((0_i64, reporting_currency)),
+                net_measures: IndexMap::new(),
+                gross_measures: IndexMap::new(),
+            });
+        entry.net_quantity += path.quantity;
+        entry.gross_quantity += path.quantity.abs();
+        entry.net_value = Money::new(
+            entry.net_value.amount() + path.value.amount(),
             reporting_currency,
-            paths,
-            aggregates: aggregate.into_values().collect(),
+        )?;
+        entry.gross_value = Money::new(
+            entry.gross_value.amount() + path.value.amount().abs(),
+            reporting_currency,
+        )?;
+        for (metric, value) in &path.measures {
+            *entry.net_measures.entry(metric.clone()).or_default() += *value;
+            *entry.gross_measures.entry(metric.clone()).or_default() += value.abs();
         }
+    }
+    Ok(CompositeExposureReport {
+        reporting_currency,
+        paths,
+        aggregates: aggregate.into_values().collect(),
     })
 }

@@ -275,13 +275,11 @@ impl FxVarianceSwap {
 
     /// Calculate payoff given realized variance.
     pub fn payoff(&self, realized_variance: f64) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let variance_diff = realized_variance - self.strike_variance;
-            Money::new(
-                self.notional.amount() * variance_diff * self.side.sign(),
-                self.notional.currency(),
-            )?
-        })
+        let variance_diff = realized_variance - self.strike_variance;
+        Money::new(
+            self.notional.amount() * variance_diff * self.side.sign(),
+            self.notional.currency(),
+        )
     }
 
     /// Get observation dates based on frequency.

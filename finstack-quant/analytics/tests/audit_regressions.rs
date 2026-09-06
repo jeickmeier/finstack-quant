@@ -25,6 +25,92 @@ fn close(actual: f64, expected: f64) {
 }
 
 #[test]
+fn rolling_greeks_matches_fresh_windows_across_constant_benchmark_spans() {
+    for window in [1, 3, 21, 63, 252] {
+        for level in [0.001, 0.01, 0.03, -0.01] {
+            let n = window + 150;
+            let mut benchmark = vec![level; n];
+            benchmark[0] = 0.02;
+            benchmark[1] = -0.03;
+            // Stay constant across multiple scheduled rebuilds, then resume
+            // moving so the regression must recover immediately.
+            for (i, value) in benchmark.iter_mut().enumerate().skip(window + 130) {
+                *value += (i % 7) as f64 * 0.001;
+            }
+            let returns: Vec<f64> = (0..n).map(|i| (i % 7) as f64 * 0.001 - 0.003).collect();
+            let grid = dates(n);
+            let mut perf = Performance::from_returns(
+                grid.clone(),
+                vec![benchmark, returns],
+                vec!["B".into(), "P".into()],
+                None,
+                PeriodKind::Daily,
+            )
+            .unwrap();
+            let rolling = perf.rolling_greeks(1, window, 0.02).unwrap();
+            assert_eq!(rolling.dates, grid[window - 1..]);
+            for start in 0..rolling.betas.len() {
+                perf.reset_date_range(grid[start], grid[start + window - 1]);
+                let fresh = &perf.greeks(0.02)[1];
+                if fresh.beta.is_nan() {
+                    assert!(
+                        rolling.betas[start].is_nan(),
+                        "window={window}, level={level}, start={start}"
+                    );
+                    assert!(rolling.alphas[start].is_nan());
+                } else {
+                    assert!((rolling.betas[start] - fresh.beta).abs() < 1e-10);
+                    assert!((rolling.alphas[start] - fresh.alpha).abs() < 1e-10);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn rolling_greeks_reproduced_three_observation_window_is_undefined() {
+    let perf = Performance::from_returns(
+        dates(5),
+        vec![
+            vec![0.02, -0.03, 0.001, 0.001, 0.001],
+            vec![0.04, -0.06, 0.01, 0.02, 0.03],
+        ],
+        vec!["B".into(), "P".into()],
+        None,
+        PeriodKind::Daily,
+    )
+    .unwrap();
+    let rolling = perf.rolling_greeks(1, 3, 0.0).unwrap();
+    assert!(rolling.betas[2].is_nan());
+    assert!(rolling.alphas[2].is_nan());
+}
+
+#[test]
+fn rolling_greeks_preserves_small_nonzero_benchmark_variance() {
+    for (level, movement) in [(0.0, 1e-18), (0.001, 1e-10)] {
+        let mut benchmark: Vec<f64> = (0..160)
+            .map(|i| level + (i % 7) as f64 * movement)
+            .collect();
+        benchmark[0] = 0.02;
+        benchmark[1] = -0.03;
+        let returns = benchmark.iter().map(|b| 2.0 * b).collect();
+        let perf = Performance::from_returns(
+            dates(benchmark.len()),
+            vec![benchmark, returns],
+            vec!["B".into(), "P".into()],
+            None,
+            PeriodKind::Daily,
+        )
+        .unwrap();
+        let rolling = perf.rolling_greeks(1, 3, 0.0).unwrap();
+        for (&beta, &alpha) in rolling.betas.iter().zip(&rolling.alphas) {
+            close(beta, 2.0);
+            close(alpha, 0.0);
+        }
+    }
+}
+
+#[test]
 fn tail_mass_is_exact_with_ties_and_fractional_observations() {
     let mut returns = vec![0.0; 100];
     returns[0] = -0.2;

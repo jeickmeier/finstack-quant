@@ -172,39 +172,37 @@ pub(crate) fn money_estimate_from_pairs(
     scale: f64,
     currency: Currency,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
-    Ok({
-        let multiplicity = split.multiplicity;
-        let mut stats = OnlineStats::new();
-        for (pair_idx, chunk) in path_values.chunks(multiplicity).enumerate() {
-            if !split.is_price(pair_idx * multiplicity) {
-                continue;
-            }
-            let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
-            stats.update(pair_avg * scale);
+    let multiplicity = split.multiplicity;
+    let mut stats = OnlineStats::new();
+    for (pair_idx, chunk) in path_values.chunks(multiplicity).enumerate() {
+        if !split.is_price(pair_idx * multiplicity) {
+            continue;
         }
+        let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
+        stats.update(pair_avg * scale);
+    }
 
-        let n = stats.count().max(1) as f64;
-        let aggregated_paths = stats.count() * multiplicity;
-        let mean = stats.mean();
-        let stderr = stats.std_dev() / n.sqrt();
-        let lo = mean - 1.96 * stderr;
-        let hi = mean + 1.96 * stderr;
-        MoneyEstimate {
-            mean: finstack_quant_core::money::Money::new(mean, currency)?,
-            stderr,
-            ci_95: (
-                finstack_quant_core::money::Money::new(lo, currency)?,
-                finstack_quant_core::money::Money::new(hi, currency)?,
-            ),
-            num_paths: aggregated_paths,
-            num_simulated_paths: aggregated_paths,
-            std_dev: Some(stats.std_dev()),
-            median: None,
-            percentile_25: None,
-            percentile_75: None,
-            min: None,
-            max: None,
-        }
+    let n = stats.count().max(1) as f64;
+    let aggregated_paths = stats.count() * multiplicity;
+    let mean = stats.mean();
+    let stderr = stats.std_dev() / n.sqrt();
+    let lo = mean - 1.96 * stderr;
+    let hi = mean + 1.96 * stderr;
+    Ok(MoneyEstimate {
+        mean: finstack_quant_core::money::Money::new(mean, currency)?,
+        stderr,
+        ci_95: (
+            finstack_quant_core::money::Money::new(lo, currency)?,
+            finstack_quant_core::money::Money::new(hi, currency)?,
+        ),
+        num_paths: aggregated_paths,
+        num_simulated_paths: aggregated_paths,
+        std_dev: Some(stats.std_dev()),
+        median: None,
+        percentile_25: None,
+        percentile_75: None,
+        min: None,
+        max: None,
     })
 }
 

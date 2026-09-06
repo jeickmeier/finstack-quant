@@ -198,13 +198,10 @@ macro_rules! impl_future_option_instrument {
 
         impl finstack_quant_cashflows::CashflowScheduleSource for $ty {
             fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
-                Ok({
-                Some(finstack_quant_core::money::Money::new(
+                Ok(Some(finstack_quant_core::money::Money::new(
                     self.terms.contracts * self.terms.multiplier,
                     self.terms.currency,
-                )?)
-
-                })
+                )?))
             }
 
             fn raw_cashflow_schedule(

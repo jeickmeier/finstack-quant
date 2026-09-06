@@ -327,18 +327,16 @@ impl Payoff for AutocallablePayoff {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let redemption_ratio = if let Some(idx) = self.autocalled_at {
-                self.payment_df_ratios[idx]
-            } else {
-                let payment_df_ratio = self.payment_df_ratios.last().copied().unwrap_or(1.0);
-                self.final_payoff_ratio(self.final_spot, self.min_spot_observed) * payment_df_ratio
-            };
-            Money::new(
-                (redemption_ratio + self.discounted_coupon_ratio) * self.notional,
-                currency,
-            )?
-        })
+        let redemption_ratio = if let Some(idx) = self.autocalled_at {
+            self.payment_df_ratios[idx]
+        } else {
+            let payment_df_ratio = self.payment_df_ratios.last().copied().unwrap_or(1.0);
+            self.final_payoff_ratio(self.final_spot, self.min_spot_observed) * payment_df_ratio
+        };
+        Money::new(
+            (redemption_ratio + self.discounted_coupon_ratio) * self.notional,
+            currency,
+        )
     }
 
     fn reset(&mut self) {

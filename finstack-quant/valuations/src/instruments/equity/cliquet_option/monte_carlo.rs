@@ -216,20 +216,15 @@ impl Payoff for CliquetCallPayoff {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            // Compute total cliquet return: max(global_floor, min(global_cap, Σ R_i*)).
-            let total_return = self.compute_return();
+        let total_return = self.compute_return();
 
-            // A long cliquet *call* holder cannot pay the issuer. When a negative
-            // global floor is configured, `total_return` can be negative, but the
-            // option payoff is `max(total_return, 0)` — the holder simply lets the
-            // worthless option expire. Without this floor a negative global floor
-            // would make the long call pay a negative amount (CRITICAL).
-            let payoff_return = total_return.max(0.0);
-
-            // Payoff = max(global_return, 0) * notional
-            Money::new(payoff_return * self.notional, currency)?
-        })
+        // A long cliquet *call* holder cannot pay the issuer. When a negative
+        // global floor is configured, `total_return` can be negative, but the
+        // option payoff is `max(total_return, 0)` — the holder simply lets the
+        // worthless option expire. Without this floor a negative global floor
+        // would make the long call pay a negative amount.
+        let payoff_return = total_return.max(0.0);
+        Money::new(payoff_return * self.notional, currency)
     }
 
     fn reset(&mut self) {

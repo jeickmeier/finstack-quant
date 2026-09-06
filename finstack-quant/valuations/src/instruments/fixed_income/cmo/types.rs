@@ -240,22 +240,20 @@ impl CmoWaterfall {
 
     /// Get total current face across all tranches (excluding IO).
     pub fn total_current_face(&self) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let total: f64 = self
-                .tranches
-                .iter()
-                .filter(|t| t.receives_principal())
-                .map(|t| t.current_face.amount())
-                .sum();
+        let total: f64 = self
+            .tranches
+            .iter()
+            .filter(|t| t.receives_principal())
+            .map(|t| t.current_face.amount())
+            .sum();
 
-            let currency = self
-                .tranches
-                .first()
-                .map(|t| t.current_face.currency())
-                .unwrap_or(Currency::USD);
+        let currency = self
+            .tranches
+            .first()
+            .map(|t| t.current_face.currency())
+            .unwrap_or(Currency::USD);
 
-            Money::new(total, currency)?
-        })
+        Money::new(total, currency)
     }
 }
 

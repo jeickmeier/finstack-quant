@@ -33,24 +33,22 @@ fn scaled_fund(
     fund: &PrivateMarketsFund,
     bump: f64,
 ) -> finstack_quant_core::Result<PrivateMarketsFund> {
-    Ok({
-        let mut scaled = fund.clone();
-        for event in &mut scaled.events {
-            if matches!(
-                event.kind,
-                FundEventKind::Distribution | FundEventKind::Proceeds
-            ) {
-                event.amount = Money::new(
-                    event.amount.amount() * (1.0 + bump),
-                    event.amount.currency(),
-                )?;
-            }
+    let mut scaled = fund.clone();
+    for event in &mut scaled.events {
+        if matches!(
+            event.kind,
+            FundEventKind::Distribution | FundEventKind::Proceeds
+        ) {
+            event.amount = Money::new(
+                event.amount.amount() * (1.0 + bump),
+                event.amount.currency(),
+            )?;
         }
-        if let Some(nav) = scaled.unrealized_nav {
-            scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency())?);
-        }
-        scaled
-    })
+    }
+    if let Some(nav) = scaled.unrealized_nav {
+        scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency())?);
+    }
+    Ok(scaled)
 }
 
 /// NAV01 calculator for PrivateMarketsFund.

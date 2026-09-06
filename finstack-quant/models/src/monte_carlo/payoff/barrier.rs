@@ -294,28 +294,25 @@ impl Payoff for BarrierOptionPayoff {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            if self.is_active() {
-                // Standard vanilla payoff
-                let intrinsic = match self.option_type {
-                    OptionKind::Call => (self.terminal_spot - self.strike).max(0.0),
-                    OptionKind::Put => (self.strike - self.terminal_spot).max(0.0),
-                };
-                Money::new(intrinsic * self.notional, currency)?
-            } else {
-                // Rebate payment. With at-hit timing configured and an actual
-                // hit (knock-out), compound the rebate forward from τ to
-                // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
-                // never touched the barrier has no hit time and pays at expiry.
-                let mut rebate_amount = self.rebate.unwrap_or(0.0);
-                if let Some(rate) = self.rebate_at_hit_rate {
-                    if self.barrier_hit {
-                        rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
-                    }
+        if self.is_active() {
+            let intrinsic = match self.option_type {
+                OptionKind::Call => (self.terminal_spot - self.strike).max(0.0),
+                OptionKind::Put => (self.strike - self.terminal_spot).max(0.0),
+            };
+            Money::new(intrinsic * self.notional, currency)
+        } else {
+            // Rebate payment. With at-hit timing configured and an actual
+            // hit (knock-out), compound the rebate forward from τ to
+            // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
+            // never touched the barrier has no hit time and pays at expiry.
+            let mut rebate_amount = self.rebate.unwrap_or(0.0);
+            if let Some(rate) = self.rebate_at_hit_rate {
+                if self.barrier_hit {
+                    rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
                 }
-                Money::new(rebate_amount * self.notional, currency)?
             }
-        })
+            Money::new(rebate_amount * self.notional, currency)
+        }
     }
 
     fn reset(&mut self) {

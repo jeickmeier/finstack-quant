@@ -226,11 +226,9 @@ impl Payoff for AsianCall {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let average = self.compute_average();
-            let intrinsic = (average - self.strike).max(0.0);
-            Money::new(intrinsic * self.notional, currency)?
-        })
+        let average = self.compute_average();
+        let intrinsic = (average - self.strike).max(0.0);
+        Money::new(intrinsic * self.notional, currency)
     }
 
     /// The last contracted fixing step: the engine validates that the time
@@ -420,11 +418,9 @@ impl Payoff for AsianPut {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let average = self.compute_average();
-            let intrinsic = (self.strike - average).max(0.0);
-            Money::new(intrinsic * self.notional, currency)?
-        })
+        let average = self.compute_average();
+        let intrinsic = (self.strike - average).max(0.0);
+        Money::new(intrinsic * self.notional, currency)
     }
 
     /// The last contracted fixing step: the engine validates that the time

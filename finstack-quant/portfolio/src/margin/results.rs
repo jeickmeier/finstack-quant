@@ -48,25 +48,22 @@ impl NettingSetMargin {
         position_count: usize,
         im_methodology: ImMethodology,
     ) -> finstack_quant_core::Result<Self> {
-        Ok({
-            let currency = initial_margin.currency();
-            let total = Money::new(
-                initial_margin.amount() + variation_margin.amount().max(0.0),
-                currency,
-            )?;
-
-            Self {
-                netting_set_id,
-                as_of,
-                initial_margin,
-                variation_margin,
-                total_margin: total,
-                position_count,
-                im_methodology,
-                is_approximate: false,
-                sensitivities: None,
-                im_breakdown: HashMap::default(),
-            }
+        let currency = initial_margin.currency();
+        let total = Money::new(
+            initial_margin.amount() + variation_margin.amount().max(0.0),
+            currency,
+        )?;
+        Ok(Self {
+            netting_set_id,
+            as_of,
+            initial_margin,
+            variation_margin,
+            total_margin: total,
+            position_count,
+            im_methodology,
+            is_approximate: false,
+            sensitivities: None,
+            im_breakdown: HashMap::default(),
         })
     }
 

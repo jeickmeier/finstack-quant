@@ -500,36 +500,34 @@ pub struct AllocationLedger {
 impl AllocationLedger {
     /// Extract LP-only cashflows for NPV calculation.
     pub fn lp_cashflows(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        Ok({
-            let mut by_date: IndexMap<Date, f64> = IndexMap::new();
-            let mut currency: Option<Currency> = None;
+        let mut by_date: IndexMap<Date, f64> = IndexMap::new();
+        let mut currency: Option<Currency> = None;
 
-            for (date, amount) in &self.contributions {
-                currency = currency.or(Some(amount.currency()));
-                *by_date.entry(*date).or_default() += amount.amount();
+        for (date, amount) in &self.contributions {
+            currency = currency.or(Some(amount.currency()));
+            *by_date.entry(*date).or_default() += amount.amount();
+        }
+
+        for row in &self.rows {
+            let amt = row.to_lp.amount();
+            if amt.abs() > 1e-6 {
+                currency = currency.or(Some(row.to_lp.currency()));
+                *by_date.entry(row.date).or_default() += amt;
             }
+        }
 
-            for row in &self.rows {
-                let amt = row.to_lp.amount();
-                if amt.abs() > 1e-6 {
-                    currency = currency.or(Some(row.to_lp.currency()));
-                    *by_date.entry(row.date).or_default() += amt;
-                }
-            }
+        let Some(ccy) = currency else {
+            return Ok(Vec::new());
+        };
 
-            let Some(ccy) = currency else {
-                return Ok(Vec::new());
-            };
+        let mut flows: Vec<(Date, Money)> = by_date
+            .into_iter()
+            .filter(|(_, amt)| amt.abs() > 1e-6)
+            .map(|(date, amt)| Money::new(amt, ccy).map(|money| (date, money)))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-            let mut flows: Vec<(Date, Money)> = by_date
-                .into_iter()
-                .filter(|(_, amt)| amt.abs() > 1e-6)
-                .map(|(date, amt)| Money::new(amt, ccy).map(|money| (date, money)))
-                .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-
-            flows.sort_by_key(|(date, _)| *date);
-            flows
-        })
+        flows.sort_by_key(|(date, _)| *date);
+        Ok(flows)
     }
 
     /// Export allocation ledger as structured data for DataFrame creation.
@@ -1097,24 +1095,22 @@ impl<'a> EquityWaterfallEngine<'a> {
         prior_rows: &[AllocationRow],
         allocation_date: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        Ok({
-            let mut flows: Vec<(Date, Money)> = Vec::new();
-            for event in all_events {
-                if event.kind == FundEventKind::Contribution && event.date <= allocation_date {
-                    flows.push((
-                        event.date,
-                        Money::new(-event.amount.amount(), event.amount.currency())?,
-                    ));
-                }
+        let mut flows: Vec<(Date, Money)> = Vec::new();
+        for event in all_events {
+            if event.kind == FundEventKind::Contribution && event.date <= allocation_date {
+                flows.push((
+                    event.date,
+                    Money::new(-event.amount.amount(), event.amount.currency())?,
+                ));
             }
-            for row in prior_rows {
-                if row.date <= allocation_date && row.to_lp.amount().abs() > 1e-9 {
-                    flows.push((row.date, row.to_lp));
-                }
+        }
+        for row in prior_rows {
+            if row.date <= allocation_date && row.to_lp.amount().abs() > 1e-9 {
+                flows.push((row.date, row.to_lp));
             }
-            flows.sort_by_key(|(d, _)| *d);
-            flows
-        })
+        }
+        flows.sort_by_key(|(d, _)| *d);
+        Ok(flows)
     }
 
     /// Calculate the amount needed for preferred return using robust root finding.

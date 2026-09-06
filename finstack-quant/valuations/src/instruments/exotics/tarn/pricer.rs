@@ -181,20 +181,18 @@ impl Payoff for TarnPayoff {
         &self,
         currency: finstack_quant_core::currency::Currency,
     ) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let mut pv = self.discounted_pv;
-            if self.pathwise {
-                // The maturity settlement event flushes all pending cashflows;
-                // discount any defensive remainder with the last observed bank
-                // factor rather than dropping it.
-                pv += self.pending / self.last_bank;
-            } else if !self.redeemed {
-                if let Some(final_event) = self.events.last() {
-                    pv += self.notional * final_event.discount_factor;
-                }
+        let mut pv = self.discounted_pv;
+        if self.pathwise {
+            // The maturity settlement event flushes all pending cashflows;
+            // discount any defensive remainder with the last observed bank
+            // factor rather than dropping it.
+            pv += self.pending / self.last_bank;
+        } else if !self.redeemed {
+            if let Some(final_event) = self.events.last() {
+                pv += self.notional * final_event.discount_factor;
             }
-            Money::new(pv, currency)?
-        })
+        }
+        Money::new(pv, currency)
     }
 
     fn reset(&mut self) {
@@ -488,30 +486,28 @@ fn deterministic_estimate(
     events: &[CouponEvent],
     num_paths: usize,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
-    Ok({
-        let mut payoff = TarnPayoff::new(
-            inst.fixed_rate,
-            inst.coupon_floor,
-            inst.target_coupon,
-            inst.notional.amount(),
-            Arc::from(events.to_vec()),
-            false,
-        );
-        payoff.settle_all_seasoned();
-        let pv = payoff.value(inst.notional.currency())?;
-        MoneyEstimate {
-            mean: pv,
-            stderr: 0.0,
-            ci_95: (pv, pv),
-            num_paths,
-            num_simulated_paths: num_paths,
-            std_dev: Some(0.0),
-            median: None,
-            percentile_25: None,
-            percentile_75: None,
-            min: Some(pv.amount()),
-            max: Some(pv.amount()),
-        }
+    let mut payoff = TarnPayoff::new(
+        inst.fixed_rate,
+        inst.coupon_floor,
+        inst.target_coupon,
+        inst.notional.amount(),
+        Arc::from(events.to_vec()),
+        false,
+    );
+    payoff.settle_all_seasoned();
+    let pv = payoff.value(inst.notional.currency())?;
+    Ok(MoneyEstimate {
+        mean: pv,
+        stderr: 0.0,
+        ci_95: (pv, pv),
+        num_paths,
+        num_simulated_paths: num_paths,
+        std_dev: Some(0.0),
+        median: None,
+        percentile_25: None,
+        percentile_75: None,
+        min: Some(pv.amount()),
+        max: Some(pv.amount()),
     })
 }
 

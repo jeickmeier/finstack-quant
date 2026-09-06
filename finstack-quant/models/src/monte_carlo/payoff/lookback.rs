@@ -158,13 +158,11 @@ impl Payoff for Lookback {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let intrinsic = match self.direction {
-                LookbackDirection::Call => (self.extreme_spot - self.strike).max(0.0),
-                LookbackDirection::Put => (self.strike - self.extreme_spot).max(0.0),
-            };
-            Money::new(intrinsic * self.notional, currency)?
-        })
+        let intrinsic = match self.direction {
+            LookbackDirection::Call => (self.extreme_spot - self.strike).max(0.0),
+            LookbackDirection::Put => (self.strike - self.extreme_spot).max(0.0),
+        };
+        Money::new(intrinsic * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -253,13 +251,11 @@ impl Payoff for FloatingStrikeLookbackCall {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            // Floor at zero for defensive coding: while mathematically S_T >= S_min,
-            // floating-point edge cases (e.g., pathological reset states) could produce
-            // negative values without this guard.
-            let payoff = (self.terminal_spot - self.min_spot).max(0.0);
-            Money::new(payoff * self.notional, currency)?
-        })
+        // Floor at zero for defensive coding: while mathematically S_T >= S_min,
+        // floating-point edge cases (e.g., pathological reset states) could produce
+        // negative values without this guard.
+        let payoff = (self.terminal_spot - self.min_spot).max(0.0);
+        Money::new(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -349,12 +345,10 @@ impl Payoff for FloatingStrikeLookbackPut {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            // Floor at zero for defensive coding: while mathematically S_max >= S_T,
-            // floating-point edge cases could produce negative values without this guard.
-            let payoff = (self.max_spot - self.terminal_spot).max(0.0);
-            Money::new(payoff * self.notional, currency)?
-        })
+        // Floor at zero for defensive coding: while mathematically S_max >= S_T,
+        // floating-point edge cases could produce negative values without this guard.
+        let payoff = (self.max_spot - self.terminal_spot).max(0.0);
+        Money::new(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {

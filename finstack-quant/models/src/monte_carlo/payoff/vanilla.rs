@@ -79,10 +79,8 @@ impl Payoff for EuropeanCall {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let intrinsic = (self.terminal_spot - self.strike).max(0.0);
-            Money::new(intrinsic * self.notional, currency)?
-        })
+        let intrinsic = (self.terminal_spot - self.strike).max(0.0);
+        Money::new(intrinsic * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -145,10 +143,8 @@ impl Payoff for EuropeanPut {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let intrinsic = (self.strike - self.terminal_spot).max(0.0);
-            Money::new(intrinsic * self.notional, currency)?
-        })
+        let intrinsic = (self.strike - self.terminal_spot).max(0.0);
+        Money::new(intrinsic * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -225,16 +221,14 @@ impl Payoff for Digital {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let condition_met = if self.is_call {
-                self.terminal_spot > self.strike
-            } else {
-                self.terminal_spot < self.strike
-            };
+        let condition_met = if self.is_call {
+            self.terminal_spot > self.strike
+        } else {
+            self.terminal_spot < self.strike
+        };
 
-            let payoff = if condition_met { self.payout } else { 0.0 };
-            Money::new(payoff, currency)?
-        })
+        let payoff = if condition_met { self.payout } else { 0.0 };
+        Money::new(payoff, currency)
     }
 
     fn reset(&mut self) {
@@ -308,11 +302,9 @@ impl Payoff for Forward {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        Ok({
-            let diff = self.terminal_spot - self.forward_price;
-            let payoff = if self.is_long { diff } else { -diff };
-            Money::new(payoff * self.notional, currency)?
-        })
+        let diff = self.terminal_spot - self.forward_price;
+        let payoff = if self.is_long { diff } else { -diff };
+        Money::new(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {
