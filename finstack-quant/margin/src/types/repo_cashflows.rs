@@ -1,7 +1,7 @@
 //! Margin cashflow generation for repos.
 
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar};
 use finstack_quant_core::money::Money;
 
 use super::{MarginCall, RepoMarginSpec};
@@ -13,17 +13,28 @@ use super::{MarginCall, RepoMarginSpec};
 /// * `spec` - Repo margin specification
 /// * `cash_amount` - Cash amount of the repo
 /// * `valuations` - Time series of (date, collateral_value) pairs
+/// * `calendar` - Contractual calendar used for the business-day settlement lag.
 /// * `currency` - Currency for cashflows
 ///
 /// # Returns
 ///
-/// Vector of margin-related cashflows.
+/// Vector of margin-related cashflows. Pending agreed calls are included in the
+/// running collateral balance to avoid repeated calls before settlement.
 pub fn generate_margin_cashflows(
     spec: &RepoMarginSpec,
     cash_amount: Money,
     valuations: &[(Date, f64)],
     currency: finstack_quant_core::currency::Currency,
+    calendar: &dyn HolidayCalendar,
 ) -> finstack_quant_core::Result<Vec<CashFlow>> {
+    if cash_amount.currency() != currency {
+        return Err(finstack_quant_core::Error::Validation(
+            "repo margin cash currency mismatch".into(),
+        ));
+    }
+    let lag = i32::try_from(spec.settlement_lag).map_err(|_| {
+        finstack_quant_core::Error::Validation("repo settlement lag exceeds supported range".into())
+    })?;
     if !spec.has_margining() {
         return Ok(vec![]);
     }
@@ -32,6 +43,7 @@ pub fn generate_margin_cashflows(
     let mut margin_balance = 0.0;
 
     for (i, (date, collateral_value)) in valuations.iter().enumerate() {
+        let settlement_date = date.add_business_days(lag, calendar)?;
         let effective_collateral_value = collateral_value + margin_balance;
         let required_collateral = spec.required_collateral(cash_amount.amount());
         let call_trigger = spec.call_trigger_value(cash_amount.amount());
@@ -39,8 +51,8 @@ pub fn generate_margin_cashflows(
         if effective_collateral_value < call_trigger {
             let deficit = required_collateral - effective_collateral_value;
             cashflows.push(CashFlow::new(
-                *date,
-                None,
+                settlement_date,
+                Some(*date),
                 Money::new(deficit, currency)?,
                 CFKind::VariationMarginPay,
                 0.0,
@@ -51,8 +63,8 @@ pub fn generate_margin_cashflows(
             // Opening excess is not a return.
             let excess = effective_collateral_value - required_collateral;
             cashflows.push(CashFlow::new(
-                *date,
-                None,
+                settlement_date,
+                Some(*date),
                 Money::new(excess, currency)?,
                 CFKind::VariationMarginReceive,
                 0.0,
@@ -147,10 +159,10 @@ pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
         .map(|call| {
             let kind = match call.call_type {
                 super::MarginCallType::InitialMargin => CFKind::InitialMarginPost,
-                super::MarginCallType::VariationMarginDelivery | super::MarginCallType::TopUp => {
+                super::MarginCallType::VariationMarginPost | super::MarginCallType::TopUp => {
                     CFKind::VariationMarginPay
                 }
-                super::MarginCallType::VariationMarginReturn => CFKind::VariationMarginReceive,
+                super::MarginCallType::VariationMarginCollect => CFKind::VariationMarginReceive,
                 super::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
             };
 
@@ -186,8 +198,14 @@ mod tests {
             (test_date(2025, 1, 16), 100_000_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
-            .expect("valid margin cashflows fixture");
+        let cashflows = generate_margin_cashflows(
+            &spec,
+            cash,
+            &valuations,
+            Currency::USD,
+            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+        )
+        .expect("valid margin cashflows fixture");
         assert!(cashflows.is_empty());
     }
 
@@ -200,8 +218,14 @@ mod tests {
             (test_date(2025, 1, 16), 100_000_000.0), // Deficit of 2M
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
-            .expect("valid margin cashflows fixture");
+        let cashflows = generate_margin_cashflows(
+            &spec,
+            cash,
+            &valuations,
+            Currency::USD,
+            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+        )
+        .expect("valid margin cashflows fixture");
 
         // Should have one margin call for the 2M deficit
         assert_eq!(cashflows.len(), 1);
@@ -220,8 +244,14 @@ mod tests {
             (test_date(2025, 1, 16), 101_500_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
-            .expect("valid margin cashflows fixture");
+        let cashflows = generate_margin_cashflows(
+            &spec,
+            cash,
+            &valuations,
+            Currency::USD,
+            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+        )
+        .expect("valid margin cashflows fixture");
 
         assert!(cashflows.is_empty());
     }
@@ -237,8 +267,14 @@ mod tests {
             (test_date(2025, 1, 18), 100_000_000.0),
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
-            .expect("valid margin cashflows fixture");
+        let cashflows = generate_margin_cashflows(
+            &spec,
+            cash,
+            &valuations,
+            Currency::USD,
+            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+        )
+        .expect("valid margin cashflows fixture");
 
         assert_eq!(cashflows.len(), 1);
         assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
@@ -254,8 +290,14 @@ mod tests {
             (test_date(2025, 1, 16), 105_000_000.0), // Excess of 3M
         ];
 
-        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD)
-            .expect("valid margin cashflows fixture");
+        let cashflows = generate_margin_cashflows(
+            &spec,
+            cash,
+            &valuations,
+            Currency::USD,
+            finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
+        )
+        .expect("valid margin cashflows fixture");
 
         // Should have one margin return for the 3M excess
         assert_eq!(cashflows.len(), 1);

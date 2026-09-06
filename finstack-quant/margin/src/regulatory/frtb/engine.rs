@@ -132,7 +132,7 @@ impl FrtbSbaEngine {
         }
 
         // DRC and RRAO are not subject to correlation scenarios.
-        let drc = drc_charge(&sensitivities.drc_positions);
+        let drc = drc_charge(&sensitivities.drc_positions)?;
         let rrao = rrao_charge(&sensitivities.rrao_exotic_notionals);
 
         // Total = max(SBA across scenarios) + DRC + RRAO.
@@ -321,10 +321,11 @@ mod tests {
 
         let mut sens = FrtbSensitivities::new(Currency::USD);
         sens.drc_positions.push(DrcPosition {
+            maturity_years: 1.0,
             issuer: "ACME".to_string(),
             jtd_amount: 1_000_000.0,
             rating_bucket: 4, // BBB -> RW = 0.06 per MAR22.24
-            sector: DrcSector::FinancialsCorporate,
+            sector: DrcSector::Corporate,
             seniority: DrcSeniority::SeniorUnsecured,
             asset_type: DrcAssetType::Corporate,
             pnl_adjustment: 0.0,
@@ -350,10 +351,11 @@ mod tests {
         let mut sens = FrtbSensitivities::new(Currency::USD);
         // Long corporate bond (FinancialsCorporate bucket).
         sens.drc_positions.push(DrcPosition {
+            maturity_years: 1.0,
             issuer: "CORP_A".to_string(),
             jtd_amount: 1_000_000.0,
             rating_bucket: 4, // BBB, RW = 0.06
-            sector: DrcSector::FinancialsCorporate,
+            sector: DrcSector::Corporate,
             seniority: DrcSeniority::SeniorUnsecured,
             asset_type: DrcAssetType::Corporate,
             pnl_adjustment: 0.0,
@@ -361,6 +363,7 @@ mod tests {
         // Short sovereign exposure (Sovereign bucket) — must NOT hedge
         // the corporate long.
         sens.drc_positions.push(DrcPosition {
+            maturity_years: 1.0,
             issuer: "SOV_A".to_string(),
             jtd_amount: -1_000_000.0,
             rating_bucket: 2, // AA, RW = 0.02
@@ -446,13 +449,13 @@ mod tests {
         // different tenors: name-identity rho = 1.0, but tenor rho = 0.65
         // kicks in.
         let mut sens_diff_tenor = FrtbSensitivities::new(Currency::USD);
-        sens_diff_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", 1_000_000.0);
-        sens_diff_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "5Y", 1_000_000.0);
+        sens_diff_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", "bond", 1_000_000.0);
+        sens_diff_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "5Y", "bond", 1_000_000.0);
 
         // Same name, same tenor: both factors = 1, full correlation.
         let mut sens_same_tenor = FrtbSensitivities::new(Currency::USD);
-        sens_same_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", 1_000_000.0);
-        sens_same_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", 1_000_000.0);
+        sens_same_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", "bond", 1_000_000.0);
+        sens_same_tenor.add_csr_nonsec_delta("ISSUER_A", 4, "1Y", "bond", 1_000_000.0);
 
         let charge_diff = engine
             .calculate(&sens_diff_tenor)

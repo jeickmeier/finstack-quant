@@ -22,7 +22,8 @@ use finstack_quant_margin::regulatory::{
         FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
     },
     sa_ccr::{
-        EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType, SaCcrTrade,
+        EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
+        SaCcrSupervisoryCategory, SaCcrTrade,
     },
 };
 use pyo3::prelude::*;
@@ -76,7 +77,7 @@ fn py_bool(value: bool) -> &'static str {
 /// **1 percentage point** of curve shift (``100 x DV01``); CSR deltas are
 /// base-currency P&L per 1 basis point of spread; equity, commodity and FX
 /// deltas are base-currency P&L per 1 percentage point of the underlying;
-/// vegas are base-currency P&L per unit implied-volatility move; curvature
+/// vegas are base-currency P&L as volatility-scaled vega (sigma times dV/dsigma); curvature
 /// pairs are the up/down shocked P&L positions; DRC amounts are signed JTD
 /// notionals before LGD; RRAO amounts are gross notionals.
 #[pyclass(
@@ -195,7 +196,8 @@ impl PyFrtbSensitivities {
                     let label = || need(&tenor, "tenor");
                     match (risk_class.as_str(), kind.as_str()) {
                         ("csr_non_sec", "delta") => {
-                            sens.add_csr_nonsec_delta(&name, bucket, &label()?, amount)
+                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
+                            sens.add_csr_nonsec_delta(&name, bucket, &tenor, &basis, amount)
                         }
                         ("csr_non_sec", "vega") => {
                             sens.add_csr_nonsec_vega(&name, bucket, &label()?, amount)
@@ -204,7 +206,8 @@ impl PyFrtbSensitivities {
                             sens.add_csr_nonsec_curvature(&name, bucket, up, down)
                         }
                         ("csr_sec_ctp", "delta") => {
-                            sens.add_csr_sec_ctp_delta(&name, bucket, &label()?, amount)
+                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
+                            sens.add_csr_sec_ctp_delta(&name, bucket, &tenor, &basis, amount)
                         }
                         ("csr_sec_ctp", "vega") => {
                             sens.add_csr_sec_ctp_vega(&name, bucket, &label()?, amount)
@@ -213,7 +216,8 @@ impl PyFrtbSensitivities {
                             sens.add_csr_sec_ctp_curvature(&name, bucket, up, down)
                         }
                         ("csr_sec_non_ctp", "delta") => {
-                            sens.add_csr_sec_nonctp_delta(&name, bucket, &label()?, amount)
+                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
+                            sens.add_csr_sec_nonctp_delta(&name, bucket, &tenor, &basis, amount)
                         }
                         ("csr_sec_non_ctp", "vega") => {
                             sens.add_csr_sec_nonctp_vega(&name, bucket, &label()?, amount)
@@ -222,7 +226,8 @@ impl PyFrtbSensitivities {
                             sens.add_csr_sec_nonctp_curvature(&name, bucket, up, down)
                         }
                         ("commodity", "delta") => {
-                            sens.add_commodity_delta(&name, bucket, &label()?, amount)
+                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
+                            sens.add_commodity_delta(&name, bucket, &tenor, &basis, amount)
                         }
                         ("commodity", "vega") => {
                             sens.add_commodity_vega(&name, bucket, &label()?, amount)
@@ -238,6 +243,7 @@ impl PyFrtbSensitivities {
                     let bucket = req_bucket(&row, "bucket")?;
                     match kind.as_str() {
                         "delta" => sens.add_equity_delta(&underlier, bucket, amount),
+                        "repo_delta" => sens.add_equity_repo_delta(&underlier, bucket, amount),
                         "vega" => sens.add_equity_vega(
                             &underlier,
                             bucket,
@@ -321,16 +327,23 @@ impl PyFrtbSensitivities {
     }
 
     /// Add a CSR non-securitisation delta: ``amount`` is base-currency P&L
-    /// per 1 basis point of spread move; ``bucket`` is the 1-based CSR
+    /// per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based CSR
     /// non-sec bucket (MAR21.51).
-    #[pyo3(signature = (issuer, bucket, tenor, amount))]
-    fn add_csr_nonsec_delta(&mut self, issuer: &str, bucket: u8, tenor: &str, amount: f64) {
+    #[pyo3(signature = (issuer, bucket, tenor, basis, amount))]
+    fn add_csr_nonsec_delta(
+        &mut self,
+        issuer: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        amount: f64,
+    ) {
         self.inner
-            .add_csr_nonsec_delta(issuer, bucket, tenor, amount);
+            .add_csr_nonsec_delta(issuer, bucket, tenor, basis, amount);
     }
 
     /// Add a CSR non-securitisation vega: ``amount`` is base-currency P&L
-    /// per unit implied-volatility move at option ``maturity``.
+    /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
     #[pyo3(signature = (issuer, bucket, maturity, amount))]
     fn add_csr_nonsec_vega(&mut self, issuer: &str, bucket: u8, maturity: &str, amount: f64) {
         self.inner
@@ -346,16 +359,23 @@ impl PyFrtbSensitivities {
     }
 
     /// Add a CSR securitisation (CTP) delta: ``amount`` is base-currency
-    /// P&L per 1 basis point of spread move; ``bucket`` is the 1-based
+    /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
     /// sec-CTP bucket (MAR21.59).
-    #[pyo3(signature = (tranche, bucket, tenor, amount))]
-    fn add_csr_sec_ctp_delta(&mut self, tranche: &str, bucket: u8, tenor: &str, amount: f64) {
+    #[pyo3(signature = (tranche, bucket, tenor, basis, amount))]
+    fn add_csr_sec_ctp_delta(
+        &mut self,
+        tranche: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        amount: f64,
+    ) {
         self.inner
-            .add_csr_sec_ctp_delta(tranche, bucket, tenor, amount);
+            .add_csr_sec_ctp_delta(tranche, bucket, tenor, basis, amount);
     }
 
     /// Add a CSR securitisation (CTP) vega: ``amount`` is base-currency P&L
-    /// per unit implied-volatility move at option ``maturity``.
+    /// as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
     #[pyo3(signature = (tranche, bucket, maturity, amount))]
     fn add_csr_sec_ctp_vega(&mut self, tranche: &str, bucket: u8, maturity: &str, amount: f64) {
         self.inner
@@ -371,16 +391,23 @@ impl PyFrtbSensitivities {
     }
 
     /// Add a CSR securitisation (non-CTP) delta: ``amount`` is base-currency
-    /// P&L per 1 basis point of spread move; ``bucket`` is the 1-based
+    /// P&L per percentage-point spread move (100 times CS01); ``bucket`` is the 1-based
     /// sec non-CTP bucket (MAR21.64).
-    #[pyo3(signature = (tranche, bucket, tenor, amount))]
-    fn add_csr_sec_nonctp_delta(&mut self, tranche: &str, bucket: u8, tenor: &str, amount: f64) {
+    #[pyo3(signature = (tranche, bucket, tenor, basis, amount))]
+    fn add_csr_sec_nonctp_delta(
+        &mut self,
+        tranche: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        amount: f64,
+    ) {
         self.inner
-            .add_csr_sec_nonctp_delta(tranche, bucket, tenor, amount);
+            .add_csr_sec_nonctp_delta(tranche, bucket, tenor, basis, amount);
     }
 
     /// Add a CSR securitisation (non-CTP) vega: ``amount`` is base-currency
-    /// P&L per unit implied-volatility move at option ``maturity``.
+    /// P&L as volatility-scaled vega (sigma times dV/dsigma) at option ``maturity``.
     #[pyo3(signature = (tranche, bucket, maturity, amount))]
     fn add_csr_sec_nonctp_vega(&mut self, tranche: &str, bucket: u8, maturity: &str, amount: f64) {
         self.inner
@@ -409,6 +436,12 @@ impl PyFrtbSensitivities {
         self.inner.add_equity_delta(underlier, bucket, amount);
     }
 
+    /// Add equity repo-rate P&L per one percentage-point rate shift.
+    #[pyo3(signature = (underlier, bucket, amount))]
+    fn add_equity_repo_delta(&mut self, underlier: &str, bucket: u8, amount: f64) {
+        self.inner.add_equity_repo_delta(underlier, bucket, amount);
+    }
+
     /// Add an FX delta for the pair ``(ccy1, ccy2)``: ``amount`` is
     /// base-currency P&L per 1 percentage point move in the exchange rate.
     /// Raises ``ValueError`` for an unknown currency.
@@ -423,9 +456,17 @@ impl PyFrtbSensitivities {
     /// Add a commodity delta: ``amount`` is base-currency P&L per 1
     /// percentage point move in the commodity price at ``tenor``; ``bucket``
     /// is the 1-based commodity bucket (MAR21.82).
-    #[pyo3(signature = (name, bucket, tenor, amount))]
-    fn add_commodity_delta(&mut self, name: &str, bucket: u8, tenor: &str, amount: f64) {
-        self.inner.add_commodity_delta(name, bucket, tenor, amount);
+    #[pyo3(signature = (name, bucket, tenor, basis, amount))]
+    fn add_commodity_delta(
+        &mut self,
+        name: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        amount: f64,
+    ) {
+        self.inner
+            .add_commodity_delta(name, bucket, tenor, basis, amount);
     }
 
     /// Add a commodity vega: ``amount`` is base-currency P&L per unit
@@ -531,21 +572,22 @@ impl PyFrtbSensitivities {
     /// rating_bucket : int
     ///     Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
     /// sector : str
-    ///     ``"sovereign"``, ``"financials_corporate"``, ``"materials_energy"``,
-    ///     ``"consumer_goods"``, ``"technology_media"`` or
-    ///     ``"health_care_utilities"``.
+    ///     ``"corporate"``, ``"sovereign"`` or ``"local_government"``.
     /// seniority : str
     ///     ``"senior_unsecured"``, ``"subordinated"``, ``"equity"`` or
-    ///     ``"securitization"`` (selects the LGD).
+    ///     ``"covered_bond"`` (selects the LGD).
     /// asset_type : str
-    ///     ``"corporate"``, ``"sovereign"``, ``"securitization"`` or ``"equity"``.
+    ///     ``"corporate"``, ``"sovereign"``, ``"local_government"`` or ``"equity"``;
+    ///     securitization DRC is rejected by the engine.
+    /// maturity_years : float
+    ///     Finite nonnegative residual maturity; JTD scales by years clipped to [0.25, 1.0].
     /// pnl_adjustment : float, default 0.0
     ///     Mark-to-market adjustment per MAR22.9 (negative for a long
     ///     position carrying an unrealised loss).
     ///
     /// Raises ``ValueError`` for an unknown sector, seniority or asset-type
     /// label.
-    #[pyo3(signature = (issuer, jtd_amount, rating_bucket, sector, seniority, asset_type, pnl_adjustment = 0.0))]
+    #[pyo3(signature = (issuer, jtd_amount, rating_bucket, sector, seniority, asset_type, maturity_years, pnl_adjustment = 0.0))]
     #[allow(clippy::too_many_arguments)]
     fn add_drc_position(
         &mut self,
@@ -555,9 +597,11 @@ impl PyFrtbSensitivities {
         sector: &str,
         seniority: &str,
         asset_type: &str,
+        maturity_years: f64,
         pnl_adjustment: f64,
     ) -> PyResult<()> {
         self.inner.add_drc_position(DrcPosition {
+            maturity_years,
             issuer: issuer.to_string(),
             jtd_amount,
             rating_bucket,
@@ -802,6 +846,8 @@ const TRADE_COLUMNS: &[ColumnSchema<'_>] = &[
     ("mtm", "float64"),
     ("is_option", "bool"),
     ("option_type", "str"),
+    ("supervisory_category", "str"),
+    ("option_maturity_date", "str"),
 ];
 
 impl PySaCcrTrade {
@@ -820,6 +866,8 @@ impl PySaCcrTrade {
             "mtm": t.mtm,
             "is_option": t.is_option,
             "option_type": t.option_type.map(serde_label),
+            "supervisory_category": t.supervisory_category.map(serde_label),
+            "option_maturity_date": t.option_maturity_date.map(|d| d.to_string()),
         })
     }
 }
@@ -861,7 +909,7 @@ impl PySaCcrTrade {
     /// Raises ``ValueError`` when a label is unknown or the trade fails the
     /// BCBS 279 coherence checks, ``TypeError`` for a non-date-like date.
     #[new]
-    #[pyo3(signature = (trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option = false, option_type = None))]
+    #[pyo3(signature = (trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option = false, option_type = None, supervisory_category = None, option_maturity_date = None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         trade_id: &str,
@@ -876,8 +924,14 @@ impl PySaCcrTrade {
         mtm: f64,
         is_option: bool,
         option_type: Option<&str>,
+        supervisory_category: Option<&str>,
+        option_maturity_date: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let inner = SaCcrTrade {
+            supervisory_category: supervisory_category
+                .map(parse_label::<SaCcrSupervisoryCategory>)
+                .transpose()?,
+            option_maturity_date: option_maturity_date.map(extract_date).transpose()?,
             trade_id: trade_id.to_string(),
             asset_class: parse_label::<SaCcrAssetClass>(asset_class)?,
             notional,
@@ -940,6 +994,15 @@ impl PySaCcrTrade {
                     _ => false,
                 };
                 let inner = SaCcrTrade {
+                    supervisory_category: opt_str(row, "supervisory_category")?
+                        .map(|s| parse_label::<SaCcrSupervisoryCategory>(&s))
+                        .transpose()?,
+                    option_maturity_date: row
+                        .get_item("option_maturity_date")?
+                        .filter(|v| !v.is_none())
+                        .as_ref()
+                        .map(extract_date)
+                        .transpose()?,
                     trade_id: req_str(row, "trade_id")?,
                     asset_class: parse_label::<SaCcrAssetClass>(&req_str(row, "asset_class")?)?,
                     notional: req_f64(row, "notional")?,
@@ -979,6 +1042,21 @@ impl PySaCcrTrade {
     #[getter]
     fn asset_class(&self) -> String {
         asset_class_label(self.inner.asset_class)
+    }
+
+    /// Supervisory category wire label, or None for IR and FX.
+    #[getter]
+    fn supervisory_category(&self) -> Option<String> {
+        self.inner.supervisory_category.map(serde_label)
+    }
+
+    /// Option expiry as a date, distinct from the underlying end date.
+    #[getter]
+    fn option_maturity_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .option_maturity_date
+            .map(|date| date_to_py(py, date))
+            .transpose()
     }
 
     /// Trade notional, in the netting set's reporting currency.
@@ -1139,7 +1217,7 @@ impl PySaCcrNettingSetConfig {
     ///     calculations.
     ///
     /// Raises ``ValueError`` if an amount is non-finite, threshold or MTA is
-    /// negative, ``mpor_days`` is zero, or the date string is not ISO 8601.
+    /// negative, ``mpor_days`` is below ten bilateral or five cleared business days, or the date string is not ISO 8601.
     #[staticmethod]
     #[pyo3(signature = (netting_set_id, collateral, threshold, mta, nica, mpor_days, as_of))]
     fn margined(

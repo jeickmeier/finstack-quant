@@ -66,6 +66,59 @@ pub enum SaCcrOptionType {
     PutShort,
 }
 
+/// Supervisory classification required for credit, equity and commodity trades.
+/// Parameters are prescribed by CRE52.72; this is independent of hedging-set identity.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SaCcrSupervisoryCategory {
+    /// Single-name credit rated AAA or AA.
+    CreditAa,
+    /// Single-name credit rated A.
+    CreditA,
+    /// Single-name credit rated BBB.
+    CreditBbb,
+    /// Single-name credit rated BB.
+    CreditBb,
+    /// Single-name credit rated B.
+    CreditB,
+    /// Single-name credit rated CCC or lower.
+    CreditCcc,
+    /// Investment-grade credit index.
+    CreditIndexIg,
+    /// High-yield credit index.
+    CreditIndexHy,
+    /// Single-name equity.
+    EquitySingleName,
+    /// Equity index.
+    EquityIndex,
+    /// Electricity commodity.
+    CommodityElectricity,
+    /// Non-electricity commodity.
+    CommodityOther,
+}
+
+impl SaCcrSupervisoryCategory {
+    pub(crate) fn parameters(self) -> (SaCcrAssetClass, f64, f64) {
+        use SaCcrAssetClass::{Commodity, Credit, Equity};
+        match self {
+            Self::CreditAa => (Credit, 0.0038, 0.5),
+            Self::CreditA => (Credit, 0.0042, 0.5),
+            Self::CreditBbb => (Credit, 0.0054, 0.5),
+            Self::CreditBb => (Credit, 0.0106, 0.5),
+            Self::CreditB => (Credit, 0.016, 0.5),
+            Self::CreditCcc => (Credit, 0.06, 0.5),
+            Self::CreditIndexIg => (Credit, 0.0038, 0.8),
+            Self::CreditIndexHy => (Credit, 0.0106, 0.8),
+            Self::EquitySingleName => (Equity, 0.32, 0.5),
+            Self::EquityIndex => (Equity, 0.20, 0.8),
+            Self::CommodityElectricity => (Commodity, 0.40, 0.4),
+            Self::CommodityOther => (Commodity, 0.18, 0.4),
+        }
+    }
+}
+
 /// A single derivative trade for SA-CCR EAD computation.
 ///
 /// Captures the trade-level attributes required by the SA-CCR formula:
@@ -77,11 +130,17 @@ pub struct SaCcrTrade {
     pub trade_id: String,
     /// Asset class assignment.
     pub asset_class: SaCcrAssetClass,
-    /// Adjusted notional in reporting currency.
+    /// Explicit supervisory category; required outside IR and FX.
+    pub supervisory_category: Option<SaCcrSupervisoryCategory>,
+    /// Option expiry for maturity-factor calculation, distinct from the
+    /// underlying start/end dates used for supervisory duration.
+    pub option_maturity_date: Option<Date>,
+    /// Notional in reporting currency before supervisory duration for IR/credit.
+    /// FX, equity and commodity notionals must already use CRE52 adjusted notionals.
     pub notional: f64,
-    /// Trade start date (for maturity factor computation).
+    /// Underlying start date used for IR/credit supervisory duration.
     pub start_date: Date,
-    /// Trade end date / maturity.
+    /// Underlying end date used for supervisory duration; linear trade maturity.
     pub end_date: Date,
     /// Underlier reference (e.g., currency pair, issuer, equity name, commodity).
     pub underlier: String,
@@ -132,13 +191,15 @@ impl SaCcrNettingSetConfig {
     ///
     /// Collateral and NICA are signed net amounts (positive means the bank holds
     /// collateral); threshold and MTA are non-negative agreement amounts.
-    /// A margined netting set must specify a positive MPOR, while an unmargined
-    /// set may leave `mpor_days` at zero.
+    /// Margined sets require at least ten business days for bilateral exposures
+    /// or five for cleared exposures. Supply any longer period required by the
+    /// trade count, liquidity, disputes or remargining frequency. Unmargined
+    /// sets may leave `mpor_days` at zero.
     ///
     /// # Errors
     ///
     /// Returns an error if collateral, threshold, MTA, or NICA is non-finite;
-    /// threshold or MTA is negative; or a margined set has zero MPOR.
+    /// threshold or MTA is negative; or MPOR is below the applicable floor.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         for (name, value) in [
             ("collateral", self.collateral),
@@ -165,9 +226,16 @@ impl SaCcrNettingSetConfig {
                 self.netting_set_id
             )));
         }
-        if self.is_margined && self.mpor_days == 0 {
+        if self.is_margined
+            && self.mpor_days
+                < if self.netting_set_id.is_cleared() {
+                    5
+                } else {
+                    10
+                }
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "SA-CCR netting set '{}': margined MPOR must be positive",
+                "SA-CCR netting set '{}': margined MPOR must be at least 10 business days bilateral or 5 cleared",
                 self.netting_set_id
             )));
         }
@@ -241,7 +309,8 @@ impl SaCcrNettingSetConfig {
 /// SA-CCR Exposure at Default result.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EadResult {
-    /// Exposure at Default: `alpha * (RC + PFE)`.
+    /// Exposure at Default: `alpha * (RC + PFE)`, capped for margined sets
+    /// at the same netting set calculated without a margin agreement.
     pub ead: f64,
     /// Replacement cost component.
     pub rc: f64,
@@ -280,7 +349,7 @@ fn validate_finite_trade_value(
 impl SaCcrTrade {
     /// Validate supervisory-delta / direction / option-type coherence.
     ///
-    /// The add-on path [`super::add_on::asset_class_add_on`] uses
+    /// The add-on path in the validated engine uses
     /// `supervisory_delta * |notional|` as the adjusted notional — the
     /// sign of the entire contribution comes from `supervisory_delta`.
     /// If a caller misconfigures `supervisory_delta` (e.g. passes +1
@@ -309,6 +378,26 @@ impl SaCcrTrade {
     /// Returns [`finstack_quant_core::Error::Validation`] with a message naming the
     /// trade id and the specific invariant that failed.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        match self.supervisory_category {
+            Some(category) if category.parameters().0 == self.asset_class => {}
+            None if matches!(
+                self.asset_class,
+                SaCcrAssetClass::InterestRate | SaCcrAssetClass::ForeignExchange
+            ) => {}
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "SA-CCR requires a supervisory category consistent with the asset class".into(),
+                ))
+            }
+        }
+        if self.is_option != self.option_maturity_date.is_some()
+            || self
+                .option_maturity_date
+                .is_some_and(|date| date > self.end_date)
+        {
+            return Err(finstack_quant_core::Error::Validation("SA-CCR options require an explicit expiry no later than the underlying end date; linear trades must omit expiry".into()));
+        }
+
         let id = self.trade_id.as_str();
 
         validate_finite_trade_value(id, "notional", self.notional)?;
@@ -391,6 +480,8 @@ mod validate_tests {
     /// Base linear IR trade: long 100M 5Y, direction and supervisory_delta both +1.
     fn linear_long() -> SaCcrTrade {
         SaCcrTrade {
+            supervisory_category: None,
+            option_maturity_date: None,
             trade_id: "LIN-LONG".into(),
             asset_class: SaCcrAssetClass::InterestRate,
             notional: 100_000_000.0,
@@ -408,6 +499,8 @@ mod validate_tests {
 
     fn option(opt: SaCcrOptionType, direction: f64, delta: f64) -> SaCcrTrade {
         SaCcrTrade {
+            supervisory_category: Some(SaCcrSupervisoryCategory::EquityIndex),
+            option_maturity_date: Some(d(2026, 1, 15)),
             trade_id: "OPT".into(),
             asset_class: SaCcrAssetClass::Equity,
             notional: 10_000_000.0,
@@ -553,6 +646,7 @@ mod validate_tests {
     fn rejects_option_without_option_type() {
         let mut t = linear_long();
         t.is_option = true;
+        t.option_maturity_date = Some(t.end_date);
         t.option_type = None;
         let err = t
             .validate()

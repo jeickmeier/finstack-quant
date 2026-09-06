@@ -66,8 +66,8 @@ VM_COLUMNS = [
     "settlement_date",
     "gross_exposure",
     "net_exposure",
-    "delivery_amount",
-    "return_amount",
+    "post_amount",
+    "collect_amount",
     "net_margin",
     "requires_call",
     "currency",
@@ -112,14 +112,14 @@ def test_vm_result_to_dataframe_is_one_row() -> None:
     assert row["net_exposure"] == pytest.approx(result.net_exposure) == pytest.approx(800_000.0)
     assert row["net_exposure"] != row["gross_exposure"]
     # 800,000 required against 250,000 posted.
-    assert row["delivery_amount"] == pytest.approx(result.delivery_amount) == pytest.approx(550_000.0)
-    assert row["return_amount"] == pytest.approx(result.return_amount) == pytest.approx(0.0)
-    assert row["net_margin"] == pytest.approx(result.net_margin) == pytest.approx(550_000.0)
+    assert row["collect_amount"] == pytest.approx(result.collect_amount) == pytest.approx(550_000.0)
+    assert row["post_amount"] == pytest.approx(result.post_amount) == pytest.approx(0.0)
+    assert row["net_margin"] == pytest.approx(result.net_margin) == pytest.approx(-550_000.0)
     assert bool(row["requires_call"]) == result.requires_call is True
 
 
 def test_vm_result_to_dataframe_renders_a_collateral_return() -> None:
-    """The mirror case, so ``delivery_amount`` and ``return_amount`` differ.
+    """The mirror case, so ``collect_amount`` and ``post_amount`` differ.
 
     A single call direction leaves one of the two at zero and makes
     ``net_margin`` equal the other, so the two legs are only distinguishable
@@ -130,10 +130,10 @@ def test_vm_result_to_dataframe_renders_a_collateral_return() -> None:
 
     assert row["gross_exposure"] == pytest.approx(1_000_000.0)
     assert row["net_exposure"] == pytest.approx(800_000.0)
-    assert row["delivery_amount"] == pytest.approx(0.0)
-    assert row["return_amount"] == pytest.approx(400_000.0)
-    assert row["net_margin"] == pytest.approx(-400_000.0)
-    assert row["delivery_amount"] != row["return_amount"]
+    assert row["collect_amount"] == pytest.approx(0.0)
+    assert row["post_amount"] == pytest.approx(400_000.0)
+    assert row["net_margin"] == pytest.approx(400_000.0)
+    assert row["collect_amount"] != row["post_amount"]
 
 
 # ImResult
@@ -303,7 +303,7 @@ def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens = FrtbSensitivities("USD")
     sens.add_girr_delta("5Y", 12_000.0)
     sens.add_girr_delta("2Y", 8_000.0)
-    sens.add_csr_nonsec_delta("ACME", 3, "5Y", 4_000.0)
+    sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 4_000.0)
     sens.add_equity_delta("AAPL", 1, 25_000.0)
     sens.add_fx_delta("EUR", "USD", 9_000.0)
     sens.add_girr_curvature(500.0, -400.0)
@@ -452,3 +452,11 @@ def test_simm_sensitivities_row_order_ignores_the_insertion_order() -> None:
 
     assert len(forward) == 10
     pd.testing.assert_frame_equal(forward, backward)
+
+
+def test_margin_utilization_zero_requirement_pickle_roundtrip() -> None:
+    import pickle
+
+    ratio = MarginUtilization(10.0, 0.0, "USD")
+    restored = pickle.loads(pickle.dumps(ratio))  # noqa: S301
+    assert restored.to_json() == ratio.to_json()

@@ -15,10 +15,10 @@
 //! | Risk class     | RW scale              | Expected sensitivity unit      |
 //! |----------------|-----------------------|--------------------------------|
 //! | GIRR delta     | percent (`1.7` = 1.7%)| $ per **1 percentage-point** yield shift (i.e. 100x DV01) |
-//! | GIRR vega      | decimal (`1.00`)      | $ per 1 unit of implied vol    |
+//! | GIRR vega      | decimal (`1.00`)      | volatility-scaled vega, `sigma * dV/dsigma`    |
 //! | CSR delta      | percent               | $ per 1 pp spread shift        |
-//! | Equity delta   | percent (`55` = 55%)  | $ per 1% price move (i.e. `100 * dV/dP * P`) |
-//! | Equity vega    | decimal (`0.78`)      | $ per 1 unit of implied vol    |
+//! | Equity delta   | percent (`55` = 55%)  | $ per 1% price move (i.e. `0.01 * dV/dP * P`) |
+//! | Equity vega    | decimal               | volatility-scaled vega, `sigma * dV/dsigma`    |
 //! | Commodity delta| percent               | $ per 1% price move            |
 //! | FX delta       | percent (`15` = 15%)  | $ per 1% FX rate move          |
 //! | Curvature      | none applied by the engine | raw `CVR+` / `CVR-` in $ |

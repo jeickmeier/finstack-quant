@@ -40,10 +40,12 @@ pub struct ImResult {
     /// `interest_rate`). Values are IM amounts for that component.
     pub breakdown: std::collections::BTreeMap<String, Money>,
 
-    /// Whether the amount is a conservative approximation (proxy) rather than
+    /// Whether the amount is an approximation rather than
     /// an exact computation under the named methodology.
     ///
-    /// Set to `true` by the clearing-house and internal-model calculators when
+    /// Approximations need not be conservative. Historical SIMM sets this flag
+    /// because its input dimensions and some aggregation stages are simplified.
+    /// Also set by the clearing-house and internal-model calculators when
     /// they fall back to `|exposure_base| x conservative_rate` because no
     /// [`ExternalImSource`](crate::calculators::im::ExternalImSource) supplied
     /// a real margin amount. Portfolio-level consumers should surface this

@@ -8,33 +8,13 @@
 //! within the same hedging set offset per the asset-class rule; hedging
 //! sets are then aggregated per the asset-class cross-HS rule.
 //!
-//! # Known scope limitations
-//!
-//! The add-on aggregation across hedging sets for non-IR asset classes
-//! uses the classic `sqrt((sum rho*d_HS)^2 + sum (1 - rho^2) * d_HS^2)`
-//! decomposition applied at the hedging-set level, which is the correct
-//! formulation when each hedging set corresponds to a single reference
-//! entity / commodity (Credit / Equity / Commodity under MAR52 / CRE52).
-//! Deployments that put multiple entities in the same hedging-set
-//! bucket should perform the systematic/idiosyncratic split at the
-//! entity level upstream and pass one hedging-set-per-entity here.
-
 use super::maturity_factor::{maturity_factor_margined, maturity_factor_unmargined};
-use super::params::{supervisory_correlation, supervisory_factor};
+
 use super::types::{SaCcrAssetClass, SaCcrNettingSetConfig, SaCcrTrade};
 use finstack_quant_core::HashMap;
 
 /// IR supervisory correlation continuous-compounding rate per CRE52.54.
 const IR_SUPERVISORY_DISCOUNT_RATE: f64 = 0.05;
-
-/// Minimum supervisory duration in years (10 business days).
-///
-/// CRE52.48 imposes a 10-business-day floor on remaining maturity for the
-/// unmargined maturity factor; we apply the same floor to supervisory
-/// duration so in-flight IR trades with nearly-zero remaining tenor do
-/// not collapse to zero effective notional. 10 business days ≈ 10/250
-/// years.
-const MIN_SUPERVISORY_DURATION_YEARS: f64 = 10.0 / 250.0;
 
 /// IR maturity-bucket correlation matrix off-diagonal entries per
 /// CRE52.54 (1.4 for adjacent buckets, 0.6 for non-adjacent).
@@ -55,7 +35,9 @@ fn trade_maturity_factor(config: &SaCcrNettingSetConfig, trade: &SaCcrTrade) -> 
     if config.is_margined {
         maturity_factor_margined(config.mpor_days)
     } else {
-        let days = (trade.end_date - config.as_of).whole_days().max(0) as f64;
+        let days = (trade.option_maturity_date.unwrap_or(trade.end_date) - config.as_of)
+            .whole_days()
+            .max(0) as f64;
         let m_years = days / 365.0;
         maturity_factor_unmargined(m_years)
     }
@@ -80,7 +62,7 @@ fn trade_maturity_factor(config: &SaCcrNettingSetConfig, trade: &SaCcrTrade) -> 
 /// # References
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
-pub fn asset_class_add_on(
+pub(super) fn asset_class_add_on(
     asset_class: SaCcrAssetClass,
     trades: &[SaCcrTrade],
     config: &SaCcrNettingSetConfig,
@@ -104,7 +86,7 @@ pub fn asset_class_add_on(
 ///   `EN_HS = sqrt(D1^2 + D2^2 + D3^2 + 1.4*D1*D2 + 1.4*D2*D3 + 0.6*D1*D3)`
 /// * Across hedging sets (currencies): simple absolute sum.
 fn ir_add_on(trades: &[SaCcrTrade], config: &SaCcrNettingSetConfig) -> f64 {
-    let sf = supervisory_factor(SaCcrAssetClass::InterestRate);
+    let sf = 0.005;
 
     // (D1, D2, D3) per hedging set.
     let mut by_hs: HashMap<String, [f64; 3]> = HashMap::default();
@@ -173,53 +155,62 @@ pub fn supervisory_duration(start_years: f64, end_years: f64) -> f64 {
     let s = start_years.max(0.0);
     let e = end_years.max(s);
     let sd = ((-r * s).exp() - (-r * e).exp()) / r;
-    sd.max(MIN_SUPERVISORY_DURATION_YEARS)
+    sd.max(0.0)
 }
 
-/// Non-IR add-on with the simplified hedging-set-level
-/// systematic/idiosyncratic decomposition. See module docs for the
-/// single-entity-per-HS assumption.
+/// Aggregate credit/equity by reference entity and commodities within each
+/// hedging set; commodity hedging sets and FX currency pairs receive no offset.
 fn non_ir_add_on(
     asset_class: SaCcrAssetClass,
     trades: &[SaCcrTrade],
     config: &SaCcrNettingSetConfig,
 ) -> f64 {
-    let sf = supervisory_factor(asset_class);
-    let rho = supervisory_correlation(asset_class);
-
-    let mut by_hedging_set: HashMap<String, f64> = HashMap::default();
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<String, BTreeMap<String, (f64, f64)>> = BTreeMap::new();
     for trade in trades.iter().filter(|t| t.asset_class == asset_class) {
-        let mf = trade_maturity_factor(config, trade);
-        let d_i = trade.supervisory_delta * trade.notional.abs() * mf;
-        *by_hedging_set
-            .entry(trade.hedging_set.clone())
-            .or_insert(0.0) += d_i;
+        let (_, sf, rho) = trade
+            .supervisory_category
+            .map(|c| c.parameters())
+            .unwrap_or((SaCcrAssetClass::ForeignExchange, 0.04, 1.0));
+        let duration = if asset_class == SaCcrAssetClass::Credit {
+            supervisory_duration(
+                (trade.start_date - config.as_of).whole_days().max(0) as f64 / 365.0,
+                (trade.end_date - config.as_of).whole_days().max(0) as f64 / 365.0,
+            )
+        } else {
+            1.0
+        };
+        let effective = trade.supervisory_delta
+            * trade.notional.abs()
+            * duration
+            * trade_maturity_factor(config, trade)
+            * sf;
+        let group = if matches!(
+            asset_class,
+            SaCcrAssetClass::Commodity | SaCcrAssetClass::ForeignExchange
+        ) {
+            trade.hedging_set.clone()
+        } else {
+            String::new()
+        };
+        let entity = groups
+            .entry(group)
+            .or_default()
+            .entry(trade.underlier.clone())
+            .or_insert((0.0, rho));
+        entity.0 += effective;
     }
-
-    if by_hedging_set.is_empty() {
-        return 0.0;
-    }
-
-    let hedging_set_values: Vec<f64> = by_hedging_set.values().copied().collect();
-
-    // FX hedging sets are currency pairs. Offset within a pair, but do not
-    // let opposite deltas in different pairs collapse the total add-on.
-    if asset_class == SaCcrAssetClass::ForeignExchange {
-        let add_on_raw: f64 = hedging_set_values.iter().map(|hs| hs.abs()).sum();
-        return add_on_raw * sf;
-    }
-
-    // For Credit / Equity / Commodity (rho < 1) each hedging set is the
-    // systematic/idiosyncratic unit per the single-entity-per-HS caveat
-    // in the module docs.
-    let systematic: f64 = hedging_set_values.iter().sum::<f64>() * rho;
-    let idiosyncratic: f64 = hedging_set_values
-        .iter()
-        .map(|hs| (1.0 - rho * rho) * hs * hs)
-        .sum::<f64>();
-
-    let add_on_raw = (systematic * systematic + idiosyncratic).sqrt();
-    add_on_raw * sf
+    groups
+        .values()
+        .map(|entities| {
+            let systematic: f64 = entities.values().map(|(d, rho)| d * rho).sum();
+            let idiosyncratic: f64 = entities
+                .values()
+                .map(|(d, rho)| (1.0 - rho * rho) * d * d)
+                .sum();
+            (systematic * systematic + idiosyncratic).max(0.0).sqrt()
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -267,6 +258,8 @@ mod tests {
 
         fn fx_trade(end: Date, notional: f64) -> SaCcrTrade {
             SaCcrTrade {
+                supervisory_category: None,
+                option_maturity_date: None,
                 trade_id: "T".into(),
                 asset_class: SaCcrAssetClass::ForeignExchange,
                 notional,
@@ -284,6 +277,8 @@ mod tests {
 
         fn ir_trade(start: Date, end: Date, notional: f64) -> SaCcrTrade {
             SaCcrTrade {
+                supervisory_category: None,
+                option_maturity_date: None,
                 trade_id: "IR".into(),
                 asset_class: SaCcrAssetClass::InterestRate,
                 notional,

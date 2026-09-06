@@ -193,8 +193,17 @@ impl RegulatorySchedule {
     }
 
     /// Get the IM rate for an asset class and maturity.
-    #[must_use]
-    pub fn rate(&self, asset_class: ScheduleAssetClass, maturity_years: f64) -> f64 {
+    ///
+    /// # Arguments
+    ///
+    /// * `asset_class` - Regulatory schedule class; absent entries use the contractual default rate.
+    /// * `maturity_years` - Finite nonnegative residual maturity in years.
+    ///
+    /// # Errors
+    ///
+    /// Rejects invalid maturity or a selected rate outside the finite [0, 1] range.
+    pub fn rate(&self, asset_class: ScheduleAssetClass, maturity_years: f64) -> Result<f64> {
+        validate_maturity(maturity_years)?;
         let bucket = if maturity_years < self.short_to_medium {
             MaturityBucket::Short
         } else if maturity_years < self.medium_to_long {
@@ -203,10 +212,16 @@ impl RegulatorySchedule {
             MaturityBucket::Long
         };
 
-        *self
+        let rate = *self
             .rates
             .get(&(asset_class, bucket))
-            .unwrap_or(&self.default_rate)
+            .unwrap_or(&self.default_rate);
+        if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
+            return Err(finstack_quant_core::Error::Validation(
+                "schedule IM rate must be finite and in [0, 1]".into(),
+            ));
+        }
+        Ok(rate)
     }
 }
 
@@ -347,15 +362,19 @@ impl ScheduleImCalculator {
     ///
     /// # Arguments
     ///
-    /// * `years` - Maturity expressed as a year fraction
+    /// * `years` - Finite nonnegative residual maturity expressed as a year fraction
     ///
     /// # Returns
     ///
     /// The updated calculator.
-    #[must_use]
-    pub fn with_maturity(mut self, years: f64) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Rejects negative or non-finite maturity.
+    pub fn with_maturity(mut self, years: f64) -> Result<Self> {
+        validate_maturity(years)?;
         self.default_maturity_years = years;
-        self
+        Ok(self)
     }
 
     /// Calculate gross schedule IM from an explicit notional amount.
@@ -366,7 +385,7 @@ impl ScheduleImCalculator {
     ///   the reporting currency. The calculation uses `abs(notional)`.
     /// * `asset_class` - Schedule asset class used for the rate lookup and
     ///   result breakdown key.
-    /// * `maturity_years` - Remaining maturity as a year fraction.
+    /// * `maturity_years` - Finite nonnegative residual maturity as a year fraction.
     /// * `as_of` - Calculation date stored on the returned result.
     ///
     /// # Returns
@@ -378,117 +397,89 @@ impl ScheduleImCalculator {
     /// benefit is applied. For portfolios with offsetting positions use
     /// [`calculate_netting_set_with_ngr`](Self::calculate_netting_set_with_ngr)
     /// which implements the BCBS-IOSCO NGR reduction factor.
-    #[must_use]
     pub fn calculate_for_notional(
         &self,
         notional: Money,
         asset_class: ScheduleAssetClass,
         maturity_years: f64,
         as_of: Date,
-    ) -> ImResult {
-        let rate = self.schedule.rate(asset_class.clone(), maturity_years);
-        let amount = notional.abs() * rate;
-        self.result_from_amount(amount, as_of, asset_class.to_string())
+    ) -> Result<ImResult> {
+        let rate = self.schedule.rate(asset_class.clone(), maturity_years)?;
+        let amount = Money::new(notional.amount().abs() * rate, notional.currency())?;
+        Ok(self.result_from_amount(amount, as_of, asset_class.to_string()))
     }
 
-    /// BCBS-IOSCO Schedule IM with the Net-to-Gross Ratio (NGR) reduction
-    /// factor applied to a netting set of positions.
-    ///
-    /// ```text
-    /// IM = Gross_Notional × Rate × (0.4 + 0.6 × NGR)
-    /// NGR = max(0, Σ MtM_i) / Σ max(0, MtM_i)
-    /// ```
-    ///
-    /// Reference: BCBS-IOSCO *Margin Requirements for Non-Centrally
-    /// Cleared Derivatives* (March 2015, revised July 2020), §3.3
-    /// ("Gross and Net Notional").
-    ///
-    /// The gross-only path [`Self::calculate_for_notional`] can overstate the
-    /// requirement by up to 60% for well-offset netting sets; this
-    /// method should be preferred for any book that nets.
+    /// Calculate trade-specific gross schedule IM, then apply one netting-set NGR.
     ///
     /// # Arguments
     ///
-    /// * `positions` — `[(signed_mtm, gross_notional)]` per instrument.
-    ///   MtM signs matter (used for NGR numerator); gross notionals are
-    ///   summed as absolute values for the pre-factor IM base.
-    /// * `asset_class` — schedule asset class, **applied uniformly to every
-    ///   position**. The BCBS-IOSCO Schedule applies a class-specific gross
-    ///   initial-margin rate, so this method assumes the entire netting set
-    ///   belongs to a single asset class.
-    /// * `maturity_years` — representative remaining maturity for the
-    ///   rate lookup. Typical convention: longest or weighted-average
-    ///   remaining maturity across the netting set.
-    /// * `as_of` — calculation date stored on the returned result.
-    ///
-    /// # Precondition
-    ///
-    /// All positions **must** be of `asset_class`. The `(mtm, notional)` inputs
-    /// carry no per-position class, so this method cannot detect a mixed set; a
-    /// heterogeneous netting set would be charged at a single (wrong) rate. The
-    /// caller must partition the book by asset class, call this once per class,
-    /// and sum the results.
+    /// * `positions` - Tuples of signed MtM, gross notional, schedule asset class,
+    ///   and finite nonnegative residual maturity in years. All money must share
+    ///   one reporting currency. Each trade receives its own schedule rate.
+    /// * `as_of` - Calculation date stored on the result.
     ///
     /// # Returns
     ///
-    /// `Some(ImResult)` when a non-empty, same-currency netting set has
-    /// positive gross notional. The result breakdown key is
-    /// [`Self::ngr_breakdown_key`]. Returns `None` when `positions` is empty,
-    /// all notionals are zero (the NGR denominator would be zero), or the
-    /// netting set mixes currencies.
+    /// No result for an empty set or zero gross notional. Otherwise the sum of
+    /// trade gross IM multiplied by `0.4 + 0.6 * NGR`, where NGR is positive net
+    /// MtM divided by gross positive MtM (zero when gross positive MtM is zero).
+    ///
+    /// # Errors
+    ///
+    /// Rejects mixed currencies, invalid maturities or non-finite amounts.
     pub fn calculate_netting_set_with_ngr(
         &self,
-        positions: &[(Money, Money)],
-        asset_class: ScheduleAssetClass,
-        maturity_years: f64,
+        positions: &[(Money, Money, ScheduleAssetClass, f64)],
         as_of: Date,
-    ) -> finstack_quant_core::Result<Option<ImResult>> {
-        if positions.is_empty() {
+    ) -> Result<Option<ImResult>> {
+        let Some(first) = positions.first() else {
+            return Ok(None);
+        };
+        let currency = first.0.currency();
+        let mut gross_by_class = HashMap::default();
+        let mut gross_notional = 0.0;
+        for (mtm, notional, asset_class, maturity) in positions {
+            if mtm.currency() != currency
+                || notional.currency() != currency
+                || !mtm.amount().is_finite()
+                || !notional.amount().is_finite()
+                || !maturity.is_finite()
+                || *maturity < 0.0
+            {
+                return Err(finstack_quant_core::Error::Validation("schedule IM requires finite amounts in one currency and nonnegative finite maturities".into()));
+            }
+            gross_notional += notional.amount().abs();
+            let gross =
+                notional.amount().abs() * self.schedule.rate(asset_class.clone(), *maturity)?;
+            *gross_by_class
+                .entry(Self::ngr_breakdown_key(asset_class))
+                .or_insert(0.0) += gross;
+        }
+        if gross_notional == 0.0 {
             return Ok(None);
         }
-        // Reporting currency must be consistent across the netting set.
-        let reporting_currency = positions[0].0.currency();
-        if positions.iter().any(|(mtm, notional)| {
-            mtm.currency() != reporting_currency || notional.currency() != reporting_currency
-        }) {
-            return Ok(None);
-        }
-
-        // Neumaier compensated summation guards against catastrophic
-        // cancellation in `signed_mtm_sum` when long/short MTMs nearly
-        // offset across a large netting set: a naive f64 sum can leave
-        // a residual far larger than the true cancellation error, which
-        // would skew the NGR ratio. The denominator follows the standard
-        // CEM/BCBS form: sum positive MtMs, not sum absolute MtMs.
-        let signed_mtm_sum: f64 = neumaier_sum(positions.iter().map(|(mtm, _)| mtm.amount()));
-        let positive_mtm_sum: f64 =
-            neumaier_sum(positions.iter().map(|(mtm, _)| mtm.amount().max(0.0)));
-        let gross_notional_sum: f64 = neumaier_sum(
-            positions
-                .iter()
-                .map(|(_, notional)| notional.amount().abs()),
-        );
-
-        // Reject only literally non-positive denominators; sub-unit
-        // notionals are legitimate for low-denomination currencies
-        // (e.g., JPY) and the NGR clamp `clamp(0.0, 1.0)` already caps
-        // any spurious near-zero division.
-        if gross_notional_sum <= 0.0 {
-            return Ok(None);
-        }
-
-        let ngr = if positive_mtm_sum <= 0.0 {
+        let signed_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount()));
+        let positive_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount().max(0.0)));
+        let ngr = if positive_mtm == 0.0 {
             0.0
         } else {
-            (signed_mtm_sum.max(0.0) / positive_mtm_sum).clamp(0.0, 1.0)
+            (signed_mtm.max(0.0) / positive_mtm).clamp(0.0, 1.0)
         };
         let reduction = 0.4 + 0.6 * ngr;
-        let rate = self.schedule.rate(asset_class.clone(), maturity_years);
-        let amount = Money::new(gross_notional_sum * rate * reduction, reporting_currency)?;
-        Ok(Some(self.result_from_amount(
+        let mut breakdown = HashMap::default();
+        for (key, gross) in gross_by_class {
+            breakdown.insert(key, Money::new(gross * reduction, currency)?);
+        }
+        let amount = Money::new(
+            neumaier_sum(breakdown.values().map(|m| m.amount())),
+            currency,
+        )?;
+        Ok(Some(ImResult::with_breakdown(
             amount,
+            ImMethodology::Schedule,
             as_of,
-            Self::ngr_breakdown_key(&asset_class),
+            self.mpor_days,
+            breakdown,
         )))
     }
 
@@ -512,8 +503,7 @@ impl ScheduleImCalculator {
     /// # Returns
     ///
     /// A decimal rate such as `0.01` for 1%.
-    #[must_use]
-    pub fn rate(&self, asset_class: ScheduleAssetClass, maturity_years: f64) -> f64 {
+    pub fn rate(&self, asset_class: ScheduleAssetClass, maturity_years: f64) -> Result<f64> {
         self.schedule.rate(asset_class, maturity_years)
     }
 
@@ -550,17 +540,26 @@ impl ImCalculator for ScheduleImCalculator {
             "a regulatory notional",
         )?;
 
-        Ok(self.calculate_for_notional(
+        self.calculate_for_notional(
             notional,
             self.default_asset_class.clone(),
             self.default_maturity_years,
             as_of,
-        ))
+        )
     }
 
     fn methodology(&self) -> ImMethodology {
         ImMethodology::Schedule
     }
+}
+
+fn validate_maturity(years: f64) -> Result<()> {
+    if !years.is_finite() || years < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "schedule IM maturity must be finite and nonnegative".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -572,22 +571,65 @@ mod tests {
         Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date")
     }
 
+    fn ir_positions(pairs: &[(Money, Money)]) -> Vec<(Money, Money, ScheduleAssetClass, f64)> {
+        pairs
+            .iter()
+            .copied()
+            .map(|(mtm, notional)| (mtm, notional, ScheduleAssetClass::InterestRate, 5.0))
+            .collect()
+    }
+
     #[test]
     fn bcbs_schedule_rates() {
         let schedule = RegulatorySchedule::bcbs_iosco()
             .expect("bcbs_iosco schedule should load from embedded registry");
 
         // Interest rate
-        assert_eq!(schedule.rate(ScheduleAssetClass::InterestRate, 1.0), 0.01); // 1%
-        assert_eq!(schedule.rate(ScheduleAssetClass::InterestRate, 3.0), 0.02); // 2%
-        assert_eq!(schedule.rate(ScheduleAssetClass::InterestRate, 10.0), 0.04); // 4%
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::InterestRate, 1.0)
+                .expect("rate"),
+            0.01
+        );
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::InterestRate, 3.0)
+                .expect("rate"),
+            0.02
+        );
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::InterestRate, 10.0)
+                .expect("rate"),
+            0.04
+        );
 
-        assert_eq!(schedule.rate(ScheduleAssetClass::Credit, 1.0), 0.02);
-        assert_eq!(schedule.rate(ScheduleAssetClass::Credit, 10.0), 0.10);
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::Credit, 1.0)
+                .expect("rate"),
+            0.02
+        );
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::Credit, 10.0)
+                .expect("rate"),
+            0.10
+        );
 
         // Equity (constant)
-        assert_eq!(schedule.rate(ScheduleAssetClass::Equity, 1.0), 0.15);
-        assert_eq!(schedule.rate(ScheduleAssetClass::Equity, 10.0), 0.15);
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::Equity, 1.0)
+                .expect("rate"),
+            0.15
+        );
+        assert_eq!(
+            schedule
+                .rate(ScheduleAssetClass::Equity, 10.0)
+                .expect("rate"),
+            0.15
+        );
     }
 
     #[test]
@@ -596,12 +638,9 @@ mod tests {
             .expect("bcbs_standard calculator should load from embedded registry");
 
         let notional = Money::from((100_000_000_i64, Currency::USD));
-        let im = calc.calculate_for_notional(
-            notional,
-            ScheduleAssetClass::InterestRate,
-            5.0,
-            test_date(),
-        );
+        let im = calc
+            .calculate_for_notional(notional, ScheduleAssetClass::InterestRate, 5.0, test_date())
+            .expect("IM");
 
         // 5y IR uses long bucket (4%) since maturity >= 5.0
         assert_eq!(im.amount.amount(), 4_000_000.0);
@@ -665,11 +704,13 @@ mod tests {
         let calc = ScheduleImCalculator::bcbs_standard()
             .expect("bcbs_standard calculator should load from embedded registry")
             .with_asset_class(ScheduleAssetClass::Credit)
-            .with_maturity(7.0);
+            .with_maturity(7.0)
+            .expect("maturity");
 
         let notional = Money::from((50_000_000_i64, Currency::USD));
-        let im =
-            calc.calculate_for_notional(notional, ScheduleAssetClass::Credit, 7.0, test_date());
+        let im = calc
+            .calculate_for_notional(notional, ScheduleAssetClass::Credit, 7.0, test_date())
+            .expect("IM");
 
         // 7y credit uses long bucket (10%)
         assert_eq!(im.amount.amount(), 5_000_000.0);
@@ -696,7 +737,7 @@ mod tests {
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
         // Two perfectly-offsetting positions of ±10M MtM, each 100M notional.
-        let positions = vec![
+        let positions = [
             (
                 Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
                 Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
@@ -707,12 +748,7 @@ mod tests {
             ),
         ];
         let im = calc
-            .calculate_netting_set_with_ngr(
-                &positions,
-                ScheduleAssetClass::InterestRate,
-                5.0,
-                test_date(),
-            )
+            .calculate_netting_set_with_ngr(&ir_positions(&positions), test_date())
             .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
@@ -733,7 +769,7 @@ mod tests {
             .expect("bcbs_standard loads")
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
-        let positions = vec![
+        let positions = [
             (
                 Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
                 Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
@@ -744,12 +780,7 @@ mod tests {
             ),
         ];
         let im = calc
-            .calculate_netting_set_with_ngr(
-                &positions,
-                ScheduleAssetClass::InterestRate,
-                5.0,
-                test_date(),
-            )
+            .calculate_netting_set_with_ngr(&ir_positions(&positions), test_date())
             .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
@@ -770,7 +801,7 @@ mod tests {
             .expect("bcbs_standard loads")
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
-        let positions = vec![
+        let positions = [
             (
                 Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
                 Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
@@ -781,12 +812,7 @@ mod tests {
             ),
         ];
         let im = calc
-            .calculate_netting_set_with_ngr(
-                &positions,
-                ScheduleAssetClass::InterestRate,
-                5.0,
-                test_date(),
-            )
+            .calculate_netting_set_with_ngr(&ir_positions(&positions), test_date())
             .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
@@ -806,7 +832,7 @@ mod tests {
             .expect("bcbs_standard loads")
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
-        let positions = vec![
+        let positions = [
             (
                 Money::new(-10.0e6, Currency::USD).expect("valid money fixture"),
                 Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
@@ -817,12 +843,7 @@ mod tests {
             ),
         ];
         let im = calc
-            .calculate_netting_set_with_ngr(
-                &positions,
-                ScheduleAssetClass::InterestRate,
-                5.0,
-                test_date(),
-            )
+            .calculate_netting_set_with_ngr(&ir_positions(&positions), test_date())
             .expect("valid netting-set IM fixture")
             .expect("NGR computable");
 
@@ -842,11 +863,11 @@ mod tests {
             .with_asset_class(ScheduleAssetClass::InterestRate);
 
         assert!(calc
-            .calculate_netting_set_with_ngr(&[], ScheduleAssetClass::InterestRate, 5.0, test_date())
+            .calculate_netting_set_with_ngr(&[], test_date())
             .expect("valid netting-set IM fixture")
             .is_none());
 
-        let mixed = vec![
+        let mixed = [
             (
                 Money::new(10.0e6, Currency::USD).expect("valid money fixture"),
                 Money::new(100.0e6, Currency::USD).expect("valid money fixture"),
@@ -857,14 +878,8 @@ mod tests {
             ),
         ];
         assert!(calc
-            .calculate_netting_set_with_ngr(
-                &mixed,
-                ScheduleAssetClass::InterestRate,
-                5.0,
-                test_date()
-            )
-            .expect("valid netting-set IM fixture")
-            .is_none());
+            .calculate_netting_set_with_ngr(&ir_positions(&mixed), test_date())
+            .is_err());
     }
 
     #[test]

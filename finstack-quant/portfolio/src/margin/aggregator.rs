@@ -339,8 +339,8 @@ impl PortfolioMarginAggregator {
         }
 
         // VM is the net CSA call amount after threshold/MTA terms. A netting
-        // set with no `margin_spec` has no CSA to apply, so the gross MTM is
-        // reported unchanged — that is a degradation, not a result, and it is
+        // set with no `margin_spec` has no CSA to apply, so negative gross MTM is
+        // reported as desk outflow — that is a degradation, not a result, and it is
         // recorded rather than passed off silently. Repo netting sets reach
         // this path: they carry a `RepoMarginSpec` that the aggregator does
         // not yet consume, so their haircut terms are not reflected in VM.
@@ -350,7 +350,7 @@ impl PortfolioMarginAggregator {
                     pos_id.clone(),
                     format!(
                         "MO-16: netting set '{}' has no margin_spec; variation margin is the \
-                         gross MTM with no threshold, MTA or haircut applied",
+                         negative gross MTM with no threshold, MTA or haircut applied",
                         netting_set.id
                     ),
                 ));
@@ -394,7 +394,7 @@ impl PortfolioMarginAggregator {
             im_methodology,
         )?;
 
-        result.is_approximate = netting_set.is_cleared();
+        result.is_approximate = netting_set.is_cleared() || simm_breakdown.is_some();
 
         if let Some((sensitivities, breakdown)) = simm_breakdown {
             result = result.with_simm_breakdown(sensitivities, breakdown);
@@ -470,7 +470,7 @@ impl PortfolioMarginAggregator {
         // records the degradation so the unadjusted figure is not mistaken
         // for a CSA-netted call amount.
         let Some(spec) = &netting_set.margin_spec else {
-            return Ok(gross_vm);
+            return Ok(Money::new(-gross_vm.amount(), self.base_currency)?);
         };
 
         let current_collateral = Money::from((0_i64, self.base_currency));
@@ -857,8 +857,8 @@ mod tests {
 
         assert_eq!(
             result.total_variation_margin.amount(),
-            200_000.0,
-            "M-13: VM should be raw MTM less threshold when above MTA"
+            -200_000.0,
+            "M-13: positive exposure above threshold is a desk collection"
         );
     }
 

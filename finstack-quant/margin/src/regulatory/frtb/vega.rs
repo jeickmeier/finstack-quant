@@ -4,10 +4,13 @@
 //! the same two-level (intra-bucket, inter-bucket) formula as delta,
 //! but with vega-specific risk weights and correlations.
 
-use super::aggregation::{inter_bucket, intra_bucket_pairwise, intra_bucket_uniform_map};
-use super::params::{commodity, csr, equity, fx, girr};
+use super::aggregation::{
+    inter_bucket, inter_bucket_plus_undiversified, inter_bucket_with, intra_bucket_pairwise,
+};
+use super::params::{self, equity, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
 use finstack_quant_core::HashMap;
+use std::collections::BTreeMap;
 
 /// Compute the vega risk charge for a single risk class under one
 /// correlation scenario.
@@ -105,31 +108,17 @@ fn exp_decay_rho(t_i: f64, t_j: f64, alpha: f64) -> f64 {
 // CSR vega (non-sec, sec CTP, sec non-CTP)
 
 fn csr_nonsec_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(
-        &sens.csr_nonsec_vega,
-        csr::CSR_NONSEC_VEGA_RISK_WEIGHT,
-        csr::CSR_NONSEC_INTRA_BUCKET_NAME_CORRELATION,
-        csr::CSR_NONSEC_INTER_BUCKET_CORRELATION,
-        scenario,
-    )
+    generic_bucketed_vega(&sens.csr_nonsec_vega, FrtbRiskClass::CsrNonSec, scenario)
 }
 
 fn csr_sec_ctp_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_bucketed_vega(
-        &sens.csr_sec_ctp_vega,
-        csr::CSR_SEC_CTP_VEGA_RISK_WEIGHT,
-        csr::CSR_SEC_CTP_INTRA_BUCKET_CORRELATION,
-        csr::CSR_SEC_CTP_INTER_BUCKET_CORRELATION,
-        scenario,
-    )
+    generic_bucketed_vega(&sens.csr_sec_ctp_vega, FrtbRiskClass::CsrSecCtp, scenario)
 }
 
 fn csr_sec_nonctp_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     generic_bucketed_vega(
         &sens.csr_sec_nonctp_vega,
-        csr::CSR_SEC_NONCTP_VEGA_RISK_WEIGHT,
-        csr::CSR_SEC_NONCTP_INTRA_BUCKET_CORRELATION,
-        csr::CSR_SEC_NONCTP_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrSecNonCtp,
         scenario,
     )
 }
@@ -137,87 +126,83 @@ fn csr_sec_nonctp_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) 
 // Equity vega
 
 fn equity_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.equity_vega.is_empty() {
-        return 0.0;
-    }
-
-    let mut by_bucket: HashMap<u8, Vec<f64>> = HashMap::default();
-    for ((_, bucket, _), vega) in &sens.equity_vega {
-        let ws = vega * equity::EQUITY_VEGA_RISK_WEIGHT;
-        by_bucket.entry(*bucket).or_default().push(ws);
-    }
-
-    let intra_rho = scenario.scale_correlation(equity::EQUITY_INTRA_BUCKET_CORRELATION);
-    let inter_gamma = scenario.scale_correlation(equity::EQUITY_INTER_BUCKET_CORRELATION);
-
-    let bucket_results = intra_bucket_uniform_map(&by_bucket, intra_rho);
-    inter_bucket(&bucket_results, inter_gamma)
+    generic_bucketed_vega(&sens.equity_vega, FrtbRiskClass::Equity, scenario)
 }
 
 // Commodity vega
 
 fn commodity_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.commodity_vega.is_empty() {
-        return 0.0;
-    }
-
-    let mut by_bucket: HashMap<u8, Vec<f64>> = HashMap::default();
-    for ((_, bucket, _), vega) in &sens.commodity_vega {
-        let ws = vega * commodity::COMMODITY_VEGA_RISK_WEIGHT;
-        by_bucket.entry(*bucket).or_default().push(ws);
-    }
-
-    let intra_rho = scenario.scale_correlation(commodity::COMMODITY_INTRA_BUCKET_CORRELATION);
-    let inter_gamma = scenario.scale_correlation(commodity::COMMODITY_INTER_BUCKET_CORRELATION);
-
-    let bucket_results = intra_bucket_uniform_map(&by_bucket, intra_rho);
-    inter_bucket(&bucket_results, inter_gamma)
+    generic_bucketed_vega(&sens.commodity_vega, FrtbRiskClass::Commodity, scenario)
 }
 
 // FX vega
 
 fn fx_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.fx_vega.is_empty() {
-        return 0.0;
-    }
-
-    // FX vega: single bucket, uniform off-diagonal correlation. Use the
-    // O(n) closed form (see `delta::fx_delta` for the identity).
-    let rho = scenario.scale_correlation(fx::FX_INTER_PAIR_CORRELATION);
-    let mut sum_ws = 0.0;
-    let mut sum_ws_sq = 0.0;
-    for v in sens.fx_vega.values() {
-        let ws = v * fx::FX_VEGA_RISK_WEIGHT;
-        sum_ws += ws;
-        sum_ws_sq += ws * ws;
-    }
-    let k_squared = (1.0 - rho) * sum_ws_sq + rho * sum_ws * sum_ws;
-    k_squared.max(0.0).sqrt()
+    let entries: Vec<_> = sens
+        .fx_vega
+        .iter()
+        .map(|((a, b, tenor), v)| {
+            (
+                v * fx::FX_VEGA_RISK_WEIGHT,
+                (*a, *b, girr::tenor_to_years(tenor).unwrap_or(f64::NAN)),
+            )
+        })
+        .collect();
+    intra_bucket_pairwise(&entries, |(ai, bi, ti), (aj, bj, tj)| {
+        let pair_rho = if ai == aj && bi == bj {
+            1.0
+        } else {
+            fx::FX_INTER_PAIR_CORRELATION
+        };
+        scenario.scale_correlation(pair_rho * exp_decay_rho(*ti, *tj, 0.01))
+    })
+    .0
 }
 
 /// Generic bucketed vega aggregation for (name, bucket, tenor) keys.
 fn generic_bucketed_vega(
     sensitivities: &HashMap<(String, u8, String), f64>,
-    vega_rw: f64,
-    intra_rho: f64,
-    inter_gamma: f64,
+    class: FrtbRiskClass,
     scenario: CorrelationScenario,
 ) -> f64 {
-    if sensitivities.is_empty() {
-        return 0.0;
+    let mut buckets = BTreeMap::<u8, Vec<(f64, (&str, f64))>>::new();
+    for ((name, bucket, tenor), vega) in sensitivities {
+        let weight = if class == FrtbRiskClass::Equity {
+            equity::equity_vega_risk_weight(*bucket)
+        } else {
+            1.0
+        };
+        buckets.entry(*bucket).or_default().push((
+            vega * weight,
+            (name, girr::tenor_to_years(tenor).unwrap_or(f64::NAN)),
+        ));
     }
-
-    let mut by_bucket: HashMap<u8, Vec<f64>> = HashMap::default();
-    for ((_, bucket, _), vega) in sensitivities {
-        let ws = vega * vega_rw;
-        by_bucket.entry(*bucket).or_default().push(ws);
+    let ids: Vec<_> = buckets.keys().copied().collect();
+    let results: Vec<_> = buckets
+        .iter()
+        .map(|(b, entries)| {
+            if params::other_bucket(class, *b) {
+                return (
+                    entries.iter().map(|(w, _)| w.abs()).sum(),
+                    entries.iter().map(|(w, _)| w).sum(),
+                );
+            }
+            intra_bucket_pairwise(entries, |(ni, ti), (nj, tj)| {
+                let rn = if ni == nj {
+                    1.0
+                } else {
+                    params::name_correlation(class, *b)
+                };
+                scenario.scale_correlation(rn * exp_decay_rho(*ti, *tj, 0.01))
+            })
+        })
+        .collect();
+    if class == FrtbRiskClass::CsrSecNonCtp {
+        return inter_bucket_plus_undiversified(&ids, &results, |b| params::other_bucket(class, b));
     }
-
-    let scaled_intra = scenario.scale_correlation(intra_rho);
-    let scaled_inter = scenario.scale_correlation(inter_gamma);
-
-    let bucket_results = intra_bucket_uniform_map(&by_bucket, scaled_intra);
-    inter_bucket(&bucket_results, scaled_inter)
+    inter_bucket_with(&results, |i, j| {
+        scenario.scale_correlation(params::bucket_correlation(class, ids[i], ids[j]))
+    })
 }
 
 #[cfg(test)]
@@ -299,12 +284,8 @@ mod tests {
         //   K_1   = 347_850.5426185217, S_1 = 400_000
         //   K_3   = S_3 = 200_000
         //
-        // Inter-bucket gamma = 40% (flattened; see the deviation notes in
-        // `params/csr.rs`, MAR21.57):
-        //   Vega^2 = 1.21e11 + 4.0e10 + 2 * 0.40 * 400_000 * 200_000
-        //          = 1.61e11 + 6.4e10 = 2.25e11
-        //   Vega   = 474_341.6490252569
-        assert_charge(charge, 474_341.649_025_256_9, "CSR non-sec vega");
+        // Table 5 sectors 1/3 have gamma=10%: variance = 121e9 + 40e9 + 16e9.
+        assert_charge(charge, 177_000_000_000.0_f64.sqrt(), "CSR non-sec vega");
     }
 
     #[test]

@@ -58,8 +58,19 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
     insert_entries(
         &mut sensitivities.csr_nonsec_delta,
         [
-            (("ZETA".to_string(), 3, "5Y".to_string()), 18.0),
-            (("ALPHA".to_string(), 1, "3Y".to_string()), 19.0),
+            (
+                ("ZETA".to_string(), 3, "5Y".to_string(), "basis".to_string()),
+                18.0,
+            ),
+            (
+                (
+                    "ALPHA".to_string(),
+                    1,
+                    "3Y".to_string(),
+                    "basis".to_string(),
+                ),
+                19.0,
+            ),
         ],
         reverse,
     );
@@ -82,8 +93,24 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
     insert_entries(
         &mut sensitivities.csr_sec_ctp_delta,
         [
-            (("CTP_Z".to_string(), 4, "5Y".to_string()), 24.0),
-            (("CTP_A".to_string(), 2, "3Y".to_string()), 25.0),
+            (
+                (
+                    "CTP_Z".to_string(),
+                    4,
+                    "5Y".to_string(),
+                    "basis".to_string(),
+                ),
+                24.0,
+            ),
+            (
+                (
+                    "CTP_A".to_string(),
+                    2,
+                    "3Y".to_string(),
+                    "basis".to_string(),
+                ),
+                25.0,
+            ),
         ],
         reverse,
     );
@@ -106,8 +133,24 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
     insert_entries(
         &mut sensitivities.csr_sec_nonctp_delta,
         [
-            (("NCTP_Z".to_string(), 5, "5Y".to_string()), 30.0),
-            (("NCTP_A".to_string(), 2, "3Y".to_string()), 31.0),
+            (
+                (
+                    "NCTP_Z".to_string(),
+                    5,
+                    "5Y".to_string(),
+                    "basis".to_string(),
+                ),
+                30.0,
+            ),
+            (
+                (
+                    "NCTP_A".to_string(),
+                    2,
+                    "3Y".to_string(),
+                    "basis".to_string(),
+                ),
+                31.0,
+            ),
         ],
         reverse,
     );
@@ -154,8 +197,24 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
     insert_entries(
         &mut sensitivities.commodity_delta,
         [
-            (("Power".to_string(), 2, "1Y".to_string()), 42.0),
-            (("Crude".to_string(), 1, "6M".to_string()), 43.0),
+            (
+                (
+                    "Power".to_string(),
+                    2,
+                    "1Y".to_string(),
+                    "basis".to_string(),
+                ),
+                42.0,
+            ),
+            (
+                (
+                    "Crude".to_string(),
+                    1,
+                    "6M".to_string(),
+                    "basis".to_string(),
+                ),
+                43.0,
+            ),
         ],
         reverse,
     );
@@ -200,10 +259,11 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
         reverse,
     );
     sensitivities.drc_positions.push(DrcPosition {
+        maturity_years: 1.0,
         issuer: "ACME".to_string(),
         jtd_amount: 1_000_000.0,
         rating_bucket: 4,
-        sector: DrcSector::FinancialsCorporate,
+        sector: DrcSector::Corporate,
         seniority: DrcSeniority::SeniorUnsecured,
         asset_type: DrcAssetType::Corporate,
         pnl_adjustment: -10_000.0,

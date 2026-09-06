@@ -15,8 +15,8 @@ use pyo3::types::PyDict;
 /// Variation margin calculation result.
 ///
 /// Sign convention: ``gross_exposure`` is the signed mark-to-market from our
-/// side (positive = the counterparty owes us). ``delivery_amount`` is what we
-/// post and ``return_amount`` what we receive back; at most one is non-zero.
+/// side (positive = the counterparty owes us). ``post_amount`` is what we
+/// post and ``collect_amount`` what we receive back; at most one is non-zero.
 /// Amounts are floats in the CSA base currency.
 #[pyclass(
     name = "VmResult",
@@ -76,17 +76,17 @@ impl PyVmResult {
 
     /// Delivery amount (positive = we post margin).
     #[getter]
-    fn delivery_amount(&self) -> f64 {
-        self.inner.delivery_amount.amount()
+    fn post_amount(&self) -> f64 {
+        self.inner.post_amount.amount()
     }
 
     /// Return amount (positive = we receive margin back).
     #[getter]
-    fn return_amount(&self) -> f64 {
-        self.inner.return_amount.amount()
+    fn collect_amount(&self) -> f64 {
+        self.inner.collect_amount.amount()
     }
 
-    /// Net margin amount (delivery - return).
+    /// Net desk cash outflow (post minus collect).
     #[getter]
     fn net_margin(&self) -> f64 {
         self.inner.net_margin().amount()
@@ -107,12 +107,12 @@ impl PyVmResult {
     /// Export the result as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``date``, ``settlement_date`` (ISO 8601 strings),
-    /// ``gross_exposure``, ``net_exposure``, ``delivery_amount``,
-    /// ``return_amount``, ``net_margin``, ``requires_call``, ``currency``.
+    /// ``gross_exposure``, ``net_exposure``, ``post_amount``,
+    /// ``collect_amount``, ``net_margin``, ``requires_call``, ``currency``.
     ///
     /// All amount columns are floats in the single CSA currency reported by
-    /// ``currency``; positive ``delivery_amount`` means we post margin and
-    /// positive ``return_amount`` means we receive margin back.
+    /// ``currency``; positive ``post_amount`` means we post margin and
+    /// positive ``collect_amount`` means we receive margin back.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item("date", vec![self.inner.date.to_string()])?;
@@ -122,8 +122,8 @@ impl PyVmResult {
         )?;
         data.set_item("gross_exposure", vec![self.inner.gross_exposure.amount()])?;
         data.set_item("net_exposure", vec![self.inner.net_exposure.amount()])?;
-        data.set_item("delivery_amount", vec![self.inner.delivery_amount.amount()])?;
-        data.set_item("return_amount", vec![self.inner.return_amount.amount()])?;
+        data.set_item("post_amount", vec![self.inner.post_amount.amount()])?;
+        data.set_item("collect_amount", vec![self.inner.collect_amount.amount()])?;
         data.set_item("net_margin", vec![self.inner.net_margin().amount()])?;
         data.set_item("requires_call", vec![self.inner.requires_call()])?;
         data.set_item(
@@ -135,10 +135,10 @@ impl PyVmResult {
 
     fn __repr__(&self) -> String {
         format!(
-            "VmResult(date={}, delivery={:.2}, return={:.2}, requires_call={}, settlement_date={})",
+            "VmResult(date={}, post={:.2}, collect={:.2}, requires_call={}, settlement_date={})",
             self.inner.date,
-            self.inner.delivery_amount.amount(),
-            self.inner.return_amount.amount(),
+            self.inner.post_amount.amount(),
+            self.inner.collect_amount.amount(),
             if self.inner.requires_call() {
                 "True"
             } else {
@@ -225,7 +225,7 @@ impl PyVmCalculator {
     ///     Signed mark-to-market in ``currency`` (positive = the counterparty
     ///     owes us, negative = we owe them).
     /// posted_collateral : float
-    ///     Collateral currently posted to us, in ``currency``.
+    ///     Signed balance in ``currency``: positive held, negative posted, including pending agreed calls.
     /// currency : str
     ///     ISO-4217 code; must equal the CSA base currency.
     /// as_of : datetime.date | str
@@ -271,7 +271,7 @@ impl PyVmCalculator {
     ///
     /// Returns a pandas ``DataFrame`` with one row per call and columns
     /// ``call_date``, ``settlement_date`` (ISO 8601 strings), ``call_type``
-    /// (``"variation_margin_delivery"`` or ``"variation_margin_return"``),
+    /// (``"variation_margin_post"`` or ``"variation_margin_collect"``),
     /// ``amount``, ``mtm_trigger``, ``threshold``, ``mta_applied`` (floats in
     /// ``currency``) and ``currency``. Dates without a call produce no row.
     ///

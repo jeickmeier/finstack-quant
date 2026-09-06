@@ -456,8 +456,8 @@ for label,valuation_wire in [("base",wire),("stress",stress_wire)]:
     exposure=float(valuation_wire["position_values"]["USD-PAYER-IRS"]["value_base"]["amount"])
     vm=vm_calculator.calculate(exposure,0.0,"USD",AS_OF)
     # Zero threshold/IA and $500k MTA: these actual IRS exposures require no transfer.
-    margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_delivery_usd":vm.delivery_amount,
-                       "VM_return_usd":vm.return_amount,"gross_schedule_IM_usd":schedule_im.amount})
+    margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_post_usd":vm.post_amount,
+                       "VM_collect_usd":vm.collect_amount,"gross_schedule_IM_usd":schedule_im.amount})
 margin_table=pd.DataFrame(margin_rows)
 print(margin_table)
 ```
@@ -1067,8 +1067,8 @@ for label,valuation_wire in [("base",wire),("stress",stress_wire)]:
     exposure=float(valuation_wire["position_values"]["USD-PAYER-IRS"]["value_base"]["amount"])
     vm=vm_calculator.calculate(exposure,0.0,"USD",AS_OF)
     # Zero threshold/IA and $500k MTA: these actual IRS exposures require no transfer.
-    margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_delivery_usd":vm.delivery_amount,
-                       "VM_return_usd":vm.return_amount,"gross_schedule_IM_usd":schedule_im.amount})
+    margin_rows.append({"case":label,"IRS_exposure_usd":exposure,"VM_post_usd":vm.post_amount,
+                       "VM_collect_usd":vm.collect_amount,"gross_schedule_IM_usd":schedule_im.amount})
 margin_table=pd.DataFrame(margin_rows)
 print(margin_table)
 ```
@@ -1499,7 +1499,7 @@ add_check(
 
 max_irs_exposure = float(r["margin"].IRS_exposure_usd.abs().max())
 max_vm_cashflow = float(
-    r["margin"][["VM_delivery_usd", "VM_return_usd"]].abs().to_numpy().max()
+    r["margin"][["VM_post_usd", "VM_collect_usd"]].abs().to_numpy().max()
 )
 margin_failures = sum(
     (
@@ -1820,7 +1820,7 @@ add_check(
 
 max_irs_exposure = float(r["margin"].IRS_exposure_usd.abs().max())
 max_vm_cashflow = float(
-    r["margin"][["VM_delivery_usd", "VM_return_usd"]].abs().to_numpy().max()
+    r["margin"][["VM_post_usd", "VM_collect_usd"]].abs().to_numpy().max()
 )
 margin_failures = sum(
     (

@@ -234,7 +234,8 @@ schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF
 
 for row in schedule_rows:row["gross_schedule_im_usd"]=schedule.calculate_for_notional(row["notional_usd"],"USD",row["asset_class"],row["maturity_years"],AS_OF).amount
 gross_schedule=sum(r["gross_schedule_im_usd"] for r in schedule_rows)
-# The API's NGR convenience method is single asset class; aggregate this mixed set visibly.
+# Apply one NGR to the trade-specific gross amounts.
+# The credit example below explicitly elects a BBB supervisory category.
 schedule_net=gross_schedule*(.4+.6*ngr)
 print(pd.DataFrame(schedule_rows).to_string(index=False))
 print({"net_mtm_usd":net_mtm,"NGR":ngr,"schedule_net_usd":schedule_net,"SIMM_net_usd":netting_im.amount})
@@ -247,10 +248,10 @@ print("VM initial and controlled+50k mark move:",initial_vm.to_json(),next_vm.to
 # Capital is distinct from IM. Explicit two-trade GIRR and credit-spread delta scope.
 capital_sens=FrtbSensitivities("USD")
 for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sens.add_girr_delta(row.tenor,row.amount,row.currency)
-for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,100*row.amount)
+for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,"cds",100*row.amount)
 capital_result=FrtbSbaEngine().calculate(capital_sens)
 print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)
-trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base) for terms in trade_terms]
+trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base,supervisory_category=None if terms["asset_class"]=="interest_rate" else "credit_bbb") for terms in trade_terms]
 
 config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilateral("ACME-DEALER","CSA-ANALYST"),collateral=0.,as_of=AS_OF)
 ead=margin_api.SaCcrEngine().calculate_ead(config,trades)
@@ -304,7 +305,7 @@ vm_rows=[]
 for threshold,mta in [(0.,0.),(50_000.,10_000.),(95_000.,10_000.)]:
  terms=margin_api.CsaSpec.usd_regulatory().with_vm_threshold(threshold,mta)
  result=margin_api.VmCalculator(terms).calculate(200_000.,100_000.,"USD",AS_OF)
- vm_rows.append({"threshold_usd":threshold,"MTA_usd":mta,"delivery_usd":result.delivery_amount,"return_usd":result.return_amount})
+ vm_rows.append({"threshold_usd":threshold,"MTA_usd":mta,"post_usd":result.post_amount,"collect_usd":result.collect_amount})
 print(pd.DataFrame(vm_rows).to_string(index=False))
 ```
 {/* /notebook-block */}

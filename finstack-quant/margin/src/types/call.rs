@@ -21,15 +21,15 @@ pub enum MarginCallType {
     /// Collateral to be posted to cover potential future exposure.
     InitialMargin,
 
-    /// Variation margin delivery (margin to be posted)
+    /// Variation margin paid by the desk
     ///
-    /// Mark-to-market payment when exposure has increased.
-    VariationMarginDelivery,
+    /// Includes new collateral posted and excess collateral returned.
+    VariationMarginPost,
 
-    /// Variation margin return (margin to be received back)
+    /// Variation margin received by the desk
     ///
-    /// Return of excess collateral when exposure has decreased.
-    VariationMarginReturn,
+    /// Includes new collateral collected and return of collateral previously posted.
+    VariationMarginCollect,
 
     /// Top-up margin call
     ///
@@ -46,8 +46,8 @@ impl fmt::Display for MarginCallType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MarginCallType::InitialMargin => write!(f, "initial_margin"),
-            MarginCallType::VariationMarginDelivery => write!(f, "variation_margin_delivery"),
-            MarginCallType::VariationMarginReturn => write!(f, "variation_margin_return"),
+            MarginCallType::VariationMarginPost => write!(f, "variation_margin_post"),
+            MarginCallType::VariationMarginCollect => write!(f, "variation_margin_collect"),
             MarginCallType::TopUp => write!(f, "top_up"),
             MarginCallType::Substitution => write!(f, "substitution"),
         }
@@ -60,8 +60,8 @@ impl std::str::FromStr for MarginCallType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "initial_margin" => Ok(MarginCallType::InitialMargin),
-            "variation_margin_delivery" => Ok(MarginCallType::VariationMarginDelivery),
-            "variation_margin_return" => Ok(MarginCallType::VariationMarginReturn),
+            "variation_margin_post" => Ok(MarginCallType::VariationMarginPost),
+            "variation_margin_collect" => Ok(MarginCallType::VariationMarginCollect),
             "top_up" => Ok(MarginCallType::TopUp),
             "substitution" => Ok(MarginCallType::Substitution),
             other => Err(format!("Unknown margin call type: {}", other)),
@@ -88,7 +88,7 @@ pub struct MarginCall {
     /// Type of margin call
     pub call_type: MarginCallType,
 
-    /// Amount of margin required (positive = delivery, negative = return)
+    /// Nonnegative transfer amount; call_type specifies the desk cashflow direction.
     pub amount: Money,
 
     /// Specific collateral type requested (if applicable)
@@ -106,9 +106,9 @@ pub struct MarginCall {
 }
 
 impl MarginCall {
-    /// Create a new variation margin delivery call.
+    /// Create a variation margin payment by the desk.
     #[must_use]
-    pub fn vm_delivery(
+    pub fn vm_post(
         call_date: Date,
         settlement_date: Date,
         amount: Money,
@@ -119,7 +119,7 @@ impl MarginCall {
         Self {
             call_date,
             settlement_date,
-            call_type: MarginCallType::VariationMarginDelivery,
+            call_type: MarginCallType::VariationMarginPost,
             amount,
             collateral_type: None,
             mtm_trigger,
@@ -128,9 +128,9 @@ impl MarginCall {
         }
     }
 
-    /// Create a new variation margin return call.
+    /// Create a variation margin collection by the desk.
     #[must_use]
-    pub fn vm_return(
+    pub fn vm_collect(
         call_date: Date,
         settlement_date: Date,
         amount: Money,
@@ -141,7 +141,7 @@ impl MarginCall {
         Self {
             call_date,
             settlement_date,
-            call_type: MarginCallType::VariationMarginReturn,
+            call_type: MarginCallType::VariationMarginCollect,
             amount,
             collateral_type: None,
             mtm_trigger,
@@ -171,21 +171,21 @@ impl MarginCall {
         }
     }
 
-    /// Check if this is a delivery (posting) call.
+    /// Check if this is a posting call.
     #[must_use]
-    pub fn is_delivery(&self) -> bool {
+    pub fn is_post(&self) -> bool {
         matches!(
             self.call_type,
             MarginCallType::InitialMargin
-                | MarginCallType::VariationMarginDelivery
+                | MarginCallType::VariationMarginPost
                 | MarginCallType::TopUp
         )
     }
 
-    /// Check if this is a return call.
+    /// Check if the desk receives variation margin.
     #[must_use]
-    pub fn is_return(&self) -> bool {
-        matches!(self.call_type, MarginCallType::VariationMarginReturn)
+    pub fn is_collect(&self) -> bool {
+        matches!(self.call_type, MarginCallType::VariationMarginCollect)
     }
 
     /// Get the number of business days until settlement.
@@ -210,23 +210,23 @@ mod tests {
     fn margin_call_type_display() {
         assert_eq!(MarginCallType::InitialMargin.to_string(), "initial_margin");
         assert_eq!(
-            MarginCallType::VariationMarginDelivery.to_string(),
-            "variation_margin_delivery"
+            MarginCallType::VariationMarginPost.to_string(),
+            "variation_margin_post"
         );
         assert_eq!(
-            "variation_margin_return"
+            "variation_margin_collect"
                 .parse::<MarginCallType>()
                 .expect("canonical margin call type"),
-            MarginCallType::VariationMarginReturn
+            MarginCallType::VariationMarginCollect
         );
-        for noncanonical in ["vm_delivery", "IM", "topup", "variation-margin-return"] {
+        for noncanonical in ["vm_post", "IM", "topup", "variation-margin-return"] {
             assert!(noncanonical.parse::<MarginCallType>().is_err());
         }
     }
 
     #[test]
-    fn vm_delivery_call() {
-        let call = MarginCall::vm_delivery(
+    fn vm_post_call() {
+        let call = MarginCall::vm_post(
             test_date(2025, 1, 15),
             test_date(2025, 1, 16),
             Money::from((1_000_000_i64, Currency::USD)),
@@ -235,15 +235,15 @@ mod tests {
             Money::from((500_000_i64, Currency::USD)),
         );
 
-        assert!(call.is_delivery());
-        assert!(!call.is_return());
-        assert_eq!(call.call_type, MarginCallType::VariationMarginDelivery);
+        assert!(call.is_post());
+        assert!(!call.is_collect());
+        assert_eq!(call.call_type, MarginCallType::VariationMarginPost);
         assert_eq!(call.days_to_settle(), 1);
     }
 
     #[test]
-    fn vm_return_call() {
-        let call = MarginCall::vm_return(
+    fn vm_collect_call() {
+        let call = MarginCall::vm_collect(
             test_date(2025, 1, 15),
             test_date(2025, 1, 16),
             Money::from((500_000_i64, Currency::USD)),
@@ -252,8 +252,8 @@ mod tests {
             Money::from((500_000_i64, Currency::USD)),
         );
 
-        assert!(!call.is_delivery());
-        assert!(call.is_return());
+        assert!(!call.is_post());
+        assert!(call.is_collect());
     }
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
             Some(CollateralAssetClass::Cash),
         );
 
-        assert!(call.is_delivery());
+        assert!(call.is_post());
         assert_eq!(call.call_type, MarginCallType::InitialMargin);
         assert_eq!(call.collateral_type, Some(CollateralAssetClass::Cash));
         assert_eq!(call.days_to_settle(), 2);

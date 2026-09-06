@@ -1103,7 +1103,7 @@
       "properties": {
         "amount": {
           "$ref": "#/$defs/Money",
-          "description": "Amount of margin required (positive = delivery, negative = return)"
+          "description": "Nonnegative transfer amount; call_type specifies the desk cashflow direction."
         },
         "call_date": {
           "description": "Date the margin call is issued",
@@ -1204,13 +1204,13 @@
           "type": "string"
         },
         {
-          "const": "variation_margin_delivery",
-          "description": "Variation margin delivery (margin to be posted)\n\nMark-to-market payment when exposure has increased.",
+          "const": "variation_margin_post",
+          "description": "Variation margin paid by the desk\n\nIncludes new collateral posted and excess collateral returned.",
           "type": "string"
         },
         {
-          "const": "variation_margin_return",
-          "description": "Variation margin return (margin to be received back)\n\nReturn of excess collateral when exposure has decreased.",
+          "const": "variation_margin_collect",
+          "description": "Variation margin received by the desk\n\nIncludes new collateral collected and return of collateral previously posted.",
           "type": "string"
         },
         {

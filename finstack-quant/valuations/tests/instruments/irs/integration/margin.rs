@@ -209,9 +209,9 @@ fn test_vm_threshold_behavior() {
         .calculate(small_exposure, no_posted, as_of)
         .expect("VM calculation succeeds");
 
-    // Net exposure within threshold means delivery_amount should be zero
+    // Net exposure within threshold means post_amount should be zero
     assert_eq!(
-        result.delivery_amount.amount(),
+        result.post_amount.amount(),
         0.0,
         "Small exposure within threshold should not require delivery"
     );
@@ -225,7 +225,7 @@ fn test_vm_threshold_behavior() {
 
     // Should have delivery amount
     assert!(
-        result.delivery_amount.amount() > 0.0,
+        result.collect_amount.amount() > 0.0,
         "Large exposure should require delivery"
     );
 }

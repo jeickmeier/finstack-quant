@@ -1784,7 +1784,19 @@ export interface MonteCarloEstimateJson {
  */
 export interface VariationMarginJson {
   /**
-   * Sum of absolute mark-to-market exposures, in the caller's currency.
+   * ISO-4217 currency of every amount.
+   */
+  currency: string;
+  /**
+   * ISO-8601 calculation date.
+   */
+  date: string;
+  /**
+   * ISO-8601 settlement date after the contractual business-day lag.
+   */
+  settlement_date: string;
+  /**
+   * Signed mark-to-market exposure; positive means the counterparty owes the desk.
    */
   gross_exposure: number;
   /**
@@ -1792,19 +1804,19 @@ export interface VariationMarginJson {
    */
   net_exposure: number;
   /**
-   * Variation-margin delivery (call) amount, in the caller's currency.
+   * Amount the desk pays, including new postings and collateral returned.
    */
-  delivery_amount: number;
+  post_amount: number;
   /**
-   * Variation-margin return (refund) amount, in the caller's currency.
+   * Amount the desk receives, including collections and collateral returned to it.
    */
-  return_amount: number;
+  collect_amount: number;
   /**
-   * Net variation-margin movement: delivery minus return.
+   * Net desk cash outflow: post minus collect.
    */
   net_margin: number;
   /**
-   * True when delivery or return amount is strictly positive.
+   * True when the post or collect amount is strictly positive.
    */
   requires_call: boolean;
 }
@@ -4679,7 +4691,7 @@ export interface MonteCarloNamespace {
  * await init();
  * const csa = margin.csaUsdRegulatoryJson();
  * const vm = margin.calculateVm(csa, 1_000_000, 0, "USD", "2026-01-02");
- * console.log(vm.call_amount);
+ * console.log(vm.collect_amount);
  * ```
  */
 export interface MarginNamespace {
@@ -4700,22 +4712,22 @@ export interface MarginNamespace {
   /**
    * Validate a CSA specification JSON string.
    *
-   * Deserializes and re-serializes the input to verify it conforms
-   * to the `CsaSpec` schema. Returns the canonical JSON on success.
+   * Validates the JSON schema and CSA semantics, including amount currencies,
+   * monetary bounds and calendar lookup. Returns canonical JSON on success.
    * @returns Canonical CSA JSON after schema validation.
    * @param json - CSA specification JSON to validate and normalize into canonical form.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded CSA specification.
+   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
    */
   validateCsaJson(json: string): string;
   /**
    * Calculate variation margin given exposure, posted collateral, and CSA JSON.
    *
-   * Returns a JSON object with delivery_amount, return_amount, net_exposure,
+   * Returns a JSON object with post_amount, collect_amount, net_exposure,
    * and requires_call fields.
    *
    * @param csaJson - CSA specification JSON governing thresholds, minimum transfer, and timing.
-   * @param exposure - Current mark-to-market exposure in the supplied currency units.
-   * @param postedCollateral - Collateral already posted in the supplied currency units.
+   * @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
+   * @param postedCollateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
    * @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
    * @param asOf - ISO-8601 VM calculation date.
    * @returns Variation-margin call amount, currency, and CSA metadata as a plain object.

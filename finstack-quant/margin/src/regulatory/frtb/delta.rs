@@ -3,10 +3,13 @@
 //! Two-level aggregation (intra-bucket then inter-bucket) with
 //! correlation scenario scaling.
 
-use super::aggregation::{inter_bucket, intra_bucket_pairwise, intra_bucket_uniform_map};
-use super::params::{commodity, csr, equity, fx, girr};
+use super::aggregation::{
+    inter_bucket, inter_bucket_plus_undiversified, inter_bucket_with, intra_bucket_pairwise,
+};
+use super::params::{self, commodity, csr, equity, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
 use finstack_quant_core::HashMap;
+use std::collections::BTreeMap;
 
 /// Compute the delta risk charge for a single risk class under one
 /// correlation scenario.
@@ -168,47 +171,28 @@ fn intra_girr_correlation(
 // CSR Non-Sec delta
 
 fn csr_nonsec_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.csr_nonsec_delta.is_empty() {
-        return 0.0;
-    }
     csr_bucketed_delta(
         &sens.csr_nonsec_delta,
         csr::csr_nonsec_risk_weight,
-        csr::CSR_NONSEC_INTRA_BUCKET_NAME_CORRELATION,
-        csr::CSR_NONSEC_INTRA_BUCKET_TENOR_CORRELATION,
-        csr::CSR_NONSEC_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrNonSec,
         scenario,
     )
 }
 
 fn csr_sec_ctp_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.csr_sec_ctp_delta.is_empty() {
-        return 0.0;
-    }
-    // Sec CTP intra-bucket correlation is defined uniformly (MAR21.78),
-    // so name and tenor factors are both equal to the prescribed constant
-    // and the triple-rho reduces to a single-rho aggregation — but we
-    // route through the same helper for consistency.
     csr_bucketed_delta(
         &sens.csr_sec_ctp_delta,
         csr::csr_sec_ctp_risk_weight,
-        csr::CSR_SEC_CTP_INTRA_BUCKET_CORRELATION,
-        1.0,
-        csr::CSR_SEC_CTP_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrSecCtp,
         scenario,
     )
 }
 
 fn csr_sec_nonctp_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.csr_sec_nonctp_delta.is_empty() {
-        return 0.0;
-    }
     csr_bucketed_delta(
         &sens.csr_sec_nonctp_delta,
         csr::csr_sec_nonctp_risk_weight,
-        csr::CSR_SEC_NONCTP_INTRA_BUCKET_CORRELATION,
-        1.0,
-        csr::CSR_SEC_NONCTP_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrSecNonCtp,
         scenario,
     )
 }
@@ -216,44 +200,55 @@ fn csr_sec_nonctp_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario)
 // Equity delta
 
 fn equity_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.equity_delta.is_empty() {
-        return 0.0;
+    let mut buckets = BTreeMap::<u8, Vec<(f64, (&str, bool))>>::new();
+    for (repo, map) in [(false, &sens.equity_delta), (true, &sens.equity_repo_delta)] {
+        for ((name, bucket), delta) in map {
+            let weight = equity::equity_risk_weight(*bucket) / if repo { 100.0 } else { 1.0 };
+            buckets
+                .entry(*bucket)
+                .or_default()
+                .push((delta * weight, (name, repo)));
+        }
     }
-
-    // Group by bucket.
-    let mut by_bucket: HashMap<u8, Vec<f64>> = HashMap::default();
-    for ((_, bucket), delta) in &sens.equity_delta {
-        let rw = equity::equity_risk_weight(*bucket);
-        let ws = delta * rw;
-        by_bucket.entry(*bucket).or_default().push(ws);
-    }
-
-    let intra_rho = scenario.scale_correlation(equity::EQUITY_INTRA_BUCKET_CORRELATION);
-    let inter_gamma = scenario.scale_correlation(equity::EQUITY_INTER_BUCKET_CORRELATION);
-
-    let bucket_results = intra_bucket_uniform_map(&by_bucket, intra_rho);
-    inter_bucket(&bucket_results, inter_gamma)
+    let ids: Vec<_> = buckets.keys().copied().collect();
+    let results: Vec<_> = buckets
+        .iter()
+        .map(|(b, entries)| {
+            if params::other_bucket(FrtbRiskClass::Equity, *b) {
+                (
+                    entries.iter().map(|(w, _)| w.abs()).sum(),
+                    entries.iter().map(|(w, _)| w).sum(),
+                )
+            } else {
+                intra_bucket_pairwise(entries, |(ni, ri), (nj, rj)| {
+                    let name_rho = if ni == nj {
+                        1.0
+                    } else {
+                        params::name_correlation(FrtbRiskClass::Equity, *b)
+                    };
+                    scenario.scale_correlation(name_rho * if ri == rj { 1.0 } else { 0.999 })
+                })
+            }
+        })
+        .collect();
+    inter_bucket_with(&results, |i, j| {
+        scenario.scale_correlation(params::bucket_correlation(
+            FrtbRiskClass::Equity,
+            ids[i],
+            ids[j],
+        ))
+    })
 }
 
 // Commodity delta
 
 fn commodity_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    if sens.commodity_delta.is_empty() {
-        return 0.0;
-    }
-
-    let mut by_bucket: HashMap<u8, Vec<f64>> = HashMap::default();
-    for ((_, bucket, _), delta) in &sens.commodity_delta {
-        let rw = commodity::commodity_risk_weight(*bucket);
-        let ws = delta * rw;
-        by_bucket.entry(*bucket).or_default().push(ws);
-    }
-
-    let intra_rho = scenario.scale_correlation(commodity::COMMODITY_INTRA_BUCKET_CORRELATION);
-    let inter_gamma = scenario.scale_correlation(commodity::COMMODITY_INTER_BUCKET_CORRELATION);
-
-    let bucket_results = intra_bucket_uniform_map(&by_bucket, intra_rho);
-    inter_bucket(&bucket_results, inter_gamma)
+    csr_bucketed_delta(
+        &sens.commodity_delta,
+        commodity::commodity_risk_weight,
+        FrtbRiskClass::Commodity,
+        scenario,
+    )
 }
 
 // FX delta
@@ -296,65 +291,71 @@ fn girr_risk_weight(tenor: &str) -> f64 {
     })
 }
 
-/// CSR-specific delta aggregation with full intra-bucket `rho = rho_name * rho_tenor`.
+/// CSR-specific delta aggregation with intra-bucket
+/// `rho = rho_name * rho_tenor * rho_basis`.
 ///
-/// Per MAR21.54 (non-sec) and equivalent sections for sec CTP / sec non-CTP,
-/// the intra-bucket correlation between two weighted sensitivities within
-/// the same bucket factorises:
+/// Per MAR21.54 (non-sec) and equivalent sections for sec CTP / sec non-CTP:
 ///
 /// ```text
 /// rho_kl = rho_name(name_k, name_l)
 ///        * rho_tenor(tenor_k, tenor_l)
 ///        * rho_basis(basis_k, basis_l)
-///   ```
-///
-/// where each component is 1 if the two dimensions match and the prescribed
-/// correlation otherwise. Because the sensitivity map carries only
-/// `(name, bucket, tenor)` and has no explicit basis dimension, this
-/// implementation assumes a single basis per record and computes
-/// `rho_name * rho_tenor` only — callers mixing bond vs CDS basis should
-/// pre-apply the `rho_basis` factor (e.g. 0.999 for non-sec) to their
-/// sensitivities before calling, or the capital number will be slightly
-/// overstated (less offset than Basel allows).
+/// ```
 fn csr_bucketed_delta(
-    sensitivities: &HashMap<(String, u8, String), f64>,
+    sensitivities: &HashMap<(String, u8, String, String), f64>,
     risk_weight_fn: impl Fn(u8) -> f64,
-    name_correlation: f64,
-    tenor_correlation: f64,
-    inter_bucket_gamma: f64,
+    class: FrtbRiskClass,
     scenario: CorrelationScenario,
 ) -> f64 {
-    // Group weighted sensitivities by bucket, preserving name + tenor.
-    type Entry = (f64, (String, String)); // (weighted_sensitivity, (name, tenor))
-    let mut by_bucket: HashMap<u8, Vec<Entry>> = HashMap::default();
-    for ((name, bucket, tenor), delta) in sensitivities {
-        let rw = risk_weight_fn(*bucket);
-        let ws = delta * rw;
-        by_bucket
+    let mut buckets = BTreeMap::<u8, Vec<(f64, (&str, &str, &str))>>::new();
+    for ((name, bucket, tenor, basis), delta) in sensitivities {
+        buckets
             .entry(*bucket)
             .or_default()
-            .push((ws, (name.clone(), tenor.clone())));
+            .push((delta * risk_weight_fn(*bucket), (name, tenor, basis)));
     }
-
-    let scaled_name = scenario.scale_correlation(name_correlation);
-    let scaled_tenor = scenario.scale_correlation(tenor_correlation);
-    let scaled_inter = scenario.scale_correlation(inter_bucket_gamma);
-
-    // Intra-bucket aggregation with factorised rho.
-    let bucket_results: Vec<_> = by_bucket
-        .values()
-        .map(|entries| {
-            intra_bucket_pairwise(entries, |(name_i, tenor_i), (name_j, tenor_j)| {
-                let rn = if name_i == name_j { 1.0 } else { scaled_name };
-                let rt = if tenor_i == tenor_j {
+    let ids: Vec<_> = buckets.keys().copied().collect();
+    let results: Vec<_> = buckets
+        .iter()
+        .map(|(b, entries)| {
+            if params::other_bucket(class, *b) {
+                return (
+                    entries.iter().map(|(w, _)| w.abs()).sum(),
+                    entries.iter().map(|(w, _)| w).sum(),
+                );
+            }
+            intra_bucket_pairwise(entries, |(ni, ti, bi), (nj, tj, bj)| {
+                let rn = if ni == nj {
                     1.0
                 } else {
-                    scaled_tenor
+                    params::name_correlation(class, *b)
                 };
-                rn * rt
+                let rt = if ti == tj {
+                    1.0
+                } else {
+                    match class {
+                        FrtbRiskClass::Commodity => 0.99,
+                        FrtbRiskClass::CsrSecNonCtp => 0.8,
+                        _ => 0.65,
+                    }
+                };
+                scenario.scale_correlation(
+                    rn * rt
+                        * if bi == bj {
+                            1.0
+                        } else if class == FrtbRiskClass::CsrSecCtp {
+                            0.99
+                        } else {
+                            0.999
+                        },
+                )
             })
         })
         .collect();
-
-    inter_bucket(&bucket_results, scaled_inter)
+    if class == FrtbRiskClass::CsrSecNonCtp {
+        return inter_bucket_plus_undiversified(&ids, &results, |b| params::other_bucket(class, b));
+    }
+    inter_bucket_with(&results, |i, j| {
+        scenario.scale_correlation(params::bucket_correlation(class, ids[i], ids[j]))
+    })
 }

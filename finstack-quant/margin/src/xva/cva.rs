@@ -133,7 +133,7 @@ fn compute_cva_internal(
 
     let mut prev_survival = 1.0;
     let mut prev_own_survival = 1.0;
-    let mut prev_epe: f64 = 0.0;
+    let mut prev_epe = exposure_profile.epe[0];
     let mut prev_df: f64 = 1.0;
     let mut prev_t: f64 = 0.0;
 
@@ -245,7 +245,8 @@ fn compute_dva_internal(
     let mut dva = 0.0;
     let mut prev_survival = 1.0;
     let mut prev_counterparty_survival = 1.0;
-    let mut prev_ene: f64 = 0.0;
+    let mut prev_ene =
+        (exposure_profile.ene[0] - posted_im.map_or(0.0, |profile| im_at(profile, 0.0))).max(0.0);
     let mut prev_df: f64 = 1.0;
 
     for i in 0..n {
@@ -312,8 +313,8 @@ fn compute_fva_internal(
     let mut fva = 0.0;
     let mut prev_counterparty_survival = 1.0;
     let mut prev_own_survival = 1.0;
-    let mut prev_epe: f64 = 0.0;
-    let mut prev_ene: f64 = 0.0;
+    let mut prev_epe = exposure_profile.epe[0];
+    let mut prev_ene = exposure_profile.ene[0];
     let mut prev_df: f64 = 1.0;
     let mut prev_t: f64 = 0.0;
 

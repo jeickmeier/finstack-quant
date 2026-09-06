@@ -446,7 +446,9 @@ impl PySimmSensitivities {
     }
 }
 
-/// ISDA SIMM initial-margin calculator.
+/// Indicative historical SIMM v2.6 calculator. USD-normalized inputs are required.
+/// Product-class, subcurve and some non-IR dimensions are incomplete; results
+/// always carry approximation=true and do not represent current regulatory SIMM.
 ///
 /// Loads the registry-backed SIMM parameters for one rule version and
 /// aggregates explicit ``SimmSensitivities`` into an ``ImResult``.
@@ -482,7 +484,7 @@ impl PySimmCalculator {
         Ok(Self { inner })
     }
 
-    /// SIMM version label (`"v2_5"` or `"v2_6"`).
+    /// Supported SIMM version label (`"v2_6"`).
     #[getter]
     fn version(&self) -> &'static str {
         self.inner.version().as_str()
@@ -511,10 +513,8 @@ impl PySimmCalculator {
     ///     Sensitivity set to aggregate; validated first (unknown tenors or
     ///     commodity buckets raise instead of pricing to zero).
     /// currency : str
-    ///     Label for the reported amounts. **No FX conversion is applied**:
-    ///     the amounts are the raw aggregates of the sensitivities as
-    ///     supplied, so pass ``sensitivities.base_currency`` (or convert with
-    ///     ``SimmSensitivities.scaled_to_currency`` first).
+    ///     Must be USD and equal sensitivities.base_currency. Concentration
+    ///     thresholds are USD-denominated; convert other-currency inputs first.
     /// as_of : datetime.date | str
     ///     Calculation date stamped on the result.
     ///
@@ -595,11 +595,16 @@ impl PyScheduleImCalculator {
         })
     }
 
-    /// Return a copy whose default maturity is ``years``.
-    fn with_maturity(&self, years: f64) -> Self {
-        Self {
-            inner: self.inner.clone().with_maturity(years),
-        }
+    /// Return a copy whose default maturity is finite nonnegative ``years``.
+    /// Raises ValueError for invalid maturity.
+    fn with_maturity(&self, years: f64) -> PyResult<Self> {
+        Ok(Self {
+            inner: self
+                .inner
+                .clone()
+                .with_maturity(years)
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Default asset class label used by trait-based calculations.
@@ -624,9 +629,9 @@ impl PyScheduleImCalculator {
     /// asset class label and remaining maturity in years. Raises
     /// ``ValueError`` for an unknown label.
     fn rate(&self, asset_class: &str, maturity_years: f64) -> PyResult<f64> {
-        Ok(self
-            .inner
-            .rate(parse_schedule_asset_class(asset_class)?, maturity_years))
+        self.inner
+            .rate(parse_schedule_asset_class(asset_class)?, maturity_years)
+            .map_err(core_to_py)
     }
 
     /// Calculate gross schedule IM from an explicit notional.
@@ -659,58 +664,57 @@ impl PyScheduleImCalculator {
         let ccy = parse_currency(currency)?;
         let as_of = extract_date(as_of)?;
         let asset_class = parse_schedule_asset_class(asset_class)?;
-        Ok(PyImResult::from_inner(self.inner.calculate_for_notional(
-            money_from_amount(notional, ccy)?,
-            asset_class,
-            maturity_years,
-            as_of,
-        )))
+        Ok(PyImResult::from_inner(
+            self.inner
+                .calculate_for_notional(
+                    money_from_amount(notional, ccy)?,
+                    asset_class,
+                    maturity_years,
+                    as_of,
+                )
+                .map_err(core_to_py)?,
+        ))
     }
 
-    /// Calculate schedule IM for a single-asset-class netting set using the
-    /// BCBS-IOSCO net-to-gross ratio reduction ``0.4 + 0.6 * NGR``.
+    /// Calculate trade-specific gross IM and apply one netting-set NGR.
     ///
     /// Parameters
     /// ----------
-    /// positions : list[tuple[float, float]]
-    ///     ``(signed_mtm, gross_notional)`` pairs in ``currency``.
+    /// positions : list[tuple[float, float, str, float]]
+    ///     ``(signed_mtm, gross_notional, asset_class, maturity_years)`` in
+    ///     ``currency``. Each trade uses its own schedule rate.
     /// currency : str
     ///     ISO-4217 code for every amount and the result.
-    /// asset_class : str
-    ///     Schedule asset class label applied to all positions.
-    /// maturity_years : float
-    ///     Representative remaining maturity for the rate lookup.
     /// as_of : datetime.date | str
     ///     Calculation date stamped on the result.
     ///
     /// Returns ``None`` for an empty position list or zero gross notional.
-    /// Raises ``ValueError`` if the currency, asset class, an amount or the
-    /// date is invalid.
-    #[pyo3(signature = (positions, currency, asset_class, maturity_years, as_of))]
+    /// Raises ``ValueError`` if the currency, asset class, an amount, a
+    /// maturity or the date is invalid.
+    #[pyo3(signature = (positions, currency, as_of))]
     fn calculate_netting_set_with_ngr(
         &self,
-        positions: Vec<(f64, f64)>,
+        positions: Vec<(f64, f64, String, f64)>,
         currency: &str,
-        asset_class: &str,
-        maturity_years: f64,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<Option<PyImResult>> {
         let ccy = parse_currency(currency)?;
         let as_of = extract_date(as_of)?;
-        let asset_class = parse_schedule_asset_class(asset_class)?;
         let money_positions: Vec<_> = positions
             .into_iter()
-            .map(|(mtm, notional)| {
+            .map(|(mtm, notional, asset_class, maturity)| {
                 Ok((
                     money_from_amount(mtm, ccy)?,
                     money_from_amount(notional, ccy)?,
+                    parse_schedule_asset_class(&asset_class)?,
+                    maturity,
                 ))
             })
             .collect::<PyResult<_>>()?;
         Ok(self
             .inner
-            .calculate_netting_set_with_ngr(&money_positions, asset_class, maturity_years, as_of)
-            .map_err(crate::errors::core_to_py)?
+            .calculate_netting_set_with_ngr(&money_positions, as_of)
+            .map_err(core_to_py)?
             .map(PyImResult::from_inner))
     }
 
@@ -821,6 +825,20 @@ impl PyHaircutImCalculator {
     #[getter]
     fn mpor_days(&self) -> u32 {
         self.inner.mpor_days()
+    }
+
+    /// Return a calculator with collateral residual maturity in years and an
+    /// optional rating (for example AAA or A-). Raises ValueError for invalid terms.
+    #[pyo3(signature = (remaining_years, rating=None))]
+    fn with_collateral_terms(&self, remaining_years: f64, rating: Option<&str>) -> PyResult<Self> {
+        let rating = rating.map(str::parse).transpose().map_err(core_to_py)?;
+        Ok(Self {
+            inner: self
+                .inner
+                .clone()
+                .with_collateral_terms(remaining_years, rating)
+                .map_err(core_to_py)?,
+        })
     }
 
     /// Base haircut (decimal, excluding the FX add-on) for a collateral

@@ -16,8 +16,9 @@ use wasm_bindgen::prelude::*;
 /// finite observation time. Aggregates can emit at missing current rows.
 /// EWMA requires `span >= 1`; centered biased variance is used, with missing
 /// initial volatility and zero volatility for constant series after two finite rows.
-/// Rolling slope uses row positions and preserves missing-row gaps. `drawdown` takes a level series. `rolling_sharpe` is a period
-/// feature `(mean - risk_free) / sample_std` on returns, not the annualized
+/// Rolling slope uses row positions and preserves missing-row gaps.
+/// `drawdown` takes a level series. `rolling_sharpe` is a period feature
+/// `(mean - risk_free) / sample_std` on returns, not the annualized
 /// `analytics` Sharpe. Optional JSON `risk_free` defaults to `0.0` in the same
 /// units as the return series.
 ///

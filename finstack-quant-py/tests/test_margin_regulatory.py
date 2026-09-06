@@ -76,7 +76,19 @@ def test_sa_ccr_trade_keyword_constructor_matches_json() -> None:
     assert typed.option_type is None
 
     with pytest.raises(ValueError, match="agree in sign"):
-        SaCcrTrade("X", "credit", 1.0, "2025-01-15", "2026-01-15", "ACME", "HS", 1.0, -1.0, 0.0)
+        SaCcrTrade(
+            "X",
+            "credit",
+            1.0,
+            "2025-01-15",
+            "2026-01-15",
+            "ACME",
+            "HS",
+            1.0,
+            -1.0,
+            0.0,
+            supervisory_category="credit_bbb",
+        )
 
 
 def test_sa_ccr_trade_dataframe_round_trip() -> None:
@@ -96,6 +108,7 @@ def test_sa_ccr_trade_from_json_validates_regulatory_semantics() -> None:
     option_payload["is_option"] = True
     option_payload["option_type"] = "call_long"
     option_payload["supervisory_delta"] = 0.6
+    option_payload["option_maturity_date"] = "2026-01-15"
     option = SaCcrTrade.from_json(json.dumps(option_payload))
     assert json.loads(option.to_json())["option_type"] == "call_long"
 
@@ -107,6 +120,7 @@ def test_sa_ccr_trade_from_json_validates_regulatory_semantics() -> None:
     payload = linear_trade_payload()
     payload["is_option"] = True
     payload["option_type"] = None
+    payload["option_maturity_date"] = "2026-01-15"
     with pytest.raises(ValueError, match="requires option_type"):
         SaCcrTrade.from_json(json.dumps(payload))
 
@@ -285,19 +299,19 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     sens.add_girr_xccy_basis_delta(500.0, "EUR")
     sens.add_girr_vega("1Y", "5Y", 2_000.0)
     sens.add_girr_curvature(300.0, -200.0)
-    sens.add_csr_nonsec_delta("ACME", 3, "5Y", 4_000.0)
+    sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 4_000.0)
     sens.add_csr_nonsec_vega("ACME", 3, "1Y", 400.0)
     sens.add_csr_nonsec_curvature("ACME", 3, 50.0, -40.0)
-    sens.add_csr_sec_ctp_delta("CDX-T", 1, "5Y", 1_000.0)
+    sens.add_csr_sec_ctp_delta("CDX-T", 1, "5Y", "bond", 1_000.0)
     sens.add_csr_sec_ctp_vega("CDX-T", 1, "1Y", 100.0)
     sens.add_csr_sec_ctp_curvature("CDX-T", 1, 10.0, -8.0)
-    sens.add_csr_sec_nonctp_delta("ABS-1", 1, "5Y", 1_000.0)
+    sens.add_csr_sec_nonctp_delta("ABS-1", 1, "5Y", "bond", 1_000.0)
     sens.add_csr_sec_nonctp_vega("ABS-1", 1, "1Y", 100.0)
     sens.add_csr_sec_nonctp_curvature("ABS-1", 1, 10.0, -8.0)
     sens.add_equity_delta("ACME", 1, 12_000.0)
     sens.add_equity_vega("ACME", 1, "1Y", 600.0)
     sens.add_equity_curvature("ACME", 1, 70.0, -60.0)
-    sens.add_commodity_delta("WTI", 2, "1Y", 3_000.0)
+    sens.add_commodity_delta("WTI", 2, "1Y", "location", 3_000.0)
     sens.add_commodity_vega("WTI", 2, "1Y", 300.0)
     sens.add_commodity_curvature("WTI", 2, 30.0, -20.0)
     sens.add_fx_delta("EUR", "USD", 9_000.0)
@@ -311,7 +325,7 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     assert restored.to_json() == sens.to_json()
     assert "delta=9" in repr(sens)
 
-    sens.add_drc_position("ACME", 1_000_000.0, 3, "financials_corporate", "senior_unsecured", "corporate")
+    sens.add_drc_position("ACME", 1_000_000.0, 3, "corporate", "senior_unsecured", "corporate", 1.0)
     charged = frtb_sba_charge(sens)
     assert charged.drc > 0.0
     with pytest.raises(ValueError, match="add_drc_position"):
@@ -319,3 +333,33 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
 
     empty = frtb_sba_charge(FrtbSensitivities("USD"))
     assert repr(empty.rrao) == "0.0"
+
+
+def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
+    sens = FrtbSensitivities("USD")
+    sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 100.0)
+    sens.add_csr_nonsec_delta("ACME", 3, "5Y", "cds", -100.0)
+    sens.add_commodity_delta("WTI", 2, "1Y", "Cushing", 100.0)
+    sens.add_commodity_delta("WTI", 2, "1Y", "Houston", -100.0)
+    sens.add_equity_repo_delta("ACME", 3, 1_000.0)
+    assert FrtbSensitivities.from_dataframe(sens.to_dataframe()).to_json() == sens.to_json()
+    assert frtb_sba_charge(sens).total > 0
+    option = SaCcrTrade(
+        "OPT",
+        "equity",
+        1e6,
+        "2025-01-15",
+        "2030-01-15",
+        "ACME",
+        "EQ",
+        1.0,
+        0.6,
+        0.0,
+        is_option=True,
+        option_type="call_long",
+        supervisory_category="equity_single_name",
+        option_maturity_date="2026-01-15",
+    )
+    assert SaCcrTrade.from_dataframe(option.to_dataframe())[0].to_json() == option.to_json()
+    assert option.option_maturity_date == dt.date(2026, 1, 15)
+    assert option.supervisory_category == "equity_single_name"

@@ -526,7 +526,6 @@ fn cap_weights(
     if long.is_empty() && short.is_empty() {
         return Ok(());
     }
-    // Keep the centered signal's signs, with half the gross on each side.
     for (side, sign) in [(&mut long, 1.0), (&mut short, -1.0)] {
         if (side.len() as f64) * max_abs < 0.5 {
             return Err(Error::Validation(

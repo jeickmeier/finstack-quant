@@ -249,9 +249,9 @@ def timeseries(
         value: Name of the numeric column to transform. ``NaN``/``None`` entries
             are treated as missing.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            identifying the entity. Aware datetimes normalize to UTC.
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            used to sort within each entity. Aware datetimes normalize to UTC.
             Omit when ``df.index`` is a ``DatetimeIndex``.
         op: Time-series operation name (e.g. ``"returns"``, ``"rolling_mean"``,
             ``"ewma_mean"``). See ``transform_timeseries`` for the full set.
@@ -522,9 +522,9 @@ def pairwise(
             treated as missing.
         other: Name of the second numeric column paired with ``value``.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            identifying the entity. Aware datetimes normalize to UTC.
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            used to sort within each entity. Aware datetimes normalize to UTC.
             Omit when ``df.index`` is a ``DatetimeIndex``.
         op: Pairwise operation name: ``"rolling_cov"``, ``"rolling_corr"``, or
             ``"rolling_beta"``.
@@ -597,9 +597,9 @@ def rolling_regression_residual(
             missing.
         exposures: Names of the exposure columns regressed against ``value``.
         entity: Column name, index level name, or integer index level position
-            identifying the entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            identifying the entity. Aware datetimes normalize to UTC.
         order: Column name, index level name, or integer index level position
-            used to sort within each entity; entries use the binding key conversion (aware datetimes normalize to UTC).
+            used to sort within each entity. Aware datetimes normalize to UTC.
             Omit when ``df.index`` is a ``DatetimeIndex``.
         params: Optional parameters ``window``, ``min_periods``, and
             ``fit_intercept``.
@@ -673,7 +673,8 @@ def risk_scaled_weights(
         KeyError: If ``value`` or ``volatility`` is missing, or ``time_key`` is
             not a column or index level (and no ``DatetimeIndex`` default
             applies).
-        ValueError: If volatility is negative or arithmetic is non-finite. If ``time_key`` is ambiguous.
+        ValueError: If volatility is negative, arithmetic is non-finite, or
+            ``time_key`` is ambiguous.
 
     Examples:
     --------
@@ -780,7 +781,8 @@ def neutralize_and_zscore(
         KeyError: If ``value`` or any exposure column is missing, or ``time_key``
             is not a column or index level (and no ``DatetimeIndex`` default
             applies).
-        ValueError: If ``fit_intercept=False`` or arithmetic is non-finite. If ``time_key`` is ambiguous or ``params`` are malformed.
+        ValueError: If ``fit_intercept=False``, arithmetic is non-finite,
+            ``time_key`` is ambiguous, or ``params`` are malformed.
 
     Examples:
     --------

@@ -23,6 +23,7 @@ fn serialize_csa(csa: &finstack_quant_margin::CsaSpec) -> Result<String, JsValue
 #[wasm_bindgen(js_name = csaUsdRegulatoryJson)]
 pub fn csa_usd_regulatory_json() -> Result<String, JsValue> {
     let csa = finstack_quant_margin::CsaSpec::usd_regulatory().map_err(to_js_err)?;
+    csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
 }
 
@@ -35,33 +36,35 @@ pub fn csa_usd_regulatory_json() -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = csaEurRegulatoryJson)]
 pub fn csa_eur_regulatory_json() -> Result<String, JsValue> {
     let csa = finstack_quant_margin::CsaSpec::eur_regulatory().map_err(to_js_err)?;
+    csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
 }
 
 /// Validate a CSA specification JSON string.
 ///
-/// Deserializes and re-serializes the input to verify it conforms
-/// to the `CsaSpec` schema. Returns the canonical JSON on success.
+/// Checks the JSON schema and canonical CSA semantics, including currencies,
+/// monetary bounds and calendar lookup. Returns canonical JSON on success.
 ///
 /// # Errors
 ///
 /// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded CSA specification.
+/// the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
 /// @param json - CSA specification JSON to validate and normalize into canonical form.
 #[wasm_bindgen(js_name = validateCsaJson)]
 pub fn validate_csa_json(json: &str) -> Result<String, JsValue> {
     let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(json).map_err(to_js_err)?;
+    csa.validate().map_err(to_js_err)?;
     serialize_csa(&csa)
 }
 
 /// Calculate variation margin given exposure, posted collateral, and CSA JSON.
 ///
-/// Returns a JSON object with delivery_amount, return_amount, net_exposure,
+/// Returns a JSON object with post_amount, collect_amount, net_exposure,
 /// and requires_call fields.
 ///
 /// @param csa_json - CSA specification JSON governing thresholds, minimum transfer, and timing.
-/// @param exposure - Current mark-to-market exposure in the supplied currency units.
-/// @param posted_collateral - Collateral already posted in the supplied currency units.
+/// @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
+/// @param posted_collateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
 /// @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
 /// @param as_of - ISO-8601 VM calculation date.
 /// @returns Variation-margin call amount, currency, and CSA metadata as a plain object.
@@ -92,10 +95,13 @@ pub fn calculate_vm(
     let result = calc.calculate(exp, posted, as_of).map_err(to_js_err)?;
 
     let out = serde_json::json!({
+        "currency": ccy.to_string(),
+        "settlement_date": result.settlement_date.to_string(),
+        "date": result.date.to_string(),
         "gross_exposure": result.gross_exposure.amount(),
         "net_exposure": result.net_exposure.amount(),
-        "delivery_amount": result.delivery_amount.amount(),
-        "return_amount": result.return_amount.amount(),
+        "post_amount": result.post_amount.amount(),
+        "collect_amount": result.collect_amount.amount(),
         "net_margin": result.net_margin().amount(),
         "requires_call": result.requires_call(),
     });

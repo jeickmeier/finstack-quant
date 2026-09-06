@@ -24,11 +24,11 @@ pub struct VmResult {
     /// Net exposure after applying threshold and independent amount
     pub net_exposure: Money,
 
-    /// Delivery amount (positive = we need to post margin)
-    pub delivery_amount: Money,
+    /// Amount to post to the counterparty, including returned collateral
+    pub post_amount: Money,
 
-    /// Return amount (positive = we receive margin back)
-    pub return_amount: Money,
+    /// Amount to collect from the counterparty, including returned collateral
+    pub collect_amount: Money,
 
     /// Settlement date for the margin transfer
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
@@ -36,20 +36,20 @@ pub struct VmResult {
 }
 
 impl VmResult {
-    /// Get the net margin amount (delivery - return).
+    /// Get net cash outflow: post minus collect, positive when the desk pays.
     #[must_use]
     pub fn net_margin(&self) -> Money {
-        if self.delivery_amount.amount() > 0.0 {
-            self.delivery_amount
+        if self.post_amount.amount() > 0.0 {
+            self.post_amount
         } else {
-            self.return_amount.checked_neg()
+            self.collect_amount.checked_neg()
         }
     }
 
     /// Check if a margin call is required.
     #[must_use]
     pub fn requires_call(&self) -> bool {
-        self.delivery_amount.amount() > 0.0 || self.return_amount.amount() > 0.0
+        self.post_amount.amount() > 0.0 || self.collect_amount.amount() > 0.0
     }
 }
 
@@ -62,7 +62,7 @@ impl VmResult {
 ///
 /// Credit support follows [`crate::VmParameters::calculate_margin_call`] (symmetric
 /// threshold in `|Exposure|`, bilateral handling of signed exposure). Delivery
-/// and return amounts split that signed amount by exposure sign.
+/// and collection amounts split that signed amount by cashflow direction.
 ///
 /// Implementation delegates CSA/MTA/rounding logic to
 /// `VmParameters::calculate_margin_call` to ensure consistent behavior
@@ -85,7 +85,7 @@ impl VmResult {
 /// let as_of = Date::from_calendar_date(2025, time::Month::January, 15).expect("valid");
 ///
 /// let result = calc.calculate(exposure, posted, as_of)?;
-/// println!("Delivery required: {}", result.delivery_amount);
+/// println!("Cash to post: {}", result.post_amount);
 /// # Ok(())
 /// # }
 /// ```
@@ -130,18 +130,19 @@ impl VmCalculator {
     /// # Arguments
     ///
     /// * `exposure` - Current mark-to-market exposure (positive = counterparty owes us)
-    /// * `posted_collateral` - Value of currently posted collateral
+    /// * `posted_collateral` - Signed collateral balance, positive held and negative posted, including pending agreed calls.
     /// * `as_of` - Calculation date
     ///
     /// # Returns
     ///
-    /// [`VmResult`] with delivery and return amounts.
+    /// [`VmResult`] with desk post and collect amounts.
     pub fn calculate(
         &self,
         exposure: Money,
         posted_collateral: Money,
         as_of: Date,
     ) -> Result<VmResult> {
+        self.csa.validate()?;
         let currency = self.csa.base_currency;
 
         if exposure.currency() != currency {
@@ -163,30 +164,9 @@ impl VmCalculator {
 
         let vm_params = &self.csa.vm_params;
         let net_exposure_money = vm_params.required_credit_support(exposure)?;
-        let exp = exposure.amount();
-
         let net_call = vm_params.calculate_margin_call(exposure, posted_collateral)?;
-        let (delivery, ret) = match net_call.amount().total_cmp(&0.0) {
-            std::cmp::Ordering::Greater => {
-                if exp >= 0.0 {
-                    (net_call, Money::from((0_i64, currency)))
-                } else {
-                    (Money::from((0_i64, currency)), net_call)
-                }
-            }
-            std::cmp::Ordering::Less => {
-                let abs_amt = Money::new(net_call.amount().abs(), currency)?;
-                if exp >= 0.0 {
-                    (Money::from((0_i64, currency)), abs_amt)
-                } else {
-                    (abs_amt, Money::from((0_i64, currency)))
-                }
-            }
-            std::cmp::Ordering::Equal => (
-                Money::from((0_i64, currency)),
-                Money::from((0_i64, currency)),
-            ),
-        };
+        let post = Money::new((-net_call.amount()).max(0.0), currency)?;
+        let collect = Money::new(net_call.amount().max(0.0), currency)?;
 
         let settlement_date = self.calculate_settlement_date(as_of)?;
 
@@ -194,8 +174,8 @@ impl VmCalculator {
             date: as_of,
             gross_exposure: exposure,
             net_exposure: net_exposure_money,
-            delivery_amount: delivery,
-            return_amount: ret,
+            post_amount: post,
+            collect_amount: collect,
             settlement_date,
         })
     }
@@ -205,7 +185,7 @@ impl VmCalculator {
     /// # Arguments
     ///
     /// * `exposures` - Time series of (date, exposure) pairs
-    /// * `initial_collateral` - Initially posted collateral
+    /// * `initial_collateral` - Signed collateral balance: positive held, negative posted.
     ///
     /// # Returns
     ///
@@ -224,40 +204,28 @@ impl VmCalculator {
             if result.requires_call() {
                 let settlement_date = result.settlement_date;
 
-                if result.delivery_amount.amount() > 0.0 {
-                    debug!(date = %date, amount = result.delivery_amount.amount(), "VM delivery margin call");
-                    calls.push(MarginCall::vm_delivery(
+                if result.post_amount.amount() > 0.0 {
+                    debug!(date = %date, amount = result.post_amount.amount(), "VM post margin call");
+                    calls.push(MarginCall::vm_post(
                         *date,
                         settlement_date,
-                        result.delivery_amount,
+                        result.post_amount,
                         *exposure,
                         self.csa.vm_params.threshold,
                         self.csa.vm_params.mta,
                     ));
-                    current_collateral = if exposure.amount() < 0.0 {
-                        current_collateral
-                            .checked_sub(result.delivery_amount)
-                            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?
-                    } else {
-                        current_collateral.checked_add(result.delivery_amount)?
-                    };
-                } else if result.return_amount.amount() > 0.0 {
-                    debug!(date = %date, amount = result.return_amount.amount(), "VM return margin call");
-                    calls.push(MarginCall::vm_return(
+                    current_collateral = current_collateral.checked_sub(result.post_amount)?;
+                } else if result.collect_amount.amount() > 0.0 {
+                    debug!(date = %date, amount = result.collect_amount.amount(), "VM collect margin call");
+                    calls.push(MarginCall::vm_collect(
                         *date,
                         settlement_date,
-                        result.return_amount,
+                        result.collect_amount,
                         *exposure,
                         self.csa.vm_params.threshold,
                         self.csa.vm_params.mta,
                     ));
-                    current_collateral = if exposure.amount() < 0.0 {
-                        current_collateral.checked_add(result.return_amount)?
-                    } else {
-                        current_collateral
-                            .checked_sub(result.return_amount)
-                            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?
-                    };
+                    current_collateral = current_collateral.checked_add(result.collect_amount)?;
                 }
             }
         }
@@ -370,8 +338,8 @@ mod tests {
             .expect("calc ok");
 
         // With zero threshold, delivery = exposure - posted = 2M
-        assert_eq!(result.delivery_amount.amount(), 2_000_000.0);
-        assert_eq!(result.return_amount.amount(), 0.0);
+        assert_eq!(result.collect_amount.amount(), 2_000_000.0);
+        assert_eq!(result.post_amount.amount(), 0.0);
     }
 
     #[test]
@@ -385,8 +353,8 @@ mod tests {
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
 
-        assert_eq!(result.delivery_amount.amount(), 2_000_000.0);
-        assert_eq!(result.return_amount.amount(), 0.0);
+        assert_eq!(result.post_amount.amount(), 2_000_000.0);
+        assert_eq!(result.collect_amount.amount(), 0.0);
     }
 
     #[test]
@@ -401,7 +369,7 @@ mod tests {
             .calculate(exposure, posted, test_date(2025, 1, 15))
             .expect("calc ok");
 
-        assert_eq!(result.delivery_amount.amount(), 0.0);
+        assert_eq!(result.post_amount.amount(), 0.0);
         assert!(!result.requires_call());
     }
 
@@ -418,8 +386,8 @@ mod tests {
             .expect("calc ok");
 
         // Return = posted - required = 3M - 1M = 2M
-        assert_eq!(result.delivery_amount.amount(), 0.0);
-        assert_eq!(result.return_amount.amount(), 2_000_000.0);
+        assert_eq!(result.collect_amount.amount(), 0.0);
+        assert_eq!(result.post_amount.amount(), 2_000_000.0);
     }
 
     #[test]
@@ -452,8 +420,8 @@ mod tests {
             .expect("matching currencies should succeed");
         let result = calc.calculate(exposure, posted, as_of).expect("calc ok");
 
-        assert_eq!(result.delivery_amount, params_call);
-        assert_eq!(result.return_amount.amount(), 0.0);
+        assert_eq!(result.collect_amount, params_call);
+        assert_eq!(result.post_amount.amount(), 0.0);
 
         // Now flip to a return scenario
         let exposure = Money::from((500_000_i64, Currency::USD));
@@ -465,9 +433,9 @@ mod tests {
             .expect("matching currencies should succeed");
         let result = calc.calculate(exposure, posted, as_of).expect("calc ok");
 
-        assert_eq!(result.delivery_amount.amount(), 0.0);
+        assert_eq!(result.collect_amount.amount(), 0.0);
         assert_eq!(
-            result.return_amount,
+            result.post_amount,
             Money::new(params_call.amount().abs(), Currency::USD).expect("valid money fixture")
         );
     }
@@ -498,9 +466,9 @@ mod tests {
 
         // Three calls: 2 deliveries (1M, then 1M more), then 1 return (0.5M excess)
         assert_eq!(calls.len(), 3);
-        assert_eq!(calls[0].call_type, MarginCallType::VariationMarginDelivery);
-        assert_eq!(calls[1].call_type, MarginCallType::VariationMarginDelivery);
-        assert_eq!(calls[2].call_type, MarginCallType::VariationMarginReturn);
+        assert_eq!(calls[0].call_type, MarginCallType::VariationMarginCollect);
+        assert_eq!(calls[1].call_type, MarginCallType::VariationMarginCollect);
+        assert_eq!(calls[2].call_type, MarginCallType::VariationMarginPost);
     }
 
     #[test]
@@ -532,7 +500,7 @@ mod tests {
             1,
             "persistent deficit should not be called repeatedly"
         );
-        assert_eq!(calls[0].call_type, MarginCallType::VariationMarginDelivery);
+        assert_eq!(calls[0].call_type, MarginCallType::VariationMarginPost);
         assert_eq!(calls[0].amount, Money::from((2_000_000_i64, Currency::USD)));
     }
 

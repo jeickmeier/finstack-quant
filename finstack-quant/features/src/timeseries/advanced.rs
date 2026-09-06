@@ -166,11 +166,7 @@ fn skewness(values: &[f64]) -> Option<f64> {
     let (sum_sq, sum_cubed) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_cubed), value| {
-            let centered = *value;
-            (
-                sum_sq + centered * centered,
-                sum_cubed + centered * centered * centered,
-            )
+            (sum_sq + value * value, sum_cubed + value * value * value)
         });
     let sample_var = sum_sq / (n - 1) as f64;
     if sample_var <= 0.0 {
@@ -190,8 +186,7 @@ fn excess_kurtosis(values: &[f64]) -> Option<f64> {
     let (sum_sq, sum_fourth) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_fourth), value| {
-            let centered = *value;
-            let squared = centered * centered;
+            let squared = value * value;
             (sum_sq + squared, sum_fourth + squared * squared)
         });
     let sample_var = sum_sq / (n - 1) as f64;

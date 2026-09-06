@@ -318,7 +318,9 @@ pub struct ExposureDiagnostics {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExposureProfile {
-    /// Time points in years from valuation date.
+    /// Nonnegative time points in years from valuation date. An explicit zero
+    /// node supplies opening exposure; before the first node exposure is held
+    /// flat at that node, consistently across CVA, DVA, FVA and MVA.
     pub times: Vec<f64>,
 
     /// Portfolio mark-to-market value at each time point (may be negative).
@@ -373,9 +375,9 @@ impl ExposureProfile {
         }
 
         for (i, &t) in self.times.iter().enumerate() {
-            if !t.is_finite() || t <= 0.0 {
+            if !t.is_finite() || t < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "ExposureProfile: times[{i}] = {t} must be positive and finite"
+                    "ExposureProfile: times[{i}] = {t} must be nonnegative and finite"
                 )));
             }
             if i > 0 && t <= self.times[i - 1] {

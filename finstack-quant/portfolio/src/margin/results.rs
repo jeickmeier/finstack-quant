@@ -17,7 +17,7 @@ pub struct NettingSetMargin {
     pub as_of: Date,
     /// Initial margin requirement
     pub initial_margin: Money,
-    /// Variation margin requirement
+    /// Signed desk VM outflow: positive posts, negative collections.
     pub variation_margin: Money,
     /// Total margin (IM + positive VM)
     pub total_margin: Money,
@@ -25,7 +25,7 @@ pub struct NettingSetMargin {
     pub position_count: usize,
     /// IM methodology used
     pub im_methodology: ImMethodology,
-    /// Whether IM is a conservative gross-exposure proxy rather than a CCP portfolio calculation.
+    /// Whether IM uses an approximate model, including historical SIMM or the CCP proxy.
     pub is_approximate: bool,
     /// Aggregated sensitivities (for SIMM breakdown)
     pub sensitivities: Option<SimmSensitivities>,
@@ -102,7 +102,7 @@ pub struct PortfolioMarginResult {
     pub base_currency: Currency,
     /// Total initial margin across all netting sets
     pub total_initial_margin: Money,
-    /// Total variation margin across all netting sets
+    /// Signed desk VM outflow across all netting sets; collections are negative.
     pub total_variation_margin: Money,
     /// Total margin requirement
     pub total_margin: Money,

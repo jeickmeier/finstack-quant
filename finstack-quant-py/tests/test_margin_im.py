@@ -76,10 +76,8 @@ def test_schedule_im_gross_and_ngr_paths() -> None:
         dt.date(2025, 1, 15),
     )
     netted = calc.calculate_netting_set_with_ngr(
-        [(2_000_000.0, 100_000_000.0), (-1_500_000.0, 80_000_000.0)],
+        [(2_000_000.0, 100_000_000.0, "interest_rate", 5.0), (-1_500_000.0, 80_000_000.0, "interest_rate", 5.0)],
         "USD",
-        "interest_rate",
-        5.0,
         dt.date(2025, 1, 15),
     )
 

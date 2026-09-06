@@ -1,14 +1,16 @@
 //! ISDA Standard Initial Margin Model (SIMM) calculator.
 //!
-//! Implements the ISDA SIMM methodology for calculating initial margin
-//! on non-centrally cleared OTC derivatives.
+//! Computes an indicative historical v2.6 approximation for uncleared OTC
+//! derivatives. USD-normalized sensitivities are required. Product-class,
+//! subcurve and some non-IR factor dimensions are incomplete; every ImResult
+//! is marked approximate. This is not current regulatory SIMM.
 //!
 //! # ISDA SIMM Methodology
 //!
 //! SIMM calculates IM based on sensitivities across risk classes:
 //! - Interest Rate (IR): DV01-style currency sensitivities by tenor bucket
-//! - Credit Qualifying (CQ): CS01-style currency sensitivities for investment-grade credit
-//! - Credit Non-Qualifying (CNQ): CS01-style currency sensitivities for high-yield credit
+//! - Credit Qualifying (CQ): CS01-style currency sensitivities for corporate, sovereign and index credit
+//! - Credit Non-Qualifying (CNQ): CS01-style currency sensitivities for securitization credit
 //! - Equity: signed currency delta and vega sensitivities
 //! - Commodity: signed currency delta and vega sensitivities
 //! - FX: signed currency delta and vega sensitivities
@@ -410,7 +412,7 @@ impl SimmCalculator {
         // reductions are bit-reproducible regardless of HashMap iteration.
         let mut currencies: Vec<(&Currency, &HashMap<String, f64>)> = by_currency.iter().collect();
         currencies.sort_by_key(|(ccy, _)| **ccy);
-        let k_values: Vec<f64> = currencies
+        let k_values: Vec<(f64, f64, f64)> = currencies
             .into_iter()
             .map(|(_, tenor_map)| {
                 let mut weighted: Vec<(usize, f64)> = tenor_map
@@ -422,12 +424,14 @@ impl SimmCalculator {
                     })
                     .collect();
                 weighted.sort_by_key(|(idx, _)| *idx);
-                let net_ws: f64 = weighted.iter().map(|(_, ws)| *ws).sum();
-                let cf = self.concentration_factor(SimmRiskClass::InterestRate, net_ws);
+                let raw_net: f64 = tenor_map.values().sum();
+                let cf = self.concentration_factor(SimmRiskClass::InterestRate, raw_net);
                 for (_, ws) in &mut weighted {
                     *ws *= cf;
                 }
-                self.ir_tenor_norm(&weighted)
+                let k = self.ir_tenor_norm(&weighted);
+                let signed = weighted.iter().map(|(_, ws)| *ws).sum::<f64>().clamp(-k, k);
+                (k, signed, cf)
             })
             .collect();
 
@@ -446,12 +450,15 @@ impl SimmCalculator {
 
     /// Combine per-currency IR margins with the SIMM inter-currency
     /// correlation `γ` (uniform off-diagonal).
-    fn aggregate_ir_currencies(&self, k_values: &[f64]) -> f64 {
-        if k_values.len() <= 1 {
-            return k_values.first().copied().unwrap_or(0.0);
+    fn aggregate_ir_currencies(&self, buckets: &[(f64, f64, f64)]) -> f64 {
+        let mut variance: f64 = buckets.iter().map(|(k, _, _)| k * k).sum();
+        for (i, (_, s_i, cr_i)) in buckets.iter().enumerate() {
+            for (_, s_j, cr_j) in &buckets[..i] {
+                let g = cr_i.min(*cr_j) / cr_i.max(*cr_j);
+                variance += 2.0 * self.params.ir_inter_currency_correlation * g * s_i * s_j;
+            }
         }
-        let gamma = self.params.ir_inter_currency_correlation;
-        correlated_norm(k_values, |_, _| gamma)
+        variance.max(0.0).sqrt()
     }
 
     /// Calculate IR vega margin with multi-currency aggregation.
@@ -479,9 +486,14 @@ impl SimmCalculator {
 
         let mut currencies: Vec<(&Currency, &HashMap<String, f64>)> = by_currency.iter().collect();
         currencies.sort_by_key(|(ccy, _)| **ccy);
-        let k_values: Vec<f64> = currencies
+        let k_values: Vec<(f64, f64, f64)> = currencies
             .into_iter()
-            .map(|(_, tenor_map)| self.calculate_ir_vega(tenor_map))
+            .map(|(_, tenor_map)| {
+                let k = self.calculate_ir_vega(tenor_map);
+                let signed =
+                    (tenor_map.values().sum::<f64>() * self.params.ir_vega_weight).clamp(-k, k);
+                (k, signed, 1.0)
+            })
             .collect();
 
         self.aggregate_ir_currencies(&k_values)
@@ -895,8 +907,10 @@ impl SimmCalculator {
         }
     }
 
-    /// Calculate SIMM margin from pre-computed sensitivities as a raw
-    /// `(total, breakdown)` tuple.
+    /// Calculate indicative historical SIMM v2.6 from sensitivities as a raw
+    /// `(total, breakdown)` tuple. This omits the approximation flag from the
+    /// result envelope; all amounts remain approximate for the limitations
+    /// documented on [`Self::calculate_from_sensitivities`].
     ///
     /// Specialised variant of [`Self::calculate_from_sensitivities`] for Rust
     /// callers that aggregate many netting sets and do not want an
@@ -906,7 +920,7 @@ impl SimmCalculator {
     /// # Arguments
     ///
     /// * `sensitivities` - SIMM sensitivities by risk class using the units documented on [`SimmSensitivities`]
-    /// * `currency` - Currency in which returned [`Money`] amounts will be labeled
+    /// * `currency` - USD, matching the sensitivity base currency; concentration thresholds are USD-denominated and no FX conversion is performed
     ///
     /// # Returns
     ///
@@ -949,6 +963,11 @@ impl SimmCalculator {
         currency: Currency,
     ) -> finstack_quant_core::Result<(f64, HashMap<String, Money>)> {
         sensitivities.validate()?;
+        if currency != sensitivities.base_currency || currency != Currency::USD {
+            return Err(finstack_quant_core::Error::Validation(
+                "SIMM requires USD-normalized sensitivities and USD output because concentration thresholds are in USD; convert inputs explicitly before calculation".into()
+            ));
+        }
         let mut breakdown = HashMap::default();
         let mut risk_class_margins = HashMap::default();
 
@@ -1004,6 +1023,7 @@ impl SimmCalculator {
         let non_qual_total = sensitivities
             .credit_non_qualifying_delta
             .values()
+            .map(|s| s.abs())
             .sum::<f64>();
         if non_qual_total.abs() > 0.0 {
             let credit_margin = self.calculate_credit_non_qualifying_delta(non_qual_total);
@@ -1020,6 +1040,7 @@ impl SimmCalculator {
         let non_qual_vega_total = sensitivities
             .credit_non_qualifying_vega
             .values()
+            .map(|s| s.abs())
             .sum::<f64>();
         if non_qual_vega_total.abs() > 0.0 {
             let credit_vega_margin = self.calculate_credit_non_qualifying_vega(non_qual_vega_total);
@@ -1035,7 +1056,7 @@ impl SimmCalculator {
         }
 
         // Equity Delta
-        let total_equity = sensitivities.total_equity_delta();
+        let total_equity: f64 = sensitivities.equity_delta.values().map(|s| s.abs()).sum();
         if total_equity.abs() > 0.0 {
             let equity_margin = self.calculate_equity_delta(total_equity);
             if equity_margin > 0.0 {
@@ -1048,7 +1069,7 @@ impl SimmCalculator {
         }
 
         // Equity Vega
-        let total_equity_vega: f64 = sensitivities.equity_vega.values().sum();
+        let total_equity_vega: f64 = sensitivities.equity_vega.values().map(|s| s.abs()).sum();
         if total_equity_vega.abs() > 0.0 {
             let equity_vega_margin = self.calculate_equity_vega(total_equity_vega);
             if equity_vega_margin > 0.0 {
@@ -1073,7 +1094,7 @@ impl SimmCalculator {
         }
 
         // FX Vega
-        let total_fx_vega: f64 = sensitivities.fx_vega.values().sum();
+        let total_fx_vega: f64 = sensitivities.fx_vega.values().map(|s| s.abs()).sum();
         if total_fx_vega.abs() > 0.0 {
             let fx_vega_margin = self.calculate_fx_vega(total_fx_vega);
             if fx_vega_margin > 0.0 {
@@ -1173,7 +1194,12 @@ impl SimmCalculator {
         Ok((total_im, breakdown))
     }
 
-    /// Calculate SIMM from explicit sensitivities and return a full [`ImResult`].
+    /// Calculate indicative historical SIMM v2.6 from explicit sensitivities.
+    ///
+    /// Results always carry `approximation = true`: the input contract omits
+    /// product-class, IR subcurve and full non-IR bucket dimensions. Non-IR
+    /// name aggregates use gross absolute sensitivities to prevent false offsets.
+    /// This model is unsuitable for regulatory margin or current-version reconciliation.
     ///
     /// This is the canonical entry point: it validates the container with
     /// [`SimmSensitivities::validate`] first, so a mistyped tenor or commodity
@@ -1185,9 +1211,8 @@ impl SimmCalculator {
     /// # Arguments
     ///
     /// * `sensitivities` - SIMM sensitivity container using the units documented on [`SimmSensitivities`].
-    /// * `currency` - Currency label for the returned [`Money`] amounts. No FX
-    ///   conversion is applied: the amounts are the raw SIMM aggregates of the
-    ///   sensitivities as supplied, merely labelled in `currency`.
+    /// * `currency` - Must be USD and match the sensitivity base currency. All
+    ///   sensitivities must already be converted to USD before concentration tests.
     /// * `as_of` - Calculation date stamped on the result.
     ///
     /// # Errors
@@ -1202,13 +1227,15 @@ impl SimmCalculator {
     ) -> Result<ImResult> {
         let (amount, breakdown) =
             self.calculate_from_sensitivities_parts(sensitivities, currency)?;
-        Ok(ImResult::with_breakdown(
+        let mut result = ImResult::with_breakdown(
             Money::new(amount, currency)?,
             ImMethodology::Simm,
             as_of,
             self.mpor_days(),
             breakdown,
-        ))
+        );
+        result.approximation = true;
+        Ok(result)
     }
 
     /// Aggregate risk class margins with the SIMM inter-risk-class correlation matrix.

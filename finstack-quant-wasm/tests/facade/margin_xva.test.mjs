@@ -216,3 +216,18 @@ test('computeBilateralXva rejects unknown funding fields', () => {
     )
   );
 });
+
+test('VM validation and desk direction retain settlement metadata', () => {
+  const csa = margin.csaUsdRegulatoryJson();
+  const collect = margin.calculateVm(csa, 1e6, 0, 'USD', '2025-01-10');
+  assert.equal(collect.collect_amount, 1e6);
+  assert.equal(collect.post_amount, 0);
+  assert.equal(collect.currency, 'USD');
+  assert.equal(collect.date, '2025-01-10');
+  assert.equal(collect.settlement_date, '2025-01-13');
+  const post = margin.calculateVm(csa, -1e6, 0, 'USD', '2025-01-10');
+  assert.equal(post.post_amount, 1e6);
+  const invalid = JSON.parse(csa);
+  invalid.calendar_id = 'unknown-calendar';
+  assert.throws(() => margin.validateCsaJson(JSON.stringify(invalid)));
+});

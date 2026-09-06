@@ -4,8 +4,10 @@
 //! that delta/vega/curvature cannot model. It is NOT subject to
 //! correlation scenarios.
 
-use super::types::{DrcPosition, DrcSector, DrcSeniority};
+use super::types::{DrcAssetType, DrcPosition, DrcSector, DrcSeniority};
 use finstack_quant_core::HashMap;
+use std::collections::BTreeMap;
+use std::sync::LazyLock;
 
 /// Prescribed DRC risk weights by rating bucket.
 ///
@@ -26,8 +28,9 @@ pub const DRC_RISK_WEIGHTS: &[(u8, f64)] = &[
 
 /// LGD assumptions by seniority.
 pub const DRC_LGD: &[(DrcSeniority, f64)] = &[
+    (DrcSeniority::CoveredBond, 0.25),
     (DrcSeniority::SeniorUnsecured, 0.75),
-    (DrcSeniority::Subordinated, 0.75),
+    (DrcSeniority::Subordinated, 1.00),
     (DrcSeniority::Equity, 1.00),
     (DrcSeniority::Securitization, 1.00),
 ];
@@ -67,83 +70,98 @@ pub const DRC_LGD: &[(DrcSeniority, f64)] = &[
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
 ///
-pub fn drc_charge(positions: &[DrcPosition]) -> f64 {
-    if positions.is_empty() {
-        return 0.0;
+pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
+    struct Obligor {
+        sector: DrcSector,
+        rating: u8,
+        longs: [f64; 4],
+        shorts: [f64; 4],
     }
-
-    // Step 1: per-position gross JTD, MAR22.9 floor.
-    // Step 2: net per issuer inside the same sector bucket. We key by
-    // (sector, issuer) so the same obligor in different buckets — which
-    // shouldn't normally happen, but is well-defined here — is netted
-    // within each bucket independently.
-    struct NetEntry {
-        net_jtd: f64,
-        rating_bucket: u8,
-    }
-    let mut net_by_issuer: HashMap<(DrcSector, String), NetEntry> = HashMap::default();
+    let mut obligors = BTreeMap::<&str, Obligor>::new();
     for pos in positions {
-        let lgd = drc_lgd(pos.seniority);
-        let raw = lgd * pos.jtd_amount + pos.pnl_adjustment;
-        // MAR22.9 sign-preserving floor: longs clamp at 0 from below,
-        // shorts clamp at 0 from above, using the *notional* sign.
-        let gross_jtd = if pos.jtd_amount > 0.0 {
-            raw.max(0.0)
-        } else if pos.jtd_amount < 0.0 {
-            raw.min(0.0)
-        } else {
-            0.0
+        let valid_sector = match pos.asset_type {
+            DrcAssetType::Corporate | DrcAssetType::Equity => pos.sector == DrcSector::Corporate,
+            DrcAssetType::Sovereign => pos.sector == DrcSector::Sovereign,
+            DrcAssetType::LocalGovernment => pos.sector == DrcSector::LocalGovernment,
+            DrcAssetType::Securitization => false,
         };
-        let entry = net_by_issuer
-            .entry((pos.sector, pos.issuer.clone()))
-            .or_insert(NetEntry {
-                net_jtd: 0.0,
-                rating_bucket: pos.rating_bucket,
-            });
-        entry.net_jtd += gross_jtd;
-    }
-
-    // Step 3: for each sector bucket, accumulate BOTH weighted and
-    // unweighted long/short sums. HBR uses unweighted net JTD per MAR22.23,
-    // while the bucket DRC itself uses weighted sums.
-    #[derive(Default, Clone, Copy)]
-    struct BucketAcc {
-        long_unweighted: f64,
-        short_unweighted_abs: f64,
-        long_weighted: f64,
-        short_weighted_abs: f64,
-    }
-    let mut by_sector: HashMap<DrcSector, BucketAcc> = HashMap::default();
-    for ((sector, _issuer), entry) in &net_by_issuer {
-        let rw = drc_risk_weight(entry.rating_bucket);
-        let weighted = entry.net_jtd * rw;
-        let acc = by_sector.entry(*sector).or_default();
-        if entry.net_jtd > 0.0 {
-            acc.long_unweighted += entry.net_jtd;
-            acc.long_weighted += weighted;
-        } else if entry.net_jtd < 0.0 {
-            acc.short_unweighted_abs += entry.net_jtd.abs();
-            acc.short_weighted_abs += weighted.abs();
+        if !valid_sector || pos.seniority == DrcSeniority::Securitization {
+            return Err(finstack_quant_core::Error::Validation("DRC requires consistent non-securitisation asset and bucket classifications; securitisation DRC is unsupported".into()));
+        }
+        if pos.issuer.trim().is_empty()
+            || !(1..=9).contains(&pos.rating_bucket)
+            || !pos.maturity_years.is_finite()
+            || pos.maturity_years < 0.0
+            || !pos.jtd_amount.is_finite()
+            || !pos.pnl_adjustment.is_finite()
+            || (pos.asset_type == DrcAssetType::Equity) != (pos.seniority == DrcSeniority::Equity)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "invalid DRC amount, maturity, rating or equity seniority".into(),
+            ));
+        }
+        let rank = match pos.seniority {
+            DrcSeniority::CoveredBond => 0,
+            DrcSeniority::SeniorUnsecured => 1,
+            DrcSeniority::Subordinated => 2,
+            DrcSeniority::Equity => 3,
+            DrcSeniority::Securitization => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "securitization DRC is unsupported".into(),
+                ))
+            }
+        };
+        let entry = obligors.entry(&pos.issuer).or_insert(Obligor {
+            sector: pos.sector,
+            rating: pos.rating_bucket,
+            longs: [0.0; 4],
+            shorts: [0.0; 4],
+        });
+        if entry.sector != pos.sector || entry.rating != pos.rating_bucket {
+            return Err(finstack_quant_core::Error::Validation(
+                "DRC obligor must have one bucket and rating assignment".into(),
+            ));
+        }
+        let raw = drc_lgd(pos.seniority) * pos.jtd_amount + pos.pnl_adjustment;
+        let maturity = pos.maturity_years.clamp(0.25, 1.0);
+        if pos.jtd_amount > 0.0 {
+            entry.longs[rank] += raw.max(0.0) * maturity;
+        } else if pos.jtd_amount < 0.0 {
+            entry.shorts[rank] += (-raw).max(0.0) * maturity;
         }
     }
-
-    // Steps 4 & 5: per-bucket HBR (unweighted) and DRC (weighted), summed
-    // across buckets.
-    let mut total = 0.0;
-    for acc in by_sector.values() {
-        let denom = acc.long_unweighted + acc.short_unweighted_abs;
-        let hbr = if denom > 0.0 {
-            acc.long_unweighted / denom
-        } else {
-            0.0
-        };
-        let bucket_drc = (acc.long_weighted - hbr * acc.short_weighted_abs).max(0.0);
-        total += bucket_drc;
+    // Rank grows toward junior claims. Shorts can offset only equally senior
+    // or more senior longs. Consume the most constrained longs first.
+    let mut buckets = HashMap::<DrcSector, [f64; 4]>::default();
+    for entry in obligors.values_mut() {
+        for long_rank in (0..4).rev() {
+            for short_rank in long_rank..4 {
+                let offset = entry.longs[long_rank].min(entry.shorts[short_rank]);
+                entry.longs[long_rank] -= offset;
+                entry.shorts[short_rank] -= offset;
+            }
+        }
+        let long: f64 = entry.longs.iter().sum();
+        let short: f64 = entry.shorts.iter().sum();
+        let rw = drc_risk_weight(entry.rating);
+        let bucket = buckets.entry(entry.sector).or_default();
+        bucket[0] += long;
+        bucket[1] += short;
+        bucket[2] += long * rw;
+        bucket[3] += short * rw;
     }
-    total
+    Ok(buckets
+        .values()
+        .map(|b| {
+            let hbr = if b[0] + b[1] > 0.0 {
+                b[0] / (b[0] + b[1])
+            } else {
+                0.0
+            };
+            (b[2] - hbr * b[3]).max(0.0)
+        })
+        .sum())
 }
-
-use std::sync::LazyLock;
 
 static DRC_RW_BY_BUCKET: LazyLock<finstack_quant_core::HashMap<u8, f64>> =
     LazyLock::new(|| DRC_RISK_WEIGHTS.iter().copied().collect());

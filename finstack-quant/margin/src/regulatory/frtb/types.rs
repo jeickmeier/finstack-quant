@@ -130,16 +130,10 @@ mod correlation_scenario_tests {
 pub enum DrcSector {
     /// Sovereign entities.
     Sovereign,
-    /// Financial and corporate issuers.
-    FinancialsCorporate,
-    /// Materials and energy sector.
-    MaterialsEnergy,
-    /// Consumer goods sector.
-    ConsumerGoods,
-    /// Technology and media sector.
-    TechnologyMedia,
-    /// Healthcare and utilities sector.
-    HealthCareUtilities,
+    /// Corporate issuers, including financial institutions and equities.
+    Corporate,
+    /// Local governments and municipalities.
+    LocalGovernment,
 }
 
 /// DRC seniority for LGD assignment.
@@ -147,6 +141,8 @@ pub enum DrcSector {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum DrcSeniority {
+    /// Covered bonds, 25% loss given default.
+    CoveredBond,
     /// Senior unsecured debt.
     SeniorUnsecured,
     /// Subordinated debt.
@@ -166,6 +162,8 @@ pub enum DrcAssetType {
     Corporate,
     /// Sovereign bonds.
     Sovereign,
+    /// Local-government and municipal bonds.
+    LocalGovernment,
     /// Securitization tranches.
     Securitization,
     /// Equity instruments.
@@ -189,6 +187,9 @@ pub enum DrcAssetType {
 /// LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DrcPosition {
+    /// Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
+    /// Cash equities use the elected three-month or greater-than-one-year horizon.
+    pub maturity_years: f64,
     /// Issuer identifier.
     pub issuer: String,
     /// Signed JTD *notional* (positive = long, negative = short). Does
@@ -200,13 +201,13 @@ pub struct DrcPosition {
     pub sector: DrcSector,
     /// Seniority for LGD determination.
     pub seniority: DrcSeniority,
-    /// Asset sub-type: corporate bond, equity, or securitization.
+    /// Asset sub-type: corporate, sovereign, local government, or equity.
+    /// Securitizations are rejected because they require a separate DRC model.
     pub asset_type: DrcAssetType,
     /// Mark-to-market / P&L adjustment from MAR22.9. Default 0. Add a
     /// negative value for a long position with unrealised loss so the
     /// gross JTD is correctly floored at zero when the mark-down already
-    /// exceeds `LGD * notional`. Ignored for securitisations where Basel
-    /// treats JTD differently.
+    /// exceeds `LGD * notional`.
     #[serde(default)]
     pub pnl_adjustment: f64,
 }
@@ -262,22 +263,25 @@ pub struct FrtbSensitivities {
     /// GIRR curvature: (currency) -> (cvr_up, cvr_down).
     pub girr_curvature: HashMap<Currency, (f64, f64)>,
 
-    /// CSR non-sec delta by (issuer, bucket, tenor).
-    pub csr_nonsec_delta: HashMap<(String, u8, String), f64>,
+    /// CSR non-sec delta by (issuer, bucket, tenor, basis).
+    /// The fourth key is the bond versus CDS curve identifier.
+    pub csr_nonsec_delta: HashMap<(String, u8, String, String), f64>,
     /// CSR non-sec vega by (issuer, bucket, option_maturity).
     pub csr_nonsec_vega: HashMap<(String, u8, String), f64>,
     /// CSR non-sec curvature by (issuer, bucket) -> (cvr_up, cvr_down).
     pub csr_nonsec_curvature: HashMap<(String, u8), (f64, f64)>,
 
-    /// CSR sec-CTP delta by (tranche, bucket, tenor).
-    pub csr_sec_ctp_delta: HashMap<(String, u8, String), f64>,
+    /// CSR sec-CTP delta by (tranche, bucket, tenor, basis).
+    /// The fourth key is the bond versus CDS curve identifier.
+    pub csr_sec_ctp_delta: HashMap<(String, u8, String, String), f64>,
     /// CSR sec-CTP vega by (tranche, bucket, option_maturity).
     pub csr_sec_ctp_vega: HashMap<(String, u8, String), f64>,
     /// CSR sec-CTP curvature by (tranche, bucket) -> (cvr_up, cvr_down).
     pub csr_sec_ctp_curvature: HashMap<(String, u8), (f64, f64)>,
 
-    /// CSR sec-non-CTP delta by (tranche, bucket, tenor).
-    pub csr_sec_nonctp_delta: HashMap<(String, u8, String), f64>,
+    /// CSR sec-non-CTP delta by (tranche, bucket, tenor, basis).
+    /// The fourth key is the bond versus CDS curve identifier.
+    pub csr_sec_nonctp_delta: HashMap<(String, u8, String, String), f64>,
     /// CSR sec-non-CTP vega by (tranche, bucket, option_maturity).
     pub csr_sec_nonctp_vega: HashMap<(String, u8, String), f64>,
     /// CSR sec-non-CTP curvature by (tranche, bucket) -> (cvr_up, cvr_down).
@@ -285,13 +289,16 @@ pub struct FrtbSensitivities {
 
     /// Equity delta by (underlier, bucket).
     pub equity_delta: HashMap<(String, u8), f64>,
+    /// Equity repo-rate delta by (underlier, bucket), in base currency per one percentage-point rate shift.
+    pub equity_repo_delta: HashMap<(String, u8), f64>,
     /// Equity vega by (underlier, bucket, option_maturity).
     pub equity_vega: HashMap<(String, u8, String), f64>,
     /// Equity curvature by (underlier, bucket) -> (cvr_up, cvr_down).
     pub equity_curvature: HashMap<(String, u8), (f64, f64)>,
 
-    /// Commodity delta by (commodity_name, bucket, tenor).
-    pub commodity_delta: HashMap<(String, u8, String), f64>,
+    /// Commodity delta by (commodity_name, bucket, tenor, location).
+    /// The fourth key is the delivery location.
+    pub commodity_delta: HashMap<(String, u8, String, String), f64>,
     /// Commodity vega by (commodity_name, bucket, option_maturity).
     pub commodity_vega: HashMap<(String, u8, String), f64>,
     /// Commodity curvature by (commodity_name, bucket) -> (cvr_up, cvr_down).
@@ -350,6 +357,7 @@ impl FrtbSensitivities {
             csr_sec_nonctp_vega: HashMap::default(),
             csr_sec_nonctp_curvature: HashMap::default(),
             equity_delta: HashMap::default(),
+            equity_repo_delta: HashMap::default(),
             equity_vega: HashMap::default(),
             equity_curvature: HashMap::default(),
             commodity_delta: HashMap::default(),
@@ -441,27 +449,6 @@ impl FrtbSensitivities {
 
         for (entries, allowed, field, label_kind, tenor_kind) in [
             (
-                &self.csr_nonsec_delta,
-                super::params::csr::CSR_NONSEC_RISK_WEIGHTS,
-                "csr_nonsec_delta",
-                "issuer",
-                "tenor",
-            ),
-            (
-                &self.csr_sec_ctp_delta,
-                super::params::csr::CSR_SEC_CTP_RISK_WEIGHTS,
-                "csr_sec_ctp_delta",
-                "name",
-                "tenor",
-            ),
-            (
-                &self.csr_sec_nonctp_delta,
-                super::params::csr::CSR_SEC_NONCTP_RISK_WEIGHTS,
-                "csr_sec_nonctp_delta",
-                "name",
-                "tenor",
-            ),
-            (
                 &self.csr_nonsec_vega,
                 super::params::csr::CSR_NONSEC_RISK_WEIGHTS,
                 "csr_nonsec_vega",
@@ -490,13 +477,6 @@ impl FrtbSensitivities {
                 "maturity",
             ),
             (
-                &self.commodity_delta,
-                super::params::commodity::COMMODITY_RISK_WEIGHTS,
-                "commodity_delta",
-                "name",
-                "tenor",
-            ),
-            (
                 &self.commodity_vega,
                 super::params::commodity::COMMODITY_RISK_WEIGHTS,
                 "commodity_vega",
@@ -512,7 +492,40 @@ impl FrtbSensitivities {
             }
         }
 
-        for ((underlier, bucket_id), value) in &self.equity_delta {
+        for (entries, allowed, field) in [
+            (
+                &self.csr_nonsec_delta,
+                super::params::csr::CSR_NONSEC_RISK_WEIGHTS,
+                "csr_nonsec_delta",
+            ),
+            (
+                &self.csr_sec_ctp_delta,
+                super::params::csr::CSR_SEC_CTP_RISK_WEIGHTS,
+                "csr_sec_ctp_delta",
+            ),
+            (
+                &self.csr_sec_nonctp_delta,
+                super::params::csr::CSR_SEC_NONCTP_RISK_WEIGHTS,
+                "csr_sec_nonctp_delta",
+            ),
+            (
+                &self.commodity_delta,
+                super::params::commodity::COMMODITY_RISK_WEIGHTS,
+                "commodity_delta",
+            ),
+        ] {
+            for ((label, bucket_id, tenor_label, basis), value) in entries {
+                identifier(&format!("{field}.name"), label)?;
+                identifier(&format!("{field}.basis"), basis)?;
+                bucket(field, *bucket_id, allowed)?;
+                tenor(&format!("{field}.tenor"), tenor_label)?;
+                finite(field, *value)?;
+            }
+        }
+
+        for ((underlier, bucket_id), value) in
+            self.equity_delta.iter().chain(&self.equity_repo_delta)
+        {
             identifier("equity_delta.underlier", underlier)?;
             bucket(
                 "equity_delta",
@@ -608,10 +621,30 @@ impl FrtbSensitivities {
     }
 
     /// Add a CSR non-sec delta sensitivity.
-    pub fn add_csr_nonsec_delta(&mut self, issuer: &str, bucket: u8, tenor: &str, delta: f64) {
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer` - Issuer or reference-entity identifier.
+    /// * `bucket` - Prescribed one-based CSR non-securitisation bucket.
+    /// * `tenor` - Regulatory residual tenor label, such as `5Y`.
+    /// * `basis` - Bond versus CDS curve identifier; equal labels identify the same basis.
+    /// * `delta` - Signed base-currency P&L per percentage-point credit-spread move; repeated complete keys accumulate.
+    pub fn add_csr_nonsec_delta(
+        &mut self,
+        issuer: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        delta: f64,
+    ) {
         *self
             .csr_nonsec_delta
-            .entry((issuer.to_string(), bucket, tenor.to_string()))
+            .entry((
+                issuer.to_string(),
+                bucket,
+                tenor.to_string(),
+                basis.to_string(),
+            ))
             .or_insert(0.0) += delta;
     }
 
@@ -623,16 +656,50 @@ impl FrtbSensitivities {
             .or_insert(0.0) += delta;
     }
 
+    /// Add an equity repo-rate delta sensitivity.
+    ///
+    /// # Arguments
+    ///
+    /// * `underlier` - Equity issuer identifier, shared with its spot sensitivities.
+    /// * `bucket` - Prescribed equity bucket, 1 through 13.
+    /// * `delta` - Signed base-currency P&L per percentage-point parallel repo-rate shift; repeated keys accumulate.
+    pub fn add_equity_repo_delta(&mut self, underlier: &str, bucket: u8, delta: f64) {
+        *self
+            .equity_repo_delta
+            .entry((underlier.to_string(), bucket))
+            .or_insert(0.0) += delta;
+    }
+
     /// Add an FX delta sensitivity.
     pub fn add_fx_delta(&mut self, ccy1: Currency, ccy2: Currency, delta: f64) {
         *self.fx_delta.entry((ccy1, ccy2)).or_insert(0.0) += delta;
     }
 
     /// Add a commodity delta sensitivity.
-    pub fn add_commodity_delta(&mut self, name: &str, bucket: u8, tenor: &str, delta: f64) {
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Commodity identifier.
+    /// * `bucket` - Prescribed one-based commodity bucket.
+    /// * `tenor` - Regulatory residual tenor label, such as `5Y`.
+    /// * `basis` - Delivery location; equal labels identify the same basis.
+    /// * `delta` - Signed base-currency P&L per one percent commodity-price move; repeated complete keys accumulate.
+    pub fn add_commodity_delta(
+        &mut self,
+        name: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        delta: f64,
+    ) {
         *self
             .commodity_delta
-            .entry((name.to_string(), bucket, tenor.to_string()))
+            .entry((
+                name.to_string(),
+                bucket,
+                tenor.to_string(),
+                basis.to_string(),
+            ))
             .or_insert(0.0) += delta;
     }
 
@@ -729,7 +796,7 @@ impl FrtbSensitivities {
     /// * `issuer` - Issuer or reference-entity identifier.
     /// * `bucket` - CSR non-securitisation bucket (1-based, MAR21.51).
     /// * `maturity` - Option maturity label such as `"1Y"`.
-    /// * `vega` - Base-currency vega per unit implied-volatility move.
+    /// * `vega` - Volatility-scaled vega in base currency, sigma times dV/dsigma.
     pub fn add_csr_nonsec_vega(&mut self, issuer: &str, bucket: u8, maturity: &str, vega: f64) {
         *self
             .csr_nonsec_vega
@@ -765,13 +832,26 @@ impl FrtbSensitivities {
     /// # Arguments
     ///
     /// * `tranche` - Tranche or index identifier.
-    /// * `bucket` - CSR sec-CTP bucket (1-based, MAR21.59).
-    /// * `tenor` - Credit-spread tenor label such as `"5Y"`.
-    /// * `delta` - Base-currency P&L per 1 basis-point spread move.
-    pub fn add_csr_sec_ctp_delta(&mut self, tranche: &str, bucket: u8, tenor: &str, delta: f64) {
+    /// * `bucket` - Prescribed one-based CSR sec-CTP bucket.
+    /// * `tenor` - Regulatory residual tenor label, such as `5Y`.
+    /// * `basis` - Bond versus CDS curve identifier; equal labels identify the same basis.
+    /// * `delta` - Signed base-currency P&L per percentage-point credit-spread move; repeated complete keys accumulate.
+    pub fn add_csr_sec_ctp_delta(
+        &mut self,
+        tranche: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        delta: f64,
+    ) {
         *self
             .csr_sec_ctp_delta
-            .entry((tranche.to_string(), bucket, tenor.to_string()))
+            .entry((
+                tranche.to_string(),
+                bucket,
+                tenor.to_string(),
+                basis.to_string(),
+            ))
             .or_insert(0.0) += delta;
     }
 
@@ -782,7 +862,7 @@ impl FrtbSensitivities {
     /// * `tranche` - Tranche or index identifier.
     /// * `bucket` - CSR sec-CTP bucket (1-based, MAR21.59).
     /// * `maturity` - Option maturity label such as `"1Y"`.
-    /// * `vega` - Base-currency vega per unit implied-volatility move.
+    /// * `vega` - Volatility-scaled vega in base currency, sigma times dV/dsigma.
     pub fn add_csr_sec_ctp_vega(&mut self, tranche: &str, bucket: u8, maturity: &str, vega: f64) {
         *self
             .csr_sec_ctp_vega
@@ -818,13 +898,26 @@ impl FrtbSensitivities {
     /// # Arguments
     ///
     /// * `tranche` - Tranche identifier.
-    /// * `bucket` - CSR sec non-CTP bucket (1-based, MAR21.64).
-    /// * `tenor` - Credit-spread tenor label such as `"5Y"`.
-    /// * `delta` - Base-currency P&L per 1 basis-point spread move.
-    pub fn add_csr_sec_nonctp_delta(&mut self, tranche: &str, bucket: u8, tenor: &str, delta: f64) {
+    /// * `bucket` - Prescribed one-based CSR sec non-CTP bucket.
+    /// * `tenor` - Regulatory residual tenor label, such as `5Y`.
+    /// * `basis` - Bond versus CDS curve identifier; equal labels identify the same basis.
+    /// * `delta` - Signed base-currency P&L per percentage-point credit-spread move; repeated complete keys accumulate.
+    pub fn add_csr_sec_nonctp_delta(
+        &mut self,
+        tranche: &str,
+        bucket: u8,
+        tenor: &str,
+        basis: &str,
+        delta: f64,
+    ) {
         *self
             .csr_sec_nonctp_delta
-            .entry((tranche.to_string(), bucket, tenor.to_string()))
+            .entry((
+                tranche.to_string(),
+                bucket,
+                tenor.to_string(),
+                basis.to_string(),
+            ))
             .or_insert(0.0) += delta;
     }
 
@@ -835,7 +928,7 @@ impl FrtbSensitivities {
     /// * `tranche` - Tranche identifier.
     /// * `bucket` - CSR sec non-CTP bucket (1-based, MAR21.64).
     /// * `maturity` - Option maturity label such as `"1Y"`.
-    /// * `vega` - Base-currency vega per unit implied-volatility move.
+    /// * `vega` - Volatility-scaled vega in base currency, sigma times dV/dsigma.
     pub fn add_csr_sec_nonctp_vega(
         &mut self,
         tranche: &str,
@@ -879,7 +972,7 @@ impl FrtbSensitivities {
     /// * `name` - Commodity identifier.
     /// * `bucket` - Commodity bucket (1-based, MAR21.82).
     /// * `maturity` - Option maturity label such as `"1Y"`.
-    /// * `vega` - Base-currency vega per unit implied-volatility move.
+    /// * `vega` - Volatility-scaled vega in base currency, sigma times dV/dsigma.
     pub fn add_commodity_vega(&mut self, name: &str, bucket: u8, maturity: &str, vega: f64) {
         *self
             .commodity_vega

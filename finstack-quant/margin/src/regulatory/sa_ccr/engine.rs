@@ -9,6 +9,7 @@ use super::pfe::pfe;
 use super::replacement_cost::replacement_cost;
 use super::types::{EadResult, SaCcrNettingSetConfig, SaCcrTrade};
 use finstack_quant_core::Result;
+use std::collections::BTreeMap;
 
 /// SA-CCR engine for computing Exposure at Default.
 ///
@@ -88,10 +89,27 @@ impl SaCcrEngine {
         for trade in trades {
             trade.validate()?;
         }
+        let mut entities = BTreeMap::new();
+        for trade in trades {
+            let key = (trade.asset_class, trade.underlier.as_str());
+            if let Some(previous) = entities.insert(key, trade.supervisory_category) {
+                if previous != trade.supervisory_category {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "SA-CCR entity has inconsistent supervisory categories".into(),
+                    ));
+                }
+            }
+        }
         let rc = replacement_cost(config, trades);
         let (mult, add_on_agg, add_on_by_class) = pfe(config, trades);
         let pfe_value = mult * add_on_agg;
-        let ead = self.alpha * (rc + pfe_value);
+        let mut ead = self.alpha * (rc + pfe_value);
+        if config.is_margined {
+            let mut unmargined = config.clone();
+            unmargined.is_margined = false;
+            let cap = self.calculate_ead(&unmargined, trades)?.ead;
+            ead = ead.min(cap);
+        }
 
         // `maturity_factor` on `EadResult` is a single summary number for
         // reporting. For margined sets it is the (per-trade shared)
@@ -148,6 +166,8 @@ mod tests {
 
     fn simple_ir_trade(trade_id: &str, notional: f64, direction: f64, mtm: f64) -> SaCcrTrade {
         SaCcrTrade {
+            supervisory_category: None,
+            option_maturity_date: None,
             trade_id: trade_id.to_string(),
             asset_class: SaCcrAssetClass::InterestRate,
             notional,
@@ -481,6 +501,8 @@ mod tests {
         let ir_trade = simple_ir_trade("T1", 100_000_000.0, 1.0, 1_000_000.0);
 
         let fx_trade = SaCcrTrade {
+            supervisory_category: None,
+            option_maturity_date: None,
             trade_id: "T2".to_string(),
             asset_class: SaCcrAssetClass::ForeignExchange,
             notional: 50_000_000.0,

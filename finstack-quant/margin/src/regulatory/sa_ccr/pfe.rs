@@ -30,7 +30,7 @@ const MULTIPLIER_FLOOR: f64 = 0.05;
 /// # References
 ///
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
-pub fn pfe(
+pub(super) fn pfe(
     config: &SaCcrNettingSetConfig,
     trades: &[SaCcrTrade],
 ) -> (f64, f64, BTreeMap<SaCcrAssetClass, f64>) {

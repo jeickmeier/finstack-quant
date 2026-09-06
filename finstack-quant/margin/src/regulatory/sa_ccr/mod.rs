@@ -6,10 +6,12 @@
 pub mod add_on;
 pub mod engine;
 pub mod maturity_factor;
-pub mod params;
 pub mod pfe;
 pub mod replacement_cost;
 pub mod types;
 
 pub use engine::SaCcrEngine;
-pub use types::{EadResult, SaCcrAssetClass, SaCcrNettingSetConfig, SaCcrOptionType, SaCcrTrade};
+pub use types::{
+    EadResult, SaCcrAssetClass, SaCcrNettingSetConfig, SaCcrOptionType, SaCcrSupervisoryCategory,
+    SaCcrTrade,
+};

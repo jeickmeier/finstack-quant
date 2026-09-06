@@ -159,7 +159,7 @@ fn test_margin_call_with_threshold() {
 
     // Should be within threshold so no delivery amount
     assert_eq!(
-        result.delivery_amount.amount(),
+        result.post_amount.amount(),
         0.0,
         "Exposure within threshold should not trigger delivery"
     );
@@ -201,7 +201,7 @@ fn test_margin_call_exceeds_threshold() {
 
     // Should have delivery amount when above threshold
     assert!(
-        result.delivery_amount.amount() > 0.0,
+        result.collect_amount.amount() > 0.0,
         "Should generate positive delivery amount"
     );
 }

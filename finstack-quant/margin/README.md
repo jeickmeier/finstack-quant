@@ -111,7 +111,7 @@ assert!(result.requires_call());
 
 `VmCalculator::calculate` rejects an exposure or collateral amount whose currency
 differs from `csa.base_currency` — it never converts implicitly. `VmResult`
-carries `gross_exposure`, `net_exposure`, `delivery_amount`, `return_amount`, and
+carries `gross_exposure`, `net_exposure`, `post_amount`, `collect_amount`, and
 the `settlement_date` derived from the CSA's call timing.
 
 ### `Marginable` integration
@@ -175,19 +175,23 @@ Only `id`, `margin_spec`, `netting_set_id`, `simm_sensitivities`, and
 - VM/IM thresholds, MTAs, independent amounts, and all calculator results are
   `Money`. Currency mismatches error rather than converting.
 - `Marginable::simm_sensitivities` expects currency-denominated risk measures
-  (DV01/CS01-style dollar sensitivities), not raw quote moves. Decimal-vs-bp
-  mistakes change IM materially.
+  (DV01/CS01-style dollar sensitivities), not raw quote moves. The supported
+  v2.6 calculation is an indicative USD-only approximation: product-class,
+  subcurve, and some non-IR factor dimensions are incomplete. Results carry
+  `approximation = true`; this is not a current regulatory SIMM implementation.
 - **FRTB risk weights reproduce the Basel tables as published, so the expected
   sensitivity scale varies by risk class**: GIRR/CSR/equity/commodity/FX delta
   weights are in percent (so feed `$` per 1 percentage-point or 1 % move — GIRR
-  delta is 100× DV01), while vega weights are decimal (`$` per 1 unit of implied
-  vol). Pre-scale your sensitivity feed; do not edit the weight tables. The full
+  delta is 100× DV01), while vega weights are decimal and multiply volatility-scaled vega
+  (`sigma * dV/dsigma`). Pre-scale your sensitivity feed; do not edit the weight tables. The full
   table is in the [`regulatory::frtb`](src/regulatory/frtb/mod.rs) module docs.
 - Schedule IM, the cleared-IM proxy, and haircut IM invoked through the
   `ImCalculator` trait require `Marginable::im_exposure_base`. They fail closed
   rather than falling back to MtM as a pseudo-notional.
 - XVA adjustments are positive when they cost the desk and compose as
-  `total_xva = CVA − DVA + FVA + MVA`. Exposure times are year fractions.
+  `total_xva = CVA − DVA + FVA + MVA`. Exposure times are nonnegative, strictly increasing year fractions and
+  may include zero. Exposure is held constant before the first supplied point
+  for CVA/DVA/FVA, consistent with IM extrapolation for MVA.
 - Persisted SIMM and FRTB tuple-keyed sensitivities serialize as deterministic
   sorted entry arrays (`SimmSensitivitiesJson`, the FRTB wire type), because
   tuple keys were never representable as JSON object keys.
@@ -200,10 +204,10 @@ currency-safety, and serde rules.
 | Calculator | Entry point | Notes |
 |------------|-------------|-------|
 | `VmCalculator` | `calculate(exposure, posted, as_of)` | Applies CSA threshold, MTA, rounding, and settlement dating. `generate_margin_calls` and `margin_call_dates` cover schedules. |
-| `SimmCalculator` | `calculate_from_sensitivities` | Versioned parameters from the registry (`SimmVersion`); per-risk-class methods are also public. Risk-class aggregation reduces in a canonical order so the quadratic form is bit-reproducible. |
+| `SimmCalculator` | `calculate_from_sensitivities` | Indicative historical v2.6 parameters from the registry; USD inputs only and results explicitly approximate. Risk-class aggregation reduces in a canonical order so the quadratic form is bit-reproducible. |
 | `ScheduleImCalculator` | `calculate_for_notional` | BCBS-IOSCO grid (`BCBS_IOSCO_SCHEDULE_ID = "bcbs_iosco"`); the `ImCalculator` path uses `im_exposure_base`. |
 | `ClearingHouseImCalculator` | `calculate_conservative`, `with_input_source` | Accepts an external CCP value via `ExternalImSource`, or scales an exposure base by registry-backed proxy rates (`lch_swapclear`, `ice_clear_credit`, `cme`, `generic_var`). |
-| `HaircutImCalculator` | `calculate_for_collateral` | Collateral-haircut IM from an `EligibleCollateralSchedule`, with an FX add-on when the posted-collateral currency differs. |
+| `HaircutImCalculator` | `calculate_for_collateral` | Uses `with_collateral_terms` to match maturity/rating eligibility and the matching entry’s haircut and FX add-on; rejects ineligible or negative collateral. |
 
 Repo margining rules are separate from the haircut IM engine: `RepoMarginSpec`
 carries a `margin_type: RepoMarginType` (`None`, `MarkToMarket`, `NetExposure`,
@@ -212,7 +216,10 @@ settlement lag, and answers `required_collateral`, `call_trigger_value`,
 `requires_margin_call`, `margin_deficit`, and `excess_collateral` directly.
 Separately, `types::{generate_margin_cashflows,
 generate_margin_interest_cashflows, margin_calls_to_cashflows}` turn calls into
-`CashFlow`s.
+`CashFlow`s. Repo cashflow generation requires the contractual business-day calendar.
+The signed VM balance is positive collateral held and negative collateral posted,
+including pending agreed calls. `post_amount` is desk cash paid; `collect_amount`
+is desk cash received, including returns in either direction.
 
 ## Regulatory capital
 
@@ -343,3 +350,13 @@ tests the workspace gates run separately.
 - [BCBS FRTB minimum capital requirements (d457)](../../docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements)
 - [Gregory XVA Challenge](../../docs/REFERENCES.md#gregory-xva-challenge)
 - [Green XVA](../../docs/REFERENCES.md#green-xva)
+
+Regulatory input boundaries: SA-CCR credit, equity and commodity trades require
+an explicit supervisory category; options require their expiry separately from
+the underlying maturity. MPOR is at least ten business days for bilateral sets
+or five for cleared sets, and the caller must supply any applicable longer
+period. Margined EAD is capped by its unmargined counterpart; reported RC/PFE
+are the components before that cap. FRTB CSR/commodity delta keys include spread
+basis/delivery location; equity repo-rate delta is separate from equity spot.
+DRC inputs include residual maturity and seniority, with corporate, sovereign
+and local-government buckets. Securitization DRC is explicitly unsupported.

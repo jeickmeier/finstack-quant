@@ -161,8 +161,8 @@ impl PyMarginTenor {
 /// Type of margin call.
 ///
 /// Immutable, hashable enum-style wrapper; ``from_str`` parses the lower-case
-/// wire label (``"initial_margin"``, ``"variation_margin_delivery"``,
-/// ``"variation_margin_return"``, ``"top_up"``, ``"substitution"``) and
+/// wire label (``"initial_margin"``, ``"variation_margin_post"``,
+/// ``"variation_margin_collect"``, ``"top_up"``, ``"substitution"``) and
 /// ``str()`` renders it. This is the ``call_type`` column of
 /// ``VmCalculator.generate_margin_calls``.
 #[pyclass(
@@ -190,17 +190,17 @@ impl PyMarginCallType {
 
     /// Variation margin delivery (margin to be posted).
     #[staticmethod]
-    fn variation_margin_delivery() -> Self {
+    fn variation_margin_post() -> Self {
         Self {
-            inner: fm::MarginCallType::VariationMarginDelivery,
+            inner: fm::MarginCallType::VariationMarginPost,
         }
     }
 
     /// Variation margin return (margin to be received back).
     #[staticmethod]
-    fn variation_margin_return() -> Self {
+    fn variation_margin_collect() -> Self {
         Self {
-            inner: fm::MarginCallType::VariationMarginReturn,
+            inner: fm::MarginCallType::VariationMarginCollect,
         }
     }
 

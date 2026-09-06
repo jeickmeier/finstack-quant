@@ -233,13 +233,13 @@ impl FrtbSensitivities {
                 &self.csr_sec_nonctp_curvature,
             ),
         ] {
-            for ((issuer, bucket, tenor), amount) in delta {
+            for ((issuer, bucket, tenor, basis), amount) in delta {
                 rows.push(
                     label,
                     "delta",
                     Some(issuer.clone()),
                     bucket_label(*bucket),
-                    Some(tenor.clone()),
+                    Some(format!("{tenor}/{basis}")),
                     *amount,
                 );
             }
@@ -268,6 +268,16 @@ impl FrtbSensitivities {
                 *amount,
             );
         }
+        for ((underlier, bucket), amount) in &self.equity_repo_delta {
+            rows.push(
+                "equity",
+                "repo_delta",
+                Some(underlier.clone()),
+                bucket_label(*bucket),
+                None,
+                *amount,
+            );
+        }
         for ((underlier, bucket, maturity), amount) in &self.equity_vega {
             rows.push(
                 "equity",
@@ -287,13 +297,13 @@ impl FrtbSensitivities {
             );
         }
 
-        for ((name, bucket, tenor), amount) in &self.commodity_delta {
+        for ((name, bucket, tenor, basis), amount) in &self.commodity_delta {
             rows.push(
                 "commodity",
                 "delta",
                 Some(name.clone()),
                 bucket_label(*bucket),
-                Some(tenor.clone()),
+                Some(format!("{tenor}/{basis}")),
                 *amount,
             );
         }

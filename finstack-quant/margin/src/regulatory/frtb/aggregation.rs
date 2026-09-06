@@ -9,8 +9,6 @@
 //! Cross-risk-class aggregation ([`aggregate_sba`]) is also simple addition —
 //! the SBA, unlike SIMM, has no cross-risk-class correlation matrix.
 
-use core::hash::Hash;
-
 use super::types::FrtbRiskClass;
 use finstack_quant_core::HashMap;
 
@@ -106,50 +104,6 @@ fn inter_bucket_quadratic(
     total
 }
 
-/// Intra-bucket aggregation for a single bucket with a uniform correlation.
-///
-/// `rho_kl = 1` when `k == l`, otherwise `intra_rho`. Callers must pre-scale
-/// `intra_rho` for the active correlation scenario.
-///
-/// Computed in `O(n)` using the closed-form identity for a uniform
-/// off-diagonal correlation:
-///
-/// ```text
-/// Σ_ij ρ_ij · ws_i · ws_j
-///   = Σ_i ws_i² + ρ · Σ_{i≠j} ws_i · ws_j
-///   = Σ_i ws_i² + ρ · [(Σ_i ws_i)² - Σ_i ws_i²]
-///   = (1 - ρ) · Σ_i ws_i² + ρ · (Σ_i ws_i)²
-/// ```
-pub(super) fn intra_bucket_uniform(entries: &[f64], intra_rho: f64) -> BucketResult {
-    let mut sum_ws = 0.0;
-    let mut sum_ws_sq = 0.0;
-    for &ws in entries {
-        sum_ws += ws;
-        sum_ws_sq += ws * ws;
-    }
-    let k_squared = (1.0 - intra_rho) * sum_ws_sq + intra_rho * sum_ws * sum_ws;
-    let k_b = k_squared.max(0.0).sqrt();
-    (k_b, sum_ws)
-}
-
-/// Apply [`intra_bucket_uniform`] across every bucket in a map.
-///
-/// Iteration order is driven by the input `HashMap` and is therefore not
-/// deterministic — inter-bucket aggregation does not depend on order, so
-/// that is fine.
-pub(super) fn intra_bucket_uniform_map<B>(
-    by_bucket: &HashMap<B, Vec<f64>>,
-    intra_rho: f64,
-) -> Vec<BucketResult>
-where
-    B: Eq + Hash,
-{
-    by_bucket
-        .values()
-        .map(|entries| intra_bucket_uniform(entries, intra_rho))
-        .collect()
-}
-
 /// Inter-bucket aggregation per MAR21.4-21.6.
 ///
 /// Tries the standard quadratic form first with uncapped
@@ -166,7 +120,15 @@ where
 ///
 /// `gamma` must already be scaled for the active correlation scenario.
 pub(super) fn inter_bucket(bucket_results: &[BucketResult], gamma: f64) -> f64 {
-    let standard = inter_bucket_quadratic(bucket_results, |_, _| gamma);
+    inter_bucket_with(bucket_results, |_, _| gamma)
+}
+
+/// Standard and alternative aggregation for bucket-specific correlations.
+pub(super) fn inter_bucket_with(
+    bucket_results: &[BucketResult],
+    gamma: impl Fn(usize, usize) -> f64,
+) -> f64 {
+    let standard = inter_bucket_quadratic(bucket_results, &gamma);
     if standard >= 0.0 {
         standard.sqrt()
     } else {
@@ -174,8 +136,31 @@ pub(super) fn inter_bucket(bucket_results: &[BucketResult], gamma: f64) -> f64 {
             .iter()
             .map(|&(k, s)| (k, s.clamp(-k, k)))
             .collect();
-        inter_bucket_pairwise(&capped, |_, _| gamma)
+        inter_bucket_pairwise(&capped, gamma)
     }
+}
+
+/// MAR21.71: add undiversified buckets as a sum of `K_b` after a
+/// zero-correlation quadratic over the remaining buckets.
+pub(super) fn inter_bucket_plus_undiversified(
+    ids: &[u8],
+    results: &[BucketResult],
+    undiversified: impl Fn(u8) -> bool,
+) -> f64 {
+    let extra: f64 = ids
+        .iter()
+        .zip(results)
+        .filter(|(b, _)| undiversified(**b))
+        .map(|(_, r)| r.0)
+        .sum();
+    extra
+        + ids
+            .iter()
+            .zip(results)
+            .filter(|(b, _)| !undiversified(**b))
+            .map(|(_, r)| r.0 * r.0)
+            .sum::<f64>()
+            .sqrt()
 }
 
 /// Aggregate delta+vega+curvature across risk classes for one correlation scenario.

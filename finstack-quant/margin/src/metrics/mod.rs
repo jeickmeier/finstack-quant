@@ -38,6 +38,7 @@ fn ensure_same_currency(what: &str, left: Money, right: Money) -> Result<()> {
 ///
 /// Ratio of posted margin to required margin.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "MarginUtilizationWire", into = "MarginUtilizationWire")]
 pub struct MarginUtilization {
     /// Posted margin amount
     pub posted: Money,
@@ -45,6 +46,31 @@ pub struct MarginUtilization {
     pub required: Money,
     /// Utilization ratio (posted / required)
     pub ratio: f64,
+}
+
+// Only primitive amounts are serialized. The ratio is derived on decode, so
+// positive collateral against zero requirement never writes invalid JSON infinity.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MarginUtilizationWire {
+    posted: Money,
+    required: Money,
+}
+
+impl TryFrom<MarginUtilizationWire> for MarginUtilization {
+    type Error = finstack_quant_core::Error;
+    fn try_from(value: MarginUtilizationWire) -> Result<Self> {
+        Self::new(value.posted, value.required)
+    }
+}
+
+impl From<MarginUtilization> for MarginUtilizationWire {
+    fn from(value: MarginUtilization) -> Self {
+        Self {
+            posted: value.posted,
+            required: value.required,
+        }
+    }
 }
 
 impl MarginUtilization {
@@ -80,6 +106,14 @@ impl MarginUtilization {
     /// ```
     pub fn new(posted: Money, required: Money) -> Result<Self> {
         ensure_same_currency("margin utilization", posted, required)?;
+        if [posted.amount(), required.amount()]
+            .iter()
+            .any(|x| !x.is_finite() || *x < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "margin amounts must be finite and nonnegative".into(),
+            ));
+        }
 
         let ratio = if required.amount() > 0.0 {
             posted.amount() / required.amount()

@@ -38,10 +38,11 @@
 //! negative and `1` otherwise, so a pair of bucket-level gains
 //! cannot reduce the charge from a separate pair of losses.
 
-use super::aggregation::inter_bucket_pairwise;
-use super::params::{commodity, csr, equity, fx, girr};
+use super::aggregation::{inter_bucket_pairwise, inter_bucket_plus_undiversified};
+use super::params::{self, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
 use finstack_quant_core::HashMap;
+use std::collections::BTreeMap;
 
 /// Compute the curvature risk charge for a single risk class.
 ///
@@ -94,15 +95,14 @@ fn girr_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f6
         .map(|&(up, down)| bucket_k_and_s(&[(up, down)], 0.0))
         .collect();
 
-    let gamma = scenario.scale_correlation(girr::GIRR_INTER_BUCKET_CORRELATION);
+    let gamma = scenario.scale_correlation(girr::GIRR_INTER_BUCKET_CORRELATION.powi(2));
     curvature_inter_bucket(&bucket_results, gamma)
 }
 
 fn csr_nonsec_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     generic_curvature_bucketed(
         &sens.csr_nonsec_curvature,
-        csr::CSR_NONSEC_INTRA_BUCKET_NAME_CORRELATION,
-        csr::CSR_NONSEC_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrNonSec,
         scenario,
     )
 }
@@ -110,8 +110,7 @@ fn csr_nonsec_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario)
 fn csr_sec_ctp_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     generic_curvature_bucketed(
         &sens.csr_sec_ctp_curvature,
-        csr::CSR_SEC_CTP_INTRA_BUCKET_CORRELATION,
-        csr::CSR_SEC_CTP_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrSecCtp,
         scenario,
     )
 }
@@ -119,26 +118,19 @@ fn csr_sec_ctp_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario
 fn csr_sec_nonctp_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     generic_curvature_bucketed(
         &sens.csr_sec_nonctp_curvature,
-        csr::CSR_SEC_NONCTP_INTRA_BUCKET_CORRELATION,
-        csr::CSR_SEC_NONCTP_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::CsrSecNonCtp,
         scenario,
     )
 }
 
 fn equity_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
-    generic_curvature_bucketed(
-        &sens.equity_curvature,
-        equity::EQUITY_INTRA_BUCKET_CORRELATION,
-        equity::EQUITY_INTER_BUCKET_CORRELATION,
-        scenario,
-    )
+    generic_curvature_bucketed(&sens.equity_curvature, FrtbRiskClass::Equity, scenario)
 }
 
 fn commodity_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     generic_curvature_bucketed(
         &sens.commodity_curvature,
-        commodity::COMMODITY_INTRA_BUCKET_CORRELATION,
-        commodity::COMMODITY_INTER_BUCKET_CORRELATION,
+        FrtbRiskClass::Commodity,
         scenario,
     )
 }
@@ -154,7 +146,7 @@ fn fx_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 
         .values()
         .map(|&(up, down)| (up, down))
         .collect();
-    let rho = scenario.scale_correlation(fx::FX_INTER_PAIR_CORRELATION);
+    let rho = scenario.scale_correlation(fx::FX_INTER_PAIR_CORRELATION.powi(2));
     let (k_b, s_b) = bucket_k_and_s(&pairs, rho);
     curvature_inter_bucket(&[(k_b, s_b)], rho)
 }
@@ -163,28 +155,35 @@ fn fx_curvature(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 
 
 fn generic_curvature_bucketed(
     curvatures: &HashMap<(String, u8), (f64, f64)>,
-    intra_rho: f64,
-    inter_gamma: f64,
+    class: FrtbRiskClass,
     scenario: CorrelationScenario,
 ) -> f64 {
-    if curvatures.is_empty() {
-        return 0.0;
-    }
-
-    let mut by_bucket: HashMap<u8, Vec<(f64, f64)>> = HashMap::default();
+    let mut buckets = BTreeMap::<u8, Vec<(f64, f64)>>::new();
     for ((_, bucket), pair) in curvatures {
-        by_bucket.entry(*bucket).or_default().push(*pair);
+        buckets.entry(*bucket).or_default().push(*pair);
     }
-
-    let scaled_intra = scenario.scale_correlation(intra_rho);
-    let scaled_inter = scenario.scale_correlation(inter_gamma);
-
-    let bucket_results: Vec<(f64, f64)> = by_bucket
-        .values()
-        .map(|pairs| bucket_k_and_s(pairs, scaled_intra))
+    let ids: Vec<_> = buckets.keys().copied().collect();
+    let results: Vec<_> = buckets
+        .iter()
+        .map(|(b, pairs)| {
+            if params::other_bucket(class, *b) {
+                let up: f64 = pairs.iter().map(|p| p.0.max(0.0)).sum();
+                let down: f64 = pairs.iter().map(|p| p.1.max(0.0)).sum();
+                return (up.max(down), up.max(down));
+            }
+            bucket_k_and_s(
+                pairs,
+                scenario.scale_correlation(params::name_correlation(class, *b).powi(2)),
+            )
+        })
         .collect();
-
-    curvature_inter_bucket(&bucket_results, scaled_inter)
+    if class == FrtbRiskClass::CsrSecNonCtp {
+        return inter_bucket_plus_undiversified(&ids, &results, |b| params::other_bucket(class, b));
+    }
+    inter_bucket_pairwise(&results, |i, j| {
+        scenario.scale_correlation(params::bucket_correlation(class, ids[i], ids[j]).powi(2))
+            * psi(results[i].1, results[j].1)
+    })
 }
 
 // MAR21.5 helpers
@@ -207,8 +206,8 @@ fn psi(x: f64, y: f64) -> f64 {
 ///
 /// `pairs` is the list of `(CVR+, CVR-)` per risk factor. Computes
 /// `K_b^+` and `K_b^-` separately, picks the larger, and returns the
-/// corresponding direction's `sum CVR` (already capped at `[-K_b, K_b]`
-/// for safety in inter-bucket aggregation).
+/// corresponding direction's uncapped `sum CVR`. On a tie, select the
+/// direction with the larger sum, as required by MAR21.5.
 fn bucket_k_and_s(pairs: &[(f64, f64)], intra_rho: f64) -> (f64, f64) {
     if pairs.is_empty() {
         return (0.0, 0.0);
@@ -219,12 +218,14 @@ fn bucket_k_and_s(pairs: &[(f64, f64)], intra_rho: f64) -> (f64, f64) {
     let (k_minus, s_minus_raw) =
         one_side_k(&pairs.iter().map(|p| p.1).collect::<Vec<_>>(), intra_rho);
 
-    if k_plus >= k_minus {
-        let s_capped = s_plus_raw.max(-k_plus).min(k_plus);
-        (k_plus, s_capped)
+    if k_plus
+        .total_cmp(&k_minus)
+        .then_with(|| s_plus_raw.total_cmp(&s_minus_raw))
+        .is_gt()
+    {
+        (k_plus, s_plus_raw)
     } else {
-        let s_capped = s_minus_raw.max(-k_minus).min(k_minus);
-        (k_minus, s_capped)
+        (k_minus, s_minus_raw)
     }
 }
 
@@ -250,9 +251,8 @@ fn one_side_k(cvrs: &[f64], rho: f64) -> (f64, f64) {
 /// + sum_{b != c} gamma^2 * S_b * S_c * psi(S_b, S_c)) )
 /// ```
 fn curvature_inter_bucket(bucket_results: &[(f64, f64)], gamma: f64) -> f64 {
-    let gamma_sq = gamma * gamma;
     inter_bucket_pairwise(bucket_results, |i, j| {
-        gamma_sq * psi(bucket_results[i].1, bucket_results[j].1)
+        gamma * psi(bucket_results[i].1, bucket_results[j].1)
     })
 }
 
@@ -285,18 +285,12 @@ mod tests {
     }
 
     #[test]
-    fn s_b_is_capped_by_k_b() {
-        // Two factors both positive CVR+, the sum could exceed K_b under
-        // a diagonal-only formula; check the cap keeps S_b <= K_b.
+    fn s_b_preserves_raw_sum() {
         let pairs = vec![(10.0, 0.0), (10.0, 0.0)];
         let (k, s) = bucket_k_and_s(&pairs, 0.5);
-        // K = sqrt(100 + 100 + 2*0.5*10*10*1) = sqrt(300) ~= 17.32
-        // Raw S = 20, capped at K = 17.32.
         let k_expected = 300_f64.sqrt();
         assert!((k - k_expected).abs() < 1e-10);
-        assert!(s <= k + 1e-12, "S_b must be capped by K_b");
-        assert!(s >= -k - 1e-12);
-        assert!((s - k_expected).abs() < 1e-10, "S_b should equal cap here");
+        assert_eq!(s, 20.0);
     }
 
     #[test]
@@ -325,11 +319,7 @@ mod tests {
             (k - k_plus_expected).abs() < 1e-10,
             "K_b should equal K+ = {k_plus_expected}, got {k}"
         );
-        // S+ raw = 14, K = ~13.4 so capped = K.
-        assert!(
-            s > 0.0 && (s - k).abs() < 1e-12,
-            "S_b should be the up-side sum capped at K_b, got {s}"
-        );
+        assert_eq!(s, 14.0);
     }
 
     #[test]

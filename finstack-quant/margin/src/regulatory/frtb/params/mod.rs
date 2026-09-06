@@ -18,43 +18,111 @@
 //! | Last reviewed | 2026-08-20 |
 //! | Review procedure | See `data/margin/README.md`, "FRTB parameter review" |
 //!
-//! No numeric parameter in MAR21 changed between d457 and the consolidated
-//! text; the consolidation made wording corrections only (notably MAR21.99,
-//! "for each risk class" to "for each bucket"). Each submodule names the
-//! specific paragraphs and tables it draws on, and records its own **"Known
-//! deviations from MAR21"** section where the implemented value differs from
-//! the published one.
-//!
-//! # Deviation summary
-//!
-//! Every deviation is pinned by a test in this module so it cannot change
-//! unnoticed. None has been silently corrected: each moves published capital
-//! numbers and needs explicit sign-off.
-//!
-//! | Module | Deviation |
-//! |--------|-----------|
-//! | [`csr`] | Non-sec buckets 8/9 risk weights transposed and wrong; sec non-CTP table largely wrong (bucket 25 is 12.5% against a published 3.5%); all three sub-classes flatten the prescribed correlation structures |
-//! | [`equity`] | Vega weight rounded (0.78 vs 77.78%) and not split by bucket; repo-rate risk-weight column missing; intra/inter correlations flattened |
-//! | [`commodity`] | Intra-bucket correlation flattened to a single 55%; bucket-11 inter-bucket carve-out missing |
-//! | [`girr`] | Specified-currency `sqrt(2)` relief and cross-curve basis correlation not implemented (both conservative) |
-//! | [`fx`] | Specified-pair `sqrt(2)` relief and the MAR21.98 curvature 1.5 scalar not implemented (both conservative) |
-//!
-//! # Curvature risk weights
-//!
-//! There are deliberately **no** curvature risk-weight constants. MAR21.98
-//! makes the FX and equity curvature shock a relative shift equal to the
-//! delta risk weight, and MAR21.99 makes the GIRR/CSR/commodity curvature
-//! shock a shift sized by the highest prescribed delta risk weight **in the
-//! bucket**. No flat curvature risk weight is published anywhere in MAR21.
-//! The engine consumes caller-supplied, already-shocked `CVR+`/`CVR-` values,
-//! so it needs no curvature weight of its own.
-
 pub mod commodity;
 pub mod correlation_scenarios;
 pub mod csr;
 pub mod equity;
 pub mod fx;
 pub mod girr;
+
+use super::types::FrtbRiskClass;
+
+/// Name/tranche correlation before tenor, basis and scenario adjustments.
+pub(super) fn name_correlation(class: FrtbRiskClass, bucket: u8) -> f64 {
+    match class {
+        FrtbRiskClass::Equity => match bucket {
+            1..=4 => 0.15,
+            5..=8 => 0.25,
+            9 => 0.075,
+            10 => 0.125,
+            12..=13 => 0.8,
+            _ => 0.0,
+        },
+        FrtbRiskClass::Commodity => [0.55, 0.95, 0.4, 0.8, 0.6, 0.65, 0.55, 0.45, 0.15, 0.4, 0.15]
+            .get(usize::from(bucket.wrapping_sub(1)))
+            .copied()
+            .unwrap_or(f64::NAN),
+        FrtbRiskClass::CsrNonSec | FrtbRiskClass::CsrSecCtp => {
+            if bucket >= 17 {
+                0.8
+            } else {
+                0.35
+            }
+        }
+        FrtbRiskClass::CsrSecNonCtp => 0.4,
+        _ => 1.0,
+    }
+}
+
+/// Buckets whose constituents receive no intra-bucket diversification.
+pub(super) fn other_bucket(class: FrtbRiskClass, bucket: u8) -> bool {
+    matches!(
+        (class, bucket),
+        (FrtbRiskClass::Equity, 11)
+            | (FrtbRiskClass::CsrNonSec | FrtbRiskClass::CsrSecCtp, 16)
+            | (FrtbRiskClass::CsrSecNonCtp, 25)
+    )
+}
+
+/// Basel MAR21.57 sector matrix, with rating adjustment for IG versus HY.
+fn credit_inter_correlation(b: u8, c: u8) -> f64 {
+    const MATRIX: [[f64; 11]; 11] = [
+        [1., 0.75, 0.10, 0.20, 0.25, 0.20, 0.15, 0.10, 0., 0.45, 0.45],
+        [0.75, 1., 0.05, 0.15, 0.20, 0.15, 0.10, 0.10, 0., 0.45, 0.45],
+        [0.10, 0.05, 1., 0.05, 0.15, 0.20, 0.05, 0.20, 0., 0.45, 0.45],
+        [0.20, 0.15, 0.05, 1., 0.20, 0.25, 0.05, 0.05, 0., 0.45, 0.45],
+        [0.25, 0.20, 0.15, 0.20, 1., 0.25, 0.05, 0.15, 0., 0.45, 0.45],
+        [0.20, 0.15, 0.20, 0.25, 0.25, 1., 0.05, 0.20, 0., 0.45, 0.45],
+        [0.15, 0.10, 0.05, 0.05, 0.05, 0.05, 1., 0.05, 0., 0.45, 0.45],
+        [0.10, 0.10, 0.20, 0.05, 0.15, 0.20, 0.05, 1., 0., 0.45, 0.45],
+        [0., 0., 0., 0., 0., 0., 0., 0., 1., 0., 0.],
+        [0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0., 1., 0.75],
+        [0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0., 0.75, 1.],
+    ];
+    let sector = |x: u8| {
+        Some(usize::from(match x {
+            1..=8 => x - 1,
+            9..=15 => x - 9,
+            16..=18 => x - 8,
+            _ => return None,
+        }))
+    };
+    let rating = if b <= 15 && c <= 15 && (b <= 8) != (c <= 8) {
+        0.5
+    } else {
+        1.0
+    };
+    match (sector(b), sector(c)) {
+        (Some(i), Some(j)) => rating * MATRIX[i][j],
+        _ => f64::NAN,
+    }
+}
+
+/// Correlation between distinct Basel buckets before scenario scaling.
+pub(super) fn bucket_correlation(class: FrtbRiskClass, b: u8, c: u8) -> f64 {
+    match class {
+        FrtbRiskClass::Equity => {
+            if b == 11 || c == 11 {
+                0.0
+            } else if b <= 10 && c <= 10 {
+                0.15
+            } else if b >= 12 && c >= 12 {
+                0.75
+            } else {
+                0.45
+            }
+        }
+        FrtbRiskClass::Commodity => {
+            if b == 11 || c == 11 {
+                0.0
+            } else {
+                0.2
+            }
+        }
+        FrtbRiskClass::CsrNonSec | FrtbRiskClass::CsrSecCtp => credit_inter_correlation(b, c),
+        _ => 0.0,
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -224,12 +292,8 @@ mod tests {
     #[test]
     fn csr_nonsec_risk_weights_match_mar21_53_table_4() {
         // All 18 buckets match MAR21.53 Table 4 as published.
-        //
-        // Buckets 8 and 9 were previously 1.0% and 2.5% against a published
-        // 2.5% and 2.0% — bucket 8 (covered bonds) understated by 60%.
-        // Corrected 2026-08-20 against BCBS d457. MAR21.53 footnote 17 permits
-        // a *discretionary* 1.5% for covered bonds rated AA- or better; the
-        // old 1.0% was not that value either.
+        // MAR21.53 footnote 17 permits a *discretionary* 1.5% for covered
+        // bonds rated AA- or better; this table carries the standard 2.5%.
         assert_bucket_table(
             csr::CSR_NONSEC_RISK_WEIGHTS,
             &[
@@ -271,24 +335,16 @@ mod tests {
     }
 
     #[test]
-    fn csr_nonsec_correlations_pin_current_values() {
-        // rho_name and rho_tenor match MAR21.54 for buckets 1-15.
+    fn csr_nonsec_correlations_match_basel() {
         assert_exact(
-            csr::CSR_NONSEC_INTRA_BUCKET_NAME_CORRELATION,
+            super::name_correlation(super::FrtbRiskClass::CsrNonSec, 1),
             0.35,
-            "CSR non-sec rho_name (MAR21.54)",
+            "name correlation",
         );
         assert_exact(
-            csr::CSR_NONSEC_INTRA_BUCKET_TENOR_CORRELATION,
-            0.65,
-            "CSR non-sec rho_tenor (MAR21.54)",
-        );
-        // DEVIATION: MAR21.57 prescribes gamma_rating * gamma_sector with a
-        // Table 5 matrix, not a uniform 40%.
-        assert_exact(
-            csr::CSR_NONSEC_INTER_BUCKET_CORRELATION,
-            0.40,
-            "CSR non-sec inter-bucket correlation (flattened, see MAR21.57)",
+            super::bucket_correlation(super::FrtbRiskClass::CsrNonSec, 1, 3),
+            0.1,
+            "sector correlation",
         );
     }
 
@@ -319,19 +375,16 @@ mod tests {
     }
 
     #[test]
-    fn csr_sec_ctp_correlations_pin_current_values() {
-        // DEVIATION: MAR21.60 reuses the MAR21.54/21.55 name/tenor/basis
-        // decomposition (with rho_basis = 99.00%), and MAR21.61 reuses the
-        // MAR21.57 inter-bucket construction. Neither is a flat constant.
+    fn csr_sec_ctp_correlations_match_basel() {
         assert_exact(
-            csr::CSR_SEC_CTP_INTRA_BUCKET_CORRELATION,
-            0.30,
-            "CSR sec CTP intra-bucket correlation (flattened, see MAR21.60)",
+            super::name_correlation(super::FrtbRiskClass::CsrSecCtp, 1),
+            0.35,
+            "name correlation",
         );
         assert_exact(
-            csr::CSR_SEC_CTP_INTER_BUCKET_CORRELATION,
-            0.40,
-            "CSR sec CTP inter-bucket correlation (flattened, see MAR21.61)",
+            super::bucket_correlation(super::FrtbRiskClass::CsrSecCtp, 1, 3),
+            0.1,
+            "sector correlation",
         );
     }
 
@@ -339,14 +392,9 @@ mod tests {
     fn csr_sec_nonctp_risk_weights_match_mar21_64_through_67() {
         // MAR21.64 Table 8 publishes eight senior investment-grade weights
         //   [0.9, 1.5, 2.0, 2.0, 0.8, 1.2, 1.2, 1.4]%
-        // and DERIVES the rest: buckets 9-16 are 1.25x those (MAR21.65),
+        // and derives the rest: buckets 9-16 are 1.25x those (MAR21.65),
         // buckets 17-24 are 1.75x (MAR21.66), and bucket 25 = 3.5% (MAR21.67).
-        //
-        // Corrected 2026-08-20 against BCBS d457. Previously only buckets 1,
-        // 2, 3, 5 and 6 matched; 20 of 25 were wrong, with bucket 25 at 12.5%
-        // against a published 3.5% (a 3.6x overstatement). The expectations
-        // below are written as the same products the table uses, so a change
-        // to a base weight must be made in exactly one place.
+        // The expectations use the same products as the table.
         assert_bucket_table(
             csr::CSR_SEC_NONCTP_RISK_WEIGHTS,
             &[
@@ -381,19 +429,16 @@ mod tests {
     }
 
     #[test]
-    fn csr_sec_nonctp_correlations_pin_current_values() {
-        // DEVIATION: MAR21.68 prescribes rho_tranche (40%) * rho_tenor (80%)
-        // * rho_basis (99.90%); MAR21.70 sets the inter-bucket gamma to 0%
-        // across buckets 1-24, with bucket 25 simply summed (MAR21.71).
+    fn csr_sec_nonctp_correlations_match_basel() {
         assert_exact(
-            csr::CSR_SEC_NONCTP_INTRA_BUCKET_CORRELATION,
-            0.30,
-            "CSR sec non-CTP intra-bucket correlation (flattened, see MAR21.68)",
+            super::name_correlation(super::FrtbRiskClass::CsrSecNonCtp, 1),
+            0.4,
+            "name correlation",
         );
         assert_exact(
-            csr::CSR_SEC_NONCTP_INTER_BUCKET_CORRELATION,
-            0.20,
-            "CSR sec non-CTP inter-bucket correlation (should be 0%, see MAR21.70)",
+            super::bucket_correlation(super::FrtbRiskClass::CsrSecNonCtp, 1, 5),
+            0.0,
+            "sector correlation",
         );
     }
 
@@ -425,46 +470,40 @@ mod tests {
     }
 
     #[test]
-    fn equity_correlations_pin_current_values() {
-        // DEVIATION: MAR21.78 prescribes 15% (buckets 1-4), 25% (5-8),
-        // 7.5% (9), 12.5% (10) and 80% (12-13); MAR21.80 prescribes 15%
-        // within buckets 1-10, 0% against bucket 11, 75% between 12 and 13,
-        // and 45% otherwise. Both are flattened to a single 15% here.
+    fn equity_correlations_match_basel() {
+        for (bucket, expected) in [(1, 0.15), (5, 0.25), (9, 0.075), (10, 0.125), (12, 0.8)] {
+            assert_exact(
+                super::name_correlation(super::FrtbRiskClass::Equity, bucket),
+                expected,
+                "equity name correlation",
+            );
+        }
         assert_exact(
-            equity::EQUITY_INTRA_BUCKET_CORRELATION,
-            0.15,
-            "equity intra-bucket correlation (flattened, see MAR21.78)",
+            super::bucket_correlation(super::FrtbRiskClass::Equity, 12, 13),
+            0.75,
+            "index correlation",
         );
         assert_exact(
-            equity::EQUITY_INTER_BUCKET_CORRELATION,
-            0.15,
-            "equity inter-bucket correlation (flattened, see MAR21.80)",
+            super::bucket_correlation(super::FrtbRiskClass::Equity, 1, 11),
+            0.0,
+            "other sector correlation",
         );
     }
 
     #[test]
-    fn equity_vega_risk_weight_pins_known_deviation_from_mar21_92() {
-        // DEVIATION (pinned, not corrected). MAR21.92 Table 13 publishes
-        // 77.78% for equity large cap and indices (buckets 1-8, 12-13) and
-        // 100% for small cap and other sector (buckets 9-11). This constant
-        // is a single rounded 0.78 applied to every bucket.
-        assert_exact(
-            equity::EQUITY_VEGA_RISK_WEIGHT,
-            0.78,
-            "equity vega risk weight (rounded, not bucket-split)",
-        );
-        // Distance from the published large-cap value, so the size of the
-        // rounding error is recorded rather than merely implied.
-        let published_large_cap = 0.55 * 2.0_f64.sqrt(); // = 0.777817...
-        assert!(
-            (equity::EQUITY_VEGA_RISK_WEIGHT - published_large_cap).abs() < 3e-3,
-            "0.78 should be within a rounding step of the published 77.78%"
-        );
-        assert!(
-            (equity::EQUITY_VEGA_RISK_WEIGHT - published_large_cap).abs() > 1e-6,
-            "if this now matches 0.55*sqrt(2) exactly the rounding deviation \
-             has been fixed -- update this test and params/equity.rs"
-        );
+    fn equity_vega_risk_weight_matches_mar21_92() {
+        for b in 1..=13 {
+            let expected = if (9..=11).contains(&b) {
+                1.0
+            } else {
+                0.55 * 2.0_f64.sqrt()
+            };
+            assert_exact(
+                equity::equity_vega_risk_weight(b),
+                expected,
+                "equity vega liquidity horizon",
+            );
+        }
     }
 
     // -----------------------------------------------------------------
@@ -493,23 +532,21 @@ mod tests {
     }
 
     #[test]
-    fn commodity_correlations_pin_current_values() {
-        // DEVIATION: MAR21.83 Table 12 gives a per-bucket rho_cty vector
-        // [55, 95, 40, 80, 60, 65, 55, 45, 15, 40, 15]%, further multiplied
-        // by rho_tenor (99.00%) and rho_basis (99.90%). 55% is correct for
-        // buckets 1 and 7 only.
+    fn commodity_correlations_match_basel() {
+        for (i, rho) in [0.55, 0.95, 0.4, 0.8, 0.6, 0.65, 0.55, 0.45, 0.15, 0.4, 0.15]
+            .into_iter()
+            .enumerate()
+        {
+            assert_exact(
+                super::name_correlation(super::FrtbRiskClass::Commodity, (i + 1) as u8),
+                rho,
+                "commodity name correlation",
+            );
+        }
         assert_exact(
-            commodity::COMMODITY_INTRA_BUCKET_CORRELATION,
-            0.55,
-            "commodity intra-bucket correlation (flattened, see MAR21.83)",
-        );
-        // 20% is the published MAR21.85(1) value for bucket pairs within
-        // 1-10. DEVIATION: MAR21.85(2) sets gamma to 0% when either bucket
-        // is 11, which is not implemented.
-        assert_exact(
-            commodity::COMMODITY_INTER_BUCKET_CORRELATION,
-            0.20,
-            "commodity inter-bucket correlation (MAR21.85(1))",
+            super::bucket_correlation(super::FrtbRiskClass::Commodity, 1, 11),
+            0.0,
+            "other commodity correlation",
         );
     }
 
@@ -622,16 +659,8 @@ mod tests {
             5.0,
             "CSR sec non-CTP fallback risk weight",
         );
-        assert_exact(
-            equity::equity_risk_weight(UNMAPPED),
-            55.0,
-            "equity fallback risk weight",
-        );
-        assert_exact(
-            commodity::commodity_risk_weight(UNMAPPED),
-            20.0,
-            "commodity fallback risk weight",
-        );
+        assert!(equity::equity_risk_weight(UNMAPPED).is_nan());
+        assert!(commodity::commodity_risk_weight(UNMAPPED).is_nan());
     }
 
     #[test]

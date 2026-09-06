@@ -362,6 +362,25 @@ impl CsaSpec {
 
     /// Validate CSA identifiers and the contractual holiday calendar.
     pub fn validate(&self) -> Result<()> {
+        self.vm_params.validate(self.base_currency)?;
+        if let Some(im) = &self.im_params {
+            for (name, amount) in [("threshold", im.threshold), ("MTA", im.mta)] {
+                if amount.currency() != self.base_currency
+                    || !amount.amount().is_finite()
+                    || amount.amount() < 0.0
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "IM {name} must be finite, nonnegative and denominated in {}",
+                        self.base_currency
+                    )));
+                }
+            }
+            if im.mpor_days == 0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "IM MPOR must be positive".into(),
+                ));
+            }
+        }
         if self.id.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "CSA id must not be empty".into(),

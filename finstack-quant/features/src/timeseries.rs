@@ -147,14 +147,15 @@ impl TimeSeriesOp {
 ///
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
-/// `periods`, `half_life`, and EWMA `span` count finite observations (observation time); missing rows do not advance the lag or decay. Rolling `window`s
-/// span the trailing `window` rows and require `min_periods` finite rows.
-/// EWMA `span` must be at least 1; centered biased variance is used. Volatility
-/// is missing initially, then zero for constant data. Rolling slope uses row
-/// positions, preserving gaps. Aggregates can emit at missing current rows.
-/// `drawdown` expects a level series. `rolling_sharpe` is a period feature, not the `analytics`
-/// Sharpe; optional JSON `risk_free` defaults to `0.0` in the same units as
-/// the return series.
+/// `periods`, `half_life`, and EWMA `span` count finite observations
+/// (observation time); missing rows do not advance the lag or decay. Rolling
+/// `window`s span the trailing `window` rows and require `min_periods` finite
+/// rows. EWMA `span` must be at least 1; centered biased variance is used.
+/// Volatility is missing initially, then zero for constant data. Rolling slope
+/// uses row positions, preserving gaps. Aggregates can emit at missing current
+/// rows. `drawdown` expects a level series. `rolling_sharpe` is a period
+/// feature, not the `analytics` Sharpe; optional JSON `risk_free` defaults to
+/// `0.0` in the same units as the return series.
 ///
 /// # Arguments
 ///

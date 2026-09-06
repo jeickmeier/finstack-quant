@@ -67,7 +67,7 @@ pub(crate) fn finite(value: Option<f64>) -> Option<f64> {
     // Signed zeros are numerically equal, including for total-ordered ranks.
     value
         .filter(|inner| inner.is_finite())
-        .map(|v| if v.abs() <= 0.0 { 0.0 } else { v })
+        .map(|v| if v == 0.0 { 0.0 } else { v })
 }
 
 pub(crate) fn validate_lengths(primary: usize, others: &[(&str, usize)]) -> Result<()> {

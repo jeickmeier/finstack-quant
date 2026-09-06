@@ -32,15 +32,17 @@ fails CI rather than silently changing a margin number.
 ## `simm.v1.json`
 
 **Source.** International Swaps and Derivatives Association, *ISDA SIMM
-Methodology*. Two versions are embedded:
+Methodology*. One historical version is embedded:
 
 | Registry id | ISDA document | Frozen on |
 |-------------|---------------|-----------|
 | `v2_6` | ISDA SIMM Methodology Version 2.6 (December 2023) | 2024-01-15 |
-| `v2_5` | ISDA SIMM Methodology Version 2.5 (December 2022) | 2023-01-15 |
 
 Contains per-version MPOR, risk weights, correlations and concentration
-thresholds across the SIMM risk classes.
+thresholds across the SIMM risk classes. Concentration thresholds use USD;
+inputs and output must be normalized to USD. The implementation is explicitly
+approximate because some required factor and product-class dimensions are
+not represented. Parameter provenance is not model certification.
 
 **Pinned by.** `tests/simm_schedule_parity.rs`. That file is the authoritative
 provenance record for this JSON: it carries the ISDA section/table reference

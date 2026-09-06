@@ -242,7 +242,8 @@ pub struct PyExposureProfile {
 impl PyExposureProfile {
     /// Construct from parallel vectors on a time grid.
     ///
-    /// ``times`` are strictly positive year fractions; ``mtm_values``,
+    /// ``times`` are nonnegative, strictly increasing year fractions; a zero-time
+    /// origin is allowed, and XVA holds exposure constant before the first point. ``mtm_values``,
     /// ``epe`` and ``ene`` are amounts in the netting set's currency at each
     /// time. ``diagnostics`` optionally attaches the engine's failure
     /// counters. Values are stored as given; ``validate()`` and the XVA

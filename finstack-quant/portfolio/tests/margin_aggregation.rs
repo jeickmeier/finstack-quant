@@ -381,7 +381,8 @@ fn calculate_sums_netting_sets_into_portfolio_totals() {
     assert!((result.total_initial_margin.amount() - im).abs() < 1e-9);
     assert!((result.total_variation_margin.amount() - vm).abs() < 1e-9);
     assert!((result.total_margin.amount() - total).abs() < 1e-9);
-    assert_eq!(result.total_variation_margin.amount(), 1_500_000.0);
+    assert_eq!(result.total_variation_margin.amount(), -1_500_000.0);
+    assert!(sets.iter().all(|set| set.is_approximate));
 }
 
 #[test]
@@ -390,8 +391,8 @@ fn calculate_nets_negative_vm_but_only_positive_vm_adds_to_total_margin() {
     let receivable = NettingSetId::bilateral("BANK_B", "CSA_002");
     let result = run_margin_for(
         &[
-            usd_instrument("irs-owed", owed, 300_000.0),
-            usd_instrument("irs-receivable", receivable, -500_000.0),
+            usd_instrument("irs-owed", owed, -300_000.0),
+            usd_instrument("irs-receivable", receivable, 500_000.0),
         ],
         &MarketContext::new(),
     );
@@ -430,8 +431,8 @@ fn calculate_converts_foreign_currency_netting_set_to_base() {
         assert_eq!(margin.variation_margin.currency(), Currency::USD);
         assert_eq!(margin.total_margin.currency(), Currency::USD);
     }
-    // VM: 500k USD + 2M EUR * 1.10.
-    assert!((mixed.total_variation_margin.amount() - (500_000.0 + 2_200_000.0)).abs() < 1e-6);
+    // Desk collects 500k USD + 2M EUR * 1.10.
+    assert!((mixed.total_variation_margin.amount() + (500_000.0 + 2_200_000.0)).abs() < 1e-6);
     // The EUR set's IM is the USD set's IM scaled by the spot rate (same unit
     // IR delta, sensitivities rebased before the SIMM run).
     let usd_im = usd_only.by_netting_set[&usd_set].initial_margin.amount();

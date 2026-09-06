@@ -14,8 +14,8 @@ fn calculate_vm_usd_regulatory() {
     let obj: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
     assert!(obj["gross_exposure"].as_f64().is_some());
     assert!(obj["net_exposure"].as_f64().is_some());
-    assert!(obj["delivery_amount"].as_f64().is_some());
-    assert!(obj["return_amount"].as_f64().is_some());
+    assert!(obj["post_amount"].as_f64().is_some());
+    assert!(obj["collect_amount"].as_f64().is_some());
     assert!(obj["net_margin"].as_f64().is_some());
     assert!(obj["requires_call"].as_bool().is_some());
 }

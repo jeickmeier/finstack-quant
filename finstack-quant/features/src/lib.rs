@@ -48,15 +48,14 @@
 //!   `v_t` is compared with the `periods`-th finite value before it. Missing
 //!   rows do not decay EWMA or half-life. Rolling `window`s span the trailing
 //!   `window` rows of the entity; only finite rows inside the window
-//!   contribute and `min_periods` of them are required.
+//!   contribute and `min_periods` of them are required (`min_periods` cannot
+//!   exceed `window`). Rolling aggregates can still emit at a missing current
+//!   row.
 //! - `params` are strict: a key the operation does not read (for example
 //!   `"windows"`) is rejected instead of silently falling back to the default.
 //! - Outputs preserve input order and length; element `i` of the output
-//!   corresponds to element `i` of `values`.
-//! - Missing inputs are excluded; rolling aggregates can still emit at missing
-//!   rows. Non-finite arithmetic results are validation errors on every surface.
-//! - Rolling operations require `min_periods` finite points in the window
-//!   before emitting a value; `min_periods` cannot exceed `window`.
+//!   corresponds to element `i` of `values`. Non-finite arithmetic results
+//!   are validation errors on every surface.
 //! - EWMA requires `span >= 1` and uses centered biased variance. Volatility
 //!   is missing on the first finite observation, then zero for constant data.
 //! - `cap_weights` enforces final caps, zero net and unit gross; infeasible

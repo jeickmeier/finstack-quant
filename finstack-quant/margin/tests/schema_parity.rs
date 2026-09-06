@@ -49,7 +49,7 @@ fn csa_fixture() -> Value {
 fn margin_call_fixture() -> Value {
     json!({
         "schema": "finstack_quant.margin/1",
-        "margin_call": MarginCall::vm_delivery(
+        "margin_call": MarginCall::vm_post(
             date!(2026 - 07 - 30),
             date!(2026 - 07 - 31),
             Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -234,7 +234,7 @@ fn synthetic_margin_schema_validates_representative_union_variants() {
     serde_json::from_value::<CsaSpec>(csa_json)
         .expect("representative CSA must satisfy serde constraints");
     let otc = OtcMarginSpec::bilateral_simm(csa.clone());
-    let margin_call = MarginCall::vm_delivery(
+    let margin_call = MarginCall::vm_post(
         date!(2026 - 07 - 30),
         date!(2026 - 07 - 31),
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),

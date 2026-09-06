@@ -109,6 +109,36 @@ impl VmParameters {
         }
     }
 
+    /// Validate all monetary elections in the contractual currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - CSA base currency; no implicit FX conversion is performed.
+    ///
+    /// # Errors
+    ///
+    /// Rejects non-finite, negative, or cross-currency elections.
+    pub fn validate(&self, currency: Currency) -> Result<()> {
+        for (name, value) in [
+            ("threshold", self.threshold),
+            ("MTA", self.mta),
+            ("rounding", self.rounding),
+            ("independent amount", self.independent_amount),
+        ] {
+            if value.currency() != currency || !value.amount().is_finite() || value.amount() < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "VM {name} must be finite, nonnegative and denominated in {currency}"
+                )));
+            }
+        }
+        if self.settlement_lag > i32::MAX as u32 {
+            return Err(finstack_quant_core::Error::Validation(
+                "VM settlement lag exceeds supported range".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Compute the required credit support amount **before** netting
     /// against currently posted collateral, rounding, and the MTA cutoff.
     ///
@@ -130,6 +160,7 @@ impl VmParameters {
     /// Returns [`finstack_quant_core::Error::Validation`] if `exposure.currency()`
     /// does not match the threshold currency.
     pub fn required_credit_support(&self, exposure: Money) -> Result<Money> {
+        self.validate(exposure.currency())?;
         if exposure.currency() != self.threshold.currency() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "VM exposure currency mismatch: expected {}, got {}",
@@ -186,7 +217,7 @@ impl VmParameters {
     /// negative amount means **delivery** of margin to the counterparty (implemented
     /// in [`crate::calculators::VmCalculator`]).
     ///
-    /// Calls where the **rounded** credit support amount is strictly below the
+    /// Calls where the unrounded credit support amount is strictly below the
     /// Minimum Transfer Amount return zero.
     ///
     /// # Arguments
@@ -198,7 +229,7 @@ impl VmParameters {
     ///
     /// Signed credit support amount (positive = collect from them; negative = return
     /// excess when `Exposure ≥ 0`, or post margin when `Exposure < 0`). Zero if
-    /// below MTA after rounding.
+    /// below MTA before rounding.
     pub fn calculate_margin_call(
         &self,
         exposure: Money,
@@ -222,13 +253,13 @@ impl VmParameters {
 
         let rounded = self.round_transfer_amount(
             Money::new(credit_support_amount, currency)?,
-            exposure.amount(),
+            required.amount(),
         )?;
         Ok(rounded)
     }
 
     /// Round a transfer amount according to ISDA delivery/return elections.
-    fn round_transfer_amount(&self, amount: Money, exposure_amount: f64) -> Result<Money> {
+    fn round_transfer_amount(&self, amount: Money, required_amount: f64) -> Result<Money> {
         let rounding = self.rounding.amount();
         if rounding <= 0.0 {
             return Ok(amount);
@@ -239,7 +270,7 @@ impl VmParameters {
         }
 
         let units = raw.abs() / rounding;
-        let rounded_abs = if raw > 0.0 || exposure_amount < 0.0 {
+        let rounded_abs = if raw * required_amount > 0.0 {
             units.ceil() * rounding
         } else {
             units.floor() * rounding

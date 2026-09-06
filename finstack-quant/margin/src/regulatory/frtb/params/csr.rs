@@ -17,73 +17,6 @@
 //! | Last reviewed | 2026-08-20 |
 //! | Review procedure | See `data/margin/README.md`, "FRTB parameter review" |
 //!
-//! # Known deviations from MAR21
-//!
-//! The **risk-weight tables were corrected on 2026-08-20** against BCBS d457:
-//! all of Table 4 (non-sec), Table 6 (sec CTP) and the MAR21.64-21.67 non-CTP
-//! derivation now match as published, and the corrected buckets are exercised
-//! end-to-end in `margin/tests/frtb_sba_charges.rs`.
-//!
-//! What remains below is **correlation** structure, not risk weights. Each item
-//! moves published capital numbers and is recorded rather than silently
-//! changed. Current behaviour is pinned by `super::tests`.
-//!
-//! **Non-securitisation**
-//!
-//! - ~~Risk weights for buckets 8 and 9 are transposed and wrong~~
-//!   **RESOLVED 2026-08-20.** All 18 Table 4 entries now match MAR21.53 as
-//!   published. Buckets 8 and 9 previously read 1.0% and 2.5% against a
-//!   published 2.5% and 2.0%, understating covered bonds by 60%.
-//! - **Index buckets 17-18 use the wrong name correlation** (MAR21.55).
-//!   Those buckets take `rho_name = 80%`, not the 35% of MAR21.54.
-//! - **Bucket 16 special case not implemented** (MAR21.56). For "Other
-//!   sector", correlations do not apply and `K_b = sum |WS_k|`.
-//! - **Inter-bucket correlation is flattened** (MAR21.57). A single 40% is
-//!   applied. MAR21.57 prescribes
-//!   `gamma_bc = gamma_rating * gamma_sector`, where `gamma_rating` is 50%
-//!   between different rating categories within buckets 1-15 (else 1) and
-//!   `gamma_sector` comes from the 11x11 Table 5 matrix (values 0%-75%).
-//!
-//! **Securitisation (CTP)**
-//!
-//! - Risk weights ([`CSR_SEC_CTP_RISK_WEIGHTS`]) match MAR21.59 Table 6
-//!   exactly. No deviation.
-//! - **Correlations are flattened** (MAR21.60, MAR21.61). MAR21.60 derives
-//!   the CTP intra-bucket correlation exactly as MAR21.54/21.55 does
-//!   (`rho_name` 35%/80%, `rho_tenor` 65%) except that `rho_basis` is
-//!   **99.00%** rather than 99.90%; MAR21.61 makes the inter-bucket gamma
-//!   identical to MAR21.57. The implementation uses flat 30% / 40% instead.
-//!
-//! **Securitisation (non-CTP)**
-//!
-//! - ~~The risk-weight table is largely wrong~~ **RESOLVED 2026-08-20.**
-//!   All 25 buckets now match MAR21.64-21.67. [`CSR_SEC_NONCTP_RISK_WEIGHTS`]
-//!   carries the eight published Table 8 weights and writes buckets 9-16 and
-//!   17-24 as the literal `x1.25` / `x1.75` products, so the derivation is
-//!   visible and a base-row change propagates automatically. Previously only
-//!   buckets 1, 2, 3, 5 and 6 matched and bucket 25 read 12.5% against a
-//!   published 3.5%.
-//! - **Intra-bucket correlation is wrong** (MAR21.68). Published:
-//!   `rho_tranche` = 40% for different tranches (a "same tranche" needs >80%
-//!   notional overlap), `rho_tenor` = 80%, `rho_basis` = 99.90%. Implemented:
-//!   a flat 30%.
-//! - **Inter-bucket correlation should be zero** (MAR21.70). `gamma_bc` is
-//!   **0%** across buckets 1-24, and MAR21.71 requires bucket 25 to be simply
-//!   summed with the rest (no diversification). The implementation applies
-//!   20%, recognising diversification the standard does not allow.
-//! - **Bucket 25 special case not implemented** (MAR21.69). Correlations do
-//!   not apply; `K_b = sum |WS_k|`.
-//!
-//! **All three sub-classes**
-//!
-//! - **Curvature risk weight** (MAR21.99). CSR curvature uses a shift sized
-//!   by the highest prescribed delta risk weight in the bucket. No separate
-//!   curvature risk-weight constant is published or exposed here; the engine
-//!   consumes caller-supplied, already-shocked `CVR+`/`CVR-` values.
-//!   MAR21.100 additionally requires curvature correlations to be the
-//!   **squares** of the delta correlations; the engine squares the
-//!   inter-bucket gamma but not the intra-bucket rho.
-
 /// CSR non-securitisation delta risk weights by bucket, in percent
 /// (MAR21.53, Table 4).
 ///
@@ -104,11 +37,6 @@
 /// 16: Other sector
 /// 17: Investment-grade indices
 /// 18: High-yield indices
-///
-/// # Deviation
-///
-/// Buckets 8 and 9 do not match Table 4 — see the "Known deviations from
-/// MAR21" section in the module docs.
 pub const CSR_NONSEC_RISK_WEIGHTS: &[(u8, f64)] = &[
     (1, 0.5),
     (2, 1.0),
@@ -132,24 +60,6 @@ pub const CSR_NONSEC_RISK_WEIGHTS: &[(u8, f64)] = &[
     (17, 1.5),
     (18, 5.0),
 ];
-
-/// CSR non-sec intra-bucket name correlation (MAR21.54): 35% between
-/// different issuer names in buckets 1-15.
-///
-/// Index buckets 17-18 should use 80% instead (MAR21.55); that split is not
-/// implemented.
-pub const CSR_NONSEC_INTRA_BUCKET_NAME_CORRELATION: f64 = 0.35;
-
-/// CSR non-sec intra-bucket tenor correlation (MAR21.54): 65% between
-/// different tenors.
-pub const CSR_NONSEC_INTRA_BUCKET_TENOR_CORRELATION: f64 = 0.65;
-
-/// CSR non-sec inter-bucket correlation, applied uniformly.
-///
-/// MAR21.57 instead prescribes `gamma_rating * gamma_sector` with a Table 5
-/// sector matrix. See the "Known deviations from MAR21" section in the module
-/// docs.
-pub const CSR_NONSEC_INTER_BUCKET_CORRELATION: f64 = 0.40;
 
 /// CSR non-securitisation vega risk weight (MAR21.92).
 ///
@@ -203,12 +113,8 @@ pub const CSR_SEC_CTP_RISK_WEIGHTS: &[(u8, f64)] = &[
 
 /// CSR securitisation (non-CTP) delta risk weights by bucket, in percent.
 ///
-/// # Deviation
-///
-/// Only buckets 1, 2, 3, 5 and 6 match MAR21.64 Table 8. The remaining 20
-/// entries do not follow the Table 8 + MAR21.65/21.66/21.67 derivation —
-/// see the "Known deviations from MAR21" section in the module docs for the
-/// published vector.
+/// Buckets 1-8 are MAR21.64 Table 8; 9-16 are 1.25x (MAR21.65); 17-24 are
+/// 1.75x (MAR21.66); bucket 25 is 3.5% (MAR21.67).
 pub const CSR_SEC_NONCTP_RISK_WEIGHTS: &[(u8, f64)] = &[
     // Buckets 1-8 — senior investment grade. MAR21.64 Table 8.
     (1, 0.9),
@@ -242,31 +148,6 @@ pub const CSR_SEC_NONCTP_RISK_WEIGHTS: &[(u8, f64)] = &[
     // Bucket 25 — other sector (MAR21.67).
     (25, 3.5),
 ];
-
-/// CSR sec CTP intra-bucket correlation, applied uniformly.
-///
-/// MAR21.60 instead reuses the MAR21.54/21.55 decomposition with
-/// `rho_basis = 99.00%`. See the module-level deviation notes.
-pub const CSR_SEC_CTP_INTRA_BUCKET_CORRELATION: f64 = 0.30;
-
-/// CSR sec CTP inter-bucket correlation, applied uniformly.
-///
-/// MAR21.61 instead reuses the MAR21.57 `gamma_rating * gamma_sector`
-/// construction. See the module-level deviation notes.
-pub const CSR_SEC_CTP_INTER_BUCKET_CORRELATION: f64 = 0.40;
-
-/// CSR sec non-CTP intra-bucket correlation, applied uniformly.
-///
-/// MAR21.68 instead prescribes
-/// `rho_tranche (40%) * rho_tenor (80%) * rho_basis (99.90%)`. See the
-/// module-level deviation notes.
-pub const CSR_SEC_NONCTP_INTRA_BUCKET_CORRELATION: f64 = 0.30;
-
-/// CSR sec non-CTP inter-bucket correlation, applied uniformly.
-///
-/// MAR21.70 instead sets `gamma_bc = 0%` across buckets 1-24, with bucket 25
-/// simply summed (MAR21.71). See the module-level deviation notes.
-pub const CSR_SEC_NONCTP_INTER_BUCKET_CORRELATION: f64 = 0.20;
 
 use std::sync::LazyLock;
 

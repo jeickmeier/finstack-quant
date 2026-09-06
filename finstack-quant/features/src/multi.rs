@@ -192,7 +192,8 @@ pub fn neutralize(
 /// * `op` - Canonical operation name: `"rolling_cov"`, `"rolling_corr"`, or
 ///   `"rolling_beta"`.
 /// * `params` - Optional JSON parameters; `window` defaults to 1 and
-///   `min_periods` defaults to `window`. `window` counts rows, `min_periods` counts finite pairs and cannot exceed `window`.
+///   `min_periods` defaults to `window`. `window` counts rows; `min_periods`
+///   counts finite pairs and cannot exceed `window`.
 ///
 /// # Errors
 ///
@@ -297,7 +298,8 @@ pub fn transform_timeseries_pairwise_with_op(
 /// * `order` - Row-aligned sortable keys that establish rolling chronology.
 ///   Time order is lexicographic; use ISO-8601 for calendar chronology.
 /// * `params` - Optional JSON controls for `window`, `min_periods`, and
-///   `fit_intercept`. `window` spans rows; `min_periods` counts complete rows within it and must not exceed `window`.
+///   `fit_intercept`. `window` spans rows; `min_periods` counts complete rows
+///   within it and must not exceed `window`.
 ///
 /// # Errors
 ///

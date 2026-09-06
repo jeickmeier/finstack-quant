@@ -9,7 +9,7 @@ use crate::types::{CollateralAssetClass, EligibleCollateralSchedule, ImMethodolo
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
+use finstack_quant_core::{types::CreditRating, Result};
 
 /// Margin period of risk in business days used for haircut-based repo IM.
 pub const HAIRCUT_MPOR_DAYS: u32 = 2;
@@ -68,6 +68,8 @@ pub struct HaircutImCalculator {
     /// Posted collateral currency. The FX add-on applies only when this is
     /// set and differs from the instrument's MTM currency.
     posted_collateral_currency: Option<finstack_quant_core::currency::Currency>,
+    remaining_years: Option<f64>,
+    rating: Option<CreditRating>,
 }
 
 impl HaircutImCalculator {
@@ -78,6 +80,8 @@ impl HaircutImCalculator {
             eligible_collateral,
             default_asset_class: CollateralAssetClass::GovernmentBonds,
             posted_collateral_currency: None,
+            remaining_years: None,
+            rating: None,
         }
     }
 
@@ -109,6 +113,72 @@ impl HaircutImCalculator {
     ) -> Self {
         self.posted_collateral_currency = Some(currency);
         self
+    }
+
+    /// Supply collateral terms used to enforce contractual eligibility.
+    ///
+    /// # Arguments
+    ///
+    /// * `remaining_years` - Finite nonnegative residual maturity in years.
+    /// * `rating` - Current collateral credit rating; absence is accepted only for entries without a rating floor.
+    ///
+    /// # Errors
+    ///
+    /// Rejects negative or non-finite maturity.
+    pub fn with_collateral_terms(
+        mut self,
+        remaining_years: f64,
+        rating: Option<CreditRating>,
+    ) -> Result<Self> {
+        if !remaining_years.is_finite() || remaining_years < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "collateral maturity must be finite and nonnegative".into(),
+            ));
+        }
+        self.remaining_years = Some(remaining_years);
+        self.rating = rating;
+        Ok(self)
+    }
+
+    fn matching_entry(
+        &self,
+        asset_class: &CollateralAssetClass,
+    ) -> Result<&crate::types::CollateralEligibility> {
+        for entry in &self.eligible_collateral.eligible {
+            if &entry.asset_class != asset_class {
+                continue;
+            }
+            if let Some(constraints) = &entry.maturity_constraints {
+                if !self
+                    .remaining_years
+                    .is_some_and(|years| constraints.is_satisfied(years))
+                {
+                    continue;
+                }
+            }
+            if let Some(min_rating) = &entry.min_rating {
+                let floor: CreditRating = min_rating.parse()?;
+                if !self
+                    .rating
+                    .is_some_and(|rating| rating != CreditRating::NR && rating <= floor)
+                {
+                    continue;
+                }
+            }
+            if !entry.haircut.is_finite()
+                || !(0.0..=1.0).contains(&entry.haircut)
+                || !entry.fx_haircut_addon.is_finite()
+                || !(0.0..=1.0).contains(&entry.fx_haircut_addon)
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "invalid contractual haircut".into(),
+                ));
+            }
+            return Ok(entry);
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "collateral {asset_class} has no eligible entry for the supplied maturity and rating"
+        )))
     }
 
     /// Set the default asset class.
@@ -162,8 +232,8 @@ impl HaircutImCalculator {
     ///
     /// # Errors
     ///
-    /// Returns an error if the asset class has no configured or standard
-    /// haircut, or if the FX add-on cannot be resolved.
+    /// Returns an error for negative collateral, missing maturity or rating required
+    /// by the schedule, ineligible collateral, or invalid contractual haircuts.
     pub fn calculate_for_collateral(
         &self,
         collateral_value: Money,
@@ -171,16 +241,13 @@ impl HaircutImCalculator {
         currency_mismatch: bool,
         as_of: Date,
     ) -> Result<ImResult> {
-        let haircut = match self.eligible_collateral.haircut_for(asset_class) {
-            Some(h) => h,
-            None => asset_class.standard_haircut()?,
-        };
-
-        let total_haircut = if currency_mismatch {
-            haircut + asset_class.fx_addon()?
-        } else {
-            haircut
-        };
+        if !collateral_value.amount().is_finite() || collateral_value.amount() < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "collateral value must be finite and nonnegative".into(),
+            ));
+        }
+        let entry = self.matching_entry(asset_class)?;
+        let total_haircut = entry.total_haircut(currency_mismatch);
 
         let amount = collateral_value * total_haircut;
         Ok(Self::result_from_amount(
@@ -192,10 +259,7 @@ impl HaircutImCalculator {
 
     /// Get the haircut for an asset class.
     pub fn haircut_for(&self, asset_class: &CollateralAssetClass) -> Result<f64> {
-        match self.eligible_collateral.haircut_for(asset_class) {
-            Some(h) => Ok(h),
-            None => asset_class.standard_haircut(),
-        }
+        Ok(self.matching_entry(asset_class)?.haircut)
     }
 
     fn result_from_amount(
@@ -259,7 +323,10 @@ mod tests {
 
     #[test]
     fn haircut_calculation() {
-        let calc = HaircutImCalculator::us_treasuries().expect("registry should load");
+        let calc = HaircutImCalculator::us_treasuries()
+            .expect("registry should load")
+            .with_collateral_terms(0.5, Some(CreditRating::AAA))
+            .expect("terms");
 
         let collateral = Money::from((10_000_000_i64, Currency::USD));
         let im = calc
@@ -278,7 +345,10 @@ mod tests {
 
     #[test]
     fn fx_addon_applied() {
-        let calc = HaircutImCalculator::bcbs_standard().expect("registry should load");
+        let calc = HaircutImCalculator::bcbs_standard()
+            .expect("registry should load")
+            .with_collateral_terms(0.5, Some(CreditRating::AAA))
+            .expect("terms");
 
         let collateral = Money::from((10_000_000_i64, Currency::USD));
 
@@ -425,7 +495,10 @@ mod tests {
             mtm: Money::from((0_i64, Currency::USD)),
             exposure_base: Money::from((100_000_000_i64, Currency::USD)),
         };
-        let calc = HaircutImCalculator::bcbs_standard().expect("registry should load");
+        let calc = HaircutImCalculator::bcbs_standard()
+            .expect("registry should load")
+            .with_collateral_terms(0.5, Some(CreditRating::AAA))
+            .expect("terms");
         let result = calc
             .calculate(&repo, &MarketContext::new(), date!(2025 - 01 - 01))
             .expect("haircut IM should calculate from exposure base");
