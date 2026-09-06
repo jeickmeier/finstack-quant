@@ -310,7 +310,9 @@ class Currency:
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise; it returns the ISO 4217 minor-unit count
+        from the generated table. A missing table entry falls back to 2 decimal
+        places.
         """
         ...
 

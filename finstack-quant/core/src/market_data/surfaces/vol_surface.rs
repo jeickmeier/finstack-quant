@@ -37,6 +37,7 @@
 //! assert_eq!(surface.vols()[1], 0.21);
 //! ```
 
+use crate::market_data::bumps::BumpType;
 use crate::{
     error::InputError,
     market_data::bumps::{BumpSpec, Bumpable},
@@ -565,10 +566,7 @@ impl Bumpable for VolSurface {
         use crate::error::InputError;
 
         spec.validate_finite()?;
-        if !matches!(
-            spec.bump_type,
-            crate::market_data::bumps::BumpType::Parallel
-        ) {
+        if !matches!(spec.bump_type, BumpType::Parallel) {
             return Err(InputError::UnsupportedBump {
                 reason: "VolSurface only supports Parallel bumps, not key-rate bumps".to_string(),
             }

@@ -994,7 +994,7 @@
               "description": "Extrapolation policy"
             },
             "fx_policy": {
-              "description": "Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].",
+              "description": "Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].",
               "type": [
                 "string",
                 "null"
@@ -1102,7 +1102,7 @@
             },
             "fx_policy": {
               "default": null,
-              "description": "Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].",
+              "description": "Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].",
               "type": [
                 "string",
                 "null"

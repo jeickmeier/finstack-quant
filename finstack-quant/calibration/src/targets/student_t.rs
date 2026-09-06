@@ -299,7 +299,7 @@ impl StudentTTarget {
             .with_metadata("tranche_instrument_id", &self.params.tranche_instrument_id)
             .with_metadata("calibrated_df", format!("{:.6}", calibrated_df))
             .with_metadata("df_bounds", format!("[{:.2}, {:.2}]", df_lo, df_hi))
-            .with_model_version(finstack_quant_core::versions::STUDENT_T_COPULA);
+            .with_model_version(crate::versions::STUDENT_T_COPULA);
         let mut report = report;
         report.update_solver_config(self.config.solver.clone());
 

@@ -373,7 +373,7 @@ impl HazardCurveTarget {
         };
 
         let report = report
-            .with_model_version(finstack_quant_core::versions::ISDA_STANDARD_MODEL)
+            .with_model_version(crate::versions::ISDA_STANDARD_MODEL)
             .with_metadata("calibration_type", "hazard_curve")
             .with_metadata("curve_id", params.curve_id.as_str())
             .with_metadata("entity", &params.entity);

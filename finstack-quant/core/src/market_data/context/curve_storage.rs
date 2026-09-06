@@ -1,8 +1,8 @@
 //! Heterogeneous curve storage and curve-specific transformation plumbing.
 
+use crate::market_data::bumps::Bumpable;
 use std::sync::Arc;
 
-use crate::market_data::bumps::{BumpType, Bumpable};
 use crate::types::CurveId;
 use crate::Result;
 
@@ -237,57 +237,6 @@ impl CurveStorage {
                 Ok(())
             }
             Self::Inflation(original) => {
-                // Special handling for TriangularKeyRate bumps on InflationCurve
-                if let BumpType::TriangularKeyRate {
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                } = spec.bump_type
-                {
-                    let (delta, is_multiplicative) =
-                        spec.resolve_standard_values().ok_or_else(|| {
-                            crate::error::InputError::UnsupportedBump {
-                                reason: "InflationCurve key-rate bump requires additive bump"
-                                    .to_string(),
-                            }
-                        })?;
-                    if is_multiplicative {
-                        return Err(crate::error::InputError::UnsupportedBump {
-                            reason:
-                                "InflationCurve key-rate bump does not support multiplicative bumps"
-                                    .to_string(),
-                        }
-                        .into());
-                    }
-                    let mut points: Vec<(f64, f64)> = original
-                        .knots()
-                        .iter()
-                        .copied()
-                        .zip(original.cpi_levels().iter().copied())
-                        .collect();
-                    for (tenor, level) in &mut points {
-                        let weight = crate::market_data::term_structures::common::triangular_weight(
-                            *tenor,
-                            prev_bucket,
-                            target_bucket,
-                            next_bucket,
-                        );
-                        if weight > 0.0 {
-                            *level *= 1.0 + delta * weight;
-                        }
-                    }
-                    let rebuilt = InflationCurve::builder(original_id.clone())
-                        .base_cpi(original.base_cpi())
-                        .base_date(original.base_date())
-                        .day_count(original.day_count())
-                        .indexation_lag_months(original.indexation_lag_months())
-                        .knots(points)
-                        .interp(original.interp_style())
-                        .extrapolation(original.extrapolation())
-                        .build()?;
-                    *self = Self::Inflation(Arc::new(rebuilt));
-                    return Ok(());
-                }
                 let curve = bump_curve_preserving_id(
                     original.as_ref(),
                     original_id,
@@ -438,15 +387,18 @@ mod tests {
             "right boundary should stay unchanged"
         );
         assert!(
-            (levels[2] - 315.12).abs() < 1e-10,
+            (levels[2] - 300.0 * ((312.0_f64 / 300.0).powf(1.0 / 5.0) + 0.01).powf(5.0)).abs()
+                < 1e-10,
             "target knot should receive the full bump"
         );
         assert!(
-            (levels[1] - 307.53).abs() < 1e-10,
+            (levels[1] - 300.0 * ((306.0_f64 / 300.0).powf(1.0 / 2.5) + 0.005).powf(2.5)).abs()
+                < 1e-10,
             "left neighbor should receive half the bump"
         );
         assert!(
-            (levels[3] - 319.59).abs() < 1e-10,
+            (levels[3] - 300.0 * ((318.0_f64 / 300.0).powf(1.0 / 7.5) + 0.005).powf(7.5)).abs()
+                < 1e-10,
             "right neighbor should receive half the bump"
         );
     }

@@ -26,11 +26,7 @@ tests/
 ├── types.rs                + types/       Rate / Bps / Percentage
 ├── golden_tests.rs         + golden/      reference-value fixtures (see golden/README.md)
 ├── canonical_api.rs                       npv/irr/quadrature result and error consistency
-├── credit.rs                              cross-module credit workflows
-├── liability_management.rs                distressed-exchange / LME economics
-├── recovery_waterfall.rs                  absolute-priority recovery allocation
 ├── phase2_strictness.rs                   nested serde strictness + finite-value regressions
-├── simplicity_parity.rs                   parity guards on canonical API variants
 ├── sobol_golden.rs                        Sobol direction numbers vs Joe & Kuo (2008)
 └── data/                                  fixture data (see data/README_sobol.md)
     ├── canonical/                         MarketContextState canonical bytes + sha256 pin
@@ -59,16 +55,14 @@ with the amount rather than fixing an absolute epsilon.
 
 ```bash
 # Everything in the crate (lib unit tests + all integration targets)
-cargo nextest run -p finstack-quant-core
+mise run rust-test-crate -- finstack-quant-core
 
 # One target
-cargo nextest run -p finstack-quant-core --test cashflow
+mise run rust-test-integration -- finstack-quant-core cashflow
 
 # One test, by substring
-cargo nextest run -p finstack-quant-core --test cashflow npv_100_cashflows
+mise run rust-test-filter -- finstack-quant-core npv_100_cashflows
 
-# With stdout from passing tests
-cargo nextest run -p finstack-quant-core --no-capture
 ```
 
 Workspace-wide: `mise run rust-test`. Do not invoke a bare `cargo test` — it

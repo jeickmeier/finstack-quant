@@ -23,12 +23,8 @@
 //!
 //! - Key-rate risk methodology: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-use super::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
-use super::term_structures::{
-    BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve,
-};
 use crate::currency::Currency;
-use crate::dates::{Date, DayCount, DayCountContext};
+use crate::dates::Date;
 use crate::types::CurveId;
 
 /// Mode of applying a bump.
@@ -359,7 +355,7 @@ impl BumpSpec {
         }
     }
 
-    fn resolve_standard_values_or_error(
+    pub(crate) fn resolve_standard_values_or_error(
         &self,
         context: &str,
         supported: &str,
@@ -376,7 +372,7 @@ impl BumpSpec {
         })
     }
 
-    fn standard_bump_id(&self, id: &CurveId) -> CurveId {
+    pub(crate) fn standard_bump_id(&self, id: &CurveId) -> CurveId {
         match self.units {
             BumpUnits::RateBp => id_bump_bp(id.as_str(), self.value),
             BumpUnits::Percent => id_bump_pct(id.as_str(), self.value),
@@ -384,7 +380,7 @@ impl BumpSpec {
         }
     }
 
-    fn hazard_shift_id(&self, id: &CurveId) -> CurveId {
+    pub(crate) fn hazard_shift_id(&self, id: &CurveId) -> CurveId {
         match self.units {
             BumpUnits::RateBp => id_spread_bp(id.as_str(), self.value),
             BumpUnits::Percent => id_bump_pct(id.as_str(), self.value),
@@ -488,6 +484,12 @@ pub(crate) fn id_bump_pct(id: &str, pct: f64) -> CurveId {
 pub trait Bumpable: Sized + Send + Sync {
     /// Apply a bump specification to create a new bumped instance.
     ///
+    /// # Arguments
+    ///
+    /// * `spec` - Shock to apply: mode, units, magnitude, and parallel versus
+    ///   triangular key-rate shape. Supported combinations are type-specific;
+    ///   see each implementor for the accepted unit/mode pairs and bump space.
+    ///
     /// # Errors
     ///
     /// Returns [`InputError::UnsupportedBump`](crate::error::InputError::UnsupportedBump)
@@ -495,423 +497,10 @@ pub trait Bumpable: Sized + Send + Sync {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self>;
 }
 
-impl Bumpable for DiscountCurve {
-    /// Apply a continuously compounded zero-space shock.
-    ///
-    /// Additive `RateBp` / `Percent` / `Fraction` bumps shift zeros via
-    /// `DF_bumped(t) = DF(t) · exp(−δr · t)` (and the triangular-weighted
-    /// analogue for key-rate bumps). This does **not** re-bootstrap from
-    /// stored [`super::term_structures::RateCalibrationRecipe`] quotes.
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "DiscountCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} bumps",
-        )?;
-
-        if is_multiplicative {
-            return Err(crate::error::InputError::UnsupportedBump {
-                reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
-            }
-            .into());
-        }
-
-        // Internal DiscountCurve methods expect bump in Basis Points (BP).
-        // Convert normalized value back to BP.
-        let bp = val * 10_000.0;
-
-        match spec.bump_type {
-            BumpType::Parallel => self.with_parallel_bump(bp),
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => self.with_triangular_key_rate_bump_neighbors(
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-                bp,
-            ),
-        }
-    }
-}
-
-impl Bumpable for ForwardCurve {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        use crate::error::InputError;
-
-        match spec.bump_type {
-            BumpType::Parallel => {
-                spec.resolve_standard_values_or_error(
-                    "ForwardCurve parallel bump requires",
-                    "Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
-                )?;
-                self.bumped_with_id(spec.standard_bump_id(self.id()), &spec)
-            }
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => {
-                // For triangular key-rate bumps, only support additive rate bumps
-                if spec.mode == BumpMode::Additive && spec.units == BumpUnits::RateBp {
-                    self.with_triangular_key_rate_bump_neighbors(
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                        spec.value,
-                    )
-                } else {
-                    Err(InputError::UnsupportedBump {
-                        reason: format!(
-                            "ForwardCurve key-rate bump requires Additive/RateBp, got {:?}/{:?}",
-                            spec.mode, spec.units
-                        ),
-                    }
-                    .into())
-                }
-            }
-        }
-    }
-}
-
-impl Bumpable for HazardCurve {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_parallel("HazardCurve")?;
-        spec.resolve_standard_values_or_error(
-            "HazardCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} bumps",
-        )?;
-
-        // `bump_in_place` interprets RateBp/Percent as **par spread** shocks
-        // (converted to hazard via 1/(1 - recovery)), rejects bumps that would
-        // drive a hazard rate negative, and drops the stored par-spread quotes
-        // that were calibrated to the unbumped hazards.
-        self.bumped_with_id(spec.hazard_shift_id(self.id()), &spec)
-    }
-}
-
-impl Bumpable for InflationCurve {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_finite()?;
-
-        let factor = spec.resolve_standard_values_or_error(
-            "InflationCurve",
-            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
-        )?;
-
-        let bumped_id = spec.standard_bump_id(self.id());
-
-        let mut bumped_points = Vec::with_capacity(self.knots().len());
-        for &t in self.knots() {
-            if t <= 0.0 {
-                bumped_points.push((t, self.base_cpi()));
-                continue;
-            }
-
-            let zero_rate = self.inflation_rate(0.0, t)?;
-            let weight = match spec.bump_type {
-                BumpType::Parallel => 1.0,
-                BumpType::TriangularKeyRate {
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                } => {
-                    super::term_structures::common::validate_triangular_bucket_grid(
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    )?;
-                    super::term_structures::common::triangular_weight(
-                        t,
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    )
-                }
-            };
-            let bumped_zero_rate = if factor.1 {
-                (1.0 + zero_rate) * (1.0 + (factor.0 - 1.0) * weight) - 1.0
-            } else {
-                zero_rate + factor.0 * weight
-            };
-            let bumped_cpi = self.base_cpi() * (1.0 + bumped_zero_rate).powf(t);
-            bumped_points.push((t, bumped_cpi));
-        }
-
-        InflationCurve::builder(bumped_id)
-            .base_cpi(self.base_cpi())
-            .base_date(self.base_date())
-            .day_count(self.day_count())
-            .indexation_lag_months(self.indexation_lag_months())
-            .knots(bumped_points)
-            .interp(self.interp_style())
-            .extrapolation(self.extrapolation())
-            .build()
-    }
-}
-
-impl InflationIndex {
-    /// Apply a parallel zero-inflation-rate bump only to observations strictly
-    /// after `published_through`.
-    ///
-    /// Published CPI observations are contractual fixings and must remain
-    /// immutable under market-risk shocks. The last observation on or before
-    /// `published_through` anchors the projected CPI path; later observations
-    /// are treated as forecasts and receive the same zero-rate bump semantics as
-    /// [`InflationCurve`].
-    ///
-    /// Additive percentage/fraction bumps change the annualized zero-inflation
-    /// rate from the anchor to each projected observation. A multiplicative
-    /// factor scales `1 + zero_rate`; it is not a direct multiplier on CPI.
-    /// The returned index retains every published observation unchanged.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `spec` is non-finite, non-parallel, or uses an
-    /// unsupported unit/mode combination; no observation exists on or before
-    /// `published_through`; an anchor or projected CPI level is non-positive
-    /// or non-finite; the Act/365F year fraction fails; a shock implies an
-    /// invalid growth factor; or the rebuilt index fails validation.
-    pub fn apply_projection_bump(
-        &self,
-        published_through: Date,
-        spec: BumpSpec,
-    ) -> crate::Result<Self> {
-        spec.validate_parallel("InflationIndex")?;
-        let (shift, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
-            crate::error::InputError::UnsupportedBump {
-                reason: "InflationIndex only supports Additive/{Percent,Fraction} or \
-                         Multiplicative/Factor parallel bumps"
-                    .to_string(),
-            }
-        })?;
-
-        let observations = self.observations();
-        let Some((anchor_date, anchor_cpi)) = observations
-            .iter()
-            .rev()
-            .find(|(date, _)| *date <= published_through)
-            .copied()
-        else {
-            return Err(crate::error::InputError::NotFound {
-                id: format!(
-                    "inflation index '{}' observation on or before {}",
-                    self.id, published_through
-                ),
-            }
-            .into());
-        };
-        if !anchor_cpi.is_finite() || anchor_cpi <= 0.0 {
-            return Err(crate::error::InputError::Invalid.into());
-        }
-
-        let mut bumped = Vec::with_capacity(observations.len());
-        for (date, cpi) in observations {
-            if date <= published_through {
-                bumped.push((date, cpi));
-                continue;
-            }
-            let t =
-                DayCount::Act365F.year_fraction(anchor_date, date, DayCountContext::default())?;
-            if t <= 0.0 {
-                bumped.push((date, anchor_cpi));
-                continue;
-            }
-            if !cpi.is_finite() || cpi <= 0.0 {
-                return Err(crate::error::InputError::Invalid.into());
-            }
-            let zero_rate = (cpi / anchor_cpi).powf(1.0 / t) - 1.0;
-            let shifted_rate = if is_multiplicative {
-                (1.0 + zero_rate) * shift - 1.0
-            } else {
-                zero_rate + shift
-            };
-            if shifted_rate <= -1.0 || !shifted_rate.is_finite() {
-                return Err(crate::error::InputError::Invalid.into());
-            }
-            bumped.push((date, anchor_cpi * (1.0 + shifted_rate).powf(t)));
-        }
-
-        self.with_replaced_observations(bumped)
-    }
-}
-
-impl Bumpable for BaseCorrelationCurve {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_parallel("BaseCorrelationCurve")?;
-
-        let (add, mul) = {
-            let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
-                "BaseCorrelationCurve",
-                "only supports Additive/{Percent,Fraction} or Multiplicative/Factor",
-            )?;
-
-            if is_multiplicative {
-                (0.0, raw_val)
-            } else {
-                (raw_val, 1.0)
-            }
-        };
-
-        let bumped_id = spec.standard_bump_id(self.id());
-
-        let mut bumped_points = Vec::with_capacity(self.detachment_points().len());
-        for (&d, &c) in self
-            .detachment_points()
-            .iter()
-            .zip(self.correlations().iter())
-        {
-            bumped_points.push((d, (c * mul + add).clamp(0.0, 1.0)));
-        }
-
-        BaseCorrelationCurve::builder(bumped_id)
-            .knots(bumped_points)
-            .build()
-    }
-}
-
-impl Bumpable for MarketScalar {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "MarketScalar",
-            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
-        )?;
-
-        match self {
-            MarketScalar::Unitless(v) => {
-                let new_val = if is_multiplicative {
-                    v * raw_val
-                } else {
-                    v + raw_val
-                };
-                Ok(MarketScalar::Unitless(new_val))
-            }
-            MarketScalar::Price(m) => match (spec.mode, spec.units) {
-                (BumpMode::Additive, BumpUnits::Fraction) => {
-                    let bump = crate::money::Money::new(spec.value, m.currency())?;
-                    m.checked_add(bump).map(MarketScalar::Price)
-                }
-                (BumpMode::Additive, BumpUnits::Percent) => {
-                    Ok(MarketScalar::Price(*m * (1.0 + spec.value / 100.0)))
-                }
-                (BumpMode::Multiplicative, BumpUnits::Factor) => {
-                    Ok(MarketScalar::Price(*m * spec.value))
-                }
-                _ => Err(crate::error::InputError::UnsupportedBump {
-                    reason: format!(
-                        "MarketScalar::Price only supports Additive/{{Fraction,Percent}} or Multiplicative/Factor, got {:?}/{:?}",
-                        spec.mode, spec.units
-                    ),
-                }
-                .into()),
-            },
-        }
-    }
-}
-
-impl Bumpable for ScalarTimeSeries {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_parallel("ScalarTimeSeries")?;
-
-        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "ScalarTimeSeries",
-            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
-        )?;
-
-        let observations = self.observations();
-        let mut bumped_obs = Vec::with_capacity(observations.len());
-        for (d, v) in observations {
-            let bumped = if is_multiplicative {
-                v * raw_val
-            } else {
-                v + raw_val
-            };
-            bumped_obs.push((d, bumped));
-        }
-
-        ScalarTimeSeries::new(self.id().as_str(), bumped_obs, self.currency())
-            .map(|s| s.with_interpolation(self.interpolation()))
-    }
-}
-
-/// Unit convention for price and volatility-index curves (both are
-/// [`PriceCurve`]): the curve's native level unit (USD/bbl, index points, ...)
-/// is the additive unit, so `Additive/Fraction` is an absolute shift,
-/// `Additive/Percent` is a percentage of the current level, and
-/// `Multiplicative/{Factor,Percent}` scale every level. `RateBp` is rejected:
-/// a basis point has no meaning for a price or an index level.
-impl Bumpable for PriceCurve {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        use crate::error::InputError;
-
-        match spec.bump_type {
-            BumpType::Parallel => {
-                // Price curves support both additive and multiplicative bumps
-                match (spec.mode, spec.units) {
-                    (BumpMode::Additive, BumpUnits::Fraction) => {
-                        // Interpret fraction as absolute price units
-                        self.with_parallel_bump(spec.value)
-                    }
-                    (BumpMode::Additive, BumpUnits::Percent) => {
-                        // Interpret percent as percentage of current price
-                        let pct = spec.value / 100.0;
-                        self.with_percentage_bump(pct)
-                    }
-                    (BumpMode::Multiplicative, BumpUnits::Factor) => {
-                        // spec.value is the target factor (e.g., 1.10 for +10%)
-                        let pct = spec.value - 1.0;
-                        self.with_percentage_bump(pct)
-                    }
-                    (BumpMode::Multiplicative, BumpUnits::Percent) => {
-                        // spec.value is the percentage (e.g., 10 for +10%)
-                        let pct = spec.value / 100.0;
-                        self.with_percentage_bump(pct)
-                    }
-                    _ => Err(InputError::UnsupportedBump {
-                        reason: format!(
-                            "PriceCurve parallel bump: unsupported mode/units {:?}/{:?}. \
-                             Use Additive/{{Fraction,Percent}} or Multiplicative/{{Factor,Percent}}",
-                            spec.mode, spec.units
-                        ),
-                    }
-                    .into()),
-                }
-            }
-            BumpType::TriangularKeyRate {
-                prev_bucket,
-                target_bucket,
-                next_bucket,
-            } => {
-                let bump = match (spec.mode, spec.units) {
-                    (BumpMode::Additive, BumpUnits::Fraction) => spec.value,
-                    (BumpMode::Additive, BumpUnits::Percent) => {
-                        // Compute percentage of spot as additive bump
-                        spec.value / 100.0 * self.spot_price()
-                    }
-                    _ => {
-                        return Err(InputError::UnsupportedBump {
-                            reason: format!(
-                                "PriceCurve key-rate bump requires Additive mode, got {:?}/{:?}",
-                                spec.mode, spec.units
-                            ),
-                        }
-                        .into());
-                    }
-                };
-                self.with_triangular_key_rate_bump_neighbors(
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                    bump,
-                )
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::market_data::scalars::MarketScalar;
 
     #[test]
     fn test_resolve_standard_values() {

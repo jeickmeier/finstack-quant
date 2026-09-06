@@ -69,6 +69,7 @@
 use super::primitives::{ScalarTimeSeries, SeriesInterpolation};
 use crate::currency::Currency;
 use crate::dates::{Date, DateExt};
+use crate::market_data::bumps::BumpSpec;
 use crate::{Error, Result};
 
 use serde::{Deserialize, Serialize};
@@ -655,6 +656,105 @@ impl TryFrom<InflationIndexWire> for InflationIndex {
         Ok(index)
     }
 }
+impl InflationIndex {
+    /// Apply a parallel zero-inflation-rate bump only to observations strictly
+    /// after `published_through`.
+    ///
+    /// Published CPI observations are contractual fixings and must remain
+    /// immutable under market-risk shocks. The last observation on or before
+    /// `published_through` anchors the projected CPI path; later observations
+    /// are treated as forecasts and receive the same zero-rate bump semantics as
+    /// [`crate::market_data::term_structures::InflationCurve`].
+    ///
+    /// Additive percentage/fraction bumps change the annualized zero-inflation
+    /// rate from the anchor to each projected observation. A multiplicative
+    /// factor scales `1 + zero_rate`; it is not a direct multiplier on CPI.
+    /// The returned index retains every published observation unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `published_through` - Inclusive cutoff date. Observations on or before
+    ///   this date remain published fixings; later observations are forecasts
+    ///   and receive the zero-rate shock.
+    /// * `spec` - Parallel bump only. Additive `Percent` or `Fraction` shifts
+    ///   the annualized zero-inflation rate from the anchor; multiplicative
+    ///   `Factor` scales `1 + zero_rate` and is not a CPI-level multiplier.
+    ///   Key-rate shapes and other unit/mode pairs are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `spec` is non-finite, non-parallel, or uses an
+    /// unsupported unit/mode combination; no observation exists on or before
+    /// `published_through`; an anchor or projected CPI level is non-positive
+    /// or non-finite; the Act/365F year fraction fails; a shock implies an
+    /// invalid growth factor; or the rebuilt index fails validation.
+    pub fn apply_projection_bump(
+        &self,
+        published_through: crate::dates::Date,
+        spec: BumpSpec,
+    ) -> crate::Result<Self> {
+        spec.validate_parallel("InflationIndex")?;
+        let (shift, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
+            crate::error::InputError::UnsupportedBump {
+                reason: "InflationIndex only supports Additive/{Percent,Fraction} or \
+                         Multiplicative/Factor parallel bumps"
+                    .to_string(),
+            }
+        })?;
+
+        let observations = self.observations();
+        let Some((anchor_date, anchor_cpi)) = observations
+            .iter()
+            .rev()
+            .find(|(date, _)| *date <= published_through)
+            .copied()
+        else {
+            return Err(crate::error::InputError::NotFound {
+                id: format!(
+                    "inflation index '{}' observation on or before {}",
+                    self.id, published_through
+                ),
+            }
+            .into());
+        };
+        if !anchor_cpi.is_finite() || anchor_cpi <= 0.0 {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+
+        let mut bumped = Vec::with_capacity(observations.len());
+        for (date, cpi) in observations {
+            if date <= published_through {
+                bumped.push((date, cpi));
+                continue;
+            }
+            let t = crate::dates::DayCount::Act365F.year_fraction(
+                anchor_date,
+                date,
+                crate::dates::DayCountContext::default(),
+            )?;
+            if t <= 0.0 {
+                bumped.push((date, anchor_cpi));
+                continue;
+            }
+            if !cpi.is_finite() || cpi <= 0.0 {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            let zero_rate = (cpi / anchor_cpi).powf(1.0 / t) - 1.0;
+            let shifted_rate = if is_multiplicative {
+                (1.0 + zero_rate) * shift - 1.0
+            } else {
+                zero_rate + shift
+            };
+            if shifted_rate <= -1.0 || !shifted_rate.is_finite() {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            bumped.push((date, anchor_cpi * (1.0 + shifted_rate).powf(t)));
+        }
+
+        self.with_replaced_observations(bumped)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

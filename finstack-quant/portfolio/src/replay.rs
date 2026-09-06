@@ -795,7 +795,7 @@ mod tests {
 
         let error = compute_summary(&steps).expect_err("overflow must surface as an error");
         assert!(
-            error.to_string().contains("total P&L"),
+            error.to_string().contains("total MTM P&L"),
             "unexpected error: {error}"
         );
     }

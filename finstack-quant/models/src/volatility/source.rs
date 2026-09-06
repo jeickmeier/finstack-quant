@@ -6,13 +6,13 @@ use finstack_quant_core::{
     error::InputError,
     market_data::context::MarketContext,
     market_data::surfaces::{
-        FxDeltaVolSurface, FxDeltaVolSurfaceBuilder, VolCube, VolInterpolationMode, VolQuoteType,
-        VolSurface, VolSurfaceAxis,
+        FxDeltaVolSurface, VolCube, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
     },
     types::CurveId,
     Error, Result,
 };
 
+use super::fx::get_fx_delta_vol;
 use super::sabr::SabrParameters;
 
 /// Concrete computational view over the core volatility artifacts.
@@ -713,160 +713,4 @@ fn cube_total_variance(
         )));
     }
     Ok((total / expiry).sqrt())
-}
-
-#[inline]
-fn linear_clamped(xs: &[f64], ys: &[f64], x: f64) -> f64 {
-    if !x.is_finite() {
-        return f64::NAN;
-    }
-    if x <= xs[0] {
-        return ys[0];
-    }
-    if x >= xs[xs.len() - 1] {
-        return ys[ys.len() - 1];
-    }
-    let upper = xs.partition_point(|node| *node < x);
-    let weight = (x - xs[upper - 1]) / (xs[upper] - xs[upper - 1]);
-    ys[upper - 1] + weight * (ys[upper] - ys[upper - 1])
-}
-
-/// Convert premium-unadjusted forward delta to strike.
-///
-/// # Arguments
-///
-/// * `delta` - Absolute call delta on the open unit interval.
-/// * `forward` - Positive FX forward in domestic-currency units per foreign unit.
-/// * `vol` - Annualized Black volatility as a decimal.
-/// * `expiry` - Time to expiry in years.
-pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
-    forward * (-z * vol * expiry.sqrt() + 0.5 * vol * vol * expiry).exp()
-}
-
-/// Convert strike to premium-unadjusted forward call delta.
-///
-/// # Arguments
-///
-/// * `strike` - Positive strike in domestic-currency units per foreign unit.
-/// * `forward` - Positive FX forward in the same units as `strike`.
-/// * `vol` - Annualized Black volatility as a decimal.
-/// * `expiry` - Time to expiry in years.
-pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_core::math::norm_cdf(super::black::d1_black76(forward, strike, vol, expiry))
-}
-
-/// Evaluate an FX delta-quoted volatility artifact.
-///
-/// # Arguments
-///
-/// * `surface` - Structurally validated ATM, risk-reversal, and butterfly quotes.
-/// * `expiry` - Positive option expiry in years; wings are flat outside the axis.
-/// * `strike` - Positive strike in domestic-currency units per foreign unit.
-/// * `forward` - Positive FX forward in the same units as `strike`.
-///
-/// # Errors
-///
-/// Returns an input error for non-positive or non-finite coordinates, or for
-/// quotes that imply a non-positive wing volatility.
-pub fn get_fx_delta_vol(
-    surface: &FxDeltaVolSurface,
-    expiry: f64,
-    strike: f64,
-    forward: f64,
-) -> Result<f64> {
-    if expiry <= 0.0
-        || !expiry.is_finite()
-        || strike <= 0.0
-        || !strike.is_finite()
-        || forward <= 0.0
-        || !forward.is_finite()
-    {
-        return Err(InputError::NonPositiveValue.into());
-    }
-    let atm = linear_clamped(surface.expiries(), surface.atm_vols(), expiry);
-    let rr25 = linear_clamped(surface.expiries(), surface.rr_25d(), expiry);
-    let bf25 = linear_clamped(surface.expiries(), surface.bf_25d(), expiry);
-    let (put25, call25) = (atm + bf25 - 0.5 * rr25, atm + bf25 + 0.5 * rr25);
-    if put25 <= 0.0 || call25 <= 0.0 {
-        return Err(InputError::NegativeValue.into());
-    }
-    let atm_strike = forward * (0.5 * atm * atm * expiry).exp();
-    let put25_strike = delta_to_strike(0.75, forward, put25, expiry);
-    let call25_strike = delta_to_strike(0.25, forward, call25, expiry);
-    let mut strikes = vec![put25_strike, atm_strike, call25_strike];
-    let mut vols = vec![put25, atm, call25];
-    if let (Some(rr10), Some(bf10)) = (surface.rr_10d(), surface.bf_10d()) {
-        let rr10 = linear_clamped(surface.expiries(), rr10, expiry);
-        let bf10 = linear_clamped(surface.expiries(), bf10, expiry);
-        let put10 = atm + bf10 - 0.5 * rr10;
-        let call10 = atm + bf10 + 0.5 * rr10;
-        if put10 <= 0.0 || call10 <= 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        strikes.insert(0, delta_to_strike(0.90, forward, put10, expiry));
-        vols.insert(0, put10);
-        strikes.push(delta_to_strike(0.10, forward, call10, expiry));
-        vols.push(call10);
-    }
-    Ok(linear_clamped(&strikes, &vols, strike))
-}
-
-/// Return ATM, 25-delta put, and 25-delta call volatilities at a stored expiry.
-///
-/// # Arguments
-///
-/// * `surface` - Structurally validated FX delta-volatility quotes.
-/// * `expiry_index` - Zero-based index into the stored expiry axis.
-///
-/// # Errors
-///
-/// Returns an input error when `expiry_index` is outside the stored axis.
-pub fn get_fx_delta_pillar_vols(
-    surface: &FxDeltaVolSurface,
-    expiry_index: usize,
-) -> Result<(f64, f64, f64)> {
-    let atm = *surface
-        .atm_vols()
-        .get(expiry_index)
-        .ok_or(InputError::Invalid)?;
-    let rr = surface.rr_25d()[expiry_index];
-    let bf = surface.bf_25d()[expiry_index];
-    Ok((atm, atm + bf - 0.5 * rr, atm + bf + 0.5 * rr))
-}
-
-/// Materialize an FX delta-quoted artifact on a rectangular strike grid.
-///
-/// # Arguments
-///
-/// * `surface` - Structurally validated FX delta-volatility quotes.
-/// * `spot` - Positive FX spot in domestic-currency units per foreign unit.
-/// * `domestic_rate` - Continuously compounded domestic rate as an annual decimal.
-/// * `foreign_rate` - Continuously compounded foreign rate as an annual decimal.
-///
-/// # Errors
-///
-/// Returns an input or structural-validation error when the market inputs or
-/// recovered volatility grid are invalid.
-pub fn materialize_fx_delta_surface(
-    surface: &FxDeltaVolSurface,
-    spot: f64,
-    domestic_rate: f64,
-    foreign_rate: f64,
-) -> Result<VolSurface> {
-    let mut builder = FxDeltaVolSurfaceBuilder::new(surface.id().clone())
-        .spot(spot)
-        .domestic_rate(domestic_rate)
-        .foreign_rate(foreign_rate)
-        .expiries(surface.expiries())
-        .atm_vols(surface.atm_vols())
-        .rr_25d(surface.rr_25d())
-        .bf_25d(surface.bf_25d());
-    if let Some(rr) = surface.rr_10d() {
-        builder = builder.rr_10d(rr);
-    }
-    if let Some(bf) = surface.bf_10d() {
-        builder = builder.bf_10d(bf);
-    }
-    builder.build()
 }

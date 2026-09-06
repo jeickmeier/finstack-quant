@@ -3044,6 +3044,15 @@ class FxDeltaVolSurface:
     (``0.08`` is 8%); risk reversals are call vol minus put vol and
     butterflies are average wing vol minus ATM.
 
+    This type stores quotes only. Recover pillar vols with
+    :func:`finstack_quant.models.volatility.get_fx_delta_pillar_vols`,
+    evaluate a strike with
+    :func:`finstack_quant.models.volatility.get_fx_delta_vol`, or
+    materialize a strike-axis :class:`VolSurface` with
+    :func:`finstack_quant.models.volatility.materialize_fx_delta_surface`.
+    There is no Python quote-builder class; those helpers are the conversion
+    surface.
+
     Examples
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface

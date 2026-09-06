@@ -18,7 +18,7 @@
 //!
 //! - **Volatility surfaces** (`VolSurface`): Implied volatility by strike/maturity
 //! - **FX delta vol surfaces** (`FxDeltaVolSurface`): FX smiles quoted in ATM /
-//!   risk-reversal / butterfly form, converted to strikes for pricing
+//!   risk-reversal / butterfly form; conversion for pricing lives in models
 //!
 //! ## Scalars and Time Series
 //!
@@ -70,10 +70,6 @@
 //! - Volatility surfaces: `docs/REFERENCES.md#gatheral-volatility-surface`
 //!
 
-/// Volatility surface arbitrage detection framework.
-///
-/// Model-free checks (butterfly, calendar spread, local vol density)
-/// and SVI-specific checks (moment bounds, density, cross-slice).
 /// Bump functionality for scenario analysis and stress testing.
 pub mod bumps;
 /// Market data context with enum-based storage.
@@ -82,7 +78,6 @@ pub mod context;
 pub mod diff;
 /// Shared dividend schedules (cash/yield/stock) for equities/ETFs.
 pub mod dividends;
-/// Dynamic term structure models (Diebold-Li, PCA).
 /// Historical rate fixing lookup utilities.
 ///
 /// Provides the canonical `FIXING:{curve_id}` convention and shared helpers

@@ -243,7 +243,7 @@ fn enrich_cap_floor_report(
     moneyness: MoneynessSummary,
 ) -> CalibrationReport {
     report
-        .with_model_version(finstack_quant_core::versions::HULL_WHITE_1F)
+        .with_model_version(crate::versions::HULL_WHITE_1F)
         .with_metadata("kappa", format!("{kappa:.6}"))
         .with_metadata("sigma", format!("{sigma:.6}"))
         .with_metadata("quote_count", quote_count.to_string())

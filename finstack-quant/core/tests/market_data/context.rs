@@ -920,8 +920,8 @@ fn market_context_bumps_inflation_triangular_key_rate_branch() {
     let bumped_inf = bumped.get_inflation_curve("USD-CPI").unwrap();
     let bumped_levels = bumped_inf.cpi_levels();
 
-    // Closest knot to 1.0y should be bumped multiplicatively
-    assert!((bumped_levels[1] - orig_levels[1] * 1.0001).abs() < 1e-9);
+    // A 1bp annualized zero-rate shift at one year adds base CPI * 1bp.
+    assert!((bumped_levels[1] - (orig_levels[1] + orig.base_cpi() * 0.0001)).abs() < 1e-9);
     // Other points unchanged
     assert!((bumped_levels[0] - orig_levels[0]).abs() < 1e-12);
     assert!((bumped_levels[2] - orig_levels[2]).abs() < 1e-12);
@@ -1329,4 +1329,81 @@ fn market_context_clone_thread_safe_smoke() {
     });
 
     assert!(handle.join().expect("thread should join"));
+}
+
+#[test]
+fn inflation_bumps_match_direct_curve_and_context_entry_points() {
+    use finstack_quant_core::market_data::bumps::{BumpMode, BumpType, BumpUnits, Bumpable};
+    use finstack_quant_core::market_data::term_structures::InflationCurve;
+    let curve = InflationCurve::builder("CPI")
+        .base_date(sample_base_date())
+        .base_cpi(300.0)
+        .knots([
+            (0.0, 300.0),
+            (2.5, 306.0),
+            (5.0, 312.0),
+            (7.5, 318.0),
+            (10.0, 324.0),
+        ])
+        .build()
+        .unwrap();
+    let context = MarketContext::new().insert(curve.clone());
+    for (mode, units, value) in [
+        (BumpMode::Additive, BumpUnits::RateBp, 100.0),
+        (BumpMode::Additive, BumpUnits::Percent, -0.5),
+        (BumpMode::Additive, BumpUnits::Fraction, 0.01),
+        (BumpMode::Multiplicative, BumpUnits::Factor, 1.01),
+    ] {
+        for bump_type in [
+            BumpType::Parallel,
+            BumpType::TriangularKeyRate {
+                prev_bucket: Some(0.0),
+                target_bucket: 5.0,
+                next_bucket: Some(10.0),
+            },
+        ] {
+            let spec = BumpSpec {
+                mode,
+                units,
+                value,
+                bump_type,
+            };
+            let direct = curve.apply_bump(spec).unwrap();
+            let mut bumped = context
+                .bump([MarketBump::Curve {
+                    id: "CPI".into(),
+                    spec,
+                }])
+                .unwrap();
+            assert_eq!(
+                direct.cpi_levels(),
+                bumped.get_inflation_curve("CPI").unwrap().cpi_levels()
+            );
+            assert_eq!(
+                bumped.get_inflation_curve("CPI").unwrap().id().as_str(),
+                "CPI"
+            );
+            let token = bumped
+                .apply_curve_bump_in_place(&"CPI".into(), spec)
+                .unwrap();
+            let twice = direct.apply_bump(spec).unwrap();
+            assert_eq!(
+                twice.cpi_levels(),
+                bumped.get_inflation_curve("CPI").unwrap().cpi_levels()
+            );
+            bumped.revert_scratch_bump(token).unwrap();
+            assert_eq!(
+                direct.cpi_levels(),
+                bumped.get_inflation_curve("CPI").unwrap().cpi_levels()
+            );
+        }
+    }
+    let spec = BumpSpec::triangular_key_rate_bp(6.0, 5.0, 10.0, 100.0);
+    assert!(curve.apply_bump(spec).is_err());
+    assert!(context
+        .bump([MarketBump::Curve {
+            id: "CPI".into(),
+            spec
+        }])
+        .is_err());
 }

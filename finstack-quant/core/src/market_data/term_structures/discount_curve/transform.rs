@@ -3,7 +3,7 @@
 use super::super::common::roll_knots;
 use super::DiscountCurve;
 use crate::dates::DayCountContext;
-use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
+use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 
 impl DiscountCurve {
     /// Clone the curve under `id` and apply `spec` through [`Self::bump_in_place`],
@@ -12,7 +12,7 @@ impl DiscountCurve {
     pub(crate) fn bumped_with_id(
         &self,
         id: crate::types::CurveId,
-        spec: &crate::market_data::bumps::BumpSpec,
+        spec: &BumpSpec,
     ) -> crate::Result<Self> {
         let mut bumped = self.clone();
         bumped.id = id;
@@ -31,10 +31,7 @@ impl DiscountCurve {
     ///
     /// Clones the value array and the interpolator's consumed knot/value inputs,
     /// but avoids cloning the full curve and its calibration recipe.
-    pub(crate) fn bump_in_place(
-        &mut self,
-        spec: &crate::market_data::bumps::BumpSpec,
-    ) -> crate::Result<()> {
+    pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
         spec.validate_finite()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
@@ -285,5 +282,44 @@ impl DiscountCurve {
             .base_date(new_base)
             .knots(rolled_points)
             .build()
+    }
+}
+
+impl Bumpable for DiscountCurve {
+    /// Apply a continuously compounded zero-space shock.
+    ///
+    /// Additive `RateBp` / `Percent` / `Fraction` bumps shift zeros via
+    /// `DF_bumped(t) = DF(t) · exp(−δr · t)` (and the triangular-weighted
+    /// analogue for key-rate bumps). This does **not** re-bootstrap from
+    /// stored [`crate::market_data::term_structures::RateCalibrationRecipe`] quotes.
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "DiscountCurve",
+            "only supports Additive/{RateBp,Percent,Fraction} bumps",
+        )?;
+
+        if is_multiplicative {
+            return Err(crate::error::InputError::UnsupportedBump {
+                reason: "DiscountCurve does not support Multiplicative bumps".to_string(),
+            }
+            .into());
+        }
+
+        // Internal methods take basis points; `val` is a decimal rate.
+        let bp = val * 10_000.0;
+
+        match spec.bump_type {
+            BumpType::Parallel => self.with_parallel_bump(bp),
+            BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            } => self.with_triangular_key_rate_bump_neighbors(
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+                bp,
+            ),
+        }
     }
 }

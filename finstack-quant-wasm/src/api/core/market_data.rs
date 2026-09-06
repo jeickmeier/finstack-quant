@@ -937,8 +937,9 @@ impl JsVolCube {
 /// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
 /// 10-delta wings).
 ///
-/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011) and
-/// converts to a strike-axis volatility surface on demand via Garman-Kohlhagen.
+/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). Use
+/// `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`) for
+/// evaluation; this type does not convert quotes to strikes itself.
 /// The delta convention is **forward delta (premium-unadjusted)**.
 #[wasm_bindgen(js_name = FxDeltaVolSurface)]
 pub struct JsFxDeltaVolSurface {

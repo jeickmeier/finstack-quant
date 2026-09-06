@@ -473,8 +473,7 @@ Global solve requires strictly increasing times.",
         }
 
         // Stamp model version and calibration metadata for audit trail.
-        report.model_version =
-            Some(finstack_quant_core::versions::MULTI_CURVE_OIS_DISCOUNT.to_string());
+        report.model_version = Some(crate::versions::MULTI_CURVE_OIS_DISCOUNT.to_string());
         report
             .metadata
             .insert("calibration_type".to_string(), "discount_curve".to_string());

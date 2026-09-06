@@ -20,6 +20,7 @@ Public modules:
 - `recalibration`: cached implementations of the valuations replay port.
 - `hull_white`: explicit Hull-White parameter calibration.
 - `lmm`: explicit Bermudan LMM base-volatility calibration.
+- `versions`: methodology identifiers recorded on `CalibrationReport::model_version`.
 
 Quote-to-instrument construction lives in crate-private `build/`.
 

@@ -185,6 +185,13 @@ impl CompiledExpr {
     /// up-front planning cost is not appropriate; it builds and caches the
     /// equivalent plan lazily on the first evaluation.
     ///
+    /// # Arguments
+    ///
+    /// * `ast` - Owned expression tree to plan, deduplicating structurally
+    ///   identical subexpressions before evaluation.
+    /// * `meta` - Result metadata stored in the execution plan and copied into
+    ///   each evaluation result.
+    ///
     /// # Errors
     ///
     /// Returns an error if the expression graph cannot be converted into a

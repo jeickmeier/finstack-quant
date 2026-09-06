@@ -307,7 +307,7 @@ impl SviSurfaceTarget {
             params_by_expiry.len(),
             global_config.vol_surface.validation_tolerance,
         )
-        .with_model_version(finstack_quant_core::versions::SVI_SURFACE);
+        .with_model_version(crate::versions::SVI_SURFACE);
         report.update_solver_config(global_config.solver.clone());
 
         let strict_failures: Vec<String> = [calendar_arbitrage, slice_butterfly_arbitrage]

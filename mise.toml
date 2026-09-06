@@ -705,9 +705,21 @@ run = [
   "cargo run -p finstack-quant-portfolio --bin gen_materialization_schemas -- --write",
 ]
 
+[tasks.core-gen-data]
+description = "Generate core currency and lunar reference tables from maintained CSV data"
+run = "uv run --no-project python finstack-quant/core/build/generate_reference_data.py"
+
+[tasks.core-check-data]
+description = "Verify core generated reference tables match maintained CSV data"
+run = [
+  "uv run --no-sync pytest scripts/tests/test_generate_core_reference_data.py -q",
+  "uv run --no-project python finstack-quant/core/build/generate_reference_data.py --check",
+]
+
 [tasks.gen-write]
 description = "Regenerate checked-in schemas, fixtures, and TypeScript bindings"
 run = [
+  { task = "core-gen-data" },
   { task = "rust-gen-schemas" },
   { task = "wasm-gen-bindings" },
 ]
@@ -718,6 +730,7 @@ run = """
 set -eu
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
+mise run core-check-data
 mise run rust-check-schemas
 mise run wasm-check-bindings
 uv run --no-sync python scripts/check_generated_instrument_fixtures.py \

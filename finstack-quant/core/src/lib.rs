@@ -70,13 +70,16 @@
 //! - [`serde_guard`]: `deny_unknown_fields` enforcement for `#[serde(flatten)]` structs
 //! - [`table`]: Serializable columnar table envelope for host-language bindings
 //! - [`validation`]: Generic invariant-checking helpers
-//! - [`versions`]: Canonical model-version strings for calibration reports
 //!
 //! For most users, importing `use finstack_quant_core::prelude::*;` provides
 //! all commonly needed types.
 //!
 //! # Cargo features
-//! Serde support is always enabled in this crate; no feature flags are required.
+//!
+//! - `json-schema` (default): `schemars` derives and the `schema` generation module.
+//! - `ts_export`: `ts_rs::TS` derives on contract diagnostics types.
+//!
+//! Serde is always enabled. WASM builds this crate with `default-features = false`.
 //!
 //! # Minimum Supported Rust Version (MSRV)
 //! This crate targets **Rust 1.90**.  It is tested in CI and follows the
@@ -97,7 +100,7 @@ pub mod canonical;
 /// Foundational cashflow primitives and discounting helpers.
 pub mod cashflow;
 pub(crate) mod collections;
-/// Global configuration and environment settings.
+/// Caller-supplied configuration and rounding policy.
 pub mod config;
 /// Persisted-contract descriptors, loading limits, and diagnostics.
 pub mod contract;
@@ -137,8 +140,6 @@ pub mod table;
 pub mod types;
 /// Generic validation helpers for checking invariants.
 pub mod validation;
-/// Canonical model-version strings for calibration reports.
-pub mod versions;
 /// Canonical serde representations used by generated JSON contracts.
 pub mod wire;
 

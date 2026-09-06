@@ -156,3 +156,6 @@ pub use report::{CalibrationDiagnostics, CalibrationReport, QuoteQuality};
 // Internal/advanced re-exports (not part of typical usage)
 #[doc(hidden)]
 pub use config::CALIBRATION_CONFIG_KEY;
+
+/// Calibration methodology identifiers recorded in audit reports.
+pub mod versions;

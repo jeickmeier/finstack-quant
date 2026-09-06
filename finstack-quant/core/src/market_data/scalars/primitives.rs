@@ -13,6 +13,7 @@ use super::storage::TimeSeriesStorage;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::InputError;
+use crate::market_data::bumps::{BumpMode, BumpSpec, BumpUnits, Bumpable};
 use crate::types::CurveId;
 use crate::Result;
 #[cfg(test)]
@@ -520,6 +521,70 @@ impl TryFrom<ScalarTimeSeriesWire> for ScalarTimeSeries {
     fn try_from(state: ScalarTimeSeriesWire) -> Result<Self> {
         Self::new(state.id, state.observations, state.currency)
             .map(|s| s.with_interpolation(state.interpolation))
+    }
+}
+
+impl Bumpable for MarketScalar {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "MarketScalar",
+            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
+        )?;
+
+        match self {
+            MarketScalar::Unitless(v) => {
+                let new_val = if is_multiplicative {
+                    v * raw_val
+                } else {
+                    v + raw_val
+                };
+                Ok(MarketScalar::Unitless(new_val))
+            }
+            MarketScalar::Price(m) => match (spec.mode, spec.units) {
+                (BumpMode::Additive, BumpUnits::Fraction) => {
+                    let bump = crate::money::Money::new(spec.value, m.currency())?;
+                    m.checked_add(bump).map(MarketScalar::Price)
+                }
+                (BumpMode::Additive, BumpUnits::Percent) => {
+                    Ok(MarketScalar::Price(*m * (1.0 + spec.value / 100.0)))
+                }
+                (BumpMode::Multiplicative, BumpUnits::Factor) => {
+                    Ok(MarketScalar::Price(*m * spec.value))
+                }
+                _ => Err(crate::error::InputError::UnsupportedBump {
+                    reason: format!(
+                        "MarketScalar::Price only supports Additive/{{Fraction,Percent}} or Multiplicative/Factor, got {:?}/{:?}",
+                        spec.mode, spec.units
+                    ),
+                }
+                .into()),
+            },
+        }
+    }
+}
+
+impl Bumpable for ScalarTimeSeries {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_parallel("ScalarTimeSeries")?;
+
+        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "ScalarTimeSeries",
+            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
+        )?;
+
+        let observations = self.observations();
+        let mut bumped_obs = Vec::with_capacity(observations.len());
+        for (d, v) in observations {
+            let bumped = if is_multiplicative {
+                v * raw_val
+            } else {
+                v + raw_val
+            };
+            bumped_obs.push((d, bumped));
+        }
+
+        ScalarTimeSeries::new(self.id().as_str(), bumped_obs, self.currency())
+            .map(|s| s.with_interpolation(self.interpolation()))
     }
 }
 

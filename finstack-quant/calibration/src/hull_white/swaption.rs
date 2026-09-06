@@ -185,7 +185,7 @@ pub fn calibrate_hull_white_to_swaptions(
     // HW-specific metadata. The framework reports a generic "global_fit"
     // type; HW consumers expect "hull_white_1f" for serialization stability.
     report = report
-        .with_model_version(finstack_quant_core::versions::HULL_WHITE_1F)
+        .with_model_version(crate::versions::HULL_WHITE_1F)
         .with_metadata("type", "hull_white_1f".to_string())
         .with_metadata("kappa", format!("{:.6}", params.kappa))
         .with_metadata("sigma", format!("{:.6}", params.sigma))

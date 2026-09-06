@@ -74,6 +74,7 @@
 
 use super::common::{build_interp, roll_knots, split_points};
 use crate::dates::{Date, DayCount, DayCountContext};
+use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{error::InputError, math::interp::types::Interp, types::CurveId};
 
@@ -709,7 +710,65 @@ impl InflationCurveBuilder {
     }
 }
 
-// Serialization support
+impl Bumpable for InflationCurve {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_finite()?;
+
+        let (shift, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "InflationCurve",
+            "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
+        )?;
+
+        let bumped_id = spec.standard_bump_id(self.id());
+
+        let mut bumped_points = Vec::with_capacity(self.knots().len());
+        for &t in self.knots() {
+            if t <= 0.0 {
+                bumped_points.push((t, self.base_cpi()));
+                continue;
+            }
+
+            let zero_rate = self.inflation_rate(0.0, t)?;
+            let weight = match spec.bump_type {
+                BumpType::Parallel => 1.0,
+                BumpType::TriangularKeyRate {
+                    prev_bucket,
+                    target_bucket,
+                    next_bucket,
+                } => {
+                    crate::market_data::term_structures::common::validate_triangular_bucket_grid(
+                        prev_bucket,
+                        target_bucket,
+                        next_bucket,
+                    )?;
+                    crate::market_data::term_structures::common::triangular_weight(
+                        t,
+                        prev_bucket,
+                        target_bucket,
+                        next_bucket,
+                    )
+                }
+            };
+            let bumped_zero_rate = if is_multiplicative {
+                (1.0 + zero_rate) * (1.0 + (shift - 1.0) * weight) - 1.0
+            } else {
+                zero_rate + shift * weight
+            };
+            let bumped_cpi = self.base_cpi() * (1.0 + bumped_zero_rate).powf(t);
+            bumped_points.push((t, bumped_cpi));
+        }
+
+        InflationCurve::builder(bumped_id)
+            .base_cpi(self.base_cpi())
+            .base_date(self.base_date())
+            .day_count(self.day_count())
+            .indexation_lag_months(self.indexation_lag_months())
+            .knots(bumped_points)
+            .interp(self.interp_style())
+            .extrapolation(self.extrapolation())
+            .build()
+    }
+}
 
 #[cfg(test)]
 mod tests {

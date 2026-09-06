@@ -1,17 +1,14 @@
 //! Two-dimensional market data surfaces.
 //!
 //! Provides 2D interpolation structures for market observables that vary by
-//! two parameters (e.g., volatility by strike and maturity). Currently supports
-//! volatility surfaces with planned expansion for correlation and dividend surfaces.
+//! two parameters (for example volatility by strike and maturity).
 //!
 //! # Surface Types
 //!
 //! - `VolSurface`: Observed implied volatility by strike and maturity
 //! - `VolCube`: SABR parameter and forward nodes by expiry and tenor
-//! - `FxDeltaVolSurface`: FX smile quotes in delta space
-//! - `FxDeltaVolSurfaceBuilder`: Builder for market-standard FX ATM / risk-reversal
-//!   / butterfly inputs, materializing a strike-based `VolSurface` that samples
-//!   each expiry's own smile on the union of all pillar strikes
+//! - `FxDeltaVolSurface`: FX smile quotes in delta space; conversion and
+//!   smile materialization live in `finstack-quant-models`
 //!
 //! # When to use which surface
 //!
@@ -47,116 +44,14 @@
 //!
 //! - General volatility-surface conventions: `docs/REFERENCES.md#gatheral-volatility-surface`
 //!
-//! - FX volatility quoting:
-//!   , `docs/REFERENCES.md#clark-fx-options` `docs/REFERENCES.md#wystup-fx-options`
+//! - FX volatility quoting: `docs/REFERENCES.md#clark-fx-options`,
+//!   `docs/REFERENCES.md#wystup-fx-options`
 
-mod delta_vol_surface;
 pub mod fx_delta_vol_surface;
 mod sabr_parameter_data;
 mod vol_cube;
 mod vol_surface;
 
-/// Recover 25d/10d wing vols from ATM/RR/BF quotes, treating BF as a
-/// **smile (broker) strangle**: `sigma_wing = ATM + BF ± RR/2` exactly.
-/// No market-strangle consistency solve is performed.
-#[inline]
-pub(crate) fn recover_fx_wing_vols(atm: f64, rr: f64, bf: f64) -> (f64, f64) {
-    let sigma_call = atm + bf + 0.5 * rr;
-    let sigma_put = atm + bf - 0.5 * rr;
-    (sigma_put, sigma_call)
-}
-
-/// Garman-Kohlhagen FX forward `F = S * exp((r_d - r_f) * T)` with
-/// continuously compounded rates.
-#[inline]
-pub(crate) fn fx_forward(spot: f64, domestic_rate: f64, foreign_rate: f64, expiry: f64) -> f64 {
-    spot * ((domestic_rate - foreign_rate) * expiry).exp()
-}
-
-/// Delta-neutral-straddle ATM strike `K = F * exp(sigma^2 T / 2)` under the
-/// premium-unadjusted **forward delta** convention.
-#[inline]
-pub(crate) fn fx_atm_dns_strike(forward: f64, vol: f64, expiry: f64) -> f64 {
-    forward * (0.5 * vol * vol * expiry).exp()
-}
-
-/// Strikes for put/call at absolute delta `delta_abs` using the
-/// premium-unadjusted **forward delta** convention (`Delta_call = N(d1)`),
-/// i.e. `K = F * exp(∓ N⁻¹(Δ) σ √T + σ² T / 2)`. Spot-delta and
-/// premium-adjusted conventions are intentionally not supported here.
-#[inline]
-pub(crate) fn fx_put_call_delta_strikes(
-    forward: f64,
-    sigma_put: f64,
-    sigma_call: f64,
-    expiry: f64,
-    delta_abs: f64,
-) -> (f64, f64) {
-    let sqrt_t = expiry.sqrt();
-    let z_delta = crate::math::special_functions::standard_normal_inv_cdf(delta_abs);
-    let k_put =
-        forward * (z_delta * sigma_put * sqrt_t + 0.5 * sigma_put * sigma_put * expiry).exp();
-    let k_call =
-        forward * (-z_delta * sigma_call * sqrt_t + 0.5 * sigma_call * sigma_call * expiry).exp();
-    (k_put, k_call)
-}
-
-#[inline]
-pub(crate) fn fx_put_call_25d_strikes(
-    forward: f64,
-    sigma_put: f64,
-    sigma_call: f64,
-    expiry: f64,
-) -> (f64, f64) {
-    fx_put_call_delta_strikes(forward, sigma_put, sigma_call, expiry, 0.25)
-}
-
-/// Per-expiry FX smile pillars: the (strikes, vols) of one expiry's own
-/// 3-point (25Δ put, ATM DNS, 25Δ call) or 5-point (plus 10Δ wings) smile.
-///
-/// This is the canonical per-expiry smile representation shared by
-/// [`FxDeltaVolSurfaceBuilder`] uses this representation when materializing a
-/// rectangular data artifact. Each expiry's strikes are derived from *that
-/// expiry's* forward and vol scale; no strikes from other expiries are involved.
-///
-/// `wings_10d` carries `(rr_10d, bf_10d)` when 10-delta quotes are available.
-///
-/// # Errors
-///
-/// Returns [`InputError::NegativeValue`](crate::error::InputError) if any
-/// recovered wing vol is non-positive.
-pub(crate) fn fx_smile_pillars(
-    forward: f64,
-    expiry: f64,
-    atm: f64,
-    rr_25d: f64,
-    bf_25d: f64,
-    wings_10d: Option<(f64, f64)>,
-) -> crate::Result<(Vec<f64>, Vec<f64>)> {
-    let (sigma_put, sigma_call) = recover_fx_wing_vols(atm, rr_25d, bf_25d);
-    if sigma_call <= 0.0 || sigma_put <= 0.0 {
-        return Err(crate::error::InputError::NegativeValue.into());
-    }
-
-    let k_atm = fx_atm_dns_strike(forward, atm, expiry);
-    let (k_put, k_call) = fx_put_call_25d_strikes(forward, sigma_put, sigma_call, expiry);
-
-    if let Some((rr_10d, bf_10d)) = wings_10d {
-        let (sigma_put_10d, sigma_call_10d) = recover_fx_wing_vols(atm, rr_10d, bf_10d);
-        if sigma_call_10d <= 0.0 || sigma_put_10d <= 0.0 {
-            return Err(crate::error::InputError::NegativeValue.into());
-        }
-        let (k_put_10d, k_call_10d) =
-            fx_put_call_delta_strikes(forward, sigma_put_10d, sigma_call_10d, expiry, 0.10);
-        Ok((
-            vec![k_put_10d, k_put, k_atm, k_call, k_call_10d],
-            vec![sigma_put_10d, sigma_put, atm, sigma_call, sigma_call_10d],
-        ))
-    } else {
-        Ok((vec![k_put, k_atm, k_call], vec![sigma_put, atm, sigma_call]))
-    }
-}
-pub use delta_vol_surface::FxDeltaVolSurfaceBuilder;
 pub use fx_delta_vol_surface::FxDeltaVolSurface;
 pub use sabr_parameter_data::SabrParameterData;
 pub use vol_cube::{VolCube, VolCubeBuilder};

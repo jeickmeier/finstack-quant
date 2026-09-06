@@ -69,6 +69,7 @@
 //!   Wiley Finance. Chapters 6-8 (Tranche pricing and base correlation). `docs/REFERENCES.md#o-kane-2008`
 
 use crate::error::InputError;
+use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::math::interp::{types::Interp, ExtrapolationPolicy, InterpStyle};
 use crate::types::CurveId;
 use crate::Result;
@@ -607,5 +608,36 @@ impl BaseCorrelationCurveBuilder {
         }
 
         Ok(curve)
+    }
+}
+
+impl Bumpable for BaseCorrelationCurve {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_parallel("BaseCorrelationCurve")?;
+
+        let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
+            "BaseCorrelationCurve",
+            "only supports Additive/{Percent,Fraction} or Multiplicative/Factor",
+        )?;
+        let (add, mul) = if is_multiplicative {
+            (0.0, raw_val)
+        } else {
+            (raw_val, 1.0)
+        };
+
+        let bumped_id = spec.standard_bump_id(self.id());
+
+        let mut bumped_points = Vec::with_capacity(self.detachment_points().len());
+        for (&d, &c) in self
+            .detachment_points()
+            .iter()
+            .zip(self.correlations().iter())
+        {
+            bumped_points.push((d, (c * mul + add).clamp(0.0, 1.0)));
+        }
+
+        BaseCorrelationCurve::builder(bumped_id)
+            .knots(bumped_points)
+            .build()
     }
 }

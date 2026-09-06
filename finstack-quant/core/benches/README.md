@@ -11,10 +11,15 @@ keeps benchmark runtime an explicit decision.
 
 ## Suites
 
-Eleven targets are registered. Each is `harness = false` (Criterion owns `main`).
+Targets are registered in `Cargo.toml`. Each is `harness = false` (Criterion owns `main`).
 
 | Target | Measures |
 |--------|----------|
+| `calendar_lookup` | Calendar lookup and business-day evaluation. |
+| `brownian_bridge` | Brownian bridge path construction. |
+| `sobol` | Seeded Sobol sequence generation. |
+| `correlation_apply` | Applying correlation factors to vectors. |
+| `fx_matrix` | FX quote lookup, caching, and triangulation. |
 | `daycount_operations` | Year fractions across day-count conventions; the `ActActIsma` and `Bus252` paths that need a `DayCountContext`; batch date-period calculation. |
 | `interpolation` | Linear, log-linear, cubic Hermite, monotone convex, and piecewise-quadratic-forward interpolation; per-strategy comparison; extrapolation. |
 | `curve_operations` | `DiscountCurve` `df`/`zero`/`forward` lookups, `ForwardCurve` rates, `HazardCurve` survival, interpolation-style comparison, and curve construction. |
@@ -24,8 +29,7 @@ Eleven targets are registered. Each is `harness = false` (Criterion owns `main`)
 | `cashflow_operations` | Curve-based `npv` with `Money` flows on flat and shaped curves, scalar `npv_amounts`, `Discountable` trait dispatch, and bond/swap flow profiles. Each group runs one fixed flow count; no group sweeps size. |
 | `schedule_generation` | `ScheduleBuilder` across frequencies, stub conventions, tenors, and EOM handling; IMM and CDS-IMM generation; business-day adjustment; schedule iteration. |
 | `expr_eval` | Steady-state `CompiledExpr::eval` cost over a multi-node DAG with many rows — the pooled-arena, node-id-indexed path that statements hits once per period. |
-| `migration_matrix` | `MigrationSimulator::simulate` and `empirical_matrix` per-path cost (the `Arc<RatingScale>` sharing path), which dominates rating-migration VaR/CVA runs. |
-| `context_bump` | `MarketContext::bump` cost as a function of context size — the finite-difference greeks hot path, where each factor costs two full context copies. |
+| `context_bump` | `MarketContext::bump` cost as a function of context size — the finite-difference greeks hot path, using copy-on-write contexts for factor shocks. |
 
 `benches/support/bench_utils.rs` holds `bench_iter` and `bench_with_criterion`,
 pulled in via `#[path = "support/bench_utils.rs"] mod bench_utils;`. It is a

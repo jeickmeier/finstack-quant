@@ -87,6 +87,7 @@ use super::common::{
     bump_knots_triangular, default_curve_base_date, infer_spot_from_knots, roll_knots,
     split_points, validate_non_negative_knots, year_fraction_to,
 };
+use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
     dates::{Date, DayCount},
@@ -690,7 +691,69 @@ impl PriceCurveBuilder {
     }
 }
 
-// Trait implementations
+/// Unit convention for price and volatility-index curves (both are
+/// [`PriceCurve`]): the curve's native level unit (USD/bbl, index points, ...)
+/// is the additive unit, so `Additive/Fraction` is an absolute shift,
+/// `Additive/Percent` is a percentage of the current level, and
+/// `Multiplicative/{Factor,Percent}` scale every level. `RateBp` is rejected:
+/// a basis point has no meaning for a price or an index level.
+impl Bumpable for PriceCurve {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        match spec.bump_type {
+            BumpType::Parallel => {
+                match (spec.mode, spec.units) {
+                    (BumpMode::Additive, BumpUnits::Fraction) => {
+                        self.with_parallel_bump(spec.value)
+                    }
+                    (BumpMode::Additive, BumpUnits::Percent)
+                    | (BumpMode::Multiplicative, BumpUnits::Percent) => {
+                        let pct = spec.value / 100.0;
+                        self.with_percentage_bump(pct)
+                    }
+                    (BumpMode::Multiplicative, BumpUnits::Factor) => {
+                        let pct = spec.value - 1.0;
+                        self.with_percentage_bump(pct)
+                    }
+                    _ => Err(InputError::UnsupportedBump {
+                        reason: format!(
+                            "PriceCurve parallel bump: unsupported mode/units {:?}/{:?}. \
+                             Use Additive/{{Fraction,Percent}} or Multiplicative/{{Factor,Percent}}",
+                            spec.mode, spec.units
+                        ),
+                    }
+                    .into()),
+                }
+            }
+            BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            } => {
+                let bump = match (spec.mode, spec.units) {
+                    (BumpMode::Additive, BumpUnits::Fraction) => spec.value,
+                    (BumpMode::Additive, BumpUnits::Percent) => {
+                        spec.value / 100.0 * self.spot_price()
+                    }
+                    _ => {
+                        return Err(InputError::UnsupportedBump {
+                            reason: format!(
+                                "PriceCurve key-rate bump requires Additive mode, got {:?}/{:?}",
+                                spec.mode, spec.units
+                            ),
+                        }
+                        .into());
+                    }
+                };
+                self.with_triangular_key_rate_bump_neighbors(
+                    prev_bucket,
+                    target_bucket,
+                    next_bucket,
+                    bump,
+                )
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

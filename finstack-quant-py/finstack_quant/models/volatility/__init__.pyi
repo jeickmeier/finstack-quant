@@ -1,5 +1,11 @@
 """Product-independent volatility models, evaluators, fitting, and convention conversion.
 
+FX delta-quoted smiles are stored as
+:class:`finstack_quant.core.market_data.FxDeltaVolSurface` and evaluated with
+:func:`get_fx_delta_vol` or :func:`materialize_fx_delta_surface`. Quote
+construction from ATM / risk-reversal / butterfly rows is a Rust-only
+``FxVolSurfaceBuilder``; Python callers construct the quote artifact directly.
+
 Examples
 --------
 >>> from finstack_quant.models.volatility import SabrParameters

@@ -11,6 +11,8 @@
 //! - **Heston Model**: Stochastic volatility with mean reversion
 //! - **Local Volatility**: Dupire local vol surface construction
 //! - **Normal Model**: Bachelier pricing for negative rates
+//! - **FX delta quotes**: ATM DNS / risk-reversal / butterfly conversion and
+//!   smile evaluation (`FxVolSurfaceBuilder`, `get_fx_delta_vol`)
 //!
 //! # Volatility Models
 //!
@@ -60,12 +62,14 @@
 //! # See Also
 //!
 //! - [`SabrModel`] for SABR smile interpolation
+//! - [`FxVolSurfaceBuilder`] for FX delta-quoted smile materialization
 //! - [`crate::closed_form`] for analytical formulas
 
 pub mod arbitrage;
 pub mod black;
 mod conventions;
 mod convert;
+mod fx;
 pub mod heston;
 mod implied;
 pub mod local_vol;
@@ -87,10 +91,14 @@ pub use sabr::{
 };
 pub use sabr_derivatives::{SabrCalibrationDerivatives, SabrMarketData};
 pub use source::{
-    delta_to_strike, get_cube_normal_vol, get_cube_normal_vol_clamped, get_cube_vol,
-    get_cube_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol, get_surface_vol,
-    get_surface_vol_clamped, get_surface_vol_extrapolated, materialize_cube_expiry_slice,
-    materialize_cube_expiry_slice_normal, materialize_cube_grid, materialize_cube_tenor_slice,
-    materialize_cube_tenor_slice_normal, materialize_fx_delta_surface, measure_vol_surface_shift,
-    strike_to_delta, VolSource,
+    get_cube_normal_vol, get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped,
+    get_surface_vol, get_surface_vol_clamped, get_surface_vol_extrapolated,
+    materialize_cube_expiry_slice, materialize_cube_expiry_slice_normal, materialize_cube_grid,
+    materialize_cube_tenor_slice, materialize_cube_tenor_slice_normal, measure_vol_surface_shift,
+    VolSource,
+};
+
+pub use fx::{
+    delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol, materialize_fx_delta_surface,
+    strike_to_delta, FxVolSurfaceBuilder,
 };

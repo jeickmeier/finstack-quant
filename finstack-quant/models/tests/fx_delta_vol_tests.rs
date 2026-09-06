@@ -7,7 +7,8 @@
 //! short expiry must reproduce that expiry's own 3/5-point smile exactly —
 //! never flat-extrapolated wing vol injected by long-expiry strikes.
 
-use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, FxDeltaVolSurfaceBuilder};
+use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+use finstack_quant_models::volatility::FxVolSurfaceBuilder;
 
 const SPOT: f64 = 1.10;
 const R_F: f64 = 0.0;
@@ -59,7 +60,7 @@ fn pillar_smile_5pt(i: usize) -> ([f64; 5], [f64; 5]) {
 }
 
 fn built_surface_5pt() -> finstack_quant_core::market_data::surfaces::VolSurface {
-    FxDeltaVolSurfaceBuilder::new("EURUSD-VOL")
+    FxVolSurfaceBuilder::new("EURUSD-VOL")
         .spot(SPOT)
         .domestic_rate(r_d())
         .foreign_rate(R_F)
@@ -198,7 +199,7 @@ fn pillar_strikes_reproduce_pillar_vols_exactly() {
 #[test]
 fn pillar_strikes_reproduce_pillar_vols_three_point_smile() {
     // 3-point (25Δ-only) variant of the pillar-reproduction check.
-    let surface = FxDeltaVolSurfaceBuilder::new("EURUSD-VOL-3PT")
+    let surface = FxVolSurfaceBuilder::new("EURUSD-VOL-3PT")
         .spot(SPOT)
         .domestic_rate(r_d())
         .foreign_rate(R_F)

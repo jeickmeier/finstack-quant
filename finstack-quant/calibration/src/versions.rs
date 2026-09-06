@@ -1,35 +1,16 @@
-//! Canonical model-version strings for audit trails and calibration reports.
+//! Methodology identifiers stamped onto [`crate::CalibrationReport::model_version`].
 //!
-//! # Why centralize
-//!
-//! Each calibration target previously emitted its own hard-coded
-//! `CalibrationReport::model_version` string, so any version bump touched
-//! several unrelated files and the strings were visible only to reviewers who
-//! happened to grep for them.
-//!
-//! Centralizing them here means:
-//!
-//! * A reviewer can see the full set of active model versions at a glance
-//!   when auditing the calibration pipeline.
-//! * A version bump touches one file.
-//! * Consumers that persist the `model_version` field to audit logs see
-//!   consistent, drift-free identifiers regardless of which entry point
-//!   produced the report.
-//!
-//! # Naming convention
-//!
-//! Each constant follows the pattern:
+//! Each constant names a calibration methodology, not the crate version:
 //!
 //! ```text
-//! <ModelName> v<semver> [(implementation notes in parentheses)]
+//! <ModelName> v<semver> [(implementation notes)]
 //! ```
 //!
-//! where `<semver>` is a conceptual version tracking the calibration
-//! methodology (not the crate version), and the parenthetical notes call
-//! out non-default algorithm choices (e.g. "Jamshidian decomposition,
-//! vega-weighted, multi-start"). Bump the version whenever a change to
-//! the calibration math would plausibly move prices under otherwise
-//! identical inputs.
+//! Parenthetical notes record non-default algorithm choices such as Jamshidian
+//! decomposition or Gatheral total-variance interpolation. Change the identifier
+//! when a change to the calibration math would move prices under otherwise
+//! identical inputs. Report construction sites import these constants instead of
+//! repeating string literals.
 
 /// Hull-White 1F calibration (Jamshidian decomposition, vega-weighted
 /// residuals, Halton multi-start).
