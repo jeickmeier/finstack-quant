@@ -23,9 +23,9 @@ use crate::primitives::{CFKind, CashFlow};
 pub(super) struct BuildContext<'a> {
     pub(super) ccy: Currency,
     pub(super) issue: Date,
-    /// Date on which the final principal redemption is paid: BDC-adjust
-    /// `maturity` on the principal-paying leg, then apply that leg's payment
-    /// lag. Equals the raw `maturity` when no coupon schedule exists.
+    /// Payment date of the coupon window ending at maturity, including its
+    /// business-day adjustment and payment lag. Equals the raw `maturity`
+    /// when no coupon schedule exists.
     pub(super) redemption_date: Date,
     /// Whether to emit the maturity balloon as `CFKind::Notional`.
     pub(super) principal_exchange: PrincipalExchange,

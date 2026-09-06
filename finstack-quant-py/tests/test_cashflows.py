@@ -372,3 +372,51 @@ def test_cashflows_reject_amortization_over_notional() -> None:
 
     with pytest.raises(ValueError, match="principal repayments exceed outstanding"):
         validate_cashflow_schedule_json(json.dumps(schedule))
+
+
+@pytest.mark.parametrize(
+    ("issue", "maturity", "day_count", "as_of", "expected"),
+    [
+        ("2025-01-15", "2025-10-15", "act_act_isma", "2025-07-15", 50_000.0),
+        ("2024-08-31", "2025-02-28", "30e_360_isda", "2025-01-31", 100_000 * 150 / 360),
+    ],
+)
+def test_accrual_retains_contractual_day_count_context(
+    issue: str, maturity: str, day_count: str, as_of: str, expected: float
+) -> None:
+    spec = json.loads(_cashflow_spec())
+    spec.update(issue=issue, maturity=maturity)
+    spec["coupon_program"][0]["spec"].update(
+        rate="0.1",
+        frequency={"count": 6, "unit": "months"},
+        day_count=day_count,
+        business_day_convention="unadjusted",
+        stub="long_back",
+    )
+    raw = validate_cashflow_schedule_json(build_cashflow_schedule_json(json.dumps(spec)))
+    cfg = json.dumps({
+        "method": "linear",
+        "ex_coupon": None,
+        "include_pik": True,
+        "frequency": {"count": 6, "unit": "months"},
+    })
+    assert accrued_interest(raw, as_of, cfg) == pytest.approx(expected, abs=1e-8)
+
+
+def test_typed_accrual_reference_metadata_roundtrips() -> None:
+    from finstack_quant.cashflows.primitives import CashFlow, CashFlowAccrual, CFKind
+    from finstack_quant.core.dates import DayCount
+    from finstack_quant.core.money import Money
+
+    metadata = CashFlowAccrual(
+        "2025-01-15",
+        "2025-10-15",
+        DayCount.ACT_ACT_ISMA,
+        coupon_period=("2025-01-15", "2025-07-15"),
+        end_is_termination_date=True,
+    )
+    flow = CashFlow("2025-10-15", Money(75_000, "USD"), CFKind.STUB).with_accrual(metadata)
+    restored = CashFlow.from_json(flow.to_json()).accrual
+    assert restored is not None
+    assert restored.coupon_period == (datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
+    assert restored.end_is_termination_date is True

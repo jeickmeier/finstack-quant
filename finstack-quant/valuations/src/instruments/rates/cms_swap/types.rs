@@ -498,6 +498,8 @@ impl CmsSwap {
                     Some(coupon_rate),
                 )
                 .with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
                     calendar_id: None,
                     start: accrual_start,
                     end: payment_date,
@@ -550,6 +552,8 @@ impl CmsSwap {
                             Some(*rate),
                         )
                         .with_accrual(CashFlowAccrual {
+                            coupon_period: None,
+                            end_is_termination_date: false,
                             calendar_id: None,
                             start: accrual_start,
                             end: payment_date,
@@ -606,6 +610,8 @@ impl CmsSwap {
                             Some(fwd_rate + spread),
                         )
                         .with_accrual(CashFlowAccrual {
+                            coupon_period: None,
+                            end_is_termination_date: false,
                             calendar_id: None,
                             start: prev_date,
                             end: payment_date,

@@ -211,6 +211,8 @@ pub(in crate::builder) fn emit_fees_on(
                     Some(rate),
                 )
                 .with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: is_termination_date,
                     calendar_id: Some(pf.calendar_id.clone()),
                     start: period.accrual_start,
                     end: period.accrual_end,

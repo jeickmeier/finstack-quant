@@ -256,6 +256,17 @@ pub(crate) fn emit_fixed_coupons_on(
             .unwrap_or(&outstanding_fallback);
 
         // ACT/ACT ICMA: regular periods use the unadjusted span; stubs use the adjacent regular coupon.
+        let coupon_period = crate::builder::date_generation::icma_coupon_period(
+            period.unadjusted_start,
+            period.unadjusted_end,
+            spec.schedule.frequency,
+            if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                spec.schedule.stub
+            } else {
+                finstack_quant_core::dates::StubKind::ShortBack
+            },
+            spec.schedule.end_of_month,
+        );
         let yf = spec.schedule.day_count.year_fraction(
             accrual_start,
             accrual_end,
@@ -263,17 +274,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 calendar: Some(calendar),
                 frequency: Some(spec.schedule.frequency),
                 bus_basis: None,
-                coupon_period: crate::builder::date_generation::icma_coupon_period(
-                    period.unadjusted_start,
-                    period.unadjusted_end,
-                    spec.schedule.frequency,
-                    if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
-                        spec.schedule.stub
-                    } else {
-                        finstack_quant_core::dates::StubKind::ShortBack
-                    },
-                    spec.schedule.end_of_month,
-                ),
+                coupon_period,
                 end_is_termination_date: is_termination_date,
             },
         )?;
@@ -290,6 +291,15 @@ pub(crate) fn emit_fixed_coupons_on(
         let pik_amt = coupon_total * pik_pct_f64;
 
         let rate_f64 = decimal_to_f64(spec.rate)?;
+        let accrual = CashFlowAccrual {
+            coupon_period,
+            end_is_termination_date: is_termination_date,
+            calendar_id: Some(spec.schedule.calendar_id.clone()),
+            start: accrual_start,
+            end: accrual_end,
+            day_count: spec.schedule.day_count,
+            projected_index_rate: None,
+        };
 
         // Gate on cash split, not amount sign, so negative-rate coupons emit.
         if cash_pct_f64 > 0.0 {
@@ -303,26 +313,14 @@ pub(crate) fn emit_fixed_coupons_on(
                     yf,
                     Some(rate_f64),
                 )
-                .with_accrual(CashFlowAccrual {
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
-                    start: accrual_start,
-                    end: accrual_end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate: None,
-                }),
+                .with_accrual(accrual.clone()),
             );
         }
 
         let pik_added = add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
         if pik_added > 0.0 {
             if let Some(flow) = out_flows.last_mut() {
-                flow.accrual = Some(CashFlowAccrual {
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
-                    start: accrual_start,
-                    end: accrual_end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate: None,
-                });
+                flow.accrual = Some(accrual);
             }
         }
         pik_to_add += pik_added;
@@ -397,6 +395,17 @@ pub(crate) fn emit_float_coupons_on(
             .unwrap_or(&outstanding_fallback);
 
         // ACT/ACT ICMA uses the payment period, not the reset cadence.
+        let coupon_period = crate::builder::date_generation::icma_coupon_period(
+            period.unadjusted_start,
+            period.unadjusted_end,
+            spec.schedule.frequency,
+            if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                spec.schedule.stub
+            } else {
+                finstack_quant_core::dates::StubKind::ShortBack
+            },
+            spec.schedule.end_of_month,
+        );
         let yf = spec.schedule.day_count.year_fraction(
             accrual_start,
             accrual_end,
@@ -404,17 +413,7 @@ pub(crate) fn emit_float_coupons_on(
                 calendar: Some(calendar),
                 frequency: Some(spec.schedule.frequency),
                 bus_basis: None,
-                coupon_period: crate::builder::date_generation::icma_coupon_period(
-                    period.unadjusted_start,
-                    period.unadjusted_end,
-                    spec.schedule.frequency,
-                    if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
-                        spec.schedule.stub
-                    } else {
-                        finstack_quant_core::dates::StubKind::ShortBack
-                    },
-                    spec.schedule.end_of_month,
-                ),
+                coupon_period,
                 end_is_termination_date: is_termination_date,
             },
         )?;
@@ -593,9 +592,17 @@ pub(crate) fn emit_float_coupons_on(
             }
         };
         let total_rate = settlement.all_in_rate;
-        let projected_index_rate = Some(settlement.projected_index_rate);
         let cash_amt = settlement.cash_amount;
         let pik_amt = settlement.pik_amount;
+        let accrual = CashFlowAccrual {
+            coupon_period,
+            end_is_termination_date: is_termination_date,
+            calendar_id: Some(spec.schedule.calendar_id.clone()),
+            start: accrual_start,
+            end: accrual_end,
+            day_count: spec.schedule.day_count,
+            projected_index_rate: Some(settlement.projected_index_rate),
+        };
 
         if cash_pct_f64 > 0.0 {
             out_flows.push(
@@ -607,26 +614,14 @@ pub(crate) fn emit_float_coupons_on(
                     yf,
                     Some(total_rate),
                 )
-                .with_accrual(CashFlowAccrual {
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
-                    start: accrual_start,
-                    end: accrual_end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate,
-                }),
+                .with_accrual(accrual.clone()),
             );
         }
 
         let pik_added = add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(total_rate), yf)?;
         if pik_added > 0.0 {
             if let Some(flow) = out_flows.last_mut() {
-                flow.accrual = Some(CashFlowAccrual {
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
-                    start: accrual_start,
-                    end: accrual_end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate,
-                });
+                flow.accrual = Some(accrual);
             }
         }
         pik_to_add += pik_added;

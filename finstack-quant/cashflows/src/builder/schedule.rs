@@ -116,6 +116,11 @@ fn compare_accrual(
             .cmp(&right.start)
             .then_with(|| left.end.cmp(&right.end))
             .then_with(|| left.calendar_id.cmp(&right.calendar_id))
+            .then_with(|| left.coupon_period.cmp(&right.coupon_period))
+            .then_with(|| {
+                left.end_is_termination_date
+                    .cmp(&right.end_is_termination_date)
+            })
             .then_with(|| day_count_rank(left.day_count).cmp(&day_count_rank(right.day_count)))
             .then_with(
                 || match (left.projected_index_rate, right.projected_index_rate) {
@@ -1446,6 +1451,8 @@ mod tests {
         let left = CashFlowSchedule::from_parts(
             vec![
                 flow(d2, 4.0, CFKind::Recovery).with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
                     calendar_id: None,
                     start: d1,
                     end: d2,
@@ -1466,6 +1473,8 @@ mod tests {
         let right = CashFlowSchedule::from_parts(
             vec![
                 flow(d1, 10.0, CFKind::Amortization).with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
                     calendar_id: None,
                     start: d1,
                     end: d2,
@@ -1656,6 +1665,8 @@ mod tests {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let accrual = CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: false,
             calendar_id: None,
             start: d1,
             end: d2,

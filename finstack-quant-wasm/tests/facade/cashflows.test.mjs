@@ -233,3 +233,30 @@ test('cashflows retains earned accrual until the delayed payment', () => {
   );
   assert.equal(cashflows.accruedInterest(raw, '2025-07-03', null), 0);
 });
+
+test('cashflows accrual preserves ICMA reference periods and ISDA termination dates', () => {
+  for (const [issue, maturity, dayCount, asOf, expected] of [
+    ['2025-01-15', '2025-10-15', 'act_act_isma', '2025-07-15', 50000],
+    ['2024-08-31', '2025-02-28', '30e_360_isda', '2025-01-31', (100000 * 150) / 360],
+  ]) {
+    const spec = JSON.parse(cashflowSpec);
+    Object.assign(spec, { issue, maturity });
+    Object.assign(spec.coupon_program[0].spec, {
+      rate: '0.1',
+      frequency: { count: 6, unit: 'months' },
+      day_count: dayCount,
+      business_day_convention: 'unadjusted',
+      stub: 'long_back',
+    });
+    const raw = cashflows.validateCashflowScheduleJson(
+      cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null)
+    );
+    const cfg = JSON.stringify({
+      method: 'linear',
+      ex_coupon: null,
+      include_pik: true,
+      frequency: { count: 6, unit: 'months' },
+    });
+    assert.ok(Math.abs(cashflows.accruedInterest(raw, asOf, cfg) - expected) < 1e-8);
+  }
+});

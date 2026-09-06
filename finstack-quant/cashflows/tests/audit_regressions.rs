@@ -241,3 +241,136 @@ fn lockout_requires_a_preceding_fixing() {
         vec![6, 7, 8, 9, 9]
     );
 }
+
+#[test]
+fn terminal_window_payment_lag_redeems_final_pik() {
+    let mut v = spec("2025-01-01", "2025-07-01");
+    let mut first = v["coupon_program"][0].clone();
+    first["kind"] = json!("fixed_window");
+    first["start"] = json!("2025-01-01");
+    first["end"] = json!("2025-04-01");
+    let mut last = first.clone();
+    last["start"] = json!("2025-04-01");
+    last["end"] = json!("2025-07-01");
+    last["spec"]["coupon_type"] = json!("pik");
+    last["spec"]["payment_lag_days"] = json!(2);
+    v["coupon_program"] = json!([first, last]);
+    for floating in [false, true] {
+        let mut v = v.clone();
+        if floating {
+            let leg = &mut v["coupon_program"][1];
+            leg["kind"] = json!("floating_window");
+            let coupon = leg["spec"].as_object_mut().expect("coupon");
+            coupon.remove("rate");
+            coupon.insert(
+                "rate_spec".into(),
+                json!({
+                    "index_id":"TEST-3M", "spread_bp":"0", "gearing":"1",
+                    "reset_frequency":{"count":3,"unit":"months"},
+                    "reset_lag_days":0, "fallback":{"fixed_rate":"0.1"}
+                }),
+            );
+        }
+        let s = build(v);
+        let redemption = s
+            .get_flows()
+            .iter()
+            .find(|f| f.kind == CFKind::Notional && f.amount.amount() > 0.0)
+            .expect("redemption");
+        assert_eq!(redemption.date, date("2025-07-03"));
+        close(
+            redemption.amount.amount(),
+            1_000_000.0 * (1.0 + 0.1 * 91.0 / 360.0),
+        );
+        close(
+            s.outstanding_by_date()
+                .expect("balances")
+                .last()
+                .expect("final")
+                .1
+                .amount(),
+            0.0,
+        );
+    }
+}
+
+#[test]
+fn february_rate_and_payment_boundaries_are_not_termination() {
+    for payment_window in [false, true] {
+        let mut v = spec("2024-08-31", "2025-08-31");
+        v["coupon_program"][0]["spec"]["frequency"]["count"] = json!(6);
+        v["coupon_program"][0]["spec"]["day_count"] = json!("30e_360_isda");
+        v["coupon_program"][0]["spec"]["end_of_month"] = json!(true);
+        if payment_window {
+            v["payment_program"] =
+                json!([{"kind":"window", "start":"2024-08-31", "end":"2025-02-28", "split":"pik"}]);
+        } else {
+            v["coupon_program"][0]["kind"] = json!("step_up");
+            let coupon = v["coupon_program"][0]["spec"]
+                .as_object_mut()
+                .expect("coupon");
+            coupon.remove("rate");
+            coupon.insert("initial_rate".into(), json!("0.1"));
+            coupon.insert("step_schedule".into(), json!([["2025-02-28", "0.2"]]));
+        }
+        let s = build(v);
+        let coupon = s
+            .get_flows()
+            .iter()
+            .find(|f| f.date == date("2025-02-28"))
+            .expect("February coupon");
+        close(coupon.amount.amount(), 50_000.0);
+        assert!(
+            !coupon
+                .accrual
+                .as_ref()
+                .expect("metadata")
+                .end_is_termination_date
+        );
+    }
+}
+
+#[test]
+fn accrued_interest_preserves_icma_long_stub_reference_on_roundtrip() {
+    for (stub, issue, maturity, as_of) in [
+        ("long_back", "2025-01-15", "2025-10-15", "2025-07-15"),
+        ("long_front", "2025-01-15", "2025-10-15", "2025-04-15"),
+    ] {
+        let mut v = spec(issue, maturity);
+        v["coupon_program"][0]["spec"]["frequency"]["count"] = json!(6);
+        v["coupon_program"][0]["spec"]["day_count"] = json!("act_act_isma");
+        v["coupon_program"][0]["spec"]["stub"] = json!(stub);
+        let raw = serde_json::to_string(&build(v)).expect("serialize");
+        let cfg = json!({"method":"linear", "ex_coupon":null, "include_pik":true, "frequency":{"count":6,"unit":"months"}}).to_string();
+        let expected = if stub == "long_back" {
+            50_000.0
+        } else {
+            100_000.0 * 90.0 / 182.0 / 2.0
+        };
+        close(
+            cf::accrued_interest(&raw, as_of, Some(&cfg)).expect("accrued"),
+            expected,
+        );
+    }
+}
+
+#[test]
+fn accrued_interest_preserves_february_termination_on_roundtrip() {
+    let mut v = spec("2024-08-31", "2025-02-28");
+    v["coupon_program"][0]["spec"]["frequency"]["count"] = json!(6);
+    v["coupon_program"][0]["spec"]["day_count"] = json!("30e_360_isda");
+    v["coupon_program"][0]["spec"]["payment_lag_days"] = json!(2);
+    let raw = serde_json::to_string(&build(v)).expect("serialize");
+    close(
+        cf::accrued_interest(&raw, "2025-01-31", None).expect("accrued"),
+        100_000.0 * 150.0 / 360.0,
+    );
+    close(
+        cf::accrued_interest(&raw, "2025-02-28", None).expect("unpaid coupon"),
+        100_000.0 * 178.0 / 360.0,
+    );
+    close(
+        cf::accrued_interest(&raw, "2025-03-04", None).expect("paid coupon"),
+        0.0,
+    );
+}

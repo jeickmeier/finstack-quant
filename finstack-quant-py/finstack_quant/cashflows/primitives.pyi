@@ -185,6 +185,8 @@ class CashFlowAccrual:
         day_count: DayCount,
         projected_index_rate: float | None = None,
         calendar_id: str | None = None,
+        coupon_period: tuple[datetime.date | str, datetime.date | str] | None = None,
+        end_is_termination_date: bool = False,
     ) -> None:
         """Create coupon accrual metadata.
 
@@ -201,6 +203,12 @@ class CashFlowAccrual:
         calendar_id : str, optional
             Registered calendar identifier, including '+' joint identifiers.
             Required for BUS/252 accrued interest; otherwise optional.
+        coupon_period : tuple[datetime.date or str, datetime.date or str], optional
+            Regular ACT/ACT ICMA reference period for stub accrual. None leaves
+            reference-period selection to the schedule accrual caller.
+        end_is_termination_date : bool, optional
+            Whether end is instrument maturity, for the 30E/360 ISDA February
+            exception. False for intermediate coupon periods by default.
 
         Raises
         ------
@@ -262,6 +270,28 @@ class CashFlowAccrual:
         -------
         str or None
             Registered identifier, or None if unspecified. Access does not raise; no lookup is performed.
+        """
+        ...
+
+    @property
+    def coupon_period(self) -> tuple[datetime.date, datetime.date] | None:
+        """Return regular reference dates for ACT/ACT ICMA accrual.
+
+        Returns
+        -------
+        tuple[datetime.date, datetime.date] or None
+            Regular coupon anchors, or None when unspecified. Access does not raise domain errors.
+        """
+        ...
+
+    @property
+    def end_is_termination_date(self) -> bool:
+        """Return whether accrual ends at instrument termination.
+
+        Returns
+        -------
+        bool
+            True applies the 30E/360 ISDA February maturity exception. Access does not raise domain errors.
         """
         ...
 

@@ -431,6 +431,8 @@ fn json_round_trips_without_optional_accrual_field() {
 #[test]
 fn accrual_metadata_round_trips() {
     let accrual = CashFlowAccrual {
+        coupon_period: Some((d(2025, 3, 15), d(2025, 9, 15))),
+        end_is_termination_date: true,
         calendar_id: None,
         start: d(2025, 3, 15),
         end: d(2025, 6, 15),

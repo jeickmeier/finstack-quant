@@ -7,7 +7,7 @@
 use super::schedule::{finalize_flows, CashFlowSchedule};
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use crate::primitives::{CFKind, CashFlow};
-use finstack_quant_core::dates::{Date, DateExt};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -290,38 +290,25 @@ fn initialize_build_state(
     })
 }
 
-/// Redemption (and LinearTo maturity) date: BDC-adjust `maturity` on the
-/// principal-paying leg, then apply that leg's payment lag.
-///
-/// Principal-paying leg = first fixed schedule, else first floating. With no
-/// coupon leg there is no resolved calendar, so the raw maturity is kept.
+/// Redemption follows the payment date of the coupon ending at maturity.
+/// With no coupon leg, principal is paid on the raw maturity date.
 fn compute_redemption_date(
     maturity: Date,
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
-) -> finstack_quant_core::Result<Date> {
-    let (business_day_convention, calendar, payment_lag_days) =
-        if let Some(schedule) = fixed_schedules.first() {
-            (
-                schedule.spec.schedule.business_day_convention,
-                schedule.calendar,
-                schedule.spec.schedule.payment_lag_days,
-            )
-        } else if let Some(schedule) = float_schedules.first() {
-            (
-                schedule.spec.schedule.business_day_convention,
-                schedule.calendar,
-                schedule.spec.schedule.payment_lag_days,
-            )
-        } else {
-            return Ok(maturity);
-        };
-    let adjusted = finstack_quant_core::dates::adjust(maturity, business_day_convention, calendar)?;
-    if payment_lag_days > 0 {
-        adjusted.add_business_days(payment_lag_days, calendar)
-    } else {
-        Ok(adjusted)
-    }
+) -> Date {
+    let fixed_periods = fixed_schedules
+        .iter()
+        .flat_map(|schedule| schedule.prev.values());
+    let float_periods = float_schedules
+        .iter()
+        .flat_map(|schedule| schedule.prev.values());
+    fixed_periods
+        .chain(float_periods)
+        .filter(|period| period.unadjusted_end == maturity)
+        .map(|period| period.payment_date)
+        .max()
+        .unwrap_or(maturity)
 }
 
 fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::Result<Vec<Date>> {
@@ -471,12 +458,12 @@ impl CashFlowBuilder {
     ///   change interest only from the next period (see
     ///   [`PrincipalEvent`]'s interest-base convention).
     /// - **Redemption conventions:** business-day adjustment and payment lag
-    ///   follow the first fixed coupon leg, else the first floating leg.
+    ///   follow the coupon window ending at maturity.
     /// - **Amortization cadence:** `LinearTo` / `PercentOfOriginalPerPeriod`
     ///   use all contractual coupon windows, including rate steps and fixed/float switches.
     /// - **Reporting day count:** the schedule's representative day count is
-    ///   taken from the same first coupon leg; schedules with no coupon leg
-    ///   default to Act/365F.
+    ///   taken from the first fixed coupon leg, else the first floating leg;
+    ///   schedules with no coupon leg default to Act/365F.
     ///
     /// # Errors
     ///
@@ -538,8 +525,7 @@ impl CashFlowBuilder {
             .into());
         }
 
-        let redemption_date =
-            compute_redemption_date(maturity, &fixed_schedules, &float_schedules)?;
+        let redemption_date = compute_redemption_date(maturity, &fixed_schedules, &float_schedules);
         let date_inputs = DateCollectionInputs {
             issue,
             maturity,

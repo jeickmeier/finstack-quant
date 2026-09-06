@@ -316,6 +316,8 @@ struct CouponBucket {
     /// conventions, so the schedule representative convention is used.
     accrual_day_count: Option<DayCount>,
     calendar_id: Option<String>,
+    coupon_period: Option<(Date, Date)>,
+    end_is_termination_date: bool,
     cash_amount: f64,
     pik_amount: f64,
     /// Accrual year fraction as reported by the builder.
@@ -342,6 +344,8 @@ struct CouponPeriod {
 struct PeriodInputs {
     payment_date: Date,
     calendar_id: Option<String>,
+    coupon_period: Option<(Date, Date)>,
+    end_is_termination_date: bool,
     start: Date,
     end: Date,
     day_count: DayCount,
@@ -399,12 +403,13 @@ fn build_coupon_periods(
 
     for &i in &coupon_idx {
         let cf = &schedule.flows[i];
-        let true_period = cf
-            .accrual
-            .as_ref()
-            .map(|accrual| (accrual.start, accrual.end));
-        let calendar_id = cf.accrual.as_ref().and_then(|a| a.calendar_id.clone());
-        let flow_day_count = cf.accrual.as_ref().map(|accrual| accrual.day_count);
+        let accrual = cf.accrual.as_ref();
+        let true_period = accrual.map(|accrual| (accrual.start, accrual.end));
+        let calendar_id = accrual.and_then(|accrual| accrual.calendar_id.clone());
+        let coupon_period = accrual.and_then(|accrual| accrual.coupon_period);
+        let end_is_termination_date =
+            accrual.is_some_and(|accrual| accrual.end_is_termination_date);
+        let flow_day_count = accrual.map(|accrual| accrual.day_count);
 
         let cf_af = if cf.accrual_factor > 0.0 {
             if !cf.accrual_factor.is_finite() {
@@ -433,6 +438,8 @@ fn build_coupon_periods(
                     && bucket.accrual_end == true_period.map(|(_, end)| end)
                     && bucket.accrual_day_count == flow_day_count
                     && bucket.calendar_id == calendar_id
+                    && bucket.coupon_period == coupon_period
+                    && bucket.end_is_termination_date == end_is_termination_date
             });
         if let Some(bucket) = matching_bucket {
             if cf.kind == CFKind::Pik {
@@ -455,6 +462,8 @@ fn build_coupon_periods(
             accrual_end: true_period.map(|(_, end)| end),
             accrual_day_count: flow_day_count,
             calendar_id,
+            coupon_period,
+            end_is_termination_date,
             cash_amount: if cf.kind == CFKind::Pik {
                 0.0
             } else {
@@ -532,6 +541,7 @@ fn build_period_inputs(
             continue;
         }
 
+        let coupon_period = p.bucket.coupon_period.or(Some((p.start, p.end)));
         let total_yf = match p.bucket.accrual_factor {
             Some(af) if af.is_finite() && af > 0.0 => af,
             Some(af) => {
@@ -549,8 +559,8 @@ fn build_period_inputs(
                         .map(finstack_quant_core::dates::calendar_by_id_strict)
                         .transpose()?,
                     frequency,
-                    // ACT/ACT ICMA stubs use the actual coupon period as the reference.
-                    coupon_period: Some((p.start, p.end)),
+                    coupon_period,
+                    end_is_termination_date: p.bucket.end_is_termination_date,
                     ..Default::default()
                 };
                 p.day_count.year_fraction(p.start, p.end, ctx)?
@@ -564,6 +574,8 @@ fn build_period_inputs(
         result.push(PeriodInputs {
             payment_date: p.bucket.date,
             calendar_id: p.bucket.calendar_id.clone(),
+            coupon_period,
+            end_is_termination_date: p.bucket.end_is_termination_date,
             start: p.start,
             end: p.end,
             day_count: p.day_count,
@@ -608,12 +620,17 @@ fn find_active_periods_and_elapsed<'a>(
                     .map(finstack_quant_core::dates::calendar_by_id_strict)
                     .transpose()?,
                 frequency: cfg.frequency,
-                coupon_period: Some((inputs.start, inputs.end)),
+                coupon_period: inputs.coupon_period,
+                end_is_termination_date: inputs.end_is_termination_date,
                 ..Default::default()
+            };
+            let elapsed_context = DayCountContext {
+                end_is_termination_date: inputs.end_is_termination_date && as_of >= inputs.end,
+                ..day_count_context
             };
             let dc_elapsed = inputs
                 .day_count
-                .year_fraction(inputs.start, as_of.min(inputs.end), day_count_context)?
+                .year_fraction(inputs.start, as_of.min(inputs.end), elapsed_context)?
                 .max(0.0);
 
             let dc_total =
@@ -837,6 +854,8 @@ mod tests {
                 Some(0.06),
             )
             .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
                 calendar_id: None,
                 start: issue,
                 end,
@@ -852,6 +871,8 @@ mod tests {
                 Some(0.048666666666666664),
             )
             .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
                 calendar_id: None,
                 start: second_start,
                 end,
@@ -984,6 +1005,8 @@ mod tests {
     fn lagged_period_inputs() -> PeriodInputs {
         PeriodInputs {
             calendar_id: None,
+            coupon_period: None,
+            end_is_termination_date: false,
             payment_date: make_date(2025, 7, 5),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 5),
@@ -1031,6 +1054,8 @@ mod tests {
     fn elapsed_rescaled_even_when_raw_day_count_is_below_builder_accrual_factor() {
         let inputs = PeriodInputs {
             calendar_id: None,
+            coupon_period: None,
+            end_is_termination_date: false,
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 1),
@@ -1083,6 +1108,8 @@ mod tests {
     fn compounded_inputs() -> PeriodInputs {
         PeriodInputs {
             calendar_id: None,
+            coupon_period: None,
+            end_is_termination_date: false,
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 1),
@@ -1166,6 +1193,8 @@ mod tests {
             day_count: DayCount::Thirty360,
             bucket: CouponBucket {
                 calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: false,
                 date: make_date(2025, 7, 1),
                 accrual_start: None,
                 accrual_end: None,
@@ -1199,6 +1228,8 @@ mod tests {
     fn ex_coupon_window_spanning_full_period_is_rejected() {
         let inputs = PeriodInputs {
             calendar_id: None,
+            coupon_period: None,
+            end_is_termination_date: false,
             payment_date: make_date(2025, 2, 1),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 2, 1),

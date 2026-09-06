@@ -561,6 +561,23 @@
             "null"
           ]
         },
+        "coupon_period": {
+          "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day-count convention used for the accrual factor."
@@ -568,6 +585,11 @@
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Contractual accrual-period end date."
+        },
+        "end_is_termination_date": {
+          "default": false,
+          "description": "Whether `end` is the instrument termination date, for the 30E/360 ISDA\nFebruary exception. Intermediate coupon and rate-step ends are false.",
+          "type": "boolean"
         },
         "projected_index_rate": {
           "description": "Projected index rate before spread, gearing, caps, or floors.",

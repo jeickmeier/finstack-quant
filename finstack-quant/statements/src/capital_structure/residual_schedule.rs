@@ -112,6 +112,8 @@ pub(crate) fn rebuild_residual_interest(
                         .max()
                         .or(schedule.get_meta().issue_date)?;
                     Some(CashFlowAccrual {
+                        coupon_period: None,
+                        end_is_termination_date: false,
                         start,
                         end: original.date,
                         day_count: schedule.get_day_count(),
@@ -175,6 +177,8 @@ pub(crate) fn rebuild_residual_interest(
                 flow.rate = Some(original.rate.unwrap_or(rate));
                 flow.accrual_factor = factor;
                 flow.accrual = Some(CashFlowAccrual {
+                    end_is_termination_date: accrual.end_is_termination_date
+                        && bounds[1] == accrual.end,
                     start: bounds[0],
                     end: bounds[1],
                     ..accrual.clone()

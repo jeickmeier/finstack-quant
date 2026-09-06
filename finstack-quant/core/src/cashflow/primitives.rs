@@ -350,6 +350,22 @@ pub struct CashFlowAccrual {
     /// Required for BUS/252; otherwise optional. Joint calendars use `+`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_id: Option<String>,
+    /// Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
+    /// `None` leaves reference-period selection to the schedule accrual caller.
+    #[serde(
+        default,
+        with = "crate::wire::optional_date_pair",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
+    )]
+    pub coupon_period: Option<(Date, Date)>,
+    /// Whether `end` is the instrument termination date, for the 30E/360 ISDA
+    /// February exception. Intermediate coupon and rate-step ends are false.
+    #[serde(default)]
+    pub end_is_termination_date: bool,
 }
 
 /// A single dated cash-flow (payment or reset).
@@ -537,6 +553,14 @@ impl CashFlow {
             }
         }
         if let Some(accrual) = &self.accrual {
+            if accrual
+                .coupon_period
+                .is_some_and(|(start, end)| start >= end)
+            {
+                return Err(crate::Error::Validation(
+                    "CashFlow: reference coupon period start must be before end".into(),
+                ));
+            }
             if accrual.start >= accrual.end {
                 return Err(crate::Error::Validation(
                     "CashFlow: accrual start must be before accrual end".into(),

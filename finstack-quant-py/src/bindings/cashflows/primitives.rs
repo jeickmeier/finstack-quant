@@ -189,22 +189,35 @@ impl PyCashFlowAccrual {
     ///     Decimal index rate before spread, gearing and constraints.
     /// calendar_id : str, optional
     ///     Registered calendar identifier; required for BUS/252 accrual.
+    /// coupon_period : tuple[datetime.date or str, datetime.date or str], optional
+    ///     Regular reference period for ACT/ACT ICMA stub accrual; None leaves
+    ///     reference-period selection to the schedule accrual caller.
+    /// end_is_termination_date : bool, optional
+    ///     True only when end is the instrument termination date, for the
+    ///     30E/360 ISDA February exception. Defaults to False.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If either date cannot be parsed.
     #[new]
-    #[pyo3(signature = (start, end, day_count, projected_index_rate=None, calendar_id=None))]
+    #[pyo3(signature = (start, end, day_count, projected_index_rate=None, calendar_id=None, coupon_period=None, end_is_termination_date=false))]
     fn new(
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
         day_count: PyRef<'_, PyDayCount>,
         projected_index_rate: Option<f64>,
         calendar_id: Option<String>,
+        coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        end_is_termination_date: bool,
     ) -> PyResult<Self> {
+        let coupon_period = coupon_period
+            .map(|(start, end)| Ok::<_, PyErr>((py_to_date(&start)?, py_to_date(&end)?)))
+            .transpose()?;
         Ok(Self {
             inner: CashFlowAccrual {
+                coupon_period,
+                end_is_termination_date,
                 start: py_to_date(start)?,
                 end: py_to_date(end)?,
                 day_count: day_count.inner,
@@ -236,6 +249,24 @@ impl PyCashFlowAccrual {
     #[getter]
     fn projected_index_rate(&self) -> Option<f64> {
         self.inner.projected_index_rate
+    }
+
+    /// Regular ACT/ACT ICMA reference dates, or None when unspecified.
+    #[getter]
+    fn coupon_period<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+        self.inner
+            .coupon_period
+            .map(|(start, end)| Ok((date_to_py(py, start)?, date_to_py(py, end)?)))
+            .transpose()
+    }
+
+    /// Whether accrual end is the instrument termination date.
+    #[getter]
+    fn end_is_termination_date(&self) -> bool {
+        self.inner.end_is_termination_date
     }
 
     /// Registered accrual calendar identifier, or None when unused.

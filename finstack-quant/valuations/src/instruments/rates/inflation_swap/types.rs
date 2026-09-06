@@ -591,6 +591,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             Some(fixed_rate),
         )
         .with_accrual(CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: false,
             calendar_id: None,
             start: self.start_date,
             end: self.maturity,
@@ -606,6 +608,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             inflation_rate,
         )
         .with_accrual(CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: false,
             calendar_id: None,
             start: self.start_date,
             end: self.maturity,
@@ -988,6 +992,8 @@ impl YoYInflationSwap {
                 Some(fixed_rate),
             )
             .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
                 calendar_id: None,
                 start,
                 end,
@@ -1003,6 +1009,8 @@ impl YoYInflationSwap {
                 Some(inflation_rate),
             )
             .with_accrual(CashFlowAccrual {
+                coupon_period: None,
+                end_is_termination_date: false,
                 calendar_id: None,
                 start,
                 end,

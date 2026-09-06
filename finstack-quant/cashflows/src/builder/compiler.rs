@@ -137,9 +137,12 @@ fn build_periods_with_meta(
     index_period_schedule(periods, params.frequency)
 }
 
-/// Latest accrual end in a compiled period map.
-fn terminal_accrual_end(prev: &PeriodMap) -> Option<Date> {
-    prev.values().map(|period| period.accrual_end).max()
+/// Adjusted accrual end of the instrument maturity period, if present.
+/// Rate-group and coupon-window boundaries are not termination dates.
+fn terminal_accrual_end(prev: &PeriodMap, maturity: Date) -> Option<Date> {
+    prev.values()
+        .find(|period| period.unadjusted_end == maturity)
+        .map(|period| period.accrual_end)
 }
 
 /// Compiled fixed-coupon schedule produced by [`compute_coupon_schedules`].
@@ -239,7 +242,7 @@ pub(super) fn build_fee_schedules(
                     )));
                 }
                 let calendar = resolve_calendar_strict(calendar_id)?;
-                let terminal = terminal_accrual_end(&prev);
+                let terminal = terminal_accrual_end(&prev, maturity);
                 periodic_fees.push(PeriodicFee {
                     calendar_id: calendar_id.clone(),
                     base: base.clone(),
@@ -356,6 +359,7 @@ pub(super) fn collect_dates(
 }
 
 struct StepUpCompileInput<'a> {
+    maturity: Date,
     split: CouponType,
     initial_rate: Decimal,
     step_schedule: &'a [(Date, Decimal)],
@@ -406,7 +410,7 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         }
 
         fn into_fixed_schedule(self, input: &StepUpCompileInput<'_>) -> FixedSchedule {
-            let terminal = terminal_accrual_end(&self.prev);
+            let terminal = terminal_accrual_end(&self.prev, input.maturity);
             FixedSchedule {
                 spec: FixedCouponSpec {
                     coupon_type: input.split,
@@ -628,7 +632,7 @@ pub(super) fn compute_coupon_schedules(
                     rate: *rate,
                     schedule: chosen_coupon.schedule.clone(),
                 };
-                let terminal = terminal_accrual_end(&prev);
+                let terminal = terminal_accrual_end(&prev, maturity);
                 fixed_schedules.push(FixedSchedule {
                     spec,
                     calendar,
@@ -648,6 +652,7 @@ pub(super) fn compute_coupon_schedules(
                     ));
                 }
                 fixed_schedules.extend(compile_step_up_schedules(StepUpCompileInput {
+                    maturity,
                     split,
                     initial_rate: *initial_rate,
                     step_schedule,
@@ -672,7 +677,7 @@ pub(super) fn compute_coupon_schedules(
                     .as_deref()
                     .unwrap_or(&spec.schedule.calendar_id);
                 let fixing_calendar = resolve_calendar_strict(fixing_calendar_id)?;
-                let terminal = terminal_accrual_end(&prev);
+                let terminal = terminal_accrual_end(&prev, maturity);
                 float_schedules.push(FloatSchedule {
                     spec,
                     calendar,
