@@ -34,6 +34,9 @@ rebuild; keep that flag when adding static checkers to a task.
 
 The unit tests for these scripts live in [`tests/`](tests/) and run under
 pytest; several `mise` tasks run them immediately before the script itself.
+`tests/test_generate_core_reference_data.py` covers the generator at
+`finstack-quant/core/build/generate_reference_data.py` and is driven by
+`mise run core-check-data`.
 
 ## Documentation contract checkers
 
@@ -125,7 +128,6 @@ without a QuantLib install.
 | Script | Purpose | Driven by |
 | --- | --- | --- |
 | `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `mise run rust-publish-checks`, CI `Rust Publish Checks` |
-| `semver_checks.py` | Normalizes a baseline checkout of tag `v0.6.0` (override with `--baseline-rev`) and delegates to `cargo-semver-checks`. Normalization exists because top-level directories were renamed since the baseline. | `mise run rust-semver-checks` |
 | `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/release.yml` |
 
 ## Code health and hygiene
@@ -133,7 +135,6 @@ without a QuantLib install.
 | Script | Purpose | Driven by |
 | --- | --- | --- |
 | `check_loc.py` | Lists source files above a line limit (default 1000; positional override). Rust files are counted after stripping `#[test]` functions and `#[cfg(test)]` modules. `--ci` exits 1 on violations. | `mise run check-loc` |
-| `check_tiny_loc.py` | The advisory inverse: files at or below a threshold (default 25), grouped by directory, as candidates to fold into a neighbor. Always exits 0. | `mise run check-tiny-loc` |
 | `audit_hardcoded_assumptions.py` | Flags source lines carrying market-convention, rating-agency, regulatory, accounting, or product assumptions that belong in a data registry. Reviewed matches live in `hardcoded_assumptions_allowlist.json`. `--format {text,markdown,json}`, `--include-allowed`, `--fail-on-candidates`. | `mise run assumptions-audit` |
 | `clean_workspace.py` | Removes build artifacts, virtualenvs, and caches. `--incremental` drops only Cargo incremental caches; `--wasm` drops only wasm-pack output and wasm32 target artifacts. | `mise run all-clean`, `rust-clean-incremental`, `wasm-clean` |
 
@@ -151,5 +152,11 @@ uv run pytest scripts/golden/quantlib/test_generate.py -q   # needs QuantLib
 ```
 
 Tasks that bundle the relevant tests with their checker:
-`mise run check-loc`, `mise run check-tiny-loc`, `mise run rust-serde-audit`,
-`mise run python-doc`.
+`mise run check-loc`, `mise run rust-serde-audit`, `mise run rust-check-schemas`,
+`mise run gen-check`, `mise run wasm-check-bindings`, `mise run python-doc`,
+`mise run core-check-data`, `mise run rust-bench-compare`,
+`mise run materialization-rust-bench-compare`,
+`mise run python-bench-portfolio-baseline`,
+`mise run python-bench-portfolio-compare`,
+`mise run materialization-benchmark-doc-check`,
+`mise run materialization-benchmark-record`.

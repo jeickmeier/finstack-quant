@@ -46,10 +46,9 @@ Two details worth knowing before editing:
   (`pierotofy/set-swap-space`); the workspace has OOM'd linking without it. The
   light jobs (`prime-cache`, Supply-chain Security, Rust Publish Checks) do not.
 - The semver job compares against `origin/master`, not against the released
-  tag. The tag-baseline path is the local
-  [`mise run rust-semver-checks`](../scripts/README.md) task, which normalizes a
-  `v0.6.0` checkout for the directory renames since that release. The two are
-  not interchangeable.
+  tag. For a tag baseline locally, use the same command with
+  `--baseline-rev <tag>` (current tags already use the `finstack-quant-*`
+  crate layout, so no checkout rewrite is required).
 
 ### docs.yml
 

@@ -348,10 +348,6 @@ run = [
 description = "Audit Rust dependencies via cargo-deny"
 run = "cargo deny check"
 
-[tasks.rust-semver-checks]
-description = "Compare the umbrella Rust crate against the v0.6.0 baseline"
-run = "python3 scripts/semver_checks.py"
-
 [tasks.rust-publish-checks]
 description = "Validate Rust crate publish order and first-crate dry-run"
 run = "uv run --no-sync python scripts/cargo_publish_checks.py"
@@ -414,6 +410,7 @@ npm --prefix finstack-quant-wasm run bench -- --materialization-only
 [tasks.python-bench-portfolio-baseline]
 description = "Explicitly establish immutable Python baseline; set FQ_REPLACE_MATERIALIZATION_BASELINE=1 to replace"
 run = """
+uv run --no-sync pytest scripts/tests/test_check_python_materialization_regressions.py -q
 replace_flag=$(uv run python scripts/materialization_baseline_replace_flag.py)
 uv run python scripts/check_python_materialization_regressions.py guard \
   --baseline benchmarks/materialization/materialization-python-baseline.json \
@@ -444,6 +441,7 @@ uv run python scripts/check_python_materialization_regressions.py seal \
 [tasks.python-bench-portfolio-compare]
 description = "Strictly compare fresh release-Python materialization measurements"
 run = """
+uv run --no-sync pytest scripts/tests/test_check_python_materialization_regressions.py -q
 current_output=${FQ_MATERIALIZATION_PYTHON_CURRENT_OUTPUT:-target/materialization-python/current.json}
 result_output=${FQ_MATERIALIZATION_PYTHON_COMPARISON_OUTPUT:-target/materialization-python/comparison.json}
 mise run materialization-benchmark-fixtures
@@ -636,7 +634,10 @@ run = [
 
 [tasks.wasm-check-bindings]
 description = "Verify Rust-exported TypeScript types without mutating the workspace"
-run = "uv run --no-sync python scripts/check_generated_ts.py"
+run = [
+  "uv run --no-sync pytest scripts/tests/test_check_generated_ts.py -q",
+  "uv run --no-sync python scripts/check_generated_ts.py",
+]
 
 # ─────────────────────────────────────────────────────────────────
 # Packaging (wheels)
@@ -665,6 +666,7 @@ run = [
 description = "Verify JSON schemas match Rust types"
 run = [
   "mise run rust-serde-audit",
+  "uv run --no-sync pytest scripts/tests/test_check_schema_residue.py -q",
   "uv run --no-sync python scripts/check_schema_residue.py",
   "cargo run -p finstack-quant-core --bin gen_core_schemas -- --check",
   "cargo run -p finstack-quant-attribution --bin gen_attribution_schemas -- --check",
@@ -728,6 +730,7 @@ run = [
 description = "Verify schemas and bindings; fail if generated artifacts drift"
 run = """
 set -eu
+uv run --no-sync pytest scripts/tests/test_generation_digest.py -q
 uv run --no-sync python scripts/generation_digest.py --check-manifest
 before_digest=$(uv run --no-sync python scripts/generation_digest.py)
 mise run core-check-data
@@ -779,13 +782,6 @@ run = [
   "uv run python scripts/check_loc.py",
 ]
 
-[tasks.check-tiny-loc]
-description = "List tiny source files at or below the LOC threshold (default 25), grouped by directory"
-run = [
-  "uv run pytest scripts/tests/test_check_tiny_loc.py -q",
-  "uv run python scripts/check_tiny_loc.py",
-]
-
 [tasks.rust-flamegraph]
 description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
 run = "cargo flamegraph --profile bench"
@@ -817,6 +813,7 @@ run = "cargo bench --bench '*' -- --save-baseline main --sample-size ${FQ_BENCH_
 [tasks.rust-bench-compare]
 description = "Compare current benchmarks against 'main' and fail above 10% median regression"
 run = """
+uv run --no-sync pytest scripts/tests/test_check_criterion_regressions.py -q
 cargo bench --bench '*' -- --baseline main --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10} --warm-up-time ${FQ_BENCH_WARM_UP_TIME:-1} --measurement-time ${FQ_BENCH_MEASUREMENT_TIME:-1} --nresamples ${FQ_BENCH_NRESAMPLES:-1000} --noplot
 uv run python scripts/check_criterion_regressions.py --threshold 0.10
 """
@@ -825,6 +822,7 @@ uv run python scripts/check_criterion_regressions.py --threshold 0.10
 description = "Verify tracked benchmark digests, baselines, and toolchains"
 # --no-sync: pure static checks; plain `uv run` rebuilds the PyO3 extension.
 run = """
+uv run --no-sync pytest scripts/tests/test_materialization_baseline_orchestration.py -q
 uv run --no-sync python scripts/sync_materialization_benchmark_digest.py \
   --artifact benchmarks/materialization/materialization-benchmark-results.json \
   --document benchmarks/MATERIALIZATION_BENCHMARKS.md --check
@@ -870,6 +868,7 @@ uv run python scripts/manage_materialization_rust_baseline.py seal \
 [tasks.materialization-rust-bench-compare]
 description = "Compare exact fresh materialization outputs against the checked-in baseline"
 run = """
+uv run --no-sync pytest scripts/tests/test_check_criterion_regressions.py -q
 mise run materialization-benchmark-fixtures
 uv run python scripts/prepare_materialization_criterion_run.py \
   --baseline benchmarks/materialization/materialization-rust-baseline.json \
@@ -893,6 +892,7 @@ uv run python scripts/check_criterion_regressions.py \
 [tasks.materialization-benchmark-record]
 description = "Regenerate and verify the complete release materialization benchmark record"
 run = """
+uv run --no-sync pytest scripts/tests/test_collect_materialization_results.py -q
 mise run materialization-benchmark-fixtures
 uv run python scripts/manage_materialization_rust_baseline.py verify \
   --baseline benchmarks/materialization/materialization-rust-baseline.json \
