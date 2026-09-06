@@ -48,6 +48,25 @@ from finstack_quant.core.types import Bps, CreditRating, Percentage, Rate
 from finstack_quant.models.credit import moodys_warf_factor
 
 
+def test_icma_reference_period_preserves_february_coupon_tenor() -> None:
+    start, end = date(2024, 8, 30), date(2025, 2, 28)
+    ctx = DayCountContext(frequency=Tenor.semi_annual(), coupon_period=(start, end))
+    assert DayCount.ACT_ACT_ISMA.year_fraction(start, end, ctx) == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("interpolation", ["step", "linear"])
+def test_reference_cpi_requires_exact_monthly_fixings(interpolation: str) -> None:
+    index = InflationIndex(
+        "US-CPI",
+        [(date(2025, 2, 1), 303.0), (date(2025, 4, 1), 315.0)],
+        Currency("USD"),
+        interpolation=interpolation,
+    )
+    with pytest.raises(KeyError, match="2025-03-01"):
+        index.ref_cpi_months_lag(date(2025, 5, 15), 3)
+    assert index.ref_cpi_months_lag(date(2025, 5, 1), 3) == 303.0
+
+
 def test_tenor_constructor_uses_checked_rust_validation() -> None:
     with pytest.raises(ValueError, match="count must be positive"):
         Tenor(0, TenorUnit.MONTHS)

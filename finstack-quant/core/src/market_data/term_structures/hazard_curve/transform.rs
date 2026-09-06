@@ -211,7 +211,8 @@ impl HazardCurve {
     /// # Errors
     ///
     /// Returns an error when a tenor or bump is non-finite, the curve is
-    /// malformed, or rebuilding the shocked curve fails validation.
+    /// malformed, any requested shock produces a negative or non-finite
+    /// hazard rate, or rebuilding the shocked curve fails validation.
     pub fn with_tenor_hazard_rate_bumps_bp(
         &self,
         targets_bp: &[(f64, f64)],
@@ -244,22 +245,22 @@ impl HazardCurve {
             if *tenor > last_knot + 1e-6 {
                 continue;
             }
-            let mut target_index = knots
+            let target_index = knots
                 .iter()
                 .position(|knot| (*knot - tenor).abs() <= 1e-6)
-                .unwrap_or(0);
-            if target_index == 0 {
-                if *tenor <= knots[0] {
-                    target_index = 0;
-                } else if *tenor >= last_knot {
-                    target_index = knots.len() - 1;
-                } else if let Some(index) = (0..knots.len() - 1)
-                    .find(|index| *tenor > knots[*index] && *tenor < knots[*index + 1])
-                {
-                    target_index = index;
+                .unwrap_or_else(|| {
+                    knots
+                        .partition_point(|&knot| knot < *tenor)
+                        .min(knots.len() - 1)
+                });
+            let shifted = hazard_rates[target_index] + bump_bp * 1e-4;
+            if !shifted.is_finite() || shifted < 0.0 {
+                return Err(crate::error::InputError::UnsupportedBump {
+                    reason: "non-finite or negative hazard rate after tenor bump".to_string(),
                 }
+                .into());
             }
-            hazard_rates[target_index] = (hazard_rates[target_index] + bump_bp * 1e-4).max(0.0);
+            hazard_rates[target_index] = shifted;
         }
 
         self.metadata_builder(self.id.clone())

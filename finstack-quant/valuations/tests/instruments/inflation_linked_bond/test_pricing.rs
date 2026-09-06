@@ -248,7 +248,7 @@ fn test_npv_with_deflation_protection() {
         .build()
         .unwrap();
 
-    let observations = vec![(d(2024, 12, 1), 290.0)]; // Deflation vs base of 300
+    let observations = (1..=12).map(|month| (d(2025, month, 1), 290.0)).collect(); // Deflation vs base of 300
     let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
         "US-CPI-U",
         observations,

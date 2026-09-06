@@ -189,6 +189,7 @@ fn test_index_ratio_maturity_only_deflation_protection() {
     // Create deflation scenario index
     let observations = vec![
         (d(2024, 10, 1), 295.0), // Deflation
+        (d(2024, 11, 1), 295.0),
         (d(2025, 1, 1), 295.0),
         (d(2025, 1, 15), 295.0),
     ];

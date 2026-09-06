@@ -109,7 +109,7 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
 
     // Cover the bond's full lagged history so schedule generation can look up
     // early coupon fixings instead of failing on missing 2020-era observations.
-    let observations = monthly_observations(d(2019, 10, 1), 364, 250.0, 0.002);
+    let observations = monthly_observations(d(2019, 10, 1), 664, 250.0, 0.002);
     let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
         .unwrap()
         .with_interpolation(InflationInterpolation::Linear);

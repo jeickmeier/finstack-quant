@@ -16,7 +16,9 @@ const MAX_ACT_ACT_ISMA_RECURSION_DEPTH: usize = 512;
 /// This helper is intended for irregular first/last coupons where the regular
 /// coupon period cannot be inferred from `start`, `end`, and `frequency` alone.
 /// The `reference_start`/`reference_end` pair must describe one regular coupon
-/// period from the underlying schedule.
+/// period from the underlying schedule. Its nominal month length is inferred
+/// by rounding `12 * reference_days / 365`, so February clamping and ordinary
+/// business-day adjustments do not shorten the coupon tenor.
 ///
 /// Use this helper when you already know the surrounding regular coupon period
 /// from the bond schedule. For regular coupons, prefer
@@ -59,7 +61,8 @@ pub fn act_act_isma_year_fraction_with_reference_period(
         return Err(InputError::InvalidDateRange.into());
     }
 
-    let period_months = reference_start.months_until(reference_end);
+    let reference_days = (reference_end - reference_start).whole_days() as f64;
+    let period_months = (12.0 * reference_days / 365.0).round() as u32;
     if period_months == 0 {
         return Err(InputError::Invalid.into());
     }

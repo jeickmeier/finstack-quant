@@ -465,6 +465,14 @@ impl InflationIndex {
     /// inflation-linked bonds) own the lag and must use an index with
     /// `lag == None`.
     ///
+    /// # Arguments
+    ///
+    /// * `date` - Contract date whose day of month determines the daily weight.
+    /// * `lag_months` - Calendar months between the contract month and the first
+    ///   CPI observation month (3 for US TIPS). Observations must exist on the
+    ///   first of their month; missing months are not interpolated. The first of
+    ///   the contract month needs only the first lagged observation.
+    ///
     /// # Errors
     ///
     /// Returns an error when the anchor observations are unavailable or the
@@ -473,10 +481,12 @@ impl InflationIndex {
         let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
             .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
         let anchor0 = first_of_month.add_months(-(lag_months as i32));
+        let cpi0 = self.apply_seasonality(self.series.value_on_exact(anchor0)?, anchor0)?;
+        if date.day() == 1 {
+            return Ok(cpi0);
+        }
         let anchor1 = anchor0.add_months(1);
-
-        let cpi0 = self.apply_seasonality(self.series_interp.value_on(anchor0)?, anchor0)?;
-        let cpi1 = self.apply_seasonality(self.series_interp.value_on(anchor1)?, anchor1)?;
+        let cpi1 = self.apply_seasonality(self.series.value_on_exact(anchor1)?, anchor1)?;
 
         let days_in_month = f64::from(date.month().length(date.year()));
         let weight = (f64::from(date.day()) - 1.0) / days_in_month;
@@ -861,6 +871,45 @@ mod tests {
             .expect("days-lagged lookup should succeed");
 
         assert_eq!(value, 101.0);
+    }
+
+    #[test]
+    fn ref_cpi_months_lag_requires_exact_monthly_observations() {
+        for interpolation in [InflationInterpolation::Step, InflationInterpolation::Linear] {
+            for observations in [
+                vec![
+                    (make_date(2025, 1, 1), 300.0),
+                    (make_date(2025, 2, 1), 303.0),
+                ],
+                vec![
+                    (make_date(2025, 2, 1), 303.0),
+                    (make_date(2025, 4, 1), 315.0),
+                ],
+                vec![
+                    (make_date(2025, 1, 1), 300.0),
+                    (make_date(2025, 3, 1), 306.0),
+                ],
+            ] {
+                let index = InflationIndex::new("US-CPI", observations, Currency::USD)
+                    .unwrap()
+                    .with_interpolation(interpolation);
+                assert!(matches!(
+                    index.ref_cpi_months_lag(make_date(2025, 5, 15), 3),
+                    Err(Error::Input(crate::error::InputError::NotFound { .. }))
+                ));
+            }
+            let index = InflationIndex::new(
+                "US-CPI",
+                vec![(make_date(2025, 2, 1), 303.0)],
+                Currency::USD,
+            )
+            .unwrap()
+            .with_interpolation(interpolation);
+            assert_eq!(
+                index.ref_cpi_months_lag(make_date(2025, 5, 1), 3).unwrap(),
+                303.0
+            );
+        }
     }
 
     #[test]

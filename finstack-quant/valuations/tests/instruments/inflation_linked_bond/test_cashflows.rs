@@ -225,7 +225,7 @@ fn test_schedule_with_deflation_protection() {
 
     let (mut ctx, _) = market_context_with_index();
     // Insert deflated index
-    let observations = vec![(d(2024, 4, 1), 295.0), (d(2024, 6, 1), 295.0)]; // Lower than base across the lagged coupon window
+    let observations = (4..=11).map(|month| (d(2024, month, 1), 295.0)).collect(); // Lower than base across the lagged coupon window
     let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
         "US-CPI-U",
         observations,

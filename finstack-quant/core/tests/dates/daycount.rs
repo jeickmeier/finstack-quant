@@ -743,6 +743,52 @@ fn actact_vs_actact_isma_comparison() {
 }
 
 #[test]
+fn actact_isma_reference_period_preserves_short_month_coupon_tenor() {
+    for (start, end, frequency, expected) in [
+        (
+            make_date(2024, 8, 30),
+            make_date(2025, 2, 28),
+            Tenor::semi_annual(),
+            0.5,
+        ),
+        (
+            make_date(2023, 8, 30),
+            make_date(2024, 2, 29),
+            Tenor::semi_annual(),
+            0.5,
+        ),
+        (
+            make_date(2025, 1, 30),
+            make_date(2025, 2, 28),
+            Tenor::monthly(),
+            1.0 / 12.0,
+        ),
+    ] {
+        let context = DayCountContext {
+            frequency: Some(frequency),
+            coupon_period: Some((start, end)),
+            ..Default::default()
+        };
+        let full = DayCount::ActActIsma
+            .year_fraction(start, end, context)
+            .unwrap();
+        assert!((full - expected).abs() < TOL, "{start} -> {end}: {full}");
+        let direct =
+            act_act_isma_year_fraction_with_reference_period(start, end, start, end).unwrap();
+        assert!((direct - expected).abs() < TOL);
+        let mid = start + Duration::days(10);
+        let accrued = DayCount::ActActIsma
+            .year_fraction(start, mid, context)
+            .unwrap();
+        let remaining = DayCount::ActActIsma
+            .year_fraction(mid, end, context)
+            .unwrap();
+        assert!((accrued - expected * 10.0 / (end - start).whole_days() as f64).abs() < TOL);
+        assert!((accrued + remaining - expected).abs() < TOL);
+    }
+}
+
+#[test]
 fn actact_isma_reference_period_handles_short_front_stub_with_month_end_anchor() {
     let start = make_date(2025, 3, 15);
     let end = make_date(2025, 7, 31);

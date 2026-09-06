@@ -1699,8 +1699,8 @@ mod tests {
         let index = InflationIndex::new(
             "UK-RPI",
             vec![
-                (d(2023, Month::January, 1), 100.0),
-                (d(2024, Month::January, 1), 102.0),
+                (d(2023, Month::October, 1), 100.0),
+                (d(2023, Month::November, 1), 102.0),
             ],
             Currency::USD,
         )

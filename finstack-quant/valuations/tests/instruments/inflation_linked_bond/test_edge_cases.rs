@@ -212,7 +212,7 @@ fn test_extreme_deflation() {
     let (mut ctx, _) = market_context_with_index();
 
     // Extreme deflation scenario
-    let observations = vec![(d(2024, 12, 1), 100.0)]; // 67% deflation
+    let observations = (1..=12).map(|month| (d(2025, month, 1), 100.0)).collect(); // 67% deflation
     let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
         "US-CPI-U",
         observations,
@@ -243,7 +243,7 @@ fn test_extreme_inflation() {
     let (mut ctx, _) = market_context_with_index();
 
     // Extreme inflation scenario
-    let observations = vec![(d(2024, 12, 1), 1000.0)]; // 900% inflation
+    let observations = (1..=12).map(|month| (d(2025, month, 1), 1000.0)).collect(); // 900% inflation
     let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
         "US-CPI-U",
         observations,

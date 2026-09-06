@@ -4860,7 +4860,10 @@ class InflationIndex:
         date : datetime.date or str
             Contract date.
         lag_months : int
-            Months to look back before interpolating (``3`` for TIPS/gilts).
+            Calendar months to look back (``3`` for TIPS/gilts). Observations
+            must exist on the first of their month; missing months are not
+            interpolated. The first of the contract month needs only the first
+            lagged observation.
 
         Returns
         -------
@@ -4869,8 +4872,10 @@ class InflationIndex:
 
         Raises
         ------
+        KeyError
+            If a required monthly CPI observation is missing.
         ValueError
-            If the lagged date is outside the observation range.
+            If the contract date cannot be parsed.
         """
         ...
 

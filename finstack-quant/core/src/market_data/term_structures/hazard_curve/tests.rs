@@ -386,13 +386,57 @@ fn direct_hazard_rate_tenor_bumps_preserve_segment_matching_and_additivity() {
             (10.0 + 2e-6, 100.0),
         ])
         .expect("tenor direct shocks");
-    let expected = [0.010, 0.016, 0.020, 0.025];
+    let expected = [0.010, 0.0152, 0.0208, 0.025];
     for ((tenor, rate), expected_rate) in bumped.knot_points().zip(expected) {
         assert!(
             (rate - expected_rate).abs() < 1e-12,
             "unexpected direct hazard rate at {tenor}: {rate}"
         );
     }
+}
+
+#[test]
+fn tenor_hazard_bump_changes_only_the_containing_segment() {
+    let curve = HazardCurve::builder("SEGMENTS")
+        .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+        .build()
+        .unwrap();
+    let bumped = curve
+        .with_tenor_hazard_rate_bumps_bp(&[(4.0, 100.0)])
+        .unwrap();
+    assert_eq!(bumped.hazard_rate(2.0), curve.hazard_rate(2.0));
+    assert!((bumped.hazard_rate(4.0) - 0.03).abs() < 1e-12);
+    assert_eq!(bumped.hazard_rate(6.0), curve.hazard_rate(6.0));
+    assert!((bumped.sp(3.0) - curve.sp(3.0)).abs() < 1e-12);
+    assert!((bumped.sp(4.0) / curve.sp(4.0) - (-0.01_f64).exp()).abs() < 1e-12);
+    assert!((bumped.sp(6.0) / curve.sp(6.0) - (-0.02_f64).exp()).abs() < 1e-12);
+}
+
+#[test]
+fn tenor_hazard_down_bumps_reject_negative_rates() {
+    let curve = HazardCurve::builder("DOWN")
+        .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
+        .build()
+        .unwrap();
+    assert!(curve
+        .with_tenor_hazard_rate_bumps_bp(&[(3.0, -200.0)])
+        .is_err());
+    assert!(curve
+        .with_tenor_hazard_rate_bumps_bp(&[(3.0, -100.0), (3.0, -100.0)])
+        .is_err());
+    assert_eq!(curve.hazard_rate(3.0), 0.015);
+    let zero = curve
+        .with_tenor_hazard_rate_bumps_bp(&[(1.0, -100.0)])
+        .unwrap();
+    assert_eq!(zero.hazard_rate(1.0), 0.0);
+    let restored = zero
+        .with_tenor_hazard_rate_bumps_bp(&[(1.0, 100.0)])
+        .unwrap();
+    assert!((restored.sp(4.0) - curve.sp(4.0)).abs() < 1e-12);
 }
 
 #[test]
