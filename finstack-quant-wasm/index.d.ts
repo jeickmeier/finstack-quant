@@ -9145,7 +9145,7 @@ export interface StatementsAnalyticsNamespace {
    * @param baseJson - Base statement-result JSON.
    * @param comparisonJson - Comparison statement-result JSON.
    * @param configJson - Configuration JSON for this call.
-   * @throws Error - Rejects malformed result or configuration JSON, empty metric or period selections, a requested value missing from either result, or failure to serialize the variance report to JavaScript.
+   * @throws Error - Rejects malformed result or configuration JSON, empty metric or period selections, mismatched metric types or currencies, a requested value missing from either result, or failure to serialize the variance report to JavaScript.
    */
   runVariance(
     baseJson: string,
@@ -9223,7 +9223,7 @@ export interface StatementsAnalyticsNamespace {
    * @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
    * @param terminalValueJson - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
    * @param ufcfNode - Node identifier holding unlevered free cash flow for the forecast periods.
-   * @param netDebtOverride - Optional flat net-debt amount used instead of the model-derived bridge.
+   * @param netDebtOverride - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
    * @param waccSensitivityBump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
    * @param waccDenominatorEpsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
    * @param maxStableGrowthRate - Maximum perpetual stable growth rate; omitted uses the canonical 5% default.
@@ -9256,10 +9256,10 @@ export interface StatementsAnalyticsNamespace {
    * @returns Leveraged-buyout evaluation result against the statement model.
    * @param modelJson - Financial-model specification JSON.
    * @param entryMultiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
-   * @param entryMetricNode - Node identifier supplying the entry valuation metric, read at the model's first period.
+   * @param entryMetricNode - Monetary node in model currency supplying the entry metric at the first period.
    * @param exitMultiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
-   * @param exitMetricNode - Node identifier supplying the exit valuation metric, read at the exit period.
-   * @param exitNetDebtNode - Node identifier supplying net debt outstanding at the exit period, where a modelled amortisation schedule lands.
+   * @param exitMetricNode - Monetary node in model currency supplying the exit metric at the exit period.
+   * @param exitNetDebtNode - Monetary node in model currency supplying net debt at the exit period.
    * @param exitPeriod - Model period label at which the sponsor exits, e.g. "2029".
    * @param sourcesJson - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
    * @param transactionFees - Transaction fees and expenses funded at close, in the model currency.
@@ -9452,7 +9452,7 @@ export interface StatementsAnalyticsNamespace {
    * @param yValues - Comparable-company dependent-variable values aligned with x_values.
    * @param subjectX - Subject company's independent-variable value for the fitted regression.
    * @param subjectY - Subject company's observed dependent-variable value for relative-value comparison.
-   * @throws Error - Rejects when `x_values` or `y_values` is not a numeric JavaScript array, or the regression result cannot be serialized. Fewer than three paired values or an unidentifiable fit returns `undefined`.
+   * @throws Error - Rejects when `x_values` or `y_values` is not a numeric JavaScript array, or the regression result cannot be serialized. Fewer than three paired values or an unidentifiable fit returns `undefined`, as do unequal lengths and non-finite numeric inputs or outputs.
    */
   regressionFairValue(
     xValues: number[],

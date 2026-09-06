@@ -187,13 +187,33 @@ def test_compute_ecl_ead_schedule_reduces_lifetime_ecl() -> None:
 
 
 def test_compute_ecl_stage3_time_to_recovery() -> None:
-    """Stage 3 ECL is discounted LGD x EAD over the recovery horizon."""
+    """Stage 3 allowance is carrying EAD less discounted recovery."""
     from finstack_quant.statements_analytics import compute_ecl
 
     curve = [(0.0, 0.0), (1.0, 0.02)]
     exposure = _exposure()
     fast = compute_ecl(exposure, curve, stage="stage3", stage3_time_to_recovery_years=0.5).ecl
     slow = compute_ecl(exposure, curve, stage="stage3", stage3_time_to_recovery_years=3.0).ecl
-    # Longer time to recovery discounts the loss more heavily.
-    assert slow < fast
-    assert fast <= 0.45 * 1_000_000.0
+    # Longer time to recovery reduces recovery PV and increases impairment.
+    assert slow > fast
+    assert fast >= 0.45 * 1_000_000.0
+
+
+def test_same_rating_pd_deterioration_reaches_stage_two() -> None:
+    from finstack_quant.statements_analytics import Stage, classify_stage
+
+    exposure = _exposure(current_pd=0.20, origination_pd=0.01, current_rating="BBB", origination_rating="BBB")
+    assert classify_stage(exposure).stage == Stage.Stage2
+
+
+def test_stage_three_full_loss_and_invalid_bucket_inputs() -> None:
+    from finstack_quant.statements_analytics import Stage, compute_ecl
+
+    exposure = _exposure(ead=100.0, lgd=1.0, eir=0.1)
+    result = compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage3)
+    assert result.ecl == pytest.approx(100.0)
+    for invalid in [float("nan"), float("inf")]:
+        with pytest.raises(ValueError, match="bucket_width_years"):
+            compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage2, bucket_width_years=invalid)
+        with pytest.raises(ValueError, match=r"(?i)knot"):
+            compute_ecl(exposure, [(0.0, 0.0), (invalid, 0.1)], stage=Stage.Stage2)

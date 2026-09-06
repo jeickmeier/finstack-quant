@@ -81,6 +81,8 @@ pub enum CeclMethodology {
 #[serde(deny_unknown_fields)]
 pub struct CeclConfig {
     /// Time bucket width in years (same as IFRS 9). Default: 0.25.
+    /// Must be finite and at least 0.0001 years (at most one million buckets
+    /// for the maximum supported 100-year maturity).
     pub bucket_width_years: f64,
 
     /// Reasonable and supportable (R&S) forecast period in years.
@@ -105,7 +107,8 @@ pub struct CeclConfig {
     pub impaired_qualitative_triggers_enabled: bool,
 
     /// Expected time to recovery / resolution for credit-impaired exposures,
-    /// in years. Used as the discount timing for the impaired shortcut.
+    /// in years. Impaired allowance is current EAD less expected recovery
+    /// `(1 - LGD) * EAD`, discounted to this horizon when discounting is enabled.
     /// Default: 1.0.
     #[serde(default = "default_impaired_time_to_recovery_years")]
     pub impaired_time_to_recovery_years: f64,
@@ -152,12 +155,12 @@ impl CeclConfig {
     /// horizon, historical annual PD, impaired recovery horizon, scenario
     /// weights, or linear-reversion horizon.
     pub fn validate(&self) -> Result<()> {
-        if self.bucket_width_years <= 0.0 {
+        if !self.bucket_width_years.is_finite() || self.bucket_width_years < 1e-4 {
             return Err(Error::Validation(
-                "bucket_width_years must be positive".to_string(),
+                "bucket_width_years must be finite and at least 0.0001 years".to_string(),
             ));
         }
-        if self.forecast_horizon_years < 0.0 {
+        if !self.forecast_horizon_years.is_finite() || self.forecast_horizon_years < 0.0 {
             return Err(Error::Validation(
                 "forecast_horizon_years must be non-negative".to_string(),
             ));
@@ -177,15 +180,9 @@ impl CeclConfig {
                 "impaired_time_to_recovery_years must be finite and non-negative".to_string(),
             ));
         }
-        let total_weight: f64 = self.scenarios.iter().map(|s| s.weight).sum();
-        if (total_weight - 1.0).abs() > 1e-6 {
-            return Err(Error::Validation(format!(
-                "Scenario weights must sum to 1.0, got {:.6}",
-                total_weight
-            )));
-        }
+        super::engine::validate_scenario_weights(&self.scenarios)?;
         if let ReversionMethod::Linear { reversion_years } = self.reversion_method {
-            if reversion_years <= 0.0 {
+            if !reversion_years.is_finite() || reversion_years <= 0.0 {
                 return Err(Error::Validation(
                     "Linear reversion_years must be positive".to_string(),
                 ));
@@ -300,7 +297,11 @@ impl<'a> CeclEngine<'a> {
         let n_buckets = n_buckets.max(1);
 
         for (_, pd_source) in &self.pd_sources {
-            pd_source.cumulative_pd(rating, 0.0)?;
+            if !(0.0..=1.0).contains(&pd_source.cumulative_pd(rating, 0.0)?) {
+                return Err(Error::Validation(
+                    "PD source must return finite probabilities in [0, 1]".into(),
+                ));
+            }
         }
 
         if self.is_credit_impaired(exposure) {
@@ -309,8 +310,10 @@ impl<'a> CeclEngine<'a> {
             for (scenario, _) in &self.pd_sources {
                 let lgd = scenario.lgd_override.unwrap_or(exposure.lgd);
                 let df = self.discount_factor(exposure, t_recovery);
-                weighted_ecl += scenario.weight * lgd * exposure.ead_at(0.0)? * df;
+                let ead = exposure.ead_at(0.0)?;
+                weighted_ecl += scenario.weight * (ead - (1.0 - lgd) * ead * df);
             }
+            super::engine::validate_finite_ecl(weighted_ecl)?;
             return Ok(CeclResult {
                 exposure_id: exposure.id.clone(),
                 ecl: weighted_ecl,
@@ -338,6 +341,12 @@ impl<'a> CeclEngine<'a> {
                 // survival weight is lost at the R&S boundary.
                 let cond_mpd = self.blended_conditional_mpd(*pd_source, rating, t_start, t_end)?;
 
+                if !(0.0..=1.0).contains(&cond_mpd) {
+                    return Err(Error::Validation(
+                        "Conditional PD must be finite and in [0, 1]".into(),
+                    ));
+                }
+
                 // Unconditional bucket default probability: S(t_start) * cond_mpd.
                 let uncond_mpd = (survival * cond_mpd).max(0.0);
                 survival = (survival * (1.0 - cond_mpd)).max(0.0);
@@ -349,6 +358,7 @@ impl<'a> CeclEngine<'a> {
             weighted_ecl += scenario.weight * scenario_ecl;
         }
 
+        super::engine::validate_finite_ecl(weighted_ecl)?;
         Ok(CeclResult {
             exposure_id: exposure.id.clone(),
             ecl: weighted_ecl,
@@ -379,6 +389,7 @@ impl<'a> CeclEngine<'a> {
             exposure_years += exposure.ead_at(t_mid)? * (t_end - t_start);
         }
 
+        super::engine::validate_finite_ecl(rate * exposure_years)?;
         Ok(CeclResult {
             exposure_id: exposure.id.clone(),
             ecl: rate * exposure_years,

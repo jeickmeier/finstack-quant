@@ -181,7 +181,9 @@ pub struct ScorecardReport {
     /// Human-readable summary
     pub message: String,
 
-    /// Structured output (rating, total_score, metric_scores, rating_scale)
+    /// Structured output (rating, total_score, metric_scores, rating_scale).
+    /// With no usable positive-weight evidence, rating and total_score are
+    /// null, partial is true, and status is Failed.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub data: IndexMap<String, serde_json::Value>,
 
@@ -340,11 +342,16 @@ impl CreditScorecardExtension {
 
         // Excluded NM factors renormalize the remaining weights.
         let total_score = self.calculate_weighted_score(&scores);
+        if total_score.is_none() {
+            errors.push("Credit rating unavailable: no usable positive-weight evidence".into());
+        }
 
-        let rating = self.determine_rating(total_score, &config.rating_scale)?;
+        let rating = total_score
+            .map(|score| self.determine_rating(score, &config.rating_scale))
+            .transpose()?;
 
-        if let Some(min_rating) = &config.min_rating {
-            if !self.meets_minimum_rating(&rating, min_rating, &config.rating_scale)? {
+        if let (Some(min_rating), Some(rating)) = (&config.min_rating, &rating) {
+            if !self.meets_minimum_rating(rating, min_rating, &config.rating_scale)? {
                 warnings.push(format!(
                     "Credit rating {} is below minimum required {}",
                     rating, min_rating
@@ -357,7 +364,8 @@ impl CreditScorecardExtension {
                 ScorecardStatus::Success,
                 format!(
                     "Credit scorecard complete. Rating: {} (Score: {:.2})",
-                    rating, total_score
+                    rating.as_deref().unwrap_or("unavailable"),
+                    total_score.unwrap_or_default()
                 ),
             )
         } else {
@@ -543,17 +551,18 @@ impl CreditScorecardExtension {
     }
 
     /// Calculate weighted average score.
-    fn calculate_weighted_score(&self, scores: &[MetricScore]) -> f64 {
+    fn calculate_weighted_score(&self, scores: &[MetricScore]) -> Option<f64> {
         if scores.is_empty() {
-            return 0.0;
+            return None;
         }
 
         let total_weight: f64 = scores.iter().map(|s| s.weight).sum();
         if total_weight.abs() < f64::EPSILON {
-            return 0.0;
+            return None;
         }
 
-        scores.iter().map(|s| s.score * s.weight).sum::<f64>() / total_weight
+        let score = scores.iter().map(|s| s.score * s.weight).sum::<f64>() / total_weight;
+        score.is_finite().then_some(score)
     }
 
     /// Determine rating based on total score.
@@ -653,7 +662,7 @@ mod tests {
 
         let weighted = extension.calculate_weighted_score(&scores);
 
-        assert_eq!(weighted, 0.0);
+        assert_eq!(weighted, None);
     }
 
     // Scorecard boundary convention

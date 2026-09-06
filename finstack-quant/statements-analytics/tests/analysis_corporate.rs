@@ -346,19 +346,19 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100.0),
+                    AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100.0),
+                    AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(40.0),
+                    AmountOrScalar::amount(40.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(10.0),
+                    AmountOrScalar::amount(10.0, Currency::USD).unwrap(),
                 ),
             ],
         )
@@ -367,19 +367,19 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
             ],
         )
@@ -426,7 +426,7 @@ fn test_dcf_uses_as_of_for_valuation_date_and_auto_net_debt() {
 }
 
 #[test]
-fn test_dcf_forecast_only_uses_first_forecast_boundary_for_net_debt() {
+fn test_dcf_forecast_only_requires_opening_balance_or_override() {
     let model = ModelBuilder::new("forecast-only-dcf")
         .periods("2025Q1..Q4", None)
         .expect("valid periods")
@@ -456,19 +456,19 @@ fn test_dcf_forecast_only_uses_first_forecast_boundary_for_net_debt() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100.0),
+                    AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(75.0),
+                    AmountOrScalar::amount(75.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(40.0),
+                    AmountOrScalar::amount(40.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(10.0),
+                    AmountOrScalar::amount(10.0, Currency::USD).unwrap(),
                 ),
             ],
         )
@@ -477,19 +477,19 @@ fn test_dcf_forecast_only_uses_first_forecast_boundary_for_net_debt() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 3).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
                 (
                     PeriodId::quarter(2025, 4).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
+                    AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
                 ),
             ],
         )
@@ -507,19 +507,8 @@ fn test_dcf_forecast_only_uses_first_forecast_boundary_for_net_debt() {
         None,
         None,
     )
-    .expect("DCF evaluation should succeed");
-
-    let dcf = result
-        .dcf_instrument
-        .as_ref()
-        .expect("dcf instrument should be returned");
-    let first_forecast = model.periods.first().expect("forecast period should exist");
-
-    assert_eq!(dcf.valuation_date, first_forecast.start);
-    assert!(
-        (result.net_debt.amount() - 100.0).abs() < 1e-9,
-        "forecast-only auto net debt should come from the valuation boundary, not the terminal period"
-    );
+    .expect_err("future forecast balances must not be used for opening net debt");
+    assert!(result.to_string().contains("No balance-sheet period"));
 }
 
 // --- Parity tests: all wrapper entrypoints must produce identical results ---

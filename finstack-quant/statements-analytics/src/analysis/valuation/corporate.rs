@@ -202,9 +202,10 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// Returns an error if `market` is provided without `as_of`, if the model
 /// cannot be evaluated, if `ufcf_node` has no forecast cash flows, if the
-/// model currency cannot be inferred, if an exit-multiple metric node is
-/// missing or non-finite, or if the terminal-value assumptions are
-/// internally inconsistent.
+/// model currency cannot be inferred, if monetary nodes use another currency
+/// or no opening balance is available without a net-debt override, if an
+/// exit-multiple metric node is missing or non-finite, or if the
+/// terminal-value assumptions are internally inconsistent.
 ///
 /// # Examples
 ///
@@ -911,10 +912,9 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     let net_debt_period = model
         .periods
         .iter()
-        .rev()
-        .find(|period| period.end <= valuation_date)
-        .map(|period| period.id)
-        .or_else(|| first_forecast_period.map(|period| period.id));
+        .filter(|period| period.end - time::Duration::days(1) <= valuation_date)
+        .max_by_key(|period| period.end)
+        .map(|period| period.id);
     let net_debt = if let Some(override_val) = context.net_debt_override {
         override_val
     } else {
@@ -1024,43 +1024,22 @@ fn calculate_net_debt_from_model(
     results: &finstack_quant_statements::evaluator::StatementResult,
     balance_sheet_period: Option<finstack_quant_core::dates::PeriodId>,
 ) -> Result<f64> {
-    // Use the valuation boundary balance sheet when available; otherwise fall back
-    // to the latest model period for fully forecast-only models.
-    let selected_period_id = if let Some(period_id) = balance_sheet_period {
-        period_id
-    } else {
-        model
-            .periods
-            .last()
-            .ok_or_else(|| {
-                finstack_quant_statements::error::Error::Eval("Model has no periods".into())
-            })?
-            .id
+    // A future forecast balance cannot stand in for the opening balance sheet.
+    let selected_period_id = balance_sheet_period.ok_or_else(|| finstack_quant_statements::error::Error::Eval(
+        "No balance-sheet period ends on or before the valuation date; provide an opening balance or net_debt_override".into()
+    ))?;
+
+    let currency = extract_currency_from_model(model)?;
+    let component = |names: [&str; 2]| -> Result<f64> {
+        let node = names.into_iter().find(|name| results.get(name, &selected_period_id).is_some())
+            .ok_or_else(|| finstack_quant_statements::error::Error::Eval(format!(
+                "Net debt requires '{}' or '{}' at period {}; provide the balance-sheet node or net_debt_override",
+                names[0], names[1], selected_period_id
+            )))?;
+        monetary_node_value(results, node, &selected_period_id, currency)
     };
-
-    // Try to find total debt — warn if not found so users know the value is assumed
-    let total_debt = results
-        .get("total_debt", &selected_period_id)
-        .or_else(|| results.get("debt", &selected_period_id));
-
-    let cash = results
-        .get("cash", &selected_period_id)
-        .or_else(|| results.get("cash_and_equivalents", &selected_period_id));
-
-    let total_debt = total_debt.ok_or_else(|| {
-        finstack_quant_statements::error::Error::Eval(format!(
-            "Net debt calculation requires a 'total_debt' or 'debt' node at period {}. \
-             Provide the balance-sheet node or use net_debt_override.",
-            selected_period_id
-        ))
-    })?;
-    let cash = cash.ok_or_else(|| {
-        finstack_quant_statements::error::Error::Eval(format!(
-            "Net debt calculation requires a 'cash' or 'cash_and_equivalents' node at period {}. \
-             Provide the balance-sheet node or use net_debt_override.",
-            selected_period_id
-        ))
-    })?;
+    let total_debt = component(["total_debt", "debt"])?;
+    let cash = component(["cash", "cash_and_equivalents"])?;
 
     Ok(total_debt - cash)
 }
@@ -1085,22 +1064,43 @@ fn resolve_exit_multiple_metric(
             "Exit-multiple metric node requires a forecast period".into(),
         ));
     };
-    let Some(metric) = results.get(node, &last_forecast.id) else {
+    if results.get(node, &last_forecast.id).is_none() {
         return Err(finstack_quant_statements::error::Error::Eval(format!(
             "Exit-multiple metric node '{node}' has no value at last forecast period {}",
             last_forecast.id
         )));
-    };
-    if !metric.is_finite() {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
-            "Exit-multiple metric node '{node}' at last forecast period {} is not finite ({metric})",
-            last_forecast.id
-        )));
     }
+    let metric = monetary_node_value(
+        results,
+        node,
+        &last_forecast.id,
+        extract_currency_from_model(model)?,
+    )?;
     Ok(TerminalValueSpec::ExitMultiple {
         terminal_metric: metric,
         multiple,
     })
+}
+
+/// Read a monetary statement node without discarding its currency.
+pub(super) fn monetary_node_value(
+    results: &StatementResult,
+    node: &str,
+    period: &finstack_quant_core::dates::PeriodId,
+    currency: Currency,
+) -> Result<f64> {
+    let amount = results.get_money(node, period).ok_or_else(|| {
+        finstack_quant_statements::error::Error::Eval(format!(
+            "Node '{node}' at {period} must be monetary in {currency}"
+        ))
+    })?;
+    if amount.currency() != currency || !amount.amount().is_finite() {
+        return Err(finstack_quant_statements::error::Error::Eval(format!(
+            "Node '{node}' at {period} must be finite monetary data in {currency}, got {}",
+            amount.currency()
+        )));
+    }
+    Ok(amount.amount())
 }
 
 #[cfg(test)]
@@ -1402,9 +1402,18 @@ mod tests {
             .value(
                 "ebitda",
                 &[
-                    (PeriodId::annual(2025), AmountOrScalar::scalar(100.0)),
-                    (PeriodId::annual(2026), AmountOrScalar::scalar(125.0)),
-                    (PeriodId::annual(2027), AmountOrScalar::scalar(150.0)),
+                    (
+                        PeriodId::annual(2025),
+                        AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
+                    ),
+                    (
+                        PeriodId::annual(2026),
+                        AmountOrScalar::amount(125.0, Currency::USD).unwrap(),
+                    ),
+                    (
+                        PeriodId::annual(2027),
+                        AmountOrScalar::amount(150.0, Currency::USD).unwrap(),
+                    ),
                 ],
             )
             .with_meta("currency", serde_json::json!("USD"))

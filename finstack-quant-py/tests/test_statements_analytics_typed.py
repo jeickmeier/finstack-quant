@@ -235,3 +235,28 @@ def test_scenario_diff_rejects_empty_metrics_and_periods() -> None:
         scenario_diff(scenarios, results, "base", "downside", [], ["2025Q2"])
     with pytest.raises(ValueError, match="periods cannot be empty"):
         scenario_diff(scenarios, results, "base", "downside", ["profit"], [])
+
+
+def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
+    from finstack_quant.core.money import Money
+    from finstack_quant.statements import FinancialModelSpec
+    from finstack_quant.statements_analytics import goal_seek
+
+    models = []
+    for currency in ["USD", "EUR"]:
+        builder = ModelBuilder("typed-boundary")
+        builder.periods("2025..2026", None)
+        builder.value_money("revenue", [("2025", Money(100.0, currency)), ("2026", Money(110.0, currency))])
+        builder.compute("profit", "revenue * 0.5")
+        models.append(builder.build())
+
+    outcome = goal_seek(models[0], "profit", "2025", 60.0, "revenue", "2025", bounds=(1.0, 200.0))
+    assert outcome.model is not None
+    restored = FinancialModelSpec.from_json(outcome.model.to_json())
+    revenue = Evaluator().evaluate(restored).get_money("revenue", "2025")
+    assert revenue.amount == pytest.approx(120.0)
+    assert str(revenue.currency) == "USD"
+
+    baseline, comparison = [Evaluator().evaluate(model) for model in models]
+    with pytest.raises(ValueError, match="matching types and currencies"):
+        run_variance(baseline, comparison, VarianceConfig("usd", "eur", ["revenue"], ["2025"]))

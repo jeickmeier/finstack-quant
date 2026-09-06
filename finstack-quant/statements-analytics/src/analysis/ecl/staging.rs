@@ -291,6 +291,40 @@ pub fn classify_stage(
     pd_source: &dyn PdTermStructure,
     config: &StagingConfig,
 ) -> Result<StageResult> {
+    classify_stage_with_pds(exposure, config, || {
+        let (Some(orig), Some(curr)) = (&exposure.origination_rating, &exposure.current_rating)
+        else {
+            return Ok(None);
+        };
+        if !pd_source.contains_rating(orig) || !pd_source.contains_rating(curr) {
+            return Ok(None);
+        }
+        let horizon = exposure
+            .remaining_maturity_years
+            .min(MAX_SICR_HORIZON_YEARS);
+        Ok(Some((
+            pd_source.cumulative_pd(orig, horizon)?,
+            pd_source.cumulative_pd(curr, horizon)?,
+        )))
+    })
+}
+
+pub(super) fn classify_stage_with_pds(
+    exposure: &Exposure,
+    config: &StagingConfig,
+    pds: impl FnOnce() -> Result<Option<(f64, f64)>>,
+) -> Result<StageResult> {
+    if !exposure.remaining_maturity_years.is_finite()
+        || exposure.remaining_maturity_years < 0.0
+        || !config.pd_delta_absolute.is_finite()
+        || config.pd_delta_absolute < 0.0
+        || config.pd_delta_relative.is_nan()
+        || config.pd_delta_relative < 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "Staging maturity and thresholds must be non-negative and finite (positive infinity disables relative PD)".into(),
+        ));
+    }
     let mut triggers = Vec::new();
 
     // 1. Stage 3 DPD backstop (non-rebuttable)
@@ -322,39 +356,35 @@ pub fn classify_stage(
         });
     }
 
-    // 3. Stage 2 quantitative: PD delta (only if both ratings are present
-    //    on the exposure *and* on the PD source). A missing curve skips
-    //    PD-delta the same way an unknown notch label skips the downgrade
-    //    count; rating-downgrade notches still run on the labels.
+    // PD snapshots are independent of the labels used for rating-notch tests.
+    if let Some((orig_pd, curr_pd)) = pds()? {
+        if !(0.0..=1.0).contains(&orig_pd) || !(0.0..=1.0).contains(&curr_pd) {
+            return Err(finstack_quant_core::Error::Validation(
+                "Staging PDs must be finite probabilities in [0, 1]".into(),
+            ));
+        }
+        let delta = curr_pd - orig_pd;
+        if delta > config.pd_delta_absolute {
+            triggers.push(StagingTrigger::PdDeltaAbsolute {
+                delta,
+                threshold: config.pd_delta_absolute,
+            });
+        }
+
+        if orig_pd > 0.0 {
+            let ratio = curr_pd / orig_pd;
+            if ratio > config.pd_delta_relative {
+                triggers.push(StagingTrigger::PdDeltaRelative {
+                    ratio,
+                    threshold: config.pd_delta_relative,
+                });
+            }
+        }
+    }
+
     if let (Some(orig_rating), Some(curr_rating)) =
         (&exposure.origination_rating, &exposure.current_rating)
     {
-        if pd_source.contains_rating(orig_rating) && pd_source.contains_rating(curr_rating) {
-            let horizon = exposure
-                .remaining_maturity_years
-                .min(MAX_SICR_HORIZON_YEARS);
-            let orig_pd = pd_source.cumulative_pd(orig_rating, horizon)?;
-            let curr_pd = pd_source.cumulative_pd(curr_rating, horizon)?;
-
-            let delta = curr_pd - orig_pd;
-            if delta > config.pd_delta_absolute {
-                triggers.push(StagingTrigger::PdDeltaAbsolute {
-                    delta,
-                    threshold: config.pd_delta_absolute,
-                });
-            }
-
-            if orig_pd > 0.0 {
-                let ratio = curr_pd / orig_pd;
-                if ratio > config.pd_delta_relative {
-                    triggers.push(StagingTrigger::PdDeltaRelative {
-                        ratio,
-                        threshold: config.pd_delta_relative,
-                    });
-                }
-            }
-        }
-
         // 3b. Stage 2 quantitative: rating downgrade in notches
         //     (IFRS 9 B5.5.17(f)). A zero threshold disables the trigger.
         if config.rating_downgrade_notches > 0 {

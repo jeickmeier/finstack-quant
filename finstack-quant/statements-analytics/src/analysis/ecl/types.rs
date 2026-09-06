@@ -202,7 +202,9 @@ pub struct Exposure {
     pub remaining_maturity_years: f64,
 
     /// Loss given default (decimal, 0..1). Can be point-in-time or
-    /// downturn LGD depending on methodology.
+    /// downturn LGD depending on methodology. For credit-impaired exposures,
+    /// this is the undiscounted fraction lost: recovery at the configured
+    /// horizon is `(1 - lgd) * ead_at(0)`; the engine discounts recovery once.
     pub lgd: f64,
 
     /// Current days past due (DPD). Used for backstop staging triggers.
@@ -412,6 +414,11 @@ pub trait PdTermStructure: Send + Sync {
     fn marginal_pd(&self, rating: &str, t1: f64, t2: f64) -> Result<f64> {
         let s1 = 1.0 - self.cumulative_pd(rating, t1)?;
         let s2 = 1.0 - self.cumulative_pd(rating, t2)?;
+        if !(0.0..=1.0).contains(&s1) || !(0.0..=s1).contains(&s2) {
+            return Err(Error::Validation(
+                "PD source must return finite non-decreasing probabilities in [0, 1]".into(),
+            ));
+        }
         if s1 <= 0.0 {
             return Ok(0.0);
         }
@@ -442,9 +449,9 @@ pub trait PdTermStructure: Send + Sync {
 #[serde(try_from = "RawPdCurveData")]
 pub struct RawPdCurve {
     /// Rating label this curve applies to.
-    pub rating: String,
+    pub(super) rating: String,
     /// (time_years, cumulative_pd) knots, sorted by time, monotonically increasing.
-    pub knots: Vec<(f64, f64)>,
+    pub(super) knots: Vec<(f64, f64)>,
 }
 
 /// Serde shadow type that routes `RawPdCurve` deserialization through
@@ -496,7 +503,7 @@ impl RawPdCurve {
         for window in knots.windows(2) {
             let (t_prev, pd_prev) = window[0];
             let (t_curr, pd_curr) = window[1];
-            if t_curr <= t_prev {
+            if !t_curr.is_finite() || t_curr <= t_prev {
                 return Err(InputError::NonMonotonicKnots.into());
             }
             if pd_curr < pd_prev {
@@ -565,7 +572,7 @@ impl PdTermStructure for RawPdCurve {
 pub struct RatingPdMap {
     /// Cumulative PD curves keyed by the rating label
     /// [`PdTermStructure::cumulative_pd`] looks up. Lookup uses the map
-    /// key; [`RawPdCurve::rating`] need not match the key.
+    /// key; the curve's own rating label need not match the key.
     pub curves: IndexMap<String, RawPdCurve>,
 }
 

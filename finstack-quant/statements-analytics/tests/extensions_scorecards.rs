@@ -264,7 +264,7 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
     // fallback score, zero weight coverage, and the report is stamped partial.
     assert_eq!(
         report.data.get("total_score").and_then(|v| v.as_f64()),
-        Some(0.0)
+        None
     );
     assert_eq!(
         report.data.get("partial").and_then(|v| v.as_bool()),

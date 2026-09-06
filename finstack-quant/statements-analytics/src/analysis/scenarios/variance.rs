@@ -217,6 +217,17 @@ impl<'a> VarianceAnalyzer<'a> {
         }
     }
 
+    fn validate_units(&self, metric: &str) -> Result<()> {
+        if self.baseline.node_value_types.get(metric)
+            != self.comparison.node_value_types.get(metric)
+        {
+            return Err(Error::invalid_input(format!(
+                "Variance metric '{metric}' must have matching types and currencies"
+            )));
+        }
+        Ok(())
+    }
+
     /// Compute absolute and percentage variance for the configured metrics
     /// and periods.
     ///
@@ -245,6 +256,7 @@ impl<'a> VarianceAnalyzer<'a> {
         let mut rows = Vec::new();
 
         for metric in &config.metrics {
+            self.validate_units(metric)?;
             for period in &config.periods {
                 let baseline = self.baseline.get(metric, period).ok_or_else(|| {
                     Error::missing_data(format!(
@@ -314,6 +326,7 @@ impl<'a> VarianceAnalyzer<'a> {
         baseline_label: &str,
         comparison_label: &str,
     ) -> Result<BridgeChart> {
+        self.validate_units(target_metric)?;
         let baseline_value = self.baseline.get(target_metric, &period).ok_or_else(|| {
             Error::missing_data(format!(
                 "Missing baseline value for '{}' @ {}",
@@ -331,6 +344,14 @@ impl<'a> VarianceAnalyzer<'a> {
         let mut steps = Vec::new();
 
         for driver in drivers {
+            self.validate_units(driver)?;
+            if self.baseline.node_value_types.get(*driver)
+                != self.baseline.node_value_types.get(target_metric)
+            {
+                return Err(Error::invalid_input(
+                    "Additive bridge drivers must have the target metric type and currency",
+                ));
+            }
             let base_drv = self.baseline.get(driver, &period).ok_or_else(|| {
                 Error::missing_data(format!("Missing baseline driver '{}' @ {}", driver, period))
             })?;

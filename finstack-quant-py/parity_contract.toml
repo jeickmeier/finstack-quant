@@ -1513,15 +1513,12 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 
 # Rust-only surfaces (categories, not every name), deliberately unbound in
 # both hosts for now:
-# - ECL configuration: EclConfig/EclConfigBuilder, StagingConfig, CeclConfig,
-#   the policy default_* constructors, EclEngine/CeclEngine, portfolio
-#   aggregation (PortfolioEclResult, ProvisionWaterfall) and the full result
-#   envelopes (EclResult/WeightedEclResult buckets). The bound compute_ecl /
-#   compute_ecl_weighted / classify_stage cover the simplified request
-#   surface only; rating-downgrade and qualitative SICR triggers are NOT yet
-#   reachable from hosts (EclStageRequest::classify hardcodes them off).
-#   RatingPdMap and RawPdCurve stay Rust-only (the host Exposure wrapper
-#   stores undrawn/ccf; compute_ecl takes a priced EAD).
+# - ECL: EclConfig/EclConfigBuilder, CeclConfig, EclEngine/CeclEngine,
+#   policy default_* constructors, RatingPdMap, RawPdCurve and portfolio
+#   aggregation remain Rust-only. Python binds StagingConfig, Exposure,
+#   qualitative flags, stage triggers and full bucket/result envelopes;
+#   classify_exposure reaches the full staging waterfall and compute_ecl
+#   prices drawn EAD plus undrawn * CCF. ECL is not exposed by WASM.
 # - analysis::credit covenant forecasting (forecast_breaches,
 #   forecast_covenant, compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
@@ -1810,6 +1807,13 @@ python_only = [
     "scenario_diff",
     "validate_scorecard_config",
     "variance_bridge",
+    "EclBucket",
+    "EclResult",
+    "QualitativeFlags",
+    "Stage",
+    "StageResult",
+    "StagingConfig",
+    "WeightedEclResult",
 ]
 
 [wasm_statements_analytics_subset.python_js_map]

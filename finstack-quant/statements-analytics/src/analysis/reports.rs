@@ -292,26 +292,19 @@ pub(crate) fn trailing_sum_at(
     node_id: &str,
     at: &PeriodId,
 ) -> Option<f64> {
-    let window = at.kind().periods_per_year() as usize;
-    let mut values: Vec<(PeriodId, f64)> = results
-        .get_node(node_id)?
-        .iter()
-        .filter(|(period, _)| **period <= *at)
-        .map(|(period, value)| (*period, *value))
-        .collect();
-
-    values.sort_by_key(|(period, _)| *period);
-    let trailing: Vec<f64> = values
-        .into_iter()
-        .rev()
-        .take(window)
-        .map(|(_, value)| value)
-        .collect();
-    if trailing.len() == window && trailing.iter().all(|value| value.is_finite()) {
-        Some(trailing.iter().sum())
-    } else {
-        None
+    let mut period = *at;
+    let mut total = 0.0;
+    for index in 0..at.kind().periods_per_year() {
+        let value = results.get(node_id, &period)?;
+        if !value.is_finite() {
+            return None;
+        }
+        total += value;
+        if index + 1 < at.kind().periods_per_year() {
+            period = period.prev().ok()?;
+        }
     }
+    total.is_finite().then_some(total)
 }
 
 /// Leverage ratio (total debt / TTM EBITDA) at `at`. `None` if inputs missing

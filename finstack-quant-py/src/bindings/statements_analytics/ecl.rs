@@ -586,7 +586,9 @@ impl PyStageResult {
 /// ead : float
 ///     Drawn outstanding balance at the reporting date, in base currency.
 /// lgd : float
-///     Loss given default as a decimal fraction in ``[0, 1]``.
+///     Loss given default as a decimal fraction in ``[0, 1]``. For Stage 3,
+///     this is the undiscounted loss fraction: allowance is current EAD less
+///     discounted recovery ``(1 - lgd) * EAD``.
 /// eir : float
 ///     Effective interest rate as a decimal annual rate, used as the IFRS 9
 ///     discount rate.
@@ -985,7 +987,7 @@ impl PyEclBucket {
         self.inner.ead
     }
 
-    /// Discount factor at the bucket midpoint.
+    /// Discount factor at the bucket midpoint, or at recovery for Stage 3.
     #[getter]
     fn discount_factor(&self) -> f64 {
         self.inner.discount_factor
@@ -1274,8 +1276,7 @@ fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
 /// Raises
 /// ------
 /// ValueError
-///     If a staging invariant is violated (for example an unknown rating
-///     label reaching the PD source).
+///     If PDs are outside [0, 1], or maturity or staging thresholds are invalid.
 ///
 /// Examples
 /// --------
@@ -1327,7 +1328,7 @@ fn resolve_stage(
 ///     ``"stage3"``). ``None`` classifies the exposure first with the default
 ///     ``StagingConfig``.
 /// bucket_width_years : float | None
-///     Integration bucket width in years (``0.25`` = quarterly); ``None`` uses
+///     Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
 ///     the canonical policy default.
 /// stage3_time_to_recovery_years : float | None
 ///     Stage 3 discounting horizon to expected recovery, in years; ``None``
@@ -1385,7 +1386,7 @@ fn compute_ecl(
 ///     Measurement stage; ``None`` classifies the exposure first with the
 ///     default ``StagingConfig``.
 /// bucket_width_years : float | None
-///     Integration bucket width in years; ``None`` uses the canonical default.
+///     Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
 /// stage3_time_to_recovery_years : float | None
 ///     Stage 3 discounting horizon in years; ``None`` uses the canonical default.
 ///

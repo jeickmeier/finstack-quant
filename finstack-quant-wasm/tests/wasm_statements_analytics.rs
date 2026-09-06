@@ -192,3 +192,60 @@ fn pl_summary_report_text_returns_text() {
     let text = pl_summary_report_text(&results_json, line_items, periods).unwrap();
     assert!(!text.is_empty());
 }
+
+#[wasm_bindgen_test]
+fn regression_rejects_constant_predictor_and_unequal_lengths() {
+    let x = serde_wasm_bindgen::to_value(&vec![1.0, 1.0, 1.0]).unwrap();
+    let y = serde_wasm_bindgen::to_value(&vec![2.0, 4.0, 6.0]).unwrap();
+    assert!(regression_fair_value(x, y.clone(), 2.0, 6.0)
+        .unwrap()
+        .is_none());
+    let x = serde_wasm_bindgen::to_value(&vec![1.0, 2.0, 3.0, 4.0]).unwrap();
+    assert!(regression_fair_value(x, y, 2.0, 6.0).unwrap().is_none());
+}
+
+#[wasm_bindgen_test]
+fn monetary_goal_seek_returns_a_valid_updated_model() {
+    use finstack_quant_core::{currency::Currency, dates::PeriodId};
+    use finstack_quant_statements::{builder::ModelBuilder, types::AmountOrScalar};
+    let period = PeriodId::annual(2025);
+    let model = ModelBuilder::new("monetary-goal")
+        .periods("2025..2025", None)
+        .unwrap()
+        .value(
+            "revenue",
+            &[(
+                period,
+                AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
+            )],
+        )
+        .compute("profit", "revenue * 0.5")
+        .unwrap()
+        .build()
+        .unwrap();
+    let json = serde_json::to_string(&model).unwrap();
+    let result = goal_seek(
+        &json,
+        "profit",
+        "2025",
+        60.0,
+        "revenue",
+        "2025",
+        true,
+        Some(1.0),
+        Some(200.0),
+    )
+    .unwrap();
+    let output: serde_json::Value = serde_wasm_bindgen::from_value(result).unwrap();
+    let updated_json = output["updated_model_json"].as_str().unwrap();
+    let updated = ModelBuilder::from_spec(serde_json::from_str(updated_json).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    let results = finstack_quant_statements::evaluator::Evaluator::new()
+        .evaluate(&updated)
+        .unwrap();
+    let revenue = results.get_money("revenue", &period).unwrap();
+    assert_eq!(revenue.currency(), Currency::USD);
+    assert!((revenue.amount() - 120.0).abs() < 1e-8);
+}

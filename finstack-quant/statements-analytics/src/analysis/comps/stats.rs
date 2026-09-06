@@ -164,7 +164,8 @@ pub struct RegressionResult {
 /// Uses `OnlineCovariance` for numerically stable single-pass computation.
 ///
 /// Requires at least 3 data points. Returns `None` if the regression
-/// cannot be computed (e.g., zero variance in x).
+/// cannot be computed: unequal lengths, non-finite inputs or outputs, or
+/// zero variance in x.
 ///
 /// # Arguments
 ///
@@ -180,8 +181,13 @@ pub fn regression_fair_value(
     subject_x: f64,
     subject_y: f64,
 ) -> Option<RegressionResult> {
-    let n = x.len().min(y.len());
-    if n < 3 {
+    let n = x.len();
+    if n != y.len()
+        || n < 3
+        || !subject_x.is_finite()
+        || !subject_y.is_finite()
+        || x.iter().chain(y).any(|value| !value.is_finite())
+    {
         return None;
     }
 
@@ -192,6 +198,9 @@ pub fn regression_fair_value(
         oc.update(y[i], x[i]);
     }
 
+    if !oc.variance_y().is_finite() || oc.variance_y() <= 0.0 {
+        return None;
+    }
     let slope = oc.optimal_beta();
     let intercept = oc.mean_x() - slope * oc.mean_y();
     let corr = oc.correlation();
@@ -199,6 +208,12 @@ pub fn regression_fair_value(
     let fitted_value = intercept + slope * subject_x;
     let residual = subject_y - fitted_value;
 
+    if [slope, intercept, r_squared, fitted_value, residual]
+        .iter()
+        .any(|value| !value.is_finite())
+    {
+        return None;
+    }
     Some(RegressionResult {
         intercept,
         slope,

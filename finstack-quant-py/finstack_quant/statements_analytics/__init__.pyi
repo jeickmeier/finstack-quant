@@ -658,6 +658,9 @@ class ScorecardReport:
     ``data_json()`` includes the rated ``period``, the ``partial`` flag, and
     ``weight_coverage`` alongside the per-metric scores and rating.
 
+    With no usable positive-weight evidence, status is ``"failed"`` and the
+    ``rating`` and ``total_score`` data entries are ``None``; ``partial`` is true.
+
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ScorecardReport
@@ -4692,14 +4695,14 @@ class EclBucket:
     @property
     def discount_factor(self) -> float:
         """
-        Discount factor at the bucket midpoint.
+        Discount factor at the bucket midpoint, or at recovery for Stage 3.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Discount factor at the bucket midpoint.
+            Discount factor at the bucket midpoint, or at recovery for Stage 3.
         """
     @property
     def ecl(self) -> float:
@@ -5254,7 +5257,9 @@ class Exposure:
     ead : float
         Drawn outstanding balance at the reporting date, in base currency.
     lgd : float
-        Loss given default as a decimal fraction in ``[0, 1]``.
+        Loss given default as a decimal fraction in ``[0, 1]``. For Stage 3,
+        this is the undiscounted loss fraction; allowance is current EAD less
+        discounted recovery ``(1 - lgd) * EAD``.
     eir : float
         Effective interest rate as a decimal annual rate, used as the IFRS 9
         discount rate.
@@ -9912,8 +9917,7 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
     Raises
     ------
     ValueError
-        If a staging invariant is violated (for example an unknown rating
-        label reaching the PD source).
+        If PDs are outside [0, 1], or maturity or staging thresholds are invalid.
 
     Examples
     --------
@@ -9948,7 +9952,7 @@ def compute_ecl(
         ``"stage3"``). ``None`` classifies the exposure first with the default
         ``StagingConfig``.
     bucket_width_years : float | None
-        Integration bucket width in years (``0.25`` = quarterly); ``None`` uses
+        Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
         the canonical policy default.
     stage3_time_to_recovery_years : float | None
         Stage 3 discounting horizon to expected recovery, in years; ``None``
@@ -9994,7 +9998,7 @@ def compute_ecl_weighted(
         Measurement stage; ``None`` classifies the exposure first with the
         default ``StagingConfig``.
     bucket_width_years : float | None
-        Integration bucket width in years; ``None`` uses the canonical default.
+        Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
     stage3_time_to_recovery_years : float | None
         Stage 3 discounting horizon in years; ``None`` uses the canonical default.
 
@@ -10150,7 +10154,10 @@ def dcf_sensitivity(
     ufcf_node : str
         Node id containing unlevered free cash flow. Default ``"ufcf"``.
     net_debt_override : float | None
-        Flat net-debt amount used instead of the model-derived bridge.
+        Flat net-debt amount in model currency. Without an override, debt and
+        cash must be monetary in model currency and available at a period
+        ending on or before the inclusive valuation date; future balances are
+        rejected.
     wacc_sensitivity_bump : float | None
         Absolute shock to WACC and terminal growth in decimal (``0.01`` =
         +/-100bp); ``None`` uses the Rust ``DcfOptions`` default.
@@ -10225,7 +10232,10 @@ def evaluate_dcf(
     ufcf_node : str
         Node id containing unlevered free cash flow. Default ``"ufcf"``.
     net_debt_override : float | None
-        Flat net-debt amount used instead of the model-derived bridge.
+        Flat net-debt amount in model currency. Without an override, debt and
+        cash must be monetary in model currency and available at a period
+        ending on or before the inclusive valuation date; future balances are
+        rejected.
     mid_year_convention : bool
         Mid-year discounting. Default ``False`` (year-end).
     max_stable_growth_rate : float | None
@@ -10303,13 +10313,14 @@ def evaluate_lbo(
     entry_multiple : float
         Entry multiple in turns (``8.5`` = 8.5x).
     entry_metric_node : str
-        Node supplying the entry metric at the first period (e.g. ``"ebitda"``).
+        Monetary node in model currency supplying the entry metric at the
+        first period (e.g. ``"ebitda"``).
     exit_multiple : float
         Exit multiple in turns.
     exit_metric_node : str
-        Node supplying the exit metric at ``exit_period``.
+        Monetary node in model currency supplying the exit metric at ``exit_period``.
     exit_net_debt_node : str
-        Node supplying net debt at ``exit_period``.
+        Monetary node in model currency supplying net debt at ``exit_period``.
     exit_period : str
         Exit period label (``"2029"`` or ``"2029Q4"``).
     sources : list[tuple[str, float]]
@@ -10681,7 +10692,7 @@ def regression_fair_value(
     -------
     RegressionResult | None
         Typed fit, or ``None`` if fewer than three observations are available
-        or X has zero variance.
+        or X has zero variance, lengths differ, or any input/output is non-finite.
 
     Examples
     --------

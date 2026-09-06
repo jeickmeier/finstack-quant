@@ -193,10 +193,10 @@ pub struct LboResult {
 ///
 /// Returns an error if the model cannot be evaluated, if the model has no
 /// periods or no `"currency"` metadata, if any configured node is missing at
-/// the period it is read from, if any numeric input or model value is not
-/// finite, if a tranche amount is negative, if the resulting sponsor equity
-/// check is not strictly positive (MOIC would be undefined), or if the check
-/// suite fails to run.
+/// the period it is read from or is not monetary in model currency, if any
+/// numeric input or model value is not finite, if a tranche amount is
+/// negative, if the resulting sponsor equity check is not strictly positive
+/// (MOIC would be undefined), or if the check suite fails to run.
 ///
 /// # Examples
 ///
@@ -242,14 +242,13 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
     let results = evaluator.evaluate(model)?;
 
     let node_value = |node: &str, period: &PeriodId, role: &str| -> Result<f64> {
-        let value = results.get(node, period).ok_or_else(|| {
-            Error::Eval(format!(
+        if results.get(node, period).is_none() {
+            return Err(Error::Eval(format!(
                 "LBO {role} requires node '{node}' at period {period}; the node is absent from \
                  the evaluated model results"
-            ))
-        })?;
-        validate_finite(&format!("node '{node}' at period {period}"), value)?;
-        Ok(value)
+            )));
+        }
+        super::corporate::monetary_node_value(&results, node, period, currency)
     };
 
     let entry_metric = node_value(&config.entry_metric_node, &entry_period, "entry valuation")?;
@@ -355,15 +354,31 @@ mod tests {
             .value(
                 "ebitda",
                 &[
-                    (PeriodId::annual(2025), AmountOrScalar::scalar(22.0)),
-                    (PeriodId::annual(2026), AmountOrScalar::scalar(26.4)),
+                    (
+                        PeriodId::annual(2025),
+                        AmountOrScalar::amount(22.0, finstack_quant_core::currency::Currency::USD)
+                            .unwrap(),
+                    ),
+                    (
+                        PeriodId::annual(2026),
+                        AmountOrScalar::amount(26.4, finstack_quant_core::currency::Currency::USD)
+                            .unwrap(),
+                    ),
                 ],
             )
             .value(
                 "total_debt",
                 &[
-                    (PeriodId::annual(2025), AmountOrScalar::scalar(115.0)),
-                    (PeriodId::annual(2026), AmountOrScalar::scalar(35.0)),
+                    (
+                        PeriodId::annual(2025),
+                        AmountOrScalar::amount(115.0, finstack_quant_core::currency::Currency::USD)
+                            .unwrap(),
+                    ),
+                    (
+                        PeriodId::annual(2026),
+                        AmountOrScalar::amount(35.0, finstack_quant_core::currency::Currency::USD)
+                            .unwrap(),
+                    ),
                 ],
             )
             .with_meta("currency", serde_json::json!("USD"))
@@ -475,5 +490,16 @@ mod tests {
             err.to_string().contains("non-negative"),
             "unexpected message: {err}"
         );
+    }
+    #[test]
+    fn evaluate_lbo_rejects_currency_relabeling() {
+        let mut model = demo_model();
+        model
+            .meta
+            .insert("currency".into(), serde_json::json!("EUR"));
+        let error = evaluate_lbo(&model, &demo_config()).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("must be finite monetary data in EUR"));
     }
 }

@@ -48,8 +48,9 @@ pub fn run_sensitivity(model_json: &str, config_json: &str) -> Result<JsValue, J
 /// # Errors
 ///
 /// Rejects malformed result or configuration JSON, empty metric or period
-/// selections, a requested value missing from either result, or failure to
-/// serialize the variance report to JavaScript.
+/// selections, mismatched metric types or currencies, a requested value
+/// missing from either result, or failure to serialize the variance report
+/// to JavaScript.
 /// @param base_json - Base statement-result JSON.
 /// @param comparison_json - Comparison statement-result JSON.
 /// @param config_json - Configuration JSON for this call.
@@ -177,7 +178,7 @@ pub fn generate_tornado_entries(
 /// @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
 /// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
 /// @param ufcf_node - Node identifier holding unlevered free cash flow for the forecast periods.
-/// @param net_debt_override - Optional flat net-debt amount used instead of the model-derived bridge.
+/// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
 /// @param wacc_sensitivity_bump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
 /// @param wacc_denominator_epsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
 /// @param max_stable_growth_rate - Maximum perpetual stable growth rate; omitted uses the canonical 5% default.
@@ -254,10 +255,10 @@ pub fn dcf_sensitivity(
 /// object.
 /// @param model_json - Financial-model specification JSON.
 /// @param entry_multiple - Entry valuation multiple applied to the entry metric (8.5 = 8.5x).
-/// @param entry_metric_node - Node identifier supplying the entry valuation metric, read at the model's first period.
+/// @param entry_metric_node - Monetary node in model currency supplying the entry metric at the first period.
 /// @param exit_multiple - Exit valuation multiple applied to the exit metric (9.5 = 9.5x).
-/// @param exit_metric_node - Node identifier supplying the exit valuation metric, read at the exit period.
-/// @param exit_net_debt_node - Node identifier supplying net debt outstanding at the exit period, where a modelled amortisation schedule lands.
+/// @param exit_metric_node - Monetary node in model currency supplying the exit metric at the exit period.
+/// @param exit_net_debt_node - Monetary node in model currency supplying net debt at the exit period.
 /// @param exit_period - Model period label at which the sponsor exits, e.g. "2029".
 /// @param sources_json - Canonical JSON array of funded debt tranches at close, each {"name", "amount"} in the model currency.
 /// @param transaction_fees - Transaction fees and expenses funded at close, in the model currency.

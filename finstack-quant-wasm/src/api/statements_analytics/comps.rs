@@ -72,7 +72,8 @@ pub fn peer_stats(data: JsValue) -> Result<Option<JsValue>, JsValue> {
 ///
 /// Rejects when `x_values` or `y_values` is not a numeric JavaScript array, or
 /// the regression result cannot be serialized. Fewer than three paired values
-/// or an unidentifiable fit returns `undefined`.
+/// or an unidentifiable fit returns `undefined`, as do unequal lengths and
+/// non-finite numeric inputs or outputs.
 /// @param x_values - Comparable-company independent-variable values aligned with y_values.
 /// @param y_values - Comparable-company dependent-variable values aligned with x_values.
 /// @param subject_x - Subject company's independent-variable value for the fitted regression.

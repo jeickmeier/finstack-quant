@@ -45,7 +45,9 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
+use finstack_quant_statements::types::{
+    AmountOrScalar, FinancialModelSpec, NodeSpec, NodeValueType,
+};
 use std::cell::RefCell;
 
 /// Perform goal seek on a financial model.
@@ -193,9 +195,12 @@ pub fn goal_seek(
             // `values` map here would copy every period on every solver
             // iteration; Brent's method probes the objective many times, so a
             // per-iteration map clone is pure overhead.
+            let Ok(amount) = amount_for_node(node, driver_value) else {
+                return f64::NAN;
+            };
             node.values
                 .get_or_insert_with(Default::default)
-                .insert(driver_period, AmountOrScalar::scalar(driver_value));
+                .insert(driver_period, amount);
         }
 
         match eval.evaluate_prepared(temp_model, &prepared) {
@@ -282,6 +287,13 @@ pub fn goal_seek(
     apply_solution(model, driver_node, driver_period, update_model, solution)
 }
 
+fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {
+    match node.value_type {
+        Some(NodeValueType::Monetary { currency }) => Ok(AmountOrScalar::amount(value, currency)?),
+        _ => Ok(AmountOrScalar::scalar(value)),
+    }
+}
+
 fn apply_solution(
     model: &mut FinancialModelSpec,
     driver_node: &str,
@@ -290,11 +302,14 @@ fn apply_solution(
     value: f64,
 ) -> Result<f64> {
     if update_model {
-        if let Some(node) = model.nodes.get_mut(driver_node) {
+        let mut solved = model.clone();
+        if let Some(node) = solved.nodes.get_mut(driver_node) {
             let mut values = node.values.clone().unwrap_or_default();
-            values.insert(driver_period, AmountOrScalar::scalar(value));
+            values.insert(driver_period, amount_for_node(node, value)?);
             node.values = Some(values);
         }
+        solved.validate_semantics()?;
+        *model = solved;
     }
     Ok(value)
 }

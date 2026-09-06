@@ -4,18 +4,16 @@ use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 use super::engine::{compute_ecl_weighted, EclConfigBuilder, MacroScenario, WeightedEclResult};
-use super::staging::{classify_stage, StageResult, StagingConfig};
+use super::staging::{classify_stage_with_pds, StageResult, StagingConfig};
 use super::types::{Exposure, PdTermStructure, QualitativeFlags, RawPdCurve, Stage};
 
-const CURRENT_RATING: &str = "current";
-const ORIGINATION_RATING: &str = "origination";
 const SCENARIO_RATING: &str = "scenario";
 
 /// Inputs for the simplified IFRS 9 stage-classification workflow.
 ///
 /// This request applies the canonical ECL policy defaults and constructs the
-/// synthetic rating-based exposure used when callers supply current and
-/// origination lifetime PDs directly.
+/// exposure used when callers supply current and origination lifetime PDs
+/// directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EclStageRequest {
@@ -58,7 +56,7 @@ impl EclStageRequest {
     ///
     /// The simplified workflow intentionally disables relative-PD, rating,
     /// qualitative, and cure-state inputs that are absent from this request.
-    /// Use [`classify_stage`] directly for the complete staging surface.
+    /// Use [`super::staging::classify_stage`] directly for the complete staging surface.
     ///
     /// # Returns
     ///
@@ -66,8 +64,8 @@ impl EclStageRequest {
     ///
     /// # Errors
     ///
-    /// Returns an error if the synthetic PD source cannot resolve the current
-    /// or origination rating used during SICR comparison.
+    /// Returns an error for non-finite or out-of-range probabilities, maturity,
+    /// or policy thresholds.
     pub fn classify(&self) -> Result<StageResult> {
         let defaults = StagingConfig::default();
         let config = StagingConfig {
@@ -138,33 +136,20 @@ impl EclStageRequest {
 ///
 /// # Errors
 ///
-/// Propagates [`classify_stage`] errors; the synthetic PD source built here
-/// resolves every rating label the exposure carries, so lookup failures only
-/// arise from the underlying staging invariants.
+/// Rejects non-finite or out-of-range PDs, maturity and policy thresholds.
+/// Current and origination PDs remain separate even when rating labels match.
 pub fn classify_exposure(
     exposure: &Exposure,
     current_pd: f64,
     origination_pd: f64,
     config: &StagingConfig,
 ) -> Result<StageResult> {
-    let mut staged = exposure.clone();
-    let current_label = staged
-        .current_rating
-        .clone()
-        .unwrap_or_else(|| CURRENT_RATING.to_string());
-    let origination_label = staged
-        .origination_rating
-        .clone()
-        .unwrap_or_else(|| ORIGINATION_RATING.to_string());
-    staged.current_rating = Some(current_label.clone());
-    staged.origination_rating = Some(origination_label.clone());
-    let pd_source = RequestPdSource {
-        current_label,
-        origination_label,
-        current_pd,
-        origination_pd,
-    };
-    classify_stage(&staged, &pd_source, config)
+    if !(0.0..=1.0).contains(&current_pd) || !(0.0..=1.0).contains(&origination_pd) {
+        return Err(Error::Validation(
+            "Staging PDs must be finite probabilities in [0, 1]".into(),
+        ));
+    }
+    classify_stage_with_pds(exposure, config, || Ok(Some((origination_pd, current_pd))))
 }
 
 /// Compute probability-weighted ECL for an exposure from cumulative-PD schedules.
@@ -323,27 +308,6 @@ impl EclRequest {
             self.bucket_width_years,
             self.stage3_time_to_recovery_years,
         )
-    }
-}
-
-struct RequestPdSource {
-    current_label: String,
-    origination_label: String,
-    current_pd: f64,
-    origination_pd: f64,
-}
-
-impl PdTermStructure for RequestPdSource {
-    fn cumulative_pd(&self, rating: &str, _t: f64) -> Result<f64> {
-        if rating == self.current_label {
-            Ok(self.current_pd)
-        } else if rating == self.origination_label {
-            Ok(self.origination_pd)
-        } else {
-            Err(Error::Validation(format!(
-                "classify_exposure: unknown rating label '{rating}'"
-            )))
-        }
     }
 }
 

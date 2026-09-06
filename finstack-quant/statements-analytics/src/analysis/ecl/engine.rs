@@ -126,7 +126,8 @@ pub enum LgdType {
 #[serde(deny_unknown_fields)]
 pub struct EclConfig {
     /// Time bucket width in years for the PD-LGD-EAD integration.
-    /// Default: quarterly (0.25).
+    /// Must be finite and at least 0.0001 years, limiting a 100-year
+    /// exposure to one million buckets. Default: quarterly (0.25).
     pub bucket_width_years: f64,
 
     /// Macro scenario specifications with probability weights.
@@ -155,9 +156,9 @@ pub struct EclConfig {
 
     /// Assumed time (in years) from the reporting date to recovery
     /// realisation for Stage 3 (credit-impaired) exposures. Used to
-    /// discount the `LGD x EAD` shortfall at the EIR per IFRS 9 5.5.33 /
-    /// B5.5.33. Default: 1.0 year, a common practical recovery-lag
-    /// assumption.
+    /// discount expected recoveries `(1 - LGD) x EAD` at the EIR.
+    /// The allowance is current EAD less those discounted recoveries.
+    /// Default: 1.0 year, a common practical recovery-lag assumption.
     #[serde(default = "default_stage3_time_to_recovery_years")]
     pub stage3_time_to_recovery_years: f64,
 }
@@ -171,8 +172,8 @@ fn default_stage3_time_to_recovery_years() -> f64 {
 
 impl EclConfig {
     /// Validate the configuration invariants: scenario weights sum to 1.0
-    /// (within 1e-6), bucket width is strictly positive, and at least one
-    /// scenario is present.
+    /// (within 1e-6), bucket width is finite and at least 0.0001 years, and
+    /// at least one scenario is present.
     ///
     /// `EclConfig` exposes public fields and can be constructed directly
     /// (bypassing [`EclConfigBuilder`]), so every public entry point that
@@ -192,6 +193,14 @@ impl EclConfig {
                     scenario.id, scenario.weight
                 )));
             }
+            if scenario
+                .lgd_override
+                .is_some_and(|lgd| !(0.0..=1.0).contains(&lgd))
+            {
+                return Err(Error::Validation(
+                    "scenario LGD must be finite and in [0, 1]".into(),
+                ));
+            }
             total_weight += scenario.weight;
         }
         if (total_weight - 1.0).abs() > 1e-6 {
@@ -199,9 +208,9 @@ impl EclConfig {
                 "Scenario weights must sum to 1.0, got {total_weight:.6}"
             )));
         }
-        if self.bucket_width_years <= 0.0 {
+        if !self.bucket_width_years.is_finite() || self.bucket_width_years < 1e-4 {
             return Err(Error::Validation(
-                "bucket_width_years must be positive".to_string(),
+                "bucket_width_years must be finite and at least 0.0001 years".to_string(),
             ));
         }
         if self.scenarios.is_empty() {
@@ -281,7 +290,7 @@ impl EclConfig {
 ///
 /// Validates configuration on `build()`:
 /// - Scenario weights must sum to 1.0 (within 1e-6 tolerance)
-/// - Bucket width must be positive
+/// - Bucket width must be finite and at least 0.0001 years
 ///
 /// # Examples
 ///
@@ -428,7 +437,7 @@ impl EclConfigBuilder {
     /// # Arguments
     ///
     /// * `years` - Time from reporting date to expected recovery realisation
-    ///   used to discount the Stage 3 shortfall (default 1.0).
+    ///   used to discount Stage 3 recoveries (default 1.0).
     ///
     /// # Returns
     ///
@@ -447,7 +456,8 @@ impl EclConfigBuilder {
     /// # Errors
     ///
     /// Returns an error when scenario weights do not sum to 1.0, when bucket
-    /// width is not positive, or when no scenarios are configured.
+    /// width is not finite and at least 0.0001 years, or when no scenarios are
+    /// configured.
     pub fn build(self) -> Result<EclConfig> {
         self.config.validate()?;
         Ok(self.config)
@@ -469,14 +479,14 @@ pub struct EclBucket {
     pub t_end: f64,
     /// Unconditional default probability for the bucket,
     /// `cumPD(t_end) - cumPD(t_start)`. This is the quantity that
-    /// multiplies `LGD * EAD * DF` directly; it is *not* the
-    /// conditional-on-survival marginal PD.
+    /// multiplies `LGD * EAD * DF` for performing exposures. Stage 3
+    /// sets it to one and measures EAD less discounted recoveries.
     pub marginal_pd: f64,
     /// LGD used for this bucket.
     pub lgd: f64,
     /// EAD used for this bucket.
     pub ead: f64,
-    /// Discount factor at the bucket midpoint.
+    /// Discount factor at the bucket midpoint, or at recovery for Stage 3.
     pub discount_factor: f64,
     /// ECL contribution from this bucket.
     pub ecl: f64,
@@ -562,8 +572,8 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 ///
 /// For Stage 3 exposures the obligor has already defaulted, so the
 /// performing PD curve does not apply: the allowance is measured as the
-/// present value of the expected cash shortfall with PD ≡ 1, i.e.
-/// `ECL = LGD x EAD x DF(t_recovery)` where `t_recovery` is
+/// current carrying exposure less discounted recoveries with PD ≡ 1, i.e.
+/// `ECL = EAD - (1 - LGD) x EAD x DF(t_recovery)` where `t_recovery` is
 /// [`EclConfig::stage3_time_to_recovery_years`]. This matches IFRS 9
 /// 5.5.33 / B5.5.33 (allowance = gross carrying amount − PV of expected
 /// recoveries discounted at the EIR). The result carries a single bucket
@@ -627,16 +637,6 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 ///
 /// - IFRS 9 B5.5.28-33 -- Measurement of expected credit losses. `docs/REFERENCES.md#ifrs-9-impairment`
 /// - Duffie & Singleton (2003), *Credit Risk: Pricing, Measurement and Management*. `docs/REFERENCES.md#duffie-singleton-1999`
-///
-/// # Arguments
-///
-/// * `exposure` - Validated credit exposure providing EAD, LGD, EIR, maturity,
-///   rating, and any EAD schedule for the expected-loss calculation.
-/// * `stage` - Assigned IFRS 9 stage that selects the 12-month, lifetime, or
-///   credit-impaired calculation horizon.
-/// * `pd_source` - Term structure supplying cumulative default probabilities
-///   for the exposure's current rating.
-/// * `config` - ECL bucketing, scenarios, and stage-3 recovery-time policy.
 pub fn compute_ecl(
     exposure: &Exposure,
     stage: Stage,
@@ -646,18 +646,23 @@ pub fn compute_ecl(
     exposure.validate()?;
     config.validate()?;
 
-    // Stage 3: credit-impaired, PD ≡ 1. The allowance is the discounted
-    // expected shortfall LGD x EAD x DF(t_recovery) per IFRS 9 5.5.33 /
-    // B5.5.33. The PD curve is still validated for the exposure rating so
-    // invalid curve/rating mappings are not silently hidden by the shortcut.
+    // Stage 3: current carrying exposure less the present value of recoveries.
+    // LGD is the undiscounted fraction lost at recovery. The PD curve is still
+    // validated for the exposure rating so invalid curve/rating mappings are
+    // not silently hidden by the shortcut.
     if stage == Stage::Stage3 {
         let rating = exposure.current_rating.as_deref().unwrap_or("NR");
-        pd_source.cumulative_pd(rating, 0.0)?;
+        if !(0.0..=1.0).contains(&pd_source.cumulative_pd(rating, 0.0)?) {
+            return Err(Error::Validation(
+                "PD source must return finite probabilities in [0, 1]".into(),
+            ));
+        }
         let t_recovery = config.stage3_time_to_recovery_years;
         let lgd = effective_lgd(config, exposure.lgd)?;
         let ead = exposure.ead_at(0.0)?;
         let df = 1.0 / (1.0 + exposure.eir).powf(t_recovery);
-        let ecl = lgd * ead * df;
+        let ecl = ead - (1.0 - lgd) * ead * df;
+        validate_finite_ecl(ecl)?;
         return Ok(EclResult {
             exposure_id: exposure.id.clone(),
             stage,
@@ -705,7 +710,12 @@ pub fn compute_ecl(
         // curve (see module-level docs).
         let pd_start = pd_source.cumulative_pd(rating, t_start)?;
         let pd_end = pd_source.cumulative_pd(rating, t_end)?;
-        let uncond_mpd = (pd_end - pd_start).max(0.0);
+        if !(0.0..=1.0).contains(&pd_start) || !(pd_start..=1.0).contains(&pd_end) {
+            return Err(Error::Validation(
+                "PD source must return finite non-decreasing probabilities in [0, 1]".into(),
+            ));
+        }
+        let uncond_mpd = pd_end - pd_start;
         let ead = exposure.ead_at(t_mid)?;
         let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
 
@@ -723,6 +733,7 @@ pub fn compute_ecl(
         });
     }
 
+    validate_finite_ecl(ecl)?;
     Ok(EclResult {
         exposure_id: exposure.id.clone(),
         stage,
@@ -847,6 +858,7 @@ pub fn compute_ecl_weighted(
         scenario_results.push((scenario.id.clone(), scenario.weight, result));
     }
 
+    validate_finite_ecl(weighted_ecl)?;
     Ok(WeightedEclResult {
         exposure_id: exposure.id.clone(),
         stage,
@@ -872,6 +884,14 @@ pub(crate) fn validate_scenario_weights<'a>(
                 "scenario '{}' weight must be finite and non-negative",
                 scenario.id
             )));
+        }
+        if scenario
+            .lgd_override
+            .is_some_and(|lgd| !(0.0..=1.0).contains(&lgd))
+        {
+            return Err(Error::Validation(
+                "scenario LGD must be finite and in [0, 1]".into(),
+            ));
         }
         total_weight += scenario.weight;
     }
@@ -1023,6 +1043,16 @@ impl<'a> EclEngine<'a> {
     }
 }
 
+/// Reject arithmetic overflow before publishing an allowance.
+pub(super) fn validate_finite_ecl(ecl: f64) -> Result<()> {
+    if !ecl.is_finite() {
+        return Err(Error::Validation(
+            "ECL calculation produced a non-finite allowance".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1132,15 +1162,15 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_ecl_stage3_is_discounted_lgd_ead() {
+    fn test_compute_ecl_stage3_is_carrying_value_less_pv_recovery() {
         let exposure = make_exposure();
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
         let result = compute_ecl(&exposure, Stage::Stage3, &curve, &config).unwrap();
 
-        // PD ≡ 1: ECL = LGD x EAD x DF(t_recovery), default t_recovery = 1.0
-        let expected = 0.45 * 1_000_000.0 / 1.05_f64;
+        // PD ≡ 1: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery), default t_recovery = 1.0
+        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64;
         assert!(
             (result.ecl - expected).abs() < 1e-6,
             "Stage 3 ECL {} vs expected {}",
@@ -1175,7 +1205,7 @@ mod tests {
             .unwrap();
 
         let result = compute_ecl(&exposure, Stage::Stage3, &curve, &config).unwrap();
-        let expected = 0.45 * 1_000_000.0 / 1.05_f64.powi(2);
+        let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64.powi(2);
         assert!((result.ecl - expected).abs() < 1e-6);
     }
 

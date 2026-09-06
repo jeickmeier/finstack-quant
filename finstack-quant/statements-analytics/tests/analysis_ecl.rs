@@ -62,18 +62,18 @@ impl PdTermStructure for ForecastHorizonGuardCurve {
 // Stage 3 measurement (IFRS 9 5.5.33 / B5.5.33)
 
 #[test]
-fn stage3_ecl_is_discounted_lgd_times_ead() {
+fn stage3_ecl_is_carrying_value_less_pv_recovery() {
     let exp = exposure("defaulted-1");
     let config = EclConfig::default();
 
     let result = compute_ecl(&exp, Stage::Stage3, &bbb_curve(), &config).unwrap();
 
-    // PD ≡ 1 for credit-impaired assets: ECL = LGD x EAD x DF(t_recovery),
+    // PD ≡ 1 for credit-impaired assets: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery),
     // with default time-to-recovery of 1.0 year at EIR 5%.
-    let expected = 0.45 * 1_000_000.0 / 1.05;
+    let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05;
     assert!(
         (result.ecl - expected).abs() < 1e-6,
-        "Stage 3 ECL {} != discounted LGD x EAD {}",
+        "Stage 3 ECL {} != carrying value less PV recovery {}",
         result.ecl,
         expected
     );
@@ -203,10 +203,10 @@ fn cecl_impaired_dpd_uses_lgd_ead_shortcut() {
     exp.days_past_due = 90;
     let result = engine.compute_cecl(&exp).unwrap();
 
-    let expected = exp.lgd * exp.ead / 1.05;
+    let expected = exp.ead - (1.0 - exp.lgd) * exp.ead / 1.05;
     assert!(
         (result.ecl - expected).abs() < 1e-6,
-        "CECL impaired ECL {} != discounted LGD x EAD {}",
+        "CECL impaired ECL {} != carrying value less PV recovery {}",
         result.ecl,
         expected
     );
@@ -373,4 +373,89 @@ fn undrawn_ccf_scales_stage1_ecl() {
         result.ecl,
         expected
     );
+}
+
+#[test]
+fn unchanged_rating_still_compares_distinct_pd_snapshots() {
+    use finstack_quant_statements_analytics::analysis::{classify_exposure, StagingConfig};
+    let exp = exposure("same-rating");
+    assert_eq!(
+        classify_exposure(&exp, 0.20, 0.01, &StagingConfig::default())
+            .unwrap()
+            .stage,
+        Stage::Stage2
+    );
+    for invalid in [f64::NAN, f64::INFINITY, -0.1, 1.1] {
+        assert!(classify_exposure(&exp, invalid, 0.01, &StagingConfig::default()).is_err());
+        assert!(classify_exposure(&exp, 0.01, invalid, &StagingConfig::default()).is_err());
+    }
+}
+
+#[test]
+fn impaired_full_loss_is_not_discounted_and_delayed_recovery_increases_loss() {
+    let mut exp = exposure("recovery");
+    let curve = bbb_curve();
+    exp.lgd = 1.0;
+    let config = EclConfig::default();
+    assert_eq!(
+        compute_ecl(&exp, Stage::Stage3, &curve, &config)
+            .unwrap()
+            .ecl,
+        exp.ead
+    );
+    exp.lgd = 0.4;
+    let immediate = EclConfig {
+        stage3_time_to_recovery_years: 0.0,
+        ..config.clone()
+    };
+    let later = compute_ecl(&exp, Stage::Stage3, &curve, &config)
+        .unwrap()
+        .ecl;
+    assert!(
+        later
+            > compute_ecl(&exp, Stage::Stage3, &curve, &immediate)
+                .unwrap()
+                .ecl
+    );
+    exp.days_past_due = 90;
+    let scenario = MacroScenario {
+        id: "base".into(),
+        weight: 1.0,
+        lgd_override: None,
+    };
+    let engine = CeclEngine::new(CeclConfig::default(), vec![(&scenario, &curve)]).unwrap();
+    assert!((engine.compute_cecl(&exp).unwrap().ecl - later).abs() < 1e-8);
+    exp.lgd = 1.0;
+    assert_eq!(engine.compute_cecl(&exp).unwrap().ecl, exp.ead);
+}
+
+#[test]
+fn ecl_rejects_non_finite_curves_and_configs() {
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(RawPdCurve::new("BBB", vec![(0.0, 0.0), (invalid, 0.1)]).is_err());
+        assert!(EclConfig {
+            bucket_width_years: invalid,
+            ..Default::default()
+        }
+        .validate()
+        .is_err());
+        assert!(CeclConfig {
+            bucket_width_years: invalid,
+            ..Default::default()
+        }
+        .validate()
+        .is_err());
+        assert!(CeclConfig {
+            forecast_horizon_years: invalid,
+            ..Default::default()
+        }
+        .validate()
+        .is_err());
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 1.0,
+            lgd_override: Some(invalid),
+        };
+        assert!(CeclEngine::new(CeclConfig::default(), vec![(&scenario, &bbb_curve())]).is_err());
+    }
 }

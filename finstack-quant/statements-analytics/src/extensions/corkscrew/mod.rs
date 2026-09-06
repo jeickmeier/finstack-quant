@@ -231,6 +231,11 @@ impl CorkscrewExtension {
         let _span = tracing::info_span!("statements_analytics.corkscrew.execute").entered();
 
         let config = self.config.clone();
+        if !config.tolerance.is_finite() || config.tolerance < 0.0 {
+            return Err(finstack_quant_statements::error::Error::invalid_input(
+                "Corkscrew tolerance must be finite and non-negative",
+            ));
+        }
 
         let mut validations = Vec::new();
         let mut errors = Vec::new();
@@ -426,6 +431,7 @@ impl CorkscrewExtension {
             }
 
             let error = (curr_balance - expected_balance).abs();
+            require_finite(error)?;
             validation.max_error = validation.max_error.max(error);
             validation.periods_validated += 1;
 
@@ -484,6 +490,7 @@ impl CorkscrewExtension {
             }
 
             let imbalance = (assets - (liabilities + equity)).abs();
+            require_finite(imbalance)?;
             max_imbalance = max_imbalance.max(imbalance);
         }
 
@@ -492,6 +499,15 @@ impl CorkscrewExtension {
             is_balanced: max_imbalance <= tolerance,
         }))
     }
+}
+
+fn require_finite(value: f64) -> Result<()> {
+    if !value.is_finite() {
+        return Err(finstack_quant_statements::error::Error::invalid_input(
+            "Corkscrew balances, changes, and reconciliation errors must be finite",
+        ));
+    }
+    Ok(())
 }
 
 /// Add signed flow-node values for the current period into `expected_balance`.
