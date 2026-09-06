@@ -9,7 +9,6 @@ pub(super) fn apply(
     inputs: &AttributionInputs<'_>,
     attribution: &mut PnlAttribution,
     non_finite_detected: &mut bool,
-    realized_period_cash: Money,
 ) -> Result<()> {
     let time_period_days = inputs.time_period_days;
 
@@ -20,17 +19,14 @@ pub(super) fn apply(
 
     // Theta / CarryTotal / CouponIncome / PullToPar / RollDown / FundingCost
     // are PERIOD TOTALS over the producer's `theta_period` (default 1D),
-    // capped at expiry. Discrete coupon-like metrics must not be linearly
-    // extrapolated: a missing `theta_period_days` stamp on a window other
-    // than the 1-day default is a hard error, and CouponIncome is replaced
-    // by realized `[T0, T1)` cash when the window differs from the producer
-    // horizon.
+    // capped at expiry. PullToPar and RollDown also contain payment-date
+    // price drops, so replacing only CouponIncome cannot make linear
+    // rescaling valid. Require a matching horizon for every carry metric.
     let theta_horizon_days = inputs
         .val_t0
         .measures
         .get(MetricId::ThetaPeriodDays.as_str())
-        .copied()
-        .filter(|d| d.is_finite() && *d > 0.0);
+        .copied();
 
     let has_carry_total = inputs
         .val_t0
@@ -47,105 +43,62 @@ pub(super) fn apply(
         .measures
         .get(MetricId::CouponIncome.as_str())
         .is_some();
+    let has_carry = has_carry_total || has_theta || has_coupon;
 
-    if time_period_days > 1.0
-        && theta_horizon_days.is_none()
-        && (has_carry_total || has_theta || has_coupon)
-    {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "metrics-based carry requires theta_period_days when the attribution \
-             window is {time_period_days} days (≠ 1-day producer default); \
-             discrete coupons must not be linearly extrapolated"
-        )));
-    }
-
-    let carry_scale = match theta_horizon_days {
-        Some(horizon) => time_period_days / horizon,
-        None => 1.0,
-    };
-    let scale_differs_from_horizon = (carry_scale - 1.0).abs() > 1e-9;
-
-    if scale_differs_from_horizon && has_theta && !has_carry_total {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "metrics-based Theta requires a matching theta_period_days horizon ({time_period_days} days); \
-             a total-return Theta cannot be scaled across discrete cashflows"
-        )));
-    }
-
-    if let Some(horizon) = theta_horizon_days {
-        if (horizon - time_period_days).abs() > 1e-9 {
-            attribution.meta.notes.push(format!(
-                "Carry metrics: continuous legs normalized from a {horizon}-day \
-                 producer horizon to the {time_period_days}-day attribution window; \
-                 coupon income uses realized period cash, not a linear scale"
-            ));
+    if has_carry {
+        match theta_horizon_days {
+            None if time_period_days > 1.0 => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "metrics-based carry requires theta_period_days when the attribution \
+                     window is {time_period_days} days (≠ 1-day producer default); \
+                     discrete coupons must not be linearly extrapolated"
+                )));
+            }
+            Some(horizon)
+                if !horizon.is_finite()
+                    || horizon <= 0.0
+                    || (horizon - time_period_days).abs() > 1e-9 =>
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "metrics-based carry requires a matching theta_period_days horizon ({time_period_days} days); \
+                     recompute carry metrics over the attribution window because coupon-related price drops cannot be scaled"
+                )));
+            }
+            _ => {}
         }
     }
 
-    if scale_differs_from_horizon && !has_coupon && (has_carry_total || has_theta) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "metrics-based carry cannot linearly scale CarryTotal/Theta across a \
-             {time_period_days}-day window that differs from the producer horizon; \
-             request CouponIncome (realized cash is used) or stamp a matching \
-             theta_period_days"
-        )));
-    }
-
-    let get_scaled = |id: MetricId, notes: &mut Vec<String>, flag: &mut bool| -> Option<Money> {
-        inputs.val_t0.measures.get(id.as_str()).map(|value| {
-            factor_money_or_invalid(value * carry_scale, inputs.ccy, id.as_str(), notes, flag)
-        })
+    let get_money = |id: MetricId, notes: &mut Vec<String>, flag: &mut bool| -> Option<Money> {
+        inputs
+            .val_t0
+            .measures
+            .get(id.as_str())
+            .map(|value| factor_money_or_invalid(*value, inputs.ccy, id.as_str(), notes, flag))
     };
 
     if has_carry_total {
-        let coupon_income = if scale_differs_from_horizon {
-            Some(realized_period_cash)
-        } else {
-            inputs
-                .val_t0
-                .measures
-                .get(MetricId::CouponIncome.as_str())
-                .map(|value| {
-                    factor_money_or_invalid(
-                        *value,
-                        inputs.ccy,
-                        MetricId::CouponIncome.as_str(),
-                        &mut attribution.meta.notes,
-                        non_finite_detected,
-                    )
-                })
-        };
-
-        let pull_to_par = get_scaled(
+        let coupon_income = get_money(
+            MetricId::CouponIncome,
+            &mut attribution.meta.notes,
+            non_finite_detected,
+        );
+        let pull_to_par = get_money(
             MetricId::PullToPar,
             &mut attribution.meta.notes,
             non_finite_detected,
         );
-        let roll_down = get_scaled(
+        let roll_down = get_money(
             MetricId::RollDown,
             &mut attribution.meta.notes,
             non_finite_detected,
         );
-        let funding_cost = get_scaled(
+        let funding_cost = get_money(
             MetricId::FundingCost,
             &mut attribution.meta.notes,
             non_finite_detected,
         );
 
-        if scale_differs_from_horizon {
-            let coupon_amt = coupon_income.map(|m| m.amount()).unwrap_or(0.0);
-            let ptp_amt = pull_to_par.map(|m| m.amount()).unwrap_or(0.0);
-            let rd_amt = roll_down.map(|m| m.amount()).unwrap_or(0.0);
-            let funding_amt = funding_cost.map(|m| m.amount()).unwrap_or(0.0);
-            attribution.carry = factor_money_or_invalid(
-                coupon_amt + ptp_amt + rd_amt - funding_amt,
-                inputs.ccy,
-                "carry total (reconstructed)",
-                &mut attribution.meta.notes,
-                non_finite_detected,
-            );
-        } else if let Some(carry_total) = inputs.val_t0.measures.get(MetricId::CarryTotal.as_str())
-        {
+        if let Some(carry_total) = inputs.val_t0.measures.get(MetricId::CarryTotal.as_str()) {
             attribution.carry = factor_money_or_invalid(
                 *carry_total,
                 inputs.ccy,
@@ -164,7 +117,7 @@ pub(super) fn apply(
         });
     } else if let Some(theta) = inputs.val_t0.measures.get(MetricId::Theta.as_str()) {
         attribution.carry = factor_money_or_invalid(
-            *theta * carry_scale,
+            *theta,
             inputs.ccy,
             "carry/theta",
             &mut attribution.meta.notes,
@@ -179,11 +132,11 @@ pub(super) fn apply(
         });
     } else {
         note_warning(
-                attribution,
-                "Metrics-based carry attribution skipped: neither CarryTotal nor Theta metric was present; carry P&L set to zero",
-                inputs.instrument.id(),
-                "carry",
-            );
+            attribution,
+            "Metrics-based carry attribution skipped: neither CarryTotal nor Theta metric was present; carry P&L set to zero",
+            inputs.instrument.id(),
+            "carry",
+        );
     }
     Ok(())
 }

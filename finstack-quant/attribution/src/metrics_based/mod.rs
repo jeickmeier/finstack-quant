@@ -33,9 +33,9 @@
 //! matching the sensitivity producer. Vega uses the instrument expiry and declared
 //! reference strike; absent a reference point, only uniform surface moves are
 //! supported. Differing moves across multiple vol sources flag the result invalid.
-//! Precomputed Theta must match the attribution horizon, even when CouponIncome is
-//! supplied; the spec executor requests that horizon from the producer. Cashflow
-//! collection and payment-date FX conversion failures are returned to the caller.
+//! Precomputed Theta and CarryTotal must match the attribution horizon, even when
+//! CouponIncome is supplied; the spec executor requests that horizon from the producer.
+//! Cashflow collection and payment-date FX conversion failures are returned to the caller.
 //!
 //! # Advantages
 //!

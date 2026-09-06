@@ -25,6 +25,11 @@ dispatching through a spec: `Parallel` (the `Default`),
 `Waterfall(Vec<AttributionFactor>)`, `MetricsBased`, and
 `Taylor(TaylorAttributionConfig)`.
 
+Precomputed `Theta` and `CarryTotal` must use the attribution window's
+`theta_period_days`; carry metrics are not rescaled across coupon payments.
+The spec executor requests the matching horizon automatically. Direct callers
+must recompute metrics for their window (an omitted stamp assumes one day).
+
 Default waterfall order (from [`default_waterfall_order`](src/waterfall.rs)):
 
 ```text
@@ -51,14 +56,15 @@ finer breakdowns:
 - **CreditCurves** — per-hazard-curve spread P&L, with optional generic /
   per-level / adder decomposition via a calibrated `CreditFactorModel`
   (`CreditFactorAttribution`).
-- **InflationCurves** — real-rate and CPI curve moves.
+- **InflationCurves** — CPI curve moves and published inflation index changes.
 - **Correlations** — base correlation curve changes for structured credit.
 - **Fx** — spot FX revaluation in the target reporting currency.
-- **Volatility** — implied-vol surface moves (`VolAttribution`).
+- **Volatility** — implied-vol surface moves (`VolAttribution`); parallel and
+  waterfall also classify declared scalar volatility quotes here.
 - **ModelParameters** — prepayment, default, recovery, conversion-policy and
   other model inputs snapshotted via
   `finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot`.
-- **MarketScalars** — dividends, equity/commodity spots, inflation index fixings.
+- **MarketScalars** — dividends and equity/commodity spots.
 
 ## Layout
 

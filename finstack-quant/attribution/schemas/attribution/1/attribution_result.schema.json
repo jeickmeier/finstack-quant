@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AttributionFactor": {
-      "description": "Factor types for P&L attribution.\n\nMaps cleanly to `MarketContext` structure:\n- **RatesCurves**: discount_curves + forward_curves\n- **CreditCurves**: hazard_curves\n- **InflationCurves**: inflation_curves\n- **Correlations**: base_correlation_curves\n- **Fx**: FxMatrix\n- **Volatility**: surfaces (VolSurface)\n- **MarketScalars**: prices, series, inflation_indices, dividends",
+      "description": "Factor types for P&L attribution.\n\nGroups `MarketContext` inputs by their economic role:\n- **RatesCurves**: discount_curves + forward_curves\n- **CreditCurves**: hazard_curves\n- **InflationCurves**: inflation_curves + published inflation_indices\n- **Correlations**: base_correlation_curves\n- **Fx**: FxMatrix\n- **Volatility**: surfaces and declared scalar volatility quotes\n- **MarketScalars**: other prices, non-fixing series and dividends",
       "oneOf": [
         {
           "const": "carry",
@@ -20,7 +20,7 @@
         },
         {
           "const": "inflation_curves",
-          "description": "Inflation curves.",
+          "description": "Inflation curves and published CPI index changes.",
           "type": "string"
         },
         {
@@ -40,7 +40,7 @@
         },
         {
           "const": "market_scalars",
-          "description": "Market scalars (dividends, equity/commodity prices, inflation indices).",
+          "description": "Market scalars (dividends and equity/commodity prices).",
           "type": "string"
         },
         {

@@ -46,6 +46,9 @@ use std::sync::Arc;
 /// Returns error if:
 /// - Required metrics are missing
 /// - Currency conversion fails
+/// - Supplied carry metrics have a `theta_period_days` horizon different
+///   from the attribution window. An absent horizon stamp is accepted only
+///   for the default one-day window; recompute metrics for longer windows.
 ///
 /// # Examples
 ///
@@ -181,12 +184,7 @@ pub fn attribute_pnl_metrics_based(
             non_finite_detected = true;
         }
     }
-    super::carry::apply(
-        &inputs,
-        &mut attribution,
-        &mut non_finite_detected,
-        realized_period_cash,
-    )?;
+    super::carry::apply(&inputs, &mut attribution, &mut non_finite_detected)?;
     super::rates::apply(&inputs, &mut attribution, &mut non_finite_detected);
     super::credit::apply(&inputs, &mut attribution, &mut non_finite_detected);
     super::fx::apply(&inputs, &mut attribution, &mut non_finite_detected);

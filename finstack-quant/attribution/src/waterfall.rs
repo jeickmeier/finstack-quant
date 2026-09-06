@@ -610,11 +610,8 @@ impl<'a> WaterfallContext<'a> {
             }
         };
         let dependencies = self.current_instrument.market_dependencies()?;
-        let family_t1 = MarketSnapshot::extract_with_credit_roles(
-            self.market_t1,
-            flags,
-            &dependencies.curves.credit_curves,
-        );
+        let family_t1 =
+            MarketSnapshot::extract_with_dependencies(self.market_t1, flags, &dependencies);
         Ok(MarketSnapshot::restore_market(
             &self.current_market,
             &family_t1,

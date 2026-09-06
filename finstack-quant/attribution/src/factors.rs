@@ -27,9 +27,9 @@
 //! unchanged.
 //!
 //! Every curve is owned by exactly one flag family. Attribution execution uses
-//! the instrument's declared credit roles to assign risky discount curves to
-//! `CREDIT`; the generic snapshot API uses the storage defaults below. Each
-//! [`CurveStorage`] variant otherwise has one default family:
+//! the instrument's declared dependencies to assign risky discount curves to
+//! `CREDIT` and scalar volatility to `VOL`; the generic snapshot API uses the
+//! storage defaults below. Each [`CurveStorage`] variant otherwise has one default family:
 //!
 //! | `CurveStorage` variant | Flag family | Attribution factor |
 //! |------------------------|-------------|--------------------|
@@ -51,13 +51,13 @@
 //!   market's FX. If the snapshot's FX is `None` with the flag set, FX is cleared.
 //!   If not flagged, FX is preserved from `current_market`.
 //! - **Volatility** (`VOL` flag): if flagged, the snapshot's vol surfaces, SABR vol
-//!   cubes, FX delta-quoted vol surfaces AND volatility-index curves replace the
-//!   market's entirely. If not flagged, all four are preserved.
-//! - **Scalars** (`SCALARS` flag): **DROP semantic** — if flagged, ALL scalars from
-//!   `current_market` are dropped and ONLY the snapshot's scalars are inserted. This
-//!   is load-bearing for factor isolation correctness. If not flagged, scalars are
-//!   preserved from `current_market`. Commodity price curves restore with this
-//!   family (drop-and-replace like the other curve families).
+//!   cubes, FX delta-quoted vol surfaces, volatility-index curves and declared
+//!   scalar volatility replace the market's. Otherwise they are preserved.
+//! - **Inflation** (`INFLATION` flag): inflation curves and published CPI indices
+//!   restore together, regardless of their storage representation.
+//! - **Scalars** (`SCALARS` flag): prices other than declared scalar volatility,
+//!   non-fixing series, dividends and commodity price curves are replaced.
+//!   CPI indices, rate fixings and scalar volatility retain their own factor roles.
 //!
 //! # See Also
 //!
@@ -80,6 +80,7 @@ use finstack_quant_core::market_data::term_structures::PriceCurve;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::MarketDependencies;
 use std::sync::Arc;
 
 /// Flags indicating which market factor families to restore from snapshot vs. preserve
@@ -135,7 +136,7 @@ impl MarketRestoreFlags {
     /// Restore hazard curves from snapshot
     pub const HAZARD: Self = Self(Self::HAZARD_BIT);
 
-    /// Restore inflation curves from snapshot
+    /// Restore inflation curves and published CPI indices from snapshot.
     pub const INFLATION: Self = Self(Self::INFLATION_BIT);
 
     /// Restore base correlation curves from snapshot
@@ -147,14 +148,14 @@ impl MarketRestoreFlags {
     /// the restored market instead of preserving the current market's FX.
     pub const FX: Self = Self(Self::FX_BIT);
 
-    /// Restore volatility surfaces, SABR cubes, FX delta-quoted surfaces and
-    /// volatility-index curves from snapshot.
+    /// Restore volatility surfaces, SABR cubes, FX delta-quoted surfaces,
+    /// volatility-index curves, and declared scalar volatility from snapshot.
     pub const VOL: Self = Self(Self::VOL_BIT);
 
-    /// Restore market scalars (prices, series, inflation indices, dividends) from
-    /// snapshot. Scalars present in the current market but absent from the snapshot
-    /// are **dropped** (see module docs). Commodity price curves restore with this
-    /// family as well.
+    /// Restore non-volatility prices, non-fixing series, dividend schedules and
+    /// commodity price curves. Members of this family absent from the snapshot
+    /// are dropped. Published CPI indices and declared scalar volatility belong
+    /// to `INFLATION` and `VOL`, respectively.
     pub const SCALARS: Self = Self(Self::SCALARS_BIT);
 
     /// Convenience combination: restore both discount and forward curves (rates family)
@@ -254,7 +255,12 @@ pub struct MarketSnapshot {
     pub vol_cubes: HashMap<CurveId, Arc<VolCube>>,
     /// FX delta-quoted volatility surfaces (populated when the `VOL` flag is set).
     pub fx_delta_vol_surfaces: HashMap<CurveId, Arc<FxDeltaVolSurface>>,
-    /// Market scalar prices (populated when the `SCALARS` flag is set)
+    /// Declared volatility IDs that do not also identify their underlying spot.
+    /// Retained even when absent from the snapshot to preserve removal semantics.
+    pub volatility_scalar_ids: Vec<CurveId>,
+    /// Scalar volatility quotes (populated when the `VOL` flag is set).
+    pub volatility_scalars: HashMap<CurveId, MarketScalar>,
+    /// Market scalar prices excluding declared volatility (populated with `SCALARS`).
     pub prices: HashMap<CurveId, MarketScalar>,
     /// Scalar time series excluding rate fixings (populated when the
     /// `SCALARS` flag is set). `FIXING:`-prefixed series belong to the rates
@@ -267,7 +273,7 @@ pub struct MarketSnapshot {
     /// otherwise a single economic rate move is split across two factor lines
     /// with a cross term.
     pub fixing_series: HashMap<CurveId, ScalarTimeSeries>,
-    /// Inflation indices (populated when the `SCALARS` flag is set)
+    /// Published inflation indices (populated when the `INFLATION` flag is set).
     pub inflation_indices: HashMap<CurveId, Arc<InflationIndex>>,
     /// Dividend schedules (populated when the `SCALARS` flag is set)
     pub dividends: HashMap<CurveId, Arc<DividendSchedule>>,
@@ -284,17 +290,29 @@ impl MarketSnapshot {
     /// * `market` - Market context providing curves, surfaces, and fixing data for pricing
     /// * `flags` - Feature flags controlling optional attribution components.
     pub fn extract(market: &MarketContext, flags: MarketRestoreFlags) -> Self {
-        Self::extract_with_credit_roles(market, flags, &[])
+        Self::extract_with_dependencies(market, flags, &MarketDependencies::new())
     }
 
-    /// Extract economic factor families, separating risky discount curves from rates.
-    pub(crate) fn extract_with_credit_roles(
+    /// Extract economic factor families using the instrument's declared input roles.
+    pub(crate) fn extract_with_dependencies(
         market: &MarketContext,
         flags: MarketRestoreFlags,
-        credit_curve_ids: &[CurveId],
+        dependencies: &MarketDependencies,
     ) -> Self {
+        let credit_curve_ids = &dependencies.curves.credit_curves;
+        let volatility_scalar_ids = dependencies
+            .volatility_dependencies
+            .iter()
+            .filter(|dependency| {
+                dependency.underlying_id.as_ref().is_none_or(|underlying| {
+                    underlying.as_str() != dependency.vol_surface_id.as_str()
+                })
+            })
+            .map(|dependency| dependency.vol_surface_id.clone())
+            .collect();
         let mut snapshot = Self {
             credit_curve_ids: credit_curve_ids.to_vec(),
+            volatility_scalar_ids,
             ..Self::default()
         };
 
@@ -389,6 +407,18 @@ impl MarketSnapshot {
                 .fx_delta_vol_surfaces_iter()
                 .map(|(k, v)| (k.clone(), Arc::clone(v)))
                 .collect();
+            snapshot.volatility_scalars = market
+                .prices_iter()
+                .filter(|(id, _)| snapshot.volatility_scalar_ids.contains(id))
+                .map(|(id, value)| (id.clone(), value.clone()))
+                .collect();
+        }
+
+        if flags.contains(MarketRestoreFlags::INFLATION) {
+            snapshot.inflation_indices = market
+                .inflation_indices_iter()
+                .map(|(id, index)| (id.clone(), Arc::clone(index)))
+                .collect();
         }
 
         if flags.contains(MarketRestoreFlags::FORWARD) {
@@ -405,6 +435,7 @@ impl MarketSnapshot {
         if flags.contains(MarketRestoreFlags::SCALARS) {
             snapshot.prices = market
                 .prices_iter()
+                .filter(|(id, _)| !snapshot.volatility_scalar_ids.contains(id))
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect();
             snapshot.series = market
@@ -414,10 +445,6 @@ impl MarketSnapshot {
                         .starts_with(finstack_quant_core::market_data::fixings::FIXING_PREFIX)
                 })
                 .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            snapshot.inflation_indices = market
-                .inflation_indices_iter()
-                .map(|(k, v)| (k.clone(), Arc::clone(v)))
                 .collect();
             snapshot.dividends = market
                 .dividends_iter()
@@ -445,13 +472,18 @@ impl MarketSnapshot {
     /// - **FX**: if flagged, replaced by `snapshot.fx` (which may be `None`,
     ///   clearing FX); otherwise preserved from `current_market`.
     /// - **Volatility**: if flagged, vol surfaces, SABR cubes, FX-delta
-    ///   surfaces and vol-index curves are all replaced wholesale by the
-    ///   snapshot's; otherwise preserved from `current_market`.
-    /// - **Scalars**: if flagged, **all** scalars from `current_market` are
-    ///   dropped and only the snapshot's scalars are inserted (this is
-    ///   load-bearing for factor isolation), and price curves are
-    ///   drop-and-replaced. Otherwise scalars are preserved from
-    ///   `current_market`.
+    ///   surfaces, vol-index curves and declared scalar volatility are replaced;
+    ///   otherwise preserved from `current_market`.
+    /// - **Inflation**: curves and published CPI indices are replaced together.
+    /// - **Scalars**: non-volatility prices, non-fixing series, dividends and
+    ///   price curves are replaced. Other scalar-store families are preserved.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_market` - Market whose unflagged economic factors are preserved.
+    /// * `snapshot` - Replacement factor values and declared input roles. A
+    ///   missing value removes that input when its family is flagged.
+    /// * `restore_flags` - Economic families to replace from `snapshot`.
     pub fn restore_market(
         current_market: &MarketContext,
         snapshot: &MarketSnapshot,
@@ -555,37 +587,66 @@ impl MarketSnapshot {
             );
         }
 
-        // --- Scalars: DROP-and-replace if flagged, else preserved by the clone.
-        //
-        // Drop semantic is intentional: a scalar present in `current_market` but
-        // absent from `snapshot` must NOT appear in the result. This keeps factor
-        // isolation correct for the attribution call paths.
-        //
-        // `FIXING:`-prefixed series belong to the rates (FORWARD) family below.
-        if restore_flags.contains(MarketRestoreFlags::SCALARS) {
-            let preserved_fixings: Vec<ScalarTimeSeries> = new_market
-                .series_iter()
-                .filter(|(k, _)| {
-                    k.as_str()
-                        .starts_with(finstack_quant_core::market_data::fixings::FIXING_PREFIX)
-                })
-                .map(|(_, v)| v.clone())
-                .collect();
+        // --- Scalar stores: replace only the flagged economic families.
+        let restore_scalars = restore_flags.contains(MarketRestoreFlags::SCALARS);
+        let restore_inflation = restore_flags.contains(MarketRestoreFlags::INFLATION);
+        let restore_scalar_vol = restore_flags.contains(MarketRestoreFlags::VOL)
+            && !snapshot.volatility_scalar_ids.is_empty();
+        if restore_scalars || restore_inflation || restore_scalar_vol {
             new_market.clear_market_scalars_mut();
-            for series in preserved_fixings {
-                new_market.insert_series_mut(series);
+            for (id, price) in current_market.prices_iter() {
+                let replace = if snapshot.volatility_scalar_ids.contains(id) {
+                    restore_scalar_vol
+                } else {
+                    restore_scalars
+                };
+                if !replace {
+                    new_market.insert_price_mut(id.as_str(), price.clone());
+                }
             }
-            for (id, price) in &snapshot.prices {
-                new_market.insert_price_mut(id.as_str(), price.clone());
+            if restore_scalars {
+                for (id, price) in &snapshot.prices {
+                    new_market.insert_price_mut(id.as_str(), price.clone());
+                }
             }
-            for series in snapshot.series.values() {
-                new_market.insert_series_mut(series.clone());
+            if restore_scalar_vol {
+                for (id, price) in &snapshot.volatility_scalars {
+                    new_market.insert_price_mut(id.as_str(), price.clone());
+                }
             }
-            for (id, index) in &snapshot.inflation_indices {
-                new_market.insert_inflation_index_mut(id.as_str(), Arc::clone(index));
+            // Rate fixings are restored by FORWARD below, independently of
+            // SCALARS, so preserve them through this store rebuild.
+            for (id, series) in current_market.series_iter() {
+                if !restore_scalars
+                    || id
+                        .as_str()
+                        .starts_with(finstack_quant_core::market_data::fixings::FIXING_PREFIX)
+                {
+                    new_market.insert_series_mut(series.clone());
+                }
             }
-            for schedule in snapshot.dividends.values() {
-                new_market.insert_dividends_mut(Arc::clone(schedule));
+            if restore_scalars {
+                for series in snapshot.series.values() {
+                    new_market.insert_series_mut(series.clone());
+                }
+            }
+            if restore_inflation {
+                for (id, index) in &snapshot.inflation_indices {
+                    new_market.insert_inflation_index_mut(id.as_str(), Arc::clone(index));
+                }
+            } else {
+                for (id, index) in current_market.inflation_indices_iter() {
+                    new_market.insert_inflation_index_mut(id.as_str(), Arc::clone(index));
+                }
+            }
+            if restore_scalars {
+                for schedule in snapshot.dividends.values() {
+                    new_market.insert_dividends_mut(Arc::clone(schedule));
+                }
+            } else {
+                for (_, schedule) in current_market.dividends_iter() {
+                    new_market.insert_dividends_mut(Arc::clone(schedule));
+                }
             }
         }
 
@@ -603,5 +664,127 @@ impl MarketSnapshot {
         }
 
         new_market
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::types::PriceId;
+    use finstack_quant_valuations::instruments::VolatilityDependency;
+    use time::macros::date;
+
+    fn dependencies() -> MarketDependencies {
+        let mut dependencies = MarketDependencies::new();
+        dependencies.add_volatility_dependency(VolatilityDependency::new(
+            "EQ-VOL",
+            Some(PriceId::new("EQ")),
+            None,
+        ));
+        dependencies.add_volatility_dependency(VolatilityDependency::new(
+            "EQ",
+            Some(PriceId::new("EQ")),
+            None,
+        ));
+        dependencies
+    }
+
+    fn market(spot: f64, vol: f64, cpi: f64) -> MarketContext {
+        MarketContext::new()
+            .insert_price("EQ", MarketScalar::Unitless(spot))
+            .insert_price("EQ-VOL", MarketScalar::Unitless(vol))
+            .insert_inflation_index(
+                "CPI",
+                InflationIndex::new("CPI", vec![(date!(2025 - 01 - 01), cpi)], Currency::USD)
+                    .unwrap(),
+            )
+    }
+
+    fn scalar(market: &MarketContext, id: &str) -> f64 {
+        match market.get_price(id).unwrap() {
+            MarketScalar::Unitless(value) => *value,
+            MarketScalar::Price(_) => panic!("expected unitless scalar"),
+        }
+    }
+
+    #[test]
+    fn scalar_stores_restore_only_their_economic_factors() {
+        let opening = market(100.0, 0.2, 300.0);
+        let closing = market(110.0, 0.3, 310.0);
+        let dependencies = dependencies();
+        for mask in 0..8u8 {
+            let mut flags = MarketRestoreFlags::empty();
+            if mask & 1 != 0 {
+                flags = flags | MarketRestoreFlags::SCALARS;
+            }
+            if mask & 2 != 0 {
+                flags = flags | MarketRestoreFlags::VOL;
+            }
+            if mask & 4 != 0 {
+                flags = flags | MarketRestoreFlags::INFLATION;
+            }
+            let snapshot =
+                MarketSnapshot::extract_with_dependencies(&opening, flags, &dependencies);
+            let restored = MarketSnapshot::restore_market(&closing, &snapshot, flags);
+            assert_eq!(
+                scalar(&restored, "EQ"),
+                if flags.contains(MarketRestoreFlags::SCALARS) {
+                    100.0
+                } else {
+                    110.0
+                }
+            );
+            assert_eq!(
+                scalar(&restored, "EQ-VOL"),
+                if flags.contains(MarketRestoreFlags::VOL) {
+                    0.2
+                } else {
+                    0.3
+                }
+            );
+            assert_eq!(
+                restored
+                    .get_inflation_index("CPI")
+                    .unwrap()
+                    .value_on(date!(2025 - 01 - 01))
+                    .unwrap(),
+                if flags.contains(MarketRestoreFlags::INFLATION) {
+                    300.0
+                } else {
+                    310.0
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn missing_opening_quotes_are_removed_only_by_their_own_factor() {
+        let closing = market(110.0, 0.3, 310.0);
+        let dependencies = dependencies();
+        for flags in [
+            MarketRestoreFlags::SCALARS,
+            MarketRestoreFlags::VOL,
+            MarketRestoreFlags::INFLATION,
+        ] {
+            let snapshot = MarketSnapshot::extract_with_dependencies(
+                &MarketContext::new(),
+                flags,
+                &dependencies,
+            );
+            let restored = MarketSnapshot::restore_market(&closing, &snapshot, flags);
+            assert_eq!(
+                restored.get_price("EQ").is_err(),
+                flags.contains(MarketRestoreFlags::SCALARS)
+            );
+            assert_eq!(
+                restored.get_price("EQ-VOL").is_err(),
+                flags.contains(MarketRestoreFlags::VOL)
+            );
+            assert_eq!(
+                restored.get_inflation_index("CPI").is_err(),
+                flags.contains(MarketRestoreFlags::INFLATION)
+            );
+        }
     }
 }

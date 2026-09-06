@@ -72,14 +72,14 @@ pub enum AttributionMethod {
 
 /// Factor types for P&L attribution.
 ///
-/// Maps cleanly to `MarketContext` structure:
+/// Groups `MarketContext` inputs by their economic role:
 /// - **RatesCurves**: discount_curves + forward_curves
 /// - **CreditCurves**: hazard_curves
-/// - **InflationCurves**: inflation_curves
+/// - **InflationCurves**: inflation_curves + published inflation_indices
 /// - **Correlations**: base_correlation_curves
 /// - **Fx**: FxMatrix
-/// - **Volatility**: surfaces (VolSurface)
-/// - **MarketScalars**: prices, series, inflation_indices, dividends
+/// - **Volatility**: surfaces and declared scalar volatility quotes
+/// - **MarketScalars**: other prices, non-fixing series and dividends
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -93,7 +93,7 @@ pub enum AttributionFactor {
     /// Credit hazard curves (spread risk).
     CreditCurves,
 
-    /// Inflation curves.
+    /// Inflation curves and published CPI index changes.
     InflationCurves,
 
     /// Base correlation curves (structured credit).
@@ -105,7 +105,7 @@ pub enum AttributionFactor {
     /// Implied volatility changes.
     Volatility,
 
-    /// Market scalars (dividends, equity/commodity prices, inflation indices).
+    /// Market scalars (dividends and equity/commodity prices).
     MarketScalars,
 
     /// Model-specific parameters (prepayment, default, recovery, conversion).

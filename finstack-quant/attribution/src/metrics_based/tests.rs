@@ -295,7 +295,7 @@ fn metrics_based_carry_matching_horizon_stamp_uses_metrics_as_is() {
 }
 
 #[test]
-fn metrics_based_carry_mismatched_horizon_uses_realized_coupon() {
+fn metrics_based_carry_mismatched_horizon_rejects_even_with_coupon() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 20); // 5-day window, 1-day producer
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
@@ -327,7 +327,7 @@ fn metrics_based_carry_mismatched_horizon_uses_realized_coupon() {
         meta,
     );
 
-    let attribution = attribute_pnl_metrics_based(
+    let error = attribute_pnl_metrics_based(
         &instrument,
         &MarketContext::new(),
         &MarketContext::new(),
@@ -336,22 +336,9 @@ fn metrics_based_carry_mismatched_horizon_uses_realized_coupon() {
         as_of_t0,
         as_of_t1,
     )
-    .expect("mismatched-horizon carry should reconstruct");
+    .expect_err("coupon income does not make mismatched-horizon carry scalable");
 
-    let detail = attribution.carry_detail.expect("carry detail");
-    // TestInstrument has no period cash — coupon must not be 13.7 × 5.
-    assert_eq!(detail.coupon_income.expect("coupon").total.amount(), 0.0);
-    assert!((detail.pull_to_par.expect("ptp").amount() + 41.0).abs() < 1e-9);
-    assert!((detail.roll_down.expect("rd").total.amount() + 50.0).abs() < 1e-9);
-    assert!(
-        attribution
-            .meta
-            .notes
-            .iter()
-            .any(|n| n.contains("realized period cash")),
-        "mismatched horizon must note realized-cash coupon; notes: {:?}",
-        attribution.meta.notes
-    );
+    assert!(error.to_string().contains("matching theta_period_days"));
 }
 
 #[test]
@@ -2046,6 +2033,34 @@ fn theta_with_coupon_cannot_be_scaled_to_another_horizon() {
     )
     .unwrap_err();
     assert!(error.to_string().contains("matching theta_period_days"));
+}
+
+#[test]
+fn invalid_carry_horizon_is_not_treated_as_an_absent_stamp() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2025 - 01 - 02);
+    let value = Money::from((1000_i64, Currency::USD));
+    let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new("HORIZON", value));
+    let market = MarketContext::new();
+    let closing = ValuationResult::stamped("HORIZON", end, value);
+    for horizon in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        let opening =
+            ValuationResult::stamped("HORIZON", start, value).with_measures(IndexMap::from([
+                (MetricId::CarryTotal, 1.0),
+                (MetricId::ThetaPeriodDays, horizon),
+            ]));
+        let error = attribute_pnl_metrics_based(
+            &instrument,
+            &market,
+            &market,
+            &opening,
+            &closing,
+            start,
+            end,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("matching theta_period_days"));
+    }
 }
 
 #[test]

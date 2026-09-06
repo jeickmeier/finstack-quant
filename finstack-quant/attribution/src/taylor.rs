@@ -1396,7 +1396,7 @@ fn compute_fx_factor(
 /// True when a snapshot extracted with `flags` actually holds that family.
 fn snapshot_has_family(snapshot: &MarketSnapshot, flags: MarketRestoreFlags) -> bool {
     if flags.contains(MarketRestoreFlags::INFLATION) {
-        return !snapshot.inflation_curves.is_empty();
+        return !snapshot.inflation_curves.is_empty() || !snapshot.inflation_indices.is_empty();
     }
     if flags.contains(MarketRestoreFlags::CORRELATION) {
         return !snapshot.base_correlation_curves.is_empty();
@@ -1404,7 +1404,6 @@ fn snapshot_has_family(snapshot: &MarketSnapshot, flags: MarketRestoreFlags) -> 
     if flags.contains(MarketRestoreFlags::SCALARS) {
         return !snapshot.prices.is_empty()
             || !snapshot.series.is_empty()
-            || !snapshot.inflation_indices.is_empty()
             || !snapshot.dividends.is_empty()
             || !snapshot.price_curves.is_empty();
     }

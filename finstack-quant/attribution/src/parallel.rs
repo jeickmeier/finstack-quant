@@ -204,7 +204,7 @@ fn note_skipped_empty_t0_factors(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     factor_use: InstrumentFactorUse,
-    credit_curve_ids: &[finstack_quant_core::types::CurveId],
+    dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
 ) {
     use ParallelRestoredFactor as F;
     let families: [(F, &str); 7] = [
@@ -240,7 +240,7 @@ fn note_skipped_empty_t0_factors(
     if factor_use.scalars {
         flags = flags | MarketRestoreFlags::SCALARS;
     }
-    let snap_t0 = MarketSnapshot::extract_with_credit_roles(market_t0, flags, credit_curve_ids);
+    let snap_t0 = MarketSnapshot::extract_with_dependencies(market_t0, flags, dependencies);
     let mut snap_t1: Option<MarketSnapshot> = None;
     for (factor, name) in families {
         if !restored_factor_is_used(factor, factor_use) {
@@ -250,7 +250,7 @@ fn note_skipped_empty_t0_factors(
             continue;
         }
         let snap_t1 = snap_t1.get_or_insert_with(|| {
-            MarketSnapshot::extract_with_credit_roles(market_t1, flags, credit_curve_ids)
+            MarketSnapshot::extract_with_dependencies(market_t1, flags, dependencies)
         });
         if restored_factor_has_data(factor, snap_t1) {
             tracing::warn!(
@@ -271,10 +271,10 @@ fn extract_if_used(
     used: bool,
     market: &MarketContext,
     flags: MarketRestoreFlags,
-    credit_curve_ids: &[finstack_quant_core::types::CurveId],
+    dependencies: &finstack_quant_valuations::instruments::MarketDependencies,
 ) -> MarketSnapshot {
     if used {
-        MarketSnapshot::extract_with_credit_roles(market, flags, credit_curve_ids)
+        MarketSnapshot::extract_with_dependencies(market, flags, dependencies)
     } else {
         MarketSnapshot::default()
     }
@@ -292,18 +292,20 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
         ParallelRestoredFactor::Credit => {
             !snapshot.hazard_curves.is_empty() || !snapshot.credit_discount_curves.is_empty()
         }
-        ParallelRestoredFactor::Inflation => !snapshot.inflation_curves.is_empty(),
+        ParallelRestoredFactor::Inflation => {
+            !snapshot.inflation_curves.is_empty() || !snapshot.inflation_indices.is_empty()
+        }
         ParallelRestoredFactor::Correlations => !snapshot.base_correlation_curves.is_empty(),
         ParallelRestoredFactor::Volatility => {
             !snapshot.surfaces.is_empty()
                 || !snapshot.vol_cubes.is_empty()
                 || !snapshot.fx_delta_vol_surfaces.is_empty()
                 || !snapshot.vol_index_curves.is_empty()
+                || !snapshot.volatility_scalars.is_empty()
         }
         ParallelRestoredFactor::MarketScalars => {
             !snapshot.prices.is_empty()
                 || !snapshot.series.is_empty()
-                || !snapshot.inflation_indices.is_empty()
                 || !snapshot.dividends.is_empty()
                 || !snapshot.price_curves.is_empty()
         }
@@ -369,8 +371,7 @@ fn reprice_cross_factor(
     val_with_t0_b: Money,
 ) -> Result<Money> {
     let dependencies = instrument.market_dependencies()?;
-    let credit_curve_ids = &dependencies.curves.credit_curves;
-    let combined = MarketSnapshot::extract_with_credit_roles(market_t0, flags, credit_curve_ids);
+    let combined = MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
     let market_combined = MarketSnapshot::restore_market(market_t1, &combined, flags);
     let reprice = reprice_instrument(instrument, &market_combined, as_of_t1)?;
     cross_interaction_pnl(val_t1, val_with_t0_a, val_with_t0_b, reprice)
@@ -512,7 +513,6 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     validate_attribution_period(as_of_t0, as_of_t1)?;
     let recalibration_provider = CachedRecalibrationProvider::new();
     let dependencies = instrument.market_dependencies()?;
-    let credit_curve_ids = &dependencies.curves.credit_curves;
 
     // Endpoint repricings remain part of the workflow's accounting even when
     // the portfolio engine prepared them. The prepared path removes duplicate
@@ -626,48 +626,48 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             factor_use.rates,
             market_t0,
             MarketRestoreFlags::DISCOUNT,
-            credit_curve_ids,
+            &dependencies,
         );
         let forward_snap = extract_if_used(
             factor_use.rates,
             market_t0,
             MarketRestoreFlags::FORWARD,
-            credit_curve_ids,
+            &dependencies,
         );
         let credit_snap_ext = extract_if_used(
             factor_use.credit,
             market_t0,
             MarketRestoreFlags::CREDIT,
-            credit_curve_ids,
+            &dependencies,
         );
         let inflation_snap = extract_if_used(
             factor_use.inflation,
             market_t0,
             MarketRestoreFlags::INFLATION,
-            credit_curve_ids,
+            &dependencies,
         );
-        let correlation_snap = MarketSnapshot::extract_with_credit_roles(
+        let correlation_snap = MarketSnapshot::extract_with_dependencies(
             market_t0,
             MarketRestoreFlags::CORRELATION,
-            credit_curve_ids,
+            &dependencies,
         );
         let fx_snap = extract_if_used(
             factor_use.fx,
             market_t0,
             MarketRestoreFlags::FX,
-            credit_curve_ids,
+            &dependencies,
         );
         let vol_snap = extract_if_used(
             factor_use.volatility,
             market_t0,
             MarketRestoreFlags::VOL,
-            credit_curve_ids,
+            &dependencies,
         );
         let scalars_snap = extract_if_used(
             factor_use.scalars,
             market_t0,
             MarketRestoreFlags::SCALARS,
-            credit_curve_ids,
+            &dependencies,
         );
 
         let mut factor_specs = Vec::new();
@@ -695,7 +695,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         }
         // Retain the credit snapshot for the cascade reprice later (Step 4).
         credit_snapshot = credit_snap_ext;
-        if !inflation_snap.inflation_curves.is_empty() {
+        if restored_factor_has_data(ParallelRestoredFactor::Inflation, &inflation_snap) {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Inflation,
                 flags: MarketRestoreFlags::INFLATION,
@@ -929,7 +929,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
 
                 let m_flags = get_restore_flags(market_factor);
                 let combined_snap =
-                    MarketSnapshot::extract_with_credit_roles(market_t0, m_flags, credit_curve_ids);
+                    MarketSnapshot::extract_with_dependencies(market_t0, m_flags, &dependencies);
                 let market_combined =
                     MarketSnapshot::restore_market(market_t1, &combined_snap, m_flags);
                 let reprice_both = reprice_instrument(&instrument_t0, &market_combined, as_of_t1)?;
@@ -987,7 +987,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             .collect();
         let eval_pre_fx = |(factor, flags): &(ParallelRestoredFactor, MarketRestoreFlags)| {
             let snapshot =
-                MarketSnapshot::extract_with_credit_roles(market_t0, *flags, credit_curve_ids);
+                MarketSnapshot::extract_with_dependencies(market_t0, *flags, &dependencies);
             let has_data = restored_factor_has_data(*factor, &snapshot);
             reprice_factor_restored_once(
                 instrument, market_t1, &snapshot, *flags, has_data, as_of_t1, val_t1,
@@ -1036,10 +1036,10 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
 
         // Step 7: FX attribution
         let fx_snapshot = if factor_use.fx {
-            MarketSnapshot::extract_with_credit_roles(
+            MarketSnapshot::extract_with_dependencies(
                 market_t0,
                 MarketRestoreFlags::FX,
-                credit_curve_ids,
+                &dependencies,
             )
         } else {
             MarketSnapshot::default()
@@ -1079,7 +1079,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         if restored_factor_is_used(ParallelRestoredFactor::Volatility, factor_use) {
             let flags = MarketRestoreFlags::VOL;
             let snapshot =
-                MarketSnapshot::extract_with_credit_roles(market_t0, flags, credit_curve_ids);
+                MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
             // Audit M4: use the shared has-data helper so cube-only /
             // FX-delta-only / vol-index-only markets are not silently skipped.
             let has_vol = restored_factor_has_data(ParallelRestoredFactor::Volatility, &snapshot);
@@ -1134,7 +1134,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         if restored_factor_is_used(ParallelRestoredFactor::MarketScalars, factor_use) {
             let flags = MarketRestoreFlags::SCALARS;
             let snapshot =
-                MarketSnapshot::extract_with_credit_roles(market_t0, flags, credit_curve_ids);
+                MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
             let has_scalars =
                 restored_factor_has_data(ParallelRestoredFactor::MarketScalars, &snapshot);
             if let Some((pnl, reprice)) = reprice_factor_restored_once(
@@ -1411,7 +1411,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         market_t0,
         market_t1,
         factor_use,
-        credit_curve_ids,
+        &dependencies,
     );
 
     finalize_attribution(
