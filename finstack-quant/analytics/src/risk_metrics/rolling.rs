@@ -1,8 +1,8 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
-//! All rolling functions use incremental kernels with window rebuilds and return a
-//! [`DatedSeries`] aligned to window-end dates.
+//! All rolling functions share O(n) incremental kernels with window rebuilds
+//! and return a [`DatedSeries`] aligned to window-end dates.
 
 use crate::dates::Date;
 use finstack_quant_core::math::neumaier_sum;
@@ -19,9 +19,6 @@ use super::return_based::{invalid_annualization_factor, sharpe};
 /// earlier when the risk sum collapses relative to its scale since the last
 /// rebuild, because removing an outlier can expose accumulated roundoff.
 pub(crate) const ROLLING_KERNEL_RECOMPUTE_INTERVAL: usize = 1024;
-
-/// Relative cancellation threshold for rebuilding, never for zeroing risk.
-const RISK_REBUILD_RELATIVE_TOLERANCE: f64 = 1.490_116_119_384_765_6e-8; // sqrt(f64::EPSILON)
 
 #[inline]
 fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
@@ -275,7 +272,7 @@ where
         if !mean.is_finite()
             || !m2.is_finite()
             || m2 < 0.0
-            || (m2_scale > 0.0 && m2 <= RISK_REBUILD_RELATIVE_TOLERANCE * m2_scale)
+            || (m2_scale > 0.0 && m2 <= f64::EPSILON.sqrt() * m2_scale)
             || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
         {
             let start = i + 1 - window;
@@ -316,7 +313,7 @@ where
         if !sum.is_finite()
             || !sum_ds.is_finite()
             || sum_ds < 0.0
-            || (downside_scale > 0.0 && sum_ds <= RISK_REBUILD_RELATIVE_TOLERANCE * downside_scale)
+            || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
             || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
         {
             let start = i + 1 - window;

@@ -19,6 +19,7 @@ use crate::targets::parametric::ParametricCurveTarget;
 use crate::targets::student_t::StudentTTarget;
 use crate::targets::svi::SviSurfaceTarget;
 use crate::targets::swaption::SwaptionVolTarget;
+use crate::targets::util::calibration_time_on_curve;
 use crate::targets::vol::VolSurfaceTarget;
 use crate::targets::xccy_basis::XccyBasisTarget;
 use crate::validation::surfaces::validate_surface;
@@ -32,6 +33,7 @@ use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{VolCube, VolQuoteType, VolSurface};
 use finstack_quant_core::market_data::term_structures::{CreditIndexData, DiscountCurve};
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
@@ -403,16 +405,44 @@ pub(crate) fn execute_params(
         }
         StepParams::CapFloorHullWhite(p) => {
             let disc_curve = context.get_discount(&p.discount_curve_id)?;
-            let discount_df = |t: f64| disc_curve.df(t);
+            let discount_time = |t| {
+                calibration_time_on_curve(
+                    p.base_date,
+                    t,
+                    disc_curve.base_date(),
+                    disc_curve.day_count(),
+                )
+            };
+            let discount_base_time = discount_time(0.0)?;
+            // Quote/model time is ACT/365F from p.base_date. Both supplied
+            // functions must return factors relative to that same origin.
+            let discount_df = |t: f64| {
+                discount_time(t)
+                    .and_then(|end| disc_curve.df_between_times(discount_base_time, end))
+                    .unwrap_or(f64::NAN)
+            };
             let forward_curve = if p.forward_curve_id == p.discount_curve_id {
                 None
             } else {
                 Some(context.get_forward(&p.forward_curve_id)?)
             };
+            let forward_base_df = match &forward_curve {
+                Some(curve) => curve.df(calibration_time_on_curve(
+                    p.base_date,
+                    0.0,
+                    curve.base_date(),
+                    curve.day_count(),
+                )?)?,
+                None => 1.0,
+            };
             let forward_df = |t: f64| -> f64 {
-                forward_curve
-                    .as_ref()
-                    .map_or_else(|| disc_curve.df(t), |curve| curve.df(t).unwrap_or(f64::NAN))
+                let Some(curve) = forward_curve.as_ref() else {
+                    return discount_df(t);
+                };
+                calibration_time_on_curve(p.base_date, t, curve.base_date(), curve.day_count())
+                    .and_then(|time| curve.df(time))
+                    .map(|df| df / forward_base_df)
+                    .unwrap_or(f64::NAN)
             };
             let day_count = DayCount::Act365F;
 

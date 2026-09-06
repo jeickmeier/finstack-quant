@@ -34,6 +34,7 @@ mod engine_smoke;
 mod explainability;
 mod failure_modes;
 mod finstack_config;
+mod hull_white_regressions;
 mod inflation;
 mod market_quote;
 mod parametric;

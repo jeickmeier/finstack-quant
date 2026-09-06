@@ -21,6 +21,46 @@ fn flat_df(rate: f64) -> impl Fn(f64) -> f64 {
 }
 
 #[test]
+fn cap_floor_conflicting_quotes_keep_all_residuals_in_any_order() {
+    let df = flat_df(0.03);
+    let strike = ((0.03_f64 * 0.25).exp() - 1.0) / 0.25;
+    for vols in [[0.005, 0.015, 0.010], [0.005, 0.010, 0.015]] {
+        let quotes: Vec<_> = vols
+            .into_iter()
+            .map(|volatility| CapFloorQuote {
+                maturity: 5.0,
+                strike,
+                volatility,
+                is_cap: true,
+                is_normal_vol: true,
+            })
+            .collect();
+        let (_, report) = calibrate_hull_white_to_cap_floors(
+            &df,
+            &df,
+            &quotes,
+            CapFloorCalibrationConfig {
+                frequency: SwapFrequency::Quarterly,
+                fixed_kappa: Some(0.0342),
+                initial_guess: None,
+            },
+        )
+        .expect("least squares fit returns diagnostics");
+        assert_eq!(report.residuals.len(), quotes.len());
+        assert!(
+            !report.success,
+            "contradictory observations must fail acceptance"
+        );
+        let max_residual = report
+            .residuals
+            .values()
+            .map(|r| r.abs())
+            .fold(0.0_f64, f64::max);
+        assert!((max_residual - 0.005).abs() < 1e-8);
+    }
+}
+
+#[test]
 fn hw_params_validation() {
     assert!(HullWhiteCalibrationParams::new(0.05, 0.01).is_ok());
     assert!(HullWhiteCalibrationParams::new(0.0, 0.01).is_err()); // kappa = 0
@@ -200,8 +240,15 @@ fn calibrate_hw1f_round_trip() {
     let df_fn = flat_df(rate);
     let ppy = SwapFrequency::SemiAnnual.periods_per_year();
 
-    let swaption_specs: Vec<(f64, f64)> =
-        vec![(1.0, 5.0), (2.0, 5.0), (5.0, 5.0), (1.0, 10.0), (5.0, 10.0)];
+    // Repeated observations still require separate residuals.
+    let swaption_specs: Vec<(f64, f64)> = vec![
+        (1.0, 5.0),
+        (2.0, 5.0),
+        (5.0, 5.0),
+        (1.0, 10.0),
+        (5.0, 10.0),
+        (1.0, 5.0),
+    ];
 
     let quotes: Vec<SwaptionQuote> = swaption_specs
         .iter()
@@ -231,6 +278,7 @@ fn calibrate_hw1f_round_trip() {
         calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::default(), None, None)
             .expect("Calibration should succeed");
 
+    assert_eq!(report.residuals.len(), quotes.len());
     assert!(
         report.success,
         "Calibration should succeed: {}",
@@ -605,7 +653,7 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
     let true_kappa = 0.05;
     let true_sigma = 0.011;
     let df_fn = flat_df(0.035);
-    let specs = [(2.0, 0.034), (5.0, 0.036), (7.0, 0.037)];
+    let specs = [(2.0, 0.034), (5.0, 0.036), (7.0, 0.037), (5.0, 0.036)];
     let quotes: Vec<CapFloorQuote> = specs
         .iter()
         .map(|(maturity, strike)| CapFloorQuote {
@@ -635,6 +683,7 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
     )
     .expect("two-parameter cap/floor calibration succeeds");
 
+    assert_eq!(report.residuals.len(), quotes.len());
     assert!(report.success, "report should be successful: {report:?}");
     assert!(
         (true_kappa * 0.8..=true_kappa * 1.2).contains(&params.kappa),

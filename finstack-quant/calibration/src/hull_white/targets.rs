@@ -206,8 +206,8 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
         Ok(())
     }
 
-    fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        format!("{}Yx{}Y", quote.expiry, quote.tenor)
+    fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
+        format!("{idx}:{}Yx{}Y", quote.expiry, quote.tenor)
     }
 
     /// Log-space lower bounds `[ln(KAPPA_MIN), ln(SIGMA_MIN)]`.
@@ -304,9 +304,9 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
         Ok(())
     }
 
-    fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
+    fn residual_key(&self, quote: &Self::Quote, idx: usize) -> String {
         format!(
-            "{}Y_{}_{:.6}",
+            "{idx}:{}Y_{}_{:.6}",
             quote.maturity,
             if quote.is_cap { "cap" } else { "floor" },
             quote.strike

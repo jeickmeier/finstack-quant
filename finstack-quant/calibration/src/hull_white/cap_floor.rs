@@ -143,7 +143,7 @@ pub fn calibrate_hull_white_to_cap_floors(
             let model_price = hw1f_cap_floor_price(fixed, sigma, discount_df, forward_df, spec);
             residuals.insert(
                 format!(
-                    "{}Y_{}_{:.6}",
+                    "{idx}:{}Y_{}_{:.6}",
                     quote.maturity,
                     if quote.is_cap { "cap" } else { "floor" },
                     quote.strike

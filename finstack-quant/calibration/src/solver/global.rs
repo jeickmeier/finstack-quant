@@ -11,7 +11,7 @@ use crate::report::{CalibrationDiagnostics, QuoteQuality};
 use crate::{CalibrationConfig, CalibrationReport};
 use finstack_quant_core::Result;
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 
 /// Fill `resid` with a penalty term that gives LM a direction pointing back into the
 /// feasible bound box.
@@ -314,7 +314,18 @@ impl GlobalFitOptimizer {
         target.calculate_residuals(&final_curve, &active_quotes, &mut resid_values)?;
 
         for (i, (&val, quote)) in resid_values.iter().zip(active_quotes.iter()).enumerate() {
-            residuals_map.insert(target.residual_key(quote, i), val);
+            let key = target.residual_key(quote, i);
+            match residuals_map.entry(key) {
+                Entry::Vacant(entry) => {
+                    entry.insert(val);
+                }
+                Entry::Occupied(entry) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Global calibration produced duplicate residual key '{}' for observation {i}",
+                        entry.key()
+                    )));
+                }
+            }
         }
 
         let l2_norm: f64 = resid_values.iter().map(|r| r * r).sum::<f64>().sqrt();
@@ -1345,6 +1356,15 @@ mod tests {
                 Ok(())
             }
         }
+    }
+
+    #[test]
+    fn rejects_colliding_residual_keys_before_acceptance() {
+        let target = TestTarget::from_len(2, vec![0.005, 0.0]);
+        let error =
+            GlobalFitOptimizer::optimize(&target, &[0, 0], &CalibrationConfig::default(), 1e-6)
+                .expect_err("a residual must never overwrite another observation");
+        assert!(error.to_string().contains("duplicate residual key"));
     }
 
     /// Success is unweighted `max_i |r_i| <= validation_tolerance`.
