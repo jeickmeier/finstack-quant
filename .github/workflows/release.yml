@@ -92,12 +92,18 @@ jobs:
             --interpreter python${{ matrix.python }}
           manylinux: "2_28"
           # Windows wheel builds have hit rustc-version skew from cached artifacts
-          # (E0514). Keep sccache for Unix wheels, but force clean Windows compiles.
-          sccache: ${{ runner.os != 'Windows' }}
+          # (E0514). linux-arm64 is a manylinux cross-compile of the PyO3 cdylib;
+          # sccache + workspace fat LTO OOMs rustc (exit 2, no diagnostic).
+          sccache: ${{ runner.os != 'Windows' && matrix.os != 'linux-arm64' }}
         env:
           # mise.toml defaults CARGO_INCREMENTAL=1 for local/dev builds; sccache
           # refuses to wrap rustc when incremental compilation is enabled.
           CARGO_INCREMENTAL: "0"
+          # Native wheels keep workspace fat LTO. The aarch64 cross-link of
+          # finstack-quant-py with lto=fat / codegen-units=1 exhausts the
+          # manylinux container (~Release #142).
+          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.os == 'linux-arm64' && 'thin' || 'fat' }}
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.os == 'linux-arm64' && '16' || '1' }}
 
       # Linux arm64 remains build-only until the project selects a native arm64 runner.
       - name: Install built wheel

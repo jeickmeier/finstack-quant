@@ -128,7 +128,7 @@ without a QuantLib install.
 | Script | Purpose | Driven by |
 | --- | --- | --- |
 | `cargo_publish_checks.py` | Derives the crate publish order from internal dependencies, validates internal dependency versions, and dry-runs the first crate. | `mise run rust-publish-checks`, CI `Rust Publish Checks` |
-| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/release.yml` |
+| `smoke_python_wheel.py` | Imports the installed `finstack_quant` wheel, walks every public subpackage, and exercises `Currency`/`Money`, `models.bs_price`, and `EuropeanPricer.price_call`. Runs against the built wheel on every release platform except linux-arm64. | `.github/workflows/release.yml`, `finstack-quant-py/tests/test_smoke_python_wheel.py` |
 
 ## Code health and hygiene
 

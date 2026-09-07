@@ -65,25 +65,39 @@ def main() -> None:
         expiry,
         True,
     )
-    monte_carlo_price = packages["models"].monte_carlo.black_scholes_call(
-        spot,
-        strike,
-        rate,
-        dividend_yield,
-        volatility,
-        expiry,
+    estimate = (
+        packages["models"]
+        .monte_carlo.EuropeanPricer(
+            num_paths=10_000,
+            seed=42,
+            use_parallel=False,
+        )
+        .price_call(
+            spot,
+            strike,
+            rate,
+            dividend_yield,
+            volatility,
+            expiry,
+            num_steps=1,
+        )
     )
+    monte_carlo_price = estimate.mean.amount
 
     for label, price in (
         ("models.bs_price", closed_form_price),
-        ("models.monte_carlo.black_scholes_call", monte_carlo_price),
+        ("models.monte_carlo.EuropeanPricer.price_call", monte_carlo_price),
     ):
         _require(math.isfinite(price), f"{label} returned a non-finite price: {price}")
         _require(price > 0.0, f"{label} returned a non-positive price: {price}")
 
     _require(
-        math.isclose(closed_form_price, monte_carlo_price, rel_tol=1e-12, abs_tol=1e-12),
-        f"Black-Scholes implementations disagree: closed_form={closed_form_price}, monte_carlo={monte_carlo_price}",
+        math.isfinite(estimate.stderr) and estimate.stderr > 0.0, "Monte Carlo stderr must be a positive finite number"
+    )
+    _require(
+        abs(closed_form_price - monte_carlo_price) < 4.0 * estimate.stderr,
+        "Black-Scholes Monte Carlo drifted from closed form: "
+        f"closed_form={closed_form_price}, monte_carlo={monte_carlo_price}, stderr={estimate.stderr}",
     )
 
     print(
