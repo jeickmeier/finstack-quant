@@ -137,6 +137,16 @@ def _sensitivity_positions_json(position_count: int) -> str:
     ])
 
 
+_GIL_PROBE_ATTEMPTS = 8
+
+
+def _gil_heartbeat(started: threading.Event, stop: threading.Event, progress: list[int]) -> None:
+    started.set()
+    while not stop.is_set():
+        progress[0] += 1
+        time.sleep(0)
+
+
 def _assert_releases_gil[T](call: Callable[[], T]) -> T:
     """Run one native call while a Python heartbeat requires the GIL.
 
@@ -144,34 +154,46 @@ def _assert_releases_gil[T](call: Callable[[], T]) -> T:
     around the call from scheduling the heartbeat. The heartbeat itself yields
     explicitly, so it can make progress only while the native binding releases
     the GIL and cannot starve the calling thread when Rust finishes.
+
+    Short ``py.detach`` windows can miss the scheduler on a loaded CI runner,
+    so a GIL-releasing call is retried a few times before failing.
     """
-    started = threading.Event()
-    stop = threading.Event()
-    progress = [0]
+    last_progress = 0
+    holder: list[T] = []
 
-    def heartbeat() -> None:
-        started.set()
-        while not stop.is_set():
-            progress[0] += 1
-            time.sleep(0)
+    for _ in range(_GIL_PROBE_ATTEMPTS):
+        started = threading.Event()
+        stop = threading.Event()
+        progress = [0]
 
-    worker = threading.Thread(target=heartbeat, daemon=True)
-    worker.start()
-    assert started.wait(timeout=1.0)
+        worker = threading.Thread(
+            target=_gil_heartbeat,
+            args=(started, stop, progress),
+            daemon=True,
+        )
+        worker.start()
+        assert started.wait(timeout=1.0)
 
-    old_interval = sys.getswitchinterval()
-    sys.setswitchinterval(1.0)
-    before = progress[0]
-    try:
-        result = call()
-        after = progress[0]
-    finally:
-        sys.setswitchinterval(old_interval)
-        stop.set()
-        worker.join(timeout=1.0)
+        old_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1.0)
+        before = progress[0]
+        try:
+            holder.append(call())
+            after = progress[0]
+        finally:
+            sys.setswitchinterval(old_interval)
+            stop.set()
+            worker.join(timeout=1.0)
 
-    assert after > before, "background Python thread made no progress during native work"
-    return result
+        last_progress = after
+        if after > before:
+            return holder[-1]
+
+    msg = (
+        "background Python thread made no progress during native work "
+        f"(progress stayed at {last_progress} across {_GIL_PROBE_ATTEMPTS} attempts)"
+    )
+    raise AssertionError(msg)
 
 
 def test_portfolio_from_spec_releases_gil_during_json_build() -> None:
@@ -260,7 +282,7 @@ def test_replay_detached_parse_preserves_value_error_mapping() -> None:
 
 
 def test_factor_stress_releases_gil_and_returns_position_results() -> None:
-    portfolio = Portfolio.from_spec(_portfolio_spec_json(256))
+    portfolio = Portfolio.from_spec(_portfolio_spec_json(2_000))
     market = _market()
     config_json = _factor_model_config_json()
 
@@ -274,7 +296,7 @@ def test_factor_stress_releases_gil_and_returns_position_results() -> None:
         )
     )
 
-    assert len(result.position_pnl) == 256
+    assert len(result.position_pnl) == 2_000
     assert math.isfinite(result.total_pnl)
     assert result.stressed_decomposition.total_risk >= 0.0
 
