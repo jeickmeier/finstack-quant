@@ -23,8 +23,8 @@ use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::CorrelationStructure;
 use finstack_quant_scenarios::{
-    ApplicationReport, Compounding, ExecutionContext, OperationSpec, RateBindingSpec,
-    ScenarioEngine, ScenarioSpec,
+    ApplicationReport, Compounding, ExecutionContext, HazardBumpMode, OperationSpec,
+    RateBindingSpec, ScenarioEngine, ScenarioSpec,
 };
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
 use finstack_quant_statements::FinancialModelSpec;
@@ -56,7 +56,8 @@ pub fn spec(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
         operations,
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
+        // Hand-built fixture curves have no lossless recipe.
+        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     }
 }
 
@@ -351,7 +352,7 @@ pub fn compose_specs(count: usize) -> Vec<ScenarioSpec> {
             ],
             priority: (i % 3) as i32,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
+            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         })
         .collect()
 }

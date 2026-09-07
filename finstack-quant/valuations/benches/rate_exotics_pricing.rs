@@ -55,6 +55,8 @@ fn hw1f_market(as_of: Date) -> MarketContext {
         .insert(fwd_6m)
         .insert(fwd_3m)
         .insert_price("SOFR-RATE", MarketScalar::Unitless(0.03))
+        .insert_price("USD-OIS_CAPFLOOR_HW1F_KAPPA", MarketScalar::Unitless(0.03))
+        .insert_price("USD-OIS_CAPFLOOR_HW1F_SIGMA", MarketScalar::Unitless(0.01))
 }
 
 /// Equity-linked range-accrual market matching the instrument example IDs.

@@ -89,11 +89,12 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: f64) -> CmsOption {
     let mut payment_dates = Vec::with_capacity(n_periods);
     let mut accrual_fractions = Vec::with_capacity(n_periods);
 
-    for i in 1..=n_periods {
-        let days_fix = (i as i64 * 91) - 2; // quarterly fixing, 2-day lag
-        let days_pay = i as i64 * 91;
-        let fix_date = as_of + time::Duration::days(days_fix);
-        let pay_date = as_of + time::Duration::days(days_pay);
+    // Start a week after as-of so the first coupon is a live forward, and pay
+    // in arrears so the coupon date is after the SOFR 2bd reference-swap start.
+    let start = as_of + time::Duration::days(7);
+    for i in 0..n_periods {
+        let fix_date = start + time::Duration::days(i as i64 * 91);
+        let pay_date = start + time::Duration::days((i as i64 + 1) * 91);
         fixing_dates.push(fix_date);
         payment_dates.push(pay_date);
         accrual_fractions.push(0.25_f64);
