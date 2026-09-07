@@ -305,11 +305,11 @@ impl CmsReplicationPricer {
                     vol_surface: vol_surface.as_ref(),
                     cms_tenor: inst.cms_tenor,
                     payments_per_year: m,
-                    payment_delay: DayCount::Act365F.year_fraction(
-                        swap_start,
-                        payment_date,
-                        DayCountContext::default(),
-                    )?,
+                    payment_delay:
+                        crate::instruments::rates::cms_common::signed_act365f_year_fraction(
+                            swap_start,
+                            payment_date,
+                        )?,
                 },
                 strike,
                 inst.option_type,

@@ -55,7 +55,6 @@ struct DcfSpec {
 /// use finstack_quant_statements::builder::ModelBuilder;
 /// use finstack_quant_statements::checks::{builtins::NonFiniteCheck, CheckSuite};
 /// use finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder;
-/// use finstack_quant_statements::types::AmountOrScalar;
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 ///
 /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -67,18 +66,6 @@ struct DcfSpec {
 ///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), Money::from((110_000_i64, Currency::USD))),
 ///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((115_000_i64, Currency::USD))),
 ///     ])
-///     .value("total_debt", &[
-///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
-///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(500_000.0)),
-///     ])
-///     .value("cash", &[
-///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
-///         (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(50_000.0)),
-///     ])
 ///     .with_meta("currency", serde_json::json!("USD"))
 ///     .build()?;
 ///
@@ -88,6 +75,7 @@ struct DcfSpec {
 ///
 /// let _result = CorporateAnalysisBuilder::new(model)
 ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { growth_rate: 0.02 })
+///     .net_debt_override(450_000.0)
 ///     .checks(checks)
 ///     .analyze()?;
 /// # Ok(())

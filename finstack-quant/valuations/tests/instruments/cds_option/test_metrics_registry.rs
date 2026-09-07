@@ -93,15 +93,6 @@ fn test_metrics_registry_all_greeks() {
     let market = replayable_standard_market(as_of);
     let option = CDSOptionBuilder::new().build(as_of);
 
-    let pv = option.value(&market, as_of).unwrap();
-    let mut ctx = MetricContext::new(
-        std::sync::Arc::new(option),
-        std::sync::Arc::new(market),
-        as_of,
-        pv,
-        MetricContext::default_config(),
-    );
-
     let metrics = vec![
         MetricId::Delta,
         MetricId::Gamma,
@@ -111,14 +102,21 @@ fn test_metrics_registry_all_greeks() {
         MetricId::Dv01,
     ];
 
-    let registry = standard_registry();
-    let results = registry.compute(&metrics, &mut ctx).unwrap();
+    let result = option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &metrics,
+            crate::test_support::credit::pricing_options(),
+        )
+        .unwrap();
 
-    assert_eq!(results.len(), metrics.len());
     for metric_id in metrics {
-        assert!(results.contains_key(&metric_id));
-        let value = *results.get(&metric_id).unwrap();
-        assert_finite(value, &format!("{:?}", metric_id));
+        let value = *result
+            .measures
+            .get(metric_id.as_str())
+            .unwrap_or_else(|| panic!("missing {metric_id:?}"));
+        assert_finite(value, &format!("{metric_id:?}"));
     }
 }
 

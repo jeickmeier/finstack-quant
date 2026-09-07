@@ -686,9 +686,9 @@ class PortfolioBuilder:
         Parameters
         ----------
         key : str
-            Tag key.
+            Portfolio-level tag name used for grouping, filtering, and reporting.
         value : str
-            Tag value.
+            Tag payload stored under ``key`` on the built portfolio.
 
         Returns
         -------
@@ -785,6 +785,13 @@ class PositionValue:
         -------
         PositionValue
             Reconstructed value.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import PositionValue
+        >>> doc = '{"position_id":"p1","entity_id":"e1","value_native":{"amount":"1","currency":"USD"},"value_base":{"amount":"1","currency":"USD"},"metric_scale":1.0,"risk_metrics_complete":true}'
+        >>> PositionValue.from_json(doc).position_id
+        'p1'
 
         Raises
         ------
@@ -1061,6 +1068,13 @@ class ReconciliationReport:
         -------
         ReconciliationReport
             Reconstructed report.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import ReconciliationReport
+        >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 0.01}'
+        >>> ReconciliationReport.from_json(doc).is_reconciled
+        True
 
         Raises
         ------

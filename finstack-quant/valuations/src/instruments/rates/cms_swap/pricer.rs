@@ -329,10 +329,9 @@ impl CmsSwapReplicationPricer {
                 vol_surface: vol_surface.as_ref(),
                 cms_tenor: inst.cms_tenor,
                 payments_per_year,
-                payment_delay: DayCount::Act365F.year_fraction(
+                payment_delay: crate::instruments::rates::cms_common::signed_act365f_year_fraction(
                     inst.reference_swap().reference_swap_start(fixing_date)?,
                     payment_date,
-                    DayCountContext::default(),
                 )?,
             };
             let caplet = |k: f64| replicated_cms_optionlet(&inputs, k, OptionType::Call);

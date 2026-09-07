@@ -212,7 +212,6 @@ pub(crate) struct DcfEvalContext<'a> {
 /// ```
 /// use finstack_quant_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
 /// use finstack_quant_statements::builder::ModelBuilder;
-/// use finstack_quant_statements::types::AmountOrScalar;
 /// use finstack_quant_core::{currency::Currency, dates::PeriodId, money::Money};
 /// use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 ///
@@ -228,24 +227,6 @@ pub(crate) struct DcfEvalContext<'a> {
 ///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), Money::from((1_150_000_i64, Currency::USD))),
 ///         ],
 ///     )
-///     .value(
-///         "total_debt",
-///         &[
-///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
-///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(5_000_000.0)),
-///         ],
-///     )
-///     .value(
-///         "cash",
-///         &[
-///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 3).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
-///             (PeriodId::quarter(2025, 4).expect("valid period fixture"), AmountOrScalar::scalar(1_000_000.0)),
-///         ],
-///     )
 ///     .with_meta("currency", serde_json::json!("USD"))
 ///     .build()?;
 ///
@@ -254,7 +235,7 @@ pub(crate) struct DcfEvalContext<'a> {
 ///     0.10,
 ///     TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
 ///     "ufcf",
-///     None,
+///     Some(4_000_000.0),
 ///     &DcfOptions::default(),
 ///     None,
 ///     None,

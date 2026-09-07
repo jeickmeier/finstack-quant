@@ -15,9 +15,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
@@ -68,46 +67,36 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
         .build()
         .expect("discount curve");
 
-    // Bootstrapped hazard knots (per the cdx_ig_46 golden) — produced by
-    // sequential Brent root finding from the par-spread term structure.
-    let haz_knots: Vec<(f64, f64)> = vec![
-        (0.630_555_555_555_555_5, 0.002_676_511_8),
-        (1.136_111_111_111_111, 0.002_677_801_4),
-        (2.152_777_777_777_777_7, 0.005_556_018_9),
-        (3.166_666_666_666_666_5, 0.008_468_701_1),
-        (4.180_555_555_555_555, 0.013_194_693_2),
-        (5.194_444_444_444_445, 0.017_154_183_4),
-        (7.225, 0.021_843_883_2),
-        (10.269_444_444_444_444, 0.025_886_011_0),
+    let source = MarketContext::new().insert(disc);
+    // CBBT Mid CDX.NA.IG.46 par CDS tenors, mapped to standard IMM
+    // maturities. Quote-space Spread DV01 (`bump_hazard_spreads`) needs
+    // the lossless calibration recipe that this bootstrap stamps onto
+    // the curve; IsdaNa conventions keep the hazard day-count on Act/360.
+    let par_pillars = [
+        (date!(2026 - 12 - 20), 16.14),
+        (date!(2027 - 06 - 20), 16.14),
+        (date!(2028 - 06 - 20), 24.14),
+        (date!(2029 - 06 - 20), 32.36),
+        (date!(2030 - 06 - 20), 42.9932),
+        (date!(2031 - 06 - 20), 53.6264),
+        (date!(2033 - 06 - 20), 72.64),
+        (date!(2036 - 06 - 20), 92.35),
     ];
-    let par_knots: Vec<(f64, f64)> = vec![
-        (0.5, 16.14),
-        (1.0, 16.14),
-        (2.0, 24.14),
-        (3.0, 32.36),
-        (4.0, 42.9932),
-        (5.0, 53.6264),
-        (7.0, 72.64),
-        (10.0, 92.35),
-    ];
-    // IMPORTANT: hazard curve day_count must be Act360 to match the
-    // bootstrap output (`bump_hazard_spreads` uses the CDS conventions'
-    // day_count, which for IsdaNa is Act/360). The HazardCurve builder
-    // default is Act365F, which would cause the same knot t-values to map
-    // to different dates than the bootstrap intended — this was the root
-    // cause of the $73k spot CDS / 1.7 bp ATM Fwd / 28% option NPV gap
-    // identified during Phase 4 reconciliation against Bloomberg DOCS
-    // 2057273.
-    let hazard = HazardCurve::builder("CDX-NA-IG-46-CBBT")
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .recovery_rate(0.4)
-        .knots(haz_knots)
-        .par_spreads(par_knots)
-        .build()
-        .expect("hazard curve");
+    let hazard = crate::test_support::credit::calibrated_hazard_curve_from_spec(
+        crate::test_support::credit::CalibratedHazardSpec {
+            source_market: &source,
+            base_date: as_of,
+            curve_id: "CDX-NA-IG-46-CBBT",
+            entity: "CDX-NA-IG-46",
+            discount_curve_id: "USD-S531-SWAP-20260507",
+            pillars: &par_pillars,
+            recovery_rate: 0.4,
+            cds_valuation_convention: Some(CdsValuationConvention::BloombergCdswClean),
+        },
+    )
+    .expect("CDX.NA.IG.46 hazard calibration should succeed");
 
-    MarketContext::new().insert(disc).insert(hazard)
+    source.insert(hazard)
 }
 
 fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {

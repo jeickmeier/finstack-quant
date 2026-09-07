@@ -163,7 +163,7 @@
     "source_detail": "QuantLib 1.43; deterministic flat-curve native instrument benchmark.",
     "valuation_date": "2026-04-30"
   },
-  "model": "discounting",
+  "model": "hazard_rate",
   "schema": "finstack_quant.golden/1",
   "tolerances": {
     "dv01": {

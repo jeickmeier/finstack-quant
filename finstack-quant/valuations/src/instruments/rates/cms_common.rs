@@ -15,7 +15,9 @@ use crate::instruments::rates::hw1f::forward_swap_rate::{
     calculate_forward_swap_rate, resolve_reference_swap_convention, ForwardSwapRateInputs,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    calendar_by_id, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -232,6 +234,24 @@ pub fn par_annuity(rate: f64, tenor_years: f64, m: f64) -> f64 {
     (1.0 - discount) / rate
 }
 
+/// ACT/365F year fraction from `start` to `end`, signed when payment precedes swap start.
+///
+/// Hagan's payment delay is measured from reference-swap start to the coupon
+/// payment. A floorlet paid on the fixing date can settle *before* a T+2 swap
+/// start, so the delay is a small negative number rather than an invalid range.
+///
+/// # Arguments
+///
+/// * `start` - Reference-swap effective date.
+/// * `end` - Coupon payment date; may precede `start`.
+pub(crate) fn signed_act365f_year_fraction(start: Date, end: Date) -> Result<f64> {
+    if end >= start {
+        DayCount::Act365F.year_fraction(start, end, DayCountContext::default())
+    } else {
+        Ok(-DayCount::Act365F.year_fraction(end, start, DayCountContext::default())?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,5 +294,15 @@ mod tests {
         assert_eq!(usd.resolved_fixed_frequency(), Tenor::semi_annual());
         assert_eq!(usd.resolved_fixed_day_count(), DayCount::Thirty360);
         assert_eq!(usd.payments_per_year(), 2.0);
+    }
+
+    #[test]
+    fn signed_act365f_year_fraction_is_negative_when_payment_precedes_start() {
+        let start = Date::from_calendar_date(2027, time::Month::May, 20).expect("date");
+        let payment = Date::from_calendar_date(2027, time::Month::May, 18).expect("date");
+        let delay = signed_act365f_year_fraction(start, payment).expect("delay");
+        assert!(delay < 0.0);
+        let forward = signed_act365f_year_fraction(payment, start).expect("forward");
+        assert!((delay + forward).abs() < 1e-18);
     }
 }

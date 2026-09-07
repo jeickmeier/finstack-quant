@@ -56,10 +56,10 @@ The corpus is assembled from `finstack_quant::schema::documents_by_id()` and
 
 ### The pinned artifact count
 
-`every_published_artifact_carries_a_valid_example` asserts
-`artifacts().len() == 109`. Adding a schema artifact to any domain crate will
-fail this test on purpose — update the count only after confirming the new
-artifact ships an example.
+`every_published_artifact_carries_a_valid_example` asserts the published
+registry is non-empty and that every artifact ships at least one example that
+validates against its own schema. Adding a schema artifact to any domain crate
+will fail this test until that artifact includes a valid example.
 
 ## Running
 

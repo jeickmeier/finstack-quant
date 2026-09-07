@@ -21,7 +21,8 @@ use finstack_quant_core::{
 };
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
-    CdsConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec, ProtectionLegSpec,
+    CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive, PremiumLegSpec,
+    ProtectionLegSpec,
 };
 use finstack_quant_valuations::instruments::{
     Attributes, InstrumentPricingOverrides, PricingOptions,
@@ -35,6 +36,112 @@ pub fn pricing_options() -> PricingOptions {
     PricingOptions::default().with_recalibration_provider(Arc::new(
         finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new(),
     ))
+}
+
+/// Inputs for a test-only hazard curve calibrated from CDS par quotes.
+pub struct CalibratedHazardSpec<'a> {
+    /// Market that already contains the discount curve used as prior.
+    pub source_market: &'a MarketContext,
+    /// Curve base / valuation date.
+    pub base_date: Date,
+    /// Identifier stamped on the calibrated hazard curve.
+    pub curve_id: &'a str,
+    /// CDS reference entity used in the synthetic par quotes.
+    pub entity: &'a str,
+    /// Discount curve already present on `source_market`.
+    pub discount_curve_id: &'a str,
+    /// `(pillar_date, par_spread_bp)` pairs consumed by the bootstrap.
+    pub pillars: &'a [(Date, f64)],
+    /// Recovery rate as a decimal fraction in `[0, 1]`.
+    pub recovery_rate: f64,
+    /// Optional CDS valuation convention for the bootstrap CDS.
+    pub cds_valuation_convention: Option<CdsValuationConvention>,
+}
+
+/// Calibrate a replayable hazard curve from explicit pillar dates and quotes.
+///
+/// # Arguments
+///
+/// * `spec` - Discount-curve market, curve identifiers, CDS par pillars in
+///   `(date, spread_bp)` form, recovery as a decimal fraction in `[0, 1]`, and
+///   the optional CDS valuation convention used by the bootstrap instruments.
+pub fn calibrated_hazard_curve_from_spec(
+    spec: CalibratedHazardSpec<'_>,
+) -> finstack_quant_core::Result<HazardCurve> {
+    let curve_id = CurveId::new(spec.curve_id);
+    let discount_curve_id = CurveId::new(spec.discount_curve_id);
+    let quotes: Vec<_> = spec
+        .pillars
+        .iter()
+        .map(|(pillar_date, spread_bp)| {
+            MarketQuote::Cds(CdsQuote::CdsParSpread {
+                id: QuoteId::new(format!("{}-{pillar_date}", spec.entity)),
+                entity: spec.entity.to_string(),
+                pillar: Pillar::Date(*pillar_date),
+                spread_bp: *spread_bp,
+                recovery_rate: spec.recovery_rate,
+                convention: CdsConventionKey {
+                    currency: Currency::USD,
+                    doc_clause: CdsDocClause::IsdaNa,
+                },
+            })
+        })
+        .collect();
+    let params = StepParams::Hazard(HazardCurveParams {
+        curve_id: curve_id.clone(),
+        entity: spec.entity.to_string(),
+        seniority: Seniority::Senior,
+        currency: Currency::USD,
+        base_date: spec.base_date,
+        discount_curve_id: discount_curve_id.clone(),
+        recovery_rate: spec.recovery_rate,
+        notional: 1.0,
+        method: CalibrationMethod::Bootstrap,
+        interpolation: InterpStyle::LogLinear,
+        par_interp: ParInterp::Linear,
+        doc_clause: None,
+        cds_valuation_convention: spec.cds_valuation_convention,
+    });
+    let quote_ids = quotes
+        .iter()
+        .map(|quote| match quote {
+            MarketQuote::Cds(cds) => cds.id().clone(),
+            _ => unreachable!("fixture only builds CDS quotes"),
+        })
+        .collect();
+    let mut quote_sets = HashMap::default();
+    quote_sets.insert("credit".to_string(), quote_ids);
+    let discount = spec
+        .source_market
+        .get_discount(discount_curve_id.as_str())?;
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: format!("{}-hazard-fixture", spec.entity),
+            description: None,
+            quote_sets: quote_sets.into_iter().collect(),
+            settings: CalibrationConfig::default(),
+            steps: vec![CalibrationStep {
+                id: "hazard".to_string(),
+                quote_set: "credit".to_string(),
+                params,
+            }],
+        },
+        market_data: quotes.into_iter().map(MarketDatum::from).collect(),
+        prior_market: vec![PriorMarketObject::DiscountCurve(discount.as_ref().clone())],
+    };
+    let result = engine::execute(&envelope)?;
+    if !result.result.report.success {
+        return Err(finstack_quant_core::Error::Calibration {
+            message: format!("test hazard calibration failed for '{curve_id}'"),
+            category: "test_fixture".to_string(),
+        });
+    }
+    let calibrated_market = MarketContext::try_from(result.result.final_market)?;
+    calibrated_market
+        .get_hazard(curve_id.as_str())
+        .map(|curve| curve.as_ref().clone())
 }
 
 /// Calibrate a replayable USD senior hazard curve from standard CDS par quotes.
@@ -71,76 +178,20 @@ pub fn calibrated_hazard_curve_with_pillars(
 ) -> finstack_quant_core::Result<HazardCurve> {
     let curve_id = curve_id.into();
     let discount_curve_id = discount_curve_id.into();
-    let quotes: Vec<_> = pillars
+    let dated: Vec<(Date, f64)> = pillars
         .iter()
-        .map(|(day_offset, spread_bp)| {
-            let pillar_date = base_date + time::Duration::days(*day_offset);
-            MarketQuote::Cds(CdsQuote::CdsParSpread {
-                id: QuoteId::new(format!("{entity}-{pillar_date}")),
-                entity: entity.to_string(),
-                pillar: Pillar::Date(pillar_date),
-                spread_bp: *spread_bp,
-                recovery_rate: STANDARD_RECOVERY_SENIOR,
-                convention: CdsConventionKey {
-                    currency: Currency::USD,
-                    doc_clause: CdsDocClause::IsdaNa,
-                },
-            })
-        })
+        .map(|(day_offset, spread_bp)| (base_date + time::Duration::days(*day_offset), *spread_bp))
         .collect();
-    let params = StepParams::Hazard(HazardCurveParams {
-        curve_id: curve_id.clone(),
-        entity: entity.to_string(),
-        seniority: Seniority::Senior,
-        currency: Currency::USD,
+    calibrated_hazard_curve_from_spec(CalibratedHazardSpec {
+        source_market,
         base_date,
-        discount_curve_id: discount_curve_id.clone(),
+        curve_id: curve_id.as_str(),
+        entity,
+        discount_curve_id: discount_curve_id.as_str(),
+        pillars: &dated,
         recovery_rate: STANDARD_RECOVERY_SENIOR,
-        notional: 1.0,
-        method: CalibrationMethod::Bootstrap,
-        interpolation: InterpStyle::LogLinear,
-        par_interp: ParInterp::Linear,
-        doc_clause: None,
         cds_valuation_convention: None,
-    });
-    let quote_ids = quotes
-        .iter()
-        .map(|quote| match quote {
-            MarketQuote::Cds(cds) => cds.id().clone(),
-            _ => unreachable!("fixture only builds CDS quotes"),
-        })
-        .collect();
-    let mut quote_sets = HashMap::default();
-    quote_sets.insert("credit".to_string(), quote_ids);
-    let discount = source_market.get_discount(discount_curve_id.as_str())?;
-    let envelope = CalibrationEnvelope {
-        schema_url: None,
-        schema: CalibrationSchema::CURRENT,
-        plan: CalibrationPlan {
-            id: format!("{entity}-hazard-fixture"),
-            description: None,
-            quote_sets: quote_sets.into_iter().collect(),
-            settings: CalibrationConfig::default(),
-            steps: vec![CalibrationStep {
-                id: "hazard".to_string(),
-                quote_set: "credit".to_string(),
-                params,
-            }],
-        },
-        market_data: quotes.into_iter().map(MarketDatum::from).collect(),
-        prior_market: vec![PriorMarketObject::DiscountCurve(discount.as_ref().clone())],
-    };
-    let result = engine::execute(&envelope)?;
-    if !result.result.report.success {
-        return Err(finstack_quant_core::Error::Calibration {
-            message: format!("test hazard calibration failed for '{curve_id}'"),
-            category: "test_fixture".to_string(),
-        });
-    }
-    let calibrated_market = MarketContext::try_from(result.result.final_market)?;
-    calibrated_market
-        .get_hazard(curve_id.as_str())
-        .map(|curve| curve.as_ref().clone())
+    })
 }
 
 /// Create a CDS buy protection position using the builder pattern.

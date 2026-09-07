@@ -174,6 +174,7 @@ def build_fixed_hazard_bond() -> dict[str, Any]:
         description="QuantLib native five-year USD fixed-rate hazard bond with zero recovery.",
         product="fixed_hazard_bond",
     )
+    fixture["model"] = "hazard_rate"
     fixture["market"] = market_snapshot([
         _bond_discount_curve("USD-OIS", curve_rate),
         _hazard_curve("USD-CREDIT", hazard_rate),
@@ -381,6 +382,7 @@ def build_floating_hazard_bond() -> dict[str, Any]:
         product="floating_hazard_bond",
     )
     fixture["market"]["data"]["curves"].append(_hazard_curve("USD-CREDIT", hazard_rate))
+    fixture["model"] = "hazard_rate"
     fixture["instrument"] = _floating_bond_spec(credit_curve_id="USD-CREDIT")
     fixture["instrument"]["instrument"]["spec"]["id"] = "USD-FLOATING-5Y-HAZARD-QUANTLIB"
     fixture["expected"] = expected
@@ -466,6 +468,7 @@ def build_fixed_callable_oas_bond() -> dict[str, Any]:
         description="QuantLib native eight-year USD callable fixed-rate bond OAS recovery.",
         product="fixed_callable_oas_bond",
     )
+    fixture["model"] = "tree"
     fixture["market"] = market_snapshot([_bond_discount_curve("USD-OIS", curve_rate)])
     spec = fixture["instrument"]["instrument"]["spec"]
     spec["id"] = "USD-FIXED-CALLABLE-8Y-OAS-QUANTLIB"

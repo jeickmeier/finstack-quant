@@ -85,5 +85,8 @@
     "globals": "^16.5.0",
     "prettier": "^3.8.2",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@humanfs/node": "0.16.8"
   }
 }

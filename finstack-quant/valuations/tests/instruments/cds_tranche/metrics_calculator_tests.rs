@@ -105,7 +105,7 @@ fn test_correlation_delta_metric_via_price_with_metrics() {
 fn test_cs01_metric_via_price_with_metrics() {
     // Arrange
     let tranche = mezzanine_tranche();
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     // Act
@@ -113,7 +113,7 @@ fn test_cs01_metric_via_price_with_metrics() {
         &market,
         as_of,
         &[MetricId::Cs01],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        crate::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -134,7 +134,7 @@ fn test_cs01_metric_via_price_with_metrics() {
 #[ignore = "slow: covered by mise rust-test-slow"]
 fn test_parallel_cs01_reconciles_with_bucketed_cs01() {
     let tranche = mezzanine_tranche();
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let result = tranche
@@ -142,7 +142,7 @@ fn test_parallel_cs01_reconciles_with_bucketed_cs01() {
             &market,
             as_of,
             &[MetricId::Cs01, MetricId::BucketedCs01],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -325,7 +325,7 @@ fn test_bucketed_dv01_metric_via_price_with_metrics() {
 fn test_calculate_multiple_metrics_simultaneously() {
     // Arrange
     let tranche = mezzanine_tranche();
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let metrics = vec![
@@ -340,7 +340,7 @@ fn test_calculate_multiple_metrics_simultaneously() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        crate::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -370,7 +370,7 @@ fn test_calculate_multiple_metrics_simultaneously() {
 fn test_all_standard_metrics_calculable() {
     // Arrange
     let tranche = mezzanine_tranche();
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let all_metrics = vec![
@@ -390,7 +390,7 @@ fn test_all_standard_metrics_calculable() {
         &market,
         as_of,
         &all_metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        crate::test_support::credit::pricing_options(),
     );
 
     // Assert
@@ -459,7 +459,7 @@ fn test_metrics_with_missing_credit_index() {
 fn test_metrics_order_independence() {
     // Arrange
     let tranche = mezzanine_tranche();
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let metrics_order_1 = vec![MetricId::Cs01, MetricId::ParSpread, MetricId::ExpectedLoss];
@@ -471,7 +471,7 @@ fn test_metrics_order_independence() {
             &market,
             as_of,
             &metrics_order_1,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
     let result_2 = tranche
@@ -479,7 +479,7 @@ fn test_metrics_order_independence() {
             &market,
             as_of,
             &metrics_order_2,
-            finstack_quant_valuations::instruments::PricingOptions::default(),
+            crate::test_support::credit::pricing_options(),
         )
         .unwrap();
 
@@ -509,7 +509,7 @@ fn test_metrics_order_independence() {
 fn test_price_with_metrics_returns_pv_and_metrics() {
     // Arrange
     let tranche: Box<dyn Instrument> = Box::new(mezzanine_tranche());
-    let market = standard_market_context();
+    let market = replayable_market_context();
     let as_of = base_date();
 
     let metrics = vec![MetricId::Cs01, MetricId::ParSpread];
@@ -519,7 +519,7 @@ fn test_price_with_metrics_returns_pv_and_metrics() {
         &market,
         as_of,
         &metrics,
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+        crate::test_support::credit::pricing_options(),
     );
 
     // Assert
