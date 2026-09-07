@@ -17,6 +17,7 @@ True
 
 from __future__ import annotations
 
+import builtins
 import datetime
 from typing import Any, Literal
 
@@ -5170,9 +5171,9 @@ class InterestRateSwap:
     @staticmethod
     def from_conventions(
         id: str,
-        notional: Money | float,
+        notional: Money | builtins.float,
         side: Literal["pay", "receive"],
-        fixed_rate: float | Rate,
+        fixed_rate: builtins.float | Rate,
         start: datetime.date | datetime.datetime | pd.Timestamp | str,
         end: datetime.date | datetime.datetime | pd.Timestamp | str,
         index_id: str,
@@ -5388,7 +5389,7 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         metric_id: str,
         model: str = "default",
-    ) -> float:
+    ) -> builtins.float:
         """
         Compute one scalar metric for this swap (e.g. ``"dv01"``).
 
@@ -5637,7 +5638,7 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def notional(self, value: Money | float, currency: str | None = None) -> InterestRateSwapBuilder:
+    def notional(self, value: Money | builtins.float, currency: str | None = None) -> InterestRateSwapBuilder:
         """
         Set the notional shared by both legs.
 

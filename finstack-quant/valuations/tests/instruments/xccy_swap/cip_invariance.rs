@@ -1,6 +1,6 @@
 //! CIP invariance and rebalancing sign integration tests for MtM-resetting XCCY swap pricing.
 //!
-//! Spec: docs/superpowers/specs/2026-05-10-xccy-mtm-reset-design.md
+//! Citation: `docs/REFERENCES.md` (`#andersen-piterbarg-xccy-mtm-reset`).
 //!
 //! The CIP invariance identity: with `spread = 0` and CIP-consistent curves, the
 //! MtM-reset PV equals the fixed-notional PV (within numerical tolerance). This is the

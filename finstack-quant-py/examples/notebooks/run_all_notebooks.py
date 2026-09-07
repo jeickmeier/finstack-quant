@@ -364,7 +364,10 @@ def main() -> int:
         rel = nb_path.relative_to(base_dir)
         print(f"[{i}/{len(notebooks)}] Running {rel}...", end=" ", flush=True)
 
-        ok, msg, elapsed = run_notebook(nb_path, args.timeout, args.save_outputs, base_dir)
+        timeout = args.timeout
+        if "08_capstone" in rel.parts:
+            timeout = max(timeout, 900)
+        ok, msg, elapsed = run_notebook(nb_path, timeout, args.save_outputs, base_dir)
         results[nb_path] = (ok, msg, elapsed)
 
         if ok:

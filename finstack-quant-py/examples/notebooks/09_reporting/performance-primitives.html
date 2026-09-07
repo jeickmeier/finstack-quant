@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Account performance: January 15-October 15, 2025</title><style>
+.fq-ts { background:#fbfaf6; color:#1c1c1e; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  border-radius:12px; padding:30px 38px 40px; }
+.fq-ts .head { display:flex; justify-content:space-between; align-items:flex-end;
+  border-bottom:1px solid #10243f; padding-bottom:13px; margin-bottom:18px; }
+.fq-ts .head .eyebrow { font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:4px; }
+.fq-ts .head .title { font-family:Georgia,"Times New Roman",serif; font-size:25px; font-weight:600;
+  color:#10243f; letter-spacing:-.01em; }
+.fq-ts .head .subtitle { font-size:12.5px; color:#7a8190; margin-top:4px; }
+.fq-ts .head .meta { text-align:right; font-size:11px; color:#7a8190; line-height:1.6; }
+.fq-ts .kpis { display:grid; grid-template-columns:repeat(4,1fr);
+  border-top:1px solid #e4e1d8; border-bottom:1px solid #e4e1d8;
+  padding:15px 0; margin-bottom:22px; }
+.fq-ts .kpi { padding:0 16px; border-right:1px solid #e4e1d8; }
+.fq-ts .kpi:last-child { border-right:none; }
+.fq-ts .kpi .lbl { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:6px; }
+.fq-ts .kpi .val { font-family:"Iowan Old Style",Georgia,serif; font-size:25px; font-weight:600;
+  color:#10243f; line-height:1; }
+.fq-ts .kpi .val.pos { color:#1b6b4f; } .fq-ts .kpi .val.neg { color:#9b2335; }
+.fq-ts .secttl { font-family:Georgia,"Times New Roman",serif; font-size:14px; font-weight:600;
+  color:#10243f; margin:26px 0 4px; border-bottom:1px solid #e4e1d8; padding-bottom:6px; }
+.fq-ts .sub { font-size:11px; color:#7a8190; margin:0 0 10px; }
+.fq-ts .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+.fq-ts .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }
+.fq-ts table.kv { width:100%; border-collapse:collapse; font-size:12.5px; }
+.fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
+.fq-ts table.kv td.k { color:#7a8190; }
+.fq-ts table.kv td.v { text-align:right; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; color:#10243f; }
+.fq-ts table.kv td.v.pos { color:#1b6b4f; } .fq-ts table.kv td.v.neg { color:#9b2335; }
+.fq-ts table.hm { width:100%; border-collapse:collapse; font-family:"Iowan Old Style",Georgia,serif; font-size:11.5px; }
+.fq-ts table.hm th { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:10px; letter-spacing:.04em;
+  text-transform:uppercase; color:#7a8190; font-weight:600; padding:5px 0; text-align:center; }
+.fq-ts table.hm th.yr, .fq-ts table.hm td.yr { text-align:left; color:#7a8190;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:11px; width:46px; }
+.fq-ts table.hm td { text-align:center; padding:7px 2px; color:#23303f;
+  border:2px solid #fbfaf6; }
+.fq-ts table.hm td.ytd { font-weight:700; border-left:2px solid #cfc8b8; }
+.fq-ts table.dd { width:100%; border-collapse:collapse; font-size:12px; }
+.fq-ts table.dd th { font-size:10px; letter-spacing:.05em; text-transform:uppercase;
+  color:#7a8190; font-weight:600; text-align:right; padding:6px 4px; border-bottom:1px solid #10243f; }
+.fq-ts table.dd th:first-child { text-align:left; }
+.fq-ts table.dd td { padding:6px 4px; border-bottom:1px solid #e4e1d8; text-align:right;
+  font-family:"Iowan Old Style",Georgia,serif; }
+.fq-ts table.dd td:first-child { text-align:left; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#7a8190; }
+.fq-ts table.dd td.neg { color:#9b2335; }
+.fq-ts svg { display:block; width:100%; height:auto; }
+.fq-ts .foot { margin-top:30px; border-top:1px solid #10243f; padding-top:10px;
+  font-size:10.5px; color:#7a8190; display:flex; justify-content:space-between; }
+.fq-ts .fq-tip { position:fixed; pointer-events:none; z-index:9999; opacity:0; transition:opacity .08s;
+  background:#10243f; color:#fff; font:11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:4px 8px;
+  border-radius:4px; white-space:nowrap; }
+.fq-ts svg .fq-hb { cursor:crosshair; }
+.fq-ts svg rect.fq-hb:not([fill]) { fill:transparent; }
+.fq-ts svg .fq-cross { stroke:#7a8190; stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }
+.fq-ts svg .fq-mk { fill:#7c2230; stroke:#fff; stroke-width:1; pointer-events:none; }
+.fq-ts .fq-scroll { max-height:240px; overflow:auto; border:1px solid #e4e1d8; border-radius:4px; }
+.fq-ts .fq-scroll table.dd th { position:sticky; top:0; background:#f3f1ea; }
+</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow">Performance Review</div><div class="title">Account performance: January 15-October 15, 2025</div><div class="subtitle">Three observed periods; base holdings before the report-date loan purchase</div></div><div class="meta">Native analytical returns (f64); display formatting only<br>Three quarterly observations; zero risk-free rate<br>Generated 15 Oct 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">Total Return</div><div class="val pos">+2.7%</div></div><div class="kpi"><div class="lbl">CAGR</div><div class="val pos">+3.7%</div></div><div class="kpi"><div class="lbl">Sharpe</div><div class="val ">6.54</div></div><div class="kpi"><div class="lbl">Max Drawdown</div><div class="val neg">+0.0%</div></div></div><div class="secttl">Cumulative Return</div><svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg"><line x1="48" y1="186.0" x2="606" y2="186.0" stroke="#cfc8b8"/><text x="42" y="189.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0%</text><line x1="48" y1="157.0" x2="606" y2="157.0" stroke="#e4e1d8"/><text x="42" y="160.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0%</text><line x1="48" y1="128.0" x2="606" y2="128.0" stroke="#e4e1d8"/><text x="42" y="131.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">1%</text><line x1="48" y1="99.0" x2="606" y2="99.0" stroke="#e4e1d8"/><text x="42" y="102.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">2%</text><line x1="48" y1="70.0" x2="606" y2="70.0" stroke="#e4e1d8"/><text x="42" y="73.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">2%</text><line x1="48" y1="41.0" x2="606" y2="41.0" stroke="#e4e1d8"/><text x="42" y="44.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">2%</text><line x1="48" y1="12.0" x2="606" y2="12.0" stroke="#e4e1d8"/><text x="42" y="15.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">3%</text><line x1="48.0" y1="186" x2="48.0" y2="190" stroke="#7a8190"/><text x="48.0" y="201" text-anchor="middle" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">2025</text><polygon points="48.0,186.0 48.0,114.7 327.0,71.2 606.0,26.5 606.0,186.0" fill="rgba(16,36,63,0.12)"/><polyline points="48.0,114.7 327.0,71.2 606.0,26.5" fill="none" stroke="#10243f" stroke-width="1.6" stroke-linejoin="round"/><rect class="fq-hb" x="48.0" y="12" width="279.0" height="174" data-cx="48.0" data-cy="114.7" data-label="15 Apr 2025" data-val="1.23%"><title>15 Apr 2025 · 1.23%</title></rect><rect class="fq-hb" x="187.5" y="12" width="279.0" height="174" data-cx="327.0" data-cy="71.2" data-label="16 Jul 2025" data-val="1.98%"><title>16 Jul 2025 · 1.98%</title></rect><rect class="fq-hb" x="466.5" y="12" width="279.0" height="174" data-cx="606.0" data-cy="26.5" data-label="15 Oct 2025" data-val="2.75%"><title>15 Oct 2025 · 2.75%</title></rect><line class="fq-cross" x1="0" x2="0" y1="12" y2="186" style="visibility:hidden" pointer-events="none"/><circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/></svg><div class="secttl">Risk &amp; Return Statistics</div><div class="statgrid"><table class="kv"><tbody><tr><td class="k">Total Return</td><td class="v pos">+2.7%</td></tr><tr><td class="k">Annualised Return</td><td class="v pos">+3.7%</td></tr><tr><td class="k">Geometric Mean</td><td class="v pos">+0.9%</td></tr><tr><td class="k">Mean Return</td><td class="v pos">+3.6%</td></tr></tbody></table><table class="kv"><tbody><tr><td class="k">Annualised Volatility</td><td class="v ">0.6%</td></tr><tr><td class="k">Sharpe Ratio</td><td class="v ">6.54</td></tr><tr><td class="k">Sortino Ratio</td><td class="v ">inf</td></tr><tr><td class="k">Calmar Ratio</td><td class="v ">inf</td></tr><tr><td class="k">Max Drawdown</td><td class="v neg">+0.0%</td></tr></tbody></table><table class="kv"><tbody><tr><td class="k">Skewness</td><td class="v ">1.73</td></tr><tr><td class="k">Excess Kurtosis</td><td class="v ">0.00</td></tr><tr><td class="k">Value-at-Risk (95%)</td><td class="v neg">+0.7%</td></tr><tr><td class="k">Expected Shortfall</td><td class="v neg">+0.7%</td></tr><tr><td class="k">Ulcer Index</td><td class="v ">0.00</td></tr></tbody></table></div><div class="secttl">Drawdown</div><svg viewBox="0 0 620 150" xmlns="http://www.w3.org/2000/svg"><line x1="48" y1="126.0" x2="606" y2="126.0" stroke="#cfc8b8"/><text x="42" y="129.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0%</text><line x1="48" y1="103.2" x2="606" y2="103.2" stroke="#e4e1d8"/><text x="42" y="106.2" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0%</text><line x1="48" y1="80.4" x2="606" y2="80.4" stroke="#e4e1d8"/><text x="42" y="83.4" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0%</text><line x1="48" y1="57.6" x2="606" y2="57.6" stroke="#e4e1d8"/><text x="42" y="60.6" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">1%</text><line x1="48" y1="34.8" x2="606" y2="34.8" stroke="#e4e1d8"/><text x="42" y="37.8" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">1%</text><line x1="48" y1="12.0" x2="606" y2="12.0" stroke="#e4e1d8"/><text x="42" y="15.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">1%</text><line x1="48.0" y1="126" x2="48.0" y2="130" stroke="#7a8190"/><text x="48.0" y="141" text-anchor="middle" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">2025</text><polygon points="48.0,126.0 48.0,126.0 327.0,126.0 606.0,126.0 606.0,126.0" fill="rgba(155,35,53,0.13)"/><polyline points="48.0,126.0 327.0,126.0 606.0,126.0" fill="none" stroke="#9b2335" stroke-width="1.6" stroke-linejoin="round"/><rect class="fq-hb" x="48.0" y="12" width="279.0" height="114" data-cx="48.0" data-cy="126.0" data-label="15 Apr 2025" data-val="0.00%"><title>15 Apr 2025 · 0.00%</title></rect><rect class="fq-hb" x="187.5" y="12" width="279.0" height="114" data-cx="327.0" data-cy="126.0" data-label="16 Jul 2025" data-val="0.00%"><title>16 Jul 2025 · 0.00%</title></rect><rect class="fq-hb" x="466.5" y="12" width="279.0" height="114" data-cx="606.0" data-cy="126.0" data-label="15 Oct 2025" data-val="0.00%"><title>15 Oct 2025 · 0.00%</title></rect><line class="fq-cross" x1="0" x2="0" y1="12" y2="126" style="visibility:hidden" pointer-events="none"/><circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/></svg><div class="foot"><span>Account performance: January 15-October 15, 2025</span><span>finstack-quant</span></div><div class="fq-tip" aria-hidden="true"></div></div><script>
+(function(){
+  function init(){
+    document.querySelectorAll('.fq-ts svg .fq-hb').forEach(function(band){
+      if(band.__fqWired){return;} band.__fqWired=true;
+      var root=band.closest('.fq-ts'); if(!root){return;}
+      var tip=root.querySelector('.fq-tip');
+      var svg=band.ownerSVGElement;
+      var cross=svg&&svg.querySelector('.fq-cross');
+      var mk=svg&&svg.querySelector('.fq-mk');
+      function show(e){
+        if(tip){tip.textContent=band.getAttribute('data-label')+' · '+band.getAttribute('data-val');
+          tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.opacity='1';}
+        var cx=band.getAttribute('data-cx'), cy=band.getAttribute('data-cy');
+        if(cross){cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.style.visibility='visible';}
+        if(mk){mk.setAttribute('cx',cx); mk.setAttribute('cy',cy); mk.style.visibility='visible';}
+      }
+      function hide(){ if(tip){tip.style.opacity='0';} if(cross){cross.style.visibility='hidden';} if(mk){mk.style.visibility='hidden';} }
+      band.addEventListener('mousemove',show);
+      band.addEventListener('mouseenter',show);
+      band.addEventListener('mouseleave',hide);
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script></body></html>

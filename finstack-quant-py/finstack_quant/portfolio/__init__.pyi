@@ -566,6 +566,509 @@ class MaterializationReport:
         """
         ...
 
+class PortfolioBuilder:
+    """
+    Fluent builder for a runtime ``Portfolio``.
+
+    Start from :meth:`Portfolio.builder`. Each setter returns ``self`` and
+    ``build`` consumes the builder.
+
+    Examples
+    --------
+    >>> import datetime as dt
+    >>> from finstack_quant.portfolio import Portfolio
+    >>> pf = Portfolio.builder("book", "USD", dt.date(2025, 1, 1)).name("Desk book").build()
+    >>> (pf.id, pf.name)
+    ('book', 'Desk book')
+    """
+
+    def name(self, name: str) -> PortfolioBuilder:
+        """
+        Set the human-readable portfolio name.
+
+        Parameters
+        ----------
+        name : str
+            Display name stored on the built portfolio.
+
+        Returns
+        -------
+        PortfolioBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+
+    def entity(
+        self,
+        id: str,
+        name: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> PortfolioBuilder:
+        """
+        Register an entity that positions can reference.
+
+        Parameters
+        ----------
+        id : str
+            Entity identifier used by ``position(..., entity_id=id)``.
+        name : str, optional
+            Optional display name.
+        tags : dict[str, str], optional
+            Optional entity tags for grouping and filtering.
+
+        Returns
+        -------
+        PortfolioBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+
+    def position(
+        self,
+        position_id: str,
+        instrument: object,
+        quantity: float,
+        entity_id: str | None = None,
+        unit: str | dict[str, str] | None = None,
+        attributes: dict[str, str | float] | None = None,
+    ) -> PortfolioBuilder:
+        """
+        Add a position holding a typed instrument.
+
+        Parameters
+        ----------
+        position_id : str
+            Unique position identifier.
+        instrument : object
+            Any typed instrument wrapper, or a canonical instrument-envelope
+            JSON string. The instrument's own ``id`` becomes ``instrument_id``.
+        quantity : float
+            Signed holding; its meaning follows ``unit``. Must be finite.
+        entity_id : str, optional
+            Owning entity registered via ``entity(...)``; ``None`` assigns the
+            position to the auto-created standalone entity.
+        unit : str or dict, optional
+            Position unit: ``"units"`` (default), ``"face_value"``,
+            ``"percentage"``, ``"notional"`` or ``{"notional": "USD"}`` for a
+            currency-tagged lot multiplier.
+        attributes : dict[str, str | float], optional
+            Position attributes used by grouping and optimization filters.
+
+        Returns
+        -------
+        PortfolioBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        TypeError
+            If ``instrument`` is neither a typed instrument nor a JSON string.
+        ValueError
+            If the instrument payload is invalid, ``quantity`` is not finite,
+            ``unit`` is unknown, or the builder was already consumed.
+        """
+        ...
+
+    def tag(self, key: str, value: str) -> PortfolioBuilder:
+        """
+        Attach a portfolio-level tag.
+
+        Parameters
+        ----------
+        key : str
+            Tag key.
+        value : str
+            Tag value.
+
+        Returns
+        -------
+        PortfolioBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+
+    def meta(self, key: str, value: object) -> PortfolioBuilder:
+        """
+        Attach a JSON-shaped metadata entry.
+
+        Parameters
+        ----------
+        key : str
+            Metadata key.
+        value : object
+            Any ``json.dumps``-able value stored on the built portfolio.
+
+        Returns
+        -------
+        PortfolioBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+
+    def build(self) -> Portfolio:
+        """
+        Validate and build the portfolio, consuming the builder.
+
+        Returns
+        -------
+        Portfolio
+            The constructed runtime portfolio.
+
+        Raises
+        ------
+        PortfolioError
+            If a position references an unregistered entity or another
+            structural invariant fails.
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return a concise debug representation.
+
+        Returns
+        -------
+        str
+            ``PortfolioBuilder(...)`` or ``PortfolioBuilder(<consumed>)``.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+class PositionValue:
+    """
+    Valuation of a single position inside a ``PortfolioValuation``.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import PositionValue
+    >>> doc = '{"position_id":"p1","entity_id":"e1","value_native":{"amount":"1","currency":"USD"},"value_base":{"amount":"1","currency":"USD"},"metric_scale":1.0,"risk_metrics_complete":true}'
+    >>> PositionValue.from_json(doc).position_id
+    'p1'
+    """
+
+    @staticmethod
+    def from_json(json: str) -> PositionValue:
+        """
+        Parse a position value from canonical JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON text produced by :meth:`to_json`.
+
+        Returns
+        -------
+        PositionValue
+            Reconstructed value.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid ``PositionValue`` JSON.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to canonical JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON document.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    @property
+    def position_id(self) -> str:
+        """
+        Position identifier.
+
+        Returns
+        -------
+        str
+            Position identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def entity_id(self) -> str:
+        """
+        Owning entity identifier.
+
+        Returns
+        -------
+        str
+            Owning entity identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def value_native(self) -> Money:
+        """
+        Value in the instrument's native currency.
+
+        Returns
+        -------
+        Money
+            Native-currency present value.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def value_base(self) -> Money:
+        """
+        Value converted to the portfolio base currency.
+
+        Returns
+        -------
+        Money
+            Base-currency present value.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def metric_scale(self) -> float:
+        """
+        Linear scale applied to summable risk metrics.
+
+        Returns
+        -------
+        float
+            Position size and sign used to scale summable metrics.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def risk_metrics_complete(self) -> bool:
+        """
+        Whether every requested risk metric was computed for this position.
+
+        Returns
+        -------
+        bool
+            ``True`` when no metric fell back to PV-only valuation.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def risk_error(self) -> str | None:
+        """
+        Original metric-failure message when valuation fell back to PV-only.
+
+        Returns
+        -------
+        str or None
+            Failure message, or ``None`` when risk metrics completed.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def valuation_result(self) -> dict[str, Any] | None:
+        """
+        Full instrument valuation result as a JSON-shaped dict, if retained.
+
+        Returns
+        -------
+        dict[str, Any] or None
+            Metrics-inclusive valuation payload, or ``None`` when omitted.
+
+        Raises
+        ------
+        ValueError
+            If the retained result cannot be converted to a Python object.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return a concise debug representation.
+
+        Returns
+        -------
+        str
+            ``PositionValue(position_id=..., value_base=..., ...)``.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+class ReconciliationReport:
+    """
+    Reconciliation of portfolio factor buckets against ``total_pnl``.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import ReconciliationReport
+    >>> doc = '{"total_residual": 0.0, "is_reconciled": true, "tolerance": 0.01}'
+    >>> ReconciliationReport.from_json(doc).is_reconciled
+    True
+    """
+
+    @property
+    def total_residual(self) -> float:
+        """
+        Unexplained base-currency amount after all buckets are summed.
+
+        Returns
+        -------
+        float
+            Residual in the portfolio base currency.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def is_reconciled(self) -> bool:
+        """
+        Whether ``abs(total_residual) <= tolerance`` and attribution is valid.
+
+        Returns
+        -------
+        bool
+            ``False`` when attribution was flagged invalid, regardless of residual.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def tolerance(self) -> float:
+        """
+        Absolute base-currency tolerance used for the check.
+
+        Returns
+        -------
+        float
+            Tolerance in base-currency units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Single-row DataFrame view of the report.
+
+        Columns: ``total_residual``, ``is_reconciled``, ``tolerance``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row with the pinned column schema.
+
+        Raises
+        ------
+        ValueError
+            If the report cannot be serialized into a pandas object.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to a compact JSON string.
+
+        Returns
+        -------
+        str
+            Compact JSON document.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> ReconciliationReport:
+        """
+        Deserialize from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON text produced by :meth:`to_json`.
+
+        Returns
+        -------
+        ReconciliationReport
+            Reconstructed report.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid ``ReconciliationReport`` JSON.
+        """
+        ...
+
 class Portfolio:
     """
     Built runtime portfolio. Cheap to clone; pass directly to pipeline functions.

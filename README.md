@@ -6,7 +6,7 @@
 ![WASM](https://img.shields.io/badge/wasm-ready-purple)
 ![Status](https://img.shields.io/badge/status-alpha-yellow)
 
-A deterministic financial computation workspace. Thirteen Rust domain crates
+A deterministic financial computation workspace. Fourteen Rust domain crates
 cover market data, cashflows, instrument pricing, risk, factor models,
 financial-statement modeling, scenarios, margin/XVA, and portfolio aggregation.
 PyO3 and wasm-bindgen binding crates expose the same APIs to Python and
@@ -73,9 +73,9 @@ finstack-quant/
 
 ## Crate map
 
-`finstack-quant` is the umbrella crate. It has no cargo features and
-unconditionally re-exports all fourteen domain crates, so one dependency
-reaches the whole API.
+`finstack-quant` is the umbrella crate. It re-exports all fourteen domain
+crates, so one dependency reaches the whole API. Default features enable
+JSON Schema generation and validation; they do not change pricing behavior.
 
 | Crate | Umbrella path | Provides |
 |---|---|---|
@@ -125,10 +125,12 @@ edges, read off the manifests:
 `valuations` is the mid-stack hub and `portfolio` is the top. No Rust crate
 depends on a binding crate, and `core` never depends on `models`.
 
-No cargo feature selects financial behavior. The workspace declares two:
-`ts_export` (on `core`, `valuations`, `portfolio`, and the WASM crate), which
-drives the TypeScript-declaration generator, and `extension-module` (on the
-PyO3 crate), the standard PyO3 linking switch.
+No cargo feature selects financial behavior. Workspace features are
+`json-schema` and `jsonschema-validate` (default on most crates, including
+the umbrella), `ts_export` (TypeScript declaration generation on `core`,
+`models`, `valuations`, `portfolio`, `calibration`, and the WASM crate),
+`extension-module` (PyO3 linking), and `console_panic_hook` (WASM panic
+hook).
 
 ## Quick start
 

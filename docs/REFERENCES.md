@@ -124,7 +124,6 @@ risk calculation with a standard reference.
 ### MtM-Resetting Cross-Currency Swaps
 
 - Andersen & Piterbarg, *Interest Rate Modeling Vol. III: Products and Risk Management*, §16.2 (Cross-Currency Swaps), §16.4 (MtM-Resetting Notionals).
-- See `docs/superpowers/specs/2026-05-10-xccy-mtm-reset-design.md` for the implementation spec.
 - The implementation uses CIP forward FX without FX-rate correlation convexity; suitable
   for vanilla G10 basis curve construction and position pricing. Per market convention
   (matching QuantLib's `MtMCrossCurrencyBasisSwap`), the rebalancing cashflow is emitted

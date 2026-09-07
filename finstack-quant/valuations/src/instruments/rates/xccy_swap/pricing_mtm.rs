@@ -16,7 +16,8 @@
 //! discounted cashflows, requiring no additional FX surface beyond what
 //! `pv_leg_in_reporting_currency` already needs for fixed-notional XCCY.
 //!
-//! See `docs/superpowers/specs/2026-05-10-xccy-mtm-reset-design.md` for the spec.
+//! Canonical citation: `docs/REFERENCES.md`
+//! (`#andersen-piterbarg-xccy-mtm-reset`).
 
 use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 use crate::instruments::common_impl::numeric::decimal_to_f64;

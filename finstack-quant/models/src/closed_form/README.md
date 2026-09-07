@@ -123,7 +123,6 @@ the log-average directly, not the standard Black-Scholes form. Every return
 path is capped at the no-arbitrage bound `df·M₁`, because the moment-matching
 approximation can overshoot for deep-ITM/high-vol inputs.
 
-
 References: Kemna & Vorst (1990); Turnbull & Wakeman (1991); Levy (1992);
 Curran (1994); Rogers & Shi (1995); Haug (2007) ch. 3.
 

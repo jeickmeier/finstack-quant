@@ -48,7 +48,7 @@ fn create_base_market() -> MarketContext {
             (10.0, 0.65),
             (30.0, 0.35),
         ])
-        .interp(InterpStyle::MonotoneConvex)
+        .interp(InterpStyle::Linear)
         .build()
         .unwrap();
 
@@ -65,7 +65,7 @@ fn create_base_market() -> MarketContext {
             (10.0, 0.64),
             (30.0, 0.34),
         ])
-        .interp(InterpStyle::MonotoneConvex)
+        .interp(InterpStyle::Linear)
         .build()
         .unwrap();
 
@@ -301,12 +301,13 @@ fn bench_curve_node_shock(c: &mut Criterion) {
     let base_date = date!(2025 - 01 - 01);
 
     for num_nodes in [5] {
-        let mut nodes = Vec::new();
-        for i in 0..num_nodes {
-            let tenor = format!("{}Y", i + 1);
-            let bp = (i as f64 + 1.0) * 5.0;
-            nodes.push((tenor, bp));
-        }
+        let tenors = ["3M", "6M", "1Y", "2Y", "5Y"];
+        let nodes: Vec<(String, f64)> = tenors
+            .iter()
+            .take(num_nodes)
+            .enumerate()
+            .map(|(i, tenor)| (tenor.to_string(), (i as f64 + 1.0) * 5.0))
+            .collect();
 
         let scenario = ScenarioSpec {
             id: "node_shock".into(),
@@ -317,7 +318,7 @@ fn bench_curve_node_shock(c: &mut Criterion) {
                 curve_id: "USD_SOFR".into(),
                 discount_curve_id: None,
                 nodes: nodes.clone(),
-                match_mode: TenorMatchMode::Interpolate,
+                match_mode: TenorMatchMode::Exact,
             }],
             priority: 0,
             resolution_mode: Default::default(),
@@ -788,7 +789,7 @@ fn bench_serde_roundtrip(c: &mut Criterion) {
                 curve_id: "CDX_HY_HAZARD".into(),
                 discount_curve_id: Some("USD_SOFR".into()),
                 nodes: vec![("3Y".into(), 100.0), ("5Y".into(), 150.0)],
-                match_mode: TenorMatchMode::Interpolate,
+                match_mode: TenorMatchMode::Exact,
             },
             // FX
             OperationSpec::MarketFxPct {
@@ -962,7 +963,7 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
             curve_id: "CDX_HY_HAZARD".into(),
             discount_curve_id: Some("USD_SOFR".into()),
             nodes: vec![("3Y".into(), 100.0), ("5Y".into(), 150.0)],
-            match_mode: TenorMatchMode::Interpolate,
+            match_mode: TenorMatchMode::Exact,
         }],
         priority: 0,
         resolution_mode: Default::default(),

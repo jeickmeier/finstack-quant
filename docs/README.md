@@ -14,7 +14,7 @@ physically lives here and who owns it.
 | [`CONTRACTS.md`](CONTRACTS.md) | The persisted-contract matrix: which Rust serde types are wire contracts, their generated schemas, strict loaders, and Rust/Python/WASM API map. |
 | [`SERDE_STABILITY.md`](SERDE_STABILITY.md) | The serde contract policy: source-of-truth rules, v1-only scope, deterministic generation requirements. |
 | [`audits/`](audits/) | Dated deep-audit reports. One file per audit, named `YYYY-MM-DD-<scope>.md`. Historical records — do not rewrite them to match later code. |
-| [`superpowers/specs/`](superpowers/specs/) | Design specs for planned or recently landed work, including the [data platform PRD](superpowers/specs/FINSTACK_DATA_PLATFORM_PRD.md). |
+| [`superpowers/specs/`](superpowers/specs/) | Design specs for planned or recently landed work. |
 | [`superpowers/plans/`](superpowers/plans/) | Implementation plans of record. Do not edit an active plan unless the current task is that plan. |
 
 ## Documentation that lives elsewhere

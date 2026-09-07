@@ -674,7 +674,7 @@ class SimulatedPaths:
         This accessor does not raise; it returns the stored or derived value.
         """
         ...
-    def to_dataframe(self) -> pandas.DataFrame:
+    def to_dataframe(self) -> pd.DataFrame:
         """
         Long frame with ``path`` (int), ``time`` (float, years), ``asset_value`` (float); one row per path per grid point, ordered by path then time.
 

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PM decision brief</title><style>
+.fq-ts { background:#fbfaf6; color:#1c1c1e; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  border-radius:12px; padding:30px 38px 40px; }
+.fq-ts .head { display:flex; justify-content:space-between; align-items:flex-end;
+  border-bottom:1px solid #10243f; padding-bottom:13px; margin-bottom:18px; }
+.fq-ts .head .eyebrow { font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:4px; }
+.fq-ts .head .title { font-family:Georgia,"Times New Roman",serif; font-size:25px; font-weight:600;
+  color:#10243f; letter-spacing:-.01em; }
+.fq-ts .head .subtitle { font-size:12.5px; color:#7a8190; margin-top:4px; }
+.fq-ts .head .meta { text-align:right; font-size:11px; color:#7a8190; line-height:1.6; }
+.fq-ts .kpis { display:grid; grid-template-columns:repeat(4,1fr);
+  border-top:1px solid #e4e1d8; border-bottom:1px solid #e4e1d8;
+  padding:15px 0; margin-bottom:22px; }
+.fq-ts .kpi { padding:0 16px; border-right:1px solid #e4e1d8; }
+.fq-ts .kpi:last-child { border-right:none; }
+.fq-ts .kpi .lbl { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:6px; }
+.fq-ts .kpi .val { font-family:"Iowan Old Style",Georgia,serif; font-size:25px; font-weight:600;
+  color:#10243f; line-height:1; }
+.fq-ts .kpi .val.pos { color:#1b6b4f; } .fq-ts .kpi .val.neg { color:#9b2335; }
+.fq-ts .secttl { font-family:Georgia,"Times New Roman",serif; font-size:14px; font-weight:600;
+  color:#10243f; margin:26px 0 4px; border-bottom:1px solid #e4e1d8; padding-bottom:6px; }
+.fq-ts .sub { font-size:11px; color:#7a8190; margin:0 0 10px; }
+.fq-ts .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+.fq-ts .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }
+.fq-ts table.kv { width:100%; border-collapse:collapse; font-size:12.5px; }
+.fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
+.fq-ts table.kv td.k { color:#7a8190; }
+.fq-ts table.kv td.v { text-align:right; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; color:#10243f; }
+.fq-ts table.kv td.v.pos { color:#1b6b4f; } .fq-ts table.kv td.v.neg { color:#9b2335; }
+.fq-ts table.hm { width:100%; border-collapse:collapse; font-family:"Iowan Old Style",Georgia,serif; font-size:11.5px; }
+.fq-ts table.hm th { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:10px; letter-spacing:.04em;
+  text-transform:uppercase; color:#7a8190; font-weight:600; padding:5px 0; text-align:center; }
+.fq-ts table.hm th.yr, .fq-ts table.hm td.yr { text-align:left; color:#7a8190;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:11px; width:46px; }
+.fq-ts table.hm td { text-align:center; padding:7px 2px; color:#23303f;
+  border:2px solid #fbfaf6; }
+.fq-ts table.hm td.ytd { font-weight:700; border-left:2px solid #cfc8b8; }
+.fq-ts table.dd { width:100%; border-collapse:collapse; font-size:12px; }
+.fq-ts table.dd th { font-size:10px; letter-spacing:.05em; text-transform:uppercase;
+  color:#7a8190; font-weight:600; text-align:right; padding:6px 4px; border-bottom:1px solid #10243f; }
+.fq-ts table.dd th:first-child { text-align:left; }
+.fq-ts table.dd td { padding:6px 4px; border-bottom:1px solid #e4e1d8; text-align:right;
+  font-family:"Iowan Old Style",Georgia,serif; }
+.fq-ts table.dd td:first-child { text-align:left; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#7a8190; }
+.fq-ts table.dd td.neg { color:#9b2335; }
+.fq-ts svg { display:block; width:100%; height:auto; }
+.fq-ts .foot { margin-top:30px; border-top:1px solid #10243f; padding-top:10px;
+  font-size:10.5px; color:#7a8190; display:flex; justify-content:space-between; }
+.fq-ts .fq-tip { position:fixed; pointer-events:none; z-index:9999; opacity:0; transition:opacity .08s;
+  background:#10243f; color:#fff; font:11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:4px 8px;
+  border-radius:4px; white-space:nowrap; }
+.fq-ts svg .fq-hb { cursor:crosshair; }
+.fq-ts svg rect.fq-hb:not([fill]) { fill:transparent; }
+.fq-ts svg .fq-cross { stroke:#7a8190; stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }
+.fq-ts svg .fq-mk { fill:#7c2230; stroke:#fff; stroke-width:1; pointer-events:none; }
+.fq-ts .fq-scroll { max-height:240px; overflow:auto; border:1px solid #e4e1d8; border-radius:4px; }
+.fq-ts .fq-scroll table.dd th { position:sticky; top:0; background:#f3f1ea; }
+</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow"></div><div class="title">PM decision brief</div><div class="subtitle">Common-book account after deposit maturities; synthetic teaching case</div></div><div class="meta">As of 2025-10-15<br>Amounts in USD; qualified sensitivities retain their sign<br>Generated 15 Oct 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">NAV USD</div><div class="val ">4,984,648.77</div></div><div class="kpi"><div class="lbl">Linked TWR Jan-Oct</div><div class="val ">2.75%</div></div><div class="kpi"><div class="lbl">Annualized investor XIRR</div><div class="val ">3.68%</div></div><div class="kpi"><div class="lbl">USD-OIS bucketed DV01 sum USD/bp</div><div class="val ">-1,107.13</div></div><div class="kpi"><div class="lbl">ACME-HZD CS01 USD/bp</div><div class="val ">381.39</div></div><div class="kpi"><div class="lbl">USD-OIS +100 bp P&amp;L USD</div><div class="val ">-108,510.46</div></div></div><div class="secttl">Decision and conditions</div><style>
+.fq-ts { max-width:800px; margin:0 auto; padding:24px 30px; box-sizing:border-box; }
+.fq-ts .head { align-items:flex-start; margin-bottom:14px; padding-bottom:12px; gap:18px; }
+.fq-ts .head .title { font-size:24px; }
+.fq-ts .head .meta { max-width:235px; flex-shrink:0; font-size:10px; }
+.fq-ts .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); padding:10px 0; margin-bottom:16px; row-gap:12px; }
+.fq-ts .kpi { min-width:0; padding:0 12px; }
+.fq-ts .kpi:nth-child(3n) { border-right:0; }
+.fq-ts .kpi:nth-child(n+4) { padding-top:12px; border-top:1px solid #e4e1d8; }
+.fq-ts .kpi .lbl { font-size:9px; line-height:1.35; min-height:2.7em; margin-bottom:5px; }
+.fq-ts .kpi .val { font-size:22px; font-variant-numeric:tabular-nums; }
+.fq-ts .secttl { margin-top:18px; padding-bottom:5px; }
+.fq-ts p { margin:6px 0 10px; font-size:12px; line-height:1.45; }
+.fq-ts table.dd th, .fq-ts table.dd td { padding:6px 4px; }
+.fq-ts .foot { margin-top:20px; gap:16px; font-size:9px; }
+@media (max-width:600px) {
+ .fq-ts { padding:20px; } .fq-ts .head { display:block; }
+ .fq-ts .head .meta { text-align:left; margin-top:8px; max-width:none; }
+ .fq-ts .kpi { padding:0 8px; } .fq-ts .kpi .val { font-size:18px; }
+ .fq-ts .kpi .lbl { font-size:8px; }
+}
+@media print {
+ @page { size:letter; margin:0.45in; }
+ body { margin:0 !important; padding:0 !important; background:white !important; }
+ .fq-ts { max-width:none; padding:0; border-radius:0; }
+ .fq-ts .head, .fq-ts .kpis, .fq-ts table { break-inside:avoid; }
+ .fq-ts .secttl { break-after:avoid; }
+}
+</style><p>Maintain the current allocation pending review of the private loan's covenant breach and unobservable exit capacity. Use the qualified USD-OIS sensitivity to size a rates hedge; assess credit separately.</p><div class="secttl">Account reconciliation</div><table class="dd"><thead><tr><th>Component</th><th>Amount (USD)</th></tr></thead><tbody><tr><td class="">Native current positions</td><td class="">4,831,987.63</td></tr><tr><td class="">Settled USD cash after loan acquisition</td><td class="">152,661.14</td></tr><tr><td class="">Account NAV</td><td class="">4,984,648.77</td></tr></tbody></table><div class="secttl">Stress the PM can act on</div><p class="sub">Immediate; fixed credit hazard and other inputs; cash unchanged</p><table class="dd"><thead><tr><th>Scenario</th><th>P&amp;L (USD)</th><th>NAV impact</th></tr></thead><tbody><tr><td class="">USD-OIS zeros +100 bp</td><td class="">-108,510.46</td><td class="">-2.18%</td></tr></tbody></table><div class="secttl">What these numbers mean</div><p>TWR removes external-flow timing; XIRR measures the investor's dated cash experience. The loan was bought at today's native PV using settled cash, so historical returns precede that acquisition. Risk KPIs cover the named curve and hazard only, not every factor. Three observed return periods cannot establish skill. Synthetic liquidity is not an executable quote.</p><div class="foot"><span>Source pack: holdings, provenance, performance, attribution, proxy risk and stress</span><span>finstack-quant</span></div><div class="fq-tip" aria-hidden="true"></div></div><script>
+(function(){
+  function init(){
+    document.querySelectorAll('.fq-ts svg .fq-hb').forEach(function(band){
+      if(band.__fqWired){return;} band.__fqWired=true;
+      var root=band.closest('.fq-ts'); if(!root){return;}
+      var tip=root.querySelector('.fq-tip');
+      var svg=band.ownerSVGElement;
+      var cross=svg&&svg.querySelector('.fq-cross');
+      var mk=svg&&svg.querySelector('.fq-mk');
+      function show(e){
+        if(tip){tip.textContent=band.getAttribute('data-label')+' · '+band.getAttribute('data-val');
+          tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.opacity='1';}
+        var cx=band.getAttribute('data-cx'), cy=band.getAttribute('data-cy');
+        if(cross){cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.style.visibility='visible';}
+        if(mk){mk.setAttribute('cx',cx); mk.setAttribute('cy',cy); mk.style.visibility='visible';}
+      }
+      function hide(){ if(tip){tip.style.opacity='0';} if(cross){cross.style.visibility='hidden';} if(mk){mk.style.visibility='hidden';} }
+      band.addEventListener('mousemove',show);
+      band.addEventListener('mouseenter',show);
+      band.addEventListener('mouseleave',hide);
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script></body></html>

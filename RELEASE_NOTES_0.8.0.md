@@ -1,9 +1,9 @@
 # Finstack Quant 0.8.0
 
-**Release Date**: 2026-08-27
+**Release Date**: 2026-09-06
 
 **Bump type**: minor (pre-1.0; intentional breaking Rust, Python, WASM, and JSON changes)
-**Status**: Release candidate
+**Status**: Prepared, not yet tagged (`v0.7.0` is the latest git tag)
 
 ## Executive Summary
 
@@ -109,19 +109,50 @@ liquidity, and valuation-owned model namespaces do not resolve. Structured
 credit pool model engines were not previously bound, so `models::credit::pool`
 remains Rust-only in this release.
 
+### 5. Fail-closed constructors after the August RC cut
+
+These landed after the original 0.8.0 changelog date and are part of this tag:
+
+- Asian call/put constructors return `Result` and require at least one future
+  or historical fixing.
+- Portfolio margin-result JSON uses `SimmSensitivitiesJson` tuple arrays.
+- FX barrier, digital, and touch options reject a monitoring start after
+  `as_of`.
+- Black-Scholes and related model entry points reject non-positive spot or
+  strike and non-finite numerical inputs.
+
+`CashFlowAccrual` also gained optional `coupon_period` and
+`end_is_termination_date` fields.
+
+### 6. Calibration crate
+
+Quote ingestion, market construction, calibration, and replay caches live in
+`finstack-quant-calibration`. Valuations keep instruments, pricing, and the
+recalibration port. Python and WASM keep the existing `calibration` namespaces.
+
+### 7. More fail-closed constructors and removed shims
+
+- `Rate` conversion, percentage construction, and rate negation return
+  `Result`.
+- Callable bonds reject `discounting`; use `tree` or `rates_credit`.
+- `PvDiscountSource::Market` is gone; pass an explicit discount source.
+- Compatibility shims listed in `CHANGELOG.md` under post-RC surface cuts
+  were deleted rather than deprecated.
+
 ## Architecture Result
 
 The intended dependency direction is:
 
 ```text
-core / analytics / cashflows -> models -> valuations -> portfolio
+core / analytics / cashflows -> models -> calibration / valuations -> portfolio
 ```
 
 Core owns neutral types and observed market-data artifacts. Models owns
-product-independent engines. Valuations owns instruments, market resolution,
-calibration orchestration, presets, and results. Portfolio owns positions,
-assignment, valuation-based sensitivities, allocation policy, what-if workflows,
-and reporting adapters.
+product-independent engines. Calibration owns quote ingestion, market
+construction, calibration, and replay caches. Valuations owns instruments,
+market resolution, the recalibration port, presets, and results. Portfolio owns
+positions, assignment, valuation-based sensitivities, allocation policy,
+what-if workflows, and reporting adapters.
 
 ## Deprecated
 
@@ -144,6 +175,9 @@ None. No compatibility aliases or deprecated paths are retained.
    `models::credit::pool`; continue to construct and price deals through
    valuations.
 7. Keep every persisted contract marker at version 1.
+8. Replace `PvDiscountSource::Market` with an explicit discount source.
+9. Handle `Result` from `Rate` and percentage constructors.
+10. Price callable bonds with `tree` or `rates_credit`, not `discounting`.
 
 ## Numerical Behavior
 
@@ -157,5 +191,10 @@ longer manufacture a 40% assumption when the caller omitted it.
   engine types were bound before this move.
 - Core volatility artifacts provide data and structural validation only;
   computational evaluation requires the models crate.
+- Five Python golden fixtures still fail and must be resolved before tag:
+  hazard-curve QuantLib bonds (NPV/DV01), a callable OAS QuantLib bond that
+  still requests `discounting`, the Hagan CMS floorlet regression, and the
+  term-loan B CS01/DV01 regression. Do not tag `v0.8.0` until those pass or
+  are explicitly re-baselined.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the complete itemized release history.

@@ -2,7 +2,9 @@
 
 ## [Unreleased]
 
-### Changed (BREAKING)
+## [0.8.0] - 2026-09-06
+
+### Changed (BREAKING) — post-RC tightening
 
 - `AsianCall::new`, `AsianPut::new`, and both `with_history` constructors now
   return `Result`. A payoff requires at least one future or historical fixing;
@@ -10,6 +12,42 @@
 - Portfolio margin-result JSON uses the margin crate's canonical
   `SimmSensitivitiesJson` tuple arrays for nested sensitivities. The duplicate
   portfolio-specific sensitivity object format was removed.
+- FX barrier, digital, and touch options reject a monitoring start date after
+  the valuation date.
+- Black-Scholes and related model entry points reject non-positive spot or
+  strike, negative volatility or expiry, and non-finite numerical inputs.
+- `Rate` conversion, percentage construction, and rate negation return `Result`
+  instead of panicking or silently wrapping invalid values.
+- Callable bonds reject the `discounting` model. Use `tree` for rates-only
+  optional pricing or `rates_credit` for joint rates-credit optional pricing.
+- Lookback, goal-seek, covenant, carry-metric, and rolling-risk entry points
+  fail closed on non-finite, out-of-range, or missing required inputs.
+
+### Removed (BREAKING) — post-RC surface cuts
+
+- `PvDiscountSource::Market`; callers pass an explicit discount source.
+- Unused public CS01/hazard helpers and the unused hazard CS01 metric path.
+- Compatibility and orphan surfaces including the option-market forwarding
+  module, FX barrier payoff alias, empty ILB pricer module, reinvestment
+  manager, RMBS WAL calculator, ASW configuration, basket-exposure metric,
+  linear credit facade, inert ECL write-offs, formula-check alias,
+  `PeriodDataFrame` export, `Bond::pricing_cashflows`, unread XVA
+  config/netting wrappers, and speculative custom covenant evaluator hooks.
+- Python duplicate instrument-validation helpers and unread sensitivity
+  facades. Bindings take serde-owned wire shapes and typed error kinds.
+
+### Added
+
+- `CashFlowAccrual` records an optional `coupon_period` and
+  `end_is_termination_date` so accrual day counts can honor the contractual
+  coupon window and termination stub.
+- `EmbeddedJsonRegistry` is public, with a document/registry split and an
+  optional extension key.
+- Act/Act ISMA day-count and inflation-index handling coverage.
+- Documentation site under `docs-site/` with a notebook-backed curriculum.
+- `finstack-quant-calibration` owns quote ingestion, market construction,
+  calibration, and cached recalibration. Valuations keep instruments, pricing,
+  and the recalibration port.
 
 ### Fixed
 
@@ -19,8 +57,11 @@
   errors when monetary conversion overflows instead of panicking.
 - Taylor VaR borrows the supplied instruments directly, avoiding redundant
   instrument cloning and temporary reference collections.
-
-## [0.8.0] - 2026-08-27
+- CMS option rho uses a 1 bp bump. Inflation `roll_forward` and key-rate
+  bumps preserve interpolation style and extrapolation.
+- Python stubs declare `PortfolioBuilder`, `PositionValue`, and
+  `ReconciliationReport`, and nested credit types no longer shadow `pd` /
+  `lgd` / `float` in annotations.
 
 ### Changed — model-engine consolidation (BREAKING)
 

@@ -27,7 +27,6 @@ rust_decimal = { workspace = true }
 schemars = { workspace = true, optional = true }
 statrs = { version = "0.18", default-features = false }
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
-num-complex = "0.4"
 # Production-grade random number generation
 rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }

@@ -2416,7 +2416,7 @@ class pd:
             """
             ...
 
-        def map_pd(self, pd: float) -> MasterScaleResult:
+        def map_pd(self, pd: float) -> pd_mod.MasterScaleResult:
             """
             Map a PD onto its rating grade.
 
@@ -3462,7 +3462,7 @@ class lgd:
             """
             ...
         @staticmethod
-        def from_json(json: str) -> lgd.WorkoutLgdResult:
+        def from_json(json: str) -> lgd_mod.WorkoutLgdResult:
             """
             Deserialize a ``WorkoutLgdResult`` from its canonical JSON form.
 
@@ -3577,7 +3577,7 @@ class lgd:
         """
 
         @staticmethod
-        def builder() -> lgd.WorkoutLgdBuilder:
+        def builder() -> lgd_mod.WorkoutLgdBuilder:
             """
             Start a fluent builder (the only construction entry point).
 
@@ -3598,7 +3598,7 @@ class lgd:
             """
             ...
 
-        def evaluate(self, ead: float) -> lgd.WorkoutLgdResult:
+        def evaluate(self, ead: float) -> lgd_mod.WorkoutLgdResult:
             """
             Evaluate net recovery, LGD, and recovery rate at ``ead``.
 
@@ -3683,7 +3683,7 @@ class lgd:
             ...
 
         @property
-        def collateral(self) -> list[lgd.CollateralPiece]:
+        def collateral(self) -> list[lgd_mod.CollateralPiece]:
             """
             Ordered collateral waterfall, highest priority first.
 
@@ -3728,7 +3728,7 @@ class lgd:
             """
             ...
         @property
-        def costs(self) -> lgd.WorkoutCosts:
+        def costs(self) -> lgd_mod.WorkoutCosts:
             """
             Direct and indirect cost rates.
 
@@ -3758,7 +3758,7 @@ class lgd:
             """
             ...
         @staticmethod
-        def from_json(json: str) -> lgd.WorkoutLgd:
+        def from_json(json: str) -> lgd_mod.WorkoutLgd:
             """
             Deserialize a ``WorkoutLgd`` from its canonical JSON form.
 
@@ -6463,3 +6463,6 @@ class migration:
 
         """
         ...
+
+pd_mod = pd
+lgd_mod = lgd

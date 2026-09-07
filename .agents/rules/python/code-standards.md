@@ -39,7 +39,8 @@ Two documented deviations from strict crate-mirroring, both recorded in
 - `reporting` is a pure-Python presentation layer (tear sheets, tables, charts) with
   no Rust crate; it is explicitly exempt from crate-mirroring and has no WASM parity.
 
-See `docs/superpowers/specs/2026-04-10-rust-canonical-api-alignment-design.md` for the full spec.
+See `finstack-quant-py/parity_contract.toml` for the living binding-parity
+contract, including these documented deviations.
 
 ## Module Layout and Registration
 

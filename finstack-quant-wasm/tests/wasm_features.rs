@@ -108,7 +108,7 @@ fn finance_specific_feature_ops_return_js_arrays() {
     let grouped = transform_cross_sectional_grouped(values, time_key, groups, "zscore", None)
         .expect("grouped");
     let grouped: Vec<Option<f64>> = serde_wasm_bindgen::from_value(grouped).expect("grouped vec");
-    assert_eq!(grouped, vec![Some(-1.0), Some(1.0), Some(-1.0), Some(1.0)]);
+    assert_approx_options(&grouped, &[-1.0, 1.0, -1.0, 1.0]);
 
     let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)])
         .expect("values");
@@ -124,7 +124,7 @@ fn finance_specific_feature_ops_return_js_arrays() {
             .expect("exposures");
     let residual = neutralize(values, time_key, exposures, None).expect("neutralize");
     let residual: Vec<Option<f64>> = serde_wasm_bindgen::from_value(residual).expect("residual");
-    assert_eq!(residual, vec![Some(-0.5), Some(-1.0), Some(0.5), Some(1.0)]);
+    assert_approx_options(&residual, &[-0.5, -1.0, 0.5, 1.0]);
 
     let values =
         serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(3.0)]).expect("values");
@@ -180,7 +180,7 @@ fn pipeline_helper_feature_ops_return_js_arrays() {
         .expect("time key");
     let weights = rank_to_weights(values, time_key).expect("weights");
     let weights: Vec<Option<f64>> = serde_wasm_bindgen::from_value(weights).expect("weights vec");
-    assert_eq!(weights, vec![Some(-0.5), Some(0.0), Some(0.5)]);
+    assert_approx_options(&weights, &[-0.5, 0.0, 0.5]);
 
     let values = serde_wasm_bindgen::to_value(&vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)])
         .expect("values");
@@ -219,4 +219,15 @@ fn transform_panel_json_returns_json_result() {
     assert!((result["columns"][0]["values"][1].as_f64().expect("ret1") - 0.2).abs() < 1e-12);
     assert_eq!(result["columns"][1]["name"], "rank");
     assert_eq!(result["columns"][1]["values"][2], 1.0);
+}
+
+fn assert_approx_options(got: &[Option<f64>], expected: &[f64]) {
+    assert_eq!(got.len(), expected.len());
+    for (index, (value, expected)) in got.iter().zip(expected).enumerate() {
+        let value = value.expect("expected Some");
+        assert!(
+            (value - expected).abs() < 1e-12,
+            "index {index}: {value} vs {expected}"
+        );
+    }
 }

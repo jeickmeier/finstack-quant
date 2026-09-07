@@ -175,7 +175,6 @@ impl StochasticPricerConfig {
     /// Defaults to [`PoolGranularity::PerName`]; pass
     /// [`PoolGranularity::LargeHomogeneous`] to opt into the closed-form LHP
     /// fast-path for genuinely granular pools.
-    #[allow(dead_code)] // builder for the LHP fast-path; exercised by tests.
     pub(crate) fn with_pool_granularity(mut self, granularity: PoolGranularity) -> Self {
         self.pool_granularity = granularity;
         self

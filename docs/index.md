@@ -20,10 +20,8 @@ notes.
 
 - [`REFERENCES.md`](REFERENCES.md): canonical sources for formulas, conventions,
   and market practice.
-- [`superpowers/specs/FINSTACK_DATA_PLATFORM_PRD.md`](superpowers/specs/FINSTACK_DATA_PLATFORM_PRD.md): product
-  requirements for the versioned database platform, artifact compiler,
-  multi-backend adapters, pandas research interface, and portfolio
-  materialization targets.
+- [`superpowers/specs/`](superpowers/specs/): design specs for planned or
+  recently landed work.
 - [`SERDE_STABILITY.md`](SERDE_STABILITY.md): canonical serde contract rules,
   source-of-truth policy, and reproducible generation requirements.
 - [`CONTRACTS.md`](CONTRACTS.md): current persisted-contract matrix, strict

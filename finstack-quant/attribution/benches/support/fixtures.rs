@@ -141,7 +141,7 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
         .unwrap();
     let cpi_t1 = InflationCurve::builder("USD-CPI")
         .base_date(lean.as_of_t1)
-        .base_cpi(100.0)
+        .base_cpi(100.2)
         .knots([(0.0, 100.2), (1.0, 102.4), (5.0, 111.0)])
         .build()
         .unwrap();

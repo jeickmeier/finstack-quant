@@ -111,44 +111,6 @@ pub(crate) fn validate_buckets_strictly_increasing(
     Ok(())
 }
 
-/// Return each effective direct-hazard node once, in curve order.
-// Retained with the generic hazard engines until the next consolidation slice.
-#[allow(dead_code)]
-pub(crate) fn effective_hazard_node_times(hazard: &HazardCurve) -> Vec<f64> {
-    let mut nodes: Vec<f64> = hazard.knot_points().map(|(time, _)| time).collect();
-    nodes.dedup_by(|left, right| {
-        let scale = left.abs().max(right.abs()).max(1.0);
-        (*left - *right).abs() <= 1e-12 * scale
-    });
-    nodes
-}
-
-/// Format an actual hazard-node time without collapsing distinct nodes.
-// Retained with the generic hazard engines until the next consolidation slice.
-#[allow(dead_code)]
-pub(crate) fn format_hazard_node_label(years: f64) -> std::borrow::Cow<'static, str> {
-    if super::config::STANDARD_BUCKETS_YEARS
-        .iter()
-        .any(|standard| (years - standard).abs() <= 1e-12)
-    {
-        return super::config::format_bucket_label_cow(years);
-    }
-
-    let months = years * 12.0;
-    if years < 1.0 && (months - months.round()).abs() <= 1e-9 {
-        return std::borrow::Cow::Owned(format!("{:.0}m", months.round()));
-    }
-
-    let mut value = format!("{years:.10}");
-    while value.ends_with('0') {
-        value.pop();
-    }
-    if value.ends_with('.') {
-        value.pop();
-    }
-    std::borrow::Cow::Owned(format!("{value}y"))
-}
-
 /// Require a lossless calibration recipe for quote-space spread risk.
 pub(crate) fn require_hazard_replay(
     hazard: &HazardCurve,

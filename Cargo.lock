@@ -828,7 +828,6 @@ dependencies = [
  "finstack-quant-test-utils",
  "indexmap",
  "nalgebra",
- "num-complex",
  "phf",
  "proptest",
  "rand 0.9.5",
@@ -1085,7 +1084,6 @@ dependencies = [
 name = "finstack-quant-valuations-macros"
 version = "0.8.0"
 dependencies = [
- "proc-macro2",
  "quote",
  "syn 2.0.119",
 ]
