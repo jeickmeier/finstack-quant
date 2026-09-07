@@ -42,22 +42,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Native x86_64 keeps workspace fat LTO. Constrained arm64 jobs use
+          # thin LTO: linux-arm64 is a manylinux cross-link that OOMs with fat
+          # LTO (Release #142), and macos-14's 3-core runners spend 40+ minutes
+          # in rustc on finstack-quant-py and hit the job timeout (Release #143).
           # ── Linux x86_64 ──
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.12", timeout: 60 }
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.13", timeout: 60 }
-          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.14", timeout: 60 }
+          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
+          - { os: linux-x64,   runner: ubuntu-latest,  target: x86_64,  python: "3.14", timeout: 60, lto: fat,  codegen_units: 1 }
           # ── Linux arm64 ──
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.12", timeout: 60 }
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.13", timeout: 60 }
-          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.14", timeout: 60 }
+          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.12", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
+          - { os: linux-arm64, runner: ubuntu-latest,  target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
           # ── macOS arm64 (Apple Silicon) ──
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 60 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 60 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 60 }
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
           # ── Windows x86_64 (MSVC is slower — larger timeout) ──
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 90 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 90 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 90 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 90, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 90, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 90, lto: fat,  codegen_units: 1 }
 
     steps:
       - uses: actions/checkout@v5
@@ -99,11 +103,8 @@ jobs:
           # mise.toml defaults CARGO_INCREMENTAL=1 for local/dev builds; sccache
           # refuses to wrap rustc when incremental compilation is enabled.
           CARGO_INCREMENTAL: "0"
-          # Native wheels keep workspace fat LTO. The aarch64 cross-link of
-          # finstack-quant-py with lto=fat / codegen-units=1 exhausts the
-          # manylinux container (~Release #142).
-          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.os == 'linux-arm64' && 'thin' || 'fat' }}
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.os == 'linux-arm64' && '16' || '1' }}
+          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.lto }}
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}
 
       # Linux arm64 remains build-only until the project selects a native arm64 runner.
       - name: Install built wheel
