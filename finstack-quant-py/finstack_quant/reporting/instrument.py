@@ -86,7 +86,7 @@ def _money_str(m: Any) -> str:
 #   "money" full-value 0dp        "ratio" 2dp
 #   "ratio4" 4dp
 # Spot-check (2026-06-19): dirty/clean/accrued are full dollar values (not per-100),
-# so "money" kind is used (0dp). Yields/vols are decimal (×100 for %). Spreads decimal (×10000 for bp).
+# so "money" kind is used (0dp). Yields/vols are decimal (×100 for %). Spread metrics use decimal rates (×10000 for bp), except CDS par_spread which is already bp.
 _METRIC_FMT: dict[str, tuple[str, str]] = {
     "dirty_price": ("Dirty Price", "money"),
     "clean_price": ("Clean Price", "money"),
@@ -109,7 +109,7 @@ _METRIC_FMT: dict[str, tuple[str, str]] = {
     "annuity": ("Annuity", "money"),
     "pv_fixed": ("Fixed Leg PV", "money"),
     "pv_float": ("Float Leg PV", "money"),
-    "par_spread": ("Par Spread", "bp"),
+    "par_spread": ("Par Spread", "bp_value"),
     "risky_pv01": ("Risky PV01", "ratio"),
     "risky_annuity": ("Risky Annuity", "money"),
     "protection_leg_pv": ("Protection Leg PV", "money"),
@@ -139,8 +139,8 @@ def _humanize(metric_id: str) -> str:
 def _fmt_value(kind: str, v: float) -> str:
     if kind == "pct":
         return fmt.pct(v * 100.0, dp=2)
-    if kind == "bp":
-        return f"{v * 10000.0:,.0f} bp"
+    if kind in {"bp", "bp_value"}:
+        return f"{v * (10000.0 if kind == 'bp' else 1.0):,.0f} bp"
     if kind == "price":
         return f"{v:,.2f}"
     if kind == "money":
@@ -259,19 +259,16 @@ def _is_nan(x: Any) -> bool:
 
 def _cashflow_blocks(
     cashflows: Any,
-) -> tuple[list[tuple[str, float, float, float]], list[dict[str, Any]]]:
-    """Shape a cashflow DataFrame (or ``(envelope, df)``) into ladder rows and schedule rows.
-
-    Ladder rows: ``(period_label, coupon_sum, principal_sum, pv_sum)`` grouped by calendar
-    year (values scaled to millions). Schedule rows: per-flow dicts for the scroll table.
-    """
+) -> tuple[dict[str, list[tuple[str, float, float, float]]], list[dict[str, Any]]]:
+    """Render currency-partitioned Rust annual totals and every labelled cashflow."""
     df = cashflows[1] if isinstance(cashflows, tuple) else cashflows
     schedule: list[dict[str, Any]] = []
-    dates = []
-    kinds = []
-    amounts = []
-    pvs = []
+    grouped: dict[str, tuple[list[Any], list[str], list[float], list[float]]] = {}
     for _, r in df.iterrows():
+        currency = r.get("currency")
+        if not isinstance(currency, str) or not currency:
+            raise ValueError("cashflow rows require an explicit currency")
+        dates, kinds, amounts, pvs = grouped.setdefault(currency, ([], [], [], []))
         d = r["date"]
         kind = str(r.get("kind", ""))
         amt = float(r.get("amount") or 0.0)
@@ -283,17 +280,21 @@ def _cashflow_blocks(
         rate = r.get("rate")
         schedule.append({
             "Date": fmt.fmt_date(d),
+            "Currency": currency,
             "Kind": kind,
-            "Amount": fmt.money(amt, dp=0),
+            "Amount": fmt.money(amt, currency, dp=0),
             "Rate": fmt.pct(float(rate) * 100, dp=3) if rate is not None and not _is_nan(rate) else "—",
             "DF": fmt.ratio(float(r["discount_factor"]), dp=4) if "discount_factor" in r else "—",
-            "PV": fmt.money(pv, dp=0),
+            "PV": fmt.money(pv, currency, dp=0),
         })
-    rows = calendar_year_ladder(dates, kinds, amounts, pvs)
-    ladder = [
-        (str(year), non_principal / 1e6, principal / 1e6, pv / 1e6) for year, non_principal, principal, pv in rows
-    ]
-    return ladder, schedule
+    ladders = {
+        currency: [
+            (str(year), coupon / 1e6, principal / 1e6, pv / 1e6)
+            for year, coupon, principal, pv in calendar_year_ladder(*columns)
+        ]
+        for currency, columns in grouped.items()
+    }
+    return ladders, schedule
 
 
 # Task 6: Assembly — instrument_tearsheet public API
@@ -408,16 +409,22 @@ def _keyrate_section(result: Any, itype: str, theme: Theme) -> Section | None:
 def _cashflow_sections(cashflows: Any, theme: Theme) -> list[Section]:
     if cashflows is None:
         return []
-    ladder, schedule = _cashflow_blocks(cashflows)
+    ladders, schedule = _cashflow_blocks(cashflows)
     out: list[Section] = []
-    if ladder:
+    for currency, ladder in ladders.items():
         periods = [p for p, _, _, _ in ladder]
         coupon = [c for _, c, _, _ in ladder]
         principal = [pr for _, _, pr, _ in ladder]
         pv = [p for _, _, _, p in ladder]
-        out.append(Section("Cashflow Ladder", charts.cashflow_ladder(periods, coupon, principal, theme=theme, pv=pv)))
+        out.append(
+            Section(
+                f"Cashflow Ladder · {currency}",
+                charts.cashflow_ladder(periods, coupon, principal, theme=theme, pv=pv),
+                subtitle=f"Amounts in {currency} millions.",
+            )
+        )
     if schedule:
-        cols = ["Date", "Kind", "Amount", "Rate", "DF", "PV"]
+        cols = ["Date", "Currency", "Kind", "Amount", "Rate", "DF", "PV"]
         out.append(Section("Cashflow Schedule", tables.scroll(tables.data_table(schedule, columns=cols))))
     return out
 
@@ -528,7 +535,7 @@ def _build_sections(
         secs.extend(
             s
             for s in _cashflow_sections(cashflows, theme)
-            if (s.title == "Cashflow Ladder" and "cashflows" in wanted)
+            if (s.title.startswith("Cashflow Ladder") and "cashflows" in wanted)
             or (s.title == "Cashflow Schedule" and "schedule" in wanted)
         )
     if "covenants" in wanted and (s := _covenants_section(parsed)):
@@ -558,7 +565,7 @@ def instrument_tearsheet(
     result : Any
         Precomputed valuation result to render.
     cashflows : Any
-        Optional precomputed cashflow payload; otherwise fetched when possible.
+        Optional precomputed cashflow payload with explicit currency on each row; each currency is rendered separately.
     definition : Any
         Optional instrument-definition payload used to enrich the rendered sheet.
     title : str or None
@@ -580,7 +587,7 @@ def instrument_tearsheet(
     Raises:
     ------
     ValueError
-        If ``sections`` contains an unknown name.
+        If ``sections`` contains an unknown name or a cashflow row lacks an explicit currency.
     TypeError
         If ``result`` is an instrument JSON string or mapping instead of a
         precomputed valuation result.

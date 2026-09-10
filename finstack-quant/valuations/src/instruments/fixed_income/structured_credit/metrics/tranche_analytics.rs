@@ -56,7 +56,9 @@ fn tranche_currency(deal: &StructuredCredit, tranche_id: &str) -> Result<Currenc
 /// * `tranche_id` - Identifier of the floating-rate tranche to solve.
 /// * `market` - Market context supplying discounting and projection inputs.
 /// * `as_of` - ISO-8601 valuation date.
-/// * `target_pv` - Observed present value in the tranche's currency.
+/// * `target_pv` - Positive dirty settlement amount in the tranche's currency,
+///   including accrued interest once. The deal's `quote_settlement_date`
+///   excludes seller-owned payments; absence means valuation-date settlement.
 ///
 /// # Errors
 ///
@@ -116,7 +118,9 @@ pub fn structured_credit_tranche_breakeven_cdr(
 ///
 /// * `deal` - Validated structured-credit deal.
 /// * `tranche_id` - Identifier of the tranche to solve.
-/// * `market_price_pct` - Observed price as a percentage of original balance.
+/// * `market_price_pct` - Clean settlement price as a percentage of original
+///   balance. Accrued interest is added once at `quote_settlement_date`,
+///   which defaults to the valuation date.
 /// * `market` - Market context supplying discounting and stochastic inputs.
 /// * `as_of` - ISO-8601 valuation date.
 /// * `config_json` - Optional serialized [`OasConfig`]; `None` uses defaults.
@@ -160,7 +164,7 @@ pub fn structured_credit_tranche_oas(
 /// * `tranche_id` - Identifier of the tranche to measure.
 /// * `market` - Market context supplying discounting and projection inputs.
 /// * `as_of` - ISO-8601 valuation date.
-/// * `market_price_pct` - Optional observed price as a percentage of original
+/// * `market_price_pct` - Optional clean settlement price as a percentage of original
 ///   balance; `None` uses the model price.
 ///
 /// # Errors

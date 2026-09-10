@@ -182,7 +182,7 @@ pub struct EquityOption {
     pub expiry: Date,
     /// Notional amount for valuation scaling.
     pub notional: Money,
-    /// Day count convention
+    /// Model year fraction for volatility, dividend carry and exercise times; defaults to ACT/365F. Discount factors retain the curve's own date convention.
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: finstack_quant_core::dates::DayCount,
@@ -553,36 +553,67 @@ impl EquityOption {
         Ok(greeks.rho)
     }
 
-    /// Calculate implied volatility of this equity option
+    /// Recover decimal annualized volatility using the option's exercise and dividend model.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Spot, dividend and discount inputs; trial volatility replaces any surface or scalar volatility override.
+    /// * `as_of` - Valuation date, strictly before expiry and any observed exercise.
+    /// * `market_price` - Finite non-negative total trade PV in the notional currency, including the contract multiplier.
+    ///
+    /// # Errors
+    /// Returns a validation error for non-positive notional, settled exercise, invalid prices or an unidentifiable deterministic limit; propagates market, pricing and convergence errors.
     pub fn implied_vol(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         market_price: f64,
     ) -> finstack_quant_core::Result<f64> {
-        let t = self.day_count.year_fraction(
-            as_of,
-            self.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
-            return Ok(0.0);
+        use finstack_quant_core::{math::solver::BrentSolver, Error};
+        let notional = self.notional.amount();
+        if !market_price.is_finite()
+            || market_price < 0.0
+            || !notional.is_finite()
+            || notional <= 0.0
+        {
+            return Err(Error::Validation(
+                "equity implied vol requires finite non-negative PV and positive notional".into(),
+            ));
         }
-        if market_price <= 0.0 {
-            return Ok(0.0);
+        if as_of >= self.expiry || self.exercise.is_some_and(|exercise| as_of >= exercise.date) {
+            return Err(Error::Validation(
+                "equity implied vol requires a live, unexercised option".into(),
+            ));
         }
-        if self.notional.amount() <= 0.0 {
-            return Ok(0.0);
-        }
-
-        let (spot, r, q, _sigma, _t) = {
-            use crate::instruments::equity::equity_option::pricing;
-            let (spot, r, q, sigma, t) = pricing::collect_inputs(self, curves, as_of)?;
-            (spot, r, q, sigma, t)
+        let price = |sigma: f64| {
+            let mut trial = self.clone();
+            trial.instrument_pricing_overrides =
+                trial.instrument_pricing_overrides.with_implied_vol(sigma);
+            super::pricing::compute_pv(&trial, curves, as_of).map(|pv| pv.amount() / notional)
         };
-        let k = self.strike;
-        let target_unit = market_price / self.notional.amount();
-        finstack_quant_models::bs_implied_vol(spot, k, r, q, t, self.option_type, target_unit)
+        let target = market_price / notional;
+        let lower = 1e-8;
+        let low = price(lower)?;
+        let tolerance = 1e-10 * target.abs().max(1.0);
+        if target <= low + tolerance {
+            return Err(Error::Validation("equity implied vol target is below or indistinguishable from the deterministic price".into()));
+        }
+        let mut upper = 1.0;
+        while price(upper)? < target && upper < 8.0 {
+            upper *= 2.0;
+        }
+        let sigma = BrentSolver::new().tolerance(1e-12).solve_in_bracket(
+            |sigma| price(sigma).map_or(f64::NAN, |pv| pv - target),
+            lower,
+            upper,
+        )?;
+        let residual = price(sigma)? - target;
+        if residual.abs() > tolerance {
+            return Err(Error::Validation(format!(
+                "equity implied vol residual {residual} exceeds {tolerance}"
+            )));
+        }
+        Ok(sigma)
     }
 }
 
@@ -647,21 +678,29 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
             return Ok(Some(0.0));
         }
 
-        let vol_bump_abs = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump_abs = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            .map_or(crate::metrics::bump_sizes::VOLATILITY, |volatility| {
+                crate::metrics::bump_sizes::VOLATILITY.min(volatility * 0.5)
+            });
 
-        let curves_vol_up = crate::metrics::bump_surface_vol_absolute(
+        let (up, curves_vol_up) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             vol_bump_abs,
         )?;
-        let curves_vol_dn = crate::metrics::bump_surface_vol_absolute(
+        let (down, curves_vol_dn) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             -vol_bump_abs,
         )?;
 
         // Delta at sigma+:
-        let pv_su = self
+        let pv_su = up
             .value(
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_up,
@@ -671,7 +710,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 as_of,
             )?
             .amount();
-        let pv_sd = self
+        let pv_sd = up
             .value(
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_up,
@@ -684,7 +723,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
         let delta_up = (pv_su - pv_sd) / (2.0 * spot_bump_abs);
 
         // Delta at sigma-:
-        let pv_su = self
+        let pv_su = down
             .value(
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_dn,
@@ -694,7 +733,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 as_of,
             )?
             .amount();
-        let pv_sd = self
+        let pv_sd = down
             .value(
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_dn,
@@ -721,20 +760,28 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
-        let vol_bump_abs = crate::metrics::bump_sizes::VOLATILITY;
-        let curves_vol_up = crate::metrics::bump_surface_vol_absolute(
+        let vol_bump_abs = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            .map_or(crate::metrics::bump_sizes::VOLATILITY, |volatility| {
+                crate::metrics::bump_sizes::VOLATILITY.min(volatility * 0.5)
+            });
+        let (up, curves_vol_up) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             vol_bump_abs,
         )?;
-        let curves_vol_dn = crate::metrics::bump_surface_vol_absolute(
+        let (down, curves_vol_dn) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             -vol_bump_abs,
         )?;
 
-        let pv_up = self.value(&curves_vol_up, as_of)?.amount();
-        let pv_dn = self.value(&curves_vol_dn, as_of)?.amount();
+        let pv_up = up.value(&curves_vol_up, as_of)?.amount();
+        let pv_dn = down.value(&curves_vol_dn, as_of)?.amount();
 
         // Report volga per **vol point squared** to match the library-wide
         // per-vol-point vega convention (and `MetricId::Volga`). The second
@@ -1074,6 +1121,114 @@ mod tests {
     }
 
     #[test]
+    fn m13_discrete_dividend01_measures_equivalent_yield() {
+        use crate::metrics::{MetricContext, MetricId};
+        let as_of = date(2025, 1, 3);
+        let expiry = date(2026, 1, 3);
+        let curves = build_market_context(as_of, 100.0, 0.3, 0.02, 0.0);
+        let mut option = base_option(expiry);
+        option.div_yield_id = None;
+        option.discrete_dividends = vec![(date(2025, 7, 3), 2.0)];
+        let pv = option.value(&curves, as_of).expect("pv");
+        let mut context = MetricContext::new(
+            std::sync::Arc::new(option.clone()),
+            std::sync::Arc::new(curves.clone()),
+            as_of,
+            pv,
+            MetricContext::default_config(),
+        );
+        let registry = crate::metrics::standard_registry();
+        let results = registry
+            .compute(&[MetricId::Dividend01], &mut context)
+            .expect("dividend risk");
+        let actual = results[&MetricId::Dividend01];
+        let delta = option.delta(&curves, as_of).expect("delta");
+        let (prepaid, _, _, _, t) =
+            pricing::collect_inputs(&option, &curves, as_of).expect("inputs");
+        let expected = -delta * prepaid * t * 1e-4;
+        assert!((actual - expected).abs() < 1e-5, "{actual} vs {expected}");
+    }
+
+    #[test]
+    fn m13_tiny_discrete_dividend_risk_reaches_zero_cash_schedule() {
+        use crate::metrics::{MetricContext, MetricId};
+        let as_of = date(2025, 1, 3);
+        let curves = build_market_context(as_of, 100.0, 0.3, 0.02, 0.1);
+        let mut option = base_option(date(2026, 1, 3));
+        option.exercise_style = ExerciseStyle::American;
+        option.discrete_dividends = vec![(date(2025, 7, 3), 1e-6)];
+        let pv = option.value(&curves, as_of).expect("pv");
+        let mut context = MetricContext::new(
+            std::sync::Arc::new(option),
+            std::sync::Arc::new(curves),
+            as_of,
+            pv,
+            MetricContext::default_config(),
+        );
+        let values = crate::metrics::standard_registry()
+            .compute(&[MetricId::Dividend01], &mut context)
+            .expect("risk with zero downside cash dividends");
+        let risk = values[&MetricId::Dividend01];
+        assert!(risk.is_finite() && risk < -0.1 && risk > -1.0, "{risk}");
+    }
+
+    #[test]
+    fn m14_american_high_vol_gamma_converges_to_european_call() {
+        let as_of = date(2025, 1, 3);
+        let expiry = date(2026, 1, 3);
+        let curves = build_market_context(as_of, 100.0, 0.9, 0.02, 0.0);
+        let mut option = base_option(expiry);
+        let expected = option.gamma(&curves, as_of).expect("analytic gamma");
+        option.exercise_style = ExerciseStyle::American;
+        for steps in [101, 201, 401] {
+            option.instrument_pricing_overrides.model_config.tree_steps = Some(steps);
+            let actual = option.gamma(&curves, as_of).expect("tree gamma");
+            assert!(
+                (actual / expected - 1.0).abs() < 0.01,
+                "{steps}: {actual} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn m13_implied_vol_uses_exercise_engine_and_model_clock() {
+        let as_of = date(2025, 1, 3);
+        let expiry = date(2026, 1, 3);
+        let curves = build_market_context(as_of, 90.0, 0.30, 0.08, 0.01);
+        for style in [
+            ExerciseStyle::European,
+            ExerciseStyle::American,
+            ExerciseStyle::Bermudan,
+        ] {
+            let mut option = base_option(expiry);
+            option.option_type = OptionType::Put;
+            option.exercise_style = style;
+            option.day_count = DayCount::Act360;
+            option.exercise_schedule = Some(vec![date(2025, 7, 3), expiry]);
+            option.discrete_dividends = vec![(date(2025, 4, 3), 2.0)];
+            option.instrument_pricing_overrides =
+                InstrumentPricingOverrides::default().with_implied_vol(0.45);
+            let pv = option.value(&curves, as_of).expect("price");
+            let iv = option
+                .implied_vol(&curves, as_of, pv.amount())
+                .expect("invert");
+            assert!((iv - 0.45).abs() < 1e-7, "{style:?}: {iv}");
+        }
+    }
+
+    #[test]
+    fn m13_implied_vol_rejects_invalid_inputs() {
+        let as_of = date(2025, 1, 3);
+        let curves = build_market_context(as_of, 100.0, 0.30, 0.02, 0.01);
+        let mut option = base_option(date(2026, 1, 3));
+        for price in [-1.0, f64::NAN, f64::INFINITY] {
+            assert!(option.implied_vol(&curves, as_of, price).is_err());
+        }
+        option.notional = Money::from((0_i64, Currency::USD));
+        assert!(option.implied_vol(&curves, as_of, 10.0).is_err());
+    }
+
+    #[test]
     fn implied_volatility_recovers_surface_value_and_respects_override() {
         let as_of = date(2025, 1, 3);
         let expiry = date(2025, 7, 3);
@@ -1126,10 +1281,7 @@ mod tests {
         assert_eq!(greeks.theta, 0.0);
         assert_eq!(greeks.rho, 0.0);
 
-        let implied = option
-            .implied_vol(&curves, as_of, pv.amount())
-            .expect("should succeed");
-        assert_eq!(implied, 0.0);
+        assert!(option.implied_vol(&curves, as_of, pv.amount()).is_err());
     }
 
     /// Tests that separate day count handling works correctly when the discount curve

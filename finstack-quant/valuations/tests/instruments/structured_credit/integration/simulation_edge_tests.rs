@@ -48,12 +48,15 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         industry: Some("Test".to_string()),
         obligor_id: Some(format!("OB_{id}")),
         is_defaulted,
-        recovery_amount: None,
+        recovery_amount: is_defaulted
+            .then(|| Money::new(0.0, Currency::USD).expect("no outstanding claim")),
+        default_date: is_defaulted.then_some(closing_date()),
         purchase_price: None,
         acquisition_date: Some(closing_date()),
         day_count: DayCount::Act360,
         smm_override: None,
         mdr_override: None,
+        recovery_rate: None,
         contractual_payment: None,
     }
 }
@@ -354,7 +357,7 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let clo = StructuredCredit::new_clo(
+    let mut clo = StructuredCredit::new_clo(
         "CLO_REINVEST",
         pool,
         single_tranche(balance * 2.0),
@@ -363,6 +366,9 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
         "USD_OIS",
     )
     .with_payment_calendar("nyse");
+
+    clo.tranches.tranches[0].is_revolving = true;
+    clo.tranches.tranches[0].can_reinvest = true;
 
     let market = flat_market();
 
@@ -447,7 +453,7 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let clo_reinvest = StructuredCredit::new_clo(
+    let mut clo_reinvest = StructuredCredit::new_clo(
         "CLO_REINVEST",
         pool_reinvest,
         single_tranche(balance * 2.0),
@@ -456,6 +462,9 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         "USD_OIS",
     )
     .with_payment_calendar("nyse");
+
+    clo_reinvest.tranches.tranches[0].is_revolving = true;
+    clo_reinvest.tranches.tranches[0].can_reinvest = true;
 
     // Deal WITHOUT reinvestment (same pool, no reinvestment period)
     let mut pool_no_reinvest = AssetPool::new("POOL_NO_REINVEST", DealType::Clo, Currency::USD);

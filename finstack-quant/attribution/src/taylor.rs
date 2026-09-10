@@ -344,6 +344,15 @@ fn compute_taylor_result(
 
     // Rate sensitivities (parallel DV01 per discount curve)
     let market_deps = instrument_t0.market_dependencies()?;
+    // A risky discount curve belongs to the credit factor even though its
+    // storage family also makes it a discount dependency.
+    let rate_curve_ids: Vec<CurveId> = market_deps
+        .curves
+        .discount_curves
+        .iter()
+        .filter(|id| !market_deps.curves.credit_curves.contains(id))
+        .cloned()
+        .collect();
     let recalibration_provider = CachedRecalibrationProvider::new();
     let compute_rate = |curve_id: &CurveId| {
         (
@@ -360,11 +369,7 @@ fn compute_taylor_result(
             ),
         )
     };
-    let rate_results = map_policy(
-        execution_policy,
-        &market_deps.curves.discount_curves,
-        compute_rate,
-    );
+    let rate_results = map_policy(execution_policy, &rate_curve_ids, compute_rate);
     for (curve_id, result) in rate_results {
         record_taylor_factor_result(
             "rate",

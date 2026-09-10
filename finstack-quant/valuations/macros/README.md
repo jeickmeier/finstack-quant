@@ -130,15 +130,10 @@ field names the struct has. These fire only when the named fields are present:
 | `notional: Option<_>` and `spot_rate: Option<_>` | at least one is `Some` | `Error::Validation` |
 | `base_currency` and `quote_currency` | the two differ | `Error::Validation` |
 
-One further name-driven behavior: if a **required** `issue`/`issue_date` field
-is left unset and the struct has a maturity field, `build()` does not report the
-missing field — it derives the issue date as `maturity - 365 days` (via
-`time::Duration::days(365)` and `Date::checked_sub`, falling back to `maturity`
-itself on overflow). The build still fails with `InputError::Invalid` if the
-maturity field is *also* unset, since the fallback reads it. A
-`#[builder(default …)]` on the issue field takes precedence over this fallback.
-This path is the only place the derive names `::time`, and it requires `::time`
-to be resolvable at the derive site.
+Required `issue`/`issue_date` fields must be supplied explicitly. Omitting one
+returns `Error::Validation` naming the builder and missing field, just as for
+other required fields. The macro never infers a contractual issue date from
+maturity.
 
 All of these are name-based heuristics rather than declared contracts; renaming
 a field silently changes which checks run. Instrument-specific rules belong in

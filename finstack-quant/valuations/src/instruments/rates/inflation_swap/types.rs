@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::Decimal;
@@ -29,8 +29,8 @@ use rust_decimal::Decimal;
 ///
 /// # Market Conventions
 ///
-/// - **Lag**: Standard 3-month lag for US CPI, EUR HICP; 8-month for UK RPI
-/// - **Day Count**: Typically ACT/ACT for accrual, curve-specific for discounting
+/// - **Lag**: Standard 3-month lag for US CPI/EUR HICP; 2-month for UK RPI
+/// - **Day Count**: Standard fixed legs compound annually with 1/1 accrual per period
 /// - **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted
 ///
 /// # Validation
@@ -83,6 +83,10 @@ pub struct InflationSwap {
     /// Optional contract-level lag override (if set, overrides index lag)
     #[builder(optional)]
     pub lag_override: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation. Overrides index metadata;
+    /// without either source the default is monthly step interpolation.
+    #[builder(optional)]
+    pub interpolation_override: Option<InflationInterpolation>,
     /// Explicit Base CPI (reference index level at start with lag applied).
     /// If not provided, it will be looked up/calculated from start date.
     #[builder(optional)]
@@ -183,26 +187,6 @@ impl InflationSwap {
         Ok(())
     }
 
-    /// Apply lag to a date according to the instrument's lag policy.
-    ///
-    /// Uses `lag_override` if set, otherwise falls back to `default_lag`.
-    ///
-    /// # Supported Lag Types
-    ///
-    /// - `InflationLag::None`: No lag applied
-    /// - `InflationLag::Months(n)`: Subtract n months from the date
-    /// - `InflationLag::Days(n)`: Subtract n days from the date
-    ///
-    /// # Note
-    ///
-    /// The `InflationLag` enum is `#[non_exhaustive]`, so unknown variants
-    /// fall back to no lag with a debug assertion. This ensures forward
-    /// compatibility while catching unexpected variants in development.
-    pub(crate) fn apply_lag(&self, date: Date, default_lag: InflationLag) -> Date {
-        let lag_policy = self.lag_override.unwrap_or(default_lag);
-        crate::instruments::common_impl::helpers::apply_inflation_lag(date, lag_policy)
-    }
-
     fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
         crate::instruments::common_impl::helpers::resolve_inflation_lag(
             self.lag_override,
@@ -211,30 +195,29 @@ impl InflationSwap {
         )
     }
 
-    fn cpi_value_at_lagged_date(
+    fn cpi_value(
         &self,
         curves: &MarketContext,
-        discount_base: Date,
-        unlagged_date: Date,
-        lagged_date: Date,
+        as_of: Date,
+        date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        // Once the lagged fixing date is on or before the valuation date, prefer the
-        // realized index history. If a history is supplied, lookup failures (most
-        // importantly dates before the first observation) are data errors and must
-        // not be hidden by projecting a historical value from the curve.
-        if lagged_date <= discount_base {
-            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                    index.as_ref(),
-                    unlagged_date,
-                    lagged_date,
-                    self.effective_lag(curves),
-                );
-            }
-        }
-
-        let inflation_curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
-        Self::curve_cpi_value(inflation_curve.as_ref(), discount_base, lagged_date)
+        let interpolation = self
+            .interpolation_override
+            .or_else(|| {
+                curves
+                    .get_inflation_index(self.inflation_index_id.as_str())
+                    .ok()
+                    .map(|index| index.interpolation())
+            })
+            .unwrap_or_default();
+        crate::instruments::common_impl::helpers::reference_inflation_value(
+            curves,
+            self.inflation_index_id.as_str(),
+            date,
+            as_of,
+            self.effective_lag(curves),
+            interpolation,
+        )
     }
 
     /// Calculate the projected index ratio I(T_mat - Lag) / I(T_start - Lag).
@@ -253,59 +236,19 @@ impl InflationSwap {
         curves: &MarketContext,
         discount_base: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let default_lag = self.effective_lag(curves);
-        let lagged_start = self.apply_lag(self.start_date, default_lag);
-        let lagged_maturity = self.apply_lag(self.maturity, default_lag);
-
         let i_start = if let Some(base) = self.base_cpi {
             base
         } else {
-            self.cpi_value_at_lagged_date(curves, discount_base, self.start_date, lagged_start)?
+            self.cpi_value(curves, discount_base, self.start_date)?
         };
 
-        if i_start <= 0.0 {
+        if !i_start.is_finite() || i_start <= 0.0 {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
         }
 
-        let i_maturity_projected =
-            self.cpi_value_at_lagged_date(curves, discount_base, self.maturity, lagged_maturity)?;
+        let i_maturity_projected = self.cpi_value(curves, discount_base, self.maturity)?;
 
         Ok(i_maturity_projected / i_start)
-    }
-
-    pub(crate) fn curve_cpi_value(
-        curve: &finstack_quant_core::market_data::term_structures::InflationCurve,
-        fallback_base: Date,
-        lookup_date: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let default_anchor =
-            Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
-        if curve.base_date() == default_anchor {
-            // Anchor curve: measure time from the supplied fallback base. A
-            // failed day-count calculation must be PROPAGATED, not silently
-            // collapsed to `t = 0`: `unwrap_or(0.0)` masked a genuine error
-            // (e.g. an inverted date) by quietly returning the base CPI, which
-            // mis-prices the swap with no diagnostic.
-            let t = DayCount::Act365F.signed_year_fraction(
-                fallback_base,
-                lookup_date,
-                DayCountContext::default(),
-            )?;
-            Ok(curve.cpi(t))
-        } else if lookup_date < curve.base_date() {
-            // Lagged observation dates can fall before the curve base (e.g. a
-            // 3-month lag at trade inception with no fixing history). Read the
-            // curve at a signed (negative) time so it extrapolates from its
-            // base CPI instead of rejecting the inverted date range.
-            let t = curve.day_count().signed_year_fraction(
-                curve.base_date(),
-                lookup_date,
-                DayCountContext::default(),
-            )?;
-            Ok(curve.cpi(t))
-        } else {
-            curve.cpi_on_date(lookup_date)
-        }
     }
 
     /// Get the adjusted payment date based on business day convention and calendar.
@@ -330,7 +273,9 @@ impl InflationSwap {
     /// Calculate PV of the fixed leg (real rate leg).
     ///
     /// The fixed leg pays `Notional × [(1 + fixed_rate)^τ - 1]` at maturity,
-    /// where τ is the accrual year fraction using the instrument's day count.
+    /// where τ sums annual contractual periods under 1/1, including a short
+    /// initial stub as one period. Other explicitly selected day counts use
+    /// their full-term year fraction.
     ///
     /// # Errors
     ///
@@ -345,11 +290,7 @@ impl InflationSwap {
         let disc = curves.get_discount(self.discount_curve_id.as_str())?;
 
         // Use instrument day count for accrual period
-        let tau_accrual = self.day_count.year_fraction(
-            self.start_date,
-            self.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
+        let tau_accrual = self.fixed_accrual()?;
 
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         let fixed_payment = self.notional * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0);
@@ -366,12 +307,36 @@ impl InflationSwap {
         Ok(fixed_payment * df)
     }
 
-    fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {
-        let tau_accrual = self.day_count.year_fraction(
-            self.start_date,
-            self.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
+    /// Sum contractual annual accrual periods for 1/1 fixed-leg compounding.
+    fn fixed_accrual(&self) -> finstack_quant_core::Result<f64> {
+        if self.day_count != DayCount::OneOne {
+            return self.day_count.year_fraction(
+                self.start_date,
+                self.maturity,
+                DayCountContext::default(),
+            );
+        }
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.start_date,
+                end: self.maturity,
+                frequency: Tenor::annual(),
+                stub: StubKind::ShortFront,
+                business_day_convention: BusinessDayConvention::Unadjusted,
+                calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+                end_of_month: false,
+                day_count: DayCount::OneOne,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            },
         )?;
+        Ok(periods.len() as f64)
+    }
+
+    fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {
+        let tau_accrual = self.fixed_accrual()?;
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         Ok(self.notional * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0))
     }
@@ -442,11 +407,7 @@ impl InflationSwap {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
         }
 
-        let tau = self.day_count.year_fraction(
-            self.start_date,
-            self.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
+        let tau = self.fixed_accrual()?;
         if tau <= 0.0 {
             return Ok(0.0);
         }
@@ -470,11 +431,7 @@ impl InflationSwap {
             payment_date,
         )?;
 
-        let tau_accrual = self.day_count.year_fraction(
-            self.start_date,
-            self.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
+        let tau_accrual = self.fixed_accrual()?;
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         let fixed_pv = self.notional.amount() * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0) * df;
 
@@ -574,11 +531,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
         };
         let ccy = self.notional.currency();
-        let accrual_factor = self.day_count.year_fraction(
-            self.start_date,
-            self.maturity,
-            DayCountContext::default(),
-        )?;
+        let accrual_factor = self.fixed_accrual()?;
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         let inflation_rate = (accrual_factor > 0.0)
             .then_some(inflation_amount.amount() / self.notional.amount() / accrual_factor);
@@ -685,6 +638,14 @@ pub struct YoYInflationSwap {
     /// Optional contract-level lag override (if set, overrides index lag)
     #[builder(optional)]
     pub lag_override: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation. Overrides index metadata;
+    /// without either source the default is monthly step interpolation.
+    #[builder(optional)]
+    pub interpolation_override: Option<InflationInterpolation>,
+    /// Observed contractual reference CPI at start, with lag and interpolation
+    /// already applied. If absent, start CPI must resolve from market observations.
+    #[builder(optional)]
+    pub base_cpi: Option<f64>,
     /// Business day convention for payment date adjustment.
     #[builder(default = BusinessDayConvention::ModifiedFollowing)]
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
@@ -764,6 +725,12 @@ impl YoYInflationSwap {
             self.frequency.count() != 0,
             finstack_quant_core::InputError::Invalid,
         )?;
+        if self
+            .base_cpi
+            .is_some_and(|cpi| !cpi.is_finite() || cpi <= 0.0)
+        {
+            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+        }
         Ok(())
     }
 
@@ -781,25 +748,31 @@ impl YoYInflationSwap {
         as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let lag = self.effective_lag(curves);
-        let lagged_date = crate::instruments::common_impl::helpers::apply_inflation_lag(date, lag);
-
-        // Only consult realized fixings for observations whose (lagged) fixing
-        // date is on or before the valuation date. Reading later entries from a
-        // fixing series that extends past as_of would introduce look-ahead bias.
-        if lagged_date <= as_of {
-            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                    index.as_ref(),
-                    date,
-                    lagged_date,
-                    lag,
-                );
+        if date == self.start_date {
+            if let Some(base) = self.base_cpi {
+                if !base.is_finite() || base <= 0.0 {
+                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+                }
+                return Ok(base);
             }
         }
-
-        let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
-        InflationSwap::curve_cpi_value(curve.as_ref(), as_of, lagged_date)
+        let interpolation = self
+            .interpolation_override
+            .or_else(|| {
+                curves
+                    .get_inflation_index(self.inflation_index_id.as_str())
+                    .ok()
+                    .map(|index| index.interpolation())
+            })
+            .unwrap_or_default();
+        crate::instruments::common_impl::helpers::reference_inflation_value(
+            curves,
+            self.inflation_index_id.as_str(),
+            date,
+            as_of,
+            self.effective_lag(curves),
+            interpolation,
+        )
     }
 
     fn schedule(&self) -> finstack_quant_core::Result<Vec<(Date, Date, Date)>> {
@@ -1202,6 +1175,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
             .lag_override(InflationLag::None)
+            .base_cpi(100.0)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");

@@ -395,7 +395,20 @@ pub fn project_floating_rate(
 }
 
 /// Project the raw term-index rate at a reset date before coupon adjustments.
-pub(crate) fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result<f64> {
+///
+/// # Arguments
+///
+/// * `reset_date` - Contractual reset-effective date on or after the forward
+///   curve base date; past resets require recorded observations instead.
+/// * `fwd` - Term-index forward curve. Its own day count maps the date to curve
+///   time; the result is an annualized decimal index rate, without coupon
+///   spread, gearing, caps or floors.
+///
+/// # Errors
+///
+/// Returns a validation error when the date precedes the projection curve's
+/// base date, or a day-count error if that clock cannot be evaluated.
+pub fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result<f64> {
     let fwd_day_count = fwd.day_count();
     let fwd_base = fwd.base_date();
 

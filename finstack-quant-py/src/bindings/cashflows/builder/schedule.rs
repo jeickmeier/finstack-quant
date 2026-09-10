@@ -19,6 +19,7 @@ use crate::errors::core_to_py;
 
 use super::orchestrator::PyCashFlowBuilder;
 use super::specs::PyNotional;
+use crate::bindings::cashflows::fixings::PyProjectedFixing;
 
 /// Parse a schedule representation label (``"contractual"``, ``"projected"``,
 /// ``"placeholder"``, ``"no_residual"``).
@@ -74,8 +75,8 @@ impl PyCashFlowMeta {
     /// Construct schedule metadata; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (representation="contractual", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None),
-        text_signature = "(representation=\"contractual\", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None)"
+        signature = (representation="contractual", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None, projected_fixings=None),
+        text_signature = "(representation=\"contractual\", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None, projected_fixings=None)"
     )]
     fn new(
         representation: &str,
@@ -83,9 +84,15 @@ impl PyCashFlowMeta {
         facility_limit: Option<PyMoney>,
         issue_date: Option<&Bound<'_, PyAny>>,
         maturity_date: Option<&Bound<'_, PyAny>>,
+        projected_fixings: Option<Vec<PyProjectedFixing>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: CashFlowMeta {
+                projected_fixings: projected_fixings
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|fixing| fixing.inner)
+                    .collect(),
                 representation: parse_representation(representation)?,
                 calendar_ids: calendar_ids.unwrap_or_default(),
                 facility_limit: facility_limit.map(|m| m.inner),
@@ -126,6 +133,17 @@ impl PyCashFlowMeta {
             .maturity_date
             .map(|d| date_to_py(py, d))
             .transpose()
+    }
+
+    /// Raw observations needed to fix coupons crossed by a market time roll.
+    #[getter]
+    fn projected_fixings(&self) -> Vec<PyProjectedFixing> {
+        self.inner
+            .projected_fixings
+            .iter()
+            .cloned()
+            .map(|inner| PyProjectedFixing { inner })
+            .collect()
     }
 
     /// Serialize to canonical JSON.
@@ -272,6 +290,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         let rates = frame_column(obj, "rate")?;
         let accruals = frame_column(obj, "accrual")?;
         let deltas = frame_column(obj, "principal_delta")?;
+        let principal_dates = frame_column(obj, "principal_date")?;
         let mut flows = Vec::with_capacity(dates.len());
         for (i, date) in dates.iter().enumerate() {
             let amount: f64 = amounts[i].extract()?;
@@ -298,6 +317,10 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
             );
             flow.accrual = optional_json_field(obj, &accruals, i, "CashFlowAccrual")?;
             flow.principal_delta = optional_json_field(obj, &deltas, i, "principal_delta")?;
+            flow.principal_date = match principal_dates.as_ref().map(|dates| &dates[i]) {
+                Some(date) if !is_missing(date)? => Some(extract_date(date)?),
+                _ => None,
+            };
             flow.validate().map_err(core_to_py)?;
             flows.push(flow);
         }
@@ -763,7 +786,21 @@ impl PyCashFlowSchedule {
                 &flows.iter().map(|f| f.principal_delta).collect::<Vec<_>>(),
             )?,
         )?;
+        let principal_dates: Vec<Option<Bound<'py, PyAny>>> = flows
+            .iter()
+            .map(|flow| {
+                flow.principal_date
+                    .map(|date| date_to_py(py, date))
+                    .transpose()
+            })
+            .collect::<PyResult<_>>()?;
+        columns.set_item(
+            "principal_date",
+            pd.call_method1("to_datetime", (principal_dates,))?,
+        )?;
         if outstanding {
+            // Display balances at cash settlement dates, using the separately
+            // reconstructed economic principal timeline.
             let path = self.inner.outstanding_by_date().map_err(core_to_py)?;
             let balances: Vec<Option<f64>> = flows
                 .iter()

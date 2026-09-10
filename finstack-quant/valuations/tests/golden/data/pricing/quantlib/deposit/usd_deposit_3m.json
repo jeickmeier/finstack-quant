@@ -52,8 +52,10 @@
         {
           "allow_non_monotonic": false,
           "base": "2026-04-30",
+          "calibration_ois_cutoff_days": null,
           "day_count": "act_365f",
           "extrapolation": "flat_forward",
+          "fx_policy": null,
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "kind": "discount_curve",
@@ -85,9 +87,7 @@
           ],
           "min_forward_rate": null,
           "min_forward_tenor": 1e-06,
-          "rate_calibration": null,
-          "calibration_ois_cutoff_days": null,
-          "fx_policy": null
+          "rate_calibration": null
         }
       ],
       "schema": "finstack_quant.calibration/1"

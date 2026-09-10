@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::Result;
-use finstack_quant_models::{vega_weight, SabrCalibrator, SabrModel, SabrParameters};
+use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters};
 use finstack_quant_valuations::instruments::rates::swaption::contractual_swap_tenor_years;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::collections::BTreeMap;
@@ -143,10 +143,12 @@ impl SwaptionVolTarget {
         }
 
         let vol_fit_tolerance = params.vol_tolerance.unwrap_or(0.0015);
-        let sabr_solver_tolerance = params.sabr_tolerance.unwrap_or(1e-6);
-        let sabr_calibrator = SabrCalibrator::new()
-            .with_tolerance(sabr_solver_tolerance)
-            .with_max_iterations(config.solver.max_iterations());
+        if !vol_fit_tolerance.is_finite() || vol_fit_tolerance <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption vol_tolerance must be finite and positive in quoted volatility units"
+                    .into(),
+            ));
+        }
 
         let mut sabr_params: SABRParamsByExpiryTenor = BTreeMap::new();
         // Preserve each bucket's calibration forward for its ATM anchor.
@@ -223,10 +225,13 @@ impl SwaptionVolTarget {
                 continue;
             }
 
-            // Calibrate
-            // Need to handle conventions (normal/lognormal).
-            // Simplified: assume lognormal if beta != 0, normal if beta == 0
-            // Params has explicit convention.
+            // Map the absolute quote budget into a dimensionless necessary
+            // bound for the shared solver. Final reporting checks each raw
+            // quote error in the configured convention, without vega scaling.
+            let min_quote = vols.iter().copied().fold(f64::INFINITY, f64::min);
+            let sabr_calibrator = SabrCalibrator::new()
+                .with_tolerance(vol_fit_tolerance / min_quote)
+                .with_max_iterations(config.solver.max_iterations());
 
             let res = match params.vol_convention {
                 SwaptionVolConvention::Normal => sabr_calibrator
@@ -284,52 +289,9 @@ impl SwaptionVolTarget {
 
                     let model = SabrModel::new(p);
 
-                    // Normalized vega weighting of the recorded residuals so the
-                    // success gate is consistent with the vega-weighted SABR
-                    // calibration objective (see `vega_weight`). The optimizer
-                    // minimizes `Σ w·(σ_model − σ_market)²`; an unweighted
-                    // success gate would then reject low-vega wing strikes that
-                    // the objective deliberately under-weighted. Each residual is
-                    // scaled by `w_i / w_max` within its (expiry,tenor) bucket:
-                    // residuals stay in vol units, the most-weighted (≈ATM)
-                    // strike is unchanged, and wing strikes are de-emphasized
-                    // exactly as the objective de-emphasizes them.
-                    //
-                    // Weight convention must mirror the calibration arm above:
-                    // Normal quotes use Bachelier vega (beta = 0), shifted
-                    // lognormal uses shifted-Black vega (shifted F/K).
-                    let (weight_beta, weight_shift) = match params.vol_convention {
-                        SwaptionVolConvention::Normal => (0.0, 0.0),
-                        SwaptionVolConvention::Lognormal => (params.sabr_beta, 0.0),
-                        SwaptionVolConvention::ShiftedLognormal { shift } => {
-                            (params.sabr_beta, shift)
-                        }
-                    };
-                    let weights: Vec<f64> = strikes
-                        .iter()
-                        .zip(vols.iter())
-                        .map(|(&k, &v)| {
-                            vega_weight(
-                                fwd_rate + weight_shift,
-                                k + weight_shift,
-                                v,
-                                t_exp,
-                                weight_beta,
-                            )
-                        })
-                        .collect();
-                    let w_max = weights
-                        .iter()
-                        .copied()
-                        .fold(0.0_f64, f64::max)
-                        .max(f64::MIN_POSITIVE);
                     for (i, k) in strikes.iter().enumerate() {
                         let v = model.implied_volatility(fwd_rate, *k, t_exp)?;
-                        let weighted_residual = (weights[i] / w_max) * (v - vols[i]).abs();
-                        residuals.insert(
-                            format!("swpt_{}_{}_{}", kb_exp, kb_ten, i),
-                            weighted_residual,
-                        );
+                        residuals.insert(format!("swpt_{}_{}_{}", kb_exp, kb_ten, i), v - vols[i]);
                     }
                     count += 1;
                 }
@@ -1113,7 +1075,6 @@ mod tests {
             fixed_day_count: Some(DayCount::Act365F),
             swap_index: Some("USD-SOFR-3M".into()),
             vol_tolerance: None,
-            sabr_tolerance: None,
             sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
             allow_sabr_missing_bucket_fallback: false,
         }

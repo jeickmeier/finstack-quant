@@ -263,7 +263,10 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
     let market = MarketContext::new()
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
-        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+        .insert_surface(
+            build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL")
+                .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
+        );
     let mut caplet = CapFloor::new(
         "NORMAL-IV-NEGATIVE",
         RateOptionType::Caplet,
@@ -385,13 +388,16 @@ fn same_day_caplet_does_not_synthesize_option_time() {
 }
 
 #[test]
-fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
+fn auto_implied_vol_round_trips_negative_rate_normal_quote() {
     let as_of = date!(2024 - 01 - 02);
-    let surface_vol = 0.30;
+    let surface_vol = 0.01;
     let market = MarketContext::new()
         .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
         .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
-        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+        .insert_surface(
+            build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL")
+                .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
+        );
     let mut caplet = CapFloor::new(
         "AUTO-IV-NEGATIVE",
         RateOptionType::Caplet,
@@ -407,7 +413,7 @@ fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
     )
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Auto;
-    let pv = caplet.value(&market, as_of).expect("auto fallback price");
+    let pv = caplet.value(&market, as_of).expect("auto normal price");
     caplet
         .instrument_pricing_overrides
         .market_quotes
@@ -424,6 +430,6 @@ fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
 
     assert!(
         (result.measures["implied_vol"] - surface_vol).abs() < 1.0e-4,
-        "Auto implied vol must invert the original lognormal quote after fallback conversion"
+        "Auto implied vol must invert the original normal quote"
     );
 }

@@ -16,13 +16,11 @@ use finstack_quant_core::money::Money;
 
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::barrier::{
-    BarrierMonitoring, BarrierOptionPayoff, OptionKind,
-};
+use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierOptionPayoff, OptionKind};
+use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::seed;
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 /// Barrier option Heston Monte Carlo pricer.
 ///
@@ -58,14 +56,18 @@ impl BarrierOptionHestonMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, f64)> {
+        inst.validate_monitoring_state(as_of)?;
+        if as_of >= inst.expiry {
+            return super::pricer::price_expired_barrier(inst, market, as_of)
+                .map(|value| (value, 0.0));
+        }
+        if let Some(value) = super::pricer::known_knock_out_value(inst, market, as_of)? {
+            return Ok((value, 0.0));
+        }
         // Time to maturity
         let t = inst
             .day_count
             .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-
-        if t <= 0.0 {
-            return price_expired_barrier(inst, market).map(|m| (m, 0.0));
-        }
 
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
         let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
@@ -74,69 +76,70 @@ impl BarrierOptionHestonMcPricer {
             t,
             "BarrierOption Heston MC discount curve",
         )?;
-        if inst.observed_barrier_breached == Some(true)
-            && inst.barrier_type.is_knock_out()
-            && inst.rebate_timing
-                == finstack_quant_models::closed_form::barrier::RebateTiming::AtHit
-        {
-            return Ok((Money::from((0_i64, inst.notional.currency())), 0.0));
-        }
-
         let spot_scalar = market.get_price(&inst.spot_id)?;
         let spot = match spot_scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
+                if m.currency() != inst.notional.currency() {
+                    return Err(finstack_quant_core::Error::CurrencyMismatch {
+                        expected: inst.notional.currency(),
+                        actual: m.currency(),
+                    });
+                }
+                m.amount()
+            }
         };
 
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            spot,
+            "BarrierOption Heston spot",
+        )?;
         let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
             market,
             inst.div_yield_id.as_ref(),
         )?;
-
-        // Get volatility (used for barrier bridge correction sigma)
-        let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
-        let sigma = finstack_quant_models::volatility::get_surface_vol_clamped(
-            &vol_surface,
-            t,
-            inst.strike,
-        );
 
         let heston_params =
             crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(
                 market, r, q,
             )?;
         let v0 = heston_params.v0;
+        let sigma = v0.sqrt();
         let process = HestonProcess::new(heston_params);
         let discretization = QeHeston::new();
 
-        let num_steps = ((t * self.steps_per_year).round() as usize).max(10);
-        let time_grid = TimeGrid::uniform(t, num_steps)?;
+        let grid_config = PathDependentPricerConfig {
+            steps_per_year: self.steps_per_year,
+            min_steps: 10,
+            ..PathDependentPricerConfig::default()
+        };
+        let (time_grid, monitoring) =
+            inst.monitoring
+                .time_grid(as_of, inst.day_count, None, t, &grid_config)?;
         let maturity_step = time_grid.num_steps();
 
-        // Create barrier payoff (uses vol-surface sigma for bridge correction)
+        // The Heston path variance supplies the local bridge volatility.
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
-            inst.rebate.map(|m| m.amount()),
+            inst.rebate.map(|m| m.amount() / inst.notional.amount()),
             inst.notional.amount(),
             maturity_step,
             sigma,
             &time_grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
+            monitoring,
         )
         .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
         if super::pricer::wants_at_hit_rebate(inst) {
             payoff = payoff.with_rebate_at_hit(r);
         }
 
-        let num_paths = inst
-            .instrument_pricing_overrides
-            .model_config
-            .mc_paths
-            .filter(|&n| n > 0)
-            .unwrap_or(self.num_paths);
+        let num_paths = crate::instruments::common_impl::helpers::resolve_mc_paths(
+            inst.instrument_pricing_overrides.model_config.mc_paths,
+            self.num_paths,
+        )?;
 
         // Derive deterministic seed
         let seed_val = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
@@ -197,50 +200,4 @@ impl Pricer for BarrierOptionHestonMcPricer {
         }
         Ok(result)
     }
-}
-
-/// Price an expired barrier option using explicit observed barrier state.
-fn price_expired_barrier(
-    inst: &BarrierOption,
-    curves: &MarketContext,
-) -> finstack_quant_core::Result<Money> {
-    let spot_scalar = curves.get_price(&inst.spot_id)?;
-    let spot = match spot_scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-    };
-
-    let ccy = inst.notional.currency();
-    let notional = inst.notional.amount();
-    let is_knock_out = inst.barrier_type.is_knock_out();
-
-    let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "Expired barrier option requires `observed_barrier_breached` to determine realized payoff"
-                .to_string(),
-        )
-    })?;
-
-    let intrinsic = match inst.option_type {
-        crate::instruments::OptionType::Call => (spot - inst.strike).max(0.0) * notional,
-        crate::instruments::OptionType::Put => (inst.strike - spot).max(0.0) * notional,
-    };
-    let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
-
-    let pv = if is_knock_out {
-        if barrier_breached {
-            rebate
-        } else {
-            intrinsic
-        }
-    } else {
-        // Knock-in
-        if barrier_breached {
-            intrinsic
-        } else {
-            rebate
-        }
-    };
-
-    Money::new(pv, ccy)
 }

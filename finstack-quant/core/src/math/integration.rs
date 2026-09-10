@@ -613,14 +613,18 @@ where
 ///   accepted by `f`.
 /// * `b` - Upper endpoint of the integration interval, in the domain units
 ///   accepted by `f`; values below `a` produce a signed integral.
-/// * `tol` - Error tolerance for adaptive refinement
+/// * `tol` - Non-negative absolute error budget for the sum of all subinterval
+///   estimates, in integral units; local refinement uses proportional shares.
 /// * `max_depth` - Maximum recursion depth to prevent infinite refinement
 ///
 /// # Returns
 ///
-/// Approximate integral value with error bounded by `tol` when convergence is reached.
+/// Approximate integral value whose summed quadrature error estimate is at most `tol`.
 ///
 /// # Errors
+///
+/// Returns [`InputError::Invalid`] for non-finite endpoints, or a negative or
+/// non-finite tolerance.
 ///
 /// Returns [`Error::Input`] wrapping [`InputError::SolverConvergenceFailed`] if the
 /// tolerance cannot be met within `max_depth` recursion levels. The error payload
@@ -634,11 +638,12 @@ where
 /// 1. Compute Simpson's rule on `[a, mid]` and `[mid, b]`
 /// 2. Compare the composite estimate against the coarser estimate using Richardson
 ///    extrapolation: `error ≈ |total - whole| / 15`
-/// 3. If `error ≤ tol`, accept the composite estimate and return it
-/// 4. If the error budget is not met and `depth == max_depth`, return
-///    [`InputError::SolverConvergenceFailed`] with the
-///    residual, interval, and tolerance in the error message
-/// 5. Otherwise, recursively refine each half with `tol/2`
+/// 3. If the local error fits its share, retain the value and error estimate.
+/// 4. Otherwise refine each half with half the local budget, until `max_depth`.
+/// 5. Sum absolute error estimates across every terminal subinterval. Accept
+///    only if that sum meets `tol`; otherwise return a convergence error.
+///    This allows an isolated kink to use unused budget from smooth regions
+///    without accepting an unconverged total integral.
 ///
 /// # Complexity
 ///
@@ -659,6 +664,9 @@ pub fn adaptive_simpson<F2>(f: F2, a: f64, b: f64, tol: f64, max_depth: usize) -
 where
     F2: Fn(f64) -> f64 + Copy,
 {
+    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
+        return Err(InputError::Invalid.into());
+    }
     #[allow(clippy::too_many_arguments)]
     fn adaptive_simpson_inner<F2>(
         f: F2,
@@ -671,7 +679,7 @@ where
         whole: f64,
         depth: usize,
         max_depth: usize,
-    ) -> Result<f64, Error>
+    ) -> (f64, f64)
     where
         F2: Fn(f64) -> f64 + Copy,
     {
@@ -689,29 +697,16 @@ where
 
         let error_estimate = (total - whole).abs() / 15.0;
 
-        if error_estimate <= tol {
-            return Ok(total);
-        }
-
-        if depth >= max_depth {
-            return Err(crate::error::InputError::SolverConvergenceFailed {
-                iterations: depth,
-                residual: error_estimate,
-                last_x: (a + b) / 2.0,
-                reason: format!(
-                    "adaptive_simpson did not meet tolerance {tol:.2e} at max_depth {max_depth} \
-                     (interval [{a:.6e}, {b:.6e}], error estimate {error_estimate:.2e})"
-                ),
-            }
-            .into());
+        if error_estimate <= tol || !error_estimate.is_finite() || depth >= max_depth {
+            return (total, error_estimate);
         }
 
         let mid_tol = tol / 2.0;
-        let left_result =
-            adaptive_simpson_inner(f, a, c, mid_tol, fa, fc, fd, left, depth + 1, max_depth)?;
-        let right_result =
-            adaptive_simpson_inner(f, c, b, mid_tol, fc, fb, fe, right, depth + 1, max_depth)?;
-        Ok(left_result + right_result)
+        let (left_result, left_error) =
+            adaptive_simpson_inner(f, a, c, mid_tol, fa, fc, fd, left, depth + 1, max_depth);
+        let (right_result, right_error) =
+            adaptive_simpson_inner(f, c, b, mid_tol, fc, fb, fe, right, depth + 1, max_depth);
+        (left_result + right_result, left_error + right_error)
     }
 
     let c = (a + b) / 2.0;
@@ -722,7 +717,22 @@ where
 
     let whole = h * (fa + 4.0 * fc + fb);
 
-    adaptive_simpson_inner(f, a, b, tol, fa, fb, fc, whole, 0, max_depth)
+    let (value, error_estimate) =
+        adaptive_simpson_inner(f, a, b, tol, fa, fb, fc, whole, 0, max_depth);
+    if value.is_finite() && error_estimate <= tol {
+        Ok(value)
+    } else {
+        Err(InputError::SolverConvergenceFailed {
+            iterations: max_depth,
+            residual: error_estimate,
+            last_x: c,
+            reason: format!(
+                "adaptive_simpson did not meet total tolerance {tol:.2e} at max_depth {max_depth} \
+                 (interval [{a:.6e}, {b:.6e}], summed error estimate {error_estimate:.2e})"
+            ),
+        }
+        .into())
+    }
 }
 
 // Gauss–Legendre Quadrature (finite intervals)

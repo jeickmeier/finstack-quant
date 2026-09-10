@@ -1,6 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{DiscountAt, DEFAULT_QUADRATURE_ORDER};
+use super::config::{DiscountAt, DEFAULT_INTEGRATION_TOLERANCE};
 use super::*;
 use crate::cashflow::primitives::CFKind;
 use crate::instruments::credit_derivatives::cds_tranche::parameters::CDSTrancheParams;
@@ -170,7 +170,10 @@ fn sample_tranche() -> CDSTranche {
 #[test]
 fn test_model_creation() {
     let model = CDSTranchePricer::new();
-    assert_eq!(model.params.quadrature_order, DEFAULT_QUADRATURE_ORDER);
+    assert_eq!(
+        model.params.integration_tolerance,
+        DEFAULT_INTEGRATION_TOLERANCE
+    );
     assert!(model.params.use_issuer_curves);
 }
 
@@ -2672,4 +2675,116 @@ fn test_stochastic_recovery_full_pool_el_matches_index() {
         "stochastic recovery should still reshape sub-pool tranche EL: \
          stoch={equity_stoch}, const={equity_const}"
     );
+}
+
+mod production_credit_audit {
+    use super::*;
+
+    #[test]
+    fn finite_pool_loss_matches_independent_adaptive_reference() {
+        let reference: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/production_tranche_loss_reference.json"
+        ))
+        .expect("reference");
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+            min_correlation: 0.0001,
+            max_correlation: 0.9999,
+            corr_boundary_width: 0.00001,
+            ..Default::default()
+        })
+        .expect("pricer");
+        for row in reference["cases"].as_array().expect("cases") {
+            let pd = row["pd"].as_f64().expect("PD");
+            let rho = row["correlation"].as_f64().expect("rho");
+            let cap = row["cap"].as_f64().expect("cap");
+            let expected = row["expected_loss"].as_f64().expect("EL");
+            let hazard = HazardCurve::builder("HZ")
+                .base_date(base)
+                .recovery_rate(0.4)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .knots([(1.0, -(1.0 - pd).ln())])
+                .build()
+                .expect("hazard");
+            let correlation = BaseCorrelationCurve::builder("BC")
+                .knots([(3.0, rho), (100.0, rho)])
+                .build()
+                .expect("correlation");
+            let index = CreditIndexData::builder()
+                .num_constituents(row["n"].as_u64().expect("N") as u16)
+                .recovery_rate(0.4)
+                .index_credit_curve(Arc::new(hazard))
+                .base_correlation_curve(Arc::new(correlation))
+                .build()
+                .expect("index");
+            let actual = pricer
+                .calculate_equity_tranche_loss(cap * 100.0, rho, &index, maturity)
+                .expect("loss");
+            assert!(
+                (actual - expected).abs() < 2e-10,
+                "N={}, PD={pd}, rho={rho}, cap={cap}: {actual:.15} vs {expected:.15}",
+                index.num_constituents
+            );
+        }
+    }
+
+    #[test]
+    fn dispersed_pool_honors_constant_recovery_override() {
+        let market = sample_market_context_with_issuers(3);
+        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+        let pricer = CDSTranchePricer::with_params(
+            CDSTranchePricerConfig::default().with_constant_recovery(1.0),
+        )
+        .expect("pricer");
+        let loss = pricer
+            .calculate_equity_tranche_loss(100.0, 0.3, &index, maturity)
+            .expect("loss");
+        assert!(
+            loss.abs() < 1e-12,
+            "100% recovery must eliminate loss: {loss}"
+        );
+    }
+
+    #[test]
+    fn dispersed_stochastic_recovery_preserves_full_pool_expected_loss() {
+        let market = sample_market_context_with_issuers(3);
+        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+        let expected: f64 = index
+            .issuer_credit_curves
+            .as_ref()
+            .expect("issuers")
+            .iter()
+            .map(|(id, curve)| {
+                let t = curve
+                    .day_count()
+                    .year_fraction(
+                        curve.base_date(),
+                        maturity,
+                        finstack_quant_core::dates::DayCountContext::default(),
+                    )
+                    .expect("time");
+                index.get_issuer_weight(id)
+                    * (1.0 - curve.sp(t))
+                    * (1.0 - index.get_issuer_recovery(id))
+            })
+            .sum();
+        for tolerance in [1e-8, 1e-10] {
+            let pricer = CDSTranchePricer::with_params(
+                CDSTranchePricerConfig::default()
+                    .with_custom_stochastic_recovery(0.4, 0.1, 0.3)
+                    .with_integration_tolerance(tolerance),
+            )
+            .expect("pricer");
+            let actual = pricer
+                .calculate_equity_tranche_loss(100.0, 0.3, &index, maturity)
+                .expect("loss");
+            assert!(
+                (actual - expected).abs() < 4.0 * tolerance,
+                "full-pool stochastic recovery EL {actual} vs {expected}, tolerance {tolerance}"
+            );
+        }
+    }
 }

@@ -10,6 +10,7 @@ description = "Deterministic scenario DSL for Finstack Quant with preview, compo
 autobenches = false
 
 [dependencies]
+finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
 finstack-quant-attribution = { path = "../attribution", version = "0.8.0", default-features = false }
 finstack-quant-core = { path = "../core", version = "0.8.0", default-features = false }
 finstack-quant-models = { path = "../models", version = "0.8.0", default-features = false }
@@ -40,7 +41,6 @@ json-schema = [
 ]
 
 [dev-dependencies]
-finstack-quant-cashflows = { path = "../cashflows", version = "0.8.0", default-features = false }
 finstack-quant-calibration = { path = "../calibration", version = "0.8.0" }
 criterion = { workspace = true }
 jsonschema = { version = "0.28", default-features = false }

@@ -122,6 +122,123 @@ fn closure_check_matrix() {
 }
 
 #[test]
+fn fx_quote_updates_invalidate_cached_crosses() {
+    let date = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
+    let other_date = Date::from_calendar_date(2025, time::Month::January, 3).unwrap();
+    let policy = FxConversionPolicy::CashflowDate;
+    for update in ["single", "batch", "pinned"] {
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        matrix
+            .set_quote(Currency::GBP, Currency::USD, 1.25)
+            .unwrap();
+        if update == "pinned" {
+            for on in [date, other_date] {
+                matrix
+                    .set_quote_on(Currency::EUR, Currency::USD, on, policy, 1.10)
+                    .unwrap();
+            }
+        } else {
+            matrix
+                .set_quote(Currency::EUR, Currency::USD, 1.10)
+                .unwrap();
+        }
+        for on in [date, other_date] {
+            let before = matrix
+                .rate(FxQuery::new(Currency::EUR, Currency::GBP, on))
+                .unwrap();
+            assert!((before.rate - 0.88).abs() < 1e-12);
+        }
+        match update {
+            "single" => matrix
+                .set_quote(Currency::EUR, Currency::USD, 1.20)
+                .unwrap(),
+            "batch" => matrix
+                .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
+                .unwrap(),
+            _ => matrix
+                .set_quote_on(Currency::EUR, Currency::USD, date, policy, 1.20)
+                .unwrap(),
+        }
+        for (from, to, expected) in [
+            (Currency::EUR, Currency::GBP, 0.96),
+            (Currency::GBP, Currency::EUR, 1.0 / 0.96),
+        ] {
+            let after = matrix.rate(FxQuery::new(from, to, date)).unwrap();
+            assert!((after.rate - expected).abs() < 1e-12, "{update}: {after:?}");
+            assert!(after.triangulated);
+        }
+        let other = matrix
+            .rate(FxQuery::new(Currency::EUR, Currency::GBP, other_date))
+            .unwrap();
+        let expected = if update == "pinned" { 0.88 } else { 0.96 };
+        assert!((other.rate - expected).abs() < 1e-12);
+        assert_eq!(
+            matrix
+                .rate(FxQuery::new(Currency::GBP, Currency::USD, date))
+                .unwrap()
+                .rate,
+            1.25
+        );
+    }
+}
+
+#[test]
+fn fx_quote_update_prevents_inflight_cross_from_repopulating_cache() {
+    use std::sync::Barrier;
+
+    struct BlockingFx {
+        entered: Arc<Barrier>,
+        resume: Arc<Barrier>,
+        calls: AtomicUsize,
+    }
+
+    impl FxProvider for BlockingFx {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _: Date,
+            _: FxConversionPolicy,
+        ) -> finstack_quant_core::Result<f64> {
+            if (from, to) != (Currency::USD, Currency::GBP) {
+                return Err(finstack_quant_core::InputError::NotFound {
+                    id: format!("FX:{from}->{to}"),
+                }
+                .into());
+            }
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                self.entered.wait();
+                self.resume.wait();
+            }
+            Ok(0.8)
+        }
+    }
+
+    let entered = Arc::new(Barrier::new(2));
+    let resume = Arc::new(Barrier::new(2));
+    let matrix = Arc::new(FxMatrix::new(Arc::new(BlockingFx {
+        entered: Arc::clone(&entered),
+        resume: Arc::clone(&resume),
+        calls: AtomicUsize::new(0),
+    })));
+    let date = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
+    let query = FxQuery::new(Currency::EUR, Currency::GBP, date);
+    matrix
+        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .unwrap();
+    let reader = Arc::clone(&matrix);
+    let task = std::thread::spawn(move || reader.rate(query).unwrap());
+    entered.wait();
+    matrix
+        .set_quote(Currency::EUR, Currency::USD, 1.20)
+        .unwrap();
+    resume.wait();
+    task.join().unwrap();
+    let after = matrix.rate(query).unwrap();
+    assert!((after.rate - 0.96).abs() < 1e-12, "{after:?}");
+}
+
+#[test]
 fn fx_matrix_cache_distinguishes_query_date_and_policy() {
     struct DatePolicyFx;
 
@@ -860,7 +977,7 @@ fn set_quotes_is_atomic_on_invalid_entry() {
 }
 
 #[test]
-fn pinned_quote_outranks_pair_global_reciprocal() {
+fn pair_global_reciprocal_outranks_pinned_quote() {
     let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
@@ -883,8 +1000,8 @@ fn pinned_quote_outranks_pair_global_reciprocal() {
         .rate;
 
     assert!(
-        (rate - 1.30).abs() < 1e-12,
-        "pinned fixing should win over an opposite-direction pair-global quote"
+        (rate - 1.25).abs() < 1e-12,
+        "pair-global source priority must apply in either orientation"
     );
 }
 

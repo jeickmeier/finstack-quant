@@ -129,90 +129,40 @@ fn auto_selects_black_for_positive_rates() {
     );
 }
 
-// Auto matches the lognormal fallback for negative rates
-
 #[test]
-fn auto_matches_lognormal_fallback_for_negative_forward() {
+fn auto_follows_normal_metadata_for_negative_forward() {
     let as_of = date!(2024 - 01 - 01);
     let fixing = date!(2024 - 04 - 01);
     let payment = date!(2024 - 07 - 01);
-    let fwd_rate = -0.005; // negative forward (EUR environment)
-    let strike = 0.0; // ATM-ish
-    let sigma = 0.20; // lognormal vol on the surface
-
-    let auto_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Auto, true);
-    let lognormal_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Lognormal, true);
-
-    let ctx = context_from(as_of, fwd_rate, sigma);
-
-    let auto_pv = auto_cap
-        .value(&ctx, as_of)
-        .expect("Auto should succeed with negative forward");
-    let lognormal_pv = lognormal_cap
-        .value(&ctx, as_of)
-        .expect("Lognormal should fall back to Bachelier on a negative forward");
-
-    // Auto and Lognormal share the same lognormal→normal conversion + Bachelier
-    // fallback, so they must agree exactly. (They must NOT feed the raw 0.20
-    // surface number straight into Bachelier, which would price it as a 2000bp
-    // normal vol.)
-    let diff = (auto_pv.amount() - lognormal_pv.amount()).abs();
-    assert!(
-        diff < 1e-10,
-        "Auto should match the Lognormal fallback for negative forward: auto={}, lognormal={}, diff={}",
-        auto_pv.amount(),
-        lognormal_pv.amount(),
-        diff
+    let ctx = context_from(as_of, -0.005, 0.005).insert_surface(
+        flat_vol_surface(0.005, "VOL")
+            .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
     );
-    assert!(
-        auto_pv.amount().is_finite() && auto_pv.amount() >= 0.0,
-        "Auto PV must be finite and non-negative, got {}",
-        auto_pv.amount()
-    );
+    let auto = make_caplet(fixing, payment, -0.002, CapFloorVolType::Auto, true);
+    let normal = make_caplet(fixing, payment, -0.002, CapFloorVolType::Normal, true);
+    let auto_pv = auto.value(&ctx, as_of).expect("auto normal quote").amount();
+    let normal_pv = normal.value(&ctx, as_of).expect("normal quote").amount();
+    assert!(auto_pv > 0.0);
+    assert!((auto_pv - normal_pv).abs() < 1e-10);
 }
 
 #[test]
-fn auto_does_not_error_on_negative_forward() {
+fn black_metadata_requires_positive_rates() {
     let as_of = date!(2024 - 01 - 01);
-    let fixing = date!(2024 - 04 - 01);
-    let payment = date!(2024 - 07 - 01);
-    let fwd_rate = -0.005;
-    let strike = -0.002;
-    let sigma = 0.005;
-
-    let auto_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Auto, true);
-    let ctx = context_from(as_of, fwd_rate, sigma);
-
-    // Auto should NOT error (selects normal when Black domain is invalid)
-    let result = auto_cap.value(&ctx, as_of);
-    assert!(
-        result.is_ok(),
-        "Auto vol type should handle negative forward without error: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn lognormal_falls_back_to_normal_on_negative_forward() {
-    let as_of = date!(2024 - 01 - 01);
-    let fixing = date!(2024 - 04 - 01);
-    let payment = date!(2024 - 07 - 01);
-    let fwd_rate = -0.005;
-    let strike = 0.0;
-    let sigma = 0.20;
-
-    let black_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Lognormal, true);
-    let ctx = context_from(as_of, fwd_rate, sigma);
-
-    // Lognormal (Black) is undefined for F <= 0; we fall back to normal (Bachelier) pricing.
-    let pv = black_cap
-        .value(&ctx, as_of)
-        .expect("lognormal should auto-fallback when forward is non-positive");
-    assert!(
-        pv.amount().is_finite() && pv.amount() >= 0.0,
-        "expected finite non-negative PV, got {}",
-        pv.amount()
-    );
+    let ctx = context_from(as_of, -0.005, 0.20);
+    for model in [CapFloorVolType::Auto, CapFloorVolType::Lognormal] {
+        let cap = make_caplet(
+            date!(2024 - 04 - 01),
+            date!(2024 - 07 - 01),
+            0.0,
+            model,
+            true,
+        );
+        let error = cap
+            .value(&ctx, as_of)
+            .expect_err("invalid Black coordinates");
+        assert!(error.to_string().contains("positive forward and strike"));
+    }
 }
 
 // Serde round-trip

@@ -14,15 +14,13 @@
 
 use std::cell::Cell;
 
-use crate::instruments::fixed_income::convertible::market_inputs::volatility_candidate_ids;
 use crate::instruments::fixed_income::convertible::pricing::{
-    calculate_accrued_interest, price_convertible_bond, settlement_date, ConvertibleTreeType,
+    calculate_accrued_interest, settlement_date,
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
-use finstack_quant_core::Result;
+use finstack_quant_core::{Error, Result};
 
 pub(crate) struct ImpliedVolCalculator;
 
@@ -30,110 +28,130 @@ impl MetricCalculator for ImpliedVolCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
-
         if as_of >= bond.maturity {
             return Ok(0.0);
         }
-
         let quoted_clean = bond
             .instrument_pricing_overrides
             .market_quotes
             .quoted_clean_price
             .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                Error::from(finstack_quant_core::InputError::NotFound {
                     id: "pricing_overrides.market_quotes.quoted_clean_price".to_string(),
                 })
             })?;
-
-        let accrued = calculate_accrued_interest(bond, as_of)?;
-        // `quoted_clean` is percentage-of-par (e.g. 99.5 = 99.5% of face).
-        // `accrued` and the model price are both notional-scaled currency amounts.
-        // Scale the percentage quote to notional so the solver objective compares
-        // commensurate values — mirroring the term-loan `target_price_from_quote_or_model`.
+        let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
         let target_dirty = quoted_clean * bond.notional.amount() / 100.0 + accrued;
-
-        // Use the same tree discretization as the registry pricer and every
-        // other convertible metric so the solved vol reprices to the quote
-        // on the production tree (no discretization basis baked into the vol).
-        let tree_type = ConvertibleTreeType::default();
-
-        let underlying_id = bond.underlying_equity_id.as_deref().ok_or_else(|| {
-            finstack_quant_core::Error::internal(
-                "convertible implied vol requires underlying_equity_id",
-            )
-        })?;
-
-        let vol_candidates = volatility_candidate_ids(bond)?;
-
-        let vol_id = vol_candidates
-            .iter()
-            .find(|id| {
-                context.curves.get_price(id.as_str()).is_ok()
-                    || context.curves.get_surface(id).is_ok()
-            })
-            .cloned()
-            .unwrap_or_else(|| format!("{}-VOL", underlying_id));
-
-        let base_market = context.curves.as_ref();
-
-        // The quoted clean price is a *settlement-date* price, so the model PV
-        // (computed at `as_of`) is forward-valued to settlement before comparison
-        // — identical to the OAS objective. With the default
-        // `settlement_days = None`, settle == as_of and this factor is 1.0.
+        if !target_dirty.is_finite() || target_dirty <= 0.0 {
+            return Err(Error::Validation(
+                "convertible implied volatility requires a finite positive dirty-price target"
+                    .into(),
+            ));
+        }
         let settle = settlement_date(bond, as_of)?;
-        let settle_df = if settle > as_of {
-            base_market
-                .get_discount(bond.discount_curve_id.as_str())?
-                .df_between_dates(as_of, settle)?
-        } else {
-            1.0
+        let settle_df = context
+            .curves
+            .get_discount(bond.discount_curve_id.as_str())?
+            .df_between_dates(as_of, settle)?;
+
+        // Validate the selected pricing path before probing its numerical domain.
+        // Inversion changes only the effective equity-volatility quote; every
+        // evaluation retains the caller's engine, curves and contractual fixings.
+        context.reprice_money(&context.curves, as_of)?;
+        let evaluate = |volatility: f64| -> Result<f64> {
+            let mut trial = bond.clone();
+            trial
+                .instrument_pricing_overrides
+                .market_quotes
+                .implied_volatility = Some(volatility);
+            let price = context.reprice_instrument_money(&trial, &context.curves, as_of)?;
+            // Price error per unit notional keeps the stopping rule independent
+            // of trade scale while preserving the settlement-date quote basis.
+            let residual = (price.amount() / settle_df - target_dirty) / bond.notional.amount();
+            if !residual.is_finite() {
+                return Err(Error::Validation(
+                    "non-finite convertible implied-volatility residual".into(),
+                ));
+            }
+            Ok(residual)
         };
 
-        // Validate the unbumped pricing path before entering the solver so that
-        // missing equity / vol / curve inputs surface their real error messages
-        // rather than appearing as opaque solver convergence failures.
-        let _ = price_convertible_bond(bond, base_market, tree_type, as_of)?;
-
-        // Capture the first pricing error so a downstream solver failure can
-        // report the underlying cause. See the OAS solver for why
-        // `take().or(Some(e))` is required instead of `if take().is_none()`.
-        let captured_err: Cell<Option<finstack_quant_core::Error>> = Cell::new(None);
-        let record_err = |e: finstack_quant_core::Error| {
-            let prev = captured_err.take();
-            captured_err.set(prev.or(Some(e)));
-        };
-        let objective = |vol: f64| -> f64 {
-            let bumped = base_market
-                .clone()
-                .insert_price(&vol_id, MarketScalar::Unitless(vol));
-            match price_convertible_bond(bond, &bumped, tree_type, as_of) {
-                Ok(pv) => pv.amount() / settle_df - target_dirty,
-                Err(e) => {
-                    record_err(e);
-                    f64::NAN
-                }
+        // CRR and trinomial grids have a positive minimum admissible volatility
+        // when drift is nonzero. Find that boundary before invoking Brent, so
+        // its entire bracket consists of valid lattice evaluations.
+        let upper = 3.0;
+        let lower = admissible_lower_volatility(&evaluate, upper)?;
+        let low_residual = evaluate(lower)?;
+        let high_residual = evaluate(upper)?;
+        if low_residual.abs() <= 1e-10 {
+            return Ok(lower);
+        }
+        if high_residual.abs() <= 1e-10 {
+            return Ok(upper);
+        }
+        if low_residual.signum() == high_residual.signum() {
+            return Err(Error::Validation(format!(
+                "convertible clean-price quote is not bracketed on the selected lattice's admissible volatility interval [{lower}, {upper}]; dirty-price residuals per unit notional are {low_residual} and {high_residual}"
+            )));
+        }
+        let captured_err: Cell<Option<Error>> = Cell::new(None);
+        let objective = |volatility| match evaluate(volatility) {
+            Ok(residual) => residual,
+            Err(error) => {
+                let previous = captured_err.take();
+                captured_err.set(previous.or(Some(error)));
+                f64::NAN
             }
         };
-
-        let solver = BrentSolver::new()
-            .tolerance(1e-6)
+        let solved = BrentSolver::new()
+            .tolerance(1e-12)
             .max_iterations(100)
-            .bracket_bounds(0.001, 3.0); // 0.1% to 300% vol
+            .bracket_bounds(lower, upper)
+            .solve(objective, 0.25_f64.clamp(lower, upper));
+        if let Some(error) = captured_err.take() {
+            return Err(error);
+        }
+        let volatility = solved?;
+        let residual = evaluate(volatility)?;
+        if residual.abs() > 1e-10 {
+            return Err(Error::Validation(format!("convertible implied volatility failed repricing: dirty-price residual per unit notional {residual}")));
+        }
+        Ok(volatility)
+    }
+}
 
-        match solver.solve(objective, 0.25) {
-            Ok(implied_vol) => Ok(implied_vol),
-            Err(solver_err) => {
-                if let Some(inner) = captured_err.take() {
-                    Err(finstack_quant_core::Error::Validation(format!(
-                        "Convertible implied vol solver failed because pricing failed inside \
-                         the objective: {inner}"
-                    )))
-                } else {
-                    Err(solver_err)
+/// Locate the selected lattice's lower numerical boundary; the base pricing
+/// path has already validated all non-volatility inputs. Invalid probes remain
+/// outside the root solver's bracket and are never converted into prices.
+fn admissible_lower_volatility(evaluate: &impl Fn(f64) -> Result<f64>, upper: f64) -> Result<f64> {
+    let mut lower = 1e-8;
+    let mut invalid = 0.0;
+    loop {
+        match evaluate(lower) {
+            Ok(_) => break,
+            Err(error) => {
+                if lower >= upper {
+                    return Err(error);
                 }
+                invalid = lower;
+                lower = (lower * 2.0).min(upper);
             }
         }
     }
+    if invalid > 0.0 {
+        for _ in 0..32 {
+            let middle = 0.5 * (invalid + lower);
+            if evaluate(middle).is_ok() {
+                lower = middle;
+            } else {
+                invalid = middle;
+            }
+        }
+        // Stay strictly inside the admissible interval to avoid rounding at p=0/1.
+        lower *= 1.0 + 1e-8;
+        evaluate(lower)?;
+    }
+    Ok(lower)
 }
 
 #[cfg(test)]
@@ -320,7 +338,7 @@ mod tests {
             .expect("curve")
             .df_between_dates(as_of, settle)
             .expect("df");
-        let accrued = calculate_accrued_interest(&bond, as_of).expect("accrued");
+        let accrued = calculate_accrued_interest(&bond, &market, as_of).expect("accrued");
         let target_dirty = quoted_clean_pct * notional / 100.0 + accrued;
 
         let repriced = market.insert_price("AAPL-VOL", MarketScalar::Unitless(ivol));

@@ -90,6 +90,10 @@ impl MetricCalculator for MacaulayDurationCalculator {
                     date,
                     finstack_quant_core::dates::DayCountContext {
                         frequency: Some(bond.cashflow_spec.frequency()),
+                        coupon_period: crate::instruments::fixed_income::bond::pricing::quote_conversions::icma_reference_period(
+                            bond.cashflow_spec.day_count(), bond.cashflow_spec.frequency(),
+                            risk_flows.iter().map(|(d, _)| *d), quote_date,
+                        ),
                         ..Default::default()
                     },
                 )?

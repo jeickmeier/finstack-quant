@@ -94,8 +94,8 @@ let params = OptionMarketParams::new(
     OptionType::Put,
 );
 
-// leisen_reimer_odd rounds an even request up (200 -> 201).
-let tree = BinomialTree::leisen_reimer_odd(200);
+// leisen_reimer rounds an even request up (200 -> 201).
+let tree = BinomialTree::leisen_reimer(200);
 assert_eq!(tree.steps, 201);
 
 let american = tree.price_american(&params)?;
@@ -104,8 +104,7 @@ assert!(american >= european - 1e-9); // early exercise never destroys value
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
-`BinomialTree::leisen_reimer(steps)` logs a warning on an even step count;
-`leisen_reimer_odd` rounds up instead. Additional entry points:
+`BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
 `price_bermudan(&params, &exercise_times)`,
 `price_american_with_discrete_dividends`, `price_bermudan_with_discrete_dividends`,
 and `price_generic::<V: TreeValuator>`. Greeks are finite differences owned by
@@ -292,7 +291,7 @@ accessors return `Option<f64>`. `get_var` / `get_var_or` reach anything else.
 | Instrument | Model | Location |
 |------------|-------|----------|
 | American / Bermudan equity options | `BinomialTree::leisen_reimer` | `instruments/equity/equity_option/pricing/black.rs` |
-| Commodity options | `BinomialTree::leisen_reimer_odd` | `instruments/commodity/commodity_option/types.rs` |
+| Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_option/types.rs` |
 | Callable / putable bonds | `ShortRateTree`, `RatesCreditTree`, `HullWhiteTree` | `instruments/fixed_income/bond/pricing/engine/tree/` |
 | Term loans | `ShortRateTree`, `RatesCreditTree` | `instruments/fixed_income/term_loan/pricing/tree_engine.rs` |
 | Bermudan swaptions | `HullWhiteTree::calibrate_with_times` | `instruments/rates/swaption/` |

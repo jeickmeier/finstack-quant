@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
+import subprocess  # nosec B404 # fixed Cargo benchmark command, no shell
 from time import perf_counter_ns
 from typing import Any
 
@@ -78,7 +78,7 @@ def main() -> int:
     cargo = shutil.which("cargo")
     if cargo is None:
         raise RuntimeError("cargo is required to regenerate materialization fixtures")
-    subprocess.run(  # noqa: S603 -- resolved executable and fixed argument vector
+    subprocess.run(  # nosec B603 # noqa: S603 -- resolved executable and fixed argument vector
         [
             cargo,
             "run",

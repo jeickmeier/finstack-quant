@@ -10,6 +10,12 @@
  */
 export type HullWhiteStepParams = {
 /**
+ * Required positive maximum implied-quote error in quoted volatility units.
+ * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+ * This acceptance budget is independent of the numerical solver tolerance.
+ */
+fit_tolerance: number,
+/**
  * Discount curve ID (must already exist in market context).
  */
 curve_id: string,

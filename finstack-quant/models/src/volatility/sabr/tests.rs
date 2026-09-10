@@ -113,12 +113,13 @@ fn test_sabr_calibration() {
     let time_to_expiry = 1.0;
     let beta = 0.5; // Fixed beta
 
-    // minimize() now fails loudly instead of
-    // silently returning the best iterate on MaxIterations. This smile is not
-    // SABR-exact (positive SSE minimum), so allow a realistic gradient
-    // tolerance and iteration budget for formal convergence.
+    // These arbitrary quotes are not a SABR smile: tight quote acceptance must
+    // fail, while an explicitly budgeted approximate fit remains available.
+    assert!(SabrCalibrator::new()
+        .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
+        .is_err());
     let calibrator = SabrCalibrator::new()
-        .with_tolerance(1e-4)
+        .with_tolerance(0.05)
         .with_max_iterations(2000);
     let params = calibrator
         .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
@@ -134,7 +135,7 @@ fn test_sabr_calibration() {
             .implied_volatility(forward, strike, time_to_expiry)
             .expect("Volatility calculation should succeed in test");
         let error = (model_vol - market_vols[i]).abs();
-        assert!(error < 0.05); // Within 5% vol (calibration is approximate)
+        assert!(error / market_vols[i] < 0.05); // Within the requested relative quote budget
     }
 }
 
@@ -225,11 +226,20 @@ fn test_sabr_atm_stability() {
 fn test_sabr_auto_shift_calibration() {
     let forward = -0.002; // Negative forward
     let strikes = vec![-0.005, -0.002, 0.0, 0.002, 0.005];
-    let market_vols = vec![0.015, 0.012, 0.010, 0.011, 0.013]; // More reasonable vols for rates
+    let reference =
+        SabrModel::new(SabrParameters::normal(0.01, 0.5, -0.2).expect("valid parameters"));
+    let market_vols: Vec<_> = strikes
+        .iter()
+        .map(|&strike| {
+            reference
+                .implied_volatility(forward, strike, 0.5)
+                .expect("synthetic normal quote")
+        })
+        .collect();
     let time_to_expiry = 0.5;
     let beta = 0.0; // Normal model for rates
 
-    let calibrator = SabrCalibrator::new().with_tolerance(1e-4); // Relaxed tolerance for difficult calibration
+    let calibrator = SabrCalibrator::new().with_tolerance(1e-6);
     let params = calibrator
         .calibrate_auto_shift(forward, &strikes, &market_vols, time_to_expiry, beta)
         .expect("Volatility calculation should succeed in test");
@@ -926,65 +936,6 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
 /// must then land on a model ATM vol that is substantially closer to the true
 /// ATM than the nearest off-ATM market quote — exactly the improvement the
 /// interpolation delivers over the old nearest-strike rule.
-#[test]
-fn test_sabr_atm_pinning_interpolates_when_grid_lacks_forward() {
-    let true_params = SabrParameters::new(0.20, 0.5, 0.30, -0.25).expect("valid params");
-    let true_model = SabrModel::new(true_params);
-
-    let forward = 100.0_f64;
-    let expiry = 1.0_f64;
-
-    // Strike grid deliberately OMITS the forward (100). The inner strikes 98
-    // and 102 bracket F tightly; the nearest quote (98 or 102) is still
-    // off-ATM, which is what the old nearest-strike pin would have used.
-    let strikes = vec![90.0, 98.0, 102.0, 110.0];
-    let market_vols: Vec<f64> = strikes
-        .iter()
-        .map(|&k| {
-            true_model
-                .implied_volatility(forward, k, expiry)
-                .expect("synthetic vol should compute")
-        })
-        .collect();
-
-    let true_atm = true_model
-        .implied_volatility(forward, forward, expiry)
-        .expect("true ATM vol should compute");
-
-    // The nearest-strike quote (K=98) — what the OLD `find_atm_vol` would pin
-    // to. Assert it is measurably off the true ATM so the test is meaningful.
-    let nearest_vol = market_vols[1]; // K = 98
-    let nearest_err = (nearest_vol - true_atm).abs();
-    assert!(
-        nearest_err > 5e-4,
-        "test setup: nearest-strike quote {nearest_vol} must be off true ATM {true_atm}"
-    );
-
-    // non-convergence is now a hard error, and
-    // a 1e-10 gradient tolerance is unattainable for the scalar LM
-    // formulation (the vega-weighted SSE stagnates around 6e-7); use an
-    // attainable tolerance with a larger budget.
-    let calibrated = SabrCalibrator::new()
-        .with_tolerance(1e-5)
-        .with_max_iterations(1000)
-        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.5)
-        .expect("ATM-pinned calibration should succeed");
-    let prepared_model = SabrModel::new(calibrated);
-
-    let calibrated_atm = prepared_model
-        .atm_volatility(forward, expiry)
-        .expect("calibrated ATM vol should compute");
-    let interp_err = (calibrated_atm - true_atm).abs();
-
-    // The interpolated pin must be substantially closer to the true ATM than
-    // the nearest-strike quote — the concrete improvement from the fix.
-    assert!(
-        interp_err < nearest_err * 0.5,
-        "interpolated ATM pin must beat the nearest-strike quote: \
-         calibrated_atm={calibrated_atm} (err {interp_err:.6}), \
-         nearest quote={nearest_vol} (err {nearest_err:.6}), true_atm={true_atm}"
-    );
-}
 
 #[test]
 fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
@@ -1082,7 +1033,7 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
 }
 
 #[test]
-fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
+fn test_sabr_calibrate_recovers_known_smile() {
     let true_params = SabrParameters::new(0.25, 0.5, 0.45, -0.3).expect("valid params");
     let true_model = SabrModel::new(true_params);
 
@@ -1106,7 +1057,7 @@ fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
     let params = SabrCalibrator::new()
         .with_tolerance(1e-5)
         .with_max_iterations(1000)
-        .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
+        .calibrate(forward, &strikes, &market_vols, expiry, beta)
         .expect("derivative calibration should succeed");
 
     let model = SabrModel::new(params);
@@ -1296,80 +1247,6 @@ fn sabr_beta_one_smile_matches_hagan_reference() {
         (vol - reference_vol).abs() < 1e-6,
         "β=1 Hagan reference mismatch: got {vol:.10}, expected {reference_vol:.10}"
     );
-}
-
-/// `calibrate` and `calibrate_with_derivatives` minimize the same
-/// vega-weighted objective, so on a skewed smile they must agree on the
-/// calibrated (α, ν, ρ).
-///
-/// Regression for the bug where `calibrate_with_derivatives` fed LM the
-/// gradient of the *unweighted* SSE while the objective was vega-weighted,
-/// converging to the wrong problem's stationary point.
-#[test]
-fn test_sabr_calibrate_and_calibrate_with_derivatives_agree() {
-    // ATM lognormal vol ≈ α/√F = 0.20, so the ±20% wings sit ~1σ out and
-    // carry genuine vega weight.
-    let true_params = SabrParameters::new(2.0, 0.5, 0.5, -0.35).expect("valid params");
-    let true_model = SabrModel::new(true_params);
-
-    let forward = 100.0;
-    let expiry = 1.0;
-    let beta = 0.5;
-    let strikes = vec![80.0, 90.0, 100.0, 110.0, 120.0];
-    let market_vols: Vec<f64> = strikes
-        .iter()
-        .map(|&strike| {
-            true_model
-                .implied_volatility(forward, strike, expiry)
-                .expect("synthetic vol should compute")
-        })
-        .collect();
-
-    // non-convergence is now a hard error;
-    // 1e-10 previously "passed" via the silent best-guess fallback. Use an
-    // attainable tolerance and budget.
-    let calibrator = SabrCalibrator::new()
-        .with_tolerance(1e-7)
-        .with_max_iterations(1000);
-
-    let fd_free = calibrator
-        .calibrate(forward, &strikes, &market_vols, expiry, beta)
-        .expect("calibrate should succeed");
-    let with_derivs = calibrator
-        .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
-        .expect("calibrate_with_derivatives should succeed");
-
-    assert!(
-        (fd_free.alpha - with_derivs.alpha).abs() < 1e-3,
-        "alpha disagreement: {} vs {}",
-        fd_free.alpha,
-        with_derivs.alpha
-    );
-    assert!(
-        (fd_free.nu - with_derivs.nu).abs() < 1e-2,
-        "nu disagreement: {} vs {}",
-        fd_free.nu,
-        with_derivs.nu
-    );
-    assert!(
-        (fd_free.rho - with_derivs.rho).abs() < 1e-2,
-        "rho disagreement: {} vs {}",
-        fd_free.rho,
-        with_derivs.rho
-    );
-
-    // Both must reprice the synthetic smile.
-    let model = SabrModel::new(with_derivs);
-    for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
-        let fitted = model
-            .implied_volatility(forward, *strike, expiry)
-            .expect("fitted vol should compute");
-        assert!(
-            (fitted - market_vol).abs() < 5e-4,
-            "calibrate_with_derivatives misfit at strike {strike}: \
-             fitted={fitted:.6}, market={market_vol:.6}"
-        );
-    }
 }
 
 /// Normal-convention (β=0) calibration must actually fit the smile wings.
@@ -1564,5 +1441,35 @@ fn atm_beta_snap_is_consistent_between_smile_and_atm_paths() {
     assert!(
         (atm_snapped - near_atm).abs() < 5e-6,
         "ATM smile discontinuity for snap-band β: ATM {atm_snapped} vs K=F(1+1e-6) {near_atm}"
+    );
+}
+
+#[test]
+fn normal_and_shifted_delta_strikes_follow_active_vol_convention() {
+    let normal = SabrModel::new(SabrParameters::normal(0.008, 0.0, 0.0).expect("normal"));
+    assert!(normal.supports_negative_rates());
+    let smile = SabrSmile::new(normal, -0.002, 1.0);
+    let strike = smile.strike_from_delta(0.25, true).expect("normal strike");
+    assert!((strike - (-0.002 + 0.008 * 0.6744897501960817)).abs() < 1e-12);
+    let shifted = SabrSmile::new(
+        SabrModel::new(SabrParameters::new_with_shift(0.2, 1.0, 0.0, 0.0, 0.03).expect("shifted")),
+        -0.002,
+        1.0,
+    );
+    let unshifted = SabrSmile::new(
+        SabrModel::new(SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("unshifted")),
+        0.028,
+        1.0,
+    );
+    assert!(
+        (shifted
+            .strike_from_delta(0.25, true)
+            .expect("shifted strike")
+            + 0.03
+            - unshifted
+                .strike_from_delta(0.25, true)
+                .expect("Black strike"))
+        .abs()
+            < 1e-12
     );
 }

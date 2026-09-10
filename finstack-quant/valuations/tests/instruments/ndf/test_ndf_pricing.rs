@@ -96,13 +96,13 @@ fn fixing_remains_projectable_on_the_fixing_date() {
 }
 
 #[test]
-fn test_ndf_pricing_post_fixing_favorable() {
+fn test_ndf_pricing_post_fixing_base_depreciates() {
     let as_of = Date::from_calendar_date(2024, Month::April, 14).expect("valid date");
     let fixing_date = Date::from_calendar_date(2024, Month::April, 13).expect("valid date");
     let maturity = Date::from_calendar_date(2024, Month::April, 15).expect("valid date");
     let market = create_test_market(as_of);
 
-    // Create NDF with favorable fixing (CNY weakened)
+    // Long-CNY NDF loses when CNY weakens
     let ndf = Ndf::builder()
         .id(InstrumentId::new("USDCNY-FIXED"))
         .base_currency(Currency::CNY)
@@ -120,24 +120,23 @@ fn test_ndf_pricing_post_fixing_favorable() {
 
     let npv = ndf.value(&market, as_of).expect("should price");
 
-    // Fixing rate > contract rate: we're receiving more USD than contracted
-    // Settlement = 10M × (1/7.25 - 1/7.30) ≈ positive
+    // Each CNY buys fewer USD: settlement = 10M × (1/7.30 - 1/7.25).
     assert!(
-        npv.amount() > 0.0,
-        "NDF with favorable fixing should have positive PV, got {}",
+        npv.amount() < 0.0,
+        "Long-CNY NDF must lose on depreciation, got {}",
         npv.amount()
     );
     assert_eq!(npv.currency(), Currency::USD);
 }
 
 #[test]
-fn test_ndf_pricing_post_fixing_unfavorable() {
+fn test_ndf_pricing_post_fixing_base_appreciates() {
     let as_of = Date::from_calendar_date(2024, Month::April, 14).expect("valid date");
     let fixing_date = Date::from_calendar_date(2024, Month::April, 13).expect("valid date");
     let maturity = Date::from_calendar_date(2024, Month::April, 15).expect("valid date");
     let market = create_test_market(as_of);
 
-    // Create NDF with unfavorable fixing (CNY strengthened)
+    // Long-CNY NDF gains when CNY strengthens
     let ndf = Ndf::builder()
         .id(InstrumentId::new("USDCNY-FIXED"))
         .base_currency(Currency::CNY)
@@ -155,10 +154,10 @@ fn test_ndf_pricing_post_fixing_unfavorable() {
 
     let npv = ndf.value(&market, as_of).expect("should price");
 
-    // Fixing rate < contract rate means negative PV
+    // Each CNY buys more USD, so the long-base position gains.
     assert!(
-        npv.amount() < 0.0,
-        "NDF with unfavorable fixing should have negative PV, got {}",
+        npv.amount() > 0.0,
+        "Long-CNY NDF must gain on appreciation, got {}",
         npv.amount()
     );
 }

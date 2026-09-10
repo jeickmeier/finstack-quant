@@ -226,6 +226,7 @@ pub(crate) fn pv_mtm_reset(
             fixings_c,
             period,
             as_of,
+            None,
         )?;
         let df = relative_df_discount_curve(disc_c.as_ref(), as_of, period.payment_date)?;
         let df = require_positive_df(df, &swap.id, "constant-leg", period.payment_date)?;
@@ -296,6 +297,7 @@ pub(crate) fn pv_mtm_reset(
             fixings_r,
             period,
             as_of,
+            None,
         )?;
         let spread_decimal =
             decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
@@ -416,6 +418,7 @@ pub(crate) fn mtm_cashflow_schedule(
 
     let mut flows: Vec<CashFlow> =
         Vec::with_capacity(constant_periods.len() + resetting_periods.len() * 2 + 4);
+    let mut projected_fixings = Vec::new();
 
     // Per-period notional at T_start — also drives the initial principal cashflow.
     let n_r_initial = if constant_leg.start < as_of {
@@ -479,6 +482,7 @@ pub(crate) fn mtm_cashflow_schedule(
             fixings_c,
             period,
             as_of,
+            Some(&mut projected_fixings),
         )?;
         let all_in = projected.all_in_rate(spread_c);
         flows.push(CashFlow::new(
@@ -524,6 +528,13 @@ pub(crate) fn mtm_cashflow_schedule(
             .0
         };
 
+        if j > 0 {
+            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                series_id: mtm_fx_fixing_series_id(resetting_leg.currency, constant_leg.currency),
+                date: period.accrual_start,
+                value: Some(n_c / n_r_j),
+            });
+        }
         // Coupon at payment date on the period-start notional N_j^R.
         if period.payment_date > as_of {
             let projected_r = super::XccySwap::projected_leg_period(
@@ -532,6 +543,7 @@ pub(crate) fn mtm_cashflow_schedule(
                 fixings_r,
                 period,
                 as_of,
+                Some(&mut projected_fixings),
             )?;
             let coupon_amount = resetting_leg.side.coupon_sign()
                 * projected_r.unsigned_coupon(n_r_j, spread_decimal);
@@ -594,7 +606,10 @@ pub(crate) fn mtm_cashflow_schedule(
                 resetting_leg.notional.amount(),
                 resetting_leg.currency,
             )?),
-            ..Default::default()
+            meta: crate::cashflow::builder::CashFlowMeta {
+                projected_fixings,
+                ..Default::default()
+            },
         },
     ))
 }

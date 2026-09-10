@@ -33,6 +33,7 @@ fn valid_cashflow() -> CashFlow {
         rate: Some(0.05),
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     }
 }
 
@@ -49,6 +50,7 @@ fn cashflow_fixed_construction() {
         rate: Some(0.05),
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
 
     assert_eq!(cf.date, d(2025, 1, 15));
@@ -72,6 +74,7 @@ fn cashflow_floating_construction() {
         rate: None,
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
 
     assert_eq!(cf.kind, CFKind::FloatReset);
@@ -298,6 +301,7 @@ fn cashflow_rejects_reset_date_after_payment() {
         rate: None,
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_err(),
@@ -319,6 +323,7 @@ fn cashflow_accepts_reset_date_before_payment() {
         rate: None,
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -339,6 +344,7 @@ fn cashflow_accepts_reset_date_equal_to_payment() {
         rate: None,
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -357,6 +363,7 @@ fn cashflow_accepts_no_reset_date() {
         rate: Some(0.05),
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -377,6 +384,7 @@ fn cashflow_valid_with_all_fields_populated() {
         rate: Some(0.0325),
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -398,6 +406,7 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
         rate: Some(f64::NAN),          // Also invalid
         accrual: None,
         principal_delta: None,
+        principal_date: None,
     };
     assert!(
         cf.validate().is_err(),

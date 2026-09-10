@@ -1085,7 +1085,7 @@
         },
         "threshold": {
           "$ref": "#/$defs/Money",
-          "description": "IM threshold (aggregate group level).\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
         }
       },
       "required": [

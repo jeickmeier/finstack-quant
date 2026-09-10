@@ -191,7 +191,7 @@ impl CmsSpreadOptionPricer {
                 time_to_expiry,
                 tenor_years,
                 forward_rate,
-                inst.reference_swap().payments_per_year(),
+                inst.reference_swap().payments_per_year()?,
             )
         } else {
             0.0
@@ -436,7 +436,8 @@ fn marginal_cdf(vol_provider: &VolSource, leg: &CmsSpreadLeg, strike: f64) -> f6
 }
 
 fn clean_volatility(vol_provider: &VolSource, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
-    let vol = vol_provider.get_vol_clamped(expiry.max(0.0), tenor, strike.max(MIN_POSITIVE_RATE));
+    let vol =
+        vol_provider.get_vol_clamped(expiry.max(0.0), tenor, strike.max(MIN_POSITIVE_RATE))?;
     if vol <= 0.0 || !vol.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "CmsSpreadOption volatility source {} returned invalid vol {}",
@@ -453,10 +454,9 @@ fn clean_volatility_or_atm(vol_provider: &VolSource, leg: &CmsSpreadLeg, strike:
         leg.tenor_years,
         strike.max(MIN_POSITIVE_RATE),
     );
-    if vol.is_finite() && vol > 0.0 {
-        vol.max(MIN_VOL)
-    } else {
-        leg.atm_volatility.max(MIN_VOL)
+    match vol {
+        Ok(vol) if vol.is_finite() && vol > 0.0 => vol.max(MIN_VOL),
+        _ => leg.atm_volatility.max(MIN_VOL),
     }
 }
 

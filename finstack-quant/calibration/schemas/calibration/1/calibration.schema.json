@@ -545,13 +545,13 @@
           "description": "Inflation curve calibration.",
           "properties": {
             "base_cpi": {
-              "description": "Base CPI level used as the curve's reference CPI at t=0.\n\nWhen calibrating ZCIS curves in a curve-only context, this is typically the latest\nknown CPI fixing, i.e. CPI at `base_date - observation_lag` (not CPI at `base_date`).",
+              "description": "Base CPI level used as the curve's reference CPI at t=0.\n\nThis is the contractual reference CPI at the start date after applying\nobservation lag and monthly interpolation. Its curve date is\n`base_date - observation_lag`. Supplied index observations must reproduce\nthis value, including seasonality; a mismatch is rejected.",
               "format": "double",
               "type": "number"
             },
             "base_date": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-              "description": "Base date for the curve."
+              "description": "Valuation and calibration-instrument start date. The output curve's\nzero-time reference CPI date is this date minus `observation_lag`."
             },
             "currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -590,7 +590,7 @@
               "type": "number"
             },
             "observation_lag": {
-              "description": "Observation lag (e.g. \"3M\").\n\nThis controls the index publication lag used for instruments referencing this curve\nwhen no `InflationIndex` fixings series is provided in the market context.",
+              "description": "Observation lag (e.g. \"3M\").\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
               "type": "string"
             },
             "seasonal_factors": {
@@ -777,15 +777,6 @@
               "default": "bilinear",
               "description": "SABR parameter interpolation method between expiries/tenors."
             },
-            "sabr_tolerance": {
-              "default": null,
-              "description": "Solver tolerance used inside the SABR calibration routines.\n\nThis is an algorithmic convergence tolerance (not a market quoting tolerance).\nIf unset, the SABR calibrator default is used.",
-              "format": "double",
-              "type": [
-                "number",
-                "null"
-              ]
-            },
             "swap_index": {
               "anyOf": [
                 {
@@ -827,7 +818,7 @@
             },
             "vol_tolerance": {
               "default": null,
-              "description": "Reporting tolerance used to determine calibration success.\n\nThis is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol\ncalibration, success should reflect whether the fitted smile residuals are within a\nmarket-appropriate tolerance (e.g., 10–20 vol bp), not machine epsilon.",
+              "description": "Maximum absolute error of any fitted volatility quote; defaults to 0.0015.\n\nThis is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol\ncalibration, success should reflect whether the fitted smile residuals are within a\nmarket-appropriate tolerance (e.g., 10–20 normal vol bp), not machine epsilon.\nNormal quotes use decimal rate per square-root year; Black quotes use\ndimensionless annual volatility. Errors are never scaled by vega.",
               "format": "double",
               "type": [
                 "number",
@@ -1037,6 +1028,11 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Discount curve ID (must already exist in market context)."
             },
+            "fit_tolerance": {
+              "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+              "format": "double",
+              "type": "number"
+            },
             "initial_kappa": {
               "default": null,
               "description": "Optional initial guess for mean reversion κ.",
@@ -1062,6 +1058,7 @@
           },
           "required": [
             "kind",
+            "fit_tolerance",
             "curve_id",
             "currency",
             "base_date"
@@ -1082,6 +1079,11 @@
             "discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Discount curve ID (must already exist in market context)."
+            },
+            "fit_tolerance": {
+              "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+              "format": "double",
+              "type": "number"
             },
             "fixed_kappa": {
               "default": null,
@@ -1131,6 +1133,7 @@
           },
           "required": [
             "kind",
+            "fit_tolerance",
             "discount_curve_id",
             "forward_curve_id",
             "currency",

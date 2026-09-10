@@ -764,35 +764,20 @@ fn test_fi_index_trs_duration_dv01_errors_on_missing_configured_duration() {
     );
 }
 
-/// When `duration_id` is `None`, the DurationDv01 metric should default to 5.0Y
-/// and compute successfully.
+/// Duration risk requires an explicit index-duration source.
 #[test]
-fn test_fi_index_trs_duration_dv01_defaults_when_duration_id_is_none() {
+fn test_fi_index_trs_duration_dv01_requires_duration_id() {
     use finstack_quant_valuations::metrics::MetricId;
-
-    let as_of = as_of_date();
-    let market = create_market_context();
-
     let trs = TestFIIndexTrsBuilder::new().duration_id(None).build();
-
-    let result = trs
+    let error = trs
         .price_with_metrics(
-            &market,
-            as_of,
+            &create_market_context(),
+            as_of_date(),
             &[MetricId::DurationDv01],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .unwrap();
-
-    let dv01 = *result.measures.get("duration_dv01").unwrap();
-    // Expected: -(10_000_000 × 5.0 × 0.0001) = -5_000
-    // (negative: default side is ReceiveTotalReturn, i.e. long the bond index)
-    approx_eq(
-        dv01,
-        -5_000.0,
-        1.0, // $1 tolerance
-        "DurationDv01 should use 5.0Y default when duration_id is None",
-    );
+        .expect_err("duration input is required");
+    assert!(error.to_string().contains("duration_id"));
 }
 
 /// Providing a `MarketScalar::Price` for yield should fail with a descriptive error.

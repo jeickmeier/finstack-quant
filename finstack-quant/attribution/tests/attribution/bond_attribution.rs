@@ -329,25 +329,15 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
     let funding_cost = detail.funding_cost.unwrap().amount();
     let total = detail.total.amount();
 
-    // Measured 2026-08-12: coupon=0, pull_to_par=140.05, roll_down=−1.98,
-    // funding_cost=82.84, total=55.23 — the identity below only closes with
-    // the correct `−funding_cost` sign.
-    //
-    // The funding leg must actually be exercised: with funding_cost = 0 the
-    // sign of the funding term in the partition below is untestable (the
-    // pre-fix version of this test carried one `−funding` and one `+funding`
-    // identity, both passing on a zero).
     assert!(
         funding_cost > 0.0,
-        "funding_cost should be positive with the 3% USD-REPO funding curve, got {funding_cost}"
+        "the financing overlay must be exercised"
     );
-
-    // CarryDetail partition identity (carry_decomposition.rs):
-    //   total = coupon_income + pull_to_par + roll_down − funding_cost
     assert!(
-        (total - (coupon_income + pull_to_par + roll_down - funding_cost)).abs() < 1e-6,
-        "carry lines should partition total: coupon_income({coupon_income}) + pull_to_par({pull_to_par}) + roll_down({roll_down}) - funding_cost({funding_cost}) should = total({total})"
+        (total - (coupon_income + pull_to_par + roll_down)).abs() < 1e-6,
+        "gross carry lines must partition gross attribution carry"
     );
+    assert!((total - val_t0.measures[MetricId::CarryTotal.as_str()] - funding_cost).abs() < 1e-6);
 }
 
 #[test]

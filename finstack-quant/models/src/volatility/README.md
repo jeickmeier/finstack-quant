@@ -149,7 +149,7 @@ strike after any shift) and returns `Result<f64>`.
 
 ### `SABRCalibrator`
 
-Levenberg-Marquardt on a **vega-weighted** sum of squared vol errors over
+Levenberg-Marquardt on normalized vega-weighted squared relative quote errors over
 (α, ν, ρ), with β fixed by the caller.
 
 | Method | Notes |
@@ -157,19 +157,17 @@ Levenberg-Marquardt on a **vega-weighted** sum of squared vol errors over
 | `new()` | tolerance 1e-4, max 2000 iterations |
 | `high_precision()` | tolerance 1e-8, max 200 iterations (Bloomberg VCUB territory) |
 | `with_tolerance` / `with_max_iterations` | Fluent overrides |
-| `calibrate(F, &strikes, &vols, T, β)` | Objective-only LM |
-| `calibrate_with_derivatives(...)` | LM driven by finite-difference gradients |
-| `calibrate_shifted(...)` / `calibrate_shifted_with_derivatives(...)` | Explicit displacement |
-| `calibrate_auto_shift(...)` / `calibrate_auto_shift_with_derivatives(...)` | Displacement chosen automatically when the forward or a strike is negative |
+| `calibrate(F, &strikes, &vols, T, β)` | LM with finite-difference Jacobian |
+| `calibrate_shifted(...)` | Explicit displacement |
+| `calibrate_auto_shift(...)` | Displacement chosen automatically when the forward or a strike is negative |
 | `calibrate_with_atm_pinning(...)` | Solves α analytically for an exact ATM match, then fits ν and ρ only |
 
-Parameter bounds during the solve: ρ ∈ [−0.99, 0.99] everywhere; α and ν are
-bounded to `[0.001, 5.0]` and `[0.001, 2.0]` in `calibrate`, and to
-`[1e-6, 5.0]` and `[1e-6, 2.0]` in the `*_with_derivatives` variants.
-
-The `new()` defaults are loose on purpose. `LevenbergMarquardtSolver::minimize`
-errors instead of silently returning its best iterate, and the previous
-1e-6/100 defaults failed loudly on smiles where ρ is weakly identified.
+The solve uses log(alpha), ensuring positive alpha without a quote-scale-dependent
+upper or lower bound. Nu is bounded to [0.001, 2.0] and rho to [-0.99, 0.99].
+The configured tolerance limits the maximum relative error of each final volatility
+quote, independently of numerical solver convergence. The outcome reports signed
+errors in the original quote units and the maximum relative quote error. A fit
+outside this budget fails, including stalled and iteration-limited solves.
 
 ### `SABRSmile`
 
@@ -261,7 +259,7 @@ let vol = model.implied_volatility(0.03, 0.035, 1.0)?;
 let strikes = [0.01, 0.02, 0.03, 0.04, 0.05];
 let market_vols = [0.22, 0.20, 0.19, 0.195, 0.21];
 let fitted = SABRCalibrator::high_precision()
-    .calibrate_with_derivatives(0.03, &strikes, &market_vols, 1.0, 0.5)?;
+    .calibrate(0.03, &strikes, &market_vols, 1.0, 0.5)?;
 
 let smile = SABRSmile::new(SABRModel::new(fitted), 0.03, 1.0);
 let vols = smile.generate_smile(&strikes)?;

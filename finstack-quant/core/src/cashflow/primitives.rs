@@ -412,6 +412,19 @@ pub struct CashFlow {
     /// the schedule's initial notional rather than being counted twice.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal_delta: Option<Money>,
+    /// Economic date of the principal movement, independent of cash payment.
+    /// When absent, principal changes on `date`. Scheduled amortization and
+    /// PIK use the contractual accrual boundary even when payment is adjusted.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "crate::wire::optional_date"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<crate::wire::DateWire>")
+    )]
+    pub principal_date: Option<Date>,
 }
 
 impl CashFlow {
@@ -442,6 +455,7 @@ impl CashFlow {
             rate,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         }
     }
 
@@ -455,6 +469,24 @@ impl CashFlow {
     pub fn with_principal_delta(mut self, delta: Money) -> Self {
         self.principal_delta = Some(delta);
         self
+    }
+
+    /// Set the economic date of this flow's principal balance movement.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Contractual balance-effective date; cash still settles on
+    ///   the flow's payment `date`, which may precede or follow this date.
+    #[must_use]
+    pub fn with_principal_date(mut self, date: Date) -> Self {
+        self.principal_date = Some(date);
+        self
+    }
+
+    /// Return the balance-effective date, using payment date when unspecified.
+    #[must_use]
+    pub fn get_balance_date(&self) -> Date {
+        self.principal_date.unwrap_or(self.date)
     }
 
     /// Attach contractual accrual metadata to this flow.
@@ -618,6 +650,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(cf.date, date);
         assert_eq!(cf.amount, amount);
@@ -658,6 +691,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(princ.kind, CFKind::Notional);
         assert!(princ.validate().is_ok());
@@ -671,6 +705,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(fee.kind, CFKind::Fee);
         assert!(fee.validate().is_ok());
@@ -684,6 +719,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(pik.kind, CFKind::Pik);
         assert!(pik.validate().is_ok());
@@ -697,6 +733,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());
@@ -712,6 +749,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert!(zero_cf.validate().is_ok());
     }
@@ -801,6 +839,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(im_post.kind, CFKind::InitialMarginPost);
         assert!(im_post.validate().is_ok());
@@ -815,6 +854,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(im_return.kind, CFKind::InitialMarginReturn);
         assert!(im_return.validate().is_ok());
@@ -829,6 +869,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(vm_receive.kind, CFKind::VariationMarginReceive);
         assert!(vm_receive.validate().is_ok());
@@ -843,6 +884,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(vm_pay.kind, CFKind::VariationMarginPay);
         assert!(vm_pay.validate().is_ok());
@@ -857,6 +899,7 @@ mod tests {
             rate: Some(0.05),
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(margin_int.kind, CFKind::MarginInterest);
         assert!(margin_int.validate().is_ok());
@@ -871,6 +914,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(sub_in.kind, CFKind::CollateralSubstitutionIn);
         assert!(sub_in.validate().is_ok());
@@ -885,6 +929,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: None,
+            principal_date: None,
         };
         assert_eq!(sub_out.kind, CFKind::CollateralSubstitutionOut);
         assert!(sub_out.validate().is_ok());

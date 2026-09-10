@@ -55,7 +55,7 @@ spreads) at each future observation date, so volatility skew, smile and term
 structure come straight off the surface. No simulation variance, and generally
 more accurate than GBM Monte Carlo for anything with meaningful smile exposure.
 
-The forward is written as `S / DF(as_of → t_obs) · exp(−(q + quanto_drift)·t_obs)`,
+The forward is written as `S / DF_asset(as_of → t_obs) · exp(−(q + quanto_drift)·t_obs)`,
 which keeps the carry exact on the model/volatility clock instead of
 annualizing a curve-native zero rate when the curve and instrument day counts
 differ.
@@ -143,22 +143,26 @@ let note = RangeAccrual::builder()
 
 Quanto configuration is a single nested `quanto: Option<QuantoSpec>` field, not
 loose `quanto_correlation` / `fx_vol_surface_id` fields. `QuantoSpec` is defined
-in `instruments::common_impl::parameters::quanto` (crate-internal today — set
-the field through JSON deserialization from outside the crate):
+at `instruments::QuantoSpec`:
 
 | Field | Meaning |
 |-------|---------|
-| `correlation` | Asset–FX correlation, validated into `[-1, 1]` |
-| `fx_vol_surface_id` | FX volatility surface (required) |
-| `fx_spot_id` | Optional FX spot scalar for the vol lookup |
+| `asset_currency` | Currency of the asset price and financing |
+| `asset_discount_curve_id` | Asset-currency financing curve |
+| `correlation` | Asset correlation to payoff-currency units per asset-currency unit, in `[-1, 1]` |
+| `fx_vol_surface_id` | FX volatility surface on that same quote orientation |
+| `fx_spot_id` | Required positive FX spot scalar, in payoff currency per asset currency |
 
-The drift adjustment is `drift = q + ρ · σ_asset · σ_FX`, subtracted from the
-forward's carry exponent.
-
-`fx_spot_id` fails closed: when it is set, the scalar **must** resolve from the
-market context. The pricer will not silently substitute 1.0, because the quanto
-term scales multiplicatively with FX spot. Leave `fx_spot_id = None` to opt into
-the ATM approximation explicitly.
+The asset forward is `S / DF_asset · exp(-(q + ρ σ_asset σ_FX) t)`.
+Coupon cashflows use `DF_payoff`. The FX volatility is sampled at the forward
+FX rate `FX_spot · DF_asset / DF_payoff`. Both financing curves and the FX
+spot/surface must resolve. Monetary asset and FX scalars must carry the asset
+and payoff currencies, respectively. GBM retains its documented flat-volatility
+approximation; static replication resolves these inputs for each observation.
+The active asset-volatility override drives both the asset distribution and
+the covariance adjustment. Without an override, the asset surface supplies
+that volatility. Asset and FX sources must be compatible with unshifted Black
+pricing; normal or displaced surface quotes produce a validation error.
 
 ## Validation
 

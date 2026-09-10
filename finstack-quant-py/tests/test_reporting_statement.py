@@ -10,7 +10,7 @@ from finstack_quant.reporting.document import TearSheet
 
 
 def _results() -> object:
-    """Evaluate a small P&L model with margin formula nodes (percent-valued)."""
+    """Evaluate a small P&L model with margin formula nodes in decimal units."""
     b = statements.ModelBuilder("acme")
     b.periods("2025Q1..Q4", None)
     b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 108.0), ("2025Q3", 112.0), ("2025Q4", 118.0)])
@@ -19,8 +19,8 @@ def _results() -> object:
     b.value("opex", [("2025Q1", 18.0), ("2025Q2", 19.0), ("2025Q3", 20.0), ("2025Q4", 21.0)])
     b.compute("ebitda", "gross_profit - opex")
     b.compute("net_income", "ebitda * 0.7")
-    b.compute("ebitda_margin", "ebitda / revenue * 100")
-    b.compute("gross_margin", "gross_profit / revenue * 100")
+    b.compute("ebitda_margin", "ebitda / revenue")
+    b.compute("gross_margin", "gross_profit / revenue")
     return statements.Evaluator().evaluate(b.build())
 
 

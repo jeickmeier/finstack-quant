@@ -16,6 +16,50 @@ use finstack_quant_core::money::Money;
 use std::sync::{Arc, Mutex};
 use time::macros::date;
 
+#[test]
+fn b11_quote_set_propagates_applicable_metric_failure() {
+    struct FailedYield;
+    impl MetricCalculator for FailedYield {
+        fn calculate(&self, _: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+            Err(finstack_quant_core::Error::Validation(
+                "deliberate yield failure".into(),
+            ))
+        }
+    }
+    let bond = Bond::example().expect("bond");
+    let as_of = bond.issue_date;
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder(bond.discount_curve_id.as_str())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (20.0, 0.5)])
+            .build()
+            .expect("curve"),
+    );
+    let mut metrics = standard_registry().clone();
+    metrics
+        .replace_metric(
+            MetricId::Ytm,
+            Arc::new(FailedYield),
+            &[InstrumentType::Bond],
+        )
+        .expect("replace metric");
+    let err = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::CleanPricePct(100.0),
+        PricingOptions::default().with_metric_registry(Arc::new(metrics)),
+    )
+    .expect_err("applicable metric failure must propagate");
+    let message = err.to_string();
+    assert!(
+        message.contains("ytm")
+            && message.contains(bond.id.as_str())
+            && message.contains("deliberate yield failure"),
+        "{message}"
+    );
+}
+
 struct LinearTreeOasPricer {
     call_dates: Arc<Mutex<Vec<Date>>>,
 }

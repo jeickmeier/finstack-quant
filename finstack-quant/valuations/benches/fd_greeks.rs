@@ -96,7 +96,7 @@ fn create_barrier_option() -> BarrierOption {
         observed_barrier_breached: None,
         notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
-        use_gobet_miri: false,
+        monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
         discount_curve_id: CurveId::new("USD_DISC"),
         spot_id: "SPX".into(),
         vol_surface_id: CurveId::new("SPX_VOL"),
@@ -105,7 +105,6 @@ fn create_barrier_option() -> BarrierOption {
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
-        monitoring_frequency: None,
     }
 }
 

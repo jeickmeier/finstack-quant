@@ -40,6 +40,7 @@ fn cap_floor_conflicting_quotes_keep_all_residuals_in_any_order() {
             &df,
             &quotes,
             CapFloorCalibrationConfig {
+                fit_tolerance: 1e-6,
                 frequency: SwapFrequency::Quarterly,
                 fixed_kappa: Some(0.0342),
                 initial_guess: None,
@@ -139,6 +140,7 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
         &forward,
         &quotes,
         PiecewiseSigmaCalibrationConfig {
+            fit_tolerance: 1e-6,
             fixed_kappa: kappa,
             sigma_min: 1.0e-6,
             sigma_max: 0.1,
@@ -274,9 +276,15 @@ fn calibrate_hw1f_round_trip() {
         })
         .collect();
 
-    let (params, report) =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::default(), None, None)
-            .expect("Calibration should succeed");
+    let (params, report) = calibrate_hull_white_to_swaptions(
+        &df_fn,
+        &quotes,
+        SwapFrequency::default(),
+        None,
+        None,
+        1e-6,
+    )
+    .expect("Calibration should succeed");
 
     assert_eq!(report.residuals.len(), quotes.len());
     assert!(
@@ -320,11 +328,17 @@ fn calibrate_hw1f_annual_vs_semiannual_produces_different_params() {
         },
     ];
 
-    let (params_semi, _) =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::SemiAnnual, None, None)
-            .expect("semi-annual");
+    let (params_semi, _) = calibrate_hull_white_to_swaptions(
+        &df_fn,
+        &quotes,
+        SwapFrequency::SemiAnnual,
+        None,
+        None,
+        1e-6,
+    )
+    .expect("semi-annual");
     let (params_ann, _) =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::Annual, None, None)
+        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::Annual, None, None, 1e-6)
             .expect("annual");
 
     assert!(
@@ -359,8 +373,14 @@ fn calibrate_hw1f_rejects_insufficient_quotes() {
         is_normal_vol: true,
     }];
     let df_fn = flat_df(0.03);
-    let result =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::default(), None, None);
+    let result = calibrate_hull_white_to_swaptions(
+        &df_fn,
+        &quotes,
+        SwapFrequency::default(),
+        None,
+        None,
+        1e-6,
+    );
     assert!(result.is_err(), "Should reject < 2 quotes");
 }
 
@@ -419,9 +439,15 @@ fn hw1f_calibration_recovers_kappa_on_wide_round_trip_grid() {
         })
         .collect();
 
-    let (params, report) =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::SemiAnnual, None, None)
-            .expect("calibration should succeed");
+    let (params, report) = calibrate_hull_white_to_swaptions(
+        &df_fn,
+        &quotes,
+        SwapFrequency::SemiAnnual,
+        None,
+        None,
+        1e-6,
+    )
+    .expect("calibration should succeed");
 
     assert!(
         report.success,
@@ -471,8 +497,14 @@ fn hw1f_calibration_errors_when_kappa_drives_out_of_bounds() {
         })
         .collect();
 
-    let result =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::SemiAnnual, None, None);
+    let result = calibrate_hull_white_to_swaptions(
+        &df_fn,
+        &quotes,
+        SwapFrequency::SemiAnnual,
+        None,
+        None,
+        1e-6,
+    );
 
     match result {
         Ok((params, _)) => {
@@ -508,7 +540,12 @@ fn cap_floor_hw1f_calibration_rejects_one_quote_without_fixed_kappa() {
         &df_fn,
         &df_fn,
         &quotes,
-        CapFloorCalibrationConfig::default(),
+        CapFloorCalibrationConfig {
+            fit_tolerance: 1e-6,
+            frequency: SwapFrequency::SemiAnnual,
+            fixed_kappa: None,
+            initial_guess: None,
+        },
     );
 
     assert!(
@@ -623,7 +660,8 @@ fn cap_floor_hw1f_calibration_solves_sigma_with_fixed_kappa() {
             &df_fn,
             &df_fn,
             CapFloorPriceSpec::new(5.0, 0.0365, true, SwapFrequency::Quarterly),
-        ),
+        )
+        .expect("implied normal quote"),
         is_cap: true,
         is_normal_vol: true,
     }];
@@ -633,8 +671,10 @@ fn cap_floor_hw1f_calibration_solves_sigma_with_fixed_kappa() {
         &df_fn,
         &quotes,
         CapFloorCalibrationConfig {
+            fit_tolerance: 1e-6,
             fixed_kappa: Some(true_kappa),
-            ..CapFloorCalibrationConfig::default()
+            frequency: SwapFrequency::SemiAnnual,
+            initial_guess: None,
         },
     )
     .expect("fixed-kappa cap/floor calibration succeeds");
@@ -665,7 +705,8 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
                 &df_fn,
                 &df_fn,
                 CapFloorPriceSpec::new(*maturity, *strike, true, SwapFrequency::Quarterly),
-            ),
+            )
+            .expect("implied normal quote"),
             is_cap: true,
             is_normal_vol: true,
         })
@@ -676,9 +717,10 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
         &df_fn,
         &quotes,
         CapFloorCalibrationConfig {
+            fit_tolerance: 1e-6,
             frequency: SwapFrequency::Quarterly,
             initial_guess: Some(HullWhiteCalibrationParams::new(0.04, 0.01).expect("guess")),
-            ..CapFloorCalibrationConfig::default()
+            fixed_kappa: None,
         },
     )
     .expect("two-parameter cap/floor calibration succeeds");
@@ -770,8 +812,14 @@ fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
 
     // End-to-end: the full calibration with the same NaN curve must
     // fail cleanly rather than silently converge to a poisoned minimum.
-    let calib =
-        calibrate_hull_white_to_swaptions(&nan_df, &quotes, SwapFrequency::SemiAnnual, None, None);
+    let calib = calibrate_hull_white_to_swaptions(
+        &nan_df,
+        &quotes,
+        SwapFrequency::SemiAnnual,
+        None,
+        None,
+        1e-6,
+    );
     assert!(
         calib.is_err() || calib.as_ref().is_ok_and(|(_, report)| !report.success),
         "calibration on a degenerate (NaN-priced) curve must report \
@@ -992,9 +1040,10 @@ fn cap_floor_single_period_quote_rejected() {
         is_normal_vol: true,
     };
     let config = CapFloorCalibrationConfig {
+        fit_tolerance: 1e-6,
         frequency: SwapFrequency::Quarterly,
         fixed_kappa: Some(0.05),
-        ..Default::default()
+        initial_guess: None,
     };
     let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
     assert!(
@@ -1115,6 +1164,7 @@ fn swaption_malformed_schedule_is_rejected() {
         SwapFrequency::Annual,
         Some(&schedules),
         None,
+        1e-6,
     )
     .expect_err("a malformed per-quote schedule must be rejected");
     let msg = err.to_string();
@@ -1138,9 +1188,10 @@ fn cap_floor_fixed_kappa_out_of_band_rejected() {
     };
     for bad_kappa in [KAPPA_MAX * 2.0, KAPPA_MIN / 2.0] {
         let config = CapFloorCalibrationConfig {
+            fit_tolerance: 1e-6,
             frequency: SwapFrequency::Quarterly,
             fixed_kappa: Some(bad_kappa),
-            ..Default::default()
+            initial_guess: None,
         };
         let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
         assert!(
@@ -1194,4 +1245,41 @@ fn quote_deserialization_validates() {
             "is_cap": true, "is_normal_vol": false}"#,
     )
     .is_err());
+}
+
+#[test]
+fn m11_quote_fit_budget_controls_acceptance_without_changing_parameters() {
+    let df = flat_df(0.03);
+    let strike = ((0.03_f64 * 0.25).exp() - 1.0) / 0.25;
+    let quotes: Vec<_> = [0.009, 0.010, 0.011]
+        .into_iter()
+        .map(|volatility| CapFloorQuote {
+            maturity: 5.0,
+            strike,
+            volatility,
+            is_cap: true,
+            is_normal_vol: true,
+        })
+        .collect();
+    let fit = |fit_tolerance| {
+        calibrate_hull_white_to_cap_floors(
+            &df,
+            &df,
+            &quotes,
+            CapFloorCalibrationConfig {
+                fit_tolerance,
+                frequency: SwapFrequency::Quarterly,
+                fixed_kappa: Some(0.05),
+                initial_guess: None,
+            },
+        )
+        .expect("fit diagnostics")
+    };
+    let (strict_params, strict) = fit(0.0005);
+    let (accepted_params, accepted) = fit(0.0011);
+    assert_eq!(strict_params, accepted_params);
+    assert!(!strict.success);
+    assert!(accepted.success);
+    assert!((accepted.max_residual - 0.001).abs() < 1e-8);
+    assert_eq!(accepted.success_tolerance, Some(0.0011));
 }

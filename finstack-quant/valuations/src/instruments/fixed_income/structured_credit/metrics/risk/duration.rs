@@ -34,6 +34,7 @@ pub struct MacaulayDurationCalculator;
 
 impl MetricCalculator for MacaulayDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let settlement = super::super::quote::settlement_date(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?, context.as_of)?;
         let flows = context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -59,14 +60,13 @@ impl MetricCalculator for MacaulayDurationCalculator {
         let mut total_pv = 0.0;
 
         for (date, amount) in flows {
-            if *date <= context.as_of {
+            if *date <= settlement {
                 continue;
             }
 
-            let years =
-                day_count.year_fraction(context.as_of, *date, DayCountContext::default())?;
+            let years = day_count.year_fraction(settlement, *date, DayCountContext::default())?;
 
-            let df = disc.df_on_date_curve(*date)?;
+            let df = disc.df_between_dates(settlement, *date)?;
 
             let pv = amount.amount() * df;
 
@@ -103,66 +103,25 @@ pub struct ModifiedDurationCalculator;
 
 impl MetricCalculator for ModifiedDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // For structured credit, we use a numerical approach:
-        // Calculate price sensitivity to a small yield shift
-
-        // Get base NPV
-        let base_npv = context.base_value.amount();
-
-        if base_npv == 0.0 {
-            return Ok(0.0);
-        }
-
+        let quote = super::super::quote::SettlementQuote::from_context(context)?;
         let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
+            finstack_quant_core::Error::Validation(
+                "structured-credit duration requires projected cashflows".into(),
+            )
         })?;
-
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
-
-        let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-
-        // SC-m02: the shared metric time basis, NOT the curve's own day count.
-        // Duration is combined with convexity in the second-order price
-        // expansion, and convexity measures time in Act/365F — mixing the two
-        // made `D` and `C` incommensurable. See `METRIC_TIME_BASIS`.
-        let day_count =
-            crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
-
-        // Shift yield by 1bp
-        let yield_shift = ONE_BASIS_POINT;
-
-        // Calculate PV with shifted discount factors
-        let mut shifted_npv = 0.0;
-
-        for (date, amount) in flows {
-            if *date <= context.as_of {
-                continue;
-            }
-
-            // Calculate the spread bump time from valuation, not curve base.
-            let t = day_count.year_fraction(context.as_of, *date, DayCountContext::default())?;
-
-            // Get base discount factor
-            let df = disc.df_between_dates(context.as_of, *date)?;
-
-            // Apply yield shift: df_shifted = df * exp(-shift * t)
-            let df_shifted = df * (-yield_shift * t).exp();
-
-            shifted_npv += amount.amount() * df_shifted;
-        }
-
-        // Modified duration = -(dP/dy) / P
-        // Where dP = shifted_npv - base_npv, dy = yield_shift
-        let price_change = shifted_npv - base_npv;
-        let modified_duration = -(price_change / base_npv) / yield_shift;
-
-        Ok(modified_duration)
+        let deal = context
+            .instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>(
+            )?;
+        let curve = context
+            .curves
+            .get_discount(deal.discount_curve_id.as_str())?;
+        let base = quote.model_dirty(flows, &curve)?;
+        calculate_tranche_duration(
+            flows,
+            &curve,
+            quote.settlement,
+            Money::new(base, deal.pool.get_base_currency())?,
+        )
     }
 }
 

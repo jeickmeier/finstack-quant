@@ -27,9 +27,8 @@ pub(super) struct SimulationState<'a> {
     pub(super) closing_date: Date,
     pub(super) pool_balance_cleanup_threshold: f64,
     pub(super) tranche_recipient_keys: Vec<RecipientType>,
-    /// Whether reinvestment was active in the previous period.
-    /// Used to detect the reinvestment-end transition and reconcile pool_outstanding.
-    pub(super) was_reinvestment_active: bool,
+    /// Independently evolving OC/IC breach states for this simulation path.
+    pub(super) tranche_triggers: Vec<super::triggers::TrancheTriggerState>,
     /// Cumulative net loss realized in this scenario
     /// (`default_amount * (1 - recovery_rate)`), accumulated period by period.
     ///
@@ -41,6 +40,8 @@ pub(super) struct SimulationState<'a> {
     /// loss; trap/early-amortization/step-down triggers key off it as a fraction
     /// of the original pool.
     pub(super) cumulative_realized_loss: f64,
+    /// Loss already reflected in the supplied current note balances; not allocated again.
+    pub(super) initial_realized_loss: f64,
     /// Cumulative net loss that exceeds the structure's total absorbable
     /// notional (every tranche fully written down). Surfaced rather than
     /// silently dropped by the loss-allocation `min(...)` cap, so the
@@ -73,6 +74,10 @@ pub(super) struct SimulationState<'a> {
     /// balances flat) and released as a bullet at the accumulation end. See
     /// `ControlledAccumulationSpec`.
     pub(super) principal_funding_account: Money,
+    /// Interest retained by the waterfall, available to later interest tiers.
+    pub(super) undistributed_interest: Money,
+    /// Principal retained by the waterfall, available for later capital payments.
+    pub(super) undistributed_principal: Money,
     /// SC-M13: additive shift applied to FLOATING rate projections this period,
     /// so OAS-simulated coupons follow the same rate path as the discounting.
     /// Zero for every non-OAS run, making this exact identity there.
@@ -178,6 +183,7 @@ impl StateTemplate {
                         tranche_id: t.id.to_string(),
                         cashflows: Vec::new(),
                         detailed_flows: Vec::new(),
+                        accrual_periods: Vec::new(),
                         interest_flows: Vec::new(),
                         principal_flows: Vec::new(),
                         pik_flows: Vec::new(),
@@ -241,29 +247,7 @@ impl StateTemplate {
                 .cmp(&tranches.tranches[a].payment_priority)
         });
 
-        // Balance-weighted average collateral age (WALA) at closing. The
-        // `acquisition_date` carried by each pool asset (the origination /
-        // issue date for assets built from bonds) is the closest available
-        // proxy for loan origination; assets without one contribute zero age.
-        let mut weighted_age = 0.0_f64;
-        let mut total_weight = 0.0_f64;
-        for asset in &pool.assets {
-            let weight = asset.balance.amount().max(0.0);
-            if weight <= 0.0 {
-                continue;
-            }
-            total_weight += weight;
-            if let Some(acq_date) = asset.acquisition_date {
-                if closing_date > acq_date {
-                    weighted_age += f64::from(acq_date.months_until(closing_date)) * weight;
-                }
-            }
-        }
-        let pool_wala_months = if total_weight > 0.0 {
-            (weighted_age / total_weight).round() as u32
-        } else {
-            0
-        };
+        let pool_wala_months = pool.weighted_average_seasoning(closing_date, closing_date);
 
         Ok(Self {
             results,
@@ -296,15 +280,32 @@ impl<'a> SimulationState<'a> {
         state_date: Date,
         recovery_lag_months: u32,
     ) -> Self {
-        let initial_reinvestment_active = pool
-            .reinvestment_period
-            .as_ref()
-            .is_some_and(|period| closing_date <= period.end_date);
-
+        let mut recovery_queue = RecoveryQueue::new();
+        for asset in &pool.assets {
+            if let (true, Some(date), Some(amount)) = (
+                asset.is_defaulted,
+                asset.default_date,
+                asset.recovery_amount,
+            ) {
+                recovery_queue.add_recovery(date, amount);
+            }
+        }
+        let initial_realized_loss =
+            (pool.cumulative_defaults.amount().max(
+                template.total_pool_balance.amount() - template.performing_pool_balance.amount(),
+            ) - pool.cumulative_recoveries.amount()
+                - pool
+                    .assets
+                    .iter()
+                    .filter(|asset| asset.is_defaulted)
+                    .filter_map(|asset| asset.recovery_amount)
+                    .map(|amount| amount.amount())
+                    .sum::<f64>())
+            .max(0.0);
         Self {
             pool_state: template.pool_state.clone(),
-            pool_outstanding: template.total_pool_balance,
-            recovery_queue: RecoveryQueue::new(),
+            pool_outstanding: template.performing_pool_balance,
+            recovery_queue,
             tranche_balances: template.tranche_balances.clone(),
             deferred_interest: template.deferred_interest.clone(),
             results: template.results.clone(),
@@ -316,16 +317,19 @@ impl<'a> SimulationState<'a> {
             closing_date,
             pool_balance_cleanup_threshold: template.pool_balance_cleanup_threshold,
             tranche_recipient_keys: template.tranche_recipient_keys.clone(),
-            was_reinvestment_active: initial_reinvestment_active,
-            cumulative_realized_loss: 0.0,
+            tranche_triggers: super::triggers::initial_states(tranches),
+            cumulative_realized_loss: initial_realized_loss,
+            initial_realized_loss,
             cumulative_loss_unallocated: 0.0,
             total_pool_balance: template.total_pool_balance,
             performing_pool_balance: template.performing_pool_balance,
             loss_alloc_order: template.loss_alloc_order.clone(),
             pool_wala_months: template.pool_wala_months,
             reserve_balance: pool.reserve_account,
-            spread_account: Money::from((0_i64, template.base_currency)),
+            spread_account: pool.excess_spread_account,
             principal_funding_account: Money::from((0_i64, template.base_currency)),
+            undistributed_interest: Money::from((0_i64, template.base_currency)),
+            undistributed_principal: pool.collection_account,
             floating_rate_shift: 0.0,
         }
     }

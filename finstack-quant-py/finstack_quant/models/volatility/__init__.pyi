@@ -285,7 +285,7 @@ class SabrModel:
 
     def implied_vol(self, forward: float, strike: float, t: float) -> float:
         """
-        Black-style implied volatility under the Hagan-2002 expansion.
+        Normal or Black implied volatility under the Hagan-2002 expansion.
 
         Parameters
         ----------
@@ -299,7 +299,8 @@ class SabrModel:
         Returns
         -------
         float
-            Implied volatility as a decimal.
+            Normal decimal rate per square-root year when beta is below 1e-4;
+            otherwise dimensionless annual Black volatility.
 
         Raises
         ------
@@ -329,12 +330,13 @@ class SabrModel:
 
     def supports_negative_rates(self) -> bool:
         """
-        Return ``True`` when the model has a positive shift.
+        Return ``True`` for beta approximately zero or a positive shift.
 
         Returns
         -------
         bool
-            ``True`` if the shift is non-zero, enabling negative-rate smiles.
+            ``True`` if beta is below 1e-4 (normal dynamics) or a positive
+            displacement enables negative-rate smiles.
 
         Notes
         -----
@@ -390,11 +392,13 @@ class SabrSmile:
         Returns
         -------
         float
-            ATM implied vol as a decimal.
+            Normal decimal rate per square-root year when beta is below 1e-4;
+            otherwise dimensionless annual Black volatility.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If expiry or forward/model coordinates are invalid.
         """
         ...
 
@@ -596,12 +600,14 @@ class SabrCalibrator:
 
     def with_tolerance(self, tolerance: float) -> SabrCalibrator:
         """
-        Return a copy with an overridden convergence tolerance.
+        Return a copy with an overridden maximum relative quote error.
 
         Parameters
         ----------
         tolerance : float
-            Relative RMSE target for the fit.
+            Positive finite maximum relative error of any final volatility quote;
+            1e-4 permits 0.01% of each quote. Calibration raises ``ValueError``
+            for invalid settings and ``RuntimeError`` when no fit meets this budget.
 
         Returns
         -------
@@ -656,7 +662,8 @@ class SabrCalibrator:
         strikes : list[float]
             Strike grid aligned with ``market_vols``.
         market_vols : list[float]
-            Market implied vols as decimals.
+            Positive finite market vols: decimal rate per square-root year for beta=0,
+            dimensionless annual Black volatility otherwise.
         t : float
             Expiry in years.
         beta : float
@@ -670,7 +677,9 @@ class SabrCalibrator:
         Raises
         ------
         ValueError
-            If lengths mismatch or fit fails to converge.
+            If inputs or settings are invalid.
+        RuntimeError
+            If no fitted candidate satisfies the per-quote error budget.
         """
         ...
 
@@ -692,7 +701,8 @@ class SabrCalibrator:
         strikes : list[float]
             Strike grid aligned with ``market_vols``.
         market_vols : list[float]
-            Market implied vols as decimals.
+            Positive finite market vols: decimal rate per square-root year for beta=0,
+            dimensionless annual Black volatility otherwise.
         t : float
             Expiry in years.
         beta : float
@@ -706,7 +716,9 @@ class SabrCalibrator:
         Raises
         ------
         ValueError
-            If lengths mismatch or fit fails to converge.
+            If inputs or settings are invalid.
+        RuntimeError
+            If no fitted candidate satisfies the per-quote error budget.
         """
         ...
 

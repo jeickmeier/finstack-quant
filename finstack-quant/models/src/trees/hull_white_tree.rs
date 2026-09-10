@@ -724,7 +724,8 @@ impl HullWhiteTree {
         self.widths.get(step).copied().unwrap_or(0)
     }
 
-    /// Get short rate r(t,j) at node (step, node_idx).
+    /// Get the interval-average short rate used to discount to the next tree level.
+    /// This contains the discrete calibration shift, not the instantaneous affine shift.
     pub fn rate_at_node(&self, step: usize, node_idx: usize) -> f64 {
         let j_min = self.j_mins.get(step).copied().unwrap_or(0);
         let dx = self.dxs.get(step).copied().unwrap_or(0.0);
@@ -767,7 +768,11 @@ impl HullWhiteTree {
 
     /// Compute zero-coupon bond price P(t, T) at node (step, node_idx).
     ///
-    /// Uses the Hull-White analytical formula:
+    /// Uses the Hull-White analytical formula with the centered OU node state.
+    /// The instantaneous short rate is `x + f(0,t) + Cov(x(t), integral x ds)`;
+    /// the lattice interval shift returned by `rate_at_node` is not used.
+    ///
+    /// Formula:
     /// ```text
     /// P(t, T) = A(t, T) * exp(-B(t, T) * r(t))
     /// ```
@@ -796,7 +801,7 @@ impl HullWhiteTree {
             return 1.0;
         }
 
-        let r = self.rate_at_node(step, node_idx);
+        let x = (self.j_mins[step] + node_idx as i32) as f64 * self.dxs[step];
         let kappa = self.config.kappa;
 
         let b = if kappa.abs() < 1e-10 {
@@ -811,25 +816,6 @@ impl HullWhiteTree {
         if p_0_t <= 0.0 {
             return 0.0;
         }
-
-        // Forward rate at t=0 for maturity t
-        let f_0_t = if t > 0.0 {
-            discount_curve.instantaneous_forward(t).unwrap_or_else(|e| {
-                // Fall back to the average zero rate -ln P(0,t)/t. This keeps
-                // the f64 signature (bond_price is called inside f64-returning
-                // backward-induction closures) but the substitution is no
-                // longer silent.
-                tracing::warn!(
-                    time = t,
-                    error = %e,
-                    "HullWhiteTree::bond_price: instantaneous forward unavailable; \
-                     falling back to average zero rate -ln P(0,t)/t"
-                );
-                -p_0_t.ln() / t
-            })
-        } else {
-            self.alpha[0]
-        };
 
         // Variance term. A scheduled tree uses the same exact integrated
         // state variance as its affine caplet formulas; the scalar branch
@@ -849,10 +835,34 @@ impl HullWhiteTree {
         };
         let var_term = 0.5 * state_variance * b * b;
 
-        let ln_a = (p_0_tt / p_0_t).ln() + b * f_0_t - var_term;
-        let a = ln_a.exp();
-
-        a * (-b * r).exp()
+        // The lattice alpha is an interval discounting shift. The affine
+        // formula requires the instantaneous shift f(0,t) + c(t) instead.
+        // Its forward term cancels against A(t,T), leaving the centered OU
+        // state and c(t)=Cov[x(t), integral_0^t x(s) ds].
+        let shift = if let Some(schedule) = &self.volatility {
+            if kappa.abs() < 1e-10 {
+                schedule
+                    .times()
+                    .iter()
+                    .zip(schedule.values())
+                    .enumerate()
+                    .take_while(|(_, (left, _))| **left < t)
+                    .map(|(i, (&left, &sigma))| {
+                        let right = schedule.times().get(i + 1).copied().unwrap_or(t).min(t);
+                        sigma * sigma * (right - left) * (t - 0.5 * (left + right))
+                    })
+                    .sum()
+            } else {
+                match schedule.integrate_squared_exp_weight(0.5 * kappa, t, 0.0, t) {
+                    Ok(first) => (first - state_variance) / kappa,
+                    Err(_) => return f64::NAN,
+                }
+            }
+        } else {
+            let bt = crate::rates::hull_white::hw_b(kappa, 0.0, t);
+            0.5 * self.config.sigma.powi(2) * bt * bt
+        };
+        (p_0_tt / p_0_t) * (-b * (x + shift) - var_term).exp()
     }
 
     /// Compute forward swap rate S(t) at node (step, node_idx).

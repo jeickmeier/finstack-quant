@@ -14,7 +14,7 @@
 //! * **Risk Metrics**: Full implementation of CS01, Correlation Delta, and Jump-to-Default
 //!   using central-difference bumping for accurate hedge ratios.
 //! * **Numerical Stability**: Correlation clamping, monotonicity enforcement, and
-//!   robust integration using Gauss-Hermite quadrature.
+//!   adaptive integration with explicit error and factor-tail budgets.
 //! * **ISDA Compliance**: Mid-period protection timing, proper settlement lag handling,
 //!   and standard day count conventions.
 //!
@@ -32,16 +32,16 @@
 //! ### Protection Leg PV
 //! `PV_prot = Σ DF(t_i) * N_tr * [EL_fraction(t_i) - EL_fraction(t_{i-1})]`
 //!
-//! ## Integration Near Correlation Boundaries
+//! ## Adaptive Integration
 //!
-//! When correlation falls outside [0.05, 0.95] the pricer routes through
-//! `GaussHermiteQuadrature::integrate_adaptive`, which performs at most one
-//! order-promotion step and is a **no-op at the default quadrature order of
-//! 20** (the maximum tabulated order). Boundary-correlation accuracy at the
-//! default configuration therefore rests on the correlation clamp into
-//! (0.01, 0.99) plus the order-20 rule itself — not on adaptive refinement.
-//! Configuring a lower `quadrature_order` (5/7/10/15) enables the single
-//! promotion step near the boundaries.
+//! Conditioning factors use partitioned adaptive Simpson integration. Normal
+//! tails outside [-10,10] have probability below 1.524e-23. Student-t mixing
+//! tails use explicit quantile bounds. The configured absolute integration
+//! tolerance is allocated across intervals, factors and tails; exhausted
+//! refinement produces an error. Conditional convolution grid error and the
+//! large-pool normal approximation remain separate approximation boundaries.
+//! Base-correlation differences may clamp only noise inside the combined
+//! integration budget; materially negative tranche losses return an error.
 //!
 //! ## Portfolio Support
 //!
@@ -59,6 +59,7 @@ mod config;
 mod engine;
 mod expected_loss;
 mod heterogeneous;
+mod integration;
 mod registry;
 mod saddlepoint;
 mod sensitivities;

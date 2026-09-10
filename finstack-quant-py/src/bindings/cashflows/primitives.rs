@@ -394,6 +394,41 @@ impl PyCashFlow {
     fn principal_delta(&self) -> Option<PyMoney> {
         self.inner.principal_delta.map(PyMoney::from_inner)
     }
+    /// Explicit economic principal date, or None when payment date applies.
+    #[getter]
+    fn principal_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .principal_date
+            .map(|date| date_to_py(py, date))
+            .transpose()
+    }
+
+    /// Return the economic principal date, using payment date when unspecified.
+    fn get_balance_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.get_balance_date())
+    }
+
+    /// Return a copy with the supplied economic principal date.
+    ///
+    /// Parameters
+    /// ----------
+    /// date : datetime.date or str
+    ///     Balance-effective date; the cash payment date stays on the original row.
+    ///
+    /// Returns
+    /// -------
+    /// CashFlow
+    ///     New row with the supplied principal date.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the supplied date cannot be parsed.
+    fn with_principal_date(&self, date: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self::from_inner(
+            self.inner.clone().with_principal_date(py_to_date(date)?),
+        ))
+    }
     /// Return a copy carrying the supplied contractual accrual metadata.
     ///
     /// Parameters

@@ -7,7 +7,7 @@ use super::yield_price::{price_from_japanese_simple_yield, price_from_ytm, price
 use crate::constants::numerical::ZERO_TOLERANCE;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
-use crate::instruments::fixed_income::bond::Bond;
+use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::instruments::PricingOptions;
 use crate::metrics::{standard_registry, MetricContext, MetricId};
 use crate::pricer::{shared_standard_registry, ModelKey, PricingDispatch};
@@ -58,8 +58,11 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// Returns `Err` when the input quote cannot be normalized, required market
 /// data or cashflows are unavailable for that normalization, or the selected
-/// model cannot produce the base value. Metrics that do not apply to the bond
-/// are left unset in the returned quote set.
+/// model cannot produce the base value, or an applicable metric fails. Metric
+/// errors identify the metric and instrument. Discount margin is omitted for
+/// non-floating bonds. Asset-swap quotes require a fixed coupon or a custom
+/// cashflow schedule with an explicit floating specification; otherwise they
+/// are left unset.
 ///
 /// # Examples
 ///
@@ -225,17 +228,29 @@ pub fn compute_quotes(
         MetricId::MoosmullerYtm,
     ];
 
-    // Some quote metrics are not applicable to all bond types (e.g. FRN vs fixed),
-    // and we want `compute_quotes` to return whatever is available rather than
-    // failing the entire quote set.
+    let asset_swap_applicable = matches!(
+        (
+            &bond_for_metrics.custom_cashflows,
+            &bond_for_metrics.cashflow_spec
+        ),
+        (None, CashflowSpec::Fixed(_)) | (Some(_), CashflowSpec::Floating(_))
+    );
     for metric_id in &metric_ids {
-        if let Err(err) = metric_registry.compute(std::slice::from_ref(metric_id), &mut ctx) {
-            tracing::debug!(
-                metric_id = metric_id.as_str(),
-                error = %err,
-                "Bond quote engine metric computation failed; leaving unset"
-            );
+        if (*metric_id == MetricId::DiscountMargin && !bond_for_metrics.has_floating_coupons())
+            || ((*metric_id == MetricId::ASWPar || *metric_id == MetricId::ASWMarket)
+                && !asset_swap_applicable)
+        {
+            continue;
         }
+        metric_registry
+            .compute(std::slice::from_ref(metric_id), &mut ctx)
+            .map_err(|err| {
+                finstack_quant_core::Error::Validation(format!(
+                    "bond quote metric '{}' for instrument '{}' failed: {err}",
+                    metric_id.as_str(),
+                    bond.id.as_str(),
+                ))
+            })?;
     }
 
     // Read back the metrics we care about.
@@ -312,7 +327,7 @@ pub(crate) fn settlement_dirty_from_quote_overrides(
             None => price_from_oas(bond, curves, quote_ctx.quote_date, model, oas)?,
         }
     } else if let Some(dm) = quotes.quoted_discount_margin {
-        price_from_dm(bond, curves, quote_ctx.quote_date, dm)?
+        price_from_dm(bond, curves, as_of, dm)?
     } else if let Some(i_spread) = quotes.quoted_i_spread {
         let par_swap_rate = par_swap_rate_from_discount(bond, curves, quote_ctx.quote_date)?;
         let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;

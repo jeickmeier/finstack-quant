@@ -124,7 +124,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             period_end,
             t_start,
             t_end,
-            initial_level,
+            initial_level: _,
         } = *inputs;
         let disc = context.get_discount(self.trs.financing.discount_curve_id.as_str())?;
 
@@ -167,10 +167,10 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         } else {
             let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
             let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
-            let fwd_start = (initial_level - pv_discrete_dividends_to(period_start)?)
+            let fwd_start = (self.spot - pv_discrete_dividends_to(period_start)?)
                 * df_start.recip()
                 * (-carry_div_yield * t_start).exp();
-            let fwd_end = (initial_level - pv_discrete_dividends_to(period_end)?)
+            let fwd_end = (self.spot - pv_discrete_dividends_to(period_end)?)
                 * df_end.recip()
                 * (-carry_div_yield * t_end).exp();
             (fwd_start, fwd_end)
@@ -212,7 +212,17 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             ) / fwd_start)
         } else {
             let dividend_return = self.div_yield * dt * (1.0 - tax_rate);
-            Ok((fwd_end - fwd_start) / fwd_start + dividend_return)
+            let price_return = if t_start >= 0.0 {
+                // Spot cancels analytically for a fully future proportional
+                // return. Evaluate the carry ratio directly to avoid numerical
+                // spot sensitivity from dividing two projected spot levels.
+                let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
+                let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
+                df_start / df_end * (-carry_div_yield * (t_end - t_start)).exp() - 1.0
+            } else {
+                (fwd_end - fwd_start) / fwd_start
+            };
+            Ok(price_return + dividend_return)
         }
     }
 }
@@ -306,6 +316,41 @@ mod tests {
 
     fn date(y: i32, m: u8, d: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("month"), d).expect("date")
+    }
+
+    #[test]
+    fn m17_future_dividend_tax_uses_projected_live_reset() {
+        let as_of = date(2025, 1, 1);
+        let period_start = date(2025, 2, 1);
+        let period_end = date(2025, 3, 1);
+        let curve = DiscountCurve::builder("DISC")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let mut trs = EquityTotalReturnSwap::example().expect("TRS");
+        trs.financing.discount_curve_id = CurveId::new("DISC");
+        trs.discrete_dividends = vec![(date(2025, 2, 15), 5.0)];
+        trs.dividend_tax_rate = 0.3;
+        let actual = EquityReturnModel {
+            trs: &trs,
+            spot: 120.0,
+            div_yield: 0.0,
+        }
+        .period_return(
+            &super::PeriodReturnInputs {
+                as_of,
+                period_start,
+                period_end,
+                t_start: 31.0 / 365.0,
+                t_end: 59.0 / 365.0,
+                initial_level: 100.0,
+            },
+            &market,
+        )
+        .expect("return");
+        assert!((actual - (-5.0 * 0.3 / 120.0)).abs() < 1e-12, "{actual}");
     }
 
     #[test]

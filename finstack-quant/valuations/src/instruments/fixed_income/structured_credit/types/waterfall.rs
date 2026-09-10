@@ -332,8 +332,9 @@ pub struct AfcSpec {
 /// Each period the account captures residual interest (that would otherwise be
 /// distributed to equity) up to `target_balance`, and draws down to cover debt
 /// tranche interest shortfalls — providing credit enhancement from excess
-/// spread. Any balance unused at deal end is released back to equity, unless a
-/// cumulative-loss trap trigger is breached.
+/// spread. At termination it pays deferred debt coupons; a breached loss trap
+/// then applies remaining interest to debt principal before releasing the
+/// surplus to the residual holder.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -341,9 +342,10 @@ pub struct ExcessSpreadSpec {
     /// Target funded balance of the spread account (currency units).
     pub target_balance: Money,
     /// Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the
-    /// original pool) at or above which any remaining spread-account balance is
-    /// *retained* in the deal at maturity rather than released to equity. When
-    /// `None`, the unused balance is always released to equity.
+    /// original pool) at or above which terminal spread-account cash repays
+    /// debt principal after deferred coupons. Any surplus reaches the residual
+    /// holder. `None` releases surplus after deferred coupons without this
+    /// interest-to-principal transfer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trap_loss_pct: Option<f64>,
 }
@@ -509,13 +511,13 @@ pub enum AllocationMode {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 pub enum PaymentType {
-    /// Fee payment
+    /// Fee payment funded from interest collections.
     Fee,
-    /// Interest payment
+    /// Coupon payment funded from interest collections.
     Interest,
-    /// Principal payment
+    /// Capital repayment funded from principal collections.
     Principal,
-    /// Residual/equity distribution
+    /// Excess-interest distribution; does not retire equity principal.
     Residual,
 }
 
@@ -702,6 +704,10 @@ pub struct WaterfallDistribution {
     pub diverted_cash: Money,
     /// Remaining undistributed cash
     pub remaining_cash: Money,
+    /// Undistributed interest retained for subsequent interest-waterfall periods.
+    pub remaining_interest: Money,
+    /// Undistributed principal retained for reinvestment or debt repayment.
+    pub remaining_principal: Money,
     /// Whether any diversions occurred
     pub had_diversions: bool,
     /// Diversion reason if applicable
@@ -1071,6 +1077,11 @@ impl Waterfall {
             }
         }
 
+        principal_recipients.push(Recipient::new(
+            "equity_principal",
+            RecipientType::Equity,
+            PaymentCalculation::ResidualCash,
+        ));
         if !principal_recipients.is_empty() {
             let principal_tier = WaterfallTier::new("principal", priority, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential);

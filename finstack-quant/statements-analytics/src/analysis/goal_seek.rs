@@ -68,7 +68,9 @@ use std::cell::RefCell;
 ///
 /// # Returns
 ///
-/// Returns the solved driver value that achieves the target, or an error if no solution exists.
+/// Returns the solved driver value after re-evaluating its objective and
+/// requiring absolute target residual <= `1e-9 * max(1, abs(target_value))`.
+/// Bracket-width convergence alone is insufficient; failure leaves `model` unchanged.
 ///
 /// # Errors
 ///
@@ -132,6 +134,9 @@ pub fn goal_seek(
     update_model: bool,
     bounds: Option<(f64, f64)>,
 ) -> Result<f64> {
+    if !target_value.is_finite() {
+        return Err(Error::invalid_input("Goal-seek target must be finite"));
+    }
     if !model.has_node(target_node) {
         return Err(Error::invalid_input(format!(
             "Target node '{}' not found in model",
@@ -239,6 +244,7 @@ pub fn goal_seek(
                  driver_node='{driver_node}'. {e}"
             ))
         })?;
+        validate_target_residual(&objective, solution, target_value)?;
         return apply_solution(model, driver_node, driver_period, update_model, solution);
     }
 
@@ -284,7 +290,23 @@ pub fn goal_seek(
         }
     };
 
+    validate_target_residual(&objective, solution, target_value)?;
     apply_solution(model, driver_node, driver_period, update_model, solution)
+}
+
+fn validate_target_residual(
+    objective: &impl Fn(f64) -> f64,
+    solution: f64,
+    target: f64,
+) -> Result<()> {
+    let residual = objective(solution);
+    let tolerance = 1e-9 * target.abs().max(1.0);
+    if !solution.is_finite() || !residual.is_finite() || residual.abs() > tolerance {
+        return Err(Error::eval(format!(
+            "Goal-seek target residual {residual} exceeds tolerance {tolerance} at proposed driver {solution}; model unchanged"
+        )));
+    }
+    Ok(())
 }
 
 fn amount_for_node(node: &NodeSpec, value: f64) -> Result<AmountOrScalar> {

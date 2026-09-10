@@ -576,6 +576,60 @@ fn triangular_key_rate_bump_targets_bucket() {
 }
 
 #[test]
+fn discount_stress_is_independent_of_construction_policy() {
+    use finstack_quant_core::market_data::term_structures::ValidationMode;
+
+    for policy in [
+        ValidationMode::MarketStandard,
+        ValidationMode::NegativeRateFriendly {
+            forward_floor: -0.005,
+        },
+        ValidationMode::NegativeRateFriendly {
+            forward_floor: -0.01,
+        },
+        ValidationMode::Raw {
+            allow_non_monotonic: true,
+            forward_floor: None,
+        },
+        ValidationMode::Raw {
+            allow_non_monotonic: false,
+            forward_floor: None,
+        },
+    ] {
+        let curve = DiscountCurve::builder("OIS")
+            .base_date(sample_base_date())
+            .knots([(0.0, 1.0), (0.5, 0.999), (1.0, 0.998)])
+            .validation(policy)
+            .build()
+            .unwrap();
+        for result in [
+            curve.with_parallel_bump(-100.0),
+            curve.with_triangular_key_rate_bump_neighbors(None, 0.5, Some(1.0), 100.0),
+        ] {
+            let bumped = result.expect("stress permits negative forwards");
+            assert!(bumped.df(1.0) > bumped.df(0.5));
+        }
+    }
+}
+
+#[test]
+fn discount_bumps_reject_zero_discount_factors_in_raw_mode() {
+    use finstack_quant_core::market_data::term_structures::ValidationMode;
+
+    let curve = DiscountCurve::builder("RAW")
+        .base_date(sample_base_date())
+        .knots([(0.0, 1.0), (1.0, 0.99)])
+        .interp(InterpStyle::Linear)
+        .validation(ValidationMode::Raw {
+            allow_non_monotonic: true,
+            forward_floor: None,
+        })
+        .build()
+        .unwrap();
+    assert!(curve.with_parallel_bump(1e8).is_err());
+}
+
+#[test]
 fn with_parallel_bump_returns_error_on_invalid_curve() {
     let curve = DiscountCurve::builder("VALID")
         .base_date(sample_base_date())

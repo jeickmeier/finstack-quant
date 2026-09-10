@@ -281,6 +281,7 @@ fn schedule_from_projection(
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(mbs.current_face),
             meta: CashFlowMeta {
+                projected_fixings: Vec::new(),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 facility_limit: None,
@@ -304,6 +305,23 @@ fn next_month_start(date: Date) -> Result<Date> {
     let end = end_of_month(date)?;
     let next = end + Duration::days(1);
     Ok(next)
+}
+
+/// Interest purchased at settlement, from the calendar-month accrual boundary.
+pub(crate) fn settlement_accrued_interest(
+    mbs: &AgencyMbsPassthrough,
+    settlement: Date,
+) -> Result<f64> {
+    if settlement < mbs.issue_date || settlement >= mbs.maturity {
+        return Ok(0.0);
+    }
+    let start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+        .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+    Ok(mbs.current_face.amount()
+        * mbs.pass_through_rate
+        * mbs
+            .day_count
+            .year_fraction(start, settlement, DayCountContext::default())?)
 }
 
 fn previous_month_start(date: Date) -> Result<Date> {
@@ -505,10 +523,10 @@ mod tests {
         );
         assert_eq!(
             before[0].payment_date,
-            Date::from_calendar_date(2024, Month::February, 25).expect("valid date")
+            Date::from_calendar_date(2024, Month::February, 26).expect("valid date")
         );
 
-        let on_payment = Date::from_calendar_date(2024, Month::February, 25).expect("valid date");
+        let on_payment = Date::from_calendar_date(2024, Month::February, 26).expect("valid date");
         let same_day = generate_cashflows(&mbs, on_payment, Some(1)).expect("cashflows");
         assert_eq!(
             same_day[0].payment_date, on_payment,
@@ -516,7 +534,7 @@ mod tests {
         );
 
         let after_payment =
-            Date::from_calendar_date(2024, Month::February, 26).expect("valid date");
+            Date::from_calendar_date(2024, Month::February, 27).expect("valid date");
         let after = generate_cashflows(&mbs, after_payment, Some(1)).expect("cashflows");
         assert_eq!(
             after[0].period_start,

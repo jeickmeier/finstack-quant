@@ -2,6 +2,7 @@
 //!
 use std::collections::VecDeque;
 use std::num::NonZeroUsize;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::collections::{HashMap, HashSet};
@@ -140,9 +141,9 @@ fn effective_snapshot_rate(
     global
         .get(&direct)
         .copied()
+        .or_else(|| global.get(&reverse).map(|rate| 1.0 / rate))
         .or_else(|| pinned.get(&direct).copied())
         .or_else(|| pinned.get(&reverse).map(|rate| 1.0 / rate))
-        .or_else(|| global.get(&reverse).map(|rate| 1.0 / rate))
         .or_else(|| observed.get(&direct).copied())
         .or_else(|| observed.get(&reverse).map(|rate| 1.0 / rate))
 }
@@ -233,6 +234,7 @@ pub struct FxMatrix {
     /// never silently replaced by the provider under cache pressure.
     pinned_quotes: Mutex<HashMap<QueryKey, f64>>,
     config: FxConfig,
+    quote_revision: AtomicU64,
 }
 
 /// Resolve only the shocked pair through the original matrix. Other pairs
@@ -302,6 +304,7 @@ impl FxMatrix {
             observed_quotes: Mutex::new(BoundedCache::new(capacity)),
             pinned_quotes: Mutex::new(HashMap::default()),
             config,
+            quote_revision: AtomicU64::new(0),
         }
     }
 
@@ -335,6 +338,7 @@ impl FxMatrix {
             observed_quotes: Mutex::new(observed_quotes),
             pinned_quotes: Mutex::new(HashMap::default()),
             config,
+            quote_revision: AtomicU64::new(0),
         })
     }
 
@@ -384,8 +388,9 @@ impl FxMatrix {
     /// assert!(result.rate > 1.0);
     /// ```
     ///
-    /// Lookup precedence is: pair-global explicit quote, date/policy-pinned
-    /// quote, reciprocal of either, provider-observed cache, then the provider.
+    /// Lookup precedence is: pair-global explicit quote (either orientation),
+    /// date/policy-pinned quote (either orientation), provider-observed cache,
+    /// then the provider. Source priority is resolved before taking a reciprocal.
     /// If the direct provider request fails and triangulation is enabled, the
     /// matrix derives the cross through the configured pivot. The returned
     /// `triangulated` flag records whether that final fallback was used, even
@@ -414,57 +419,15 @@ impl FxMatrix {
             });
         }
 
-        // Check caches in precedence order, locking each store lazily so the common
-        // case (an explicit direct quote, e.g. a pegged pair) acquires a single lock
-        // instead of all three. Explicit quotes are pair-global, while provider-observed
-        // quotes are scoped by date/policy to avoid cross-query contamination.
-        let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
-        if let Some(rate) = direct_opt {
-            let rate = validate_fx_rate(from, to, rate)?;
-            return Ok(FxRateResult {
-                rate,
-                triangulated: false,
-            });
-        }
-
-        // Pinned fixings are authoritative and outrank the transient provider
-        // cache, reciprocal pair-global quotes, and the provider itself for
-        // their `(on, policy)`.
-        let (pinned_direct_opt, pinned_reciprocal_opt) =
-            self.read_pinned_pair_bidir(from, to, on, policy);
-        if let Some(rate) = pinned_direct_opt {
-            let rate = validate_fx_rate(from, to, rate)?;
-            return Ok(FxRateResult {
-                rate,
-                triangulated: false,
-            });
-        }
-        if let Some(r_rev) = pinned_reciprocal_opt {
-            return Ok(FxRateResult {
-                rate: reciprocal_rate_or_err(r_rev, to, from)?,
-                triangulated: false,
-            });
-        }
-        if let Some(r_rev) = reciprocal_opt {
-            return Ok(FxRateResult {
-                rate: reciprocal_rate_or_err(r_rev, to, from)?,
-                triangulated: false,
-            });
-        }
-
-        if let Some(q) = self.read_observed(from, to, on, policy)? {
-            let rate = validate_fx_rate(from, to, q.rate)?;
-            return Ok(FxRateResult {
-                rate,
-                triangulated: q.triangulated,
-            });
+        if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
+            return Ok(cached);
         }
 
         // The provider remains direction-sensitive; only cache storage is canonical.
         match self.provider.rate(from, to, on, policy) {
             Ok(rate) => {
                 let rate = validate_fx_rate(from, to, rate)?;
-                let rate = self.insert_observed_quote(from, to, on, policy, rate, false)?;
+                let rate = self.insert_observed_quote(from, to, on, policy, rate, None)?;
                 Ok(FxRateResult {
                     rate,
                     triangulated: false,
@@ -629,6 +592,8 @@ impl FxMatrix {
         for &(from, to, rate) in quotes {
             map.insert(Pair(from, to), rate);
         }
+        drop(map);
+        self.invalidate_observed_quotes();
         Ok(())
     }
 
@@ -651,8 +616,8 @@ impl FxMatrix {
     /// ```
     pub fn clear_cache(&self) {
         lock(&self.quotes).clear();
-        lock(&self.observed_quotes).clear();
         lock(&self.pinned_quotes).clear();
+        self.invalidate_observed_quotes();
     }
 
     /// Return cached quote count for quick diagnostics.
@@ -702,25 +667,18 @@ impl FxMatrix {
     /// assert!(state.quotes.is_empty());
     /// ```
     pub fn get_serializable_state(&self) -> FxMatrixState {
-        let mut seen = HashSet::default();
         let mut quote_vec: Vec<(Currency, Currency, f64)> = Vec::new();
 
         // Explicit pair-global quotes take precedence.
         {
             let quotes = lock(&self.quotes);
             for (pair, rate) in quotes.iter() {
-                seen.insert((pair.0, pair.1));
                 quote_vec.push((pair.0, pair.1, *rate));
             }
         }
 
-        // Merge quotes from the underlying provider that were not already
-        // present in the LRU cache (e.g. SimpleFxProvider's own store).
-        for (from, to, rate) in self.provider.snapshot_quotes() {
-            if seen.insert((from, to)) {
-                quote_vec.push((from, to, rate));
-            }
-        }
+        // Provider snapshots retain their lower authority after restoration.
+        let mut provider_quotes = self.provider.snapshot_quotes();
 
         // Pinned (date/policy-scoped) fixings are authoritative state and must
         // survive a snapshot/restore round-trip (        // persistence previously dropped pinned fixings).
@@ -740,10 +698,12 @@ impl FxMatrix {
 
         // Deterministic snapshots: sort by pair key, not by LRU order.
         quote_vec.sort_by_key(|quote| (quote.0, quote.1));
+        provider_quotes.sort_by_key(|quote| (quote.0, quote.1));
         pinned_vec.sort_by_key(|q| (q.0, q.1, q.2, q.3 as u8));
         FxMatrixState {
             config: self.config,
             quotes: quote_vec,
+            provider_quotes,
             pinned_quotes: pinned_vec,
         }
     }
@@ -768,6 +728,7 @@ impl FxMatrix {
     /// let state = FxMatrixState {
     ///     config: matrix.get_serializable_state().config,
     ///     quotes: vec![],
+    ///     provider_quotes: vec![],
     ///     pinned_quotes: vec![],
     /// };
     /// matrix.load_from_state(&state).expect("valid snapshot state");
@@ -777,6 +738,9 @@ impl FxMatrix {
     /// fixings. The state configuration is informational here: construct the
     /// matrix with [`try_with_config`](Self::try_with_config) using
     /// `state.config` when restoring cache capacity and triangulation policy.
+    /// The existing provider is retained. `state.provider_quotes` is used by
+    /// `MarketContext` snapshot restoration to construct a quote-only provider;
+    /// this method loads only the explicit global and pinned quote stores.
     ///
     /// # Errors
     ///
@@ -992,6 +956,7 @@ impl FxMatrix {
     ) -> crate::Result<f64> {
         use crate::error::InputError;
 
+        let revision = self.quote_revision.load(Ordering::Acquire);
         let pivot = self.config.pivot_currency;
 
         // Try to get first leg: from -> pivot
@@ -1020,7 +985,7 @@ impl FxMatrix {
         let rate = validate_fx_rate(from, to, rate)?;
         // Cache the derived rate together with its triangulated provenance so
         // repeat queries stamp the same metadata and value as the first lookup.
-        self.insert_observed_quote(from, to, on, policy, rate, true)
+        self.insert_observed_quote(from, to, on, policy, rate, Some(revision))
     }
 
     /// Insert an explicit provider quote
@@ -1031,8 +996,14 @@ impl FxMatrix {
             checked.is_ok(),
             "FxMatrix internal quote must be finite, positive (got {from}->{to}={rate})"
         );
-        let mut quotes = lock(&self.quotes);
-        quotes.insert(Pair(from, to), rate);
+        lock(&self.quotes).insert(Pair(from, to), rate);
+        self.invalidate_observed_quotes();
+    }
+
+    fn invalidate_observed_quotes(&self) {
+        let mut quotes = lock(&self.observed_quotes);
+        self.quote_revision.fetch_add(1, Ordering::AcqRel);
+        quotes.clear();
     }
 
     /// Insert a provider-observed quote in the pair's canonical orientation.
@@ -1050,7 +1021,7 @@ impl FxMatrix {
         on: Date,
         policy: FxConversionPolicy,
         rate: f64,
-        triangulated: bool,
+        triangulated_at: Option<u64>,
     ) -> crate::Result<f64> {
         let rate = validate_fx_rate(from, to, rate)?;
         let (base, quote, inverted) = canonical_orientation(from, to);
@@ -1062,18 +1033,23 @@ impl FxMatrix {
             (rate, rate)
         };
 
-        lock(&self.observed_quotes).put(
-            QueryKey {
-                from: base,
-                to: quote,
-                on,
-                policy,
-            },
-            ObservedQuote {
-                rate: stored,
-                triangulated,
-            },
-        );
+        let mut quotes = lock(&self.observed_quotes);
+        if triangulated_at
+            .is_none_or(|revision| revision == self.quote_revision.load(Ordering::Acquire))
+        {
+            quotes.put(
+                QueryKey {
+                    from: base,
+                    to: quote,
+                    on,
+                    policy,
+                },
+                ObservedQuote {
+                    rate: stored,
+                    triangulated: triangulated_at.is_some(),
+                },
+            );
+        }
         Ok(served)
     }
 
@@ -1096,6 +1072,7 @@ impl FxMatrix {
             },
             rate,
         );
+        self.invalidate_observed_quotes();
     }
 
     /// Read pinned `(direct, reciprocal)` quotes for a pair on `(on, policy)`.
@@ -1146,36 +1123,69 @@ impl FxMatrix {
         if from == to {
             return Ok(1.0);
         }
-        // Lock each store lazily in precedence order: the common explicit-direct-quote
-        // case acquires a single lock instead of all three. Each helper reads direct
-        // and reciprocal under one lock and drops it before returning.
-        // 1) Explicit direct pair-global quote wins
-        let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
-        if let Some(r) = direct_opt {
-            return validate_fx_rate(from, to, r);
+        if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
+            return Ok(cached.rate);
         }
-        // 2) Pinned fixings outrank reciprocal pair-global quotes, the
-        // transient observed cache, and the provider.
-        let (pinned_direct_opt, pinned_reciprocal_opt) =
-            self.read_pinned_pair_bidir(from, to, on, policy);
-        if let Some(r) = pinned_direct_opt {
-            return validate_fx_rate(from, to, r);
-        }
-        if let Some(r_rev) = pinned_reciprocal_opt {
-            return reciprocal_rate_or_err(r_rev, to, from);
-        }
-        // 3) Reciprocal pair-global quote
-        if let Some(r_rev) = reciprocal_opt {
-            return reciprocal_rate_or_err(r_rev, to, from);
-        }
-        // 4) Provider-observed cache
-        if let Some(q) = self.read_observed(from, to, on, policy)? {
-            return validate_fx_rate(from, to, q.rate);
-        }
-        // 5) Fetch from the provider
+        // Fetch from the provider
         let r = self.provider.rate(from, to, on, policy)?;
         let r = validate_fx_rate(from, to, r)?;
-        self.insert_observed_quote(from, to, on, policy, r, false)
+        self.insert_observed_quote(from, to, on, policy, r, None)
+    }
+
+    /// Resolve cache source priority before pair orientation for every lookup path.
+    fn read_cached_rate(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+    ) -> crate::Result<Option<FxRateResult>> {
+        // Check caches in precedence order, locking each store lazily so the common
+        // case (an explicit direct quote, e.g. a pegged pair) acquires a single lock
+        // instead of all three. Explicit quotes are pair-global, while provider-observed
+        // quotes are scoped by date/policy to avoid cross-query contamination.
+        let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
+        if let Some(rate) = direct_opt {
+            let rate = validate_fx_rate(from, to, rate)?;
+            return Ok(Some(FxRateResult {
+                rate,
+                triangulated: false,
+            }));
+        }
+
+        if let Some(r_rev) = reciprocal_opt {
+            return Ok(Some(FxRateResult {
+                rate: reciprocal_rate_or_err(r_rev, to, from)?,
+                triangulated: false,
+            }));
+        }
+
+        // Pinned fixings outrank provider observations for their `(on, policy)`.
+        let (pinned_direct_opt, pinned_reciprocal_opt) =
+            self.read_pinned_pair_bidir(from, to, on, policy);
+        if let Some(rate) = pinned_direct_opt {
+            let rate = validate_fx_rate(from, to, rate)?;
+            return Ok(Some(FxRateResult {
+                rate,
+                triangulated: false,
+            }));
+        }
+        if let Some(r_rev) = pinned_reciprocal_opt {
+            return Ok(Some(FxRateResult {
+                rate: reciprocal_rate_or_err(r_rev, to, from)?,
+                triangulated: false,
+            }));
+        }
+
+        if let Some(q) = self.read_observed(from, to, on, policy)? {
+            let rate = validate_fx_rate(from, to, q.rate)?;
+            return Ok(Some(FxRateResult {
+                rate,
+                triangulated: q.triangulated,
+            }));
+        }
+
+        Ok(None)
     }
 
     /// Read direct and reciprocal cached quotes for a pair under a single lock.

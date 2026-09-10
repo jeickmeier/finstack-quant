@@ -145,16 +145,7 @@ fn register_rates_instrument_metrics(
         crate::instruments::rates::cms_swap::metrics::register_cms_swap_metrics,
         crate::instruments::rates::cms_spread_option::metrics::register_cms_spread_option_metrics,
     );
-    if let Ok(default_hw) =
-        finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams::new(
-            crate::instruments::rates::swaption::metrics::bermudan_greeks::DEFAULT_KAPPA,
-            crate::instruments::rates::swaption::metrics::bermudan_greeks::DEFAULT_SIGMA,
-        )
-    {
-        crate::instruments::rates::swaption::metrics::register_bermudan_swaption_metrics(
-            registry, default_hw,
-        )?;
-    }
+    crate::instruments::rates::swaption::metrics::register_bermudan_swaption_metrics(registry)?;
     Ok(())
 }
 

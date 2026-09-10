@@ -208,7 +208,7 @@ impl YtmSolver {
                     coupon_period: super::quote_conversions::icma_reference_period(
                         spec.day_count,
                         spec.frequency,
-                        cashflows,
+                        cashflows.iter().map(|(d, _)| *d),
                         as_of,
                     ),
                     ..Default::default()
@@ -329,7 +329,7 @@ impl YtmSolver {
                 coupon_period: super::quote_conversions::icma_reference_period(
                     spec.day_count,
                     spec.frequency,
-                    cashflows,
+                    cashflows.iter().map(|(d, _)| *d),
                     as_of,
                 ),
                 ..Default::default()

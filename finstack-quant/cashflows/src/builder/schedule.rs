@@ -81,6 +81,7 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
         .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
         .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
         .then_with(|| a.reset_date.cmp(&b.reset_date))
+        .then_with(|| a.principal_date.cmp(&b.principal_date))
         .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
         .then_with(|| match (a.rate, b.rate) {
             (None, None) => std::cmp::Ordering::Equal,
@@ -157,8 +158,10 @@ pub(crate) fn finalize_flows(
     floating: &[FloatSchedule],
     issue_date: Option<Date>,
     maturity_date: Option<Date>,
+    mut projected_fixings: Vec<crate::fixings::ProjectedFixing>,
 ) -> (Vec<CashFlow>, CashFlowMeta, DayCount) {
     sort_flows(&mut flows);
+    crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
     let mut cals: Vec<String> = fixed
         .iter()
@@ -172,6 +175,7 @@ pub(crate) fn finalize_flows(
     cals.sort_unstable();
     cals.dedup();
     let meta = CashFlowMeta {
+        projected_fixings,
         calendar_ids: cals,
         facility_limit: None,
         issue_date,
@@ -228,6 +232,10 @@ impl CashflowRepresentation {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CashFlowMeta {
+    /// Raw index observations used by projected floating coupons, before spread,
+    /// gearing, caps and floors; retained for deterministic time-roll fixings.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projected_fixings: Vec<crate::fixings::ProjectedFixing>,
     /// Meaning of the schedule relative to waterfall policy.
     #[serde(default)]
     pub representation: CashflowRepresentation,
@@ -533,10 +541,10 @@ impl CashFlowSchedule {
             let replay = self.replay_balances(anchor)?;
             let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
             for (position, (index, _, balance)) in replay.iter().enumerate() {
-                let date = self.flows[*index].date;
+                let date = self.flows[*index].get_balance_date();
                 let date_finished = replay
                     .get(position + 1)
-                    .is_none_or(|(next, _, _)| self.flows[*next].date != date);
+                    .is_none_or(|(next, _, _)| self.flows[*next].get_balance_date() != date);
                 if date_finished && initial.amount() >= 0.0 && balance.amount() < -epsilon {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "principal repayments exceed outstanding on {date}: {}",
@@ -740,7 +748,7 @@ impl CashFlowSchedule {
         let replay = self.replay_balances(issue)?;
         let mut result = Vec::with_capacity(replay.len());
         for (idx, _, after) in replay {
-            let date = self.flows[idx].date;
+            let date = self.flows[idx].get_balance_date();
             if let Some((last_date, last_balance)) = result.last_mut() {
                 if *last_date == date {
                     *last_balance = after;
@@ -760,13 +768,13 @@ impl CashFlowSchedule {
             return Ok(Vec::new());
         }
         let mut order: Vec<usize> = (0..self.flows.len()).collect();
-        let already_ordered = self
-            .flows
-            .windows(2)
-            .all(|w| compare_flows(&w[0], &w[1]) != std::cmp::Ordering::Greater);
-        if !already_ordered {
-            order.sort_by(|left, right| compare_flows(&self.flows[*left], &self.flows[*right]));
-        }
+        order.sort_by(|left, right| {
+            let left = &self.flows[*left];
+            let right = &self.flows[*right];
+            left.get_balance_date()
+                .cmp(&right.get_balance_date())
+                .then_with(|| compare_flows(left, right))
+        });
         let mut outstanding = self.notional.initial;
         let mut initial_funding_skipped = false;
         let initial_amount = self.notional.initial.amount();
@@ -916,6 +924,7 @@ where
 {
     let mut flows = Vec::new();
     let mut calendar_ids = Vec::new();
+    let mut projected_fixings = Vec::new();
     let mut facility_limit: Option<Option<Money>> = None;
     let mut issue_date: Option<Option<Date>> = None;
     let mut maturity_date: Option<Option<Date>> = None;
@@ -930,6 +939,7 @@ where
         let schedule_meta = schedule.meta;
         flows.extend(schedule_flows);
         calendar_ids.extend(schedule_meta.calendar_ids);
+        projected_fixings.extend(schedule_meta.projected_fixings);
         merge_matching_option(&mut facility_limit, schedule_meta.facility_limit);
         merge_matching_option(&mut issue_date, schedule_meta.issue_date);
         merge_matching_option(&mut maturity_date, schedule_meta.maturity_date);
@@ -937,12 +947,14 @@ where
 
     calendar_ids.sort_unstable();
     calendar_ids.dedup();
+    crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
     CashFlowSchedule::from_parts(
         flows,
         notional,
         day_count,
         CashFlowMeta {
+            projected_fixings,
             representation: representation.unwrap_or_default(),
             calendar_ids,
             facility_limit: facility_limit.unwrap_or(None),
@@ -1463,6 +1475,7 @@ mod tests {
             Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
+                projected_fixings: Vec::new(),
                 representation: CashflowRepresentation::Projected,
                 calendar_ids: vec!["nyc".to_string()],
                 facility_limit: None,
@@ -1485,6 +1498,7 @@ mod tests {
             Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {
+                projected_fixings: Vec::new(),
                 representation: CashflowRepresentation::Projected,
                 calendar_ids: vec!["lon".to_string(), "nyc".to_string()],
                 facility_limit: None,

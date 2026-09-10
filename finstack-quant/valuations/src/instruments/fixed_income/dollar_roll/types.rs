@@ -130,8 +130,10 @@ pub struct DollarRoll {
     pub discount_curve_id: CurveId,
     /// Optional repo/financing curve identifier (carry-only).
     ///
-    /// Used exclusively for implied financing rate and roll specialness
-    /// calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
+    /// Forward curve used by roll specialness to calculate the simple
+    /// financing rate over the front/back settlement interval on ACT/360.
+    /// The implied financing rate itself is determined by prices and carry.
+    /// See the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
     /// module). Does **not** affect
     /// the mark-to-market PV, which always discounts both legs at
     /// `discount_curve_id`.
@@ -349,8 +351,15 @@ impl DollarRoll {
         Ok(days)
     }
 
-    fn trade_cash_amount(&self, price: f64) -> f64 {
-        self.notional.amount() * price / 100.0
+    fn trade_cash_amount(&self, price: f64, settlement: Date) -> finstack_quant_core::Result<f64> {
+        let start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+            .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+        let accrual = finstack_quant_core::dates::DayCount::Thirty360.year_fraction(
+            start,
+            settlement,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        Ok(self.notional.amount() * (price / 100.0 + self.coupon * accrual))
     }
 }
 
@@ -408,11 +417,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
             vec![
                 (
                     front_date,
-                    Money::new(self.trade_cash_amount(self.front_price), ccy)?,
+                    Money::new(self.trade_cash_amount(self.front_price, front_date)?, ccy)?,
                 ),
                 (
                     back_date,
-                    Money::new(-self.trade_cash_amount(self.back_price), ccy)?,
+                    Money::new(-self.trade_cash_amount(self.back_price, back_date)?, ccy)?,
                 ),
             ],
             CFKind::Notional,
@@ -551,5 +560,30 @@ mod tests {
             flows[1].1.amount() < 0.0,
             "back purchase should be a payment"
         );
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use finstack_quant_cashflows::CashflowScheduleSource;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use time::macros::date;
+
+    #[test]
+    fn settlement_cashflows_include_purchased_accrued_interest() {
+        let mut roll = DollarRoll::example().expect("roll");
+        roll.front_settlement_date = Some(date!(2026 - 03 - 11));
+        roll.back_settlement_date = Some(date!(2026 - 04 - 13));
+        let schedule = roll
+            .raw_cashflow_schedule(&MarketContext::new(), date!(2026 - 03 - 01))
+            .expect("schedule");
+        let flows = schedule.get_flows();
+        let expected_front =
+            roll.notional.amount() * (roll.front_price / 100.0 + roll.coupon * 10.0 / 360.0);
+        let expected_back =
+            -roll.notional.amount() * (roll.back_price / 100.0 + roll.coupon * 12.0 / 360.0);
+        assert!((flows[0].amount.amount() - expected_front).abs() < 1e-8);
+        assert!((flows[1].amount.amount() - expected_back).abs() < 1e-8);
     }
 }

@@ -26,16 +26,6 @@ def _instrument_json(instrument: dict[str, object]) -> str:
     return json.dumps({"schema": "finstack_quant.instrument/1", "instrument": instrument})
 
 
-def _credit_enhancement() -> dict[str, object]:
-    return {
-        "subordination": _money("0"),
-        "overcollateralization": _money("0"),
-        "reserve_account": _money("0"),
-        "excess_spread": 0.0,
-        "cash_trap_active": False,
-    }
-
-
 def _tranche(
     tranche_id: str,
     attachment: float,
@@ -58,7 +48,6 @@ def _tranche(
         "coupon": {"fixed": {"rate": rate}},
         "oc_trigger": None,
         "ic_trigger": None,
-        "credit_enhancement": _credit_enhancement(),
         "frequency": {"count": 3, "unit": "months"},
         "day_count": "act_360",
         "deferred_interest": _money("0"),
@@ -66,7 +55,6 @@ def _tranche(
         "is_revolving": False,
         "can_reinvest": False,
         "maturity": "2026-01-01",
-        "expected_maturity": None,
         "payment_priority": priority,
         "attributes": {},
     }
@@ -121,7 +109,6 @@ def _structured_credit_json() -> str:
         },
         "closing_date": "2024-01-01",
         "first_payment_date": "2025-02-01",
-        "reinvestment_end_date": None,
         "maturity": "2026-01-01",
         "frequency": {"count": 1, "unit": "months"},
         "payment_calendar_id": "nyse",
@@ -135,20 +122,8 @@ def _structured_credit_json() -> str:
         "stochastic_default_spec": {"model": "deterministic", "cdr": 0.0, "curve": None},
         "market_conditions": {
             "refi_rate": 0.04,
-            "original_rate": None,
-            "hpa": None,
-            "unemployment": None,
-            "seasonal_factor": 1.0,
-            "custom_factors": {},
         },
-        "credit_factors": {
-            "credit_score": None,
-            "dti": None,
-            "ltv": None,
-            "delinquency_days": 0,
-            "unemployment_rate": None,
-            "custom_factors": {},
-        },
+        "credit_factors": {},
     }
     return _instrument_json({"type": "structured_credit", "spec": spec})
 

@@ -50,7 +50,7 @@ impl MetricCalculator for OasCalculator {
                 })
             })?;
 
-        let accrued = calculate_accrued_interest(bond, as_of)?;
+        let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
         // `quoted_clean` is percentage-of-par (e.g. 99.5 = 99.5% of face).
         // `accrued` and the model price are both notional-scaled currency amounts.
         // Scale the percentage quote to notional so the solver objective compares
@@ -121,22 +121,45 @@ impl MetricCalculator for OasCalculator {
             }
         };
 
+        let curve = base_market.get_discount(curve_to_bump.as_str())?;
+        let mut forward_floor = curve.min_forward_rate().unwrap_or(f64::NEG_INFINITY);
+        if !curve.allows_non_monotonic() {
+            forward_floor = forward_floor.max(0.0);
+        }
+        let lower_spread = curve.knots().windows(2).zip(curve.dfs().windows(2)).fold(
+            -0.10_f64,
+            |lower, (times, dfs)| {
+                let forward = -(dfs[1] / dfs[0]).ln() / (times[1] - times[0]);
+                lower.max(forward_floor - forward)
+            },
+        );
+        let lower_spread = (lower_spread + 1e-12).min(0.0);
         let solver = BrentSolver::new()
             .tolerance(1e-8)
             .max_iterations(100)
-            .bracket_bounds(-0.10, 0.50); // -1000bp to +5000bp in decimal
+            .bracket_bounds(lower_spread, 0.50); // Curve-policy floor to +5000bp in decimal
 
         match solver.solve(objective, 0.0) {
             Ok(oas) => Ok(oas),
-            Err(solver_err) => {
+            Err(mut solver_err) => {
                 if let Some(inner) = captured_err.take() {
-                    Err(finstack_quant_core::Error::Validation(format!(
+                    return Err(finstack_quant_core::Error::Validation(format!(
                         "Convertible OAS solver failed because pricing failed inside the \
                          objective: {inner}"
-                    )))
-                } else {
-                    Err(solver_err)
+                    )));
                 }
+                if let finstack_quant_core::Error::Input(
+                    finstack_quant_core::InputError::SolverConvergenceFailed { reason, .. },
+                ) = &mut solver_err
+                {
+                    *reason = format!(
+                        "Convertible OAS on curve '{curve_to_bump}' failed within decimal spread bounds \
+                         [{lower_spread:.6e}, {upper_spread:.6e}]; curve policy imposes an effective \
+                         forward floor of {forward_floor:.6e} (decimal): {reason}",
+                        upper_spread = solver.bracket_max,
+                    );
+                }
+                Err(solver_err)
             }
         }
     }
@@ -273,6 +296,169 @@ mod tests {
             "OAS should be in (-10%, +50%) range; got {oas}"
         );
         assert!(oas.is_finite(), "OAS must be finite; got {oas}");
+        let bond: &ConvertibleBond = ctx.instrument_as().unwrap();
+        let bumped = super::bump_discount_curve_parallel(
+            ctx.curves.as_ref(),
+            &bond.discount_curve_id,
+            oas * 10_000.0,
+        )
+        .unwrap();
+        let repriced = super::price_convertible_bond(
+            bond,
+            &bumped,
+            super::ConvertibleTreeType::default(),
+            as_of,
+        )
+        .unwrap();
+        assert!((repriced.amount() - notional * quoted_clean_pct / 100.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn oas_search_respects_negative_rate_friendly_floor() {
+        use finstack_quant_core::market_data::term_structures::ValidationMode;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .validation(ValidationMode::NegativeRateFriendly {
+                forward_floor: -0.005,
+            })
+            .build()
+            .unwrap();
+        let market = make_market(as_of).insert(curve);
+        for expected_spread in [-0.01, 0.05] {
+            let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
+            let bumped = super::bump_discount_curve_parallel(
+                &market,
+                &bond.discount_curve_id,
+                expected_spread * 10_000.0,
+            )
+            .unwrap();
+            let target = super::price_convertible_bond(
+                &bond,
+                &bumped,
+                super::ConvertibleTreeType::default(),
+                as_of,
+            )
+            .unwrap();
+            bond.instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price = Some(target.amount() / bond.notional.amount() * 100.0);
+            let base_value = bond.value(&market, as_of).unwrap();
+            let mut ctx = MetricContext::new(
+                Arc::new(bond),
+                Arc::new(market.clone()),
+                as_of,
+                base_value,
+                Arc::new(FinstackConfig::default()),
+            );
+            let solved = super::OasCalculator.calculate(&mut ctx).unwrap();
+            assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
+        }
+    }
+
+    #[test]
+    fn oas_floor_curve_reports_search_constraints_and_accepts_boundary_root() {
+        use finstack_quant_core::market_data::term_structures::ValidationMode;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        for (end_df, policy) in [
+            (1.0, ValidationMode::MarketStandard),
+            (
+                1.05,
+                ValidationMode::NegativeRateFriendly {
+                    forward_floor: -1.05_f64.ln() / 10.0,
+                },
+            ),
+        ] {
+            for separate_credit in [false, true] {
+                let curve_id = if separate_credit { "CREDIT" } else { "USD-OIS" };
+                let curve_builder = || {
+                    DiscountCurve::builder(curve_id)
+                        .base_date(as_of)
+                        .knots([(0.0, 1.0), (10.0, end_df)])
+                        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                };
+                let unrestricted = curve_builder()
+                    .validation(ValidationMode::Raw {
+                        allow_non_monotonic: true,
+                        forward_floor: None,
+                    })
+                    .build()
+                    .unwrap();
+                let market =
+                    make_market(as_of).insert(curve_builder().validation(policy).build().unwrap());
+                let unrestricted_market = market.clone().insert(unrestricted);
+                for expected_spread in [-0.01, 0.0, 0.05] {
+                    let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
+                    if separate_credit {
+                        bond.credit_curve_id = Some(curve_id.into());
+                        bond.recovery_rate = Some(0.4);
+                    }
+                    let bumped = super::bump_discount_curve_parallel(
+                        &unrestricted_market,
+                        &curve_id.into(),
+                        expected_spread * 10_000.0,
+                    )
+                    .unwrap();
+                    let target = super::price_convertible_bond(
+                        &bond,
+                        &bumped,
+                        super::ConvertibleTreeType::default(),
+                        as_of,
+                    )
+                    .unwrap();
+                    bond.instrument_pricing_overrides
+                        .market_quotes
+                        .quoted_clean_price =
+                        Some(target.amount() / bond.notional.amount() * 100.0);
+                    let base_value = bond.value(&market, as_of).unwrap();
+                    let mut ctx = MetricContext::new(
+                        Arc::new(bond),
+                        Arc::new(market.clone()),
+                        as_of,
+                        base_value,
+                        Arc::new(FinstackConfig::default()),
+                    );
+                    let result = super::OasCalculator.calculate(&mut ctx);
+                    if expected_spread < 0.0 {
+                        let error = result.unwrap_err();
+                        assert!(matches!(
+                            error,
+                            finstack_quant_core::Error::Input(
+                                finstack_quant_core::InputError::SolverConvergenceFailed { .. }
+                            )
+                        ));
+                        let message = error.to_string();
+                        for detail in [
+                            "Convertible OAS",
+                            curve_id,
+                            "decimal spread bounds",
+                            "forward floor",
+                            "no sign change",
+                        ] {
+                            assert!(message.contains(detail), "{message}");
+                        }
+                        let mut unrestricted_ctx = MetricContext::new(
+                            Arc::clone(&ctx.instrument),
+                            Arc::new(unrestricted_market.clone()),
+                            as_of,
+                            base_value,
+                            Arc::new(FinstackConfig::default()),
+                        );
+                        let solved = super::OasCalculator
+                            .calculate(&mut unrestricted_ctx)
+                            .unwrap();
+                        assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
+                    } else {
+                        let solved = result.unwrap();
+                        assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
+                    }
+                }
+            }
+        }
     }
 
     /// Regression test for the Cell-based error capture pattern.

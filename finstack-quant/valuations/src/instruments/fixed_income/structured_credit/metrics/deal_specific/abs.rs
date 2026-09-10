@@ -20,28 +20,40 @@ impl crate::metrics::MetricCalculator for AbsChargeOffCalculator {
     }
 }
 
-/// ABS Credit Enhancement Level calculator
+/// Current senior credit enhancement as a percent of collateral value.
+/// Performing par, outstanding recovery claims and funded cash accounts support
+/// the current senior note balance; future excess-spread income is not capital.
 pub struct AbsCreditEnhancementCalculator;
 
 impl crate::metrics::MetricCalculator for AbsCreditEnhancementCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let abs = context.instrument_as::<StructuredCredit>()?;
-
-        // Credit Enhancement = Subordination + OC + Excess Spread
-        // Simplified: subordination for most senior tranche
-        if let Some(senior_tranche) = abs.tranches.tranches.first() {
-            let subordination = abs
-                .tranches
-                .subordination_amount(senior_tranche.id.as_str());
-            let pool_balance = abs.pool.total_balance()?;
-
-            if pool_balance.amount() > 0.0 {
-                Ok(subordination.amount() / pool_balance.amount() * DECIMAL_TO_PERCENT)
-            } else {
-                Ok(0.0)
+        let abs = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
+        let pool = &abs.pool;
+        let mut collateral = pool
+            .performing_balance()?
+            .checked_add(pool.collection_account)?
+            .checked_add(pool.reserve_account)?
+            .checked_add(pool.excess_spread_account)?;
+        for asset in &pool.assets {
+            if asset.is_defaulted {
+                if let Some(recovery) = asset.recovery_amount {
+                    collateral = collateral.checked_add(recovery)?;
+                }
             }
-        } else {
-            Ok(0.0)
+        }
+        let senior = abs
+            .tranches
+            .tranches
+            .iter()
+            .min_by_key(|tranche| tranche.payment_priority);
+        match senior {
+            Some(tranche) if collateral.amount() > 0.0 => Ok((collateral.amount()
+                - tranche.current_balance.amount())
+                / collateral.amount()
+                * DECIMAL_TO_PERCENT),
+            _ => Ok(0.0),
         }
     }
 }

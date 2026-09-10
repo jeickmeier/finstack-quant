@@ -196,7 +196,7 @@ fn quantlib_parity_at_the_money() {
     let bond =
         create_quantlib_convertible("CB_ATM", base, maturity, notional, 0.05, conversion_ratio);
 
-    let parity = calculate_parity(&bond, spot);
+    let parity = calculate_parity(&bond, spot).expect("parity");
 
     // QuantLib expectation: Parity = (100 * 10) / 1000 = 1.0 (100%)
     let quantlib_parity = 1.0;
@@ -224,7 +224,7 @@ fn quantlib_parity_in_the_money() {
     let bond =
         create_quantlib_convertible("CB_ITM", base, maturity, notional, 0.05, conversion_ratio);
 
-    let parity = calculate_parity(&bond, spot);
+    let parity = calculate_parity(&bond, spot).expect("parity");
 
     // QuantLib expectation: Parity = (150 * 10) / 1000 = 1.5 (150%)
     let quantlib_parity = 1.5;
@@ -252,7 +252,7 @@ fn quantlib_parity_out_of_the_money() {
     let bond =
         create_quantlib_convertible("CB_OTM", base, maturity, notional, 0.05, conversion_ratio);
 
-    let parity = calculate_parity(&bond, spot);
+    let parity = calculate_parity(&bond, spot).expect("parity");
 
     // QuantLib expectation: Parity = (50 * 10) / 1000 = 0.5 (50%)
     let quantlib_parity = 0.5;
@@ -575,10 +575,9 @@ fn quantlib_parity_puttable_convertible() {
         price_pct_of_par: 98.0, // Puttable at 98% of par
         make_whole: None,
     });
-    puttable_bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+    // Compare the put right with every other input identical, including the
+    // market volatility; an instrument override would change both the option
+    // set and the equity volatility.
     puttable_bond.call_put = Some(schedule);
 
     // Use OTM scenario where put is valuable

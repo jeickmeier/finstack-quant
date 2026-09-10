@@ -12,8 +12,9 @@ use finstack_quant_core::{
     Error, Result,
 };
 
+use super::conventions::VolatilityConvention;
 use super::fx::get_fx_delta_vol;
-use super::sabr::SabrParameters;
+use super::sabr::{SabrModel, SabrParameters, SabrVolType};
 
 /// Concrete computational view over the core volatility artifacts.
 #[derive(Clone, Debug)]
@@ -27,6 +28,46 @@ pub enum VolSource {
 }
 
 impl VolSource {
+    /// Resolve the source's quoting convention and interpolated displacement.
+    ///
+    /// Surface metadata determines normal versus Black quotes. Cubes select
+    /// normal for beta zero and otherwise preserve the interpolated SABR shift.
+    /// FX delta sources contain unshifted Black quotes. Coordinates are clamped
+    /// to the source grid exactly as in clamped volatility evaluation.
+    ///
+    /// # Arguments
+    ///
+    /// * `expiry` - Finite option expiry in years, clamped to stored pillars.
+    /// * `tenor` - Finite underlying tenor in years, clamped to cube pillars.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when either coordinate is non-finite.
+    pub fn get_convention(&self, expiry: f64, tenor: f64) -> Result<VolatilityConvention> {
+        if !expiry.is_finite() || !tenor.is_finite() {
+            return Err(Error::Validation(
+                "volatility coordinates must be finite".to_owned(),
+            ));
+        }
+        Ok(match self {
+            Self::Surface(surface) => match surface.quote_type() {
+                VolQuoteType::Normal => VolatilityConvention::Normal,
+                VolQuoteType::BlackLognormal => VolatilityConvention::Lognormal,
+            },
+            Self::Cube(cube) => {
+                let (params, _, _) = cube_params(cube, expiry, tenor);
+                if SabrModel::new(params.clone()).vol_type() == SabrVolType::Normal {
+                    VolatilityConvention::Normal
+                } else if let Some(shift) = params.shift {
+                    VolatilityConvention::ShiftedLognormal { shift }
+                } else {
+                    VolatilityConvention::Lognormal
+                }
+            }
+            Self::FxDelta(_) => VolatilityConvention::Lognormal,
+        })
+    }
+
     /// Evaluate Black/lognormal volatility.
     ///
     /// For an FX-delta source, `tenor` carries the positive FX forward because
@@ -47,13 +88,21 @@ impl VolSource {
     pub fn get_vol(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
         match self {
             Self::Surface(surface) => {
+                surface.require_quote_type(VolQuoteType::BlackLognormal)?;
                 let secondary = match surface.secondary_axis() {
                     VolSurfaceAxis::Strike => strike,
                     VolSurfaceAxis::Tenor => tenor,
                 };
                 get_surface_vol(surface, expiry, secondary)
             }
-            Self::Cube(cube) => get_cube_vol(cube, expiry, tenor, strike),
+            Self::Cube(cube) => {
+                if self.get_convention(expiry, tenor)? == VolatilityConvention::Normal {
+                    return Err(Error::Validation(
+                        "normal SABR cube cannot supply a Black volatility quote".into(),
+                    ));
+                }
+                get_cube_vol(cube, expiry, tenor, strike)
+            }
             Self::FxDelta(surface) => get_fx_delta_vol(surface, expiry, strike, tenor),
         }
     }
@@ -65,20 +114,14 @@ impl VolSource {
     /// * `expiry` - Option expiry in years; finite values are clamped.
     /// * `tenor` - Underlying tenor, or FX forward for an FX-delta source.
     /// * `strike` - Strike in source units; finite grid coordinates are clamped.
-    pub fn get_vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
-        match self {
-            Self::Surface(surface) => {
-                let secondary = match surface.secondary_axis() {
-                    VolSurfaceAxis::Strike => strike,
-                    VolSurfaceAxis::Tenor => tenor,
-                };
-                get_surface_vol_clamped(surface, expiry, secondary)
-            }
-            Self::Cube(cube) => get_cube_vol_clamped(cube, expiry, tenor, strike),
-            Self::FxDelta(surface) => {
-                get_fx_delta_vol(surface, expiry, strike, tenor).unwrap_or(f64::NAN)
-            }
-        }
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for incompatible quote metadata, non-finite coordinates,
+    /// or an invalid SABR/FX evaluation.
+    pub fn get_vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
+        let (expiry, tenor, strike) = self.clamped_coordinates(expiry, tenor, strike)?;
+        self.get_vol(expiry, tenor, strike)
     }
 
     /// Evaluate normal/Bachelier volatility.
@@ -117,18 +160,38 @@ impl VolSource {
     /// * `expiry` - Option expiry in years; finite values are clamped.
     /// * `tenor` - Underlying tenor in years.
     /// * `strike` - Strike in the same units as the source forward.
-    pub fn get_normal_vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
-        match self {
-            Self::Surface(surface) if surface.quote_type() == VolQuoteType::Normal => {
-                let secondary = match surface.secondary_axis() {
-                    VolSurfaceAxis::Strike => strike,
-                    VolSurfaceAxis::Tenor => tenor,
-                };
-                get_surface_vol_clamped(surface, expiry, secondary)
-            }
-            Self::Cube(cube) => get_cube_normal_vol_clamped(cube, expiry, tenor, strike),
-            Self::Surface(_) | Self::FxDelta(_) => f64::NAN,
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-normal surface, FX source, non-finite inputs,
+    /// or a failed normal SABR expansion.
+    pub fn get_normal_vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
+        let (expiry, tenor, strike) = self.clamped_coordinates(expiry, tenor, strike)?;
+        self.get_normal_vol(expiry, tenor, strike)
+    }
+
+    fn clamped_coordinates(&self, expiry: f64, tenor: f64, strike: f64) -> Result<(f64, f64, f64)> {
+        if !expiry.is_finite() || !tenor.is_finite() || !strike.is_finite() {
+            return Err(Error::Validation(
+                "volatility coordinates must be finite".to_owned(),
+            ));
         }
+        let clamp = |axis: &[f64], x: f64| x.clamp(axis[0], axis[axis.len() - 1]);
+        Ok(match self {
+            Self::Surface(surface) => {
+                let expiry = clamp(surface.expiries(), expiry);
+                match surface.secondary_axis() {
+                    VolSurfaceAxis::Strike => (expiry, tenor, clamp(surface.strikes(), strike)),
+                    VolSurfaceAxis::Tenor => (expiry, clamp(surface.strikes(), tenor), strike),
+                }
+            }
+            Self::Cube(cube) => (
+                clamp(cube.expiries(), expiry),
+                clamp(cube.tenors(), tenor),
+                strike,
+            ),
+            Self::FxDelta(_) => (expiry, tenor, strike),
+        })
     }
 
     /// Return the core artifact identifier.
@@ -469,7 +532,7 @@ pub fn get_cube_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, strike: f64
     } else {
         cube_vol(cube, expiry, tenor, strike, false)
     };
-    result.unwrap_or(f64::NAN).max(0.001)
+    result.unwrap_or(f64::NAN)
 }
 
 /// Evaluate checked normal SABR cube volatility.
@@ -515,7 +578,9 @@ pub fn get_cube_normal_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, stri
     let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
     let (params, forward, _) = cube_params(cube, expiry, tenor);
     let shift = params.shift.unwrap_or(0.0);
-    if params.beta > 0.0 && (forward + shift <= 0.0 || strike + shift <= 0.0) {
+    if SabrModel::new(params.clone()).vol_type() != SabrVolType::Normal
+        && (forward + shift <= 0.0 || strike + shift <= 0.0)
+    {
         return f64::NAN;
     }
     let result = if cube.interpolation_mode() == VolInterpolationMode::TotalVariance {
@@ -523,9 +588,7 @@ pub fn get_cube_normal_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, stri
     } else {
         params.implied_vol_normal(forward, strike, expiry)
     };
-    result
-        .unwrap_or(f64::NAN)
-        .max(1e-8 * forward.abs().max(1.0))
+    result.unwrap_or(f64::NAN)
 }
 
 /// Materialize a lognormal cube tenor slice as a core surface artifact.

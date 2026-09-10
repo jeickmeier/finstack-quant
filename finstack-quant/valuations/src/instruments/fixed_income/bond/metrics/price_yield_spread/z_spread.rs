@@ -180,16 +180,10 @@ impl ZSpreadCalculator {
         if as_of >= bond.maturity {
             return Ok(self.config.base_bracket_bp / 10_000.0);
         }
-        let day_count = bond.cashflow_spec.day_count();
+        // Bracket sizing is a numerical heuristic, independent of coupon accrual.
+        let day_count = finstack_quant_core::dates::DayCount::Act365F;
         let years = day_count
-            .year_fraction(
-                as_of,
-                bond.maturity,
-                DayCountContext {
-                    frequency: Some(bond.cashflow_spec.frequency()),
-                    ..Default::default()
-                },
-            )?
+            .year_fraction(as_of, bond.maturity, DayCountContext::default())?
             .max(0.0);
 
         // Scale between 1x and 2x base over 0–30y, then clamp.
@@ -292,6 +286,9 @@ impl BondZSpreadPricingKernel {
                         *date,
                         DayCountContext {
                             frequency: Some(bond.cashflow_spec.frequency()),
+                            coupon_period: crate::instruments::fixed_income::bond::pricing::quote_conversions::icma_reference_period(
+                                day_count, bond.cashflow_spec.frequency(), spread_flows.iter().map(|(d, _)| *d), quote_date,
+                            ),
                             ..DayCountContext::default()
                         },
                     )?;

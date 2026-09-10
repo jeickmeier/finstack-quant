@@ -23,6 +23,7 @@
           "unit": "months"
         },
         "spread_bp": "60",
+        "standard_imm_dates": true,
         "start": "2024-03-20",
         "stub": "short_front"
       },

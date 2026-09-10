@@ -39,7 +39,7 @@ pub struct SwaptionSchedule {
     pub payment_times: Vec<f64>,
     /// Positive fixed-leg accrual factors aligned with `payment_times`.
     pub accruals: Vec<f64>,
-    /// Underlying swap accrual-end time on the discount-curve time axis.
+    /// Underlying swap accrual-end time in ACT/365F model years from valuation date.
     pub maturity_time: f64,
 }
 
@@ -150,8 +150,12 @@ impl CapFloorQuote {
 }
 
 /// Configuration for cap/floor HW1F calibration.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct CapFloorCalibrationConfig {
+    /// Required positive maximum implied-quote error in quoted volatility units.
+    /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+    /// This acceptance budget is independent of the numerical solver tolerance.
+    pub fit_tolerance: f64,
     /// Payment frequency used to decompose full caps/floors into caplets.
     pub frequency: SwapFrequency,
     /// Optional source mean reversion. Required when calibrating from a

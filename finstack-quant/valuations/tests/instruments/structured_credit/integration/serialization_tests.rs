@@ -11,8 +11,8 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageTrigger, DealType, DefaultAssumptions, DefaultModelSpec, Overrides,
-    PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria, ReinvestmentPeriod,
+    AssetPool, CoverageTrigger, DealType, DefaultModelSpec, Overrides, PoolAsset,
+    PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria, ReinvestmentPeriod,
     StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     TriggerConsequence,
 };
@@ -273,7 +273,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
             min_yield: 0.04,
             maintain_credit_quality: true,
             maintain_wal: false,
-            apply_eligibility_criteria: true,
         },
     });
     pool.collection_account = Money::new(250_000.0, Currency::USD).expect("valid money fixture");
@@ -283,11 +282,9 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         "REP1",
         Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
         0.055,
-        Some(180.0),
-        Some("SOFR-1M".to_string()),
         Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        12,
         DayCount::Act360,
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetType::FirstLienLoan { industry: None },
     )
     .with_cpr(0.08)
     .with_cdr(0.03)
@@ -312,7 +309,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         TriggerConsequence::DivertCashFlow,
     ))
     .revolving();
-    equity.expected_maturity = Some(Date::from_calendar_date(2030, Month::January, 1).unwrap());
     equity.rating = Some(CreditRating::BB);
     equity.attributes = Attributes::new()
         .with_tag("equity")
@@ -358,7 +354,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         StructuredCredit::new_clo("FULL-CLO", pool, tranches, closing, legal, "USD-SOFR-DISC");
 
     deal.first_payment_date = first_payment;
-    deal.reinvestment_end_date = Some(reinvestment_end);
     deal.frequency = Tenor::monthly();
     deal.attributes = Attributes::new()
         .with_tag("full")
@@ -371,23 +366,12 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     deal.market_conditions =
         finstack_quant_valuations::instruments::fixed_income::structured_credit::MarketConditions {
             refi_rate: 0.035,
-            original_rate: Some(0.05),
-            hpa: Some(0.02),
-            unemployment: Some(0.05),
-            seasonal_factor: Some(0.98),
-            custom_factors: vec![("stress".to_string(), 1.2)].into_iter().collect(),
         };
 
     deal.credit_factors =
         finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditFactors {
-            credit_score: Some(720),
-            dti: Some(0.32),
-            ltv: Some(0.85),
-            delinquency_days: 15,
-            unemployment_rate: Some(0.04),
             annual_noi: None,
             annual_debt_service: None,
-            custom_factors: vec![("fico_band".to_string(), 700.0)].into_iter().collect(),
         };
 
     deal.deal_metadata =
@@ -408,18 +392,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         recovery_rate: Some(0.42),
         recovery_lag_months: Some(9),
         reinvestment_price: Some(101.0),
-    };
-
-    deal.default_assumptions = DefaultAssumptions {
-        base_cdr_annual: 0.03,
-        base_recovery_rate: 0.45,
-        base_cpr_annual: 0.09,
-        psa_speed: Some(110.0),
-        sda_speed: Some(1.2),
-        abs_speed_monthly: Some(0.011),
-        cpr_by_asset_type: vec![("abs_auto".to_string(), 0.20)].into_iter().collect(),
-        cdr_by_asset_type: vec![("abs_auto".to_string(), 0.03)].into_iter().collect(),
-        recovery_by_asset_type: vec![("abs_auto".to_string(), 0.50)].into_iter().collect(),
     };
 
     deal.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
@@ -457,7 +429,6 @@ fn test_structured_credit_full_feature_json_roundtrip() {
     assert_eq!(original.deal_type, parsed.deal_type);
     assert_eq!(original.frequency, parsed.frequency);
     assert_eq!(original.first_payment_date, parsed.first_payment_date);
-    assert_eq!(original.reinvestment_end_date, parsed.reinvestment_end_date);
 
     // AssetPool with overrides, reinvestment, rep lines, and accounts
     assert_eq!(original.pool.assets.len(), parsed.pool.assets.len());
@@ -533,28 +504,8 @@ fn test_structured_credit_full_feature_json_roundtrip() {
         original.market_conditions.refi_rate,
         parsed.market_conditions.refi_rate
     );
-    assert_eq!(
-        original.market_conditions.original_rate,
-        parsed.market_conditions.original_rate
-    );
-    assert_eq!(
-        original.credit_factors.credit_score,
-        parsed.credit_factors.credit_score
-    );
-    assert_eq!(original.credit_factors.dti, parsed.credit_factors.dti);
 
-    // Default assumptions and tags
-    assert_eq!(
-        original.default_assumptions.abs_speed_monthly,
-        parsed.default_assumptions.abs_speed_monthly
-    );
-    assert_eq!(
-        original
-            .default_assumptions
-            .cpr_by_asset_type
-            .get("abs_auto"),
-        parsed.default_assumptions.cpr_by_asset_type.get("abs_auto")
-    );
+    // Instrument tags
     assert_eq!(original.attributes.tags, parsed.attributes.tags);
     assert_eq!(original.attributes.meta, parsed.attributes.meta);
 
@@ -751,18 +702,16 @@ fn typo_in_pool_asset_field_is_rejected() {
 #[test]
 fn unknown_pool_asset_field_is_rejected() {
     let mut v = full_example_value();
-    v["instrument"]["spec"]["pool"]["assets"][0]["recovery_rate"] = serde_json::json!(0.4);
-    assert_rejected(&v, "recovery_rate", "PoolAsset");
+    v["instrument"]["spec"]["pool"]["assets"][0]["undefined_macro_factor"] = serde_json::json!(0.4);
+    assert_rejected(&v, "undefined_macro_factor", "PoolAsset");
 }
 
-/// A misspelled per-asset-type recovery map must be rejected, not silently
-/// collapsed to the flat `base_recovery_rate`.
+/// Removed runtime defaults must fail instead of shadowing canonical models.
 #[test]
-fn typo_in_default_assumptions_field_is_rejected() {
+fn removed_runtime_default_assumptions_are_rejected() {
     let mut v = full_example_value();
-    let da = &mut v["instrument"]["spec"]["default_assumptions"];
-    da["recovery_by_asset_typ"] = serde_json::json!({});
-    assert_rejected(&v, "recovery_by_asset_typ", "DefaultAssumptions");
+    v["instrument"]["spec"]["default_assumptions"] = serde_json::json!({});
+    assert_rejected(&v, "default_assumptions", "StructuredCredit");
 }
 
 /// Strictness must reach nested collections, not just the top two levels.

@@ -27,9 +27,7 @@ use crate::market_data::{
         InflationCurve, ParametricCurve, PriceCurve,
     },
 };
-use crate::money::fx::{
-    reciprocal_rate_or_err, FxConversionPolicy, FxMatrix, FxMatrixState, FxProvider,
-};
+use crate::money::fx::{FxMatrix, FxMatrixState, SimpleFxProvider};
 
 // Serde: CurveState and (De)Serialize impls
 
@@ -409,12 +407,11 @@ fn escape_json_pointer(segment: &str) -> String {
 /// restoring an FX matrix from a persisted [`FxMatrixState`]. Exposed publicly so
 /// that the v3 calibration envelope (which carries FX spots as a flat list of
 /// [`crate::market_data::context::MarketContextState::fx`]-style quotes) can
-/// materialize the same quote-only snapshot provider without duplicating the
-/// internal `SnapshotFxProvider` plumbing.
+/// materialize an explicit quote matrix without duplicating FX storage.
 ///
-/// Each quote is units of `to` per one unit of `from`. The provider contains
-/// only the supplied direct quotes and its reciprocal lookup; it carries no
-/// live-feed, historical, or policy-date behavior. The resulting matrix uses
+/// Each quote is units of `to` per one unit of `from`. The matrix contains
+/// only the supplied explicit quotes and their reciprocal lookup; it carries
+/// no live-feed, historical, or policy-date behavior. The resulting matrix uses
 /// `config` for cache, policy, and triangulation settings, while its initial
 /// global quotes come from `quotes`.
 ///
@@ -434,60 +431,9 @@ pub fn build_snapshot_fx_matrix(
     config: crate::money::fx::FxConfig,
     quotes: Vec<(crate::currency::Currency, crate::currency::Currency, f64)>,
 ) -> crate::Result<Arc<FxMatrix>> {
-    let state = FxMatrixState {
-        config,
-        quotes,
-        pinned_quotes: Vec::new(),
-    };
-    let provider: Arc<dyn FxProvider> = Arc::new(SnapshotFxProvider::from_state(&state));
-    let matrix = FxMatrix::try_with_config(provider, state.config)?;
-    matrix.load_from_state(&state)?;
+    let matrix = FxMatrix::try_with_config(Arc::new(SimpleFxProvider::new()), config)?;
+    matrix.set_quotes(&quotes)?;
     Ok(Arc::new(matrix))
-}
-
-/// Quote-only FX provider used when restoring persisted market snapshots.
-///
-/// Snapshot restore is intentionally limited to the explicit quotes captured in
-/// [`FxMatrixState`]. This avoids pretending that an arbitrary live provider can
-/// be reconstructed from serialized cache state alone.
-#[derive(Default)]
-struct SnapshotFxProvider {
-    quotes: std::collections::BTreeMap<(crate::currency::Currency, crate::currency::Currency), f64>,
-}
-
-impl SnapshotFxProvider {
-    fn from_state(state: &FxMatrixState) -> Self {
-        let quotes = state
-            .quotes
-            .iter()
-            .map(|(from, to, rate)| ((*from, *to), *rate))
-            .collect();
-        Self { quotes }
-    }
-}
-
-impl FxProvider for SnapshotFxProvider {
-    fn rate(
-        &self,
-        from: crate::currency::Currency,
-        to: crate::currency::Currency,
-        _on: crate::dates::Date,
-        _policy: FxConversionPolicy,
-    ) -> crate::Result<f64> {
-        if from == to {
-            return Ok(1.0);
-        }
-        if let Some(rate) = self.quotes.get(&(from, to)).copied() {
-            return Ok(rate);
-        }
-        if let Some(rate) = self.quotes.get(&(to, from)).copied() {
-            return reciprocal_rate_or_err(rate, to, from);
-        }
-        Err(crate::error::InputError::NotFound {
-            id: format!("FX snapshot:{from}->{to}"),
-        }
-        .into())
-    }
 }
 
 impl From<&MarketContext> for MarketContextState {
@@ -638,14 +584,15 @@ fn restore_market_context(
     }
 
     // Persisted state does not encode the original live FX provider, only the
-    // captured explicit quotes.
+    // captured global, pinned, and provider quotes.
     if let Some(fx_state) = state.fx {
         tracing::info!(
             explicit_quote_count = fx_state.quotes.len(),
             "restoring MarketContext FX as quote-only snapshot"
         );
-        let provider: Arc<dyn FxProvider> = Arc::new(SnapshotFxProvider::from_state(&fx_state));
-        let matrix = FxMatrix::try_with_config(Arc::clone(&provider), fx_state.config)?;
+        let provider = SimpleFxProvider::new();
+        provider.set_quotes(&fx_state.provider_quotes)?;
+        let matrix = FxMatrix::try_with_config(Arc::new(provider), fx_state.config)?;
         matrix.load_from_state(&fx_state)?;
         ctx.fx = Some(Arc::new(matrix));
     }

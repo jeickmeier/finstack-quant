@@ -127,7 +127,7 @@ pub(crate) const DEFAULT_INDEXATION_LAG_MONTHS: u32 = 3;
 pub struct InflationCurve {
     id: CurveId,
     base_cpi: f64,
-    /// Base (valuation) date of the curve.
+    /// Reference observation date represented by the zero-time CPI level.
     base_date: Date,
     /// Day-count basis for time conversions.
     day_count: DayCount,
@@ -431,7 +431,7 @@ impl InflationCurve {
         super::common::year_fraction_to(self.base_date, date, self.day_count)
     }
 
-    /// Base (valuation) date of the curve.
+    /// Reference observation date represented by the zero-time CPI level.
     #[inline]
     pub fn base_date(&self) -> Date {
         self.base_date

@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn discount_bump_preserves_forward_controls() {
+    fn discount_bump_preserves_numerical_controls_and_relaxes_rate_policy() {
         let curve = DiscountCurve::builder("DISC")
             .base_date(test_date())
             .day_count(DayCount::Act365F)
@@ -427,14 +427,8 @@ mod tests {
         let bumped_curve = storage.discount().expect("discount curve");
         let bumped_json = json(bumped_curve.as_ref());
         assert_eq!(bumped_curve.interp_style(), InterpStyle::Linear);
-        assert_eq!(
-            bumped_json["allow_non_monotonic"],
-            original["allow_non_monotonic"]
-        );
-        assert_eq!(
-            bumped_json["min_forward_rate"],
-            original["min_forward_rate"]
-        );
+        assert_eq!(bumped_json["allow_non_monotonic"], true);
+        assert!(bumped_json["min_forward_rate"].is_null());
         assert_eq!(
             bumped_json["min_forward_tenor"],
             original["min_forward_tenor"]

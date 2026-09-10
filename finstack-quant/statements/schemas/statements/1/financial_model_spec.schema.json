@@ -969,10 +969,10 @@
               "type": "null"
             }
           ],
-          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(price_pct_of_par, PV of remaining cashflows at reference_rate + spread)`\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
+          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(clean_floor, PV of remaining cashflows - accrued) + accrued`\n\nHere `clean_floor` is notional times `price_pct_of_par / 100`; the\nreference PV discounts remaining cashflows at the reference curve plus\nspread, and accrued interest is paid exactly once.\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
         },
         "price_pct_of_par": {
-          "description": "Redemption price as percentage of par amount.",
+          "description": "Clean redemption price as percentage of par amount (100 means par).\nAccrued coupon interest at exercise is added to determine the cash payment.",
           "format": "double",
           "type": "number"
         },
@@ -1149,7 +1149,7 @@
         "vol_type": {
           "$ref": "#/$defs/CapFloorVolType",
           "default": "auto",
-          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): treat the surface as a lognormal quote; Black-76\n  when forward and strike are positive, otherwise convert to an\n  equivalent normal vol and price with Bachelier. A normal-vol\n  surface must set `vol_type = Normal`.\n- `Lognormal`: Standard Black model, requires positive rates/strikes\n- `Normal`: Bachelier model, handles negative rates"
+          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): follow source convention and displacement metadata.\n- `Lognormal`: Black model, with the source displacement if present;\n  shifted forward and strike must both be positive.\n- `Normal`: Bachelier model using normal quotes in decimal rate units;\n  handles negative rates. Incompatible source conventions return errors."
         }
       },
       "required": [
@@ -1276,6 +1276,17 @@
         "kind": {
           "$ref": "#/$defs/CFKind",
           "description": "Category/kind of cash-flow."
+        },
+        "principal_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
         },
         "principal_delta": {
           "anyOf": [
@@ -1421,6 +1432,13 @@
             }
           ],
           "description": "Contractual maturity date, distinct from an adjusted final payment date."
+        },
+        "projected_fixings": {
+          "description": "Raw index observations used by projected floating coupons, before spread,\ngearing, caps and floors; retained for deterministic time-roll fixings.",
+          "items": {
+            "$ref": "#/$defs/ProjectedFixing"
+          },
+          "type": "array"
         },
         "representation": {
           "$ref": "#/$defs/CashflowRepresentation",
@@ -3143,6 +3161,11 @@
       "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
       "oneOf": [
         {
+          "const": "one_one",
+          "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+          "type": "string"
+        },
+        {
           "const": "act_360",
           "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
           "type": "string"
@@ -4441,7 +4464,7 @@
         },
         "threshold": {
           "$ref": "#/$defs/Money",
-          "description": "IM threshold (aggregate group level).\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
         }
       },
       "required": [
@@ -5400,14 +5423,6 @@
           "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
           "type": [
             "string",
-            "null"
-          ]
-        },
-        "quoted_price_pct": {
-          "description": "Externally-quoted price as a percentage of original balance (100.0 = par).\n\nStructured-credit spread metrics require this external target to avoid\nthe circular objective `PV(curve + z) == PV(curve)`. They return an error\nwhen it is absent.",
-          "format": "double",
-          "type": [
-            "number",
             "null"
           ]
         },
@@ -6532,6 +6547,33 @@
       "exclusiveMinimum": 0.0,
       "format": "double",
       "type": "number"
+    },
+    "ProjectedFixing": {
+      "additionalProperties": false,
+      "description": "One raw index observation needed by a projected floating coupon.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual index observation date, after fixing-calendar adjustments."
+        },
+        "series_id": {
+          "description": "Canonical market-series identifier, including the `FIXING:` prefix.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, or quote currency per base\ncurrency for an FX fixing series. The series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "series_id",
+        "date"
+      ],
+      "type": "object"
     },
     "ProtectionWindow": {
       "description": "When the return-floor protection window applies.\n\nThe window defines the interval over which the issuer can trigger a\nfloor-protected early redemption. Outside this window the floor is\ninactive (the bond behaves as uncallable or follows its normal call\nschedule). The floor binds only on early issuer-called redemptions; it\nnever applies at maturity.",

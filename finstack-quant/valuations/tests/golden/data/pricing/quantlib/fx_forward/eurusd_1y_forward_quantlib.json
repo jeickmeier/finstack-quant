@@ -5,7 +5,6 @@
     "npv": 21350.157569875475
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -28,7 +27,8 @@
         "quote_currency": "USD"
       },
       "type": "fx_forward"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {
@@ -89,6 +89,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_quotes": [],
         "quotes": [
           [
             "EUR",

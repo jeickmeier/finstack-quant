@@ -457,7 +457,15 @@ impl VarianceSwap {
         (elapsed / total).clamp(0.0, 1.0)
     }
 
-    /// Calculate realized fraction based on observation counts (sampling-based weight).
+    /// Fraction of contractual variance samples observed by valuation date.
+    ///
+    /// Close-to-close and Yang-Zhang exclude the initial anchoring level;
+    /// other OHLC estimators count each observed bar. Uses the observation
+    /// schedule, including its calendar adjustments, rather than elapsed days.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; scheduled observations on this date are included. Dates before inception return zero and dates at or after the final observation return one.
     pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
         pricer::realized_fraction_by_observations(self, as_of)
     }

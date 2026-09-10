@@ -181,6 +181,12 @@ use crate::dates::Tenor;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum DayCount {
+    /// One unit per contractual accrual period, irrespective of its length.
+    /// Inflation fixed legs compound across annual periods using this convention.
+    /// Empty intervals return zero and reversed intervals are rejected, as for
+    /// all day counts in this API.
+    #[serde(rename = "one_one")]
+    OneOne,
     /// Actual/360 day count convention.
     ///
     /// Year fraction = (actual days between dates) / 360
@@ -752,6 +758,7 @@ impl DayCount {
         let days = (end - start).whole_days() as f64;
 
         match self {
+            DayCount::OneOne => Ok(1.0),
             DayCount::Act360 => Ok(days / 360.0),
             DayCount::Act365F => Ok(days / 365.0),
             DayCount::Act365L => Ok(year_fraction_act_365l(start, end, ctx)),
@@ -855,6 +862,7 @@ impl DayCount {
     /// Canonical snake_case names accepted by [`FromStr`](std::str::FromStr),
     /// in declaration order.
     pub const NAMES: &'static [&'static str] = &[
+        "one_one",
         "act_360",
         "act_365f",
         "act_365l",
@@ -913,6 +921,7 @@ impl DayCount {
         }
         let normalized = normalized.trim_end_matches('_');
         let canonical = match normalized {
+            "1_1" => "one_one",
             "act_act_icma" | "act_act_isma" => "act_act_isma",
             "act_act_isda" | "act_act" | "actual_actual" => "act_act",
             "act_365" | "act_365_fixed" | "act_365f" | "actual_365" => "act_365f",
@@ -930,6 +939,7 @@ impl DayCount {
 impl std::fmt::Display for DayCount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let label = match self {
+            DayCount::OneOne => "one_one",
             DayCount::Act360 => "act_360",
             DayCount::Act365F => "act_365f",
             DayCount::Act365L => "act_365l",
@@ -952,6 +962,7 @@ impl std::str::FromStr for DayCount {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "one_one" => Ok(Self::OneOne),
             "act_360" => Ok(Self::Act360),
             "act_365f" => Ok(Self::Act365F),
             "act_365l" => Ok(Self::Act365L),
@@ -979,6 +990,7 @@ mod parse_tests {
     #[test]
     fn lenient_parse_accepts_term_sheet_spellings() {
         let cases = [
+            ("1/1", DayCount::OneOne),
             ("ACT/360", DayCount::Act360),
             ("act_360", DayCount::Act360),
             ("Act/365", DayCount::Act365F),

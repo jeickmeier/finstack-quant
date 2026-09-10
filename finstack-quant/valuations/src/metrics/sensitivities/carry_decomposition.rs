@@ -152,7 +152,7 @@ fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) ->
             crate::instruments::fixed_income::bond::pricing::quote_conversions::icma_reference_period(
                 day_count,
                 frequency,
-                flows,
+                flows.iter().map(|(d, _)| *d),
                 context.as_of,
             )
         }),

@@ -218,6 +218,12 @@ fn require_discount_id(discount_id: Option<&CurveId>) -> finstack_quant_core::Re
     })
 }
 
+pub(super) fn get_hazard_discount_curve_id(
+    hazard: &HazardCurve,
+) -> finstack_quant_core::Result<CurveId> {
+    Ok(recipe_inputs(hazard)?.0.discount_curve_id)
+}
+
 fn recipe_inputs(
     hazard: &HazardCurve,
 ) -> finstack_quant_core::Result<(

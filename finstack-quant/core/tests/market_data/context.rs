@@ -1332,6 +1332,56 @@ fn market_context_clone_thread_safe_smoke() {
 }
 
 #[test]
+fn discount_stress_and_invalid_bumps_preserve_scratch_restoration() {
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+
+    for policy in [
+        ValidationMode::MarketStandard,
+        ValidationMode::NegativeRateFriendly {
+            forward_floor: -0.005,
+        },
+    ] {
+        let curve = DiscountCurve::builder("OIS")
+            .base_date(sample_base_date())
+            .knots([(0.0, 1.0), (0.5, 0.999), (1.0, 0.998)])
+            .validation(policy)
+            .build()
+            .unwrap();
+        let mut context = MarketContext::new().insert(curve.clone());
+        for spec in [
+            BumpSpec::parallel_bp(f64::NAN),
+            BumpSpec::parallel_bp(-1e308),
+        ] {
+            assert!(context
+                .bump([MarketBump::Curve {
+                    id: "OIS".into(),
+                    spec
+                }])
+                .is_err());
+            assert!(context
+                .apply_curve_bump_in_place(&"OIS".into(), spec)
+                .is_err());
+            let unchanged = context.get_discount("OIS").unwrap();
+            assert_eq!(unchanged.id(), curve.id());
+            assert_eq!(unchanged.dfs(), curve.dfs());
+            for t in [0.0, 0.25, 0.5, 0.75, 1.0] {
+                assert_eq!(unchanged.df(t), curve.df(t));
+            }
+        }
+        let token = context
+            .apply_curve_bump_in_place(&"OIS".into(), BumpSpec::parallel_bp(-100.0))
+            .unwrap();
+        assert!(context.get_discount("OIS").unwrap().df(1.0) > 1.0);
+        context.revert_scratch_bump(token).unwrap();
+        assert_eq!(context.get_discount("OIS").unwrap().dfs(), curve.dfs());
+        assert_eq!(
+            context.get_discount("OIS").unwrap().min_forward_rate(),
+            curve.min_forward_rate()
+        );
+    }
+}
+
+#[test]
 fn inflation_bumps_match_direct_curve_and_context_entry_points() {
     use finstack_quant_core::market_data::bumps::{BumpMode, BumpType, BumpUnits, Bumpable};
     use finstack_quant_core::market_data::term_structures::InflationCurve;

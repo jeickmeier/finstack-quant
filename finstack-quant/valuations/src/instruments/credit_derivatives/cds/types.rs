@@ -396,6 +396,7 @@ impl CreditDefaultSwap {
             .side(PayReceive::Pay)
             .convention(convention)
             .premium(PremiumLegSpec {
+                standard_imm_dates: true,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
                 frequency,
@@ -454,6 +455,7 @@ impl CreditDefaultSwap {
             side,
             convention,
             premium: PremiumLegSpec {
+                standard_imm_dates: true,
                 start,
                 end,
                 frequency,
@@ -519,6 +521,7 @@ impl CreditDefaultSwap {
     ///     .side(PayReceive::Pay)
     ///     .convention(CdsConvention::IsdaNa)
     ///     .premium(PremiumLegSpec {
+    ///         standard_imm_dates: true,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 03 - 20),
     ///         frequency: CdsConvention::IsdaNa.frequency(),
@@ -709,8 +712,10 @@ impl CreditDefaultSwap {
     /// This is **not** a pricing entry point; it is a schedule helper that
     /// exposes the convention-driven coupon dates used by the CDS pricer.
     ///
-    /// - Dates are based on IMM 20th of Mar/Jun/Sep/Dec, with business day
-    ///   adjustment per the instrument's calendar and BDC.
+    /// - With `premium.standard_imm_dates`, dates use the prescribed quarterly
+    ///   CDS 20th grid. Bespoke legs use `premium.frequency` and `premium.stub`.
+    /// - Payments use the instrument calendar and business-day convention;
+    ///   absent calendars leave payment dates unadjusted.
     /// - The returned schedule includes the start date and the (possibly adjusted)
     ///   maturity date.
     pub fn isda_coupon_schedule(&self) -> finstack_quant_core::Result<Vec<Date>> {

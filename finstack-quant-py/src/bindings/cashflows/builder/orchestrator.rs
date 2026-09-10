@@ -35,7 +35,9 @@ impl PyPrincipalEvent {
     /// Parameters
     /// ----------
     /// date : datetime.date
-    ///     Event date.
+    ///     Economic date when outstanding principal changes.
+    /// payment_date : datetime.date
+    ///     Cash settlement date, which may differ after business-day adjustment.
     /// delta : Money
     ///     Outstanding delta (positive increases balance, negative repays).
     /// cash : Money
@@ -43,9 +45,10 @@ impl PyPrincipalEvent {
     /// kind : CFKind or str
     ///     Classification for the emitted cashflow.
     #[new]
-    #[pyo3(text_signature = "(date, delta, cash, kind)")]
+    #[pyo3(text_signature = "(date, payment_date, delta, cash, kind)")]
     fn new(
         date: &Bound<'_, PyAny>,
+        payment_date: &Bound<'_, PyAny>,
         delta: PyMoney,
         cash: PyMoney,
         kind: &Bound<'_, PyAny>,
@@ -53,6 +56,7 @@ impl PyPrincipalEvent {
         Ok(Self {
             inner: PrincipalEvent {
                 date: py_to_date(date)?,
+                payment_date: py_to_date(payment_date)?,
                 delta: delta.inner,
                 cash: cash.inner,
                 kind: extract_cf_kind(kind)?,
@@ -64,6 +68,12 @@ impl PyPrincipalEvent {
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.date)
+    }
+
+    /// Cash settlement date, independent of the economic event date.
+    #[getter]
+    fn payment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.payment_date)
     }
 
     /// Outstanding delta.
@@ -87,8 +97,9 @@ impl PyPrincipalEvent {
     /// Debug-style representation.
     fn __repr__(&self) -> String {
         format!(
-            "PrincipalEvent(date='{}', delta={} {}, cash={} {}, kind='{}')",
+            "PrincipalEvent(date='{}', payment_date='{}', delta={} {}, cash={} {}, kind='{}')",
             self.inner.date,
+            self.inner.payment_date,
             self.inner.delta.amount(),
             self.inner.delta.currency(),
             self.inner.cash.amount(),
@@ -173,21 +184,27 @@ impl PyCashFlowBuilder {
 
     /// Add a single principal event (draw/repay).
     #[pyo3(
-        signature = (date, delta, kind, cash=None),
-        text_signature = "(self, date, delta, kind, cash=None)"
+        signature = (date, payment_date, delta, kind, cash=None),
+        text_signature = "(self, date, payment_date, delta, kind, cash=None)"
     )]
     fn add_principal_event<'py>(
         mut slf: PyRefMut<'py, Self>,
         date: &Bound<'py, PyAny>,
+        payment_date: &Bound<'py, PyAny>,
         delta: PyMoney,
         kind: &Bound<'py, PyAny>,
         cash: Option<PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = py_to_date(date)?;
+        let payment_date = py_to_date(payment_date)?;
         let kind = extract_cf_kind(kind)?;
-        let _ = slf
-            .inner
-            .add_principal_event(date, delta.inner, cash.map(|c| c.inner), kind);
+        let _ = slf.inner.add_principal_event(
+            date,
+            payment_date,
+            delta.inner,
+            cash.map(|c| c.inner),
+            kind,
+        );
         Ok(slf)
     }
 

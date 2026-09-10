@@ -2,39 +2,16 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::OptionType;
+use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
 use finstack_quant_core::types::BarrierType;
 
-/// Default for use_gobet_miri field.
-///
-/// Returns `true` to enable discrete barrier monitoring correction by default.
-/// This matches the recommended production setting.
-fn default_gobet_miri() -> bool {
-    true
-}
-
-/// Barrier option instrument.
-///
-/// Barrier options are options with a barrier level that can knock in or out.
-///
-/// # Barrier Monitoring
-///
-/// Real-world barriers are typically monitored discretely (e.g., daily closes), not continuously.
-/// Continuous barrier formulas underestimate discrete barrier option values. The `use_gobet_miri`
-/// flag enables the Gobet-Miri discrete monitoring correction (β ≈ 0.5826), which adjusts the
-/// effective barrier level: `H_adj = H × exp(±0.5826 × σ × √Δt)`.
-///
-/// **Recommendation**: Set `use_gobet_miri = true` (the default) for real-world pricing.
-/// Only disable for continuous monitoring benchmarks or academic comparisons.
-///
-/// # References
-///
-/// - Broadie, Glasserman & Kou (1997), "A Continuity Correction for Discrete Barrier Options" `docs/REFERENCES.md#broadie-glasserman-kou-1997` `docs/REFERENCES.md#glasserman-2004-monte-carlo`
-/// - Gobet (2000), "Weak Approximation of Killed Diffusion Using Euler Schemes"
+/// Barrier option with a total trade rebate and explicit contractual monitoring.
+/// Continuous monitoring uses closed-form pricing by default. Discrete monitoring
+/// observes only the supplied dates and uses Monte Carlo by default.
 #[derive(
     PartialEq,
     Clone,
@@ -54,8 +31,9 @@ pub struct BarrierOption {
     pub strike: f64,
     /// Barrier level (price that triggers knock-in/out)
     pub barrier: Money,
-    /// Optional rebate amount (paid if the barrier condition is met; see
-    /// `rebate_timing` for when a knock-out rebate pays)
+    /// Total contractual trade rebate in the payoff currency, independent of
+    /// notional. Knock-outs pay on a hit according to `rebate_timing`;
+    /// knock-ins pay at expiry only if no hit occurred.
     pub rebate: Option<Money>,
     /// Timing of the knock-out rebate payment.
     ///
@@ -100,39 +78,12 @@ pub struct BarrierOption {
     pub notional: Money,
     /// Day count convention
     pub day_count: finstack_quant_core::dates::DayCount,
-    /// Whether to use Gobet-Miri discrete barrier adjustment for Monte Carlo pricing.
-    ///
-    /// When `true` (recommended), applies the Broadie-Glasserman-Kou / Gobet-Miri correction
-    /// to account for discrete barrier monitoring. This adjusts the effective barrier by
-    /// `exp(±0.5826 × σ × √Δt)` where Δt is the time step.
-    ///
-    /// # Default Value
-    ///
-    /// **Defaults to `true`** for both builder and serde deserialization, as this
-    /// reflects real-world discrete monitoring (daily closes). Set to `false` only
-    /// for continuous monitoring benchmarks or academic comparisons.
-    ///
-    /// # Production Recommendation
-    ///
-    /// Always use `true` for production pricing of barrier options. Continuous
-    /// barrier formulas systematically underestimate discrete barrier option values.
-    #[builder(default = default_gobet_miri())]
-    #[serde(default = "default_gobet_miri")]
-    pub use_gobet_miri: bool,
-    /// Monitoring frequency for discrete barrier adjustment (years between observations).
-    ///
-    /// When set, the analytical pricer applies the Broadie-Glasserman correction
-    /// to adjust the barrier level for discrete monitoring. Common values:
-    /// - `1.0/252.0` — daily monitoring
-    /// - `1.0/52.0` — weekly monitoring
-    /// - `1.0/12.0` — monthly monitoring
-    ///
-    /// When `None`, the analytical pricer uses continuous monitoring formulas.
-    /// Note: The MC pricer (`use_gobet_miri = true`) handles discrete monitoring
-    /// independently via per-step corrections.
-    #[builder(optional)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub monitoring_frequency: Option<f64>,
+    /// Contractual monitoring: continuous or an explicit, strictly increasing
+    /// set of observation dates no later than expiry. Discrete pricing does not
+    /// interpolate hits between those dates.
+    #[builder(default)]
+    #[serde(default)]
+    pub monitoring: Monitoring,
     /// Discount curve ID for present value calculations
     pub discount_curve_id: CurveId,
     /// Spot price identifier
@@ -169,7 +120,7 @@ pub struct BarrierOption {
 impl BarrierOption {
     /// Create a canonical example barrier option (up-and-out call).
     ///
-    /// Note: Uses `use_gobet_miri = true` by default for realistic discrete monitoring.
+    /// Uses continuous contractual monitoring by default.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DayCount;
@@ -187,7 +138,7 @@ impl BarrierOption {
             .observed_barrier_breached_opt(None)
             .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
-            .use_gobet_miri(true) // Enable discrete monitoring correction (recommended)
+            .monitoring(Monitoring::Continuous)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
@@ -196,7 +147,40 @@ impl BarrierOption {
             .build()
     }
 
-    /// Calculate the net present value using Monte Carlo.
+    pub(crate) fn validate_monitoring_state(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+        use crate::instruments::Instrument;
+        self.validate_invariants()?;
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
+            if observation_dates.iter().any(|date| *date < as_of)
+                && self.observed_barrier_breached.is_none()
+            {
+                return Err(finstack_quant_core::Error::Validation(
+                    "BarrierOption requires observed_barrier_breached for past observation dates"
+                        .to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Price the total trade payoff and rebate with the GBM Monte Carlo engine.
+    ///
+    /// # Arguments
+    ///
+    /// - `curves`: Market context containing the instrument's spot, volatility,
+    ///   discount curve and optional dividend-yield inputs. Volatilities and
+    ///   yields are decimal annualized values; spot is in the payoff currency.
+    /// - `as_of`: Valuation date defining the start of the remaining simulation.
+    ///   Discrete monitoring uses the contract's exact observation dates;
+    ///   continuous monitoring uses a Brownian bridge between simulation steps.
+    ///
+    /// # Returns
+    /// Present value in the notional currency. Rebate Money is the total trade
+    /// payment and is discounted according to its contractual payment timing.
+    ///
+    /// # Errors
+    /// Returns an error for missing market inputs, invalid parameters or missing
+    /// observed barrier state for monitoring dates before `as_of`.
     pub fn npv_mc(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -217,14 +201,33 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
         // sentinel); rejecting them here surfaces a `Validation` error at the
         // instrument boundary instead of panicking inside `Money::new`.
         validation::validate_f64_positive(self.strike, "BarrierOption strike")?;
+        validation::validate_money_gt(self.notional, 0.0, "BarrierOption notional")?;
+        for money in [Some(self.barrier), self.rebate].into_iter().flatten() {
+            if money.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.notional.currency(),
+                    actual: money.currency(),
+                });
+            }
+        }
         validation::validate_money_gt(self.barrier, 0.0, "BarrierOption barrier")?;
         if let Some(rebate) = self.rebate {
             // A zero rebate is economically identical to `None` and stays
             // accepted; only negative or non-finite amounts are rejected.
             validation::validate_f64_non_negative(rebate.amount(), "BarrierOption rebate")?;
         }
-        if let Some(frequency) = self.monitoring_frequency {
-            validation::validate_f64_positive(frequency, "BarrierOption monitoring_frequency")?;
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
+            validation::require_with(!observation_dates.is_empty(), || {
+                "BarrierOption discrete monitoring requires observation_dates".to_string()
+            })?;
+            validation::validate_sorted_strict(
+                observation_dates,
+                "BarrierOption observation_dates",
+            )?;
+            validation::require_with(
+                observation_dates.iter().all(|date| *date <= self.expiry),
+                || "BarrierOption observation_dates must not be after expiry".to_string(),
+            )?;
         }
         if let Some(fixing) = self.expiry_fixing {
             if fixing.currency() != self.notional.currency() {
@@ -233,7 +236,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
                     actual: fixing.currency(),
                 });
             }
-            if fixing.amount() <= 0.0 {
+            if !fixing.amount().is_finite() || fixing.amount() <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(
                     "BarrierOption expiry_fixing must be positive".to_string(),
                 ));
@@ -243,7 +246,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
     }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
-        if self.use_gobet_miri {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
             crate::pricer::ModelKey::MonteCarloGBM
         } else {
             crate::pricer::ModelKey::BarrierBSContinuous
@@ -273,18 +276,13 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
 
     /// Compute the present value with explicit monitoring semantics.
     ///
-    /// Dispatch rules:
-    /// - `use_gobet_miri = false` -> analytical continuous-monitoring pricer
-    /// - `use_gobet_miri = true` -> MC discrete-monitoring-corrected pricer
-    ///
-    /// If `use_gobet_miri = true` but no compatible Monte Carlo pricer is registered,
-    /// this returns an error instead of silently falling back to continuous pricing.
+    /// Continuous monitoring selects analytical pricing; discrete dates select MC.
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        if self.use_gobet_miri {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
             return self.npv_mc(market, as_of);
         }
 
@@ -322,7 +320,7 @@ mod tests {
     #[test]
     fn expired_barrier_requires_observed_state() {
         let mut option = super::BarrierOption::example().expect("BarrierOption example is valid");
-        option.use_gobet_miri = false;
+        option.monitoring = super::Monitoring::Continuous;
         option.observed_barrier_breached = None;
         let market = MarketContext::new()
             .insert(

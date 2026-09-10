@@ -370,8 +370,21 @@ fn test_realized_fraction_by_observations_matches_observation_count() {
     let fraction = swap
         .realized_fraction_by_observations(as_of)
         .expect("observation fraction");
-    let manual_frac = dates.iter().filter(|&&d| d <= as_of).count() as f64 / dates.len() as f64;
+    let manual_frac =
+        (dates.iter().filter(|&&d| d <= as_of).count() - 1) as f64 / (dates.len() - 1) as f64;
 
     // Assert
     assert!((fraction - manual_frac).abs() < EPSILON);
+}
+
+#[test]
+fn realized_ohlc_fraction_includes_first_observed_bar() {
+    let mut swap = sample_swap(PayReceive::Receive);
+    swap.start_date = time::macros::date!(2025 - 01 - 06);
+    swap.realized_var_method = finstack_quant_core::math::stats::RealizedVarMethod::Parkinson;
+    let dates = swap.observation_dates().expect("schedule");
+    let actual = swap
+        .realized_fraction_by_observations(dates[0])
+        .expect("fraction");
+    assert!((actual - 1.0 / dates.len() as f64).abs() < EPSILON);
 }

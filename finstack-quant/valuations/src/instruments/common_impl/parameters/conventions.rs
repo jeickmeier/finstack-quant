@@ -260,7 +260,7 @@ impl std::str::FromStr for BondConvention {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum IRSConvention {
-    /// USD SOFR OIS: Semi-annual fixed, annual float, ACT/360
+    /// USD SOFR OIS: Annual fixed, annual float, ACT/360
     ///
     /// Standard post-LIBOR USD swap convention using SOFR compounded in arrears.
     UsdSofr,
@@ -278,201 +278,145 @@ pub enum IRSConvention {
     ///
     /// Standard GBP swap convention using SONIA compounded in arrears.
     GbpSonia,
-    /// JPY TONAR OIS: Semi-annual fixed, annual float, ACT/365F
+    /// JPY TONAR OIS: Annual fixed, annual float, ACT/365F
     ///
     /// Standard JPY swap convention using TONAR compounded in arrears.
     JpyTonar,
 }
 
 impl IRSConvention {
-    /// Fixed leg day count for this convention.
+    pub(crate) fn conventions(
+        &self,
+    ) -> finstack_quant_core::Result<&'static crate::market::conventions::RateIndexConventions>
+    {
+        use crate::market::conventions::ConventionRegistry;
+        use finstack_quant_core::types::IndexId;
+        let id = match self {
+            Self::UsdSofr => "USD-SOFR-OIS",
+            Self::EurEstr => "EUR-ESTR-OIS",
+            Self::EurEuribor => "EUR-EURIBOR-6M",
+            Self::GbpSonia => "GBP-SONIA-OIS",
+            Self::JpyTonar => "JPY-TONAR-OIS",
+        };
+        ConventionRegistry::try_global()?.require_rate_index(&IndexId::new(id))
+    }
+
+    /// Fixed-leg accrual day count from the canonical rate-index registry.
     ///
-    /// # Market Standards
+    /// # Errors
     ///
-    /// - **30/360**: USD, EUR (both OIS and IBOR)
-    /// - **ACT/365F**: GBP, JPY
-    pub fn fixed_day_count(&self) -> DayCount {
-        match self {
-            IRSConvention::UsdSofr | IRSConvention::EurEstr | IRSConvention::EurEuribor => {
-                DayCount::Thirty360
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn fixed_day_count(&self) -> finstack_quant_core::Result<DayCount> {
+        Ok(self.conventions()?.default_fixed_leg_day_count)
+    }
+
+    /// Floating-leg accrual day count from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn float_day_count(&self) -> finstack_quant_core::Result<DayCount> {
+        Ok(self.conventions()?.day_count)
+    }
+
+    /// Fixed-leg payment frequency from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn fixed_frequency(&self) -> finstack_quant_core::Result<Tenor> {
+        Ok(self.conventions()?.default_fixed_leg_frequency)
+    }
+
+    /// Floating-leg payment frequency, distinct from daily OIS compounding from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn float_frequency(&self) -> finstack_quant_core::Result<Tenor> {
+        Ok(self.conventions()?.default_payment_frequency)
+    }
+
+    /// Business days between accrual end and payment from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn payment_lag_days(&self) -> finstack_quant_core::Result<i32> {
+        Ok(self.conventions()?.default_payment_lag_days)
+    }
+
+    /// Business days between the index fixing and accrual start from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn reset_lag_days(&self) -> finstack_quant_core::Result<i32> {
+        Ok(self.conventions()?.default_reset_lag_days)
+    }
+
+    /// Business-day adjustment for the swap schedule from the canonical rate-index registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded registry or required convention is invalid.
+    pub fn business_day_convention(&self) -> finstack_quant_core::Result<BusinessDayConvention> {
+        Ok(self.conventions()?.market_business_day_convention)
+    }
+
+    /// Whether the canonical index uses compounded overnight rates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded rate-index convention cannot be resolved.
+    pub fn uses_daily_compounding(&self) -> finstack_quant_core::Result<bool> {
+        Ok(self.conventions()?.ois_compounding.is_some())
+    }
+
+    /// Contractual observation lookback or shift in business days.
+    /// Standard OIS presets use zero; payment delay is a separate convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded rate-index convention cannot be resolved.
+    pub fn observation_shift_days(&self) -> finstack_quant_core::Result<i32> {
+        use crate::instruments::rates::irs::FloatingLegCompounding;
+        Ok(match self.conventions()?.ois_compounding {
+            Some(FloatingLegCompounding::CompoundedInArrears { lookback_days }) => lookback_days,
+            Some(FloatingLegCompounding::CompoundedWithObservationShift { shift_days }) => {
+                shift_days
             }
-            IRSConvention::GbpSonia | IRSConvention::JpyTonar => DayCount::Act365F,
-        }
+            _ => 0,
+        })
     }
 
-    /// Float leg day count for this convention.
+    /// Calendar identifier from the canonical rate-index convention.
     ///
-    /// # Market Standards
+    /// # Errors
     ///
-    /// - **ACT/360**: USD SOFR, EUR ESTR, EUR EURIBOR
-    /// - **ACT/365F**: GBP SONIA, JPY TONAR
-    pub fn float_day_count(&self) -> DayCount {
-        match self {
-            IRSConvention::UsdSofr | IRSConvention::EurEstr | IRSConvention::EurEuribor => {
-                DayCount::Act360
-            }
-            IRSConvention::GbpSonia | IRSConvention::JpyTonar => DayCount::Act365F,
-        }
+    /// Returns an error if the embedded rate-index convention cannot be resolved.
+    pub fn calendar_id(&self) -> finstack_quant_core::Result<&'static str> {
+        Ok(&self.conventions()?.market_calendar_id)
     }
 
-    /// Fixed leg frequency for this convention.
-    ///
-    /// # Market Standards
-    ///
-    /// - **Semi-annual**: USD, JPY
-    /// - **Annual**: EUR, GBP
-    pub fn fixed_frequency(&self) -> Tenor {
-        match self {
-            IRSConvention::UsdSofr | IRSConvention::JpyTonar => Tenor::semi_annual(),
-            IRSConvention::EurEstr | IRSConvention::EurEuribor | IRSConvention::GbpSonia => {
-                Tenor::annual()
-            }
-        }
-    }
-
-    /// Float leg frequency (payment/reset frequency) for this convention.
-    ///
-    /// # Market Standards
-    ///
-    /// - **Annual**: EUR ESTR OIS, GBP SONIA, JPY TONAR, USD SOFR (for OIS payment)
-    /// - **Semi-annual**: EUR EURIBOR 6M
-    ///
-    /// # Note on OIS Compounding
-    ///
-    /// For OIS swaps, this is the **payment frequency**, not the compounding frequency.
-    /// OIS rates are compounded daily. Use `uses_daily_compounding()`
-    /// to determine whether daily compounding applies.
-    pub fn float_frequency(&self) -> Tenor {
-        match self {
-            // OIS swaps: annual payment with daily compounding
-            IRSConvention::UsdSofr
-            | IRSConvention::EurEstr
-            | IRSConvention::GbpSonia
-            | IRSConvention::JpyTonar => Tenor::annual(),
-            // IBOR swaps: frequency matches index tenor
-            IRSConvention::EurEuribor => Tenor::semi_annual(), // EURIBOR 6M
-        }
-    }
-
-    /// Returns the compounding method for the floating leg.
-    ///
-    /// # Market Standards
-    ///
-    /// - **OIS swaps** (SOFR, ESTR, SONIA, TONAR): Daily compounding in arrears
-    ///   with observation shift (lookback)
-    /// - **IBOR swaps** (EURIBOR): Simple (no compounding within period)
-    ///
-    /// # Returns
-    ///
-    /// `true` if the swap uses daily compounded rates (OIS),
-    /// `false` if it uses simple term rates (IBOR).
-    pub fn uses_daily_compounding(&self) -> bool {
-        match self {
-            IRSConvention::UsdSofr
-            | IRSConvention::EurEstr
-            | IRSConvention::GbpSonia
-            | IRSConvention::JpyTonar => true, // OIS
-            IRSConvention::EurEuribor => false, // Term rate
-        }
-    }
-
-    /// Observation shift (lookback) in business days for OIS swaps.
-    ///
-    /// For OIS swaps, rates are typically observed with a lookback to allow
-    /// payment calculation before the payment date.
-    ///
-    /// # Market Standards
-    ///
-    /// - **2 days**: USD SOFR, EUR ESTR, JPY TONAR
-    /// - **0 days**: GBP SONIA (payment delay instead)
-    /// - **N/A**: IBOR swaps (not compounded)
-    ///
-    /// # Returns
-    ///
-    /// Number of business days for observation shift, or 0 for non-OIS swaps.
-    pub fn observation_shift_days(&self) -> i32 {
-        match self {
-            IRSConvention::UsdSofr | IRSConvention::EurEstr | IRSConvention::JpyTonar => 2,
-            IRSConvention::GbpSonia | IRSConvention::EurEuribor => 0, // Uses payment delay instead or is not applicable
-        }
-    }
-
-    /// Payment delay in business days for this convention.
-    ///
-    /// # Market Standards
-    ///
-    /// - **2 days**: Most OIS swaps (USD, EUR, JPY)
-    /// - **0 days**: GBP SONIA (uses same-day payment)
-    /// - **2 days**: EUR EURIBOR
-    pub fn payment_lag_days(&self) -> i32 {
-        match self {
-            IRSConvention::UsdSofr
-            | IRSConvention::EurEstr
-            | IRSConvention::EurEuribor
-            | IRSConvention::JpyTonar => 2,
-            IRSConvention::GbpSonia => 0,
-        }
-    }
-
-    /// Business day convention for this convention.
-    ///
-    /// All standard IRS conventions use Modified Following.
-    pub fn business_day_convention(&self) -> BusinessDayConvention {
-        BusinessDayConvention::ModifiedFollowing
-    }
-
-    /// Calendar identifier for this convention.
-    pub fn calendar_id(&self) -> Option<String> {
-        match self {
-            IRSConvention::UsdSofr => Some("usny".to_string()),
-            IRSConvention::EurEstr | IRSConvention::EurEuribor => Some("target2".to_string()),
-            IRSConvention::GbpSonia => Some("gblo".to_string()),
-            IRSConvention::JpyTonar => Some("jpto".to_string()),
-        }
-    }
-
-    /// Discount curve ID for this convention.
-    ///
-    /// Returns the OIS curve for discounting (post-crisis standard).
+    /// Conventional OIS discount-curve identifier for this currency.
     pub fn disc_curve_id(&self) -> &'static str {
         match self {
-            IRSConvention::UsdSofr => "USD-SOFR",
-            IRSConvention::EurEstr | IRSConvention::EurEuribor => "EUR-ESTR",
-            IRSConvention::GbpSonia => "GBP-SONIA",
-            IRSConvention::JpyTonar => "JPY-TONAR",
+            Self::UsdSofr => "USD-SOFR",
+            Self::EurEstr | Self::EurEuribor => "EUR-ESTR",
+            Self::GbpSonia => "GBP-SONIA",
+            Self::JpyTonar => "JPY-TONAR",
         }
     }
 
-    /// Forward/projection curve ID for this convention.
-    ///
-    /// For OIS swaps, this is the same as the discount curve.
-    /// For IBOR swaps, this is the IBOR curve.
+    /// Conventional projection-curve identifier for this index.
     pub fn forward_curve_id(&self) -> &'static str {
         match self {
-            IRSConvention::UsdSofr => "USD-SOFR",
-            IRSConvention::EurEstr => "EUR-ESTR",
-            IRSConvention::EurEuribor => "EUR-EURIBOR-6M",
-            IRSConvention::GbpSonia => "GBP-SONIA",
-            IRSConvention::JpyTonar => "JPY-TONAR",
-        }
-    }
-
-    /// Reset lag in business days for this convention.
-    ///
-    /// For OIS swaps, this is the fixing offset before the accrual period.
-    /// For IBOR swaps, this is the fixing lag before period start.
-    ///
-    /// # Market Standards
-    ///
-    /// - **2 days (T-2)**: USD, EUR, JPY
-    /// - **0 days (T-0)**: GBP SONIA
-    pub fn reset_lag_days(&self) -> i32 {
-        match self {
-            IRSConvention::UsdSofr
-            | IRSConvention::EurEstr
-            | IRSConvention::EurEuribor
-            | IRSConvention::JpyTonar => 2,
-            IRSConvention::GbpSonia => 0, // Same-day fixing
+            Self::UsdSofr => "USD-SOFR",
+            Self::EurEstr => "EUR-ESTR",
+            Self::EurEuribor => "EUR-EURIBOR-6M",
+            Self::GbpSonia => "GBP-SONIA",
+            Self::JpyTonar => "JPY-TONAR",
         }
     }
 }
@@ -668,17 +612,31 @@ mod tests {
     #[test]
     fn irs_ois_float_frequency_annual() {
         // OIS swaps pay annually with daily compounding
-        assert_eq!(IRSConvention::UsdSofr.float_frequency(), Tenor::annual());
-        assert_eq!(IRSConvention::EurEstr.float_frequency(), Tenor::annual());
-        assert_eq!(IRSConvention::GbpSonia.float_frequency(), Tenor::annual());
-        assert_eq!(IRSConvention::JpyTonar.float_frequency(), Tenor::annual());
+        assert_eq!(
+            IRSConvention::UsdSofr.float_frequency().expect("registry"),
+            Tenor::annual()
+        );
+        assert_eq!(
+            IRSConvention::EurEstr.float_frequency().expect("registry"),
+            Tenor::annual()
+        );
+        assert_eq!(
+            IRSConvention::GbpSonia.float_frequency().expect("registry"),
+            Tenor::annual()
+        );
+        assert_eq!(
+            IRSConvention::JpyTonar.float_frequency().expect("registry"),
+            Tenor::annual()
+        );
     }
 
     #[test]
     fn irs_ibor_float_frequency_matches_index() {
         // EURIBOR 6M swaps pay semi-annually
         assert_eq!(
-            IRSConvention::EurEuribor.float_frequency(),
+            IRSConvention::EurEuribor
+                .float_frequency()
+                .expect("registry"),
             Tenor::semi_annual()
         );
     }
@@ -686,27 +644,62 @@ mod tests {
     #[test]
     fn irs_compounding_method() {
         // OIS swaps use daily compounding
-        assert!(IRSConvention::UsdSofr.uses_daily_compounding());
-        assert!(IRSConvention::EurEstr.uses_daily_compounding());
-        assert!(IRSConvention::GbpSonia.uses_daily_compounding());
-        assert!(IRSConvention::JpyTonar.uses_daily_compounding());
+        assert!(IRSConvention::UsdSofr
+            .uses_daily_compounding()
+            .expect("registry"));
+        assert!(IRSConvention::EurEstr
+            .uses_daily_compounding()
+            .expect("registry"));
+        assert!(IRSConvention::GbpSonia
+            .uses_daily_compounding()
+            .expect("registry"));
+        assert!(IRSConvention::JpyTonar
+            .uses_daily_compounding()
+            .expect("registry"));
 
         // IBOR swaps use simple rates
-        assert!(!IRSConvention::EurEuribor.uses_daily_compounding());
+        assert!(!IRSConvention::EurEuribor
+            .uses_daily_compounding()
+            .expect("registry"));
     }
 
     #[test]
     fn irs_observation_shift() {
         // Standard 2-day lookback for most OIS
-        assert_eq!(IRSConvention::UsdSofr.observation_shift_days(), 2);
-        assert_eq!(IRSConvention::EurEstr.observation_shift_days(), 2);
-        assert_eq!(IRSConvention::JpyTonar.observation_shift_days(), 2);
+        assert_eq!(
+            IRSConvention::UsdSofr
+                .observation_shift_days()
+                .expect("registry"),
+            0
+        );
+        assert_eq!(
+            IRSConvention::EurEstr
+                .observation_shift_days()
+                .expect("registry"),
+            0
+        );
+        assert_eq!(
+            IRSConvention::JpyTonar
+                .observation_shift_days()
+                .expect("registry"),
+            0
+        );
 
         // SONIA uses 0-day shift with payment delay
-        assert_eq!(IRSConvention::GbpSonia.observation_shift_days(), 0);
+        assert_eq!(
+            IRSConvention::GbpSonia
+                .observation_shift_days()
+                .expect("registry"),
+            0
+        );
 
         // IBOR has no observation shift
-        assert_eq!(IRSConvention::EurEuribor.observation_shift_days(), 0);
+        assert_eq!(
+            IRSConvention::EurEuribor
+                .observation_shift_days()
+                .expect("registry"),
+            0
+        );
     }
 
     #[test]

@@ -109,7 +109,7 @@ pub struct ImDefaults {
 /// Raw default parameters for a single IM methodology.
 #[derive(Debug, Clone)]
 pub struct ImMethodDefaults {
-    /// Margin period of risk in calendar days.
+    /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Threshold amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
     pub threshold: f64,
@@ -152,7 +152,7 @@ pub struct ScheduleImSchedule {
     pub default_asset_class: ScheduleAssetClass,
     /// Default maturity expressed as a year fraction.
     pub default_maturity_years: f64,
-    /// Margin period of risk in calendar days.
+    /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Decimal rates keyed by `(asset_class, maturity_bucket)`.
     pub rates: HashMap<(ScheduleAssetClass, MaturityBucket), f64>,
@@ -181,7 +181,7 @@ pub struct AssetClassDefault {
 /// Conservative fallback CCP parameters.
 #[derive(Debug, Clone)]
 pub struct CcpParams {
-    /// Margin period of risk in calendar days.
+    /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Conservative fallback margin rate as a decimal fraction.
     pub conservative_rate: f64,
@@ -207,7 +207,7 @@ struct ParsedCcpRegistry {
 pub struct SimmParams {
     /// SIMM version identifier for this parameter set.
     pub version: SimmVersion,
-    /// Margin period of risk in calendar days.
+    /// Margin period of risk in business days.
     pub mpor_days: u32,
     /// Interest-rate delta risk weights keyed by tenor label.
     pub ir_delta_weights: HashMap<String, f64>,
@@ -219,7 +219,7 @@ pub struct SimmParams {
     pub fx_delta_weight: f64,
     /// FX delta intra-bucket correlation between distinct currency risk factors.
     ///
-    /// ISDA SIMM v2.6 uses a uniform 0.5 correlation for FX delta factors.
+    /// Historical v2.6 regular/regular FX factors against USD use 0.5.
     pub fx_intra_bucket_correlation: f64,
     /// Cross-risk-class correlations keyed by risk-class pair.
     pub risk_class_correlations: HashMap<(SimmRiskClass, SimmRiskClass), f64>,
@@ -228,7 +228,7 @@ pub struct SimmParams {
     /// Interest-rate tenor correlations keyed by ordered tenor pair.
     pub ir_tenor_correlations: HashMap<(String, String), f64>,
     /// Inter-currency correlation γ for IR delta aggregation across currencies.
-    /// Per ISDA SIMM specification (typically 0.27 for v2.5/v2.6).
+    /// Historical v2.6 paragraph 37 specifies 0.32.
     pub ir_inter_currency_correlation: f64,
     /// Interest-rate vega risk weight.
     pub ir_vega_weight: f64,
@@ -242,8 +242,46 @@ pub struct SimmParams {
     pub fx_vega_weight: f64,
     /// Commodity vega risk weight.
     pub commodity_vega_weight: f64,
-    /// Curvature scale factor applied before aggregation.
-    pub curvature_scale_factor: f64,
+    /// Correlation of distinct IR subcurves within a currency (v2.6: 99.3%).
+    pub ir_subcurve_correlation: f64,
+    /// Commodity within-bucket factor correlations by numeric bucket.
+    pub commodity_intra_bucket_correlations: HashMap<String, f64>,
+    /// Interest-rate HVR for curvature scaling; historical v2.6 paragraph 34.
+    pub ir_historical_volatility_ratio: f64,
+    /// Equity HVR applied to volatility-weighted vega; paragraph 57.
+    pub equity_historical_volatility_ratio: f64,
+    /// FX HVR applied to volatility-weighted vega; paragraph 70.
+    pub fx_historical_volatility_ratio: f64,
+    /// Commodity HVR applied to volatility-weighted vega; paragraph 62.
+    pub commodity_historical_volatility_ratio: f64,
+    /// High-volatility FX delta weight in percentage points against USD; paragraph 69.
+    pub fx_high_delta_weight: f64,
+    /// FX delta correlation between regular and high-volatility currencies against USD.
+    pub fx_regular_high_correlation: f64,
+    /// FX delta correlation between two distinct high-volatility currencies against USD.
+    pub fx_high_high_correlation: f64,
+    /// Credit qualifying correlation across tenors of the same issuer; paragraph 42.
+    pub cq_same_issuer_correlation: f64,
+    /// Credit residual-bucket correlation for distinct risk factors; paragraphs 42 and 48.
+    pub credit_residual_correlation: f64,
+    /// Interest-rate delta weights in basis points for JPY by tenor.
+    pub ir_delta_weights_low: HashMap<String, f64>,
+    /// Interest-rate delta weights in basis points for high-volatility currencies by tenor.
+    pub ir_delta_weights_high: HashMap<String, f64>,
+    /// Raw DV01 thresholds in USD per bp, keyed by currency risk group.
+    pub ir_delta_concentration_thresholds: HashMap<String, f64>,
+    /// Volatility-weighted IR vega thresholds in USD, keyed by currency risk group.
+    pub ir_vega_concentration_thresholds: HashMap<String, f64>,
+    /// Raw FX delta thresholds in USD per one-percent relative move, keyed by category 1, 2 or 3.
+    pub fx_delta_concentration_thresholds: HashMap<String, f64>,
+    /// FX vega thresholds in USD keyed by ordered category pair, such as 1_2.
+    pub fx_vega_concentration_thresholds: HashMap<String, f64>,
+    /// Raw commodity delta thresholds in USD per one-percent relative move by numeric bucket.
+    pub commodity_delta_concentration_thresholds: HashMap<String, f64>,
+    /// Commodity vega thresholds in USD by numeric bucket.
+    pub commodity_vega_concentration_thresholds: HashMap<String, f64>,
+    /// Volatility-weighted vega concentration thresholds in USD for unclassified risk factors.
+    pub vega_concentration_thresholds: HashMap<SimmRiskClass, f64>,
     /// Concentration thresholds keyed by SIMM risk class.
     pub concentration_thresholds: HashMap<SimmRiskClass, f64>,
     /// Credit qualifying bucket risk weights keyed by [`SimmCreditSector`].
@@ -255,7 +293,7 @@ pub struct SimmParams {
     /// Intra-bucket name correlation for credit qualifying delta.
     ///
     /// Per ISDA SIMM v2.6, the correlation between distinct names within the
-    /// same credit qualifying sector bucket (typically 0.42).
+    /// same credit qualifying sector bucket (v2.6: 0.46).
     pub cq_intra_bucket_correlation: f64,
     /// Inter-bucket correlations for credit qualifying delta.
     ///
@@ -264,8 +302,7 @@ pub struct SimmParams {
     pub cq_inter_bucket_correlations: HashMap<(SimmCreditSector, SimmCreditSector), f64>,
     /// Per-bucket concentration thresholds for credit qualifying delta.
     ///
-    /// When the net weighted sensitivity in a bucket exceeds its threshold,
-    /// a sqrt(|WS| / threshold) concentration factor is applied.
+    /// Thresholds apply to raw CS01 netted by issuer across tenors, before risk weighting.
     pub cq_concentration_thresholds: HashMap<SimmCreditSector, f64>,
     /// Commodity inter-bucket correlation matrix (17×17, row-major).
     ///
@@ -630,7 +667,7 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
         validate_rate("simm.cnq_delta_weight", record.cnq_delta_weight)?;
         validate_rate("simm.equity_delta_weight", record.equity_delta_weight)?;
         validate_rate("simm.fx_delta_weight", record.fx_delta_weight)?;
-        let fx_intra_bucket_correlation = record.fx_intra_bucket_correlation.unwrap_or(0.5);
+        let fx_intra_bucket_correlation = record.fx_intra_bucket_correlation;
         if !(-1.0..=1.0).contains(&fx_intra_bucket_correlation) {
             return Err(Error::Validation(
                 "simm.fx_intra_bucket_correlation must be in [-1,1]".to_string(),
@@ -657,20 +694,18 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
         // a future typo in either the default or an explicit overlay
         // value is caught at parse time, before the SimmParams escapes
         // this function.
-        let ir_vega_weight = record.ir_vega_weight.unwrap_or(0.21);
-        let cq_vega_weight = record.cq_vega_weight.unwrap_or(0.27);
-        let cnq_vega_weight = record.cnq_vega_weight.unwrap_or(0.27);
-        let equity_vega_weight = record.equity_vega_weight.unwrap_or(0.26);
-        let fx_vega_weight = record.fx_vega_weight.unwrap_or(0.30);
-        let commodity_vega_weight = record.commodity_vega_weight.unwrap_or(0.36);
-        let curvature_scale_factor = record.curvature_scale_factor.unwrap_or(1.5);
+        let ir_vega_weight = record.ir_vega_weight;
+        let cq_vega_weight = record.cq_vega_weight;
+        let cnq_vega_weight = record.cnq_vega_weight;
+        let equity_vega_weight = record.equity_vega_weight;
+        let fx_vega_weight = record.fx_vega_weight;
+        let commodity_vega_weight = record.commodity_vega_weight;
         validate_non_negative("simm.ir_vega_weight", ir_vega_weight)?;
         validate_non_negative("simm.cq_vega_weight", cq_vega_weight)?;
         validate_non_negative("simm.cnq_vega_weight", cnq_vega_weight)?;
         validate_non_negative("simm.equity_vega_weight", equity_vega_weight)?;
         validate_non_negative("simm.fx_vega_weight", fx_vega_weight)?;
         validate_non_negative("simm.commodity_vega_weight", commodity_vega_weight)?;
-        validate_non_negative("simm.curvature_scale_factor", curvature_scale_factor)?;
         let concentration_thresholds =
             parse_concentration_thresholds(&record.concentration_thresholds)?;
 
@@ -680,9 +715,7 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
         // per-bucket thresholds collapsed to the aggregate), producing
         // confident margin numbers that match no ISDA calibration.
         let cq_bucket_weights = parse_cq_bucket_weights(&record.cq_bucket_weights)?;
-        let cq_intra_bucket_correlation = record
-            .cq_intra_bucket_correlation
-            .ok_or_else(|| missing_cq_table(version, "cq_intra_bucket_correlation"))?;
+        let cq_intra_bucket_correlation = record.cq_intra_bucket_correlation;
         if !(-1.0..=1.0).contains(&cq_intra_bucket_correlation) {
             return Err(Error::Validation(
                 "simm.cq_intra_bucket_correlation must be in [-1,1]".to_string(),
@@ -711,14 +744,62 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
             risk_class_correlations: correlations,
             commodity_bucket_weights,
             ir_tenor_correlations,
-            ir_inter_currency_correlation: record.ir_inter_currency_correlation.unwrap_or(0.27),
+            ir_inter_currency_correlation: record.ir_inter_currency_correlation,
             ir_vega_weight,
             cq_vega_weight,
             cnq_vega_weight,
             equity_vega_weight,
             fx_vega_weight,
             commodity_vega_weight,
-            curvature_scale_factor,
+            ir_subcurve_correlation: record.ir_subcurve_correlation,
+            commodity_intra_bucket_correlations: parse_number_map(
+                &record.commodity_intra_bucket_correlations,
+                "simm.commodity_intra_bucket_correlations",
+            )?,
+            ir_historical_volatility_ratio: record.ir_historical_volatility_ratio,
+            equity_historical_volatility_ratio: record.equity_historical_volatility_ratio,
+            fx_historical_volatility_ratio: record.fx_historical_volatility_ratio,
+            commodity_historical_volatility_ratio: record.commodity_historical_volatility_ratio,
+            fx_high_delta_weight: record.fx_high_delta_weight,
+            fx_regular_high_correlation: record.fx_regular_high_correlation,
+            fx_high_high_correlation: record.fx_high_high_correlation,
+            cq_same_issuer_correlation: record.cq_same_issuer_correlation,
+            credit_residual_correlation: record.credit_residual_correlation,
+            ir_delta_weights_low: parse_number_map(
+                &record.ir_delta_weights_low,
+                "simm.ir_delta_weights_low",
+            )?,
+            ir_delta_weights_high: parse_number_map(
+                &record.ir_delta_weights_high,
+                "simm.ir_delta_weights_high",
+            )?,
+            ir_delta_concentration_thresholds: parse_number_map(
+                &record.ir_delta_concentration_thresholds,
+                "simm.ir_delta_concentration_thresholds",
+            )?,
+            ir_vega_concentration_thresholds: parse_number_map(
+                &record.ir_vega_concentration_thresholds,
+                "simm.ir_vega_concentration_thresholds",
+            )?,
+            fx_delta_concentration_thresholds: parse_number_map(
+                &record.fx_delta_concentration_thresholds,
+                "simm.fx_delta_concentration_thresholds",
+            )?,
+            fx_vega_concentration_thresholds: parse_number_map(
+                &record.fx_vega_concentration_thresholds,
+                "simm.fx_vega_concentration_thresholds",
+            )?,
+            commodity_delta_concentration_thresholds: parse_number_map(
+                &record.commodity_delta_concentration_thresholds,
+                "simm.commodity_delta_concentration_thresholds",
+            )?,
+            commodity_vega_concentration_thresholds: parse_number_map(
+                &record.commodity_vega_concentration_thresholds,
+                "simm.commodity_vega_concentration_thresholds",
+            )?,
+            vega_concentration_thresholds: parse_concentration_thresholds(
+                &record.vega_concentration_thresholds,
+            )?,
             concentration_thresholds,
             cq_bucket_weights,
             cq_intra_bucket_correlation,
@@ -980,16 +1061,6 @@ fn to_timing(record: &wire::MarginCallTimingRecord) -> MarginCallTiming {
     }
 }
 
-/// Error for a SIMM version whose ISDA credit-qualifying tables are absent.
-fn missing_cq_table(version: SimmVersion, field: &str) -> Error {
-    Error::Validation(format!(
-        "SIMM {version}: `simm.{field}` is missing from the registry. The \
-         credit-qualifying bucket tables are ISDA-published per version and are \
-         not derivable from the broad risk weights; supply them for this version \
-         or use a version whose tables are shipped."
-    ))
-}
-
 fn simm_cq_validation_sectors() -> [SimmCreditSector; 13] {
     use SimmCreditSector::*;
     [
@@ -1014,6 +1085,150 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
         return Err(Error::Validation(
             "simm mpor_days must be greater than zero".to_string(),
         ));
+    }
+    fn complete_positive_map(
+        field: &str,
+        values: &HashMap<String, f64>,
+        keys: &[&str],
+    ) -> Result<()> {
+        for key in keys {
+            let value = values
+                .get(*key)
+                .copied()
+                .ok_or_else(|| Error::Validation(format!("simm.{field} missing {key}")))?;
+            if !value.is_finite() || value <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "simm.{field}[{key}] must be finite and positive"
+                )));
+            }
+        }
+        Ok(())
+    }
+    for (field, values) in [
+        ("ir_delta_weights", &p.ir_delta_weights),
+        ("ir_delta_weights_low", &p.ir_delta_weights_low),
+        ("ir_delta_weights_high", &p.ir_delta_weights_high),
+    ] {
+        complete_positive_map(field, values, crate::types::SIMM_TENORS)?;
+    }
+    for (field, values) in [
+        (
+            "ir_delta_concentration_thresholds",
+            &p.ir_delta_concentration_thresholds,
+        ),
+        (
+            "ir_vega_concentration_thresholds",
+            &p.ir_vega_concentration_thresholds,
+        ),
+    ] {
+        complete_positive_map(
+            field,
+            values,
+            &["high", "regular_well_traded", "regular_less_traded", "low"],
+        )?;
+    }
+    complete_positive_map(
+        "fx_delta_concentration_thresholds",
+        &p.fx_delta_concentration_thresholds,
+        &["1", "2", "3"],
+    )?;
+    complete_positive_map(
+        "fx_vega_concentration_thresholds",
+        &p.fx_vega_concentration_thresholds,
+        &["1_1", "1_2", "1_3", "2_2", "2_3", "3_3"],
+    )?;
+    let commodity_keys: Vec<String> = (1..=17).map(|id| id.to_string()).collect();
+    let commodity_keys: Vec<&str> = commodity_keys.iter().map(String::as_str).collect();
+    for (field, values) in [
+        ("commodity_bucket_weights", &p.commodity_bucket_weights),
+        (
+            "commodity_delta_concentration_thresholds",
+            &p.commodity_delta_concentration_thresholds,
+        ),
+        (
+            "commodity_vega_concentration_thresholds",
+            &p.commodity_vega_concentration_thresholds,
+        ),
+    ] {
+        complete_positive_map(field, values, &commodity_keys)?;
+    }
+    for key in commodity_keys {
+        let rho = p
+            .commodity_intra_bucket_correlations
+            .get(key)
+            .copied()
+            .ok_or_else(|| {
+                Error::Validation(format!(
+                    "simm.commodity_intra_bucket_correlations missing {key}"
+                ))
+            })?;
+        if !(-1.0..=1.0).contains(&rho) {
+            return Err(Error::Validation(format!(
+                "invalid commodity correlation for {key}"
+            )));
+        }
+    }
+    for (field, value) in [
+        (
+            "ir_historical_volatility_ratio",
+            p.ir_historical_volatility_ratio,
+        ),
+        (
+            "equity_historical_volatility_ratio",
+            p.equity_historical_volatility_ratio,
+        ),
+        (
+            "fx_historical_volatility_ratio",
+            p.fx_historical_volatility_ratio,
+        ),
+        (
+            "commodity_historical_volatility_ratio",
+            p.commodity_historical_volatility_ratio,
+        ),
+        ("fx_high_delta_weight", p.fx_high_delta_weight),
+    ] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(Error::Validation(format!(
+                "simm.{field} must be finite and positive"
+            )));
+        }
+    }
+    for (field, value) in [
+        ("ir_subcurve_correlation", p.ir_subcurve_correlation),
+        ("fx_regular_high_correlation", p.fx_regular_high_correlation),
+        ("fx_high_high_correlation", p.fx_high_high_correlation),
+        ("cq_same_issuer_correlation", p.cq_same_issuer_correlation),
+        ("credit_residual_correlation", p.credit_residual_correlation),
+    ] {
+        if !(-1.0..=1.0).contains(&value) {
+            return Err(Error::Validation(format!("simm.{field} must be in [-1,1]")));
+        }
+    }
+    for class in [
+        SimmRiskClass::InterestRate,
+        SimmRiskClass::CreditQualifying,
+        SimmRiskClass::CreditNonQualifying,
+        SimmRiskClass::Equity,
+        SimmRiskClass::Commodity,
+        SimmRiskClass::Fx,
+    ] {
+        for (field, thresholds) in [
+            ("concentration_thresholds", &p.concentration_thresholds),
+            (
+                "vega_concentration_thresholds",
+                &p.vega_concentration_thresholds,
+            ),
+        ] {
+            let value = thresholds
+                .get(&class)
+                .copied()
+                .ok_or_else(|| Error::Validation(format!("simm.{field} missing {class}")))?;
+            if !value.is_finite() || value <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "simm.{field}[{class}] must be finite and positive"
+                )));
+            }
+        }
     }
     for (k, v) in &p.ir_delta_weights {
         validate_non_negative(&format!("simm.ir_delta_weights[{k}]"), *v)?;
@@ -1059,7 +1274,6 @@ pub(crate) fn validate_simm_params(p: &SimmParams) -> Result<()> {
     validate_non_negative("simm.equity_vega_weight", p.equity_vega_weight)?;
     validate_non_negative("simm.fx_vega_weight", p.fx_vega_weight)?;
     validate_non_negative("simm.commodity_vega_weight", p.commodity_vega_weight)?;
-    validate_non_negative("simm.curvature_scale_factor", p.curvature_scale_factor)?;
     for (rc, v) in &p.concentration_thresholds {
         validate_non_negative(&format!("simm.concentration_thresholds[{rc:?}]"), *v)?;
     }

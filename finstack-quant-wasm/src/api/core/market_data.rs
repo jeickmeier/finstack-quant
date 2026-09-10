@@ -758,11 +758,13 @@ impl JsFxMatrix {
     }
 
     /// Set an authoritative quote scoped to one date and conversion policy.
+    /// Pair-global quotes in either orientation take priority; pinned quotes
+    /// precede provider observations.
     /// @param base - Base currency code of the FX quote, where the rate is quote per base.
     /// @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
     /// @param date - ISO-8601 date used by the calculation or market-data lookup.
     /// @param policy - FX quote-selection policy for resolving direct, inverse, or triangulated rates.
-    /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+    /// @param rate - Finite positive quote-currency units per one base-currency unit.
     ///
     /// # Errors
     ///
@@ -786,6 +788,8 @@ impl JsFxMatrix {
     }
 
     /// Look up an FX rate.
+    /// Global quotes precede pinned fixings, then provider observations,
+    /// resolving source priority before taking a reciprocal.
     ///
     /// # Arguments
     /// * `base` - Base (from) currency ISO code.

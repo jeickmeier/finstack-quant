@@ -307,7 +307,7 @@ impl PyCreditFactorModel {
     /// ``tags`` (dict of dimension key to bucket tag), ``mode``
     /// (``"issuer_beta"`` / ``"bucket_only"``), ``beta_pc``, ``beta_levels``
     /// (list aligned with ``level_names()``; ``0.0`` marks a folded level),
-    /// ``adder_at_anchor`` (bp), ``adder_vol_annualized`` (bp), ``adder_vol_source``,
+    /// ``adder_at_anchor`` (bp), ``adder_vol_annualized`` (bp per square-root year), ``adder_vol_source``,
     /// ``r_squared`` and ``n_obs`` (``NaN`` for bucket-only rows), and
     /// ``spread_duration`` (years).
     #[pyo3(text_signature = "($self)")]
@@ -536,7 +536,8 @@ impl PyCreditCalibrator {
     ///     inputs: Dict or JSON string of a ``CreditCalibrationInputs`` object
     ///         (``history_panel`` with decimal spreads, ``issuer_tags``,
     ///         ``generic_factor``, ``as_of``, ``as_of_spreads``, optional
-    ///         ``idiosyncratic_overrides`` / ``spread_durations``).
+    ///         ``idiosyncratic_overrides`` / ``spread_durations``). Overrides are decimal
+    ///         spread volatility per square-root year (``0.001`` = 10 bp/√year).
     ///
     /// Returns:
     ///     Calibrated ``CreditFactorModel`` artifact.

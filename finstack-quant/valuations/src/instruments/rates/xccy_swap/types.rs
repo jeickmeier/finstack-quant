@@ -647,12 +647,15 @@ impl XccySwap {
     /// * `fixings` - Optional historical fixing series for past reset dates.
     /// * `period` - Accrual period whose coupon is being projected.
     /// * `as_of` - Valuation date that splits realized fixings from forwards.
+    /// * `projected_fixings` - Optional schedule sink for raw rate observations;
+    ///   cashflow construction supplies it, while pure PV calls use `None`.
     pub(crate) fn projected_leg_period(
         leg: &XccySwapLeg,
         fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
         fixings: Option<&finstack_quant_core::market_data::scalars::ScalarTimeSeries>,
         period: &crate::cashflow::builder::periods::SchedulePeriod,
         as_of: Date,
+        projected_fixings: Option<&mut Vec<crate::cashflow::fixings::ProjectedFixing>>,
     ) -> Result<ProjectedXccyPeriod> {
         use crate::instruments::common_impl::pricing::overnight::{
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
@@ -689,8 +692,17 @@ impl XccySwap {
                     compounding: &leg.compounding,
                     fixing_calendar: calendar,
                     compounded_spread: 0.0,
-                    need_observation_exposures: false,
+                    need_observation_exposures: projected_fixings.is_some(),
                 })?;
+                if let Some(out) = projected_fixings {
+                    out.extend(projection.observation_exposures.iter().map(|observation| {
+                        crate::cashflow::fixings::ProjectedFixing {
+                            series_id: format!("FIXING:{}", leg.forward_curve_id),
+                            date: observation.observation_start,
+                            value: Some(observation.projected_rate),
+                        }
+                    }));
+                }
                 ProjectedXccyPeriod {
                     rate: projection.rate,
                     year_fraction: projection.accrual_year_fraction,
@@ -710,6 +722,13 @@ impl XccySwap {
             } else {
                 rate_between_on_dates(fwd, period.accrual_start, period.accrual_end)?
             };
+            if let Some(out) = projected_fixings {
+                out.push(crate::cashflow::fixings::ProjectedFixing {
+                    series_id: format!("FIXING:{}", leg.forward_curve_id),
+                    date: fixing_date,
+                    value: Some(forward_rate),
+                });
+            }
             ProjectedXccyPeriod {
                 rate: forward_rate,
                 year_fraction: period.accrual_year_fraction,
@@ -747,8 +766,16 @@ impl XccySwap {
         let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")? / 10_000.0;
 
         let mut flows = Vec::with_capacity(periods.len());
+        let mut projected_fixings = Vec::new();
         for period in &periods {
-            let projected = Self::projected_leg_period(leg, fwd.as_ref(), fixings, period, as_of)?;
+            let projected = Self::projected_leg_period(
+                leg,
+                fwd.as_ref(),
+                fixings,
+                period,
+                as_of,
+                Some(&mut projected_fixings),
+            )?;
             let all_in = projected.all_in_rate(spread);
             let amount =
                 leg.side.coupon_sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
@@ -766,7 +793,10 @@ impl XccySwap {
             leg.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(leg.notional),
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    projected_fixings,
+                    ..Default::default()
+                },
             },
         ))
     }
@@ -782,6 +812,7 @@ impl XccySwap {
             let initial_amount = leg.side.initial_principal_sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
                 leg.start,
+                leg.start,
                 Money::from((0_i64, leg.currency)),
                 Some(Money::new(-initial_amount, leg.currency)?),
                 CFKind::Notional,
@@ -796,6 +827,7 @@ impl XccySwap {
         ) {
             let final_amount = leg.side.final_principal_sign() * leg.notional.amount();
             let _ = builder.add_principal_event(
+                leg.end,
                 leg.end,
                 Money::from((0_i64, leg.currency)),
                 Some(Money::new(-final_amount, leg.currency)?),
@@ -912,7 +944,8 @@ impl XccySwap {
                 continue;
             }
 
-            let projected = Self::projected_leg_period(leg, fwd.as_ref(), fixings, &period, as_of)?;
+            let projected =
+                Self::projected_leg_period(leg, fwd.as_ref(), fixings, &period, as_of, None)?;
             // Warn about extremely negative forward rates which may indicate curve issues.
             // Even in negative rate environments (JPY/CHF/EUR), rates below -5% are unusual.
             if projected.rate < EXTREME_NEGATIVE_RATE_THRESHOLD {
@@ -1591,7 +1624,7 @@ mod tests {
         };
         let mut mismatched = period;
         mismatched.accrual_year_fraction = 0.50;
-        let projected = XccySwap::projected_leg_period(&leg, &fwd, None, &mismatched, start)
+        let projected = XccySwap::projected_leg_period(&leg, &fwd, None, &mismatched, start, None)
             .expect("overnight xccy period");
         let calendar = calendar_by_id("target2").expect("target2");
         let expected = project_overnight_coupon(OvernightCouponProjectionInput {
@@ -1668,7 +1701,7 @@ mod tests {
             allow_calendar_fallback: false,
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
-        let err = XccySwap::projected_leg_period(&leg, &fwd, None, &period, start)
+        let err = XccySwap::projected_leg_period(&leg, &fwd, None, &period, start, None)
             .expect_err("unresolvable calendar must fail");
         assert!(
             err.to_string().contains("calendar"),

@@ -24,48 +24,55 @@ use finstack_quant_core::money::Money;
 /// so the exact vol returned is not critical.
 const MIN_VOL_LOOKUP_TIME: f64 = 1e-6;
 
-/// Resolve the effective vol type.
-///
-/// `Auto` is treated as a **lognormal** surface and resolves to `Lognormal`. The
-/// `Lognormal` pricing arm prices each caplet with Black-76 where the model is
-/// well-defined (`forward > 0` and `strike > 0`) and otherwise converts the
-/// lognormal vol to an equivalent normal vol and uses Bachelier. This keeps a
-/// single, consistent interpretation of the supplied surface across every
-/// caplet — including a cap whose schedule crosses zero — rather than feeding the
-/// same surface number to two incompatible models. Explicit model selections
-/// remain explicit.
-fn resolve_vol_type(vol_type: CapFloorVolType) -> CapFloorVolType {
-    match vol_type {
-        CapFloorVolType::Auto => CapFloorVolType::Lognormal,
-        other => other,
-    }
+/// Resolve the quote convention once for pricing, inversion and analytic risk.
+pub(crate) fn resolve_caplet_volatility(
+    cap_floor: &CapFloor,
+    curves: &MarketContext,
+    expiry: f64,
+    strike: f64,
+) -> finstack_quant_core::Result<crate::instruments::common_impl::vol_resolution::ResolvedVolatility>
+{
+    use crate::instruments::common_impl::vol_resolution::{resolve_volatility, VolatilityRequest};
+    use finstack_quant_models::volatility::VolatilityConvention;
+    let convention = match cap_floor.vol_type {
+        CapFloorVolType::Auto => None,
+        CapFloorVolType::Normal => Some(VolatilityConvention::Normal),
+        CapFloorVolType::Lognormal => Some(VolatilityConvention::Lognormal),
+        CapFloorVolType::ShiftedLognormal => Some(VolatilityConvention::ShiftedLognormal {
+            shift: cap_floor.resolved_vol_shift(),
+        }),
+    };
+    resolve_volatility(
+        &cap_floor.instrument_pricing_overrides.market_quotes,
+        curves,
+        cap_floor.vol_surface_id.as_str(),
+        VolatilityRequest {
+            expiry,
+            tenor: 0.0,
+            strike,
+            convention,
+            clamp: true,
+        },
+    )
 }
 
-/// Price a lognormal quote with the cap/floor pricer's negative-rate fallback.
-///
-/// The quote remains lognormal. Where Black-76 is outside its positive
-/// forward/strike domain, the quote is converted to an equivalent normal
-/// volatility before Bachelier pricing. `Auto` pricing and implied-vol inversion
-/// share this function so inversion returns the original quote convention.
-pub(crate) fn price_lognormal_quote_with_fallback(
+/// Price in the resolved quote convention without conversion or rate fallback.
+pub(crate) fn price_caplet_quote(
     inputs: CapletFloorletInputs,
+    quote: crate::instruments::common_impl::vol_resolution::ResolvedVolatility,
 ) -> finstack_quant_core::Result<Money> {
     use crate::instruments::rates::cap_floor::pricing::{black, normal};
-
-    if inputs.forward > 0.0 && inputs.strike > 0.0 {
-        black::price_caplet_floorlet(inputs)
-    } else {
-        let normal_vol = crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
-            inputs.volatility,
-            inputs.forward,
-            inputs.strike,
-            inputs.time_to_fixing,
-            None,
-        );
-        normal::price_caplet_floorlet(CapletFloorletInputs {
-            volatility: normal_vol,
-            ..inputs
-        })
+    use finstack_quant_models::volatility::VolatilityConvention;
+    let (forward, strike) = quote.model_rates(inputs.forward, inputs.strike)?;
+    let inputs = CapletFloorletInputs {
+        forward,
+        strike,
+        volatility: quote.sigma,
+        ..inputs
+    };
+    match quote.convention {
+        VolatilityConvention::Normal => normal::price_caplet_floorlet(inputs),
+        _ => black::price_caplet_floorlet(inputs),
     }
 }
 
@@ -74,7 +81,8 @@ pub(crate) fn price_cap_floor(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    use crate::instruments::rates::cap_floor::pricing::{black, normal};
+    use crate::instruments::common_impl::vol_resolution::ResolvedVolatility;
+    use finstack_quant_models::volatility::VolatilityConvention;
 
     cap_floor.validate_for_pricing()?;
 
@@ -110,67 +118,28 @@ pub(crate) fn price_cap_floor(
 
         let forward = projection.forward;
         let df = resolved_inputs.discount_factor;
-        let sigma = if effective_t_fix > 0.0 {
-            crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                &cap_floor.instrument_pricing_overrides.market_quotes,
-                curves,
-                cap_floor.vol_surface_id.as_str(),
-                effective_t_fix,
-                strike,
-            )?
+        let quote = if effective_t_fix > 0.0 {
+            resolve_caplet_volatility(cap_floor, curves, effective_t_fix, strike)?
         } else {
-            0.0
+            ResolvedVolatility {
+                sigma: 0.0,
+                convention: VolatilityConvention::Normal,
+            }
         };
         let tau = projection.accrual_year_fraction;
 
-        let inputs = || CapletFloorletInputs {
+        let inputs = CapletFloorletInputs {
             is_cap,
             notional: cap_floor.notional.amount(),
             strike,
             forward,
             discount_factor: df,
-            volatility: sigma,
+            volatility: quote.sigma,
             time_to_fixing: effective_t_fix,
             accrual_year_fraction: tau,
             currency: cap_floor.notional.currency(),
         };
-        let vol_shift = cap_floor.resolved_vol_shift();
-        let resolved = resolve_vol_type(cap_floor.vol_type);
-        let leg_pv = match resolved {
-            CapFloorVolType::Lognormal => price_lognormal_quote_with_fallback(inputs())?,
-            CapFloorVolType::ShiftedLognormal => {
-                // Shifted-lognormal Black-76 requires the SHIFTED forward and
-                // strike to be strictly positive — that is the whole point of
-                // the shift in a negative-rate regime. If `vol_shift` is too
-                // small to lift this caplet's forward (the most-negative
-                // forward across the schedule fails first), `(F + shift)`
-                // would be non-positive and Black-76 would produce a
-                // log-of-non-positive NaN. Validate explicitly with an
-                // actionable error rather than emitting garbage.
-                let shifted_forward = forward + vol_shift;
-                let shifted_strike = strike + vol_shift;
-                if shifted_forward <= 0.0 || shifted_strike <= 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "cap/floor ShiftedLognormal: vol_shift {vol_shift:.6} does not lift \
-                         the caplet forward/strike positive (shifted forward {shifted_forward:.6}, \
-                         shifted strike {shifted_strike:.6}, fixing {fixing_date}). \
-                         Increase vol_shift so F + shift > 0 for the most-negative caplet, \
-                         or price with the Normal model."
-                    )));
-                }
-                black::price_caplet_floorlet(CapletFloorletInputs {
-                    strike: shifted_strike,
-                    forward: shifted_forward,
-                    ..inputs()
-                })?
-            }
-            CapFloorVolType::Normal => normal::price_caplet_floorlet(inputs())?,
-            CapFloorVolType::Auto => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "internal error: cap/floor vol_type resolved to Auto".to_string(),
-                ));
-            }
-        };
+        let leg_pv = price_caplet_quote(inputs, quote)?;
         total_pv = total_pv.checked_add(leg_pv)?;
     }
 

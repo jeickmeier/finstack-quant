@@ -688,6 +688,59 @@ fn actact_isma_eom_grid_preserves_roll_day_across_short_month() {
 }
 
 #[test]
+fn actact_isma_backward_only_month_roll_requires_reference_period() {
+    for (start, end, frequency, expected) in [
+        (
+            make_date(2025, 2, 28),
+            make_date(2025, 3, 31),
+            Tenor::monthly(),
+            1.0 / 12.0,
+        ),
+        (
+            make_date(2024, 2, 29),
+            make_date(2024, 3, 31),
+            Tenor::monthly(),
+            1.0 / 12.0,
+        ),
+        (
+            make_date(2025, 4, 30),
+            make_date(2025, 5, 31),
+            Tenor::monthly(),
+            1.0 / 12.0,
+        ),
+        (
+            make_date(2025, 2, 28),
+            make_date(2025, 8, 31),
+            Tenor::semi_annual(),
+            0.5,
+        ),
+    ] {
+        let ctx = DayCountContext {
+            frequency: Some(frequency),
+            ..Default::default()
+        };
+        let error = DayCount::ActActIsma
+            .year_fraction(start, end, ctx)
+            .expect_err("reference period required");
+        assert!(error.to_string().contains("coupon_period"), "{error}");
+        let with_reference = DayCountContext {
+            coupon_period: Some((start, end)),
+            ..ctx
+        };
+        let fraction = DayCount::ActActIsma
+            .year_fraction(start, end, with_reference)
+            .unwrap();
+        assert!(
+            (fraction - expected).abs() < TOL,
+            "{start} to {end}: {fraction}"
+        );
+        let direct =
+            act_act_isma_year_fraction_with_reference_period(start, end, start, end).unwrap();
+        assert!((direct - expected).abs() < TOL);
+    }
+}
+
+#[test]
 fn actact_isma_partial_period() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);

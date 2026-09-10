@@ -15,7 +15,8 @@ curve_id: string,
  */
 currency: string,
 /**
- * Base date for the curve.
+ * Valuation and calibration-instrument start date. The output curve's
+ * zero-time reference CPI date is this date minus `observation_lag`.
  */
 base_date: string,
 /**
@@ -29,15 +30,18 @@ index: string,
 /**
  * Observation lag (e.g. "3M").
  *
- * This controls the index publication lag used for instruments referencing this curve
- * when no `InflationIndex` fixings series is provided in the market context.
+ * Overrides the quote convention's lag and must match any supplied index
+ * lag. The same lag determines the output curve's reference-date origin and the dates
+ * of the CPI observations consumed by calibration instruments.
  */
 observation_lag: string,
 /**
  * Base CPI level used as the curve's reference CPI at t=0.
  *
- * When calibrating ZCIS curves in a curve-only context, this is typically the latest
- * known CPI fixing, i.e. CPI at `base_date - observation_lag` (not CPI at `base_date`).
+ * This is the contractual reference CPI at the start date after applying
+ * observation lag and monthly interpolation. Its curve date is
+ * `base_date - observation_lag`. Supplied index observations must reproduce
+ * this value, including seasonality; a mismatch is rejected.
  */
 base_cpi: number,
 /**

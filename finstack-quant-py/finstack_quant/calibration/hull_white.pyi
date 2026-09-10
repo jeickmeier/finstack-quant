@@ -539,13 +539,14 @@ class CapFloorCalibrationConfig:
     Examples:
     --------
     >>> from finstack_quant.calibration.hull_white import CapFloorCalibrationConfig
-    >>> CapFloorCalibrationConfig(fixed_kappa=0.03).fixed_kappa
+    >>> CapFloorCalibrationConfig(1e-4, fixed_kappa=0.03).fixed_kappa
     0.03
 
     """
 
     def __init__(
         self,
+        fit_tolerance: float,
         frequency: str = "semi_annual",
         fixed_kappa: float | None = None,
         initial_guess: HullWhiteCalibrationParams | None = None,
@@ -554,6 +555,10 @@ class CapFloorCalibrationConfig:
 
         Parameters
         ----------
+        fit_tolerance : float
+            Required positive maximum absolute implied normal-vol error, in
+            decimal rate units (0.0001 is one normal-vol basis point). This
+            acceptance budget is independent of numerical solver tolerance.
         frequency : str, default "semi_annual"
             Caplet payment frequency: ``"annual"``, ``"semi_annual"`` or
             ``"quarterly"``.
@@ -566,9 +571,21 @@ class CapFloorCalibrationConfig:
         Raises
         ------
         ValueError
-            If ``frequency`` is not recognized or ``fixed_kappa`` is not
-            strictly positive.
+            If ``frequency`` is not recognized. Numeric constraints are validated
+            when calibration runs.
 
+        """
+
+    @property
+    def fit_tolerance(self) -> float:
+        """Maximum accepted implied normal-vol quote error.
+
+        Returns
+        -------
+        float
+            Positive absolute error budget in decimal rate volatility units.
+
+        This property does not raise.
         """
 
     @property
@@ -610,7 +627,7 @@ class CapFloorCalibrationConfig:
             Solver starting point, or None.
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[str, float | None, str | None]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[float, str, float | None, HullWhiteCalibrationParams | None]]: ...
     def __repr__(self) -> str: ...
 
 class PiecewiseSigmaCalibrationConfig:
@@ -619,7 +636,7 @@ class PiecewiseSigmaCalibrationConfig:
     Examples:
     --------
     >>> from finstack_quant.calibration.hull_white import PiecewiseSigmaCalibrationConfig
-    >>> PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05).sigma_max
+    >>> PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05, 1e-4).sigma_max
     0.05
 
     """
@@ -629,6 +646,7 @@ class PiecewiseSigmaCalibrationConfig:
         fixed_kappa: float,
         sigma_min: float,
         sigma_max: float,
+        fit_tolerance: float,
         frequency: str = "semi_annual",
     ) -> None:
         """Build a piecewise-sigma bootstrap configuration.
@@ -641,6 +659,10 @@ class PiecewiseSigmaCalibrationConfig:
             Lower bracket for each interval's volatility, decimal per annum.
         sigma_max : float
             Upper bracket for each interval's volatility, decimal per annum.
+        fit_tolerance : float
+            Required positive maximum absolute implied normal-vol error, in
+            decimal rate units (0.0001 is one normal-vol basis point). This
+            acceptance budget is independent of numerical solver tolerance.
         frequency : str, default "semi_annual"
             Caplet payment frequency: ``"annual"``, ``"semi_annual"`` or
             ``"quarterly"``.
@@ -652,6 +674,18 @@ class PiecewiseSigmaCalibrationConfig:
             ``sigma_min`` is not below ``sigma_max``, or ``frequency`` is not
             recognized.
 
+        """
+
+    @property
+    def fit_tolerance(self) -> float:
+        """Maximum accepted implied normal-vol quote error.
+
+        Returns
+        -------
+        float
+            Positive absolute error budget in decimal rate volatility units.
+
+        This property does not raise.
         """
 
     @property
@@ -706,12 +740,13 @@ class PiecewiseSigmaCalibrationConfig:
             Caplet payment frequency.
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[float, float, float, str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[float, float, float, float, str]]: ...
     def __repr__(self) -> str: ...
 
 def calibrate_hull_white_to_swaptions(
     discount: DiscountCurve,
     quotes: list[SwaptionQuote],
+    fit_tolerance: float,
     frequency: str = "semi_annual",
     initial_guess: HullWhiteCalibrationParams | None = None,
 ) -> tuple[HullWhiteCalibrationParams, CalibrationReport]:
@@ -723,6 +758,11 @@ def calibrate_hull_white_to_swaptions(
         Discount curve the swap annuities and forwards are read from.
     quotes : list[SwaptionQuote]
         At least two swaption quotes, one per free parameter.
+    fit_tolerance : float
+        Required positive maximum absolute reconstructed quote error. Normal
+        quotes use decimal rate volatility (0.0001 is one basis point); Black
+        quotes use relative volatility. A poor fit returns a report with
+        ``success=False``; callers must inspect it before using the parameters.
     frequency : str, default "semi_annual"
         Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or
         ``"quarterly"``.
@@ -739,7 +779,8 @@ def calibrate_hull_white_to_swaptions(
     ------
     ValueError
         If fewer than two quotes are supplied, ``frequency`` is invalid, or
-        ``discount`` is not a ``DiscountCurve``.
+        ``discount`` is not a ``DiscountCurve``, or ``fit_tolerance`` is not
+        finite and positive.
     RuntimeError
         If the solver fails to converge.
 
@@ -755,6 +796,7 @@ def calibrate_hull_white_to_swaptions(
     >>> params, report = calibrate_hull_white_to_swaptions(
     ...     curve,
     ...     [SwaptionQuote(1.0, 5.0, 0.0085), SwaptionQuote(5.0, 5.0, 0.0080)],
+    ...     fit_tolerance=1e-4,
     ... )
     >>> params.sigma > 0.0
     True
@@ -764,8 +806,8 @@ def calibrate_hull_white_to_swaptions(
 def calibrate_hull_white_to_cap_floors(
     discount: DiscountCurve,
     quotes: list[CapFloorQuote],
+    config: CapFloorCalibrationConfig,
     forward: DiscountCurve | None = None,
-    config: CapFloorCalibrationConfig | None = None,
 ) -> tuple[HullWhiteCalibrationParams, CalibrationReport]:
     """Fit scalar Hull-White parameters to cap/floor quotes.
 
@@ -777,8 +819,9 @@ def calibrate_hull_white_to_cap_floors(
         Cap/floor quotes; a single quote requires ``config.fixed_kappa``.
     forward : DiscountCurve | None, default None
         Curve projecting the caplet forwards; ``discount`` when None.
-    config : CapFloorCalibrationConfig | None, default None
-        Frequency, fixed kappa and initial guess; Rust defaults when None.
+    config : CapFloorCalibrationConfig
+        Required quote-fit budget, frequency, fixed kappa and initial guess.
+        Reports with ``success=False`` must not be treated as accepted fits.
 
     Returns
     -------
@@ -806,7 +849,7 @@ def calibrate_hull_white_to_cap_floors(
     >>> params, report = calibrate_hull_white_to_cap_floors(
     ...     curve,
     ...     [CapFloorQuote(5.0, 0.03, 0.009)],
-    ...     config=CapFloorCalibrationConfig(fixed_kappa=0.03),
+    ...     config=CapFloorCalibrationConfig(1e-4, fixed_kappa=0.03),
     ... )
     >>> params.kappa
     0.03
@@ -859,7 +902,7 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     >>> params, report = bootstrap_hull_white_sigma_schedule_to_cap_floors(
     ...     curve,
     ...     [CapFloorQuote(2.0, 0.03, 0.009), CapFloorQuote(5.0, 0.03, 0.010)],
-    ...     PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05),
+    ...     PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05, 1e-4),
     ... )
     >>> len(params.values)
     2

@@ -331,6 +331,15 @@ impl RangeAccrual {
             )
         })?;
 
+        if let Some(quanto) = &self.quanto {
+            quanto.validate()?;
+            validation::validate_distinct_currencies(
+                quanto.asset_currency,
+                self.notional.currency(),
+                "RangeAccrual quanto",
+            )?;
+        }
+
         match (self.past_fixings_in_range, self.total_past_observations) {
             (Some(in_range), Some(total)) => {
                 if in_range > total {
@@ -438,6 +447,17 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
                     self.vol_surface_id.clone(),
                     Some(self.spot_id.clone()),
                     Some(strike),
+                ),
+            );
+        }
+        if let Some(quanto) = &self.quanto {
+            deps.add_discount_curve(quanto.asset_discount_curve_id.clone());
+            deps.add_market_scalar_id(quanto.fx_spot_id.as_str());
+            deps.add_volatility_dependency(
+                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                    quanto.fx_vol_surface_id.clone(),
+                    Some(quanto.fx_spot_id.clone()),
+                    None,
                 ),
             );
         }

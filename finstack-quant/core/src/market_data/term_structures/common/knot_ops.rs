@@ -151,7 +151,7 @@ pub(crate) fn bump_knots_triangular(
         .zip(values.iter())
         .map(|(&t, &v)| {
             let w = triangular_weight(t, prev_bucket, target_bucket, next_bucket);
-            (t, (v + bump * w).max(0.0))
+            (t, v + bump * w)
         })
         .collect()
 }

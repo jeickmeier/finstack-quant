@@ -50,6 +50,13 @@ impl MetricId {
     /// tracking and reporting alongside computed metrics.
     pub const EquityDividendYield: Self = Self(Cow::Borrowed("equity_dividend_yield"));
 
+    /// Basket PV change for a one-basis-point absolute constituent-weight increase.
+    ///
+    /// Other weights decrease proportionally to preserve unit total weight.
+    /// Units: basket currency per 0.0001 weight move, including trade notional.
+    /// Bucket coordinates use constituent IDs, independently of display tickers.
+    pub const WeightRisk: Self = Self(Cow::Borrowed("weight_risk"));
+
     /// Equity forward price per share.
     ///
     /// Computed as: S * exp((r - q) * T), where S is spot, r is risk-free rate,
@@ -112,10 +119,19 @@ impl MetricId {
     /// Bucketed vega by volatility-surface point or node.
     ///
     /// Represents vega decomposed by surface location rather than as a single
-    /// aggregate number.
+    /// aggregate number. Default buckets use each actual source expiry and
+    /// absolute strike once. Scalar implied-volatility overrides leave the
+    /// inactive surface nodes at zero; their exposure remains in [`Self::Vega`].
     ///
     /// Units: currency per 1 vol point at each bucket.
     pub const BucketedVega: Self = Self(Cow::Borrowed("bucketed_vega"));
+
+    /// Parallel active-quote vega minus the sum of raw surface-node vegas.
+    ///
+    /// Units: currency per 1 vol point. This uncovered residual includes scalar
+    /// override exposure and finite-bump nonlinearity; it is never redistributed
+    /// into the source-node buckets.
+    pub const BucketedVegaResidual: Self = Self(Cow::Borrowed("bucketed_vega_residual"));
 
     /// Domestic rho for a 1bp move in the relevant domestic rate driver.
     ///

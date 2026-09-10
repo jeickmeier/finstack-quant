@@ -38,6 +38,58 @@ pub(crate) mod bump_sizes {
 /// `(bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL)²`.
 pub(crate) const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
 
+/// Effective scalar implied volatility, when supplied by the instrument.
+pub(crate) fn volatility_override(instrument: &dyn crate::instruments::Instrument) -> Option<f64> {
+    instrument
+        .get_instrument_pricing_overrides()?
+        .market_quotes
+        .implied_volatility
+}
+
+/// Clone and bump the active scalar quote; absent overrides leave surface risk active.
+pub(crate) fn bumped_volatility_override<I: crate::instruments::Instrument + Clone>(
+    instrument: &I,
+    bump_abs: f64,
+) -> finstack_quant_core::Result<Option<I>> {
+    let Some(volatility) = volatility_override(instrument) else {
+        return Ok(None);
+    };
+    let bumped_volatility = volatility + bump_abs;
+    if !bumped_volatility.is_finite() || bumped_volatility <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Bumped implied volatility must be positive and finite".into(),
+        ));
+    }
+    let mut bumped = instrument.clone();
+    bumped
+        .get_instrument_pricing_overrides_mut()
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Instrument's active volatility quote is not mutable".into(),
+            )
+        })?
+        .market_quotes
+        .implied_volatility = Some(bumped_volatility);
+    Ok(Some(bumped))
+}
+
+/// Prepare one volatility scenario using the same quote source as pricing.
+pub(crate) fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
+    instrument: &I,
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    surface_id: &str,
+    bump_abs: f64,
+) -> finstack_quant_core::Result<(I, finstack_quant_core::market_data::context::MarketContext)> {
+    if let Some(bumped) = bumped_volatility_override(instrument, bump_abs)? {
+        Ok((bumped, market.clone()))
+    } else {
+        Ok((
+            instrument.clone(),
+            bump_surface_vol_absolute(market, surface_id, bump_abs)?,
+        ))
+    }
+}
+
 /// Smallest implied vol on a surface's `(expiry, strike)` grid.
 ///
 /// An additive parallel vol bump of size `h` clamps the down-bumped surface

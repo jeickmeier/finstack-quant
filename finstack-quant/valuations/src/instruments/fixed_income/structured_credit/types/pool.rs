@@ -2,7 +2,7 @@
 
 use crate::instruments::fixed_income::bond::Bond;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use rust_decimal::prelude::ToPrimitive;
@@ -54,6 +54,13 @@ pub struct PoolAsset {
     pub is_defaulted: bool,
     /// Realized or modeled recovery amount when the asset is defaulted.
     pub recovery_amount: Option<Money>,
+    /// Economic default date for the outstanding recovery claim; required for defaulted assets.
+    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub default_date: Option<Date>,
     /// Acquisition price in the asset currency, used for trading gain/loss.
     pub purchase_price: Option<Money>,
     /// Date on which the pool acquired the asset, if known.
@@ -71,6 +78,9 @@ pub struct PoolAsset {
     /// Optional decimal Monthly Default Rate override.
     #[serde(default)]
     pub mdr_override: Option<f64>,
+    /// Per-asset recovery fraction in [0, 1]; overrides the deal recovery model.
+    #[serde(default)]
+    pub recovery_rate: Option<f64>,
     /// Contractual periodic payment for level-pay assets. Required for exact
     /// seasoned-loan amortization; when absent it is inferred once from the
     /// current state and remaining contractual periods.
@@ -129,6 +139,7 @@ impl PoolAsset {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: bond
                 .instrument_pricing_overrides
                 .market_quotes
@@ -139,6 +150,7 @@ impl PoolAsset {
             day_count,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         })
     }
@@ -158,7 +170,7 @@ impl PoolAsset {
     /// # Example
     /// ```text
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{Date, DayCount};
+    /// use finstack_quant_core::dates::{Date, DateExt, DayCount};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::types::pool::PoolAsset;
     /// use time::Month;
@@ -198,11 +210,13 @@ impl PoolAsset {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: None,
             day_count,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         }
     }
@@ -230,11 +244,13 @@ impl PoolAsset {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: None,
             day_count,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         }
     }
@@ -281,11 +297,16 @@ impl PoolAsset {
         )
     }
 
-    /// Mark asset as defaulted with recovery
-    pub fn default_with_recovery(&mut self, recovery_amount: Money, _default_date: Date) {
+    /// Record a default and its outstanding recovery claim, payable after the deal recovery lag.
+    /// Repeating this operation replaces the current claim; it does not add another claim.
+    ///
+    /// # Arguments
+    /// * `recovery_amount` - Unreceived recovery cash in the asset currency, from zero to defaulted par.
+    /// * `default_date` - Economic default date used to schedule the recovery payment.
+    pub fn default_with_recovery(&mut self, recovery_amount: Money, default_date: Date) {
         self.is_defaulted = true;
         self.recovery_amount = Some(recovery_amount);
-        // Could store default_date in additional field if needed
+        self.default_date = Some(default_date);
     }
 }
 
@@ -314,14 +335,12 @@ pub struct ReinvestmentPeriod {
 pub struct ReinvestmentCriteria {
     /// Maximum purchase price (% of par)
     pub max_price: f64,
-    /// Minimum yield requirement
+    /// Minimum annual decimal current yield: replacement coupon divided by purchase-price fraction.
     pub min_yield: f64,
-    /// Must maintain credit quality distribution
+    /// Require the surviving credit-quality distribution; pro-rata replacement always preserves it.
     pub maintain_credit_quality: bool,
-    /// Must maintain weighted average life
+    /// Require the surviving principal-payment profile; pro-rata replacement always preserves it.
     pub maintain_wal: bool,
-    /// Must satisfy eligibility criteria
-    pub apply_eligibility_criteria: bool,
 }
 
 impl Default for ReinvestmentCriteria {
@@ -331,7 +350,6 @@ impl Default for ReinvestmentCriteria {
             min_yield: 0.0,
             maintain_credit_quality: true,
             maintain_wal: true,
-            apply_eligibility_criteria: true,
         }
     }
 }
@@ -411,7 +429,7 @@ pub struct AssetPool {
     pub excess_spread_account: Money,
 
     /// Aggregated representative lines (optional optimization)
-    /// If present, pricing engine will use these instead of individual assets.
+    /// Must be used with an empty `assets` vector; normalized into the same engine.
     pub rep_lines: Option<Vec<RepLine>>,
 }
 
@@ -422,6 +440,8 @@ pub struct AssetPool {
 pub struct RepLine {
     /// Unique identifier for the rep line
     pub id: String,
+    /// Contractual asset classification; determines level-pay amortization.
+    pub asset_type: AssetType,
     /// Aggregated balance
     pub balance: Money,
     /// Weighted average coupon
@@ -450,26 +470,32 @@ pub struct RepLine {
 }
 
 impl RepLine {
-    /// Create a new rep line
-    #[allow(clippy::too_many_arguments)]
+    /// Create a representative collateral line with explicit amortization type.
+    ///
+    /// # Arguments
+    /// * `id` - Stable identifier used in pool diagnostics.
+    /// * `balance` - Aggregate outstanding principal in the pool currency.
+    /// * `rate` - Annual decimal coupon, or current all-in rate for floating assets.
+    /// * `maturity` - Contractual final repayment date.
+    /// * `day_count` - Coupon accrual convention.
+    /// * `asset_type` - Contractual asset type, including level-pay versus bullet behavior.
     pub fn new(
         id: impl Into<String>,
         balance: Money,
         rate: f64,
-        spread_bp: Option<f64>,
-        index_id: Option<String>,
         maturity: Date,
-        seasoning_months: u32,
         day_count: DayCount,
+        asset_type: AssetType,
     ) -> Self {
         Self {
             id: id.into(),
+            asset_type,
             balance,
             rate,
-            spread_bp,
-            index_id,
+            spread_bp: None,
+            index_id: None,
             maturity,
-            seasoning_months,
+            seasoning_months: 0,
             day_count,
             cpr: None,
             cdr: None,
@@ -533,8 +559,120 @@ impl AssetPool {
         Ok(self)
     }
 
+    /// Normalize representative collateral into the canonical asset engine.
+    pub(crate) fn normalized(&self, closing_date: Date) -> finstack_quant_core::Result<Self> {
+        self.validate_representation()?;
+        let mut pool = self.clone();
+        if let Some(lines) = pool.rep_lines.take() {
+            for line in lines {
+                for (name, value) in [
+                    ("CPR", line.cpr),
+                    ("CDR", line.cdr),
+                    ("recovery", line.recovery_rate),
+                ] {
+                    if let Some(value) = value {
+                        finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
+                    }
+                }
+                if line.seasoning_months > Date::MIN.months_until(closing_date) {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "representative seasoning precedes the supported date range".into(),
+                    ));
+                }
+                let months = i32::try_from(line.seasoning_months).map_err(|_| {
+                    finstack_quant_core::Error::Validation(
+                        "representative seasoning exceeds the supported date range".into(),
+                    )
+                })?;
+                let acquisition = closing_date.add_months(-months);
+                pool.assets.push(PoolAsset {
+                    id: line.id.into(),
+                    asset_type: line.asset_type,
+                    balance: line.balance,
+                    rate: line.rate,
+                    spread_bp: line.spread_bp,
+                    index_id: line.index_id,
+                    maturity: line.maturity,
+                    credit_quality: None,
+                    industry: None,
+                    obligor_id: None,
+                    is_defaulted: false,
+                    recovery_amount: None,
+                    default_date: None,
+                    purchase_price: None,
+                    acquisition_date: Some(acquisition),
+                    day_count: line.day_count,
+                    smm_override: line.cpr.map(|cpr| 1.0 - (1.0 - cpr).powf(1.0 / 12.0)),
+                    mdr_override: line.cdr.map(|cdr| 1.0 - (1.0 - cdr).powf(1.0 / 12.0)),
+                    recovery_rate: line.recovery_rate,
+                    contractual_payment: None,
+                });
+            }
+        }
+        for asset in &pool.assets {
+            pool.validate_asset_currency(asset)?;
+            for (name, value) in [
+                ("SMM", asset.smm_override),
+                ("MDR", asset.mdr_override),
+                ("recovery", asset.recovery_rate),
+            ] {
+                if let Some(value) = value {
+                    finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
+                }
+            }
+        }
+        Ok(pool)
+    }
+
+    fn validate_representation(&self) -> finstack_quant_core::Result<()> {
+        if !self.assets.is_empty()
+            && self
+                .rep_lines
+                .as_ref()
+                .is_some_and(|lines| !lines.is_empty())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "asset pool must contain assets or representative lines, not both".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Balance-weighted collateral age, using acquisition as the supplied
+    /// origination proxy; undated assets are new at closing.
+    pub(crate) fn weighted_average_seasoning(&self, date: Date, closing_date: Date) -> u32 {
+        let mut weighted = 0.0;
+        let mut total = 0.0;
+        for asset in &self.assets {
+            let weight = asset.balance.amount().max(0.0);
+            let start = asset.acquisition_date.unwrap_or(closing_date);
+            let age = if start < date {
+                start.months_until(date)
+            } else {
+                0
+            };
+            weighted += f64::from(age) * weight;
+            total += weight;
+        }
+        if total > 0.0 {
+            (weighted / total).round() as u32
+        } else {
+            0
+        }
+    }
+
     /// Total pool balance
     pub fn total_balance(&self) -> finstack_quant_core::Result<Money> {
+        self.validate_representation()?;
+        if let Some(lines) = &self.rep_lines {
+            if self.assets.is_empty() {
+                return lines
+                    .iter()
+                    .try_fold(Money::from((0_i64, self.base_currency)), |sum, line| {
+                        sum.checked_add(line.balance)
+                    });
+            }
+        }
         self.assets
             .iter()
             .try_fold(Money::from((0_i64, self.base_currency)), |acc, asset| {
@@ -545,6 +683,10 @@ impl AssetPool {
 
     /// Total pool balance excluding defaulted assets
     pub fn performing_balance(&self) -> finstack_quant_core::Result<Money> {
+        self.validate_representation()?;
+        if self.assets.is_empty() {
+            return self.total_balance();
+        }
         self.assets.iter().filter(|a| !a.is_defaulted).try_fold(
             Money::from((0_i64, self.base_currency)),
             |acc, asset| {
@@ -569,6 +711,12 @@ impl AssetPool {
             .assets
             .iter()
             .map(|a| a.rate * a.balance.amount())
+            .chain(
+                self.rep_lines
+                    .iter()
+                    .flatten()
+                    .map(|line| line.rate * line.balance.amount()),
+            )
             .sum::<f64>();
 
         weighted_sum / total_balance
@@ -597,6 +745,16 @@ impl AssetPool {
                     .ok()
                     .map(|term| term * a.balance.amount())
             })
+            .chain(self.rep_lines.iter().flatten().filter_map(|line| {
+                line.day_count
+                    .year_fraction(
+                        as_of.min(line.maturity),
+                        line.maturity,
+                        finstack_quant_core::dates::DayCountContext::default(),
+                    )
+                    .ok()
+                    .map(|term| term * line.balance.amount())
+            }))
             .sum::<f64>();
 
         weighted_sum / total_balance
@@ -732,6 +890,12 @@ impl AssetPool {
             included_balance += asset.balance.amount();
         }
 
+        for line in self.rep_lines.iter().flatten() {
+            if let Some(spread) = line.spread_bp {
+                weighted_spread += spread * line.balance.amount();
+                included_balance += line.balance.amount();
+            }
+        }
         if included_balance == 0.0 {
             return 0.0;
         }

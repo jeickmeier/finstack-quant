@@ -19,7 +19,6 @@ use crate::targets::parametric::ParametricCurveTarget;
 use crate::targets::student_t::StudentTTarget;
 use crate::targets::svi::SviSurfaceTarget;
 use crate::targets::swaption::SwaptionVolTarget;
-use crate::targets::util::calibration_time_on_curve;
 use crate::targets::vol::VolSurfaceTarget;
 use crate::targets::xccy_basis::XccyBasisTarget;
 use crate::validation::surfaces::validate_surface;
@@ -36,6 +35,7 @@ use finstack_quant_core::market_data::term_structures::{CreditIndexData, Discoun
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use finstack_quant_models::rates::clock::model_time_on_curve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use std::sync::Arc;
 
@@ -81,6 +81,7 @@ fn prepare_hw_swaption_input(
     vol_quote: &VolQuote,
     disc_curve: &DiscountCurve,
     expected_currency: Currency,
+    base_date: finstack_quant_core::dates::Date,
 ) -> Result<(SwaptionQuote, SwaptionSchedule)> {
     let VolQuote::SwaptionVol {
         expiry,
@@ -113,17 +114,20 @@ fn prepare_hw_swaption_input(
         )));
     }
 
-    let time_day_count = disc_curve.day_count();
+    let model_curve =
+        finstack_quant_models::rates::clock::ModelDiscountCurve::new(disc_curve, base_date)?;
     let time_from_base = |date| {
-        time_day_count.year_fraction(disc_curve.base_date(), date, DayCountContext::default())
+        Ok(finstack_quant_models::rates::clock::model_time(
+            base_date, date,
+        ))
     };
     let expiry_time = time_from_base(*expiry)?;
     let swap_start_time = time_from_base(swap_start)?;
     let maturity_time = time_from_base(swap_end)?;
-    let tenor = time_day_count.year_fraction(swap_start, swap_end, DayCountContext::default())?;
+    let tenor = finstack_quant_models::rates::clock::model_time(swap_start, swap_end);
     if expiry_time <= 0.0 || tenor <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "swaption quote must expire after the discount-curve base date and have positive tenor; expiry={expiry}, maturity={maturity}"
+            "swaption quote must expire after the calibration date and have positive tenor; expiry={expiry}, maturity={maturity}"
         )));
     }
 
@@ -139,9 +143,10 @@ fn prepare_hw_swaption_input(
     let annuity: f64 = payment_times
         .iter()
         .zip(&accruals)
-        .map(|(time, accrual)| disc_curve.df(*time) * accrual)
+        .map(|(time, accrual)| model_curve.get_df(*time).unwrap_or(f64::NAN) * accrual)
         .sum();
-    let forward = (disc_curve.df(swap_start_time) - disc_curve.df(maturity_time)) / annuity;
+    let forward =
+        (model_curve.get_df(swap_start_time)? - model_curve.get_df(maturity_time)?) / annuity;
     // SwaptionQuote is an ATM-only contract. Never reinterpret an explicit
     // off-ATM strike as the forward rate. Tolerance is 0.0001 basis points.
     if !forward.is_finite() || (*strike - forward).abs() > 1e-8 {
@@ -361,7 +366,11 @@ pub(crate) fn execute_params(
         }
         StepParams::HullWhite(p) => {
             let disc_curve = context.get_discount(&p.curve_id)?;
-            let df = |t: f64| disc_curve.df(t);
+            let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                disc_curve.as_ref(),
+                p.base_date,
+            )?;
+            let df = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
 
             let mut hw_quotes = Vec::new();
             let mut hw_schedules = Vec::new();
@@ -369,8 +378,12 @@ pub(crate) fn execute_params(
                 let MarketQuote::Vol(vol_quote @ VolQuote::SwaptionVol { .. }) = quote else {
                     continue;
                 };
-                let (prepared_quote, schedule) =
-                    prepare_hw_swaption_input(vol_quote, disc_curve.as_ref(), p.currency)?;
+                let (prepared_quote, schedule) = prepare_hw_swaption_input(
+                    vol_quote,
+                    disc_curve.as_ref(),
+                    p.currency,
+                    p.base_date,
+                )?;
                 hw_quotes.push(prepared_quote);
                 hw_schedules.push(schedule);
             }
@@ -391,6 +404,7 @@ pub(crate) fn execute_params(
                 SwapFrequency::Annual,
                 Some(&hw_schedules),
                 initial_guess,
+                p.fit_tolerance,
             )?;
 
             let (kappa_key, sigma_key) = hw1f_scalar_keys(p.curve_id.as_str());
@@ -406,7 +420,7 @@ pub(crate) fn execute_params(
         StepParams::CapFloorHullWhite(p) => {
             let disc_curve = context.get_discount(&p.discount_curve_id)?;
             let discount_time = |t| {
-                calibration_time_on_curve(
+                model_time_on_curve(
                     p.base_date,
                     t,
                     disc_curve.base_date(),
@@ -427,7 +441,7 @@ pub(crate) fn execute_params(
                 Some(context.get_forward(&p.forward_curve_id)?)
             };
             let forward_base_df = match &forward_curve {
-                Some(curve) => curve.df(calibration_time_on_curve(
+                Some(curve) => curve.df(model_time_on_curve(
                     p.base_date,
                     0.0,
                     curve.base_date(),
@@ -439,7 +453,7 @@ pub(crate) fn execute_params(
                 let Some(curve) = forward_curve.as_ref() else {
                     return discount_df(t);
                 };
-                calibration_time_on_curve(p.base_date, t, curve.base_date(), curve.day_count())
+                model_time_on_curve(p.base_date, t, curve.base_date(), curve.day_count())
                     .and_then(|time| curve.df(time))
                     .map(|df| df / forward_base_df)
                     .unwrap_or(f64::NAN)
@@ -492,6 +506,7 @@ pub(crate) fn execute_params(
                         &forward_df,
                         &cap_floor_quotes,
                         CapFloorCalibrationConfig {
+                            fit_tolerance: p.fit_tolerance,
                             frequency: p.payment_frequency,
                             fixed_kappa: p.fixed_kappa,
                             initial_guess,
@@ -517,6 +532,7 @@ pub(crate) fn execute_params(
                         &forward_df,
                         &cap_floor_quotes,
                         PiecewiseSigmaCalibrationConfig {
+                            fit_tolerance: p.fit_tolerance,
                             fixed_kappa,
                             sigma_min: 1.0e-5,
                             sigma_max: 2.0,
@@ -655,7 +671,11 @@ mod tests {
     use std::sync::Arc;
     use time::Month;
 
-    fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
+    fn build_flat_discount_curve(
+        rate: f64,
+        base_date: finstack_quant_core::dates::Date,
+        curve_id: &str,
+    ) -> DiscountCurve {
         DiscountCurve::builder(curve_id)
             .base_date(base_date)
             .day_count(DayCount::Act365F)
@@ -669,7 +689,10 @@ mod tests {
             .expect("flat discount curve should build")
     }
 
-    fn build_student_t_market(base_date: Date, correlation: f64) -> MarketContext {
+    fn build_student_t_market(
+        base_date: finstack_quant_core::dates::Date,
+        correlation: f64,
+    ) -> MarketContext {
         let discount = build_flat_discount_curve(0.03, base_date, "USD-OIS");
         let hazard = HazardCurve::builder("CDX_HAZARD")
             .base_date(base_date)
@@ -697,7 +720,11 @@ mod tests {
             .insert_credit_index("CDX.NA.IG", credit_index)
     }
 
-    fn build_student_t_quote(base_date: Date, df: f64, correlation: f64) -> CdsTrancheQuote {
+    fn build_student_t_quote(
+        base_date: finstack_quant_core::dates::Date,
+        df: f64,
+        correlation: f64,
+    ) -> CdsTrancheQuote {
         let market = build_student_t_market(base_date, correlation);
         let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity");
         let template = CdsTrancheQuote {
@@ -835,13 +862,14 @@ mod tests {
             if let VolQuote::SwaptionVol { strike: value, .. } = &mut quote {
                 *value = strike;
             }
-            let error = prepare_hw_swaption_input(&quote, &discount, Currency::USD)
-                .expect_err("off-ATM quote");
+            let error =
+                prepare_hw_swaption_input(&quote, &discount, Currency::USD, discount.base_date())
+                    .expect_err("off-ATM quote");
             assert!(error.to_string().contains("requires ATM"));
         }
         set_atm_strike(&mut quote, &discount);
         let (prepared_quote, schedule) =
-            prepare_hw_swaption_input(&quote, &discount, Currency::USD)
+            prepare_hw_swaption_input(&quote, &discount, Currency::USD, discount.base_date())
                 .expect("convention-driven HW input");
         let expected_expiry = DayCount::Act365F
             .year_fraction(base_date, expiry, DayCountContext::default())
@@ -864,6 +892,30 @@ mod tests {
         assert!(schedule.swap_start_time > prepared_quote.expiry);
         assert!(schedule.payment_times[0] > schedule.maturity_time);
         assert!((prepared_quote.tenor - (expected_maturity - expected_start)).abs() < 1.0e-15);
+        for day_count in [DayCount::Act365F, DayCount::Act360] {
+            for days_before in [0, 365] {
+                let scale = if day_count == DayCount::Act360 {
+                    365.0 / 360.0
+                } else {
+                    1.0
+                };
+                let equivalent = DiscountCurve::builder("USD-OIS")
+                    .base_date(base_date - time::Duration::days(days_before))
+                    .day_count(day_count)
+                    .knots([(0.0, 1.0), (10.0 * scale, (-0.3_f64).exp())])
+                    .build()
+                    .expect("equivalent curve");
+                let (other_quote, other_schedule) =
+                    prepare_hw_swaption_input(&quote, &equivalent, Currency::USD, base_date)
+                        .expect("same dated quote on another curve clock");
+                assert_eq!(other_quote.expiry, prepared_quote.expiry);
+                assert_eq!(other_quote.tenor, prepared_quote.tenor);
+                assert_eq!(other_schedule.payment_times, schedule.payment_times);
+                assert_eq!(other_schedule.accruals, schedule.accruals);
+                assert_eq!(other_schedule.swap_start_time, schedule.swap_start_time);
+                assert_eq!(other_schedule.maturity_time, schedule.maturity_time);
+            }
+        }
     }
 
     #[test]
@@ -876,6 +928,7 @@ mod tests {
         // calibrated values don't matter as long as calibration succeeds.
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let params = StepParams::HullWhite(HullWhiteStepParams {
+            fit_tolerance: 1e-6,
             curve_id: "USD-OIS".into(),
             currency: Currency::USD,
             base_date,
@@ -961,6 +1014,7 @@ mod tests {
     fn cap_floor_hull_white_step_persists_both_kappa_and_sigma_scalars() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let params = StepParams::CapFloorHullWhite(CapFloorHullWhiteStepParams {
+            fit_tolerance: 1e-6,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-OIS".into(),
             currency: Currency::USD,
@@ -979,7 +1033,8 @@ mod tests {
             &df_fn,
             &df_fn,
             crate::hull_white::CapFloorPriceSpec::new(5.0, 0.0365, true, SwapFrequency::Quarterly),
-        );
+        )
+        .expect("implied normal quote");
         let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
             id: QuoteId::new("USD-CAP-VOL-20300101-0.0365"),
             expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),
@@ -1015,6 +1070,7 @@ mod tests {
     fn piecewise_cap_floor_hull_white_step_persists_sigma_schedule() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let params = StepParams::CapFloorHullWhite(CapFloorHullWhiteStepParams {
+            fit_tolerance: 1e-6,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-OIS".into(),
             currency: Currency::USD,
@@ -1032,7 +1088,8 @@ mod tests {
             &df_fn,
             &df_fn,
             crate::hull_white::CapFloorPriceSpec::new(5.0, 0.0365, true, SwapFrequency::Quarterly),
-        );
+        )
+        .expect("implied normal quote");
         let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
             id: QuoteId::new("USD-CAP-VOL-20300101-0.0365"),
             expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),

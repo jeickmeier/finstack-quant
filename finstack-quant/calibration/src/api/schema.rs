@@ -894,7 +894,8 @@ pub struct InflationCurveParams {
     /// Currency of the curve.
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
-    /// Base date for the curve.
+    /// Valuation and calibration-instrument start date. The output curve's
+    /// zero-time reference CPI date is this date minus `observation_lag`.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
@@ -909,13 +910,16 @@ pub struct InflationCurveParams {
     pub index: String,
     /// Observation lag (e.g. "3M").
     ///
-    /// This controls the index publication lag used for instruments referencing this curve
-    /// when no `InflationIndex` fixings series is provided in the market context.
+    /// Overrides the quote convention's lag and must match any supplied index
+    /// lag. The same lag determines the output curve's reference-date origin and the dates
+    /// of the CPI observations consumed by calibration instruments.
     pub observation_lag: String,
     /// Base CPI level used as the curve's reference CPI at t=0.
     ///
-    /// When calibrating ZCIS curves in a curve-only context, this is typically the latest
-    /// known CPI fixing, i.e. CPI at `base_date - observation_lag` (not CPI at `base_date`).
+    /// This is the contractual reference CPI at the start date after applying
+    /// observation lag and monthly interpolation. Its curve date is
+    /// `base_date - observation_lag`. Supplied index observations must reproduce
+    /// this value, including seasonality; a mismatch is rejected.
     pub base_cpi: f64,
     /// Notional used to price synthetic inflation swaps during calibration.
     ///
@@ -1084,20 +1088,15 @@ pub struct SwaptionVolParams {
     #[serde(default)]
     #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub swap_index: Option<IndexId>,
-    /// Reporting tolerance used to determine calibration success.
+    /// Maximum absolute error of any fitted volatility quote; defaults to 0.0015.
     ///
     /// This is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol
     /// calibration, success should reflect whether the fitted smile residuals are within a
-    /// market-appropriate tolerance (e.g., 10–20 vol bp), not machine epsilon.
+    /// market-appropriate tolerance (e.g., 10–20 normal vol bp), not machine epsilon.
+    /// Normal quotes use decimal rate per square-root year; Black quotes use
+    /// dimensionless annual volatility. Errors are never scaled by vega.
     #[serde(default)]
     pub vol_tolerance: Option<f64>,
-
-    /// Solver tolerance used inside the SABR calibration routines.
-    ///
-    /// This is an algorithmic convergence tolerance (not a market quoting tolerance).
-    /// If unset, the SABR calibrator default is used.
-    #[serde(default)]
-    pub sabr_tolerance: Option<f64>,
 
     /// Extrapolation policy used when interpolating SABR parameters across the
     /// expiry–tenor grid for target points that do not have a directly calibrated bucket.
@@ -1255,6 +1254,10 @@ fn default_student_t_correlation() -> f64 {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HullWhiteStepParams {
+    /// Required positive maximum implied-quote error in quoted volatility units.
+    /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+    /// This acceptance budget is independent of the numerical solver tolerance.
+    pub fit_tolerance: f64,
     /// Discount curve ID (must already exist in market context).
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
@@ -1298,6 +1301,10 @@ pub enum HullWhiteVolatilityMode {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CapFloorHullWhiteStepParams {
+    /// Required positive maximum implied-quote error in quoted volatility units.
+    /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+    /// This acceptance budget is independent of the numerical solver tolerance.
+    pub fit_tolerance: f64,
     /// Discount curve ID (must already exist in market context).
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,

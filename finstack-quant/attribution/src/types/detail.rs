@@ -399,19 +399,10 @@ impl SourceLine {
 /// - **roll_down**: Curve shape benefit from aging along a sloped curve
 /// - **funding_cost**: Cost of financing the position
 ///
-/// The populated price-carry lines always partition `total` after removing
-/// funding that is already netted into `total`:
-///
-/// ```text
-/// coupon_income + pull_to_par + roll_down − funding_cost.unwrap_or(0) = total
-/// ```
-///
-/// when `total` is a metrics-path `CarryTotal` (already net of financing).
-/// On reprice paths, `total` is the isolated date-roll factor (`theta + cash`,
-/// all-in price carry). `funding_cost` is then a repo overlay and is **not**
-/// subtracted from `total`; the price-carry partition is
-/// `coupon + pull_to_par + roll_down = total`, and economic carry net of
-/// financing is `total − funding_cost`.
+/// Carry and endpoint P&L are both gross of financing:
+/// `coupon_income + pull_to_par + roll_down = total`. Funding remains a
+/// separately identified overlay; net financed carry is `total - funding_cost`.
+/// Metrics-based attribution adds FundingCost back to the net CarryTotal metric.
 ///
 /// In metrics-based attribution, these fields are populated from pre-computed
 /// carry decomposition metrics when available. In repricing-based attribution
@@ -430,7 +421,7 @@ impl SourceLine {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CarryDetail {
-    /// Total carry P&L. Equals the `CarryTotal` metric on the metrics-based
+    /// Gross carry P&L. Equals `CarryTotal + FundingCost` on the metrics-based
     /// path, or the repricing-based time drift plus coupons paid on the
     /// reprice paths. The populated sub-lines always partition this total.
     pub total: Money,
@@ -481,13 +472,14 @@ pub struct CarryDetail {
 ///   (lines = coupon + roll)
 /// - `credit_carry_total ≡ generic + Σ_levels(level.total) + adder_total`
 /// - `rates_carry_total ≡ Σ_lines SourceLine.rates_part
-///   + (1 − w) × pull_to_par − funding_cost`
+///   + (1 − w) × pull_to_par`
+/// - `funding_cost` is a separate financing overlay outside both gross totals.
 ///
 /// # Attribution method coverage
 ///
 /// All four methods populate `carry_detail`: Parallel, Waterfall and Taylor
-/// via `apply_total_return_carry` (theta + coupon_income; pull-to-par and
-/// funding lines stay `None` on those paths), MetricsBased from the carry
+/// via `apply_total_return_carry` (theta + coupon_income, with financing
+/// identified separately when configured), MetricsBased from the carry
 /// decomposition metrics. `credit_carry_decomposition` is therefore emitted
 /// on any path whose `carry_detail.coupon_income` is populated when a
 /// `CreditFactorModel` is supplied — the decomposition logic is

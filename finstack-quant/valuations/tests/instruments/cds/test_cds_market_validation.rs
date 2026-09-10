@@ -72,7 +72,7 @@ fn test_regional_cds_lifecycle_fixtures_na_eu_asia() {
         (
             Currency::JPY,
             CdsConvention::IsdaAs,
-            DayCount::Act365F,
+            DayCount::Act360,
             "jpto",
             3_u16,
         ),

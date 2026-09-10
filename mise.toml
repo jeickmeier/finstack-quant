@@ -198,17 +198,28 @@ usage = '''
 arg "<package>" help="Cargo package (e.g. finstack-quant-core)"
 arg "<filter>" help="Test name substring or exact name (nextest filter)"
 flag "--integration <test>" help="Limit to one integration test binary"
+flag "--lib" help="Limit to library unit tests"
 flag "--slow" help="Include ignored/slow tests"
 '''
 run = '''
 set -e
 pkg="${usage_package?}"
 filter="${usage_filter?}"
+if [ "${usage_lib:-false}" = "true" ] && [ -n "${usage_integration:-}" ]; then
+  echo "--lib and --integration are mutually exclusive" >&2
+  exit 2
+fi
 if [ -n "${usage_integration:-}" ]; then
   if [ "${usage_slow:-false}" = "true" ]; then
     cargo nextest run -p "$pkg" --test "${usage_integration?}" --run-ignored only --no-fail-fast -- "$filter"
   else
     cargo nextest run -p "$pkg" --test "${usage_integration?}" --no-fail-fast -- "$filter"
+  fi
+elif [ "${usage_lib:-false}" = "true" ]; then
+  if [ "${usage_slow:-false}" = "true" ]; then
+    cargo nextest run -p "$pkg" --lib --run-ignored only --no-fail-fast -- "$filter"
+  else
+    cargo nextest run -p "$pkg" --lib --no-fail-fast -- "$filter"
   fi
 else
   if [ "${usage_slow:-false}" = "true" ]; then

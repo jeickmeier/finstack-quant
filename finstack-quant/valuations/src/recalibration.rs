@@ -205,6 +205,18 @@ pub trait RecalibrationProvider: Send + Sync {
         request: &HazardRecalibrationRequest,
     ) -> finstack_quant_core::Result<Arc<HazardCurve>>;
 
+    /// Get the discount-curve dependency of a stored hazard calibration recipe.
+    ///
+    /// # Arguments
+    ///
+    /// * `hazard` - Source hazard curve carrying the original typed calibration
+    ///   recipe. Its discount identifier is resolved by the provider that owns
+    ///   that recipe's schema; missing or invalid recipes return an error.
+    fn get_hazard_discount_curve_id(
+        &self,
+        hazard: &HazardCurve,
+    ) -> finstack_quant_core::Result<CurveId>;
+
     /// Return exact ordered spread-risk bindings from a hazard replay recipe.
     ///
     /// # Arguments
@@ -258,6 +270,13 @@ mod tests {
                 &self,
                 _request: &HazardRecalibrationRequest,
             ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
+                unreachable!()
+            }
+
+            fn get_hazard_discount_curve_id(
+                &self,
+                _hazard: &HazardCurve,
+            ) -> finstack_quant_core::Result<CurveId> {
                 unreachable!()
             }
 

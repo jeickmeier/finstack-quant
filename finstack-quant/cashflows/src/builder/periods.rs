@@ -44,6 +44,7 @@ pub struct SchedulePeriod {
 ///
 /// This struct captures the canonical schedule conventions used to derive
 /// accrual periods, payment dates, and optional reset dates.
+#[derive(Clone, Copy)]
 pub struct BuildPeriodsParams<'a> {
     /// Start date of the schedule.
     pub start: Date,
@@ -104,11 +105,30 @@ impl<'a> BuildPeriodsParams<'a> {
     }
 }
 
-fn enrich_period(
-    mut period: SchedulePeriod,
+/// Calculate accrual over a subinterval using the original period's reference grid.
+///
+/// # Arguments
+///
+/// * `period` - Original contractual period, retaining unadjusted stub anchors.
+/// * `start` - Inclusive accrual start within the original period.
+/// * `end` - Exclusive accrual end within the original period.
+/// * `params` - Original schedule conventions, including ICMA frequency and calendar.
+///
+/// # Errors
+///
+/// Returns a validation error for an interval outside the period or invalid conventions.
+pub fn period_accrual(
+    period: &SchedulePeriod,
+    start: Date,
+    end: Date,
     params: &BuildPeriodsParams<'_>,
-    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
-) -> finstack_quant_core::Result<SchedulePeriod> {
+) -> finstack_quant_core::Result<f64> {
+    if start < period.accrual_start || end > period.accrual_end || end < start {
+        return Err(finstack_quant_core::Error::Validation(
+            "accrual subinterval lies outside its contractual period".into(),
+        ));
+    }
+    let cal = resolve_calendar_strict(params.calendar_id)?;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let day_count_context = DayCountContext {
         calendar: Some(cal),
@@ -127,11 +147,18 @@ fn enrich_period(
         ),
         end_is_termination_date: period.accrual_end >= params.end,
     };
-    period.accrual_year_fraction = params.day_count.year_fraction(
-        period.accrual_start,
-        period.accrual_end,
-        day_count_context,
-    )?;
+    params
+        .day_count
+        .year_fraction(start, end, day_count_context)
+}
+
+fn enrich_period(
+    mut period: SchedulePeriod,
+    params: &BuildPeriodsParams<'_>,
+    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
+) -> finstack_quant_core::Result<SchedulePeriod> {
+    period.accrual_year_fraction =
+        period_accrual(&period, period.accrual_start, period.accrual_end, params)?;
     period.reset_date = params
         .reset_lag_days
         .map(|lag| {

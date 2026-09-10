@@ -241,10 +241,11 @@ pub(super) fn calculate_pool_flows_with_rates(
 
         // Per-name defaults recover at their own idiosyncratically-dispersed
         // rate; the LHP and legacy paths use the period systematic recovery.
-        let asset_recovery_rate = match per_name_claim {
-            Some((_, recovery)) => recovery,
-            None => request.rates.recovery_rate,
-        };
+        let asset_recovery_rate =
+            state.pool_state.recovery_rates[i].unwrap_or(match per_name_claim {
+                Some((_, recovery)) => recovery,
+                None => request.rates.recovery_rate,
+            });
         let recovery_amt = default_amt * asset_recovery_rate;
         total_default = total_default.checked_add(Money::new(default_amt, base_currency)?)?;
         total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_currency)?)?;

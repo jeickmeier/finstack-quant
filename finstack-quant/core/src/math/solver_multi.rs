@@ -341,17 +341,17 @@ impl LevenbergMarquardtSolver {
     ///
     /// # Arguments
     /// * `objective` - Function to minimize, takes a parameter vector and returns a scalar.
-    /// * `initial` - Initial parameter guess.
-    /// * `bounds` - Optional box constraints for each parameter.
+    /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
+    /// * `bounds` - Optional ordered, non-NaN lower/upper pair for each parameter; infinities leave a side unbounded.
     ///
     /// # Returns
     /// Optimal parameter vector that minimizes the objective.
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::SolverConvergenceFailed`] when the solver
-    /// encounters a numerical failure, or terminates (iteration budget
-    /// exhausted, or step below `min_step_size`) at a point that satisfies
+    /// Returns [`crate::Error::Validation`] for invalid initial parameters or bounds.
+    /// Returns [`InputError::SolverConvergenceFailed`] on numerical failure, or when the
+    /// iteration budget is exhausted or the step is below `min_step_size` at a point satisfying
     /// neither the residual nor the (bounds-projected) gradient tolerance.
     /// Termination at a genuinely converged point — objective within
     /// `tolerance` of zero, or projected gradient below `tolerance` (e.g. a
@@ -710,6 +710,23 @@ impl LevenbergMarquardtSolver {
         if params.is_empty() || n_residuals == 0 {
             return Err(InputError::Invalid.into());
         }
+        if params.iter().any(|value| !value.is_finite()) {
+            return Err(crate::Error::Validation(
+                "LM initial parameters must be finite".into(),
+            ));
+        }
+        if let Some(bounds) = bounds {
+            if bounds.len() != params.len()
+                || bounds
+                    .iter()
+                    .zip(&params)
+                    .any(|(&(lo, hi), value)| !(lo..=hi).contains(value))
+            {
+                return Err(crate::Error::Validation(
+                    "LM requires one ordered non-NaN bound pair per parameter and initial parameters within those bounds".into(),
+                ));
+            }
+        }
 
         let mut lambda = self.lambda_init;
         let n_params = params.len();
@@ -868,17 +885,17 @@ impl LevenbergMarquardtSolver {
     /// # Arguments
     /// * `objective` - Function to minimize
     /// * `derivatives` - Provider of analytical derivatives
-    /// * `initial` - Initial parameter guess
-    /// * `bounds` - Optional box constraints
+    /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
+    /// * `bounds` - Optional ordered, non-NaN lower/upper pair for each parameter; infinities leave a side unbounded.
     ///
     /// # Returns
     /// Optimal parameter vector
     ///
     /// # Errors
     ///
+    /// Returns [`crate::Error::Validation`] for invalid initial parameters or bounds.
     /// Returns [`InputError::SolverConvergenceFailed`] on `MaxIterations`,
-    /// `NumericalFailure`, or a stall at a non-converged point (see
-    /// [`Self::minimize`]).
+    /// `NumericalFailure`, or a stall at a non-converged point (see [`Self::minimize`]).
     pub fn minimize_with_derivatives<Obj, D>(
         &self,
         objective: Obj,
@@ -1113,6 +1130,48 @@ mod tests {
         // Solution should be at boundary (3, 3)
         assert!((result[0] - 3.0).abs() < 1e-6);
         assert!((result[1] - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_minimize_rejects_invalid_initial_bounds_before_evaluation() {
+        struct QuarticDerivatives;
+        impl AnalyticalDerivatives for QuarticDerivatives {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+                let x = params[0];
+                gradient[0] = 2.0 * (x - 0.5) * (x - 2.0) * (2.0 * x - 2.5);
+            }
+        }
+        let solver = LevenbergMarquardtSolver::new();
+        for (initial, bounds) in [
+            (2.0, vec![(0.0, 1.0)]),
+            (0.5, vec![(1.0, 0.0)]),
+            (0.5, vec![(f64::NAN, 1.0)]),
+            (0.5, vec![(0.0, f64::NAN)]),
+            (0.5, vec![]),
+            (0.5, vec![(0.0, 1.0), (0.0, 1.0)]),
+            (f64::NAN, vec![(0.0, 1.0)]),
+            (f64::INFINITY, vec![(0.0, f64::INFINITY)]),
+        ] {
+            let evaluations = std::cell::Cell::new(0);
+            let objective = |p: &[f64]| {
+                evaluations.set(evaluations.get() + 1);
+                (p[0] - 0.5).powi(2) * (p[0] - 2.0).powi(2)
+            };
+            for analytical in [false, true] {
+                let result = if analytical {
+                    solver.minimize_with_derivatives(
+                        objective,
+                        &QuarticDerivatives,
+                        &[initial],
+                        Some(&bounds),
+                    )
+                } else {
+                    solver.minimize(objective, &[initial], Some(&bounds))
+                };
+                assert!(result.is_err(), "{result:?}");
+                assert_eq!(evaluations.get(), 0);
+            }
+        }
     }
 
     #[test]

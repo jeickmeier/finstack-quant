@@ -76,7 +76,7 @@ pub(crate) fn compute_pv(
         return Ok(undiscounted * df);
     }
 
-    // Seasoned mark-to-market: the day-count time-weighted blend of realized-to-date
+    // Seasoned mark-to-market: the observation-count blend of realized-to-date
     // and remaining forward variance. Shared with the `ExpectedVariance` metric via
     // `seasoned_expected_variance` so the reported metric can never drift from the
     // variance implied by this PV (W-32/W-33).
@@ -90,47 +90,20 @@ pub(crate) fn compute_pv(
     Ok(undiscounted * df)
 }
 
-/// Seasoned mark-to-market expected variance: the day-count time-weighted blend
-/// of realized-to-date and remaining forward variance.
-///
-/// Used for a partially-observed swap (`start_date <= as_of < maturity`). Both
-/// the realized term and the blend weight `w = time_elapsed_fraction` are on the
-/// **day-count time basis**, so the accrued-variance identity
-/// `σ²_expected = (V_accrued + E[V_fwd]·τ) / T` closes exactly. The realized term
-/// therefore uses [`seasoned_realized_variance`] (`V_accrued / t_elapsed`), not
-/// [`partial_realized_variance`] (observation-count annualization), which would
-/// disagree for non-uniform schedules (W-33).
-///
-/// `compute_pv` and the `ExpectedVariance` metric both call this, guaranteeing the
-/// reported expected variance always equals the variance implied by the swap's PV.
+/// Expected annualized variance using the same sample-count basis as settlement.
+/// The observed part uses the contractual estimator and annualization; remaining
+/// samples use forward variance. A fully observed swap needs no volatility input.
 pub(crate) fn seasoned_expected_variance(
     inst: &VarianceSwap,
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
+    let w = realized_fraction_by_observations(inst, as_of)?;
+    let realized = partial_realized_variance(inst, curves, as_of)?;
+    if w >= 1.0 {
+        return Ok(realized);
+    }
     let forward = remaining_forward_variance(inst, curves, as_of)?;
-    let final_observation_date = observation_dates(inst)?
-        .last()
-        .copied()
-        .unwrap_or(inst.maturity);
-    let total_t = inst.day_count.year_fraction(
-        inst.start_date,
-        final_observation_date,
-        Default::default(),
-    )?;
-    let w = if as_of <= inst.start_date {
-        0.0
-    } else if as_of >= final_observation_date || total_t <= 0.0 {
-        1.0
-    } else {
-        (inst
-            .day_count
-            .year_fraction(inst.start_date, as_of, Default::default())?
-            / total_t)
-            .clamp(0.0, 1.0)
-    };
-    let t_elapsed = w * total_t;
-    let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
     Ok(realized * w + forward * (1.0 - w))
 }
 
@@ -203,15 +176,31 @@ pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date
     if all.is_empty() {
         return Ok(0.0);
     }
-    if as_of <= inst.start_date {
+    if as_of < inst.start_date {
         return Ok(0.0);
     }
     if as_of >= all.last().copied().unwrap_or(inst.maturity) {
         return Ok(1.0);
     }
-    let total = all.len() as f64;
-    let realized = all.iter().filter(|&&d| d <= as_of).count() as f64;
-    Ok((realized / total).clamp(0.0, 1.0))
+    // Close-to-close and Yang-Zhang need the first level as an anchor;
+    // the other OHLC estimators count each bar as one sample.
+    let anchor = usize::from(
+        !inst.realized_var_method.requires_ohlc()
+            || inst.realized_var_method
+                == finstack_quant_core::math::stats::RealizedVarMethod::YangZhang,
+    );
+    let total = all.len().saturating_sub(anchor);
+    let realized = all
+        .iter()
+        .filter(|&&d| d <= as_of)
+        .count()
+        .saturating_sub(anchor);
+    if total == 0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "variance swap has no return samples".into(),
+        ));
+    }
+    Ok(realized as f64 / total as f64)
 }
 
 pub(crate) fn get_historical_prices(
@@ -322,13 +311,7 @@ pub(crate) fn get_historical_ohlc(
 /// Realized variance over the elapsed window, annualized with an explicit
 /// annualization factor.
 ///
-/// Both close-to-close and the OHLC estimators compute a per-period variance
-/// (mean over the elapsed sample) and multiply by `annualization_factor`. The
-/// factor therefore selects the *time basis* of the annualization. With the
-/// observation-frequency factor (~252 for daily) the result is annualized on
-/// an observation-count basis; with `M / t_elapsed` (M = number of return
-/// periods / OHLC bars, `t_elapsed` in years) it is annualized on a day-count
-/// time basis instead — see [`seasoned_realized_variance`].
+/// Annualize the configured observed-sample estimator on the settlement basis.
 fn realized_variance_with_factor(
     inst: &VarianceSwap,
     context: &MarketContext,
@@ -356,21 +339,6 @@ fn realized_variance_with_factor(
     realized_variance(&prices, inst.realized_var_method, annualization_factor)
 }
 
-/// Number of per-period samples (return periods or OHLC bars) accrued by
-/// `as_of`. Used to convert an observation-count annualization to a time-basis
-/// annualization without re-deriving the squared-return sum.
-fn realized_sample_count(inst: &VarianceSwap, context: &MarketContext, as_of: Date) -> Result<f64> {
-    if inst.realized_var_method.requires_ohlc() {
-        let (_, _, _, close) = get_historical_ohlc(inst, context, as_of)?;
-        // OHLC estimators average over the number of bars.
-        Ok((close.len() as f64).max(0.0))
-    } else {
-        let prices = get_historical_prices(inst, context, as_of)?;
-        // Close-to-close averages over the number of returns = points − 1.
-        Ok((prices.len() as f64 - 1.0).max(0.0))
-    }
-}
-
 pub(crate) fn partial_realized_variance(
     inst: &VarianceSwap,
     context: &MarketContext,
@@ -382,38 +350,6 @@ pub(crate) fn partial_realized_variance(
         as_of,
         annualization_factor_with_policy(inst, context),
     )
-}
-
-/// Realized variance for the seasoned mark-to-market blend, annualized on the
-/// **day-count time basis** so it is consistent with the blend weight `w`.
-///
-/// `compute_pv` blends `realized·w + forward·(1−w)` with `w` the day-count
-/// `time_elapsed_fraction`. The accrued-variance identity
-/// `σ²_expected = (V_accrued + E[V_fwd]·τ) / T` requires `realized·w` to equal
-/// `V_accrued / T`, i.e. `realized = V_accrued / t_elapsed`.
-/// [`partial_realized_variance`] instead annualizes `V_accrued` on an
-/// observation-count basis (`Σr²/N · AF`, AF ≈ 252), so the two time bases
-/// disagree and the identity does not close for non-uniform schedules.
-///
-/// This function re-bases the annualization: it annualizes with
-/// `AF = M / t_elapsed` (M = accrued sample count), which yields exactly
-/// `V_accrued / t_elapsed` for both close-to-close and OHLC estimators. When
-/// the elapsed time or sample count is degenerate (≤ 0), it falls back to the
-/// observation-count annualization.
-pub(crate) fn seasoned_realized_variance(
-    inst: &VarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-    t_elapsed: f64,
-) -> Result<f64> {
-    let m = realized_sample_count(inst, context, as_of)?;
-    if t_elapsed > 0.0 && m > 0.0 {
-        // AF = M / t_elapsed turns the per-period mean (÷M) into Σ(·)/t_elapsed.
-        realized_variance_with_factor(inst, context, as_of, m / t_elapsed)
-    } else {
-        // Degenerate window: nothing meaningful accrued — fall back.
-        partial_realized_variance(inst, context, as_of)
-    }
 }
 
 /// Minimum year-fraction below which the forward-start subtraction is skipped
@@ -595,6 +531,30 @@ mod tests {
             .insert_surface(surface.build().expect("surface"))
             .insert_price("SPX", MarketScalar::Unitless(100.0))
             .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0))
+    }
+
+    #[test]
+    fn m18_final_observation_expected_variance_matches_settlement() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        let mut swap = VarianceSwap::example().expect("swap");
+        swap.underlying_ticker = "SPX".into();
+        swap.discount_curve_id = "USD-OIS".into();
+        swap.start_date = date!(2025 - 01 - 06);
+        swap.maturity = date!(2025 - 01 - 13);
+        swap.instrument_pricing_overrides = swap.instrument_pricing_overrides.with_implied_vol(0.2);
+        let dates = observation_dates(&swap).expect("dates");
+        let final_date = *dates.last().expect("final observation");
+        let prices: Vec<_> = dates
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (*d, 100.0 * (0.01 * i as f64).exp()))
+            .collect();
+        let market = build_market(final_date)
+            .insert_series(ScalarTimeSeries::new("SPX", prices, None).expect("series"));
+        let expected = partial_realized_variance(&swap, &market, final_date).expect("realized");
+        let actual =
+            seasoned_expected_variance(&swap, &market, final_date).expect("expected variance");
+        assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
     }
 
     /// End-to-end wiring check of the EQUITY Carr-Madan path: a flat-in-strike,
@@ -815,11 +775,11 @@ mod tests {
 
     /// W-32: a seasoned variance swap on a weekend-skipping daily schedule
     /// near maturity must blend realized and forward variance by the
-    /// day-count `time_elapsed_fraction`, not by observation count. The two
+    /// settlement observation count. The two
     /// fractions diverge for non-uniform schedules and the MTM error is
     /// first-order near maturity.
     #[test]
-    fn seasoned_mtm_uses_time_weighting_not_observation_count() {
+    fn seasoned_mtm_uses_settlement_observation_weighting() {
         use crate::instruments::common_impl::traits::Attributes;
         use crate::instruments::equity::variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
@@ -883,18 +843,9 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");
 
-        // Recompute the identity from the same building blocks. The realized
-        // term must use the time-basis annualization (`seasoned_realized_variance`,
-        // W-33) so it is consistent with the day-count blend weight `w`.
-        let total_t = swap
-            .day_count
-            .year_fraction(swap.start_date, swap.maturity, Default::default())
-            .expect("total yf");
-        let t_elapsed = time_w * total_t;
-        let realized =
-            seasoned_realized_variance(&swap, &market, as_of, t_elapsed).expect("realized");
+        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
-        let expected_var = realized * time_w + forward * (1.0 - time_w);
+        let expected_var = realized * count_w + forward * (1.0 - count_w);
         let disc = market.get_discount("USD-OIS").expect("curve");
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
@@ -906,122 +857,17 @@ mod tests {
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
-            "seasoned MTM must use time-weighted identity: pv={} expected={}",
+            "seasoned MTM must use settlement observation weighting: pv={} expected={}",
             pv.amount(),
             expected_pv.amount()
         );
 
-        // And it must NOT match the (wrong) observation-count weighting.
-        let count_var = realized * count_w + forward * (1.0 - count_w);
-        let count_pv = swap.payoff(count_var).expect("valid payoff") * df;
-        assert!(
-            (pv.amount() - count_pv.amount()).abs() > 1e-6,
-            "seasoned MTM must differ from observation-count weighting"
-        );
+        let time_var = realized * time_w + forward * (1.0 - time_w);
+        let time_pv = swap.payoff(time_var).expect("payoff") * df;
+        assert!((pv.amount() - time_pv.amount()).abs() > 1e-6);
     }
 
-    /// W-33: the realized-variance term in the seasoned MTM blend must be
-    /// annualized on the *day-count time basis* (`V_accrued / t_elapsed`), the
-    /// same basis as the blend weight `w`. The observation-count annualization
-    /// (`partial_realized_variance`, Σr²/N · ~252) uses a different time base,
-    /// so the accrued-variance identity does not close. The two must differ for
-    /// a non-uniform (weekend-skipping) schedule, and `compute_pv` must use the
-    /// time-basis value.
-    #[test]
-    fn seasoned_realized_variance_uses_time_basis_not_observation_count() {
-        use crate::instruments::common_impl::traits::Attributes;
-        use crate::instruments::equity::variance_swap::types::PayReceive;
-        use finstack_quant_core::dates::{DayCount, Tenor};
-        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-        use finstack_quant_core::money::Money;
-        use finstack_quant_core::types::{CurveId, InstrumentId};
-
-        let start = date!(2025 - 01 - 06); // Monday
-        let maturity = date!(2025 - 06 - 30); // Monday
-        let as_of = date!(2025 - 04 - 18); // Friday, mid-life
-
-        let swap = VarianceSwap::builder()
-            .id(InstrumentId::new("VARSPX-W33"))
-            .underlying_ticker("SPX".to_string())
-            .notional(Money::from((
-                1_000_000_i64,
-                finstack_quant_core::currency::Currency::USD,
-            )))
-            .strike_variance(0.04)
-            .start_date(start)
-            .maturity(maturity)
-            .observation_frequency(Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
-            .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
-            .price_series_policy(
-                finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
-            )
-            .side(PayReceive::Receive)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .day_count(DayCount::Act365F)
-            .attributes(Attributes::new())
-            .build()
-            .expect("w33 swap");
-
-        let past: Vec<Date> = observation_dates(&swap)
-            .expect("observation schedule")
-            .into_iter()
-            .filter(|&d| d <= as_of)
-            .collect();
-        let obs: Vec<(Date, f64)> = past
-            .iter()
-            .enumerate()
-            .map(|(i, &d)| (d, 100.0 * (1.0 + 0.002 * (i as f64 % 4.0 - 1.5))))
-            .collect();
-        let series = ScalarTimeSeries::new("SPX", obs, None).expect("series");
-        let market = build_market(as_of).insert_series(series);
-
-        let time_w = swap.time_elapsed_fraction(as_of);
-        let total_t = swap
-            .day_count
-            .year_fraction(swap.start_date, swap.maturity, Default::default())
-            .expect("total yf");
-        let t_elapsed = time_w * total_t;
-
-        let obs_count_realized =
-            partial_realized_variance(&swap, &market, as_of).expect("obs-count realized");
-        let time_basis_realized =
-            seasoned_realized_variance(&swap, &market, as_of, t_elapsed).expect("time realized");
-
-        // The two annualizations must genuinely differ (weekend-skipping
-        // schedule => N_returns/AF ≠ t_elapsed).
-        assert!(
-            (obs_count_realized - time_basis_realized).abs() / time_basis_realized.max(1e-12)
-                > 1e-3,
-            "observation-count ({obs_count_realized}) and time-basis \
-             ({time_basis_realized}) realized variance must differ"
-        );
-
-        // Identity check: time_basis_realized = V_accrued / t_elapsed.
-        // Reconstruct V_accrued = Σr² directly from the close series.
-        let prices: Vec<f64> = past
-            .iter()
-            .enumerate()
-            .map(|(i, _)| 100.0 * (1.0 + 0.002 * (i as f64 % 4.0 - 1.5)))
-            .collect();
-        let v_accrued: f64 = prices
-            .windows(2)
-            .map(|w| {
-                let r = (w[1] / w[0]).ln();
-                r * r
-            })
-            .sum();
-        let expected_time_realized = v_accrued / t_elapsed;
-        assert!(
-            (time_basis_realized - expected_time_realized).abs()
-                / expected_time_realized.max(1e-12)
-                < 1e-9,
-            "seasoned realized variance must equal V_accrued / t_elapsed: \
-             got {time_basis_realized}, expected {expected_time_realized}"
-        );
-    }
-
-    /// Week tenors step in calendar weeks; day tenors step in business-day
+    /// Weekly and biweekly sampling counts calendar weeks rather than trading-day
     /// observations. Their annualization bases must preserve that distinction.
     #[test]
     fn weekly_and_biweekly_annualization_uses_calendar_observation_counts() {

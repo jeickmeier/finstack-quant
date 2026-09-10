@@ -26,7 +26,38 @@ use std::sync::Arc;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::Result;
 
+use crate::instruments::fx::ndf::NdfQuoteConvention;
+use crate::instruments::{FxForward, FxSpot, Instrument, Ndf};
 use crate::metrics::{MetricCalculator, MetricContext};
+
+// These products can source their sole FX quote from the instrument. An
+// observed NDF fixing is contractual and remains unchanged in either scenario.
+fn bumped_instrument_quote(
+    instrument: &dyn Instrument,
+    relative: f64,
+) -> Option<Box<dyn Instrument>> {
+    let mut bumped = instrument.clone_box();
+    if let Some(forward) = bumped.as_any_mut().downcast_mut::<FxForward>() {
+        *forward.spot_rate_override.as_mut()? *= 1.0 + relative;
+    } else if let Some(spot) = bumped.as_any_mut().downcast_mut::<FxSpot>() {
+        *spot.spot_rate.as_mut()? *= 1.0 + relative;
+    } else if let Some(ndf) = bumped.as_any_mut().downcast_mut::<Ndf>() {
+        if ndf.fixing_rate.is_none() {
+            let quote = if ndf.forward_rate_override.is_some() {
+                ndf.forward_rate_override.as_mut()?
+            } else {
+                ndf.spot_rate_override.as_mut()?
+            };
+            match ndf.quote_convention {
+                NdfQuoteConvention::SettlementPerBase => *quote *= 1.0 + relative,
+                NdfQuoteConvention::BasePerSettlement => *quote /= 1.0 + relative,
+            }
+        }
+    } else {
+        return None;
+    }
+    Some(bumped)
+}
 
 /// Generic, instrument-agnostic FX01 calculator.
 ///
@@ -47,6 +78,15 @@ impl MetricCalculator for GenericFx01Calculator {
 
         let as_of = context.as_of;
         let market = std::sync::Arc::clone(&context.curves);
+
+        if let (Some(up), Some(down)) = (
+            bumped_instrument_quote(context.instrument.as_ref(), Self::BUMP_PCT / 100.0),
+            bumped_instrument_quote(context.instrument.as_ref(), -Self::BUMP_PCT / 100.0),
+        ) {
+            let pv_up = context.reprice_instrument_raw(up.as_ref(), &market, as_of)?;
+            let pv_down = context.reprice_instrument_raw(down.as_ref(), &market, as_of)?;
+            return Ok((pv_up - pv_down) / 2.0);
+        }
 
         let make_bumps = |direction: f64| -> Vec<MarketBump> {
             pairs

@@ -559,6 +559,7 @@ mod tests {
         )];
         let notional = Notional::par(250.0, Currency::USD).expect("valid notional fixture");
         let meta = CashFlowMeta {
+            projected_fixings: Vec::new(),
             representation: CashflowRepresentation::Contractual,
             calendar_ids: vec!["weekends_only".to_string()],
             facility_limit: Some(Money::from((500_i64, Currency::USD))),

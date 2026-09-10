@@ -1593,3 +1593,38 @@ fn test_real_world_etf_scenario() {
     // NAV should be around $50 ($10B / 200M shares)
     assert!((nav.amount() - 50.0).abs() < 1.0);
 }
+
+#[test]
+fn production_risk_basket_weights_are_currency_per_bp() {
+    let mut basket = simple_equity_basket();
+    basket.notional = usd(100.0);
+    basket.expense_ratio = 0.0;
+    // Display tickers may repeat; the source IDs must retain each exposure.
+    for constituent in &mut basket.constituents {
+        constituent.ticker = Some("DUPLICATE".into());
+    }
+    let market = equity_market_context();
+    let as_of = date(2025, 1, 1);
+    let pv = basket.value(&market, as_of).expect("basket PV");
+    let mut context = MetricContext::new(
+        Arc::new(basket),
+        Arc::new(market),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let metric = MetricId::WeightRisk;
+    assert_eq!(
+        metric.unit(),
+        finstack_quant_valuations::metrics::MetricUnit::Currency
+    );
+    standard_registry()
+        .compute(std::slice::from_ref(&metric), &mut context)
+        .expect("weight risk");
+    let rows = &context.computed_series[&metric];
+    assert_eq!(rows[0].0, "AAPL");
+    assert_eq!(rows[1].0, "MSFT");
+    // Reallocate one bp from the other asset: (150 - 300) * 100 * 1e-4.
+    assert!((rows[0].1 + 1.5).abs() < 1e-9, "{:?}", rows);
+    assert!((rows[1].1 - 1.5).abs() < 1e-9);
+}

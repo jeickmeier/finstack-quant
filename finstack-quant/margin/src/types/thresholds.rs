@@ -335,7 +335,7 @@ pub struct ImParameters {
     #[cfg_attr(feature = "json-schema", schemars(range(min = 1)))]
     pub mpor_days: u32,
 
-    /// IM threshold (aggregate group level).
+    /// Group-level IM threshold allocated to this CSA by the caller.
     ///
     /// BCBS-IOSCO permits €50M aggregate threshold at group level.
     /// Many large dealers operate with zero threshold by agreement.
@@ -353,7 +353,88 @@ pub struct ImParameters {
     pub segregated: bool,
 }
 
+/// One-way IM collateral account after applying the CSA's allocated threshold.
+///
+/// IM remains separate from VM. Segregation determines the custody requirement;
+/// it does not discount gross model risk or allow the account to offset VM.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ImCollateralResult {
+    /// Gross model IM after MPOR adjustment, before contractual thresholds.
+    pub gross_initial_margin: Money,
+    /// Target collateral balance, max(gross IM minus allocated CSA threshold, 0).
+    pub required_collateral: Money,
+    /// Existing nonnegative collateral balance in this one-way IM account.
+    pub current_collateral: Money,
+    /// Signed transfer: positive posts additional IM, negative returns excess.
+    /// Absolute transfers strictly below MTA are zero; equality triggers transfer.
+    pub transfer: Money,
+    /// True requires separate custody with no reuse to satisfy VM obligations.
+    pub segregated: bool,
+}
+
 impl ImParameters {
+    /// Apply IM terms once to the gross IM of all netting sets under one CSA.
+    ///
+    /// # Arguments
+    ///
+    /// * `gross_initial_margin` - Nonnegative model IM in the threshold currency,
+    ///   already calculated for `mpor_days`; this method applies no time scaling.
+    /// * `current_collateral` - Nonnegative existing one-way IM account balance
+    ///   in the same currency; excludes VM and the opposite party's IM account.
+    ///
+    /// # Returns
+    ///
+    /// Gross IM, threshold-adjusted target, current balance, signed MTA-filtered
+    /// transfer and custody requirement. The threshold is the group's allocation
+    /// to this CSA; allocation across separate CSAs is the caller's responsibility.
+    ///
+    /// # Errors
+    ///
+    /// Rejects zero MPOR, mixed currencies, negative or non-finite amounts.
+    pub fn apply_collateral_terms(
+        &self,
+        gross_initial_margin: Money,
+        current_collateral: Money,
+    ) -> Result<ImCollateralResult> {
+        let currency = self.threshold.currency();
+        for (name, amount) in [
+            ("gross IM", gross_initial_margin),
+            ("current IM collateral", current_collateral),
+            ("IM threshold", self.threshold),
+            ("IM MTA", self.mta),
+        ] {
+            if amount.currency() != currency
+                || !amount.amount().is_finite()
+                || amount.amount() < 0.0
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{name} must be finite, nonnegative and denominated in {currency}"
+                )));
+            }
+        }
+        if self.mpor_days == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "IM MPOR must be positive".into(),
+            ));
+        }
+        let required = (gross_initial_margin.amount() - self.threshold.amount()).max(0.0);
+        let difference = required - current_collateral.amount();
+        let transfer = if difference.abs() < self.mta.amount() {
+            0.0
+        } else {
+            difference
+        };
+        Ok(ImCollateralResult {
+            gross_initial_margin,
+            required_collateral: Money::new(required, currency)?,
+            current_collateral,
+            transfer: Money::new(transfer, currency)?,
+            segregated: self.segregated,
+        })
+    }
+
     /// Canonical constructor: build IM parameters for a given methodology
     /// from the embedded margin registry.
     ///

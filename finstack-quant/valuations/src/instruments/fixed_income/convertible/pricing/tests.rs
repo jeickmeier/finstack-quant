@@ -271,7 +271,7 @@ fn dividend_protection_restores_parity_independent_of_yield() {
 #[test]
 fn test_convertible_bond_parity() {
     let bond = create_test_bond();
-    let parity = calculate_parity(&bond, 150.0);
+    let parity = calculate_parity(&bond, 150.0).expect("parity");
     assert!((parity - 1.5).abs() < 1e-9);
 }
 
@@ -393,7 +393,8 @@ fn test_accrued_interest() {
     let bond = create_test_bond();
     // Mid-period: ~3 months into a 6-month coupon period
     let mid = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
-    let accrued = calculate_accrued_interest(&bond, mid).expect("should compute");
+    let accrued =
+        calculate_accrued_interest(&bond, &MarketContext::new(), mid).expect("should compute");
     // The canonical schedule-driven linear engine gives N × r × elapsed year
     // fraction: 1000 × 5% × 90/365 from Jan 1 through Apr 1.
     let expected = 1_000.0 * 0.05 * 90.0 / 365.0;
@@ -626,7 +627,8 @@ fn test_thirty_360_day_count_corporate_convention() {
 
     // Verify accrued interest works with 30/360
     let mid = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
-    let accrued = calculate_accrued_interest(&bond, mid).expect("should compute");
+    let accrued =
+        calculate_accrued_interest(&bond, &MarketContext::new(), mid).expect("should compute");
     assert!(
         accrued > 5.0 && accrued < 20.0,
         "30/360 accrued should be reasonable: {}",

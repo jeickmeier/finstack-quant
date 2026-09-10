@@ -315,6 +315,177 @@ mod tests {
     }
 
     #[test]
+    fn structured_credit_default_claim_inputs_reconcile() {
+        use time::macros::date;
+
+        for raw in [
+            include_str!(
+                "data/pricing/regression_goldens/structured_credit/abs_credit_card_senior.json"
+            ),
+            include_str!(
+                "data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json"
+            ),
+        ] {
+            let fixture: GoldenFixture = serde_json::from_str(raw).unwrap();
+            let pricing = fixture.pricing().unwrap();
+            let instrument_json = serde_json::to_string(&pricing.instrument).unwrap();
+            let instrument = parse_boxed_instrument_from_json(&instrument_json, None)
+                .expect("default claim and tranche state must be valid");
+            let deal = instrument
+                .as_instrument()
+                .as_any()
+                .downcast_ref::<finstack_quant_valuations::instruments::StructuredCredit>()
+                .unwrap();
+            let asset = deal
+                .pool
+                .assets
+                .iter()
+                .find(|asset| asset.id.as_str() == "BOND1")
+                .unwrap();
+            assert!(asset.is_defaulted);
+            assert_eq!(asset.default_date, Some(date!(2026 - 04 - 01)));
+            assert_eq!(asset.balance.amount(), 8_000_000.0);
+            let claim = asset.recovery_amount.unwrap();
+            assert_eq!(claim.currency(), asset.balance.currency());
+            assert_eq!(claim.amount(), 1_000_000.0);
+            assert_eq!(
+                deal.pool.performing_balance().unwrap().amount(),
+                12_000_000.0
+            );
+            assert_eq!(deal.pool.cumulative_defaults, asset.balance);
+            assert_eq!(deal.pool.cumulative_recoveries.amount(), 0.0);
+            assert_eq!(deal.behavior_overrides.recovery_lag_months, Some(9));
+            let historical_loss = asset.balance.amount() - claim.amount();
+            let written_down: f64 = deal
+                .tranches
+                .tranches
+                .iter()
+                .map(|tranche| tranche.original_balance.amount() - tranche.current_balance.amount())
+                .sum();
+            assert_eq!(written_down, historical_loss);
+            for tranche in &deal.tranches.tranches {
+                assert!(tranche.target_balance.is_none());
+                match tranche.id.as_str() {
+                    "EQUITY" => assert_eq!(tranche.current_balance.amount(), 0.0),
+                    "SENIOR" => assert_eq!(tranche.current_balance.amount(), 43_000_000.0),
+                    id => panic!("unexpected tranche {id}"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn structured_credit_default_claim_is_paid_once_without_repeating_historical_loss() {
+        use finstack_quant_core::{currency::Currency, money::Money};
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCoupon;
+        use time::macros::date;
+
+        let fixture = structured_credit_fixture();
+        let pricing = fixture.pricing().unwrap();
+        let envelope: InstrumentEnvelope =
+            serde_json::from_value(pricing.instrument.clone()).unwrap();
+        let InstrumentJson::StructuredCredit(mut deal) = envelope.instrument else {
+            panic!("expected structured credit");
+        };
+        deal.pool.assets.retain(|asset| asset.is_defaulted);
+        let zero = Money::from((0_i64, Currency::USD));
+        deal.pool.collection_account = zero;
+        deal.pool.reserve_account = zero;
+        deal.pool.excess_spread_account = zero;
+        for tranche in &mut deal.tranches.tranches {
+            tranche.coupon = TrancheCoupon::Fixed { rate: 0.0 };
+        }
+        let flows = deal
+            .get_tranche_cashflows("SENIOR", &MarketContext::new(), date!(2026 - 04 - 30))
+            .expect("the only future collateral receipt is the outstanding default claim");
+        let principal: Vec<_> = flows
+            .principal_flows
+            .iter()
+            .filter(|(_, amount)| amount.amount() > 0.0)
+            .copied()
+            .collect();
+        assert_eq!(
+            principal,
+            vec![(
+                date!(2027 - 01 - 04),
+                Money::from((1_000_000_i64, Currency::USD))
+            )]
+        );
+        assert_eq!(flows.total_principal.amount(), 1_000_000.0);
+        assert_eq!(flows.total_interest.amount(), 0.0);
+        assert_eq!(flows.total_writedown.amount(), 0.0);
+        assert_eq!(flows.final_balance.amount(), 42_000_000.0);
+    }
+
+    #[test]
+    #[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
+    fn structured_credit_spread_quote_matches_discounted_cashflow_reference() {
+        use finstack_quant_core::dates::{DayCount, DayCountContext};
+        use time::macros::date;
+
+        for raw in [
+            include_str!(
+                "data/pricing/regression_goldens/structured_credit/abs_credit_card_senior.json"
+            ),
+            include_str!(
+                "data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json"
+            ),
+        ] {
+            let fixture: GoldenFixture = serde_json::from_str(raw).unwrap();
+            let pricing = fixture.pricing().unwrap();
+            let market = resolve_market(&pricing.market).unwrap();
+            let envelope: InstrumentEnvelope =
+                serde_json::from_value(pricing.instrument.clone()).unwrap();
+            let InstrumentJson::StructuredCredit(deal) = envelope.instrument else {
+                panic!("expected structured credit");
+            };
+            let as_of = date!(2026 - 04 - 30);
+            let discount = market
+                .get_discount(deal.discount_curve_id.as_str())
+                .unwrap();
+            let mut quote = 0.0;
+            let mut npv = 0.0;
+            let mut cs01 = 0.0;
+            for tranche in &deal.tranches.tranches {
+                let flows = deal
+                    .get_tranche_cashflows(tranche.id.as_str(), &market, as_of)
+                    .unwrap();
+                for (date, amount) in flows.cashflows.iter().filter(|(date, _)| *date > as_of) {
+                    let t = DayCount::Act365F
+                        .year_fraction(as_of, *date, DayCountContext::default())
+                        .unwrap();
+                    let pv = amount.amount() * discount.df_between_dates(as_of, *date).unwrap();
+                    let quoted_pv = pv * (-0.10 * t).exp();
+                    npv += pv;
+                    quote += quoted_pv;
+                    cs01 += quoted_pv * (-0.0001 * t).exp_m1();
+                }
+            }
+            let result = price_instrument_from_json(
+                &serde_json::to_string(&pricing.instrument).unwrap(),
+                &market,
+                &fixture.metadata.valuation_date,
+                &pricing.model,
+                &["cs01".to_string(), "z_spread".to_string()],
+                None,
+                None,
+            )
+            .unwrap();
+            assert_close(result.value.amount(), npv, 1e-6);
+            assert_close(result.measures["z_spread"], 0.10, 1e-10);
+            assert_close(result.measures["cs01"], cs01, 1e-6);
+            assert_close(
+                deal.instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_dirty_price_currency
+                    .unwrap(),
+                quote,
+                1e-6,
+            );
+        }
+    }
+
+    #[test]
     #[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
     fn structured_credit_dv01_matches_declared_curve_repricing() {
         let fixture = structured_credit_fixture();
@@ -354,8 +525,8 @@ mod tests {
         .expect("registry DV01 should price");
         let registry_dv01 = registry_result.measures["dv01"];
 
-        assert_close(discount, -3_051.583_130_820_654, 1e-6);
-        assert_close(sofr_3m, 2_893.358_724_945_225, 1e-6);
+        assert_close(discount, -3_082.891_017_534_77, 1e-6);
+        assert_close(sofr_3m, 2_836.106_479_169_801, 1e-6);
         // Take the combined target from the fixture rather than repeating the
         // literal here, so a re-blessed fixture cannot leave this test stale.
         assert_close(combined, fixture.expected["dv01"], 1e-6);

@@ -439,11 +439,11 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
         if let Some(period_start) = context.period_start {
             tranche
                 .coupon
-                .try_rate_for_period(period_start, context.as_of, market)?
+                .try_rate_for_period(period_start, context.valuation_date, market)?
         } else {
             tranche
                 .coupon
-                .try_current_rate_with_index(context.as_of, market)?
+                .try_rate_for_period(context.as_of, context.valuation_date, market)?
         }
     } else {
         tranche.coupon.current_rate(context.as_of)
@@ -491,6 +491,8 @@ pub struct TestContext<'a> {
     pub tranche_id: &'a str,
     /// As-of date.
     pub as_of: finstack_quant_core::dates::Date,
+    #[doc = "Valuation date determining fixing availability, independent of the coverage payment date in `as_of`."]
+    pub valuation_date: finstack_quant_core::dates::Date,
     /// Period start date for day-count accrual.
     pub period_start: Option<finstack_quant_core::dates::Date>,
     /// Cash balance.
@@ -669,6 +671,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
@@ -717,6 +720,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
@@ -770,6 +774,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
@@ -829,6 +834,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
@@ -889,6 +895,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::new(cash, Currency::USD).expect("valid money fixture"),
             interest_collections: Money::from((0_i64, Currency::USD)),
@@ -969,6 +976,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
@@ -1135,6 +1143,7 @@ mod tests {
             tranches: &tranches,
             tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((100_i64, Currency::USD)),
@@ -1252,6 +1261,7 @@ mod haircut_tests {
                 tranches: &tranches,
                 tranche_id: "A",
                 as_of,
+                valuation_date: as_of,
                 period_start: Some(period_start),
                 cash_balance: Money::from((0_i64, Currency::USD)),
                 interest_collections: Money::from((10_000_i64, Currency::USD)),
@@ -1318,6 +1328,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "A",
             as_of,
+            valuation_date: as_of,
             period_start: Some(period_start),
             cash_balance: Money::from((0_i64, Currency::USD)),
             // Collections far below what the coupon demands => a hard breach.
@@ -1403,6 +1414,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "B",
             as_of,
+            valuation_date: as_of,
             period_start: Some(period_start),
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::new(collections, Currency::USD)
@@ -1506,6 +1518,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "A",
             as_of,
+            valuation_date: as_of,
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::new(collections, Currency::USD)
@@ -1541,6 +1554,42 @@ mod haircut_tests {
             "floating cure must use the denominator's market-aware all-in rate: \
              expected {expected:.6}, got {actual:.6}"
         );
+
+        let payment = Date::from_calendar_date(2025, Month::August, 1).unwrap();
+        let start = Date::from_calendar_date(2025, Month::May, 1).unwrap();
+        let projected = TestContext {
+            as_of: payment,
+            valuation_date: as_of,
+            period_start: Some(start),
+            ..ctx
+        };
+        let result = CoverageTest::new_ic(required_ratio)
+            .calculate(&projected)
+            .expect("future coverage dates must not require future fixings");
+        let rate = tranches.tranches[0]
+            .coupon
+            .try_rate_for_period(start, as_of, &market)
+            .unwrap();
+        let accrual = tranches.tranches[0]
+            .day_count
+            .year_fraction(
+                start,
+                payment,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .unwrap();
+        assert!((result.current_ratio - collections / (100_000.0 * rate * accrual)).abs() < 1e-12);
+        let expected_cure = 100_000.0 - collections / (required_ratio * rate * accrual);
+        assert!((result.cure_amount.unwrap().amount() - expected_cure).abs() < 1e-6);
+
+        let missing_fixing = TestContext {
+            valuation_date: start,
+            ..projected
+        };
+        let error = CoverageTest::new_ic(required_ratio)
+            .calculate(&missing_fixing)
+            .expect_err("a reset on the valuation date still requires its exact fixing");
+        assert!(error.to_string().contains("2025-05-01"), "{error}");
     }
 
     /// SC-M09 — a configured haircut must track the CURRENT pool balance, not
@@ -1566,6 +1615,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "A",
             as_of,
+            valuation_date: as_of,
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
@@ -1615,6 +1665,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "A",
             as_of,
+            valuation_date: as_of,
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
@@ -1655,6 +1706,7 @@ mod haircut_tests {
             tranches: &tranches,
             tranche_id: "A",
             as_of,
+            valuation_date: as_of,
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),

@@ -14,7 +14,14 @@ use rust_decimal::Decimal;
 
 use crate::impl_instrument_base;
 
-const DEFAULT_REPO_SPECS_ID: &str = "repo.usd_general_collateral";
+fn repo_specs_id(currency: finstack_quant_core::currency::Currency) -> Result<&'static str> {
+    match currency {
+        finstack_quant_core::currency::Currency::USD => Ok("repo.usd_general_collateral"),
+        _ => Err(Error::Validation(format!(
+            "No repo defaults for {currency}; use Repo::builder with explicit contract conventions"
+        ))),
+    }
+}
 
 /// Type of repurchase agreement.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -337,7 +344,8 @@ impl Repo {
     ) -> Result<Self> {
         use finstack_quant_core::dates::calendar::calendar_by_id;
 
-        let defaults = embedded_registry()?.repo_defaults(DEFAULT_REPO_SPECS_ID)?;
+        let defaults =
+            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
         let cal_id = calendar_id.into();
         let calendar = calendar_by_id(&cal_id).ok_or_else(|| {
             Error::Input(finstack_quant_core::InputError::NotFound {
@@ -382,7 +390,8 @@ impl Repo {
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        let defaults = embedded_registry()?.repo_defaults(DEFAULT_REPO_SPECS_ID)?;
+        let defaults =
+            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
         let repo_rate = Decimal::try_from(repo_rate)
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
 
@@ -415,7 +424,8 @@ impl Repo {
         initial_maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> Result<Self> {
-        let defaults = embedded_registry()?.repo_defaults(DEFAULT_REPO_SPECS_ID)?;
+        let defaults =
+            embedded_registry()?.repo_defaults(repo_specs_id(cash_amount.currency())?)?;
         let repo_rate = Decimal::try_from(repo_rate)
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?;
 

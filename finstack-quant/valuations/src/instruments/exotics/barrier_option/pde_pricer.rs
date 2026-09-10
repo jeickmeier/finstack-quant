@@ -1,8 +1,9 @@
 //! Barrier option PDE pricer using 1D finite differences.
 //!
-//! Implements barrier enforcement via Dirichlet boundary conditions at the
-//! barrier level. Knock-out options are priced directly; knock-in options
-//! use the parity relationship: knock_in = vanilla - knock_out.
+//! Continuous barriers impose contractual rebate boundary values. Discrete
+//! barriers use a wide domain and apply hit events only on observation dates.
+//! Knock-ins use vanilla minus the zero-rebate knock-out, plus a discounted
+//! no-hit rebate when one is contractual.
 //!
 //! # Time stepping (W-01)
 //!
@@ -15,10 +16,10 @@
 //!
 //! # Knock-in parity grid consistency (W-08)
 //!
-//! Knock-in options are priced as `KI = Vanilla - KO`. Both the vanilla and
-//! knock-out solves run on the **same spatial grid and the same time stepper**
-//! so that the difference cancels discretization error to leading order
-//! rather than carrying the sum of two independent grid errors.
+//! Continuous knock-in valuation extends the knock-out grid across the barrier,
+//! retaining its nodes around spot. Discrete knock-in and knock-out valuation
+//! use the same wide spatial domain. Independent closed-form and observation-
+//! date checks establish the numerical accuracy of each calculation.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::barrier_option::types::BarrierOption;
@@ -29,15 +30,17 @@ use crate::results::ValuationResult;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::BarrierType;
 
-use finstack_quant_models::pde::{BoundaryCondition, Grid1D, PdeProblem1D, Solver1D};
+use finstack_quant_models::closed_form::barrier::RebateTiming;
+use finstack_quant_models::pde::{
+    BoundaryCondition, Grid1D, PdeProblem1D, RannacherStepper, Solver1D, TimeStepper,
+};
 
 /// Black-Scholes PDE with barrier enforcement via boundary conditions.
 ///
-/// For knock-out barriers, the option value is forced to zero at the barrier
-/// level using a Dirichlet(0) boundary condition. The grid domain is truncated
-/// at the barrier so the barrier coincides with a grid boundary.
+/// Continuous barriers truncate the spatial domain and impose the contractual
+/// rebate at its barrier boundary. Discrete barriers use a wide domain and
+/// apply the hit condition only on observation dates.
 struct BarrierPde {
     /// Volatility (annualized, decimal).
     sigma: f64,
@@ -51,6 +54,32 @@ struct BarrierPde {
     is_call: bool,
     /// True if the barrier is at the upper boundary.
     barrier_is_upper: bool,
+    maturity: f64,
+    rebate: f64,
+    rebate_timing: RebateTiming,
+    terminal_cash: Option<f64>,
+    continuous: bool,
+    observation_times: Vec<f64>,
+}
+
+impl BarrierPde {
+    fn rebate_at(&self, time: f64) -> f64 {
+        match self.rebate_timing {
+            RebateTiming::AtHit => self.rebate,
+            RebateTiming::AtExpiry => self.rebate * (-self.rate * (self.maturity - time)).exp(),
+        }
+    }
+
+    fn barrier_boundary(&self, time: f64) -> Option<f64> {
+        if self.continuous {
+            return Some(self.rebate_at(time));
+        }
+        self.observation_times
+            .iter()
+            .copied()
+            .find(|observation| *observation >= time - 1e-12)
+            .map(|next| self.rebate_at(next) * (-self.rate * (next - time).max(0.0)).exp())
+    }
 }
 
 impl PdeProblem1D for BarrierPde {
@@ -67,6 +96,9 @@ impl PdeProblem1D for BarrierPde {
     }
 
     fn terminal_condition(&self, x: f64) -> f64 {
+        if let Some(cash) = self.terminal_cash {
+            return cash;
+        }
         let s = x.exp();
         if self.is_call {
             (s - self.strike).max(0.0)
@@ -75,34 +107,38 @@ impl PdeProblem1D for BarrierPde {
         }
     }
 
-    fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+    fn lower_boundary(&self, time: f64) -> BoundaryCondition {
         if !self.barrier_is_upper {
-            // Barrier at lower boundary: knock-out => Dirichlet(0)
-            BoundaryCondition::Dirichlet(0.0)
+            if let Some(value) = self.barrier_boundary(time) {
+                return BoundaryCondition::Dirichlet(value);
+            }
+        }
+        if let Some(cash) = self.terminal_cash {
+            BoundaryCondition::Dirichlet(cash * (-self.rate * (self.maturity - time)).exp())
         } else if self.is_call {
-            // No barrier here, deep OTM call
             BoundaryCondition::Dirichlet(0.0)
         } else {
-            // No barrier here, deep ITM put
             BoundaryCondition::Linear
         }
     }
 
-    fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+    fn upper_boundary(&self, time: f64) -> BoundaryCondition {
         if self.barrier_is_upper {
-            // Barrier at upper boundary: knock-out => Dirichlet(0)
-            BoundaryCondition::Dirichlet(0.0)
+            if let Some(value) = self.barrier_boundary(time) {
+                return BoundaryCondition::Dirichlet(value);
+            }
+        }
+        if let Some(cash) = self.terminal_cash {
+            BoundaryCondition::Dirichlet(cash * (-self.rate * (self.maturity - time)).exp())
         } else if self.is_call {
-            // No barrier here, deep ITM call
             BoundaryCondition::Linear
         } else {
-            // No barrier here, deep OTM put
             BoundaryCondition::Dirichlet(0.0)
         }
     }
 
     fn is_time_homogeneous(&self) -> bool {
-        true
+        false
     }
 }
 
@@ -115,10 +151,9 @@ const RANNACHER_IMPLICIT_STEPS: usize = 2;
 /// Barrier option pricer using a 1D PDE (Rannacher startup + Crank-Nicolson)
 /// with barrier enforcement.
 ///
-/// European exercise only. Knock-out barriers are enforced via Dirichlet(0)
-/// boundary conditions at the barrier level. Knock-in options are computed
-/// via parity: KI = Vanilla - KO, with both solves sharing the same grid and
-/// stepper so the difference cancels discretization error.
+/// European exercise only. Continuous barriers impose rebate boundary values;
+/// discrete barriers enforce observation-date events. Knock-in value is the
+/// vanilla minus zero-rebate knock-out value plus the discounted no-hit rebate.
 pub(crate) struct BarrierOptionPdePricer {
     /// Number of spatial grid points.
     space_points: usize,
@@ -136,6 +171,10 @@ struct KnockOutPdeInputs {
     maturity: f64,
     is_call: bool,
     barrier_is_upper: bool,
+    rebate: f64,
+    rebate_timing: RebateTiming,
+    terminal_cash: Option<f64>,
+    observation_times: Option<Vec<f64>>,
 }
 
 struct VanillaPdeInputs {
@@ -165,64 +204,47 @@ impl BarrierOptionPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
-        let bs_inputs = crate::instruments::common_impl::helpers::collect_black_scholes_inputs_df(
-            &inst.spot_id,
-            &inst.discount_curve_id,
-            inst.div_yield_id.as_ref(),
-            &inst.vol_surface_id,
-            inst.strike,
-            inst.expiry,
-            inst.day_count,
-            market,
-            as_of,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        inst.validate_monitoring_state(as_of).map_err(|error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
         })?;
+        if as_of >= inst.expiry {
+            return super::pricer::price_expired_barrier(inst, market, as_of).map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
+            });
+        }
+        if let Some(value) =
+            super::pricer::known_knock_out_value(inst, market, as_of).map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
+            })?
+        {
+            return Ok(value);
+        }
+        let bs_inputs =
+            super::pricer::collect_barrier_inputs(inst, market, as_of).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         let spot = bs_inputs.spot;
-        let df = bs_inputs.df;
         let q = bs_inputs.q;
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
         let ccy = inst.notional.currency();
 
-        if t <= 0.0 {
-            // Delegate to the expired barrier handler via the standard pricer path
-            return Err(PricingError::model_failure_with_context(
-                "Barrier option is expired; use the analytical pricer for expired barriers"
-                    .to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        // Derive rate from DF
-        let r = if t > 0.0 && df > 0.0 {
-            -df.ln() / t
-        } else {
-            0.0
-        };
+        let r = bs_inputs.r_eff();
 
         if inst.observed_barrier_breached == Some(true) {
-            let unit = match inst.barrier_type {
-                BarrierType::UpAndIn | BarrierType::DownAndIn => {
-                    finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                        spot,
-                        inst.strike,
-                        r,
-                        q,
-                        sigma,
-                        t,
-                        inst.option_type,
-                    )
-                }
-                BarrierType::UpAndOut | BarrierType::DownAndOut => match inst.rebate_timing {
-                    finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-                    finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => {
-                        inst.rebate.map_or(0.0, |rebate| rebate.amount() * df)
-                    }
-                },
-            };
+            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+                spot,
+                inst.strike,
+                r,
+                q,
+                sigma,
+                t,
+                inst.option_type,
+            );
             return Money::new(unit * inst.notional.amount(), ccy).map_err(|error| {
                 crate::pricer::PricingError::from_core(
                     error,
@@ -236,7 +258,38 @@ impl BarrierOptionPdePricer {
         let is_knock_out = inst.barrier_type.is_knock_out();
         let barrier_is_upper = inst.barrier_type.is_up();
 
-        let ko_inputs = KnockOutPdeInputs {
+        let observation_times = match &inst.monitoring {
+            crate::instruments::Monitoring::Continuous => None,
+            crate::instruments::Monitoring::Discrete { observation_dates } => Some(
+                observation_dates
+                    .iter()
+                    .copied()
+                    .filter(|date| *date >= as_of)
+                    .map(|date| {
+                        inst.day_count
+                            .year_fraction(as_of, date, Default::default())
+                    })
+                    .collect::<finstack_quant_core::Result<Vec<_>>>()
+                    .map_err(|error| {
+                        PricingError::from_core(error, PricingErrorContext::from_instrument(inst))
+                    })?,
+            ),
+        };
+        let observed_now = observation_times
+            .as_ref()
+            .is_none_or(|times| times.first() == Some(&0.0));
+        if observed_now
+            && if barrier_is_upper {
+                spot >= barrier_level
+            } else {
+                spot <= barrier_level
+            }
+        {
+            let mut observed = inst.clone();
+            observed.observed_barrier_breached = Some(true);
+            return self.price_internal(&observed, market, as_of);
+        }
+        let mut ko_inputs = KnockOutPdeInputs {
             spot,
             strike: inst.strike,
             barrier: barrier_level,
@@ -246,11 +299,38 @@ impl BarrierOptionPdePricer {
             maturity: t,
             is_call,
             barrier_is_upper,
+            rebate: if is_knock_out {
+                inst.rebate
+                    .map_or(0.0, |m| m.amount() / inst.notional.amount())
+            } else {
+                0.0
+            },
+            rebate_timing: inst.rebate_timing,
+            terminal_cash: None,
+            observation_times,
         };
 
         // Build the barrier-truncated knock-out grid. The barrier sits exactly
         // on the truncated edge node.
-        let ko_grid = self.build_barrier_grid(&ko_inputs)?;
+        let ko_grid = if ko_inputs.observation_times.is_some() {
+            let spread = (7.0 * sigma * t.sqrt()).max(1.0);
+            let center = barrier_level.ln();
+            Grid1D::sinh_concentrated(
+                spot.ln().min(inst.strike.ln()).min(center) - spread,
+                spot.ln().max(inst.strike.ln()).max(center) + spread,
+                self.space_points,
+                center,
+                0.1,
+            )
+            .map_err(|error| {
+                PricingError::model_failure_with_context(
+                    error.to_string(),
+                    PricingErrorContext::from_instrument(inst),
+                )
+            })?
+        } else {
+            self.build_barrier_grid(&ko_inputs)?
+        };
 
         // Compute knock-out price (knock-in will use parity).
         let ko_price = self.price_knock_out(&ko_grid, &ko_inputs)?;
@@ -267,7 +347,11 @@ impl BarrierOptionPdePricer {
             // — which contain the spot — the KI = Vanilla - KO difference
             // cancels discretization error to leading order rather than
             // carrying the sum of two independent grid errors.
-            let vanilla_grid = self.build_vanilla_grid_extending(&ko_grid, &ko_inputs)?;
+            let vanilla_grid = if ko_inputs.observation_times.is_some() {
+                ko_grid.clone()
+            } else {
+                self.build_vanilla_grid_extending(&ko_grid, &ko_inputs)?
+            };
             let vanilla_price = self.price_vanilla(
                 &vanilla_grid,
                 VanillaPdeInputs {
@@ -280,24 +364,26 @@ impl BarrierOptionPdePricer {
                     is_call,
                 },
             )?;
-            // Exact parity (Merton 1973). With a shared grid the residual is
-            // pure round-off; clamp at -tol so a tiny negative value is
-            // reported as zero with a warning rather than surfaced as a
-            // negative price (W-12).
             let parity = vanilla_price - ko_price;
-            let tol = 1e-8 * vanilla_price.abs().max(1.0);
-            if parity < -tol {
-                tracing::warn!(
-                    parity,
-                    vanilla_price,
-                    ko_price,
-                    "Barrier knock-in PDE parity produced a negative price beyond tolerance; \
-                     clamping to zero. This indicates a grid/discretization problem."
-                );
-                0.0
-            } else {
-                parity.max(0.0)
+            let tolerance = 1e-6 * vanilla_price.abs().max(1.0);
+            if parity < -tolerance {
+                return Err(PricingError::model_failure_with_context(
+                    format!("Barrier knock-in PDE parity is negative ({parity}); refine the grid"),
+                    PricingErrorContext::from_instrument(inst),
+                ));
             }
+            // A knock-in rebate is paid only when monitoring finishes without
+            // a hit. Price the discounted survival indicator on the same grid.
+            ko_inputs.terminal_cash = Some(
+                inst.rebate
+                    .map_or(0.0, |m| m.amount() / inst.notional.amount()),
+            );
+            let survival_rebate = if inst.rebate.is_some() {
+                self.price_knock_out(&ko_grid, &ko_inputs)?
+            } else {
+                0.0
+            };
+            parity.max(0.0) + survival_rebate
         };
 
         Money::new(unit_price * inst.notional.amount(), ccy).map_err(|error| {
@@ -318,7 +404,7 @@ impl BarrierOptionPdePricer {
     ) -> std::result::Result<Grid1D, PricingError> {
         let ln_barrier = inputs.barrier.ln();
         let ln_spot = inputs.spot.ln();
-        let spread = 5.0 * inputs.sigma * inputs.maturity.sqrt();
+        let spread = (5.0 * inputs.sigma * inputs.maturity.sqrt()).max(0.5);
 
         // Set grid bounds so the barrier is at one edge
         let (x_min, x_max) = if inputs.barrier_is_upper {
@@ -356,7 +442,7 @@ impl BarrierOptionPdePricer {
         let ln_barrier = inputs.barrier.ln();
         let ln_spot = inputs.spot.ln();
         let ln_strike = inputs.strike.ln();
-        let spread = 5.0 * inputs.sigma * inputs.maturity.sqrt();
+        let spread = (5.0 * inputs.sigma * inputs.maturity.sqrt()).max(0.5);
         let barrier_is_upper = inputs.barrier_is_upper;
         let ko_points = ko_grid.points();
 
@@ -410,7 +496,16 @@ impl BarrierOptionPdePricer {
             strike: inputs.strike,
             is_call: inputs.is_call,
             barrier_is_upper: inputs.barrier_is_upper,
+            maturity: inputs.maturity,
+            rebate: inputs.rebate,
+            rebate_timing: inputs.rebate_timing,
+            terminal_cash: inputs.terminal_cash,
+            continuous: inputs.observation_times.is_none(),
+            observation_times: inputs.observation_times.clone().unwrap_or_default(),
         };
+        if let Some(observations) = &inputs.observation_times {
+            return self.price_discrete(grid, inputs, &pde, observations);
+        }
 
         // Rannacher startup: a few fully-implicit steps damp the price and
         // delta/gamma oscillations that plain Crank-Nicolson produces at the
@@ -430,6 +525,78 @@ impl BarrierOptionPdePricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
         Ok(solution.interpolate(ln_spot))
+    }
+
+    /// Step the wide-domain PDE between exact observation times, applying
+    /// the contractual hit condition only at those times.
+    fn price_discrete(
+        &self,
+        grid: &Grid1D,
+        inputs: &KnockOutPdeInputs,
+        pde: &BarrierPde,
+        observations: &[f64],
+    ) -> std::result::Result<f64, PricingError> {
+        let mut levels: Vec<f64> = (0..=self.time_steps)
+            .map(|step| inputs.maturity * step as f64 / self.time_steps as f64)
+            .collect();
+        levels.extend_from_slice(observations);
+        levels.sort_by(f64::total_cmp);
+        levels.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
+        levels.reverse();
+        let points = &grid.points()[1..grid.n() - 1];
+        let mut values: Vec<f64> = points.iter().map(|&x| pde.terminal_condition(x)).collect();
+        let apply_observation = |time: f64, values: &mut [f64]| {
+            if !observations
+                .iter()
+                .any(|observation| (*observation - time).abs() < 1e-12)
+            {
+                return false;
+            }
+            for (&x, value) in points.iter().zip(values.iter_mut()) {
+                let hit = if inputs.barrier_is_upper {
+                    x >= inputs.barrier.ln()
+                } else {
+                    x <= inputs.barrier.ln()
+                };
+                if hit {
+                    *value = pde.rebate_at(time);
+                }
+            }
+            true
+        };
+        apply_observation(inputs.maturity, &mut values);
+        let stepper = RannacherStepper::new(RANNACHER_IMPLICIT_STEPS, levels.len() - 1);
+        let mut since_observation = 0;
+        for times in levels.windows(2) {
+            stepper
+                .step(
+                    pde,
+                    grid,
+                    &mut values,
+                    times[0],
+                    times[1],
+                    since_observation,
+                )
+                .map_err(|error| {
+                    PricingError::model_failure_with_context(
+                        error.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+            since_observation += 1;
+            if apply_observation(times[1], &mut values) {
+                since_observation = 0;
+            }
+        }
+        // Spot lies strictly inside the wide grid, so interpolate the interior
+        // solution directly without reconstructing remote boundary values.
+        let interior = Grid1D::from_points(points.to_vec()).map_err(|error| {
+            PricingError::model_failure_with_context(
+                error.to_string(),
+                PricingErrorContext::default(),
+            )
+        })?;
+        Ok(interior.interpolate(&values, inputs.spot.ln()))
     }
 
     /// Price a vanilla option via PDE (for knock-in parity) on the supplied grid.
@@ -556,7 +723,7 @@ mod tests {
             observed_barrier_breached: None,
             notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
-            use_gobet_miri: false,
+            monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
@@ -564,7 +731,6 @@ mod tests {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            monitoring_frequency: None,
             attributes: Attributes::new(),
         }
     }
@@ -792,6 +958,75 @@ mod tests {
             "KI + KO must reconstruct the vanilla price (in-out parity): \
              ki={ki_pv:.6} + ko={ko_pv:.6} vs vanilla={vanilla:.6}, \
              residual={parity_residual:.6}"
+        );
+    }
+    #[test]
+    fn production_barrier_pde_rebate_matches_continuous_closed_form() {
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1);
+        let mkt = market(as_of, 100.0, 0.25, 0.05);
+        for barrier_type in [BarrierType::UpAndOut, BarrierType::DownAndIn] {
+            for timing in [
+                finstack_quant_models::closed_form::barrier::RebateTiming::AtHit,
+                finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry,
+            ] {
+                let level = if barrier_type.is_up() { 120.0 } else { 80.0 };
+                let mut option =
+                    barrier_option(barrier_type, OptionType::Call, expiry, 100.0, level);
+                option.notional = Money::new(1_000.0, Currency::USD).expect("notional");
+                option.rebate = Some(Money::new(25_000.0, Currency::USD).expect("rebate"));
+                option.rebate_timing = timing;
+                let analytical = option.value(&mkt, as_of).expect("analytical").amount();
+                let pde = BarrierOptionPdePricer {
+                    space_points: 600,
+                    time_steps: 800,
+                }
+                .price_internal(&option, &mkt, as_of)
+                .expect("PDE")
+                .amount();
+                assert!(
+                    (pde - analytical).abs() < 15.0,
+                    "{barrier_type:?}/{timing:?}: PDE {pde}, analytical {analytical}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn production_barrier_pde_expiry_only_monitoring_matches_truncated_call() {
+        use finstack_quant_core::math::special_functions::norm_cdf;
+        use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1);
+        let mkt = market(as_of, 100.0, 0.25, 0.05);
+        let mut option = barrier_option(
+            BarrierType::UpAndOut,
+            OptionType::Call,
+            expiry,
+            100.0,
+            120.0,
+        );
+        option.monitoring = crate::instruments::Monitoring::Discrete {
+            observation_dates: vec![expiry],
+        };
+        let t = option
+            .day_count
+            .year_fraction(as_of, expiry, Default::default())
+            .expect("time");
+        let d2 = ((100.0_f64 / 120.0).ln() + (0.05 - 0.5 * 0.25 * 0.25) * t) / (0.25 * t.sqrt());
+        let expected = bs_price_unchecked(100.0, 100.0, 0.05, 0.0, 0.25, t, OptionType::Call)
+            - bs_price_unchecked(100.0, 120.0, 0.05, 0.0, 0.25, t, OptionType::Call)
+            - 20.0 * (-0.05 * t).exp() * norm_cdf(d2);
+        let pde = BarrierOptionPdePricer {
+            space_points: 1_200,
+            time_steps: 800,
+        }
+        .price_internal(&option, &mkt, as_of)
+        .expect("PDE")
+        .amount();
+        assert!(
+            (pde - expected).abs() < 0.04,
+            "PDE {pde}, exact truncated call {expected}"
         );
     }
 }

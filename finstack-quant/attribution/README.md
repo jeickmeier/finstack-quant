@@ -27,6 +27,8 @@ dispatching through a spec: `Parallel` (the `Default`),
 
 Precomputed `Theta` and `CarryTotal` must use the attribution window's
 `theta_period_days`; carry metrics are not rescaled across coupon payments.
+Supplying net `CarryTotal` also requires `FundingCost` (explicit zero when
+unfunded), so attribution can recover gross carry consistently with endpoint P&L.
 The spec executor requests the matching horizon automatically. Direct callers
 must recompute metrics for their window (an omitted stamp assumes one day).
 
@@ -283,3 +285,9 @@ Workspace gates (`mise run rust-lint`, `mise run rust-test`, `mise run rust-doc`
 — the last one runs doctests) are what CI enforces. Use `cargo nextest`, not
 `cargo test`, for crate-scoped runs; see
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
+
+Carry and endpoint P&L are gross of financing on every methodology. Metrics-based
+attribution adds the reported `funding_cost` back to the net `carry_total` metric;
+funding remains a separate detail. Supplied net carry metrics must include funding cost (zero when unfunded). Rates and credit source lines partition gross
+carry. Scalar volatility dependencies belong to volatility P&L and are excluded
+from generic market-scalar P&L.

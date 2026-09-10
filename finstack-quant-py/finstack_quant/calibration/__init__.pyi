@@ -1836,7 +1836,9 @@ class CalibrationStep:
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Extra ``StepParams`` fields following the Rust step schema. Required
+            ``fit_tolerance`` is a finite positive per-target tolerance in the
+            supplied volatility quote units, separate from solver tolerance.
 
         Returns
         -------
@@ -1846,12 +1848,15 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If quote wiring is ambiguous, a parameter is unknown, or the required
+            ``fit_tolerance`` is missing, non-finite or non-positive.
 
         Examples:
         --------
         >>> from finstack_quant.calibration import CalibrationStep
-        >>> CalibrationStep.hull_white("hw", "usd_ois", "USD", "2024-06-28", quote_set="swaptions").kind
+        >>> CalibrationStep.hull_white(
+        ...     "hw", "usd_ois", "USD", "2024-06-28", quote_set="swaptions", fit_tolerance=1e-4
+        ... ).kind
         'hull_white'
 
         """
@@ -1886,7 +1891,9 @@ class CalibrationStep:
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
-            Extra ``StepParams`` fields following the Rust step schema.
+            Extra ``StepParams`` fields following the Rust step schema. Required
+            ``fit_tolerance`` is a finite positive per-target tolerance in the
+            supplied volatility quote units, separate from solver tolerance.
 
         Returns
         -------
@@ -1896,7 +1903,8 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If quote wiring is ambiguous or a parameter is unknown.
+            If quote wiring is ambiguous, a parameter is unknown, or the required
+            ``fit_tolerance`` is missing, non-finite or non-positive.
 
         Examples:
         --------
@@ -1908,6 +1916,7 @@ class CalibrationStep:
         ...     "USD",
         ...     "2024-06-28",
         ...     quote_set="caps",
+        ...     fit_tolerance=1e-4,
         ... ).kind
         'cap_floor_hull_white'
 

@@ -1,6 +1,6 @@
 //! Delta calculator for interest rate options (caps/floors/caplets/floorlets).
 
-use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
+use crate::instruments::rates::cap_floor::{CapFloor, RateOptionType};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -17,44 +17,24 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CapFloor = context.instrument_as()?;
-        let strike = option.strike_f64()?;
-        let vol_type = option.vol_type;
-        let vol_shift = option.resolved_vol_shift();
         let is_cap = matches!(
             option.rate_option_type,
             RateOptionType::Caplet | RateOptionType::Cap
         );
         super::common::aggregate_over_caplets(option, context, |c: CapletInputs| {
-            caplet_delta(vol_type, is_cap, strike, vol_shift, c)
+            caplet_delta(is_cap, c)
         })
     }
 }
 
-fn caplet_delta(
-    vol_type: CapFloorVolType,
-    is_cap: bool,
-    strike: f64,
-    vol_shift: f64,
-    c: CapletInputs,
-) -> f64 {
-    use super::common::lognormal_delta_with_fallback;
-    use crate::instruments::rates::cap_floor::pricing::black;
-    let coupon_delta = match vol_type {
-        // `Auto` is a lognormal surface; both share the Black-with-Bachelier
-        // fallback path so the Greek matches the pricer for any rate sign.
-        CapFloorVolType::Lognormal | CapFloorVolType::Auto => {
-            lognormal_delta_with_fallback(is_cap, strike, c.forward, c.sigma, c.fixing_t)
+fn caplet_delta(is_cap: bool, c: CapletInputs) -> f64 {
+    use crate::instruments::rates::cap_floor::pricing::{black, normal};
+    use finstack_quant_models::volatility::VolatilityConvention;
+    let coupon_delta = match c.convention {
+        VolatilityConvention::Normal => {
+            normal::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t)
         }
-        CapFloorVolType::ShiftedLognormal => black::delta(
-            is_cap,
-            strike + vol_shift,
-            c.forward + vol_shift,
-            c.sigma,
-            c.fixing_t,
-        ),
-        CapFloorVolType::Normal => crate::instruments::rates::cap_floor::pricing::normal::delta(
-            is_cap, strike, c.forward, c.sigma, c.fixing_t,
-        ),
+        _ => black::delta(is_cap, c.strike, c.forward, c.sigma, c.fixing_t),
     };
     coupon_delta * c.forward_sensitivity
 }

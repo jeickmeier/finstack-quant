@@ -101,7 +101,7 @@ pub enum CdsConvention {
     IsdaNa,
     /// Standard European convention (quarterly, Act/360).
     IsdaEu,
-    /// Standard Asian convention (quarterly, Act/365F).
+    /// Standard Asian convention (quarterly, Act/360).
     IsdaAs,
     /// Custom convention.
     Custom,
@@ -231,6 +231,8 @@ pub struct InflationSwapConventions {
     pub day_count: DayCount,
     /// Inflation lag (observation lag) in months/period.
     pub inflation_lag: Tenor,
+    /// Monthly reference CPI rule: interpolated daily for USD, monthly step for EUR/UK.
+    pub interpolation: finstack_quant_core::market_data::scalars::InflationInterpolation,
 }
 
 /// Conventions for cross-currency basis swaps.

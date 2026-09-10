@@ -157,6 +157,7 @@ fn taylor_explains_convertible_credit_spread_move() {
     )
     .expect("Taylor attribution should succeed");
 
+    assert_eq!(attribution.rates_curves_pnl.amount(), 0.0);
     assert!(
         attribution.credit_curves_pnl.amount() < 0.0,
         "credit_curves_pnl should be negative for a +150bp widening, got {}",
@@ -240,6 +241,7 @@ fn metrics_based_explains_convertible_credit_spread_move() {
         attribute_pnl_metrics_based(&conv, &market_t0, &market_t1, &val_t0, &val_t1, t0(), t1())
             .unwrap();
 
+    assert_eq!(attribution.rates_curves_pnl.amount(), 0.0);
     assert!(
         attribution.credit_curves_pnl.amount() < 0.0,
         "metrics-based credit_curves_pnl should be negative for a widening, got {}",

@@ -49,6 +49,23 @@ pub trait Pricer: Send + Sync {
     /// Get the (instrument, model) key this pricer handles
     fn key(&self) -> PricerKey;
 
+    /// Resolve model-owned settings and cached analytics before metric evaluation.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Validated base pricing request; implementations may install a
+    ///   request-local repricing dispatch that rebuilds caches for shocked inputs.
+    /// * `metrics` - Requested metric identifiers; expensive analytics should only
+    ///   be prepared when needed by these calculations.
+    fn seed_metric_context(
+        &self,
+        context: &mut crate::metrics::MetricContext,
+        metrics: &[crate::metrics::MetricId],
+    ) -> finstack_quant_core::Result<()> {
+        let _ = (context, metrics);
+        Ok(())
+    }
+
     /// Price an instrument using this pricer's model.
     ///
     /// This is a low-level dispatch hook that assumes the instrument has already

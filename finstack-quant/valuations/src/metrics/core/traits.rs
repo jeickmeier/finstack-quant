@@ -221,6 +221,10 @@ pub struct MetricContext {
     /// Tranche-level detailed cashflow results (for structured credit)
     pub detailed_tranche_cashflows: Option<TrancheCashflows>,
 
+    /// Deal-level contractual accrual records from the projected waterfall.
+    pub(crate) structured_credit_accruals:
+        Option<Vec<crate::instruments::fixed_income::structured_credit::TrancheAccrualPeriod>>,
+
     /// Cached discount curve ID.
     pub discount_curve_id: Option<CurveId>,
 
@@ -288,6 +292,7 @@ impl MetricContext {
             tagged_cashflows: None,
             internal_schedule: None,
             detailed_tranche_cashflows: None,
+            structured_credit_accruals: None,
             discount_curve_id: None,
             day_count: None,
             notional: None,
@@ -360,6 +365,13 @@ impl MetricContext {
     #[inline]
     pub(crate) fn get_market_history(&self) -> Option<&MarketHistory> {
         self.market_history.as_deref()
+    }
+
+    /// Clone the injected provider for nested historical-risk calculations.
+    pub(crate) fn get_recalibration_provider(
+        &self,
+    ) -> Option<Arc<dyn crate::recalibration::RecalibrationProvider>> {
+        self.risk_rebuild.recalibration_provider.clone()
     }
 
     /// Attach the batch-local quote recalibration provider.

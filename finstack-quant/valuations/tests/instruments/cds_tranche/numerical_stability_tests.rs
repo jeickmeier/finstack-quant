@@ -54,7 +54,7 @@ fn el_at_flat_corr(attach: f64, detach: f64, coupon_bp: f64, level: f64) -> f64 
 //
 // The extreme-correlation tests below previously asserted only
 // `is_ok()`/`is_finite()`. These invariants pin the copula economics:
-// equity EL decreasing in correlation, senior EL increasing, and the
+// equity EL decreasing in correlation, uncapped super-senior EL increasing, and the
 // 0-100% tranche reproducing the (correlation-invariant) pool EL.
 
 /// One-factor copula: equity-tranche expected loss `E[min(L, K)]` is
@@ -69,9 +69,8 @@ fn test_equity_el_monotone_decreasing_in_correlation() {
         .collect();
 
     for (i, window) in els.windows(2).enumerate() {
-        // Allow a small relative epsilon: near the clamped correlation
-        // boundaries the integrand is step-like and 20-node quadrature can
-        // break exact monotonicity by O(1e-6) relative.
+        // Retain the existing relative comparison tolerance across the
+        // complete correlation range.
         let eps = 1e-6 * window[0].abs().max(1.0);
         assert!(
             window[1] <= window[0] + eps,
@@ -91,19 +90,20 @@ fn test_equity_el_monotone_decreasing_in_correlation() {
     );
 }
 
-/// One-factor copula: senior-tranche expected loss is increasing in the
-/// flat correlation (loss mass migrates up the capital structure).
+/// Expected loss of a tranche extending beyond the maximum pool loss is
+/// increasing in flat correlation. A capped [15%,30%] tranche is a call
+/// spread, whose EL need not be monotone: probability can migrate past its
+/// detachment. Independent finite-pool references cover that case separately.
 #[test]
-fn test_senior_el_monotone_increasing_in_correlation() {
+fn test_super_senior_el_monotone_increasing_in_correlation() {
     let levels = [0.001, 0.05, 0.30, 0.60, 0.95, 0.999];
     let els: Vec<f64> = levels
         .iter()
-        .map(|&rho| el_at_flat_corr(15.0, 30.0, 100.0, rho))
+        .map(|&rho| el_at_flat_corr(30.0, 100.0, 100.0, rho))
         .collect();
 
     for (i, window) in els.windows(2).enumerate() {
-        // Same relative epsilon rationale as the equity test: quadrature on
-        // the near-step integrand at clamped extreme correlations.
+        // Same relative comparison tolerance as the equity test.
         let eps = 1e-6 * window[0].abs().max(1.0);
         assert!(
             window[1] >= window[0] - eps,

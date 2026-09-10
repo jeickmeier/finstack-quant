@@ -77,10 +77,12 @@ pub struct CreditCalibrationInputs {
     pub as_of: Date,
     /// Issuer spreads at `as_of` in decimal units (level space).
     pub as_of_spreads: BTreeMap<IssuerId, f64>,
-    /// Optional caller-supplied idiosyncratic vol overrides.
+    /// Optional annualized idiosyncratic volatility overrides, in decimal
+    /// spread per square-root year (`0.001` means 10 bp per square-root year).
     ///
     /// Caller-supplied values take precedence over history, peer-proxy, and
-    /// global-default adder-vol estimates.
+    /// global-default adder-vol estimates. Values must be finite and
+    /// non-negative; calibration converts them to the model's bp units.
     pub idiosyncratic_overrides: BTreeMap<IssuerId, f64>,
     /// Option-adjusted spread duration in **years** (`> 0`) per issuer.
     ///

@@ -11,7 +11,6 @@ use finstack_quant_core::dates::{next_cds_date, Date};
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
 use finstack_quant_core::math::binomial_pmf_all_into;
 use finstack_quant_core::{Error, Result};
-use std::sync::Arc;
 
 impl CDSTranchePricer {
     /// Apply smooth correlation boundary handling to avoid numerical discontinuities.
@@ -543,8 +542,9 @@ impl CDSTranchePricer {
     /// Calculate CS01 (sensitivity to a 1bp parallel shift in credit *par
     /// spreads*) using a central difference.
     ///
-    /// The index hazard curve is re-bootstrapped from its stored par-spread
-    /// points after a ±`cs01_bump_size` bp parallel spread shock — the same
+    /// Every issuer curve consumed by heterogeneous pricing (or the index
+    /// curve for homogeneous pricing) is re-bootstrapped after a simultaneous
+    /// ±`cs01_bump_size` bp parallel quote shock — the same
     /// market convention as the registered tranche CS01 metric calculator.
     /// Bumping the hazard intensity λ directly instead would overstate the
     /// spread sensitivity by ≈ `1/(1−R)` (≈1.67x at R=40%).
@@ -554,6 +554,15 @@ impl CDSTranchePricer {
     /// Returns a calibration error when the hazard curve has no replayable
     /// par-spread calibration recipe; a direct hazard-rate bump would silently
     /// change the metric's market-risk units.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche` - Contractual tranche, notional currency and credit-index identifier.
+    /// * `market_ctx` - Base market containing the index, its complete issuer pool
+    ///   when configured, discount curve and hazard calibration dependencies.
+    /// * `as_of` - Valuation date used identically for both bumped prices.
+    /// * `provider` - Exact quote-rebootstrap service; every active hazard curve
+    ///   must carry its original calibration recipe.
     #[must_use = "CS01 result should be used for hedging"]
     pub fn calculate_cs01(
         &self,
@@ -569,32 +578,18 @@ impl CDSTranchePricer {
             ));
         }
 
-        let original_index_arc = market_ctx.get_credit_index(&tranche.credit_index_id)?;
-        let hazard = Arc::clone(&original_index_arc.index_credit_curve);
-        let bump_bp = self.params.cs01_bump_size;
-        let source_market = Arc::new(market_ctx.clone());
-        let request = crate::metrics::sensitivities::cs01::Cs01Request::generic(
-            bump_bp,
-            tranche.discount_curve_id.clone(),
-        );
-        crate::metrics::sensitivities::cs01::compute_parallel_cs01_with_provider_raw(
+        let index = market_ctx.get_credit_index(&tranche.credit_index_id)?;
+        let hazards =
+            super::super::credit_risk::active_hazards(&index, self.params.use_issuer_curves);
+        super::super::credit_risk::parallel_cs01(
             provider,
-            hazard,
-            Arc::clone(&source_market),
-            source_market,
-            &request,
-            |bumped_hazard| {
-                let bumped_index = self.rebuild_credit_index(
-                    original_index_arc.as_ref(),
-                    original_index_arc.recovery_rate,
-                    Arc::clone(&bumped_hazard),
-                    Arc::clone(&original_index_arc.base_correlation_curve),
-                )?;
-                let bumped_market = market_ctx
-                    .clone()
-                    .insert(bumped_hazard)
-                    .insert_credit_index(&tranche.credit_index_id, bumped_index);
-                self.price_tranche(tranche, &bumped_market, as_of)
+            market_ctx,
+            tranche.credit_index_id.as_str(),
+            &tranche.discount_curve_id,
+            &hazards,
+            self.params.cs01_bump_size,
+            |market| {
+                self.price_tranche(tranche, market, as_of)
                     .map(|pv| pv.amount())
             },
         )

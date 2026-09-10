@@ -94,6 +94,24 @@ impl SabrModel {
     ) -> Result<f64> {
         self.validate_inputs(forward, strike, time_to_expiry)?;
 
+        if self.params.beta < BETA_SNAP_TOL {
+            let vol = super::expansion::normal_beta_zero(
+                self.params.alpha,
+                self.params.nu,
+                self.params.rho,
+                forward,
+                strike,
+                time_to_expiry,
+            );
+            return if vol.is_finite() && vol > 0.0 {
+                Ok(vol)
+            } else {
+                Err(Error::Validation(
+                    "normal SABR produced invalid volatility".to_owned(),
+                ))
+            };
+        }
+
         let (effective_forward, effective_strike) = match self.params.shift {
             Some(shift) => (forward + shift, strike + shift),
             None => (forward, strike),
@@ -145,8 +163,8 @@ impl SabrModel {
         // whenever ν→0, so it short-circuited every strike to the flat ATM vol
         // in the pure-CEV limit. The ν→0 limit is handled by the general
         // formula (z/χ(z)→1).
-        let relative_diff =
-            (effective_forward - effective_strike).abs() / effective_forward.max(effective_strike);
+        let relative_diff = (effective_forward - effective_strike).abs()
+            / effective_forward.abs().max(effective_strike.abs());
         if relative_diff < 1e-8 {
             return self.atm_volatility(effective_forward, time_to_expiry);
         }
@@ -290,92 +308,7 @@ impl SabrModel {
     /// - Closed-form limits at ρ → ±1
     #[inline]
     pub(crate) fn calculate_chi_robust(&self, z: f64) -> Result<f64> {
-        let rho = self.params.rho;
-
-        // Fourth-order Taylor series around z = 0:
-        // χ(z) = ln((√(1 - 2ρz + z²) + z - ρ)/(1 - ρ))
-        //
-        // With g(z) = √(1 - 2ρz + z²) = 1 - ρz + (1-ρ²)z²/2 + ρ(1-ρ²)z³/2
-        //             + (1-ρ²)(5ρ²-1)z⁴/8 + O(z⁵),
-        // (g + z - ρ)/(1 - ρ) = 1 + z + (1+ρ)z²/2 + ρ(1+ρ)z³/2 + (1+ρ)(5ρ²-1)z⁴/8,
-        // and ln(1 + w) = w - w²/2 + w³/3 - w⁴/4 gives:
-        // χ(z) = z + (ρ/2)z² + ((3ρ² - 1)/6)z³ + (ρ(5ρ² - 3)/8)z⁴ + O(z⁵)
-        // (ρ=0 check: χ(z) = asinh(z) = z - z³/6 + O(z⁵))
-        let series_chi = |z_val: f64| -> f64 {
-            let z2 = z_val * z_val;
-            let z3 = z2 * z_val;
-            let z4 = z2 * z2;
-            let c2 = rho / 2.0;
-            let c3 = (3.0 * rho * rho - 1.0) / 6.0;
-            let c4 = rho * (5.0 * rho * rho - 3.0) / 8.0;
-            z_val + c2 * z2 + c3 * z3 + c4 * z4
-        };
-
-        let exact_chi = |z_val: f64| -> Result<f64> {
-            let discriminant = 1.0 - 2.0 * rho * z_val + z_val * z_val;
-
-            if discriminant < 0.0 {
-                return Err(Error::Validation(format!(
-                    "SABR chi function: negative discriminant {} for z={:.6}, rho={:.6}",
-                    discriminant, z_val, rho
-                )));
-            }
-
-            let sqrt_disc = discriminant.sqrt();
-
-            if (1.0 - rho).abs() < 1e-10 {
-                // ρ → 1: discriminant is (1−z)², so for z<1 the limit is
-                // χ(z) = −ln(1−z). The formula diverges at z ≥ 1 (SABR density
-                // degenerates).
-                if z_val >= 1.0 {
-                    return Err(Error::Validation(format!(
-                        "SABR chi function: rho≈1 with z={z_val:.6} ≥ 1 — \
-                         Hagan expansion is undefined in this limit"
-                    )));
-                }
-                return Ok(-(1.0 - z_val).ln());
-            }
-            if (1.0 + rho).abs() < 1e-10 {
-                // ρ → −1: discriminant is (1+z)², so for z > −1 the limit is
-                // χ(z) = ln(1+z). At z ≤ −1 the log argument is non-positive
-                // and the Hagan expansion is undefined.
-                if z_val <= -1.0 {
-                    return Err(Error::Validation(format!(
-                        "SABR chi function: rho≈-1 with z={z_val:.6} ≤ -1 — \
-                         Hagan expansion is undefined in this limit"
-                    )));
-                }
-                return Ok((sqrt_disc + z_val + 1.0).ln() - (2.0_f64).ln());
-            }
-
-            let numerator = sqrt_disc + z_val - rho;
-            let denominator = 1.0 - rho;
-
-            if numerator <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "SABR chi function: non-positive log argument {} for z={:.6}, rho={:.6}",
-                    numerator, z_val, rho
-                )));
-            }
-
-            Ok((numerator / denominator).ln())
-        };
-
-        let abs_z = z.abs();
-        let z_low = 1e-5;
-        let z_high = 1e-3;
-
-        if abs_z < z_low {
-            Ok(series_chi(z))
-        } else if abs_z > z_high {
-            exact_chi(z)
-        } else {
-            let t = (abs_z - z_low) / (z_high - z_low);
-            let blend = t * t * (3.0 - 2.0 * t); // Hermite smoothstep
-            let series_val = series_chi(z);
-            let exact_val = exact_chi(z)?;
-            Ok((1.0 - blend) * series_val + blend * exact_val)
-        }
+        chi(z, self.params.rho)
     }
 
     /// `z / χ(z)` correction using a Taylor ratio for small `|z|`.
@@ -428,9 +361,9 @@ impl SabrModel {
         self.params = params;
     }
 
-    /// Whether a displacement shift is configured (negative-rate support).
+    /// Whether normal beta=0 dynamics or a displacement permit negative rates.
     pub fn supports_negative_rates(&self) -> bool {
-        self.params.shift.is_some()
+        self.params.beta < BETA_SNAP_TOL || self.params.shift.is_some()
     }
 
     /// Forward and strike after applying the optional displacement shift.
@@ -456,7 +389,11 @@ impl SabrModel {
     /// * `strike` - Unshifted strike in the same units as `forward`.
     /// * `time_to_expiry` - Expiry in years; must be strictly positive.
     pub fn validate_inputs(&self, forward: f64, strike: f64, time_to_expiry: f64) -> Result<()> {
-        if time_to_expiry <= 0.0 {
+        if !forward.is_finite()
+            || !strike.is_finite()
+            || !time_to_expiry.is_finite()
+            || time_to_expiry <= 0.0
+        {
             return Err(Error::Validation(format!(
                 "SABR time_to_expiry must be positive, got: {:.6}",
                 time_to_expiry
@@ -475,7 +412,9 @@ impl SabrModel {
                 )));
             }
         } else if let Some(shift) = self.params.shift {
-            if forward + shift <= 0.0 || strike + shift <= 0.0 {
+            if self.params.beta >= BETA_SNAP_TOL
+                && (forward + shift <= 0.0 || strike + shift <= 0.0)
+            {
                 return Err(Error::Validation(format!(
                     "Shifted SABR: effective rates must be positive. \
                      Got forward+shift={:.6}, strike+shift={:.6} (shift={:.6})",
@@ -487,5 +426,93 @@ impl SabrModel {
         }
 
         Ok(())
+    }
+}
+
+/// Stable Hagan chi function shared by normal and lognormal expansions.
+pub(super) fn chi(z: f64, rho: f64) -> Result<f64> {
+    // Fourth-order Taylor series around z = 0:
+    // χ(z) = ln((√(1 - 2ρz + z²) + z - ρ)/(1 - ρ))
+    //
+    // With g(z) = √(1 - 2ρz + z²) = 1 - ρz + (1-ρ²)z²/2 + ρ(1-ρ²)z³/2
+    //             + (1-ρ²)(5ρ²-1)z⁴/8 + O(z⁵),
+    // (g + z - ρ)/(1 - ρ) = 1 + z + (1+ρ)z²/2 + ρ(1+ρ)z³/2 + (1+ρ)(5ρ²-1)z⁴/8,
+    // and ln(1 + w) = w - w²/2 + w³/3 - w⁴/4 gives:
+    // χ(z) = z + (ρ/2)z² + ((3ρ² - 1)/6)z³ + (ρ(5ρ² - 3)/8)z⁴ + O(z⁵)
+    // (ρ=0 check: χ(z) = asinh(z) = z - z³/6 + O(z⁵))
+    let series_chi = |z_val: f64| -> f64 {
+        let z2 = z_val * z_val;
+        let z3 = z2 * z_val;
+        let z4 = z2 * z2;
+        let c2 = rho / 2.0;
+        let c3 = (3.0 * rho * rho - 1.0) / 6.0;
+        let c4 = rho * (5.0 * rho * rho - 3.0) / 8.0;
+        z_val + c2 * z2 + c3 * z3 + c4 * z4
+    };
+
+    let exact_chi = |z_val: f64| -> Result<f64> {
+        let discriminant = 1.0 - 2.0 * rho * z_val + z_val * z_val;
+
+        if discriminant < 0.0 {
+            return Err(Error::Validation(format!(
+                "SABR chi function: negative discriminant {} for z={:.6}, rho={:.6}",
+                discriminant, z_val, rho
+            )));
+        }
+
+        let sqrt_disc = discriminant.sqrt();
+
+        if (1.0 - rho).abs() < 1e-10 {
+            // ρ → 1: discriminant is (1−z)², so for z<1 the limit is
+            // χ(z) = −ln(1−z). The formula diverges at z ≥ 1 (SABR density
+            // degenerates).
+            if z_val >= 1.0 {
+                return Err(Error::Validation(format!(
+                    "SABR chi function: rho≈1 with z={z_val:.6} ≥ 1 — \
+                         Hagan expansion is undefined in this limit"
+                )));
+            }
+            return Ok(-(1.0 - z_val).ln());
+        }
+        if (1.0 + rho).abs() < 1e-10 {
+            // ρ → −1: discriminant is (1+z)², so for z > −1 the limit is
+            // χ(z) = ln(1+z). At z ≤ −1 the log argument is non-positive
+            // and the Hagan expansion is undefined.
+            if z_val <= -1.0 {
+                return Err(Error::Validation(format!(
+                    "SABR chi function: rho≈-1 with z={z_val:.6} ≤ -1 — \
+                         Hagan expansion is undefined in this limit"
+                )));
+            }
+            return Ok((sqrt_disc + z_val + 1.0).ln() - (2.0_f64).ln());
+        }
+
+        let numerator = sqrt_disc + z_val - rho;
+        let denominator = 1.0 - rho;
+
+        if numerator <= 0.0 {
+            return Err(Error::Validation(format!(
+                "SABR chi function: non-positive log argument {} for z={:.6}, rho={:.6}",
+                numerator, z_val, rho
+            )));
+        }
+
+        Ok((numerator / denominator).ln())
+    };
+
+    let abs_z = z.abs();
+    let z_low = 1e-5;
+    let z_high = 1e-3;
+
+    if abs_z < z_low {
+        Ok(series_chi(z))
+    } else if abs_z > z_high {
+        exact_chi(z)
+    } else {
+        let t = (abs_z - z_low) / (z_high - z_low);
+        let blend = t * t * (3.0 - 2.0 * t); // Hermite smoothstep
+        let series_val = series_chi(z);
+        let exact_val = exact_chi(z)?;
+        Ok((1.0 - blend) * series_val + blend * exact_val)
     }
 }

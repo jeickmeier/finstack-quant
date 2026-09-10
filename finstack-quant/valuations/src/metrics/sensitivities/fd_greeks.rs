@@ -23,7 +23,8 @@ use crate::instruments::common_impl::{
     dependencies::MarketDependencies, dependencies::VolatilityDependency,
 };
 use crate::metrics::core::finite_difference::{
-    apply_parallel_surface_bumps_in_place, revert_scratch_bumps, scalar_numeric_value,
+    apply_parallel_surface_bumps_in_place, bumped_volatility_override, revert_scratch_bumps,
+    scalar_numeric_value, volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -205,6 +206,33 @@ fn present_vol_surface_ids(
     Ok(present)
 }
 
+// Keep central higher-order differences inside the positive-volatility domain.
+fn symmetric_volatility_step(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    dependencies: &MarketDependencies,
+    volatility_surface_ids: &[CurveId],
+    requested: f64,
+) -> Result<f64> {
+    let minimum = volatility_override(instrument).or_else(|| {
+        volatility_surface_ids
+            .iter()
+            .filter_map(|id| {
+                let surface = market.get_surface(id.as_str()).ok()?;
+                min_dependency_surface_vol(&surface, id, &dependencies.volatility_dependencies)
+            })
+            .reduce(f64::min)
+    });
+    match minimum {
+        Some(volatility) if volatility.is_finite() && volatility > 0.0 => {
+            Ok(requested.min(volatility * 0.5))
+        }
+        _ => Err(finstack_quant_core::Error::Validation(
+            "Central volatility Greeks require positive active volatility".into(),
+        )),
+    }
+}
+
 /// Guard against NaN / ±Inf leaking out of finite-difference calculations.
 fn ensure_finite(value: f64, metric_name: &str) -> finstack_quant_core::Result<f64> {
     if value.is_finite() {
@@ -242,15 +270,19 @@ fn eval_raw_with_scratch_bumps<I>(
     vol_bump: Option<(&[CurveId], f64)>,
 ) -> Result<f64>
 where
-    I: Instrument,
+    I: Instrument + Clone,
 {
+    let bumped_instrument = match vol_bump {
+        Some((_, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
+        None => None,
+    };
     let price_token = if let Some((spot_id, bump_pct)) = spot_bump {
         Some(scratch.apply_price_bump_pct_in_place(spot_id, bump_pct)?)
     } else {
         None
     };
 
-    let surface_tokens = match vol_bump {
+    let surface_tokens = match vol_bump.filter(|_| bumped_instrument.is_none()) {
         Some((vol_surface_ids, bump_abs)) => {
             match apply_parallel_surface_bumps_in_place(scratch, vol_surface_ids, bump_abs) {
                 Ok(tokens) => Some(tokens),
@@ -265,7 +297,11 @@ where
         None => None,
     };
 
-    let value = context.reprice_instrument_raw(instrument, scratch, as_of);
+    let value = context.reprice_instrument_raw(
+        bumped_instrument.as_ref().unwrap_or(instrument),
+        scratch,
+        as_of,
+    );
     if let Some(tokens) = surface_tokens {
         revert_scratch_bumps(scratch, tokens)?;
     }
@@ -508,7 +544,11 @@ where
         )?;
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = present_vol_surface_ids(&dependencies, &context.curves, "vega")?;
+        let vol_surface_ids = if volatility_override(instrument).is_some() {
+            Vec::new()
+        } else {
+            present_vol_surface_ids(&dependencies, &context.curves, "vega")?
+        };
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
         let bump_abs = defaults.vol_bump_pct;
@@ -525,18 +565,20 @@ where
         // declared for that surface. A descriptor without a strike means the
         // instrument may sample the whole surface and therefore retains the
         // conservative global-minimum check.
-        let min_vol = vol_surface_ids
-            .iter()
-            .filter_map(|vol_surface_id| {
-                let surface = context.curves.get_surface(vol_surface_id.as_str()).ok()?;
-                min_dependency_surface_vol(
-                    &surface,
-                    vol_surface_id,
-                    &dependencies.volatility_dependencies,
-                )
-            })
-            .reduce(f64::min);
-        let clamp_active = min_vol.map(|m| m < bump_abs).unwrap_or(false);
+        let min_vol = volatility_override(instrument).or_else(|| {
+            vol_surface_ids
+                .iter()
+                .filter_map(|vol_surface_id| {
+                    let surface = context.curves.get_surface(vol_surface_id.as_str()).ok()?;
+                    min_dependency_surface_vol(
+                        &surface,
+                        vol_surface_id,
+                        &dependencies.volatility_dependencies,
+                    )
+                })
+                .reduce(f64::min)
+        });
+        let clamp_active = min_vol.map(|m| m <= bump_abs).unwrap_or(false);
 
         let vega = if clamp_active {
             tracing::warn!(
@@ -633,13 +675,23 @@ where
         }
 
         let dependencies = instrument.market_dependencies()?;
-        let vol_surface_ids = present_vol_surface_ids(&dependencies, &context.curves, "volga")?;
+        let vol_surface_ids = if volatility_override(instrument).is_some() {
+            Vec::new()
+        } else {
+            present_vol_surface_ids(&dependencies, &context.curves, "volga")?
+        };
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
         let seeded_instrument = clone_with_crn_seed(instrument)?;
 
         // Absolute implied vol bump (vol points).
-        let bump_abs = defaults.vol_bump_pct;
+        let bump_abs = symmetric_volatility_step(
+            instrument,
+            &context.curves,
+            &dependencies,
+            &vol_surface_ids,
+            defaults.vol_bump_pct,
+        )?;
 
         let (base_pv, pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
             let base_pv = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
@@ -716,7 +768,11 @@ where
                 "Instrument missing spot_id for vanna calculation".to_string(),
             )
         })?;
-        let vol_surface_ids = present_vol_surface_ids(&dependencies, &context.curves, "vanna")?;
+        let vol_surface_ids = if volatility_override(instrument).is_some() {
+            Vec::new()
+        } else {
+            present_vol_surface_ids(&dependencies, &context.curves, "vanna")?
+        };
 
         // Spot level for bump sizing
         let spot_scalar = context.curves.get_price(spot_id)?;
@@ -729,7 +785,13 @@ where
 
         let spot_bump = effective_spot_bump(current_spot, spot_bump_pct);
         let h_abs = spot_bump.absolute; // absolute spot change
-        let k_abs = vol_bump_abs; // absolute vol change (vol points)
+        let k_abs = symmetric_volatility_step(
+            instrument,
+            &context.curves,
+            &dependencies,
+            &vol_surface_ids,
+            vol_bump_abs,
+        )?;
 
         let seeded_instrument = clone_with_crn_seed(instrument)?;
 
@@ -1768,5 +1830,78 @@ mod tests {
         // consistent with Vega: expected = Σ slope × 0.01.
         let expected = (first_slope + second_slope) * 0.01;
         assert!((vanna - expected).abs() < 1e-9);
+    }
+    impl HasExpiry for crate::instruments::EquityOption {
+        fn expiry(&self) -> Date {
+            self.expiry
+        }
+    }
+    impl HasDayCount for crate::instruments::EquityOption {
+        fn day_count(&self) -> DayCount {
+            self.day_count
+        }
+    }
+
+    #[test]
+    fn generic_greeks_follow_the_active_override_without_a_surface() {
+        use crate::instruments::EquityOption;
+        use crate::metrics::{MetricCalculator, MetricContext};
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use finstack_quant_core::market_data::{
+            surfaces::VolSurface, term_structures::DiscountCurve,
+        };
+        let as_of = date!(2025 - 01 - 01);
+        let mut option = EquityOption::example().expect("option");
+        option.expiry = date!(2026 - 01 - 01);
+        option.strike = 120.0;
+        option.spot_id = "EQ-SPOT".into();
+        option.vol_surface_id = "EQ-VOL".into();
+        option.div_yield_id = None;
+        let bare = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, 1.0)])
+                    .build()
+                    .expect("curve"),
+            )
+            .insert_price("EQ-SPOT", MarketScalar::Unitless(100.0));
+        let quoted = bare.clone().insert_surface(
+            VolSurface::builder("EQ-VOL")
+                .expiries(&[1.0])
+                .strikes(&[120.0])
+                .row(&[0.2])
+                .build()
+                .expect("surface"),
+        );
+        let evaluate =
+            |inst: &EquityOption, market: &MarketContext, calc: &dyn MetricCalculator| {
+                let base = inst.value(market, as_of).expect("PV");
+                let mut context = MetricContext::new(
+                    Arc::new(inst.clone()),
+                    Arc::new(market.clone()),
+                    as_of,
+                    base,
+                    MetricContext::default_config(),
+                );
+                calc.calculate(&mut context).expect("active quote Greek")
+            };
+        let mut overridden = option.clone();
+        overridden.instrument_pricing_overrides = overridden
+            .instrument_pricing_overrides
+            .with_implied_vol(0.2);
+        let calculators: Vec<Box<dyn MetricCalculator>> = vec![
+            Box::new(GenericFdVega::<EquityOption>::default()),
+            Box::new(GenericFdVolga::<EquityOption>::default()),
+            Box::new(GenericFdVanna::<EquityOption>::default()),
+        ];
+        for calc in calculators {
+            let expected = evaluate(&option, &quoted, calc.as_ref());
+            assert!(expected.abs() > 1e-6);
+            for market in [&quoted, &bare] {
+                let actual = evaluate(&overridden, market, calc.as_ref());
+                assert!((actual - expected).abs() < 1e-8, "{actual} vs {expected}");
+            }
+        }
     }
 }

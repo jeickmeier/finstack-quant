@@ -12,13 +12,89 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 // MC-specific imports
-use finstack_quant_models::monte_carlo::payoff::barrier::{
-    BarrierMonitoring, BarrierOptionPayoff, OptionKind,
-};
+use finstack_quant_models::monte_carlo::payoff::barrier::{BarrierOptionPayoff, OptionKind};
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
+
+// Both engines resolve the same dated discount factor and active volatility quote.
+pub(crate) fn collect_barrier_inputs(
+    inst: &BarrierOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<crate::instruments::common_impl::helpers::BlackScholesInputsDf> {
+    use crate::instruments::common_impl::helpers::{
+        resolve_optional_dividend_yield, BlackScholesInputsDf,
+    };
+    let t = inst.day_count.year_fraction(
+        as_of,
+        inst.expiry,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
+    let df = curves
+        .get_discount(inst.discount_curve_id.as_str())?
+        .df_between_dates(as_of, inst.expiry)?;
+    if !df.is_finite() || df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Barrier discount factor must be positive and finite".into(),
+        ));
+    }
+    let spot = match curves.get_price(&inst.spot_id)? {
+        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(value) => {
+            if value.currency() != inst.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: inst.notional.currency(),
+                    actual: value.currency(),
+                });
+            }
+            value.amount()
+        }
+    };
+    crate::instruments::common_impl::validation::validate_f64_positive(
+        spot,
+        "BarrierOption asset spot",
+    )?;
+    let q = resolve_optional_dividend_yield(curves, inst.div_yield_id.as_ref())?;
+    let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        curves,
+        inst.vol_surface_id.as_str(),
+        t,
+        inst.strike,
+    )?;
+    Ok(BlackScholesInputsDf {
+        spot,
+        df,
+        q,
+        sigma,
+        t,
+    })
+}
+
+/// Remaining known knock-out rebate, independent of spot, volatility and notional.
+pub(crate) fn known_knock_out_value(
+    inst: &BarrierOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<Option<Money>> {
+    if inst.observed_barrier_breached != Some(true) || !inst.barrier_type.is_knock_out() {
+        return Ok(None);
+    }
+    let mut value = match inst.rebate_timing {
+        finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+        finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => {
+            inst.rebate.map_or(0.0, |money| money.amount())
+        }
+    };
+    if value != 0.0 && as_of < inst.expiry {
+        value *= curves
+            .get_discount(inst.discount_curve_id.as_str())?
+            .df_between_dates(as_of, inst.expiry)?;
+    }
+    Money::new(value, inst.notional.currency()).map(Some)
+}
 
 /// Whether the instrument's rebate should be paid at the hit time.
 ///
@@ -67,70 +143,28 @@ impl BarrierOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-
-        // Two clocks: t_vol (instrument day count) drives the vol surface /
-        // MC time grid, while the exact curve DF drives both the model-clock
-        // drift (`exp(-r * t_vol) = df`) and the final discounting.
-        let t_vol = inst.day_count.year_fraction(
-            as_of,
-            inst.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-
-        if t_vol <= 0.0 {
+        inst.validate_monitoring_state(as_of)?;
+        if as_of >= inst.expiry {
             return price_expired_barrier(inst, curves, as_of);
         }
-
-        let discount_factor = disc_curve.df_between_dates(as_of, inst.expiry)?;
-        // Drift annualized on the same clock used by the simulated process.
-        let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
-            discount_factor,
-            t_vol,
-            "BarrierOption discount",
-        )?;
-
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
-
-        let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
-            curves,
-            inst.div_yield_id.as_ref(),
-        )?;
-
-        // Get volatility (override → surface, using vol surface time basis)
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t_vol,
-            inst.strike,
-        )?;
+        if let Some(value) = known_knock_out_value(inst, curves, as_of)? {
+            return Ok(value);
+        }
+        let inputs = collect_barrier_inputs(inst, curves, as_of)?;
+        let (spot, q, sigma, t_vol, discount_factor) =
+            (inputs.spot, inputs.q, inputs.sigma, inputs.t, inputs.df);
+        let r = inputs.r_eff();
 
         if inst.observed_barrier_breached == Some(true) {
-            use finstack_quant_core::types::BarrierType;
-            let unit = match inst.barrier_type {
-                BarrierType::UpAndIn | BarrierType::DownAndIn => {
-                    finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                        spot,
-                        inst.strike,
-                        r,
-                        q,
-                        sigma,
-                        t_vol,
-                        inst.option_type,
-                    )
-                }
-                BarrierType::UpAndOut | BarrierType::DownAndOut => match inst.rebate_timing {
-                    finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-                    finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => inst
-                        .rebate
-                        .map_or(0.0, |rebate| rebate.amount() * discount_factor),
-                },
-            };
+            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+                spot,
+                inst.strike,
+                r,
+                q,
+                sigma,
+                t_vol,
+                inst.option_type,
+            );
             let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier knocked-in vanilla price",
@@ -147,15 +181,14 @@ impl BarrierOptionMcPricer {
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
 
-        // Create time grid with minimum-capped steps (using vol surface time basis for proper
-        // barrier monitoring - this ensures time steps align with volatility assumptions)
-        let steps_per_year = self.config.steps_per_year;
-        let num_steps = ((t_vol * steps_per_year).round() as usize).max(self.config.min_steps);
-        let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform(t_vol, num_steps)?;
-        // `maturity_step` must equal `time_grid.num_steps()` (= num_steps): the engine
-        // calls `on_event` with `state.step = num_steps` on the last iteration, so the
-        // terminal-spot capture guard `state.step == maturity_step` must fire there.
-        let maturity_step = num_steps;
+        let mut config = crate::instruments::common_impl::helpers::merged_path_config(
+            &self.config,
+            &inst.instrument_pricing_overrides,
+        )?;
+        let (time_grid, monitoring) =
+            inst.monitoring
+                .time_grid(as_of, inst.day_count, None, t_vol, &config)?;
+        let maturity_step = time_grid.num_steps();
 
         // Create payoff (using vol surface time for barrier adjustment calculations)
         let mut payoff = BarrierOptionPayoff::new(
@@ -163,12 +196,12 @@ impl BarrierOptionMcPricer {
             inst.barrier.amount(),
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
-            inst.rebate.map(|m| m.amount()),
+            inst.rebate.map(|m| m.amount() / inst.notional.amount()),
             inst.notional.amount(),
             maturity_step,
             sigma,
             &time_grid,
-            BarrierMonitoring::Continuous { start_step: 0 },
+            monitoring,
         );
         if wants_at_hit_rebate(inst) {
             payoff = payoff.with_rebate_at_hit(r);
@@ -184,16 +217,14 @@ impl BarrierOptionMcPricer {
             seed::derive_seed(&inst.id, "base")
         };
 
-        let mut config = self.config.clone();
         config.seed = seed;
 
         // Price using path-dependent pricer (using vol surface time basis for simulation)
         let pricer = PathDependentPricer::new(config);
-        let result = pricer.price(
+        let result = pricer.price_with_grid(
             &process,
             spot,
-            t_vol,
-            num_steps,
+            time_grid,
             &payoff,
             inst.notional.currency(),
             discount_factor,
@@ -247,11 +278,15 @@ pub(crate) fn compute_pv(
 /// the caller to provide `observed_barrier_breached`.
 /// The intrinsic value is `max(S - K, 0)` for calls and `max(K - S, 0)` for puts,
 /// scaled by notional.
-fn price_expired_barrier(
+pub(crate) fn price_expired_barrier(
     inst: &BarrierOption,
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
+    inst.validate_monitoring_state(as_of)?;
+    if let Some(value) = known_knock_out_value(inst, curves, as_of)? {
+        return Ok(value);
+    }
     let spot = if let Some(fixing) = inst.expiry_fixing {
         fixing.amount()
     } else if as_of == inst.expiry {
@@ -286,7 +321,10 @@ fn price_expired_barrier(
 
     let pv = if is_knock_out {
         if barrier_breached {
-            rebate
+            match inst.rebate_timing {
+                finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+                finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => rebate,
+            }
         } else {
             intrinsic
         }
@@ -305,29 +343,8 @@ fn price_expired_barrier(
 use finstack_quant_models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
 };
-/// Broadie-Glasserman-Kou / Gobet-Miri discrete barrier adjustment constant.
-///
-/// β = -ζ(1/2) / √(2π) ≈ 0.5825971579390106. Re-exported from the canonical
-/// definition in `finstack_quant_models::monte_carlo::barriers::corrections` so the
-/// analytical and MC stacks can never drift apart.
-const BG_BETA: f64 = finstack_quant_models::monte_carlo::barriers::corrections::GOBET_MIRI_BETA;
-
-/// Barrier option analytical pricer (continuous monitoring).
-///
-/// # Monitoring Convention
-///
-/// **Important**: This pricer uses **continuous monitoring** Reiner-Rubinstein formulas.
-/// Real-world barriers are typically monitored discretely (e.g., daily closes).
-/// Continuous barrier formulas **systematically underestimate** knock-out option values
-/// and overestimate knock-in option values compared to discrete monitoring.
-///
-/// For discrete monitoring pricing, use the Monte Carlo pricer
-/// ([`BarrierOptionMcPricer`]) which applies the Broadie-Glasserman-Kou / Gobet-Miri
-/// correction when `use_gobet_miri = true`.
-///
-/// `BarrierOption::value()` dispatches to this analytical pricer only when
-/// `use_gobet_miri = false`. When `use_gobet_miri = true`, `value()` routes
-/// to the MC pricer (`npv_mc()`) for discrete-monitoring-corrected prices.
+/// Reiner-Rubinstein pricer for continuous contractual monitoring.
+/// Discrete observation dates require the Monte Carlo or PDE engine.
 pub(crate) struct BarrierOptionAnalyticalPricer;
 
 impl BarrierOptionAnalyticalPricer {
@@ -356,81 +373,59 @@ impl Pricer for BarrierOptionAnalyticalPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier_opt = expect_inst::<BarrierOption>(instrument, InstrumentType::BarrierOption)?;
 
-        if barrier_opt.use_gobet_miri {
-            tracing::warn!(
-                "Analytical barrier pricer uses continuous monitoring; discrete monitoring flag \
-                 is ignored. Use Monte Carlo pricer for discrete barrier monitoring."
-            );
+        barrier_opt
+            .validate_monitoring_state(as_of)
+            .map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
+            })?;
+        if matches!(
+            barrier_opt.monitoring,
+            crate::instruments::Monitoring::Discrete { .. }
+        ) {
+            return Err(PricingError::model_failure_with_context(
+                "Analytical barrier pricing requires continuous monitoring; use MC or PDE for discrete observation dates".to_string(),
+                PricingErrorContext::from_instrument(barrier_opt),
+            ));
         }
 
-        // Use DF-first input collection to keep vol lookup on the instrument clock
-        // while preserving discounting on the discount curve clock.
-        let bs_inputs = crate::instruments::common_impl::helpers::collect_black_scholes_inputs_df(
-            &barrier_opt.spot_id,
-            &barrier_opt.discount_curve_id,
-            barrier_opt.div_yield_id.as_ref(),
-            &barrier_opt.vol_surface_id,
-            barrier_opt.strike,
-            barrier_opt.expiry,
-            barrier_opt.day_count,
-            market,
-            as_of,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-        let spot = bs_inputs.spot;
-        let q = bs_inputs.q;
-        let sigma = bs_inputs.sigma;
-        let t = bs_inputs.t;
-        let df = bs_inputs.df;
-
-        if t <= 0.0 {
-            let pv = price_expired_barrier(barrier_opt, market, as_of).map_err(|e| {
+        if as_of >= barrier_opt.expiry {
+            let pv = price_expired_barrier(barrier_opt, market, as_of).map_err(|error| {
                 PricingError::model_failure_with_context(
-                    e.to_string(),
+                    error.to_string(),
                     PricingErrorContext::default(),
                 )
             })?;
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
+        if let Some(value) = known_knock_out_value(barrier_opt, market, as_of).map_err(|error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(barrier_opt))
+        })? {
+            return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, value));
+        }
+        let bs_inputs = collect_barrier_inputs(barrier_opt, market, as_of).map_err(|error| {
+            PricingError::model_failure_with_context(
+                error.to_string(),
+                PricingErrorContext::default(),
+            )
+        })?;
+        let (spot, q, sigma, t, df) = (
+            bs_inputs.spot,
+            bs_inputs.q,
+            bs_inputs.sigma,
+            bs_inputs.t,
+            bs_inputs.df,
+        );
 
         if barrier_opt.observed_barrier_breached == Some(true) {
-            use finstack_quant_core::types::BarrierType;
-            let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
-                df,
+            let unit = finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
+                spot,
+                barrier_opt.strike,
+                bs_inputs.r_eff(),
+                q,
+                sigma,
                 t,
-                "BarrierOption discount curve",
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-            let unit = match barrier_opt.barrier_type {
-                BarrierType::UpAndIn | BarrierType::DownAndIn => {
-                    finstack_quant_models::closed_form::vanilla::bs_price_unchecked(
-                        spot,
-                        barrier_opt.strike,
-                        r,
-                        q,
-                        sigma,
-                        t,
-                        barrier_opt.option_type,
-                    )
-                }
-                BarrierType::UpAndOut | BarrierType::DownAndOut => {
-                    match barrier_opt.rebate_timing {
-                        finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-                        finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => {
-                            barrier_opt
-                                .rebate
-                                .map_or(0.0, |rebate| rebate.amount() * df)
-                        }
-                    }
-                }
-            };
+                barrier_opt.option_type,
+            );
             let unit = finstack_quant_models::closed_form::checked_closed_form_value(
                 unit,
                 "barrier observed-breach vanilla price",
@@ -456,40 +451,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 
         let analytical_barrier_type = barrier_opt.barrier_type;
 
-        // Apply Broadie-Glasserman-Kou discrete monitoring correction when
-        // monitoring_frequency is set.
-        let is_down = !barrier_opt.barrier_type.is_up();
-        let raw_barrier = barrier_opt.barrier.amount();
-        let effective_barrier = if let Some(dt) = barrier_opt.monitoring_frequency {
-            let shift = BG_BETA * sigma * dt.sqrt();
-            let shifted = if is_down {
-                raw_barrier * (-shift).exp()
-            } else {
-                raw_barrier * shift.exp()
-            };
-            // Guard against the shift crossing spot (W-09). For a large
-            // monitoring interval `βσ√Δt` can be large enough to move the
-            // effective barrier onto the *other side* of spot, which flips the
-            // option's alive/knocked state and mis-prices a near-barrier
-            // option (e.g. a live down-and-out collapses to ~0). The
-            // Broadie-Glasserman-Kou adjustment is only meaningful while the
-            // effective barrier stays on the same side of spot as the
-            // contractual barrier, so clamp it just shy of spot.
-            //
-            // `BARRIER_SPOT_GAP` keeps the effective barrier strictly off spot
-            // so the analytical formula does not see a degenerate
-            // barrier == spot input.
-            const BARRIER_SPOT_GAP: f64 = 1e-8;
-            if raw_barrier <= spot {
-                // Down-ish barrier (at or below spot): must not rise to spot.
-                shifted.min(spot * (1.0 - BARRIER_SPOT_GAP))
-            } else {
-                // Up-ish barrier (above spot): must not fall to spot.
-                shifted.max(spot * (1.0 + BARRIER_SPOT_GAP))
-            }
-        } else {
-            raw_barrier
-        };
+        let effective_barrier = barrier_opt.barrier.amount();
 
         let params =
             BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)
@@ -521,18 +483,14 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         // The closed-form leaves return NaN sentinels for out-of-domain input;
         // convert that to an error before `Money::new` panics on non-finite.
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
-            price + rebate_val,
+            price * barrier_opt.notional.amount() + rebate_val,
             "barrier closed-form price",
         )
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        let pv = Money::new(
-            price * barrier_opt.notional.amount(),
-            barrier_opt.notional.currency(),
-        )
-        .map_err(|error| {
+        let pv = Money::new(price, barrier_opt.notional.currency()).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
@@ -556,8 +514,7 @@ mod tests {
     use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
     use finstack_quant_models::closed_form::barrier::{
-        barrier_call_continuous, barrier_put_continuous, barrier_rebate, down_out_call,
-        BarrierParams, RebateTiming,
+        barrier_put_continuous, barrier_rebate, down_out_call, BarrierParams, RebateTiming,
     };
     use time::Month;
 
@@ -608,7 +565,7 @@ mod tests {
             expiry_fixing: None,
             notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
-            use_gobet_miri: false,
+            monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
@@ -616,7 +573,6 @@ mod tests {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            monitoring_frequency: None,
             attributes: Attributes::new(),
         }
     }
@@ -718,6 +674,7 @@ mod tests {
 
         let knocked_out = BarrierOption {
             rebate: Some(Money::from((3_i64, Currency::USD))),
+            rebate_timing: RebateTiming::AtExpiry,
             observed_barrier_breached: Some(true),
             ..base.clone()
         };
@@ -764,85 +721,18 @@ mod tests {
     }
 
     #[test]
-    fn analytical_pricer_applies_monitoring_frequency_shift_for_down_barrier() {
+    fn analytical_pricer_rejects_discrete_monitoring() {
         let as_of = date(2024, 1, 1);
         let expiry = date(2024, 7, 1);
-        let spot = 100.0;
-        let strike = 100.0;
-        let barrier = 80.0;
-        let vol = 0.20;
-        let rate = 0.05;
-        let div_yield = 0.0;
-        let monitoring_dt = 1.0 / 252.0;
-
-        let option = BarrierOption {
-            expiry_fixing: None,
-            monitoring_frequency: Some(monitoring_dt),
-            ..down_and_out_call(expiry, strike, barrier)
+        let mut option = down_and_out_call(expiry, 100.0, 80.0);
+        option.monitoring = crate::instruments::Monitoring::Discrete {
+            observation_dates: vec![expiry],
         };
-        let market = market(as_of, spot, vol, rate, div_yield);
-        let pv = option.value(&market, as_of).expect("barrier pv").amount();
-
-        let t = option
-            .day_count
-            .year_fraction(as_of, expiry, DayCountContext::default())
-            .expect("year fraction");
-        let df = (-rate * t).exp();
-        let shifted_barrier = barrier * (-(BG_BETA * vol * monitoring_dt.sqrt())).exp();
-        let p = BarrierParams::with_df(spot, strike, shifted_barrier, t, df, div_yield, vol)
-            .expect("positive df constructs");
-        let expected = barrier_call_continuous(&p, AnalyticalBarrierType::DownAndOut);
-
-        assert!((pv - expected).abs() < 1e-12);
-    }
-
-    /// W-09: the Broadie-Glasserman-Kou discrete-monitoring shift must not move
-    /// the effective barrier across spot. A down-and-out call whose contractual
-    /// barrier sits *above* spot is already knocked out (price ~0). With a
-    /// large monitoring interval the unguarded shift `barrier · exp(-βσ√Δt)`
-    /// can drop the effective barrier below spot, which makes the analytical
-    /// formula treat the option as alive and return a spurious positive value.
-    ///
-    /// The guard clamps the effective barrier just above spot so the
-    /// already-knocked-out option stays priced at ~0.
-    #[test]
-    fn w09_bgk_shift_does_not_cross_spot_for_knocked_out_barrier() {
-        let as_of = date(2024, 1, 1);
-        let expiry = date(2025, 1, 1);
-        let spot = 100.0;
-        let strike = 100.0;
-        // Down-and-out barrier ABOVE spot: the option is already knocked out.
-        let barrier = 130.0;
-        let vol = 0.60;
-        let rate = 0.05;
-        let div_yield = 0.0;
-        // A very large monitoring interval makes βσ√Δt large enough that the
-        // unguarded shift would push the effective barrier below spot.
-        let monitoring_dt = 4.0;
-
-        let option = BarrierOption {
-            monitoring_frequency: Some(monitoring_dt),
-            ..down_and_out_call(expiry, strike, barrier)
-        };
-        let market = market(as_of, spot, vol, rate, div_yield);
-        let pv = option.value(&market, as_of).expect("barrier pv").amount();
-
-        // The unguarded shift would have produced this (effective barrier far
-        // below spot → option treated as alive → large positive price).
-        let unguarded_barrier = barrier * (-(BG_BETA * vol * monitoring_dt.sqrt())).exp();
-        assert!(
-            unguarded_barrier < spot,
-            "test setup invalid: the unguarded shift must cross spot \
-             (unguarded effective barrier {unguarded_barrier} should be < spot {spot})"
-        );
-
-        // With the guard the effective barrier stays at/above spot, so a
-        // down-and-out whose barrier is above spot remains knocked out (~0).
-        assert!(
-            pv.abs() < 1e-6,
-            "down-and-out call with barrier above spot is already knocked out \
-             and must price to ~0, but got {pv}; the BGK shift crossed spot"
-        );
+        let market = market(as_of, 100.0, 0.2, 0.05, 0.0);
+        let error = BarrierOptionAnalyticalPricer::new()
+            .price_dyn(&option, &market, as_of)
+            .expect_err("discrete contract cannot use continuous formula");
+        assert!(error.to_string().contains("continuous monitoring"));
     }
 
     /// Curves with different native day-count conventions but the same exact
@@ -1040,11 +930,10 @@ mod tests {
     }
 
     /// W-43 / W-44 cross-check: the MC barrier pricer with the Brownian
-    /// bridge active (`use_gobet_miri = true`) estimates the
+    /// continuous bridge active estimates the
     /// *continuously*-monitored barrier price, because the bridge fills in
     /// between-step crossings. It must therefore agree with the analytical
-    /// continuous-monitoring pricer (`use_gobet_miri = false`,
-    /// `monitoring_frequency = None`) within Monte Carlo error.
+    /// continuous-monitoring analytical pricer within Monte Carlo error.
     ///
     /// Before W-43 the MC payoff layered the Broadie–Glasserman–Kou barrier
     /// shift on top of the bridge, biasing the price by order `βσ√Δt`; the
@@ -1075,7 +964,7 @@ mod tests {
         // MC with the bridge active. A fine time grid keeps the bridge
         // approximation tight; a large path count keeps MC error small.
         let mc_option = BarrierOption {
-            use_gobet_miri: true,
+            monitoring: crate::instruments::Monitoring::Continuous,
             ..down_and_out_call(expiry, strike, barrier)
         };
         let mc_pricer = BarrierOptionMcPricer {
@@ -1152,7 +1041,7 @@ mod tests {
             observed_barrier_breached: None,
             notional: Money::from((1_i64, Currency::USD)),
             day_count: DayCount::Act365F,
-            use_gobet_miri: false,
+            monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),
             spot_id: "SPX".into(),
             vol_surface_id: "SPX_VOL".into(),
@@ -1160,7 +1049,6 @@ mod tests {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            monitoring_frequency: None,
             attributes: Attributes::new(),
         };
 

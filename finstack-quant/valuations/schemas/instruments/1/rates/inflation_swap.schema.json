@@ -1,5 +1,20 @@
 {
   "$defs": {
+    "InflationInterpolation": {
+      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
+          "type": "string"
+        }
+      ]
+    },
     "InflationLag": {
       "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
@@ -44,7 +59,7 @@
     },
     "InflationSwap": {
       "additionalProperties": false,
-      "description": "Zero-coupon Inflation Swap instrument.\n\nRepresents a zero-coupon inflation swap where one party pays a fixed real rate\nand the other receives the cumulative inflation over the swap's life. At maturity:\n\n```text\nInflation leg = Notional × [CPI(T_mat - Lag) / CPI(T_start - Lag) - 1]\nFixed leg     = Notional × [(1 + fixed_rate)^τ - 1]\n```\n\n# Market Conventions\n\n- **Lag**: Standard 3-month lag for US CPI, EUR HICP; 8-month for UK RPI\n- **Day Count**: Typically ACT/ACT for accrual, curve-specific for discounting\n- **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted\n\n# Validation\n\nCall [`validate()`](Self::validate) to check structural invariants before pricing.",
+      "description": "Zero-coupon Inflation Swap instrument.\n\nRepresents a zero-coupon inflation swap where one party pays a fixed real rate\nand the other receives the cumulative inflation over the swap's life. At maturity:\n\n```text\nInflation leg = Notional × [CPI(T_mat - Lag) / CPI(T_start - Lag) - 1]\nFixed leg     = Notional × [(1 + fixed_rate)^τ - 1]\n```\n\n# Market Conventions\n\n- **Lag**: Standard 3-month lag for US CPI/EUR HICP; 2-month for UK RPI\n- **Day Count**: Standard fixed legs compound annually with 1/1 accrual per period\n- **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted\n\n# Validation\n\nCall [`validate()`](Self::validate) to check structural invariants before pricing.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -97,6 +112,17 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+        },
+        "interpolation_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationInterpolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
         },
         "lag_override": {
           "anyOf": [
@@ -203,6 +229,7 @@
           "fixed_rate": "0.02",
           "id": "INFLSWAP-USD-5Y",
           "inflation_index_id": "US-CPI",
+          "interpolation_override": null,
           "lag_override": {
             "months": 3
           },

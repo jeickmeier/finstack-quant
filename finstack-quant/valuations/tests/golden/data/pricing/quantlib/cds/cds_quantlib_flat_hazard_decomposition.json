@@ -51,6 +51,7 @@
             "unit": "months"
           },
           "spread_bp": "100.0",
+          "standard_imm_dates": true,
           "start": "2025-09-22"
         },
         "protection": {

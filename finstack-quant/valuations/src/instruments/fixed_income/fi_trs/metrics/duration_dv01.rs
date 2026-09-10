@@ -3,7 +3,6 @@
 use crate::instruments::common_impl::parameters::trs_common::TrsSide;
 use crate::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::Result;
 
 /// Calculates duration-based DV01 for fixed income index TRS.
@@ -33,42 +32,15 @@ use finstack_quant_core::Result;
 ///
 /// # Errors
 ///
-/// Returns an error if `duration_id` is configured but missing from market data.
-/// When `duration_id` is `None`, defaults to 5.0 years (broad market assumption).
+/// Requires `duration_id` and its finite unitless market scalar
+/// in years. Missing inputs or a monetary scalar return an error.
 pub(crate) struct DurationDv01Calculator;
 
 impl MetricCalculator for DurationDv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let trs: &FIIndexTotalReturnSwap = context.instrument_as()?;
 
-        // Get duration from market data.
-        // If duration_id is configured, the data MUST be present (error on missing).
-        // If duration_id is None, default to 5.0 years (broad index assumption).
-        let duration = match &trs.underlying.duration_id {
-            Some(id) => {
-                let scalar = context.curves.get_price(id.as_str()).map_err(|_| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "Index duration data '{}' is configured but not found in market context. \
-                         Provide the duration scalar or remove duration_id to use 5.0Y default.",
-                        id
-                    ))
-                })?;
-                match scalar {
-                    MarketScalar::Unitless(v) => *v,
-                    MarketScalar::Price(_) => {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "Market scalar '{}' for index duration has type Price, but duration \
-                             is a unitless quantity. Use MarketScalar::Unitless instead.",
-                            id
-                        )));
-                    }
-                }
-            }
-            // Default 5.0Y duration when not provided — may be inappropriate
-            // for short-duration indices (money market, T-bill indices).
-            // Consider supplying an explicit duration_id for non-broad-market indices.
-            None => 5.0,
-        };
+        let duration = trs.index_duration(context.curves.as_ref())?;
 
         // DV01 = Notional × Duration × 1bp
         let dv01 = trs.notional.amount() * duration * 0.0001;
@@ -78,5 +50,32 @@ impl MetricCalculator for DurationDv01Calculator {
             TrsSide::ReceiveTotalReturn => -dv01,
             TrsSide::PayTotalReturn => dv01,
         })
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use finstack_quant_core::{
+        currency::Currency, market_data::context::MarketContext, money::Money,
+    };
+    use std::sync::Arc;
+    use time::macros::date;
+
+    #[test]
+    fn duration_risk_requires_a_duration_input() {
+        let mut trs = FIIndexTotalReturnSwap::example().expect("trs");
+        trs.underlying.duration_id = None;
+        let mut context = MetricContext::new(
+            Arc::new(trs),
+            Arc::new(MarketContext::new()),
+            date!(2024 - 01 - 15),
+            Money::from((0_i64, Currency::USD)),
+            MetricContext::default_config(),
+        );
+        assert!(
+            DurationDv01Calculator.calculate(&mut context).is_err(),
+            "missing duration must not fabricate five years"
+        );
     }
 }

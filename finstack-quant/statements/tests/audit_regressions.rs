@@ -269,6 +269,12 @@ fn reporting_grid_does_not_reprice_contractual_amortizing_interest() {
 fn reporting_currency_requires_fx_even_with_one_native_currency() {
     let mut model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
+    // Changing the reporting currency also changes the declared total-node units.
+    for node in model.nodes.values_mut() {
+        node.value_type = Some(finstack_quant_statements::types::NodeValueType::Monetary {
+            currency: Currency::USD,
+        });
+    }
     assert!(Evaluator::new()
         .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
         .is_err());
@@ -300,6 +306,12 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     }
     let mut model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
+    // Changing the reporting currency also changes the declared total-node units.
+    for node in model.nodes.values_mut() {
+        node.value_type = Some(finstack_quant_statements::types::NodeValueType::Monetary {
+            currency: Currency::USD,
+        });
+    }
     model.validate_semantics().unwrap();
     let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(SnapshotFx)));
     let result = Evaluator::new()
@@ -329,4 +341,37 @@ fn small_ewm_weights_do_not_disappear_through_subtraction() {
         .unwrap();
     let result = Evaluator::new().evaluate(&model).unwrap();
     assert!((result.get("mean", &q(2025, 2)).unwrap() - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn fx_pivot_does_not_choose_reporting_currency() {
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
+    struct UnusedFx;
+    impl FxProvider for UnusedFx {
+        fn rate(
+            &self,
+            _: Currency,
+            _: Currency,
+            _: time::Date,
+            _: FxConversionPolicy,
+        ) -> finstack_quant_core::Result<f64> {
+            Ok(1.2)
+        }
+    }
+    let model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
+    let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(UnusedFx)));
+    let actual = Evaluator::new()
+        .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
+        .unwrap();
+    let native = Evaluator::new()
+        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+        .unwrap();
+    assert_eq!(
+        actual.get_money("debt", &q(2025, 1)),
+        native.get_money("debt", &q(2025, 1))
+    );
+    assert_eq!(
+        actual.get_money("debt", &q(2025, 1)).unwrap().currency(),
+        Currency::EUR
+    );
 }

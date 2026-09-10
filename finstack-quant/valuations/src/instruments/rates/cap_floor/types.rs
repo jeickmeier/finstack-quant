@@ -291,12 +291,11 @@ pub struct CapFloor {
     /// Using lognormal vol with a normal surface (or vice versa) will produce
     /// incorrect prices.
     ///
-    /// - `Auto` (default): treat the surface as a lognormal quote; Black-76
-    ///   when forward and strike are positive, otherwise convert to an
-    ///   equivalent normal vol and price with Bachelier. A normal-vol
-    ///   surface must set `vol_type = Normal`.
-    /// - `Lognormal`: Standard Black model, requires positive rates/strikes
-    /// - `Normal`: Bachelier model, handles negative rates
+    /// - `Auto` (default): follow source convention and displacement metadata.
+    /// - `Lognormal`: Black model, with the source displacement if present;
+    ///   shifted forward and strike must both be positive.
+    /// - `Normal`: Bachelier model using normal quotes in decimal rate units;
+    ///   handles negative rates. Incompatible source conventions return errors.
     #[serde(default)]
     #[builder(default)]
     pub vol_type: CapFloorVolType,
@@ -1134,6 +1133,7 @@ mod tests {
         // Build a flat vol surface at 50bp normal vol for the normal model test
         let normal_vol = 0.005;
         let normal_vol_surface = VolSurface::builder(CurveId::new("TEST-VOL-NORMAL"))
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
             .strikes(&[-0.02, -0.01, 0.0, 0.01, 0.02])
             .row(&[normal_vol, normal_vol, normal_vol, normal_vol, normal_vol])
@@ -1186,27 +1186,10 @@ mod tests {
             "Normal cap/floor PV should be finite and non-negative"
         );
 
-        // A `Lognormal` cap/floor on a NON-POSITIVE forward must fall back to
-        // the Bachelier (normal) pricer without panicking or erroring.
-        //
-        // Note: the fallback *converts* the lognormal vol to a normal vol
-        // (audit item 6) — it does NOT feed the lognormal vol verbatim into
-        // Bachelier. So the fallback PV is NOT expected to equal the
-        // `Normal`-vol-type PV here: the single 50bp surface value is a
-        // *normal* vol for the `Normal` floorlet but a *lognormal* vol for the
-        // `Lognormal` floorlet, and the lognormal→normal conversion of a vol
-        // on a negative forward (no shift) is the crude approximation that
-        // `lognormal_to_normal_vol` documents. The meaningful invariant is
-        // that the fallback produces a finite, non-negative price.
-        let black_pv = black_floorlet
+        let error = black_floorlet
             .value(&ctx, base_date)
-            .expect("lognormal should auto-fallback to Bachelier for non-positive forwards");
-        assert!(
-            black_pv.amount().is_finite() && black_pv.amount() >= 0.0,
-            "lognormal-fallback cap/floor PV on a negative forward must be finite \
-             and non-negative; got {}",
-            black_pv.amount()
-        );
+            .expect_err("Black pricing cannot consume a normal surface");
+        assert!(error.to_string().contains("normal"));
     }
 
     #[test]

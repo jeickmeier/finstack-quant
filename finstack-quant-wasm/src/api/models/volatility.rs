@@ -131,7 +131,7 @@ impl JsSabrModel {
         }
     }
 
-    /// Black implied volatility for the given strike.
+    /// Implied volatility: normal decimal rate for beta=0, Black decimal volatility otherwise.
     /// @param forward - Forward price or rate in the same quote convention as the strike.
     /// @param strike - Option strike price in the same price units as the underlying.
     /// @param t - Time from the curve base date in years.
@@ -197,7 +197,7 @@ impl JsSabrSmile {
         self.inner.atm_vol().map_err(to_js_err)
     }
 
-    /// Black implied volatility for the given strike.
+    /// Implied volatility: normal decimal rate for beta=0, Black decimal volatility otherwise.
     /// @param strike - Option strike price in the same price units as the underlying.
     ///
     /// # Errors
@@ -295,10 +295,10 @@ impl JsSabrCalibrator {
         }
     }
 
-    /// Return a copy of this calibrator with an overridden convergence
-    /// tolerance, preserving all other settings (e.g. the iteration cap from
+    /// Return a copy of this calibrator with an overridden maximum relative
+    /// quote error, preserving all other settings (e.g. the iteration cap from
     /// `highPrecision`).
-    /// @param tolerance - Non-negative numerical convergence tolerance for the calibration optimizer.
+    /// @param tolerance - Positive finite maximum relative error of any final volatility quote; 1e-4 permits 0.01% of each quote. Invalid settings or a fit outside this budget throw during calibration.
     #[wasm_bindgen(js_name = withTolerance)]
     pub fn with_tolerance(&self, tolerance: f64) -> JsSabrCalibrator {
         Self {

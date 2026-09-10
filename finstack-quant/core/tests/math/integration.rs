@@ -593,3 +593,25 @@ fn test_gauss_legendre_tiny_nonzero_interval_not_collapsed() {
         "Expected ~{width}, got {result}"
     );
 }
+
+#[test]
+fn production_credit_audit_simpson_uses_total_error_budget() {
+    let boundary = 0.123_456_7;
+    let integral = adaptive_simpson(
+        |x| if x >= boundary { 1.0 } else { 0.0 },
+        0.0,
+        1.0,
+        1e-6,
+        20,
+    )
+    .expect("localized discontinuity fits the global error budget");
+    assert!((integral - (1.0 - boundary)).abs() <= 1e-6);
+    assert!(adaptive_simpson(
+        |x| if x >= boundary { 1.0 } else { 0.0 },
+        0.0,
+        1.0,
+        1e-12,
+        2,
+    )
+    .is_err());
+}

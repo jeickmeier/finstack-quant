@@ -160,6 +160,13 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
         }
     }
 
+    fn get_hazard_discount_curve_id(
+        &self,
+        hazard: &HazardCurve,
+    ) -> finstack_quant_core::Result<finstack_quant_core::types::CurveId> {
+        super::hazard::get_hazard_discount_curve_id(hazard)
+    }
+
     fn hazard_spread_risk_buckets(
         &self,
         hazard: &HazardCurve,

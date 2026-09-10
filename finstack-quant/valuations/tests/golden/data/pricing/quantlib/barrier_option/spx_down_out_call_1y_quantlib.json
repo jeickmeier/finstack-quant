@@ -3,7 +3,6 @@
     "npv": 9.22509769221584
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -23,6 +22,9 @@
         "div_yield_id": "SPX-DIVYIELD",
         "expiry": "2027-04-30",
         "id": "SPX-DOWN-OUT-CALL-1Y-QUANTLIB",
+        "monitoring": {
+          "type": "continuous"
+        },
         "notional": {
           "amount": "1",
           "currency": "USD"
@@ -32,11 +34,11 @@
         "spot_id": "SPX-SPOT",
         "strike": 100.0,
         "underlying_ticker": "SPX",
-        "use_gobet_miri": false,
         "vol_surface_id": "SPX-BARRIER-VOL-QL"
       },
       "type": "barrier_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

@@ -13,7 +13,10 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
-use finstack_quant_margin::{Marginable, NettingSetId, SimmSensitivities};
+use finstack_quant_margin::{
+    Marginable, NettingSetId, SimmCalculator, SimmCurvatureSensitivity, SimmRiskClass,
+    SimmSensitivities,
+};
 use finstack_quant_portfolio::types::DUMMY_ENTITY_ID;
 use finstack_quant_portfolio::{
     Entity, Portfolio, PortfolioMarginAggregator, Position, PositionUnit,
@@ -145,6 +148,7 @@ fn bench_margin_aggregation(c: &mut Criterion) {
     group.sample_size(10);
     let as_of = date!(2025 - 01 - 01);
     let market = MarketContext::new();
+    let collateral_balances = finstack_quant_core::HashMap::default();
 
     for &n_positions in &[256_usize, 1_024] {
         let portfolio = margin_portfolio(n_positions, 4, as_of);
@@ -160,6 +164,7 @@ fn bench_margin_aggregation(c: &mut Criterion) {
                             std::hint::black_box(&portfolio),
                             std::hint::black_box(&market),
                             as_of,
+                            std::hint::black_box(&collateral_balances),
                         )
                         .expect("bench: margin calculate")
                 });
@@ -169,5 +174,40 @@ fn bench_margin_aggregation(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_margin_aggregation);
+fn bench_expiry_resolved_curvature(c: &mut Criterion) {
+    let calculator = SimmCalculator::default();
+    let mut group = c.benchmark_group("simm_expiry_resolved_curvature");
+    for factor_count in [16, 64] {
+        let inputs: Vec<_> = (0..factor_count)
+            .flat_map(|factor| {
+                [("2W", 1_000.0), ("1Y", -1_000.0)].map(|(expiry, vega)| SimmCurvatureSensitivity {
+                    risk_class: SimmRiskClass::InterestRate,
+                    bucket: "USD".into(),
+                    factor: format!("CURVE_{factor}"),
+                    risk_tenor: Some("5Y".into()),
+                    expiry_tenor: expiry.into(),
+                    volatility_weighted_vega: vega,
+                })
+            })
+            .collect();
+        group.bench_with_input(
+            BenchmarkId::from_parameter(factor_count),
+            &inputs,
+            |b, inputs| {
+                b.iter(|| {
+                    calculator
+                        .calculate_curvature(std::hint::black_box(inputs))
+                        .expect("valid expiry-resolved curvature inputs")
+                });
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_margin_aggregation,
+    bench_expiry_resolved_curvature
+);
 criterion_main!(benches);

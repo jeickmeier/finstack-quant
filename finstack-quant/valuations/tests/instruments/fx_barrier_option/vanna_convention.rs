@@ -17,8 +17,8 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_valuations::instruments::fx::fx_barrier_option::{FxBarrierOption, Monitoring};
 use finstack_quant_valuations::instruments::{Attributes, Instrument, OptionType, PricingOptions};
+use finstack_quant_valuations::instruments::{FxBarrierOption, Monitoring};
 use finstack_quant_valuations::metrics::MetricId;
 
 fn bump_surface_vol_absolute(

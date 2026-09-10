@@ -222,7 +222,20 @@ impl InflationSource {
                 let expected_interp = bond.validate_index_conventions(index.as_ref())?;
                 let (first_published, last_published) = index.date_range()?;
                 let cpi_on = |reference_date: Date| -> Result<f64> {
-                    if reference_date < first_published {
+                    let monthly = matches!(bond.lag, InflationLag::Months(_));
+                    let before_first = if monthly {
+                        (reference_date.year(), reference_date.month())
+                            < (first_published.year(), first_published.month())
+                    } else {
+                        reference_date < first_published
+                    };
+                    let published = if monthly {
+                        (reference_date.year(), reference_date.month())
+                            <= (last_published.year(), last_published.month())
+                    } else {
+                        reference_date <= last_published
+                    };
+                    if before_first {
                         return Err(finstack_quant_core::InputError::NotFound {
                             id: format!(
                                 "inflation index '{}' observation on or before {}",
@@ -231,8 +244,17 @@ impl InflationSource {
                         }
                         .into());
                     }
-                    if reference_date <= last_published {
-                        index.value_on(reference_date)
+                    if published {
+                        if monthly {
+                            index.ref_cpi_months_lag(
+                                reference_date.replace_day(1).map_err(|_| {
+                                    finstack_quant_core::InputError::InvalidDateRange
+                                })?,
+                                0,
+                            )
+                        } else {
+                            index.value_on(reference_date)
+                        }
                     } else {
                         curve.cpi_on_date(reference_date)
                     }
@@ -245,8 +267,12 @@ impl InflationSource {
                         let (anchor0, anchor1, weight) =
                             InflationLinkedBond::ref_cpi_anchors(date, months.into())?;
                         let cpi0 = cpi_on(anchor0)?;
-                        let cpi1 = cpi_on(anchor1)?;
-                        cpi0 + weight * (cpi1 - cpi0)
+                        if weight == 0.0 {
+                            cpi0
+                        } else {
+                            let cpi1 = cpi_on(anchor1)?;
+                            cpi0 + weight * (cpi1 - cpi0)
+                        }
                     }
                     InflationLag::Months(months) => cpi_on(date.add_months(-(i32::from(months))))?,
                     InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
@@ -650,7 +676,11 @@ impl InflationLinkedBond {
             InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
                 inflation_index.ref_cpi_months_lag(date, m.into())?
             }
-            InflationLag::Months(m) => inflation_index.value_on(date.add_months(-(m as i32)))?,
+            InflationLag::Months(m) => inflation_index.ref_cpi_months_lag(
+                date.replace_day(1)
+                    .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?,
+                m.into(),
+            )?,
             InflationLag::Days(d) => inflation_index.value_on(date - Duration::days(d as i64))?,
             _ => inflation_index.value_on(date)?,
         };
@@ -1075,7 +1105,11 @@ impl InflationLinkedBond {
         };
 
         // Determine a base clean price to center the bump around
-        let base_clean = self.quoted_clean.unwrap_or(100.0);
+        let base_clean = self.quoted_clean.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Real duration requires quoted_clean, the same clean price per 100 used for real yield".into(),
+            )
+        })?;
         let y0 = self.real_yield(base_clean, curves, as_of)?;
         // Bump yield by 1bp in decimal terms
         let bp = 1e-4;

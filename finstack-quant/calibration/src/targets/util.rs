@@ -16,46 +16,11 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
+use finstack_quant_models::rates::clock::model_time_on_curve;
 use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-
-/// Map ACT/365F calibration time to a curve's date origin and day count.
-/// Fractional days are interpolated on the destination clock so synthetic
-/// caplet periods and surface grids do not round to whole calendar days.
-///
-/// # Arguments
-///
-/// * `base_date` - Calibration date defining time zero on the source clock.
-/// * `time` - Finite, non-negative ACT/365F years since `base_date`.
-/// * `curve_base_date` - Date defining time zero on the destination curve.
-/// * `day_count` - Destination curve's day-count convention for dated lookups.
-pub(crate) fn calibration_time_on_curve(
-    base_date: Date,
-    time: f64,
-    curve_base_date: Date,
-    day_count: DayCount,
-) -> Result<f64> {
-    let days = time * 365.0;
-    if !days.is_finite() || days < 0.0 || days > (Date::MAX - base_date).whole_days() as f64 {
-        return Err(finstack_quant_core::Error::Validation(
-            "calibration time must be finite, non-negative and within the date range".into(),
-        ));
-    }
-    let date = base_date + time::Duration::days(days.floor() as i64);
-    let curve_time =
-        |date| day_count.signed_year_fraction(curve_base_date, date, DayCountContext::default());
-    let mut mapped = curve_time(date)?;
-    let fraction = days.fract();
-    if fraction > 0.0 {
-        let next = date.next_day().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("calibration time exceeds date range".into())
-        })?;
-        mapped += fraction * (curve_time(next)? - mapped);
-    }
-    Ok(mapped)
-}
 
 #[derive(Debug)]
 pub(crate) struct EquityForwardInputs {
@@ -68,7 +33,7 @@ pub(crate) struct EquityForwardInputs {
 impl EquityForwardInputs {
     pub(crate) fn forward(&self, discount: &DiscountCurve, expiry: f64) -> Result<f64> {
         let curve_time = |time| {
-            calibration_time_on_curve(
+            model_time_on_curve(
                 self.base_date,
                 time,
                 discount.base_date(),

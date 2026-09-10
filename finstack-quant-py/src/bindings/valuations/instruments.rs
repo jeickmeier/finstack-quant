@@ -1381,7 +1381,7 @@ impl PyBondBuilder {
     /// Parameters
     /// ----------
     /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date. When omitted, Rust infers ``maturity - 365 days``.
+    ///     Required contractual issue date. Omission raises ``ValueError`` on ``build()``.
     ///
     /// Returns
     /// -------
@@ -2324,7 +2324,7 @@ impl PyTermLoanBuilder {
     /// Parameters
     /// ----------
     /// value : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Issue date. When omitted, Rust infers ``maturity - 365 days``.
+    ///     Required contractual issue date. Omission raises ``ValueError`` on ``build()``.
     ///
     /// Returns
     /// -------

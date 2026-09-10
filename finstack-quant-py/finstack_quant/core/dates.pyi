@@ -294,6 +294,8 @@ class DayCount:
     0.5055555555555555
     """
 
+    ONE_ONE: DayCount
+    """One unit per nonempty accrual period, zero for an empty interval; reversed dates raise ValueError."""
     ACT_360: DayCount
     """Actual/360 (money market)."""
     ACT_365F: DayCount

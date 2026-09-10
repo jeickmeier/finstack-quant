@@ -8,8 +8,7 @@ use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::Date;
 
 use super::irr_helpers::{
-    cached_full_schedule, settlement_discount_factor, solve_irr_to_date,
-    target_price_from_quote_or_model,
+    cached_full_schedule, solve_irr_to_date, target_price_from_quote_or_model,
 };
 
 /// Compute a date N years ahead of `as_of`, with leap-year fallback.
@@ -36,17 +35,14 @@ macro_rules! define_ytn {
             fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
                 let as_of = context.as_of;
                 let schedule = cached_full_schedule(context)?;
-                // Forward-value the model PV to settlement so horizon yields share
-                // the same price origin as YTM/YTC/YTW (no spurious settlement carry).
+                // Horizon yields use the same settlement price as YTM/YTC/YTW.
                 let (maturity, target_price) = {
                     let loan: &TermLoan = context.instrument_as()?;
-                    let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
                     let target_price = target_price_from_quote_or_model(
                         loan,
                         &schedule,
                         as_of,
                         context.base_value,
-                        settle_df,
                     )?;
                     (loan.maturity, target_price)
                 };

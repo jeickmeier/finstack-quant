@@ -1196,9 +1196,8 @@ class BondBuilder:
     output one setter for one setter.
 
     Builders are consumed by ``build()``; create a new builder per
-    instrument. Required fields: ``id``, ``notional``, ``maturity``,
-    ``cashflow_spec``, ``discount_curve_id`` (``issue_date`` defaults to
-    ``maturity - 365 days``). Nested specs accept a ``dict`` or JSON ``str``
+    instrument. Required fields: ``id``, ``notional``, ``issue_date``, ``maturity``,
+    ``cashflow_spec``, ``discount_curve_id``. Nested specs accept a ``dict`` or JSON ``str``
     in the Rust serde shape; ``Bond.example().to_dict()`` shows the exact
     field names.
 
@@ -1270,12 +1269,12 @@ class BondBuilder:
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> BondBuilder:
         """
-        Set the issue date (defaults to ``maturity - 365 days`` when unset).
+        Set the required contractual issue date.
 
         Parameters
         ----------
         value : datetime.date | datetime.datetime | pd.Timestamp | str
-            Issue date (defaults to ``maturity - 365 days`` when unset) (ISO 8601 strings accepted).
+            Required contractual issue date (ISO 8601 strings accepted). Omission raises ValueError on build().
 
         Returns
         -------
@@ -3401,12 +3400,12 @@ class TermLoanBuilder:
         ...
     def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> TermLoanBuilder:
         """
-        Set the issue / funding date (defaults to ``maturity - 365 days`` when unset).
+        Set the required contractual issue / funding date.
 
         Parameters
         ----------
         value : datetime.date | datetime.datetime | pd.Timestamp | str
-            Issue / funding date (defaults to ``maturity - 365 days`` when unset) (ISO 8601 strings accepted).
+            Required contractual issue / funding date (ISO 8601 strings accepted). Omission raises ValueError on build().
 
         Returns
         -------
@@ -4664,6 +4663,7 @@ class PremiumLegSpec:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
+    ...     standard_imm_dates=True,
     ... )
     >>> leg.spread_bp
     100.0
@@ -4678,6 +4678,7 @@ class PremiumLegSpec:
         spread_bp: float | Bps,
         discount_curve_id: str,
         *,
+        standard_imm_dates: bool,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
@@ -4699,6 +4700,10 @@ class PremiumLegSpec:
             Fixed running spread in basis points (``100.0`` = 100bp = 1%).
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
+        standard_imm_dates : bool
+            True for prescribed quarterly CDS 20th dates. False generates a
+            bespoke schedule from ``frequency`` and ``stub``. Standard dates
+            require quarterly frequency and a short-front stub at pricing.
         stub : StubKind | str, default "short_front"
             Stub period handling rule.
         business_day_convention : str, default "modified_following"
@@ -4725,6 +4730,7 @@ class PremiumLegSpec:
         ...     DayCount.ACT_360,
         ...     100.0,
         ...     "USD-OIS",
+        ...     standard_imm_dates=True,
         ... )
         >>> leg.discount_curve_id
         'USD-OIS'
@@ -4763,6 +4769,7 @@ class PremiumLegSpec:
         ...     DayCount.ACT_360,
         ...     100.0,
         ...     "USD-OIS",
+        ...     standard_imm_dates=True,
         ... )
         >>> PremiumLegSpec.from_json(leg.to_json()).spread_bp
         100.0
@@ -4813,6 +4820,21 @@ class PremiumLegSpec:
         This method does not raise.
         """
         ...
+    @property
+    def standard_imm_dates(self) -> bool:
+        """Whether the leg uses prescribed quarterly CDS 20th dates.
+
+        Returns
+        -------
+        bool
+            True for the standard roll grid; false for bespoke frequency/stub dates.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored flag.
+        """
+        ...
+
     @property
     def discount_curve_id(self) -> str:
         """
@@ -7707,7 +7729,7 @@ class CapFloorBuilder:
         Parameters
         ----------
         value : Literal["lognormal", "shifted_lognormal", "normal", "auto"]
-            Volatility type convention (serde string). Must match the configured surface; ``"auto"`` (the default when unset) resolves to ``"lognormal"`` with a Bachelier fallback where Black-76 is undefined.
+            Volatility type convention (serde string). Must match the configured surface; ``"auto"`` (the default when unset) follows source convention and displacement metadata. Normal quotes use decimal rate units; Black quotes use dimensionless annual volatility. Incompatible model/source conventions raise ``ValueError``.
 
         Returns
         -------
@@ -8366,6 +8388,7 @@ class CreditDefaultSwapBuilder:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
+    ...     standard_imm_dates=True,
     ... )
     >>> protection = ProtectionLegSpec("ACME-CDS", 0.4, 3)
     >>> cds = (
@@ -9371,6 +9394,7 @@ class CDSIndexBuilder:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
+    ...     standard_imm_dates=True,
     ... )
     >>> index = (
     ...     CDSIndex
@@ -11206,9 +11230,10 @@ class ConvertibleBond:
         ...
     def parity(self, market: MarketContext | str) -> float:
         """
-        Conversion value (parity) of the bond (mirrors Rust
-        ``ConvertibleBond::parity``): ``effective_conversion_ratio * spot`` where
-        spot is the market price of ``underlying_equity_id``.
+        Conversion value divided by notional (mirrors Rust
+        ``ConvertibleBond::parity``). Ordinary conversion uses the effective
+        ratio times spot; mandatory-variable conversion uses the contractual
+        lower-price, variable-share and upper-price regimes.
 
         Parameters
         ----------
@@ -11218,20 +11243,25 @@ class ConvertibleBond:
         Returns
         -------
         float
-            Parity in notional currency units per bond.
+            Dimensionless conversion-value-to-notional ratio; 1.0 means par.
 
         Raises
         ------
         KeyError
             If the underlying price is missing from ``market``.
         ValueError
+            If conversion terms are invalid or the equity price is negative
+            or non-finite.
+        RuntimeError
             If the bond has no ``underlying_equity_id``.
         """
         ...
     def conversion_premium(self, market: MarketContext | str, bond_price: float) -> float:
         """
         Conversion premium over parity (mirrors Rust
-        ``ConvertibleBond::conversion_premium``): ``bond_price / parity - 1``.
+        ``ConvertibleBond::conversion_premium``):
+        ``bond_price / conversion_value - 1``. Conversion value follows the
+        policy, including mandatory-variable share delivery.
 
         Parameters
         ----------
@@ -11250,7 +11280,10 @@ class ConvertibleBond:
         KeyError
             If the underlying price is missing from ``market``.
         ValueError
-            If the bond has no ``underlying_equity_id`` or parity is zero.
+            If conversion value is nonpositive or ``bond_price`` is negative
+            or non-finite.
+        RuntimeError
+            If the bond has no ``underlying_equity_id``.
         """
         ...
     def greeks(
@@ -11266,7 +11299,10 @@ class ConvertibleBond:
         Parameters
         ----------
         market : MarketContext | str
-            Market carrying the curves, underlying price and volatility.
+            Market carrying the curves, equity price and volatility. An active
+            instrument volatility override takes precedence; otherwise surface
+            volatility is sampled at the contractual conversion strike. Floating
+            coupons require their forward curve and realized historical fixings.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
         bump_size : float | None
@@ -13892,7 +13928,7 @@ class FxOptionBuilder:
         ...
     def day_count(self, value: DayCount | str) -> FxOptionBuilder:
         """
-        Set the day count for the time-to-expiry year fraction.
+        Set the model day count for volatility, dividend carry and exercise times.
 
         Parameters
         ----------
@@ -14394,18 +14430,19 @@ class EquityOption:
         market_price: float,
     ) -> float:
         """
-        Implied volatility that reproduces ``market_price`` (mirrors Rust
-        ``EquityOption::implied_vol``, Black–Scholes inversion on the option's
-        day count).
+        Recover decimal volatility with the configured exercise engine,
+        dividend schedule and model day count. Trial volatility replaces the
+        active market surface or override. American and Bermudan exercise use
+        the configured lattice and remaining exercise dates.
 
         Parameters
         ----------
         market : MarketContext | str
             Market carrying the discount curve, spot and (optional) dividend yield.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-            Valuation date.
+            Valuation date strictly before expiry and observed exercise.
         market_price : float
-            Observed option value in the same scaling as ``price``.
+            Finite non-negative total trade PV in the notional currency.
 
         Returns
         -------
@@ -14414,6 +14451,9 @@ class EquityOption:
 
         Raises
         ------
+        ValueError
+            If PV or notional is invalid, the option has expired or exercised,
+            or the target is indistinguishable from the deterministic price.
         KeyError
             If required market data is missing from ``market``.
         RuntimeError
@@ -14705,7 +14745,8 @@ class EquityOption:
     @property
     def day_count(self) -> str:
         """
-        Day count for the time-to-expiry year fraction (serde name).
+        Model day count for volatility, carry and exercise times (serde name).
+        Discount factors use the discount curve's own date convention.
 
         Returns
         -------
@@ -15043,7 +15084,7 @@ class EquityOptionBuilder:
         ...
     def day_count(self, value: DayCount | str) -> EquityOptionBuilder:
         """
-        Set the day count for the time-to-expiry year fraction.
+        Set the model day count for volatility, dividend carry and exercise times.
 
         Parameters
         ----------
@@ -15334,6 +15375,7 @@ class RepLine:
     ...     datetime.date(2031, 1, 15),
     ...     12,
     ...     DayCount.ACT_360,
+    ...     asset_type={"type": "first_lien_loan", "industry": None},
     ...     cpr=0.10,
     ...     cdr=0.02,
     ...     recovery_rate=0.45,
@@ -15351,6 +15393,7 @@ class RepLine:
         seasoning_months: int,
         day_count: DayCount,
         *,
+        asset_type: dict[str, Any],
         spread_bp: float | Bps | None = None,
         index_id: str | None = None,
         cpr: float | None = None,
@@ -15375,6 +15418,8 @@ class RepLine:
             Weighted average seasoning in months.
         day_count : DayCount
             Day count convention.
+        asset_type : dict[str, Any]
+            Canonical AssetType JSON object; specifies bullet or level-pay amortization.
         spread_bp : float | Bps, optional
             Weighted average spread over the reference index, in basis
             points (e.g. ``150.0`` = 150bp), for floating-rate lines.
@@ -15417,6 +15462,7 @@ class RepLine:
         ...     datetime.date(2031, 1, 15),
         ...     12,
         ...     DayCount.ACT_360,
+        ...     asset_type={"type": "first_lien_loan", "industry": None},
         ...     cpr=0.10,
         ...     cdr=0.02,
         ...     recovery_rate=0.45,
@@ -15455,11 +15501,23 @@ class RepLine:
         >>> from finstack_quant.valuations.instruments import RepLine
         >>> restored = RepLine.from_json(
         ...     RepLine(
-        ...         "LINE-1", Money(1.0, Currency("USD")), 0.07, datetime.date(2031, 1, 15), 12, DayCount.ACT_360
+        ...         "LINE-1",
+        ...         Money(1.0, Currency("USD")),
+        ...         0.07,
+        ...         datetime.date(2031, 1, 15),
+        ...         12,
+        ...         DayCount.ACT_360,
+        ...         asset_type={"type": "first_lien_loan", "industry": None},
         ...     ).to_json()
         ... )
         >>> restored.to_json() == RepLine(
-        ...     "LINE-1", Money(1.0, Currency("USD")), 0.07, datetime.date(2031, 1, 15), 12, DayCount.ACT_360
+        ...     "LINE-1",
+        ...     Money(1.0, Currency("USD")),
+        ...     0.07,
+        ...     datetime.date(2031, 1, 15),
+        ...     12,
+        ...     DayCount.ACT_360,
+        ...     asset_type={"type": "first_lien_loan", "industry": None},
         ... ).to_json()
         True
         """
@@ -15510,6 +15568,22 @@ class RepLine:
         ------
         ValueError
             If the value cannot be reconstructed from its JSON form.
+        """
+        ...
+
+    @property
+    def asset_type(self) -> dict[str, Any]:
+        """Return the canonical asset classification and amortization behavior.
+
+        Returns
+        -------
+        dict[str, Any]
+            Rust AssetType wire object, such as ``{"type": "first_lien_loan", "industry": None}``.
+
+        Raises
+        ------
+        RuntimeError
+            If conversion to a Python dictionary fails.
         """
         ...
 
@@ -15724,7 +15798,7 @@ class AssetPool:
         Returns
         -------
         AssetPool
-            A new, empty asset pool. Use :meth:`with_rep_lines` and/or
+            A new, empty asset pool. Use either :meth:`with_rep_lines` or
             :meth:`assets` to attach collateral.
 
         Raises
@@ -15777,6 +15851,7 @@ class AssetPool:
         ...         datetime.date(2031, 1, 15),
         ...         12,
         ...         DayCount.ACT_360,
+        ...         asset_type={"type": "first_lien_loan", "industry": None},
         ...     )
         ... ])
         >>> "POOL-1" in repr(pool)
@@ -15818,6 +15893,11 @@ class AssetPool:
         ----------
         json : str
             Strict JSON object with exactly the fields ``to_json`` writes.
+            Defaulted assets specify economic ``default_date`` and outstanding,
+            unreceived ``recovery_amount`` in asset currency. Their par is excluded
+            from performing collateral. ``reinvestment_period`` owns the active
+            flag, inclusive end date, maximum percent-of-par purchase price and
+            minimum annual decimal current yield.
 
         Returns
         -------
@@ -16496,22 +16576,6 @@ class Tranche:
         ...
 
     @property
-    def expected_maturity(self) -> datetime.date | None:
-        """
-        Expected maturity date, or ``None``.
-
-        Returns
-        -------
-        datetime.date | None
-            Date, or ``None``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def payment_priority(self) -> int:
         """
         Payment priority rank (1 = most senior).
@@ -17052,7 +17116,7 @@ class StructuredCredit:
         Create a fluent builder (mirrors Rust ``StructuredCredit::builder()``).
 
         The builder pre-seeds ``market_conditions``, ``credit_factors``,
-        ``deal_metadata``, ``behavior_overrides``, ``default_assumptions``,
+        ``deal_metadata``, ``behavior_overrides``,
         and ``hedge_swaps`` with their Rust ``Default`` values (the Rust
         builder fields have no default), which the corresponding ``*_json``
         setters can override. Prefer :meth:`new_abs` / :meth:`new_clo` /
@@ -17135,6 +17199,7 @@ class StructuredCredit:
         ...         datetime.date(2031, 1, 15),
         ...         12,
         ...         DayCount.ACT_360,
+        ...         asset_type={"type": "first_lien_loan", "industry": None},
         ...     )
         ... ])
         >>> senior = (
@@ -17392,6 +17457,10 @@ class StructuredCredit:
             A ``finstack_quant.instrument/1`` envelope containing an exact
             ``"structured_credit"`` payload. The UTF-8 input must not exceed
             16 MiB. Bare payloads and cross-type coercion are rejected.
+            Pool and note balances represent current state after past losses.
+            Reinvestment configuration belongs to ``pool.reinvestment_period``;
+            note revolving targets are currency amounts. Tranche coverage triggers
+            carry breach/cure ratios and executable cash or reinvestment actions.
 
         Returns
         -------
@@ -17531,18 +17600,18 @@ class StructuredCredit:
         ...
 
     @property
-    def reinvestment_end_date(self) -> datetime.date | None:
-        """
-        End of the reinvestment period, or ``None``.
+    def quote_settlement_date(self) -> datetime.date | None:
+        """Buyer settlement date for note price and spread calculations.
 
         Returns
         -------
-        datetime.date | None
-            Date, or ``None``.
+        datetime.date or None
+            Settlement date; ``None`` uses the valuation date. Payments on or
+            before settlement belong to the seller. Model PV stays at valuation.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise; it returns the configured date.
         """
         ...
 
@@ -17738,28 +17807,26 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def reinvestment_end_date(
+    def quote_settlement_date(
         self, value: datetime.date | datetime.datetime | pd.Timestamp | str
     ) -> StructuredCreditBuilder:
-        """
-        Set the end of the reinvestment period.
+        """Set buyer settlement for prices, yields and spreads.
 
         Parameters
         ----------
         value : datetime.date | datetime.datetime | pandas.Timestamp | str
-            End date of the reinvestment period. Optional; when never set,
-            the deal has no reinvestment period.
+            Settlement on or after valuation and closing. Payments on or before
+            this date are excluded. Omission uses the valuation date.
 
         Returns
         -------
         StructuredCreditBuilder
-            ``self``, for chaining.
+            This builder for further configuration.
 
         Raises
         ------
         ValueError
-            If this builder was already consumed by a prior call to
-            :meth:`StructuredCreditBuilder.build`.
+            If the date is invalid or the builder has already been consumed.
         """
         ...
 
@@ -17882,10 +17949,9 @@ class StructuredCreditBuilder:
         Parameters
         ----------
         value : dict[str, Any] | str
-            JSON-encoded ``MarketConditions`` object (refinancing rate, home
-            price appreciation, unemployment, seasonal factor, custom
-            factors). :meth:`StructuredCredit.builder` pre-seeds the registry
-            default, which this overrides.
+            ``MarketConditions`` object with finite annual decimal ``refi_rate``
+            for Richard-Roll refinancing incentives. Negative rates are accepted.
+            This replaces the registry default; unknown macro-factor fields fail.
 
         Returns
         -------
@@ -17906,10 +17972,9 @@ class StructuredCreditBuilder:
         Parameters
         ----------
         value : dict[str, Any] | str
-            JSON-encoded ``CreditFactors`` object (credit score, DTI, LTV,
-            delinquency, unemployment, CMBS NOI/debt-service, custom
-            factors). :meth:`StructuredCredit.builder` pre-seeds
-            ``CreditFactors``'s default, which this overrides.
+            ``CreditFactors`` object with optional ``annual_noi`` and
+            ``annual_debt_service`` Money values for CMBS coverage metrics.
+            Missing values remain absent; unknown macro-factor fields fail.
 
         Returns
         -------
@@ -18187,13 +18252,20 @@ def price_instrument(
         ``"duration_mod"``, ``"z_spread"``, ``"pv01"``, ``"bucketed_dv01"``,
         ``"hvar"`` or ``"expected_shortfall"`` when supported by the
         instrument (see :func:`list_standard_metrics`). ``None`` or ``[]``
-        means valuation only.
+        means valuation only. Mortgage OAS and CMO Z-spread take clean prices
+        per 100 of current face and add settlement accrued interest. MBS
+        ``dv01`` and ``bucketed_dv01`` include the same rate-dependent
+        prepayments as ``duration_mod``. FI TRS ``duration_dv01`` requires
+        ``duration_id`` and a finite signed duration scalar in years.
+        Roll specialness is in basis points against the forward curve
+        ``repo_curve_id``, or the discount curve when absent; implied
+        financing is an ACT/360 decimal rate.
     pricing_options : MetricPricingOverrides or dict or str, optional
         Metric-time overrides merged into the instrument's own
         ``pricing_overrides`` before pricing: ``theta_period`` (``"1D"``,
         ``"1W"``, ``"1M"``), ``breakeven_config``
         (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
-        ``bond_risk_basis``, ``var_config``, ``quoted_price_pct``. A dict or
+        ``bond_risk_basis``, ``var_config``. A dict or
         JSON string is accepted in place of the typed object.
     market_history : MarketHistory or dict or str, optional
         Historical scenarios required by the ``"hvar"`` and
@@ -18218,8 +18290,10 @@ def price_instrument(
         instrument fails validation for the requested model (for example a
         seasoned floating leg without a ``FIXING:<index>`` series).
     RuntimeError
-        If the model or a metric solver fails numerically (calibration or
-        convergence failure).
+        If the model or a metric solver fails numerically, or instrument pricing
+        wraps a failure with instrument/model context. This includes missing
+        quanto inputs, asset-currency mismatches, and an analytical barrier model
+        requested for discrete monitoring; the message retains the cause.
     TypeError
         If ``instrument`` is neither a typed instrument nor a string, or
         ``market`` is neither a ``MarketContext`` nor a string.
@@ -19058,7 +19132,9 @@ def structured_credit_tranche_discount_margin(
         Valuation date used for projection and discounting, either a date-like
         object or an ISO 8601 string.
     target_pv : float
-        Target present value in the tranche's currency. Values above model PV
+        Positive dirty settlement value in the tranche's currency, including
+        accrued interest once. Settlement is the deal's ``quote_settlement_date``
+        or the valuation date when omitted. Values above model value
         produce a negative result; values below model PV produce a positive
         result.
 
@@ -19153,7 +19229,9 @@ def structured_credit_tranche_oas(
     tranche_id : str
         Identifier of the tranche within the deal.
     market_price_pct : float
-        Market price as a percentage of original balance (100.0 = par).
+        Clean settlement price as a percentage of original balance (100.0 = par).
+        Accrued interest is added once at the deal's ``quote_settlement_date``
+        (valuation date when omitted); earlier payments belong to the seller.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON supplying
         curves and fixings.
@@ -19210,8 +19288,9 @@ def structured_credit_tranche_metrics(
     as_of : datetime.date | str
         Valuation date, either a date-like object or an ISO 8601 string.
     market_price_pct : float or None, optional
-        Market price as a percentage of original balance; the model price is
-        used when omitted.
+        Clean settlement price as a percentage of original balance. When omitted,
+        the deal's market quote is used, or its model clean settlement price
+        if no quote is supplied. PV remains measured at valuation.
 
     Returns
     -------
@@ -20415,8 +20494,8 @@ class MetricPricingOverrides:
     --------
     >>> from finstack_quant.valuations.instruments import MetricPricingOverrides
     >>> opts = MetricPricingOverrides(theta_period="1W", bond_risk_basis="callable_oas")
-    >>> (opts.theta_period, opts.bond_risk_basis, opts.quoted_price_pct)
-    ('1W', 'callable_oas', None)
+    >>> (opts.theta_period, opts.bond_risk_basis)
+    ('1W', 'callable_oas')
     >>> MetricPricingOverrides.from_json(opts.to_json()) == opts
     True
     """
@@ -20430,7 +20509,6 @@ class MetricPricingOverrides:
         breakeven_config: dict[str, Any] | None = None,
         bond_risk_basis: Literal["bullet_discountable", "callable_oas"] | None = None,
         var_config: dict[str, Any] | None = None,
-        quoted_price_pct: float | None = None,
     ) -> None:
         """
         Build metric-time overrides from keyword fields.
@@ -20458,9 +20536,6 @@ class MetricPricingOverrides:
         var_config : dict[str, Any], optional
             Historical VaR / expected-shortfall configuration override
             (confidence level, horizon, decay).
-        quoted_price_pct : float, optional
-            Externally quoted price as a percentage of original balance
-            (``100.0`` = par), required by structured-credit spread metrics.
 
         Raises
         ------
@@ -20575,22 +20650,6 @@ class MetricPricingOverrides:
         ------
         ValueError
             If the configuration cannot be serialized to a Python object.
-        """
-        ...
-
-    @property
-    def quoted_price_pct(self) -> float | None:
-        """
-        Externally quoted price as a percentage of original balance.
-
-        Returns
-        -------
-        float or None
-            Quoted price (``100.0`` = par), or ``None`` when not supplied.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 

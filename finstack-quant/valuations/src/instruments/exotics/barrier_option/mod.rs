@@ -14,13 +14,16 @@
 //! # Pricing Methods
 //!
 //! - **Continuous monitoring**: Analytical formulas (Reiner & Rubinstein 1991)
-//! - **Discrete monitoring**: Monte Carlo with barrier adjustment
+//! - **Discrete monitoring**: Monte Carlo or PDE on explicit observation dates
 //! - See [`models::closed_form::barrier`](finstack_quant_models::closed_form::barrier) for formulas
 //!
-//! # Discrete Barrier Correction
+//! # Monitoring and rebates
 //!
-//! Real-world barriers are checked discretely (e.g., daily close). Broadie-Glasserman-Kou
-//! correction adjusts barrier: H_adj = H · exp(±0.5826σ√Δt)
+//! [`crate::instruments::Monitoring`] distinguishes continuous monitoring from
+//! exact discrete observation dates. GBM continuous monitoring uses a log-Brownian
+//! bridge; the Heston bridge freezes the path variance over a step and remains
+//! an approximation requiring time-step convergence. Discrete paths do not
+//! interpolate barrier crossings. Rebate Money is the total trade payment.
 //!
 //! # References
 //!

@@ -98,7 +98,6 @@ impl Default for ConvertibleTreeType {
 /// Resolved market data identifiers for Greek bumping.
 struct ResolvedIds {
     spot_id: PriceId,
-    vol_id: String,
 }
 
 /// Extracted equity market state.
@@ -177,15 +176,29 @@ fn extract_equity_state(
         0.0
     };
 
-    let vol_candidates = volatility_candidate_ids(bond)?;
-    let (volatility, resolved_vol_id) =
-        resolve_volatility_with_id(ctx, &vol_candidates, time_to_maturity, spot)?;
+    let volatility = if let Some(volatility) = bond
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility
+    {
+        volatility
+    } else {
+        let ratio = bond.effective_conversion_ratio().ok_or_else(|| {
+            Error::Validation("convertible volatility requires a valid conversion ratio".into())
+        })?;
+        let strike = bond.notional.amount() / ratio;
+        resolve_volatility(
+            ctx,
+            &volatility_candidate_ids(bond)?,
+            time_to_maturity,
+            strike,
+        )?
+    };
 
     let dividend_yield = resolve_dividend_yield(ctx, bond)?;
 
     let resolved_ids = ResolvedIds {
         spot_id: underlying_id.into(),
-        vol_id: resolved_vol_id,
     };
 
     Ok(EquityState {
@@ -199,19 +212,19 @@ fn extract_equity_state(
     })
 }
 
-/// Resolve volatility and return both the value and the resolved ID.
-fn resolve_volatility_with_id(
+/// Resolve the equity volatility at the contractual conversion strike.
+fn resolve_volatility(
     ctx: &MarketContext,
     candidate_ids: &[String],
     time_to_maturity: f64,
-    spot: f64,
-) -> Result<(f64, String)> {
+    strike: f64,
+) -> Result<f64> {
     let mut first_missing: Option<String> = None;
 
     for id in candidate_ids {
         match ctx.get_price(id) {
             Ok(MarketScalar::Unitless(vol)) => {
-                return Ok((*vol, id.clone()));
+                return Ok(*vol);
             }
             Ok(_) => {}
             Err(err) => {
@@ -230,9 +243,9 @@ fn resolve_volatility_with_id(
                 let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
                     &surface,
                     time_to_maturity,
-                    spot,
+                    strike,
                 );
-                return Ok((vol, id.clone()));
+                return Ok(vol);
             }
             Err(err) => {
                 if matches!(err, Error::Input(InputError::NotFound { .. })) {
@@ -269,7 +282,7 @@ pub(super) fn prepare_for_pricing(
     market_context: &MarketContext,
     as_of: Date,
 ) -> Result<PricingInputs> {
-    let cashflow_schedule = build_convertible_schedule(bond)?;
+    let cashflow_schedule = build_convertible_schedule(bond, market_context)?;
     let eq = extract_equity_state(bond, market_context, as_of)?;
 
     Ok(PricingInputs {
@@ -400,6 +413,39 @@ pub fn price_convertible_bond(
     price_convertible_bond_with_inputs(bond, market_context, &inputs, tree_type, as_of)
 }
 
+/// Value the straight cash component on the canonical convertible tree grid.
+/// Uses the same coupon mapping and per-step recovery blend as the main engine,
+/// excluding conversion and issuer/holder exercise rights.
+pub(crate) fn price_bond_floor(
+    bond: &ConvertibleBond,
+    market_context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    if as_of >= bond.maturity {
+        return Ok(0.0);
+    }
+    let inputs = prepare_for_pricing(bond, market_context, as_of)?;
+    let steps = match ConvertibleTreeType::default() {
+        ConvertibleTreeType::Binomial(steps) | ConvertibleTreeType::Trinomial(steps) => steps,
+    };
+    let valuator = ConvertibleBondValuator::new(
+        bond,
+        &inputs.cashflow_schedule,
+        inputs.time_to_maturity,
+        steps,
+        as_of,
+        market_context,
+        inputs.volatility,
+    )?;
+    let mut discount = 1.0;
+    let mut value = valuator.coupon_map.get(&0).copied().unwrap_or(0.0);
+    for (step, step_discount) in valuator.risky_step_dfs.iter().enumerate() {
+        discount *= step_discount;
+        value += valuator.coupon_map.get(&(step + 1)).copied().unwrap_or(0.0) * discount;
+    }
+    Ok(value + bond.notional.amount() * discount)
+}
+
 /// Calculate Greeks for a convertible bond using central finite differences.
 ///
 /// All Greeks use full repricing with bumped market contexts to ensure consistency
@@ -411,6 +457,8 @@ pub fn price_convertible_bond(
 /// - **Delta**: `(P(S+h) - P(S-h)) / (2h)` where `h = bump_pct * S`
 /// - **Gamma**: `(P(S+h) - 2*P(S) + P(S-h)) / h^2`
 /// - **Vega**: `(P(σ+0.01) - P(σ-0.01)) / (vol_up - vol_down) * 0.01` — per 1% absolute vol move
+///   Uses a forward difference when the lower quote is outside the selected
+///   lattice's admissible volatility range.
 /// - **Rho**: `(P(r+1bp) - P(r-1bp)) / 2` — per 1bp parallel shift of the
 ///   **risk-free discount curve only**; a configured credit curve is held
 ///   fixed (spread implicitly narrows by the bump). Use the DV01 metric
@@ -419,11 +467,8 @@ pub fn price_convertible_bond(
 ///
 /// # Volatility convention for delta/gamma
 ///
-/// When volatility resolves from a surface, each bumped spot reprice re-reads
-/// the surface at the bumped moneyness through models-layer clamped evaluation,
-/// so delta
-/// and gamma embed the smile slope along the spot move (**sticky-strike**
-/// finite differences), not a frozen-vol (sticky-vol) delta.
+/// Surface volatility is sampled at the contractual conversion strike. Spot
+/// bumps retain that strike, so delta and gamma use sticky-strike volatility.
 ///
 /// # Arguments
 ///
@@ -500,21 +545,33 @@ pub fn calculate_convertible_greeks(
     // ---- Vega: bump volatility (B1: central differences) ----
     {
         let h_vol = 0.01; // 1% absolute
-        let vol_down = (inputs.volatility - h_vol).max(1e-6); // Guard against negative vol
+        let mut vol_down = (inputs.volatility - h_vol).max(1e-6);
         let vol_up = inputs.volatility + h_vol;
-        let actual_width = vol_up - vol_down; // May differ from 2*h_vol when clamped
 
-        let market_vol_up = market_context
-            .clone()
-            .insert_price(&inputs.resolved_ids.vol_id, MarketScalar::Unitless(vol_up));
-        let market_vol_down = market_context.clone().insert_price(
-            &inputs.resolved_ids.vol_id,
-            MarketScalar::Unitless(vol_down),
-        );
-
-        let price_vol_up = price_convertible_bond(bond, &market_vol_up, tree_type, as_of)?.amount();
+        let mut bond_up = bond.clone();
+        bond_up
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(vol_up);
+        let mut bond_down = bond.clone();
+        bond_down
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(vol_down);
+        let price_vol_up =
+            price_convertible_bond(&bond_up, market_context, tree_type, as_of)?.amount();
         let price_vol_down =
-            price_convertible_bond(bond, &market_vol_down, tree_type, as_of)?.amount();
+            match price_convertible_bond(&bond_down, market_context, tree_type, as_of) {
+                Ok(price) => price.amount(),
+                Err(Error::Validation(_)) => {
+                    // All other inputs already priced successfully. A lower quote
+                    // can violate the lattice's drift/probability constraint.
+                    vol_down = inputs.volatility;
+                    base_price.amount()
+                }
+                Err(error) => return Err(error),
+            };
+        let actual_width = vol_up - vol_down;
 
         // Vega per 1% vol move: central difference with actual bump width.
         // (P_up - P_down) / actual_width gives per-unit-vol sensitivity;
@@ -572,7 +629,10 @@ pub fn calculate_convertible_greeks(
 }
 
 /// Build the convertible bond cashflow schedule using common builder flow.
-pub(crate) fn build_convertible_schedule(bond: &ConvertibleBond) -> Result<CashFlowSchedule> {
+pub(crate) fn build_convertible_schedule(
+    bond: &ConvertibleBond,
+    market: &MarketContext,
+) -> Result<CashFlowSchedule> {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(bond.notional, bond.issue_date, bond.maturity);
     if let Some(fixed_spec) = &bond.fixed_coupon {
@@ -581,23 +641,29 @@ pub(crate) fn build_convertible_schedule(bond: &ConvertibleBond) -> Result<CashF
     if let Some(floating_spec) = &bond.floating_coupon {
         let _ = builder.floating_cf(floating_spec.clone());
     }
-    builder.build(None)
+    builder.build(Some(market))
 }
 
 /// Calculate convertible bond parity
+///
+/// Returns the instantaneous policy-specific conversion value divided by face
+/// amount. Mandatory-variable contracts use their price-dependent delivery
+/// ratio. Invalid conversion terms or negative/non-finite spot prices fail.
 ///
 /// # Arguments
 ///
 /// * `bond` - Convertible bond whose effective conversion ratio and notional
 ///   normalize the equity conversion value.
 /// * `current_spot` - Current conversion-share price in the bond's quote
-///   currency.
-pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> f64 {
-    let Some(conversion_ratio) = bond.effective_conversion_ratio() else {
-        return 0.0;
-    };
-
-    (current_spot * conversion_ratio) / bond.notional.amount()
+///   currency; finite and nonnegative.
+pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> Result<f64> {
+    bond.validate_for_pricing()?;
+    if !current_spot.is_finite() || current_spot < 0.0 {
+        return Err(Error::Validation(
+            "conversion-share price must be finite and nonnegative".into(),
+        ));
+    }
+    Ok(compute_conversion_value(bond, current_spot)? / bond.notional.amount())
 }
 
 /// Calculate conversion premium
@@ -689,9 +755,15 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Result<Date> {
 ///
 /// * `bond` - Convertible bond whose coupon schedule and settlement lag define
 ///   the accrued-interest period.
+/// * `market_context` - Forward curves and realized index fixings used to
+///   determine floating coupon amounts; unused for fixed coupons.
 /// * `as_of` - Trade or valuation date from which the bond settlement date is
 ///   calculated.
-pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result<f64> {
+pub fn calculate_accrued_interest(
+    bond: &ConvertibleBond,
+    market_context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
     bond.validate_for_pricing()?;
     if bond.fixed_coupon.is_none() && bond.floating_coupon.is_none() {
         return Ok(0.0); // Zero-coupon
@@ -699,15 +771,24 @@ pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result
 
     let settle = settlement_date(bond, as_of)?;
 
-    let schedule = build_convertible_schedule(bond)?;
+    let schedule = build_convertible_schedule(bond, market_context)?;
+    accrued_interest_at(bond, &schedule, settle)
+}
+
+/// Coupon accrual at the actual exercise date, without applying settlement lag.
+pub(super) fn accrued_interest_at(
+    bond: &ConvertibleBond,
+    schedule: &CashFlowSchedule,
+    date: Date,
+) -> Result<f64> {
     let frequency = bond
         .fixed_coupon
         .as_ref()
         .map(|c| c.schedule.frequency)
         .or_else(|| bond.floating_coupon.as_ref().map(|c| c.schedule.frequency));
     crate::cashflow::accrual::accrued_interest_amount(
-        &schedule,
-        settle,
+        schedule,
+        date,
         &crate::cashflow::accrual::AccrualConfig {
             method: crate::cashflow::accrual::AccrualMethod::Linear,
             ex_coupon: None,

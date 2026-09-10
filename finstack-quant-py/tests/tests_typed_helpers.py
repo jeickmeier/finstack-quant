@@ -153,6 +153,7 @@ def cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
             DayCount.ACT_360,
             100.0,
             "USD-OIS",
+            standard_imm_dates=True,
         ),
         ProtectionLegSpec("ACME-CDS", 0.4, 3),
     )
@@ -300,6 +301,7 @@ def structured_credit_pool() -> AssetPool:
             datetime.date(2031, 1, 15),
             12,
             DayCount.ACT_360,
+            asset_type={"type": "first_lien_loan", "industry": None},
             cpr=0.10,
             cdr=0.02,
             recovery_rate=0.45,

@@ -3,7 +3,6 @@
     "npv": 81.84076455808031
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -40,7 +39,8 @@
         "vol_surface_id": "NKY-VOL-QL"
       },
       "type": "quanto_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {
@@ -101,6 +101,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_quotes": [],
         "quotes": [
           [
             "JPY",

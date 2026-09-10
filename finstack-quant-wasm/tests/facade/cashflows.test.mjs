@@ -197,6 +197,7 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
   spec.principal_events = [
     {
       date: '2025-02-01',
+      payment_date: '2025-02-03',
       kind: 'notional',
       delta: { amount: '100', currency: 'USD' },
       cash: { amount: '98', currency: 'USD' },
@@ -204,7 +205,8 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
   ];
   const raw = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
   const built = JSON.parse(cashflows.validateCashflowScheduleJson(raw));
-  const draw = built.flows.find((flow) => flow.date === '2025-02-01');
+  const draw = built.flows.find((flow) => flow.date === '2025-02-03' && flow.kind === 'notional');
+  assert.equal(draw.principal_date, '2025-02-01');
   assert.equal(Number(draw.principal_delta.amount), 100);
   assert.equal(Number(draw.amount.amount), -98);
   assert.equal(

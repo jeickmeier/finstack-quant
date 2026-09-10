@@ -16,6 +16,14 @@ use finstack_quant_valuations::pricer::InstrumentType;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Warning {
+    /// Par-spread shocks used the approximation delta hazard = delta spread / (1 - recovery).
+    HazardSpreadFirstOrder {
+        /// Hazard curve affected by the approximate spread shock.
+        curve_id: String,
+        /// Decimal recovery fraction used in the loss-given-default conversion.
+        recovery_rate: f64,
+    },
+
     /// A discount curve was resolved heuristically (currency-prefix or single-
     /// curve fallback) instead of via an explicit `discount_curve_id`.
     DiscountCurveHeuristic {
@@ -225,6 +233,8 @@ pub enum Warning {
 impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::HazardSpreadFirstOrder { curve_id, recovery_rate } => write!(f,
+                "First-order par-spread shock for '{curve_id}' uses delta hazard = delta spread / (1 - {recovery_rate}); quotes are not rebootstrap-reconciled"),
             Warning::DiscountCurveHeuristic { reason, .. } => f.write_str(reason),
             Warning::CommodityShockOutsideRange { detail, .. }
             | Warning::FxTriangulationInconsistent { detail }

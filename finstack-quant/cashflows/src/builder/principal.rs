@@ -105,6 +105,16 @@ impl CashFlowBuilder {
     /// positive repayment, while all other kinds emit `-cash` as a borrower
     /// draw/notional cashflow.
     ///
+    /// # Arguments
+    ///
+    /// * `date` - Economic date on which the principal delta changes interest accrual.
+    /// * `payment_date` - Cash settlement date; scheduled repayments may pay before
+    ///   or after their contractual balance-effective date.
+    /// * `delta` - Signed principal change in currency units; positive funds a draw.
+    /// * `cash` - Optional settlement amount in the same currency. When absent,
+    ///   repayments use `-delta` and draws use `delta` before cashflow sign handling.
+    /// * `kind` - Principal classification controlling settlement sign and validation.
+    ///
     /// # Sign conventions
     ///
     /// * `CFKind::Amortization` (repayment): `delta` must be `<= 0` (the
@@ -125,6 +135,7 @@ impl CashFlowBuilder {
     pub fn add_principal_event(
         &mut self,
         date: Date,
+        payment_date: Date,
         delta: Money,
         cash: Option<Money>,
         kind: CFKind,
@@ -164,6 +175,7 @@ impl CashFlowBuilder {
         }
         self.principal_events.push(PrincipalEvent {
             date,
+            payment_date,
             delta,
             cash: cash_leg,
             kind,

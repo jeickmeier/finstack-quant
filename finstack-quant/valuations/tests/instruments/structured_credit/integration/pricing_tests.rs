@@ -277,7 +277,9 @@ fn test_structured_credit_full_metric_suite() {
         .measures
         .get("dirty_price")
         .expect("dirty price should be returned");
-    sc.metric_pricing_overrides.quoted_price_pct = Some(model_price);
+    sc.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(model_price);
 
     // Act: Request comprehensive metrics
     let result = sc.price_with_metrics(
@@ -506,35 +508,24 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
         .expect("WAL metric request should succeed");
-    // Library-self-calculated WAL regression benchmark.
-    //
-    // Re-blessed (cash-conservation remediation): the loss-allocation fix
-    // (audit item 2) replaced the "cumulative loss vs original face" cap with
-    // an incremental "loss vs current balance" cap. For this ABS deal — which
-    // carries the `abs_auto_standard` default assumptions — that shifts the
-    // tranche write-down schedule, hence the principal-payment timing the WAL
-    // is weighted on.
-    //   old: 2.2255397693750574   new: 2.226010097887204   (+0.00047 y, ~0.02%)
-    // The benchmark is library-self-calculated (no external oracle), so the
-    // golden-test policy permits a documented re-bless.
-    //
-    // :
-    // (1) default/prepay/scheduled ordering now follows the stated
-    //     Intex/Moody's & SIFMA convention — MDR applied to the
-    //     BEGINNING-of-period balance, scheduled principal on the survivor,
-    //     SMM last (previously scheduled → default → prepay); and
-    // (2) the level-pay annuity uses the NOMINAL periodic rate
-    //     (rate × months/12, US mortgage convention, matching
-    //     mbs_passthrough) instead of effective compounding.
-    // Both changes slightly front-load defaults/scheduled principal, so
-    // principal returns marginally earlier and the WAL shortens.
-    //   old: 2.226010097887204   new: 2.2250660687393284   (−0.00094 y, ~0.04%)
-    // The canonical provider now seeds classified schedule rows. WAL therefore
-    // weights only principal-like rows instead of the former final fallback,
-    // which treated every positive cash settlement (including interest) as
-    // principal. This is the deterministic principal-only benchmark.
-    //   old: 2.2250660687393284   new: 2.342301092973921
-    let expected = 2.342_301_092_973_921_f64;
+    // Independent WAL definition applied to the projected principal ledger:
+    // sum(principal * actual days / 365) / sum(principal). This replaces the
+    // former self-captured number, whose implicit 2025 first-payment date was
+    // unrelated to this fixture's 2024 closing and changed the cashflow timing.
+    let mut weighted = 0.0;
+    let mut principal = 0.0;
+    for tranche in &sc.tranches.tranches {
+        let flows = sc
+            .get_tranche_cashflows(tranche.id.as_str(), &market, test_date())
+            .expect("principal ledger");
+        for (date, amount) in flows.principal_flows {
+            if date > test_date() && amount.amount() > 0.0 {
+                weighted += amount.amount() * (date - test_date()).whole_days() as f64 / 365.0;
+                principal += amount.amount();
+            }
+        }
+    }
+    let expected = weighted / principal;
     let actual = valuation.measures["wal"];
 
     assert!(

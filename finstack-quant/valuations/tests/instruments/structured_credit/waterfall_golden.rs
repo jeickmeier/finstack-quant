@@ -71,10 +71,12 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             obligor_id: Some(format!("OBLIGOR_{}", i)),
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: None,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         };
         pool.assets.push(asset);
@@ -662,7 +664,7 @@ fn test_golden_cre_pro_rata_distribution() {
 
     let market = create_test_market();
     let available_cash = Money::new(5_000_000.0, currency).expect("valid money fixture"); // Quarterly NOI
-    let interest_collections = Money::new(0.0, currency).expect("valid money fixture");
+    let interest_collections = available_cash; // Quarterly NOI is income, not return of capital.
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
     let pool_balance = Money::new(50_000_000.0, currency).expect("valid money fixture");
     let period_start = payment_date - Duration::days(90);

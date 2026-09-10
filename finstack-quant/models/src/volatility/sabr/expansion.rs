@@ -57,7 +57,7 @@
 //!   *Applied Mathematical Finance*, 12(4), 371-385. `docs/REFERENCES.md#hagan-2002-sabr`
 //! - QuantLib SABR implementation: `ql/termstructures/volatility/sabr.cpp` `docs/REFERENCES.md#hagan-2002-sabr`
 
-use super::SabrParameters;
+use super::{model::chi, SabrParameters};
 
 impl SabrParameters {
     const LOGNORMAL_ATM_LOG_MONEYNESS_THRESHOLD: f64 = 1e-8;
@@ -179,7 +179,11 @@ impl SabrParameters {
     /// on pricing paths.
     fn implied_vol_normal_unchecked(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
-        let beta = self.beta;
+        let beta = if self.beta < super::model::BETA_SNAP_TOL {
+            0.0
+        } else {
+            self.beta
+        };
         let rho = self.rho;
         let nu = self.nu;
 
@@ -196,6 +200,10 @@ impl SabrParameters {
             return f64::NAN;
         }
 
+        if beta == 0.0 {
+            return normal_beta_zero(alpha, nu, rho, f, k, t);
+        }
+
         // No special-case for ν → 0: as in the lognormal expansion, the general
         // formula is continuous in ν (z → 0, z/χ(z) → 1) and retains the full
         // (1 + [...]T) correction in the CEV limit.
@@ -207,24 +215,6 @@ impl SabrParameters {
 
         let fk = f * k;
         let one_minus_beta = 1.0 - beta;
-
-        if fk <= 0.0 {
-            // β = 0 (normal SABR) is shift-invariant: dF = σ dW₁ is unaffected
-            // by translating F and K, so an internal shift recovers the correct
-            // smile from the log-moneyness expansion.
-            if beta == 0.0 {
-                let shift_scale = (f - k).abs().max(f.abs()).max(k.abs()).max(1.0e-4);
-                let shift = (-f.min(k)).max(0.0) + shift_scale;
-                let shifted_f = f + shift;
-                let shifted_k = k + shift;
-                return self.implied_vol_normal_unchecked(shifted_f, shifted_k, t);
-            }
-            // β > 0: the CEV backbone F^β is NOT shift-invariant, so any
-            // internal shift silently changes the model. Refuse (NaN here;
-            // a descriptive error from `implied_vol_normal`) and require
-            // an explicit, calibrated shift via `with_shift`.
-            return f64::NAN;
-        }
 
         let fk_mid = fk.powf(one_minus_beta / 2.0);
         let log_fk = (f / k).ln();
@@ -269,6 +259,12 @@ impl SabrParameters {
     ///
     /// Returns [`InputError::Invalid`](finstack_quant_core::error::InputError::Invalid) when
     /// the underlying expansion yields a non-finite volatility.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Unshifted forward in decimal rate or price units, strictly positive after any configured shift.
+    /// * `k` - Unshifted strike in the same units as `f`, strictly positive after the shift.
+    /// * `t` - Finite, strictly positive option expiry in years.
     pub fn implied_vol_lognormal(
         &self,
         f: f64,
@@ -276,7 +272,7 @@ impl SabrParameters {
         t: f64,
     ) -> finstack_quant_core::Result<f64> {
         let v = self.implied_vol_lognormal_unchecked(f, k, t);
-        if v.is_finite() {
+        if v.is_finite() && v >= 0.0 {
             Ok(v)
         } else {
             Err(finstack_quant_core::error::InputError::Invalid.into())
@@ -296,13 +292,16 @@ impl SabrParameters {
     ///
     /// # Arguments
     ///
-    /// * `f` - Objective or payoff closure evaluated by the solver or Monte Carlo engine
-    /// * `k` - K used by the algorithm, subject to the enclosing type invariants and documented units.
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
+    /// * `f` - Unshifted forward in decimal rate or price units; negative values require beta zero or a sufficient configured shift.
+    /// * `k` - Unshifted strike in the same units as `f`, with the same positivity condition.
+    /// * `t` - Finite, strictly positive option expiry in years.
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> finstack_quant_core::Result<f64> {
         let shift = self.shift.unwrap_or(0.0);
         let (sf, sk) = (f + shift, k + shift);
-        if sf * sk <= 0.0 && self.beta > 0.0 && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10) {
+        if sf * sk <= 0.0
+            && self.beta >= super::model::BETA_SNAP_TOL
+            && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10)
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "SABR implied_vol_normal: forward*strike <= 0 (F={sf}, K={sk} after shift) with \
                  beta = {} > 0. The CEV backbone is not shift-invariant; configure an explicit \
@@ -311,7 +310,7 @@ impl SabrParameters {
             )));
         }
         let v = self.implied_vol_normal_unchecked(f, k, t);
-        if v.is_finite() {
+        if v.is_finite() && v >= 0.0 {
             Ok(v)
         } else {
             Err(finstack_quant_core::error::InputError::Invalid.into())
@@ -370,37 +369,13 @@ impl SabrParameters {
     }
 }
 
-/// χ(z) function used in the Hagan SABR approximation.
-///
-/// ```text
-/// χ(z) = log[(√(1 - 2ρz + z²) + z - ρ) / (1 - ρ)]
-/// ```
-///
-/// Uses a Taylor expansion for small z to avoid cancellation.
-#[inline]
-fn chi(z: f64, rho: f64) -> finstack_quant_core::Result<f64> {
-    if z.abs() < 1e-10 {
-        // Taylor expansion to O(z²): χ(z) ≈ z + ρz²/2. Higher-order terms are
-        // negligible at the |z| < 1e-10 cutover (z³ ≲ 1e-30).
-        return Ok(z * (1.0 + 0.5 * rho * z));
-    }
-
-    let discriminant = 1.0 - 2.0 * rho * z + z * z;
-    if discriminant < 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "SABR chi: negative discriminant {discriminant:.6} for z={z:.6}, rho={rho:.6}"
-        )));
-    }
-
-    let sqrt_disc = discriminant.sqrt();
-    let numerator = sqrt_disc + z - rho;
-    let denominator = 1.0 - rho;
-
-    if numerator <= 0.0 || denominator <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "SABR chi: non-positive log argument (num={numerator:.6}, den={denominator:.6})"
-        )));
-    }
-
-    Ok((numerator / denominator).ln())
+/// Hagan's beta-zero normal limit (B.70a), independent of the rate origin.
+pub(super) fn normal_beta_zero(alpha: f64, nu: f64, rho: f64, f: f64, k: f64, t: f64) -> f64 {
+    let z = nu / alpha * (f - k);
+    let ratio = if z.abs() < 1e-6 {
+        1.0 - 0.5 * rho * z + (2.0 - 3.0 * rho * rho) * z * z / 12.0
+    } else {
+        z / chi(z, rho).unwrap_or(f64::NAN)
+    };
+    alpha * ratio * (1.0 + (2.0 - 3.0 * rho * rho) * nu * nu * t / 24.0)
 }

@@ -11,9 +11,7 @@ use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSid
 use finstack_quant_core::dates::{calendar_by_id, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::{
-    standard_normal_inv_cdf, student_t_inv_cdf, GaussHermiteQuadrature,
-};
+use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::correlation::copula::{
@@ -22,15 +20,6 @@ use finstack_quant_models::correlation::copula::{
 };
 
 impl CDSTranchePricer {
-    #[inline]
-    pub(super) fn select_quadrature(&self) -> Result<&GaussHermiteQuadrature> {
-        Ok(self.quadrature_cache.get_or_init(|| {
-            finstack_quant_models::correlation::copula::select_quadrature(
-                self.params.quadrature_order,
-            )
-        }))
-    }
-
     /// Return the cached copula instance, building it on first call.
     ///
     /// The copula is determined entirely by `self.params.copula_spec` at
@@ -39,24 +28,14 @@ impl CDSTranchePricer {
     pub(super) fn copula(&self) -> &dyn Copula {
         self.copula_cache
             .get_or_init(|| match &self.params.copula_spec {
-                CopulaSpec::Gaussian => Box::new(GaussianCopula::with_quadrature_order(
-                    self.params.quadrature_order,
-                )),
+                CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
                 CopulaSpec::StudentT { degrees_of_freedom } => {
-                    Box::new(StudentTCopula::with_quadrature_order(
-                        *degrees_of_freedom,
-                        self.params.quadrature_order,
-                    ))
+                    Box::new(StudentTCopula::new(*degrees_of_freedom))
                 }
                 CopulaSpec::RandomFactorLoading { loading_volatility } => {
-                    Box::new(RandomFactorLoadingCopula::with_quadrature_order(
-                        *loading_volatility,
-                        self.params.quadrature_order,
-                    ))
+                    Box::new(RandomFactorLoadingCopula::new(*loading_volatility))
                 }
-                CopulaSpec::MultiFactor => Box::new(MultiFactorCopula::with_quadrature_order(
-                    self.params.quadrature_order,
-                )),
+                CopulaSpec::MultiFactor => Box::new(MultiFactorCopula::new()),
             })
             .as_ref()
     }
@@ -110,7 +89,6 @@ impl CDSTranchePricer {
         Self {
             params: CDSTranchePricerConfig::default(),
             copula_cache: std::sync::OnceLock::new(),
-            quadrature_cache: std::sync::OnceLock::new(),
         }
     }
 
@@ -134,7 +112,6 @@ impl CDSTranchePricer {
         Ok(Self {
             params,
             copula_cache: std::sync::OnceLock::new(),
-            quadrature_cache: std::sync::OnceLock::new(),
         })
     }
 
@@ -209,6 +186,7 @@ impl CDSTranchePricer {
                 crate::cashflow::traits::ScheduleBuildOpts {
                     notional_hint: Some(tranche.notional),
                     meta: CashFlowMeta {
+                        projected_fixings: Vec::new(),
                         representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                         calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
                         facility_limit: None,
@@ -232,6 +210,7 @@ impl CDSTranchePricer {
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(tranche.notional),
                 meta: CashFlowMeta {
+                    projected_fixings: Vec::new(),
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
                     facility_limit: None,

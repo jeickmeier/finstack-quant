@@ -3,14 +3,11 @@
 //! Provides a DRY aggregation helper to iterate caplets/floorlets and sum
 //! contributions for a given functional form (e.g., delta/gamma/vega/theta).
 
-use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
+use crate::instruments::rates::cap_floor::pricing::pricer::resolve_caplet_volatility;
 use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
-use crate::instruments::rates::cap_floor::pricing::{black, normal};
 use crate::instruments::rates::cap_floor::CapFloor;
-use crate::instruments::rates::swaption::types::{
-    lognormal_to_normal_vol, lognormal_to_normal_vol_jacobian,
-};
 use crate::metrics::MetricContext;
+use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Per-caplet inputs passed to the aggregation closure.
 ///
@@ -21,59 +18,16 @@ pub(crate) struct CapletInputs {
     pub forward: f64,
     /// Resolved implied volatility (overrides → surface lookup).
     pub sigma: f64,
+    /// Resolved model convention (including displacement).
+    pub convention: VolatilityConvention,
+    /// Strike after the same displacement as `forward`.
+    pub strike: f64,
     /// Year fraction to the option fixing date.
     pub fixing_t: f64,
     /// Sensitivity of the optioned coupon to a parallel projected-forward shift.
     pub forward_sensitivity: f64,
     /// Second sensitivity to the same parallel projected-forward shift.
     pub forward_second_sensitivity: f64,
-}
-
-/// Lognormal-convention forward delta with graceful Bachelier fallback.
-///
-/// Mirrors the pricer's `Lognormal`/`Auto` path: uses Black-76 where the model
-/// is well-defined (`forward > 0` and `strike > 0`); otherwise converts the
-/// lognormal vol to an equivalent normal vol and uses Bachelier so the Greek
-/// stays finite and consistent with the price. Shared by the `Lognormal` and
-/// `Auto` vol types.
-pub(crate) fn lognormal_delta_with_fallback(
-    is_cap: bool,
-    strike: f64,
-    forward: f64,
-    sigma: f64,
-    t: f64,
-) -> f64 {
-    if forward > 0.0 && strike > 0.0 {
-        black::delta(is_cap, strike, forward, sigma, t)
-    } else {
-        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
-        normal::delta(is_cap, strike, forward, normal_vol, t)
-    }
-}
-
-/// Lognormal-convention forward gamma with graceful Bachelier fallback.
-///
-/// See [`lognormal_delta_with_fallback`] for the model-selection rationale.
-pub(crate) fn lognormal_gamma_with_fallback(strike: f64, forward: f64, sigma: f64, t: f64) -> f64 {
-    if forward > 0.0 && strike > 0.0 {
-        black::gamma(strike, forward, sigma, t)
-    } else {
-        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
-        normal::gamma(strike, forward, normal_vol, t)
-    }
-}
-
-/// Lognormal-convention vega (per 1% vol) with graceful Bachelier fallback.
-///
-/// See [`lognormal_delta_with_fallback`] for the model-selection rationale.
-pub(crate) fn lognormal_vega_with_fallback(strike: f64, forward: f64, sigma: f64, t: f64) -> f64 {
-    if forward > 0.0 && strike > 0.0 {
-        black::vega_per_pct(strike, forward, sigma, t)
-    } else {
-        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
-        let jacobian = lognormal_to_normal_vol_jacobian(sigma, forward, strike, t, None);
-        normal::vega_per_pct(strike, forward, normal_vol, t) * jacobian
-    }
 }
 
 /// Iterate over caplets/floorlets and aggregate contributions.
@@ -122,17 +76,13 @@ where
 
         let forward = projection.forward;
         let df = resolved_inputs.discount_factor;
-        let sigma = resolve_sigma_at(
-            &option.instrument_pricing_overrides.market_quotes,
-            context.curves.as_ref(),
-            option.vol_surface_id.as_str(),
-            fixing_t,
-            strike,
-        )?;
-
+        let quote = resolve_caplet_volatility(option, context.curves.as_ref(), fixing_t, strike)?;
+        let (forward, strike) = quote.model_rates(forward, strike)?;
         let per_unit = f(CapletInputs {
             forward,
-            sigma,
+            sigma: quote.sigma,
+            convention: quote.convention,
+            strike,
             fixing_t,
             forward_sensitivity: projection.parallel_forward_sensitivity,
             forward_second_sensitivity: projection.parallel_forward_second_sensitivity,

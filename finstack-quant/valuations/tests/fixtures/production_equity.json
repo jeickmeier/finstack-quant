@@ -1,0 +1,109 @@
+{
+  "description": "Contract/market inputs matching production_lr_quantlib.json; no captured model prices.",
+  "as_of": "2025-01-01",
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "equity_option",
+      "spec": {
+        "id": "EQ-LR-AUDIT",
+        "underlying_ticker": "EQ",
+        "strike": 100.0,
+        "option_type": "put",
+        "exercise_style": "american",
+        "expiry": "2026-01-01",
+        "notional": {
+          "amount": "1",
+          "currency": "USD"
+        },
+        "day_count": "act_365f",
+        "theta_day_basis": "calendar_365",
+        "settlement": "cash",
+        "discount_curve_id": "DISC",
+        "spot_id": "SPOT",
+        "vol_surface_id": "VOL",
+        "div_yield_id": "DIV",
+        "discrete_dividends": [],
+        "attributes": {}
+      }
+    }
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "DISC",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.951229424500714
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [
+      {
+        "id": "VOL",
+        "expiries": [
+          0.5,
+          1.0,
+          2.0
+        ],
+        "strikes": [
+          50.0,
+          100.0,
+          150.0
+        ],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
+        "vols_row_major": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ]
+      }
+    ],
+    "prices": {
+      "DIV": {
+        "unitless": 0.02
+      },
+      "SPOT": {
+        "price": {
+          "amount": "100",
+          "currency": "USD"
+        }
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

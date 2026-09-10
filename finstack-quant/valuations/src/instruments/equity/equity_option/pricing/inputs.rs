@@ -5,7 +5,7 @@ use crate::instruments::common_impl::parameters::{OptionMarketParams, OptionType
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::{ExerciseStyle, SettlementType};
 use crate::pricer::{ModelKey, PricingError, PricingErrorContext};
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -63,7 +63,7 @@ pub(crate) fn resolve_lifecycle_value(
                 market.get_price(&inst.spot_id)?,
                 currency,
             )?;
-            let t = year_fraction(DayCount::Act365F, as_of, exercise.settlement_date)?;
+            let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
             let future_dividends = inst
                 .discrete_dividends
                 .iter()
@@ -109,7 +109,7 @@ pub(crate) fn resolve_lifecycle_value(
 /// Collected market inputs for equity option pricing.
 ///
 /// The effective rate `r` reproduces the curve-native date-to-date discount
-/// factor when applied over the ACT/365F model time `t_vol`.
+/// factor when applied over the configured model time `t_vol`.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct EquityOptionInputs {
     /// Spot price of the underlying
@@ -120,7 +120,7 @@ pub(crate) struct EquityOptionInputs {
     pub(crate) q: f64,
     /// Implied volatility
     pub(crate) sigma: f64,
-    /// Time to expiry for vol calculations (ACT/365F standard)
+    /// Time to expiry for vol calculations (instrument day count; ACT/365F by default)
     pub(crate) t_vol: f64,
 }
 
@@ -128,7 +128,7 @@ pub(crate) struct EquityOptionInputs {
 ///
 /// **Day Count Convention Handling:**
 /// - Discount factors use the discount curve's own day count
-/// - Vol surface lookups and model time use ACT/365F (equity market standard)
+/// - Vol surface lookups and model time use the configured model day count (ACT/365F by default)
 ///
 /// This separation ensures consistent pricing when discount curves use different
 /// conventions (e.g., OIS curves with ACT/360) than the vol surface.
@@ -142,10 +142,10 @@ pub(crate) fn collect_inputs(
     Ok((inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol))
 }
 
-/// Collect inputs with curve-native discounting and ACT/365F model time.
+/// Collect inputs with curve-native discounting and the configured model time.
 ///
 /// The curve's day count is consumed by its date-to-date discount-factor
-/// lookup; `t_vol` uses ACT/365F for volatility lookup and option pricing.
+/// lookup; `t_vol` uses the configured model day count for volatility lookup and option pricing.
 ///
 /// # Discrete Dividend Handling
 ///
@@ -159,7 +159,7 @@ pub(crate) fn collect_inputs(
 ///
 /// Only dividends with an ex-date strictly after `as_of` and on or before
 /// `inst.expiry` are returned (past and post-expiry dividends do not affect the
-/// option). Times use ACT/365F (the equity-vol market standard). The returned
+/// option). Times use the configured model day count (ACT/365F by default). The returned
 /// slice drives the escrowed-dividend spot adjustment and its rho correction.
 pub(crate) fn has_future_discrete_dividends(inst: &EquityOption, as_of: Date) -> bool {
     inst.discrete_dividends
@@ -201,7 +201,7 @@ pub(crate) fn future_dividends(
         .iter()
         .filter(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
         .map(|(ex_date, amount)| {
-            let t_div = year_fraction(DayCount::Act365F, as_of, *ex_date)?;
+            let t_div = year_fraction(inst.day_count, as_of, *ex_date)?;
             let df = disc_curve.df_between_dates(as_of, *ex_date)?;
             Ok((t_div, *amount * df))
         })
@@ -218,14 +218,13 @@ pub(crate) fn collect_inputs_extended(
     as_of: Date,
 ) -> Result<EquityOptionInputs> {
     // The curve evaluates the economic discount factor on its own day-count
-    // clock. Black–Scholes and the vol surface use ACT/365F, so bridge the two
+    // clock. Black–Scholes and the vol surface use the configured model day count, so bridge the two
     // clocks with an effective rate satisfying exp(-r * t_vol) = df.
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
-    // Vol time uses ACT/365F (equity market standard for vol surfaces)
-    // This is consistent with how equity volatility is quoted in the market
-    let t_vol = year_fraction(DayCount::Act365F, as_of, inst.expiry)?;
+    // The instrument declares the annualization basis of its volatility quotes.
+    let t_vol = year_fraction(inst.day_count, as_of, inst.expiry)?;
     // Effective BSM rate on the vol clock — see the two-clock note above.
     // A non-positive/non-finite df means a corrupted curve; error rather than
     // derive an infinite rate that would poison the Black–Scholes price.
@@ -298,7 +297,7 @@ fn future_dividend_amounts(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64,
     inst.discrete_dividends
         .iter()
         .filter(|(date, _)| *date > as_of && *date <= inst.expiry)
-        .map(|(date, amount)| Ok((year_fraction(DayCount::Act365F, as_of, *date)?, *amount)))
+        .map(|(date, amount)| Ok((year_fraction(inst.day_count, as_of, *date)?, *amount)))
         .collect()
 }
 

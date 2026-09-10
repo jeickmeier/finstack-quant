@@ -13,14 +13,7 @@
         "sda_speed_multiplier": null
       },
       "closing_date": "2024-01-01",
-      "credit_factors": {
-        "credit_score": null,
-        "custom_factors": {},
-        "delinquency_days": 0,
-        "dti": null,
-        "ltv": null,
-        "unemployment_rate": null
-      },
+      "credit_factors": {},
       "deal_metadata": {
         "manager_id": null,
         "master_servicer_id": null,
@@ -29,23 +22,12 @@
         "trustee_id": null
       },
       "deal_type": "clo",
-      "default_assumptions": {
-        "abs_speed_monthly": null,
-        "base_cdr_annual": 0.02,
-        "base_cpr_annual": 0.15,
-        "base_recovery_rate": 0.4,
-        "cdr_by_asset_type": {},
-        "cpr_by_asset_type": {},
-        "psa_speed": null,
-        "recovery_by_asset_type": {},
-        "sda_speed": null
-      },
       "default_spec": {
         "cdr": 0.02,
         "curve": null
       },
       "discount_curve_id": "USD-OIS",
-      "first_payment_date": "2025-04-01",
+      "first_payment_date": "2024-04-01",
       "frequency": {
         "count": 3,
         "unit": "months"
@@ -53,12 +35,7 @@
       "hedge_swaps": [],
       "id": "CLO-EXAMPLE",
       "market_conditions": {
-        "custom_factors": {},
-        "hpa": null,
-        "original_rate": null,
-        "refi_rate": 0.04,
-        "seasonal_factor": 1.0,
-        "unemployment": null
+        "refi_rate": 0.04
       },
       "maturity": "2034-01-01",
       "payment_calendar_id": "nyse",
@@ -77,6 +54,7 @@
             "contractual_payment": null,
             "credit_quality": null,
             "day_count": "act_360",
+            "default_date": null,
             "id": "COLLATERAL-1",
             "index_id": null,
             "industry": null,
@@ -87,6 +65,7 @@
             "purchase_price": null,
             "rate": 0.07,
             "recovery_amount": null,
+            "recovery_rate": null,
             "smm_override": null,
             "spread_bp": null
           }
@@ -133,7 +112,6 @@
         "rate": 0.4,
         "recovery_lag": 18
       },
-      "reinvestment_end_date": null,
       "tranches": {
         "total_size": {
           "amount": "100000000",
@@ -150,22 +128,6 @@
                 "rate": 0.06
               }
             },
-            "credit_enhancement": {
-              "cash_trap_active": false,
-              "excess_spread": 0.0,
-              "overcollateralization": {
-                "amount": "0",
-                "currency": "USD"
-              },
-              "reserve_account": {
-                "amount": "0",
-                "currency": "USD"
-              },
-              "subordination": {
-                "amount": "0",
-                "currency": "USD"
-              }
-            },
             "current_balance": {
               "amount": "100000000",
               "currency": "USD"
@@ -176,7 +138,6 @@
               "currency": "USD"
             },
             "detachment_point": 100.0,
-            "expected_maturity": null,
             "frequency": {
               "count": 3,
               "unit": "months"

@@ -33,9 +33,11 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::instruments::rates::cap_floor::pricing::{
-    black as black_ir, normal as normal_ir, payoff::CapletFloorletInputs,
+use crate::instruments::common_impl::vol_resolution::{
+    resolve_volatility, ResolvedVolatility, VolatilityRequest,
 };
+use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
+use crate::instruments::rates::cap_floor::pricing::pricer::price_caplet_quote;
 use crate::pricer::ModelKey;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -44,6 +46,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_models::volatility::VolatilityConvention;
 use rust_decimal::Decimal;
 
 /// Inflation option type.
@@ -181,6 +184,11 @@ pub struct InflationCapFloor {
     /// Optional contract-level lag override.
     #[builder(optional)]
     pub lag_override: Option<InflationLag>,
+    /// Contractual monthly CPI interpolation, overriding index metadata.
+    /// Defaults to monthly step interpolation when neither source supplies it.
+    #[builder(optional)]
+    pub interpolation_override:
+        Option<finstack_quant_core::market_data::scalars::InflationInterpolation>,
 
     //
     // A YoY inflation caplet pays `(CPI(Tᵢ)/CPI(Tᵢ₋₁) − 1 − K)⁺`. Under the
@@ -288,32 +296,22 @@ impl InflationCapFloor {
         as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let lagged_date = self.lagged_fixing_date(curves, date);
-
-        // Only consult realized fixings for observations whose (lagged) fixing
-        // date is on or before the valuation date. Reading later entries from a
-        // fixing series that extends past as_of would introduce look-ahead bias.
-        if lagged_date <= as_of {
-            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
-            let value = crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                index.as_ref(),
-                date,
-                lagged_date,
-                self.effective_lag(curves),
-            )?;
-            return Self::validate_cpi_value(value, date);
-        }
-
-        // Fall back to curve projection with lag adjustment, honoring the
-        // curve's anchor convention: epoch-anchored ("1970-01-01" default
-        // anchor) curves are read at Act365F(as_of -> lagged) while date-based
-        // (rebased) curves are read via `cpi_on_date` — the same anchor-aware
-        // branch the inflation swaps use.
-        let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
-        let value = crate::instruments::rates::inflation_swap::InflationSwap::curve_cpi_value(
-            curve.as_ref(),
+        let interpolation = self
+            .interpolation_override
+            .or_else(|| {
+                curves
+                    .get_inflation_index(self.inflation_index_id.as_str())
+                    .ok()
+                    .map(|index| index.interpolation())
+            })
+            .unwrap_or_default();
+        let value = crate::instruments::common_impl::helpers::reference_inflation_value(
+            curves,
+            self.inflation_index_id.as_str(),
+            date,
             as_of,
-            lagged_date,
+            self.effective_lag(curves),
+            interpolation,
         )?;
         Self::validate_cpi_value(value, date)
     }
@@ -416,6 +414,15 @@ impl InflationCapFloor {
         as_of: Date,
         model: ModelKey,
     ) -> finstack_quant_core::Result<f64> {
+        let convention = match model {
+            ModelKey::Normal => VolatilityConvention::Normal,
+            ModelKey::Black76 => VolatilityConvention::Lognormal,
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "inflation cap/floor requires Normal or Black76 pricing".to_owned(),
+                ))
+            }
+        };
         let strike = self.strike_f64()?;
         let disc = curves.get_discount(self.discount_curve_id.as_str())?;
 
@@ -465,16 +472,27 @@ impl InflationCapFloor {
 
             // Volatility at the option strike (smile) prices the Black-76 /
             // Bachelier payoff.
-            let sigma = if t_fix > 0.0 {
-                crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            let resolve = |strike| {
+                resolve_volatility(
                     &self.instrument_pricing_overrides.market_quotes,
                     curves,
                     self.vol_surface_id.as_str(),
-                    t_fix,
-                    strike,
-                )?
+                    VolatilityRequest {
+                        expiry: t_fix,
+                        tenor: 0.0,
+                        strike,
+                        convention: Some(convention),
+                        clamp: true,
+                    },
+                )
+            };
+            let quote = if t_fix > 0.0 {
+                resolve(strike)?
             } else {
-                0.0
+                ResolvedVolatility {
+                    sigma: 0.0,
+                    convention: VolatilityConvention::Normal,
+                }
             };
 
             // YoY convexity / timing adjustment (Brigo-Mercurio Ch. 16;
@@ -494,13 +512,7 @@ impl InflationCapFloor {
             // regression test, which confirms the strike-difference (where `F`
             // cancels) is vol-independent.
             let forward_rate = if t_fix > 0.0 {
-                let atm_sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                    &self.instrument_pricing_overrides.market_quotes,
-                    curves,
-                    self.vol_surface_id.as_str(),
-                    t_fix,
-                    deterministic_rate,
-                )?;
+                let atm_sigma = resolve(deterministic_rate)?.sigma;
                 yoy_convexity_adjusted_rate(
                     deterministic_ratio,
                     accrual,
@@ -518,49 +530,12 @@ impl InflationCapFloor {
                 strike,
                 forward: forward_rate,
                 discount_factor: df,
-                volatility: sigma,
+                volatility: quote.sigma,
                 time_to_fixing: t_fix,
                 accrual_year_fraction: accrual,
                 currency: self.notional.currency(),
             };
-            let leg_pv = match model {
-                ModelKey::Normal => normal_ir::price_caplet_floorlet(inputs)?,
-                _ => {
-                    // Black-76 requires a strictly positive forward and strike.
-                    // For deflation scenarios (forward_rate ≤ 0) or non-positive
-                    // strikes, transparently fall back to Bachelier (Normal)
-                    // with the input lognormal vol converted to a normal vol
-                    // via the standard mapping — matching how the regular cap/
-                    // floor pricer handles the negative-rate regime. This makes
-                    // inflation cap/floor pricing safe under deflation without
-                    // requiring the user to manually switch models per quote.
-                    let needs_normal_fallback =
-                        t_fix > 0.0 && (forward_rate <= 0.0 || strike <= 0.0);
-                    if needs_normal_fallback {
-                        tracing::debug!(
-                            forward = forward_rate,
-                            strike,
-                            t_fix,
-                            "inflation cap/floor: forward/strike non-positive, \
-                             falling back from Black-76 to Bachelier (normal)"
-                        );
-                        let normal_vol =
-                            crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
-                                sigma,
-                                forward_rate,
-                                strike,
-                                t_fix,
-                                None,
-                            );
-                        normal_ir::price_caplet_floorlet(CapletFloorletInputs {
-                            volatility: normal_vol,
-                            ..inputs
-                        })?
-                    } else {
-                        black_ir::price_caplet_floorlet(inputs)?
-                    }
-                }
-            };
+            let leg_pv = price_caplet_quote(inputs, quote)?;
 
             total_pv += leg_pv.amount();
         }

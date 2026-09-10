@@ -28,6 +28,7 @@ fn cap_envelope(prior_market: Vec<PriorMarketObject>, dual_curve: bool) -> Calib
                 id: "hw".into(),
                 quote_set: "caps".into(),
                 params: StepParams::CapFloorHullWhite(CapFloorHullWhiteStepParams {
+                    fit_tolerance: 1e-6,
                     discount_curve_id: "D".into(),
                     forward_curve_id: if dual_curve { "F" } else { "D" }.into(),
                     currency: Currency::USD,
@@ -193,4 +194,16 @@ fn cap_floor_plan_rejects_conflicting_quotes_in_any_order() {
         assert!(!result.result.report.success);
         assert_eq!(result.result.step_reports["hw"].residuals.len(), 3);
     }
+}
+
+#[test]
+fn m11_hull_white_step_requires_explicit_quote_fit_tolerance() {
+    let value = serde_json::json!({
+        "curve_id": "D", "currency": "USD", "base_date": "2025-01-01",
+        "initial_kappa": null, "initial_sigma": null
+    });
+    assert!(
+        serde_json::from_value::<HullWhiteStepParams>(value).is_err(),
+        "missing fit tolerance accepted"
+    );
 }

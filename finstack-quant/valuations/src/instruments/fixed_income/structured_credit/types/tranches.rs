@@ -51,6 +51,10 @@ pub struct CoverageTrigger {
 
 impl CoverageTrigger {
     /// Create a coverage trigger with no separate cure threshold.
+    ///
+    /// # Arguments
+    /// * `trigger_level` - Positive coverage ratio at which the test passes, such as 1.20 for 120%.
+    /// * `consequence` - Cash-distribution or reinvestment action while the test is breached.
     pub fn new(trigger_level: f64, consequence: TriggerConsequence) -> Self {
         Self {
             trigger_level,
@@ -61,56 +65,48 @@ impl CoverageTrigger {
     }
 
     /// Set a separate cure threshold and return the updated trigger.
+    ///
+    /// # Arguments
+    /// * `cure_level` - Coverage ratio required to exit breach, at least the breach threshold.
     pub fn with_cure_level(mut self, cure_level: f64) -> Self {
         self.cure_level = Some(cure_level);
         self
     }
 
-    /// Return whether current_level is below the breach threshold.
+    /// Determine breach status, retaining an existing breach until its cure level.
+    ///
+    /// # Arguments
+    /// * `current_level` - Current dimensionless coverage ratio (1.20 means 120%).
     pub fn is_breached(&self, current_level: f64) -> bool {
-        current_level < self.trigger_level
+        if self.breach_date.is_some() {
+            !self.is_cured(current_level)
+        } else {
+            current_level < self.trigger_level
+        }
+    }
+
+    /// Advance the per-path breach/cure state at a contractual payment date.
+    pub(crate) fn update(&mut self, current_level: f64, date: Date) -> bool {
+        let breached = self.is_breached(current_level);
+        if breached {
+            self.breach_date.get_or_insert(date);
+        } else {
+            self.breach_date = None;
+        }
+        breached
     }
 
     /// Return whether current_level has reached the cure threshold.
     ///
     /// When no cure level is configured, the breach threshold itself is used.
+    ///
+    /// # Arguments
+    /// * `current_level` - Current dimensionless coverage ratio, such as 1.25 for 125%.
     pub fn is_cured(&self, current_level: f64) -> bool {
         if let Some(cure) = self.cure_level {
             current_level >= cure
         } else {
             current_level >= self.trigger_level
-        }
-    }
-}
-
-/// Credit-enhancement amounts and flags available to a tranche.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct CreditEnhancement {
-    /// Principal subordination supplied by junior tranches.
-    pub subordination: Money,
-    /// Collateral balance in excess of rated tranche balance.
-    pub overcollateralization: Money,
-    /// Cash reserve balance available as credit enhancement.
-    pub reserve_account: Money,
-    /// Excess spread available to absorb losses, as an annual decimal rate.
-    pub excess_spread: f64,
-    /// Whether residual cash is currently trapped or turboed into principal.
-    pub cash_trap_active: bool,
-}
-
-impl Default for CreditEnhancement {
-    fn default() -> Self {
-        Self {
-            subordination: Money::from((0_i64, finstack_quant_core::currency::Currency::USD)),
-            overcollateralization: Money::from((
-                0_i64,
-                finstack_quant_core::currency::Currency::USD,
-            )),
-            reserve_account: Money::from((0_i64, finstack_quant_core::currency::Currency::USD)),
-            excess_spread: 0.0,
-            cash_trap_active: false,
         }
     }
 }
@@ -267,9 +263,6 @@ pub struct Tranche {
     /// Interest coverage trigger specification
     pub ic_trigger: Option<CoverageTrigger>,
 
-    /// Credit enhancement details
-    pub credit_enhancement: CreditEnhancement,
-
     /// Payment characteristics
     pub frequency: Tenor,
     /// Day count convention for interest accrual
@@ -298,13 +291,6 @@ pub struct Tranche {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub maturity: Date,
-    /// Expected maturity date (may be earlier than legal maturity for CLOs)
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    pub expected_maturity: Option<Date>,
 
     /// Payment priority (1 = most senior, paid first).
     ///
@@ -352,7 +338,6 @@ impl Tranche {
             coupon,
             oc_trigger: None,
             ic_trigger: None,
-            credit_enhancement: CreditEnhancement::default(),
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             deferred_interest: Money::from((0_i64, original_balance.currency())),
@@ -360,7 +345,6 @@ impl Tranche {
             is_revolving: false,
             can_reinvest: false,
             maturity,
-            expected_maturity: None,
             // Provisional: overwritten by `TrancheStructure::new` /
             // `TrancheStructure` deserialization, which assigns a structurally
             // ranked, distinct priority per note. See the field doc comment.
@@ -998,6 +982,18 @@ mod tests {
         assert!(trigger.is_cured(1.26)); // Above cure level
 
         // Not breached
+        assert!(!trigger.is_breached(1.25));
+    }
+
+    #[test]
+    fn production_waterfall_breached_trigger_requires_cure_threshold() {
+        let mut trigger =
+            CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow).with_cure_level(1.25);
+        trigger.breach_date = Some(test_date());
+        assert!(
+            trigger.is_breached(1.22),
+            "an existing breach persists until the cure threshold"
+        );
         assert!(!trigger.is_breached(1.25));
     }
 }

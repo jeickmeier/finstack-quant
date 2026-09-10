@@ -249,7 +249,7 @@ fn property_priority_ordering() {
     let result = run_waterfall(
         &waterfall,
         Money::new(75_000.0, currency).expect("valid money fixture"),
-        Money::new(0.0, currency).expect("valid money fixture"),
+        Money::new(75_000.0, currency).expect("interest funds fees"),
         payment_date,
         &tranches,
         Money::new(100_000_000.0, currency).expect("valid money fixture"),
@@ -323,7 +323,7 @@ fn property_pro_rata_weight_distribution() {
     let result = run_waterfall(
         &waterfall,
         Money::new(150_000.0, currency).expect("valid money fixture"), // Less than total requested
-        Money::new(0.0, currency).expect("valid money fixture"),
+        Money::new(150_000.0, currency).expect("interest funds fees"),
         payment_date,
         &tranches,
         Money::new(100_000_000.0, currency).expect("valid money fixture"),

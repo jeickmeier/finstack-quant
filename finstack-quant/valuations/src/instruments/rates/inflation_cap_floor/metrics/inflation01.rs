@@ -103,10 +103,7 @@ mod tests {
             .expect("vol surface");
         let index = InflationIndex::new(
             "US-CPI",
-            vec![
-                (date!(2000 - 01 - 01), 100.0),
-                (date!(2035 - 01 - 01), 100.0),
-            ],
+            vec![(date!(2023 - 10 - 01), 100.0)],
             finstack_quant_core::currency::Currency::USD,
         )
         .expect("inflation index");

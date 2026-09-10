@@ -268,12 +268,17 @@ pub struct CallPut {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub end_date: Date,
-    /// Redemption price as percentage of par amount.
+    /// Clean redemption price as percentage of par amount (100 means par).
+    /// Accrued coupon interest at exercise is added to determine the cash payment.
     pub price_pct_of_par: f64,
     /// Optional make-whole call specification.
     ///
     /// When set, the call price is computed as:
-    ///   `max(price_pct_of_par, PV of remaining cashflows at reference_rate + spread)`
+    ///   `max(clean_floor, PV of remaining cashflows - accrued) + accrued`
+    ///
+    /// Here `clean_floor` is notional times `price_pct_of_par / 100`; the
+    /// reference PV discounts remaining cashflows at the reference curve plus
+    /// spread, and accrued interest is paid exactly once.
     ///
     /// This ensures the holder is compensated at treasury + spread for early redemption.
     /// Common in investment-grade corporate and convertible bonds.

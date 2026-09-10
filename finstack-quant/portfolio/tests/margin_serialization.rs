@@ -56,6 +56,10 @@ fn portfolio_result(
             .expect("valid money fixture"),
         total_margin: Money::new(total_margin, Currency::USD).expect("valid money fixture"),
         by_netting_set,
+        by_csa: HashMap::default(),
+        total_required_im_collateral: Money::from((0_i64, Currency::USD)),
+        total_im_transfer: Money::from((0_i64, Currency::USD)),
+        total_segregated_im: Money::from((0_i64, Currency::USD)),
         total_positions,
         positions_without_margin: 0,
         degraded_positions: Vec::new(),
@@ -84,11 +88,11 @@ fn sample_simm_sensitivities() -> SimmSensitivities {
         .insert((Currency::EUR, Currency::USD), 410.0);
     sensitivities
         .commodity_delta
-        .insert("Power".to_string(), -95.0);
+        .insert("EuropeanPowerAndCarbon".to_string(), -95.0);
     // The three vega buckets the portfolio wire previously dropped on round-trip.
     sensitivities
         .commodity_vega
-        .insert("Power".to_string(), 42.0);
+        .insert("EuropeanPowerAndCarbon".to_string(), 42.0);
     sensitivities
         .credit_non_qualifying_vega
         .insert(("RMBS_INDEX".to_string(), "3Y".to_string()), 61.0);
@@ -100,9 +104,14 @@ fn sample_simm_sensitivities() -> SimmSensitivities {
         ),
         77.0,
     );
-    sensitivities
-        .curvature
-        .insert(SimmRiskClass::InterestRate, -75.0);
+    sensitivities.add_curvature(finstack_quant_margin::SimmCurvatureSensitivity {
+        risk_class: SimmRiskClass::InterestRate,
+        bucket: "USD".into(),
+        factor: "OIS".into(),
+        risk_tenor: Some("5Y".into()),
+        expiry_tenor: "1Y".into(),
+        volatility_weighted_vega: -75.0,
+    });
     sensitivities.credit_qualifying_delta.insert(
         (
             SimmCreditSector::Financial,
@@ -274,9 +283,9 @@ fn test_netting_set_margin_json_roundtrip() {
             "equity_vega": [["AAPL", 125.0]],
             "fx_delta": [["JPY", 2_200.0]],
             "fx_vega": [["EUR", "USD", 410.0]],
-            "commodity_delta": [["Power", -95.0]],
-            "commodity_vega": [["Power", 42.0]],
-            "curvature": [["interest_rate", -75.0]],
+            "commodity_delta": [["EuropeanPowerAndCarbon", -95.0]],
+            "commodity_vega": [["EuropeanPowerAndCarbon", 42.0]],
+            "curvature": [{"risk_class": "interest_rate", "bucket": "USD", "factor": "OIS", "risk_tenor": "5Y", "expiry_tenor": "1Y", "volatility_weighted_vega": -75.0}],
         }),
         "portfolio results must use the canonical margin sensitivity tuples"
     );

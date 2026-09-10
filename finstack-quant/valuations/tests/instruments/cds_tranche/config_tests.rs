@@ -19,14 +19,14 @@ use time::macros::date;
 // ==================== Default Configuration Tests ====================
 
 #[test]
-fn test_default_config_quadrature_order() {
+fn test_default_config_integration_tolerance() {
     // Arrange & Act
     let config = CDSTranchePricerConfig::default();
 
     // Assert
     assert_eq!(
-        config.quadrature_order, 20,
-        "Default quadrature order should be 20 (industry standard)"
+        config.integration_tolerance, 1e-10,
+        "Default integration tolerance should be 1e-10"
     );
 }
 
@@ -158,20 +158,20 @@ fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
     let multi_factor = CDSTranchePricerConfig::default().with_multi_factor_copula();
     assert!(matches!(multi_factor.copula_spec, CopulaSpec::MultiFactor));
 
-    let config = CDSTranchePricerConfig::default().with_quadrature_order(7);
+    let config = CDSTranchePricerConfig::default().with_integration_tolerance(1e-8);
     let pricer =
         CDSTranchePricer::with_params(config.clone()).expect("valid tranche pricer config");
-    assert_eq!(config.quadrature_order, 7);
-    assert_eq!(pricer.get_config().quadrature_order, 7);
+    assert_eq!(config.integration_tolerance, 1e-8);
+    assert_eq!(pricer.get_config().integration_tolerance, 1e-8);
 }
 
 #[test]
-fn pricer_rejects_unsupported_quadrature_order() {
-    let config = CDSTranchePricerConfig::default().with_quadrature_order(3);
+fn pricer_rejects_unsupported_integration_tolerance() {
+    let config = CDSTranchePricerConfig::default().with_integration_tolerance(0.0);
     let error = CDSTranchePricer::with_params(config)
         .err()
-        .expect("unsupported quadrature order must fail");
-    assert!(error.to_string().contains("quadrature_order"));
+        .expect("unsupported integration tolerance must fail");
+    assert!(error.to_string().contains("integration_tolerance"));
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn test_config_cloneable() {
     let config2 = config1.clone();
 
     // Assert
-    assert_eq!(config2.quadrature_order, config1.quadrature_order);
+    assert_eq!(config2.integration_tolerance, config1.integration_tolerance);
     assert_eq!(config2.min_correlation, config1.min_correlation);
     assert_eq!(config2.cs01_bump_size, config1.cs01_bump_size);
 }
@@ -246,12 +246,12 @@ fn test_config_independent_after_clone() {
     let config2 = config1.clone();
 
     // Act
-    config1.quadrature_order = 10;
+    config1.integration_tolerance = 1e-8;
 
     // Assert
-    assert_eq!(config1.quadrature_order, 10);
+    assert_eq!(config1.integration_tolerance, 1e-8);
     assert_eq!(
-        config2.quadrature_order, 20,
+        config2.integration_tolerance, 1e-10,
         "Cloned config should not be affected"
     );
 }

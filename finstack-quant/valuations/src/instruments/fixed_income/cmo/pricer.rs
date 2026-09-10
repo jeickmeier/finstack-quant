@@ -146,7 +146,7 @@ pub(crate) fn generate_tranche_cashflows(
     let io_tranche = is_io.then(|| ref_tranche.clone());
 
     // Track collateral factor for IO strips
-    let original_collateral = collateral.current_face.amount();
+    let original_collateral = collateral.original_face.amount();
 
     for (period_idx, cf) in collateral_cfs.iter().enumerate() {
         // Run waterfall for this period
@@ -264,6 +264,7 @@ pub(crate) fn build_reference_tranche_schedule(
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(tranche.current_face),
             meta: CashFlowMeta {
+                projected_fixings: Vec::new(),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 facility_limit: None,
@@ -278,6 +279,15 @@ pub(crate) fn build_reference_tranche_schedule(
 fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPassthrough> {
     let defaults = embedded_registry()?.cmo_collateral_defaults();
     let total_face = cmo.waterfall.total_current_face()?;
+    let original_face = Money::new(
+        cmo.waterfall
+            .tranches
+            .iter()
+            .filter(|tranche| tranche.receives_principal())
+            .map(|tranche| tranche.original_face.amount())
+            .sum(),
+        total_face.currency(),
+    )?;
     let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
     let wam = cmo.collateral_wam.unwrap_or(defaults.wam_months);
 
@@ -293,9 +303,9 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
         .pool_id(format!("{}-POOL", cmo.deal_name).into())
         .agency(cmo.agency)
         .pool_type(PoolType::Generic)
-        .original_face(total_face)
+        .original_face(original_face)
         .current_face(total_face)
-        .current_factor(1.0)
+        .current_factor(total_face.amount() / original_face.amount())
         .wac(wac)
         .pass_through_rate(pass_through)
         .servicing_fee_rate(servicing_fee)
@@ -750,5 +760,31 @@ mod tests {
 
         // PO should have positive value
         assert!(pv.amount() > 0.0);
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn seasoned_io_uses_current_reference_balance() {
+        let mut cmo = AgencyCmo::example_io_po().expect("cmo");
+        for tranche in &mut cmo.waterfall.tranches {
+            tranche.current_face =
+                Money::new(tranche.original_face.amount() * 0.6, Currency::USD).expect("money");
+            if tranche.tranche_type == CmoTrancheType::InterestOnly {
+                tranche.coupon = 0.01;
+            }
+        }
+        let as_of = date!(2024 - 01 - 15);
+        let flows = generate_tranche_cashflows(&cmo, as_of, Some(1)).expect("flows");
+        let expected = 60_000_000.0 * 0.01 / 12.0;
+        assert!(
+            (flows[0].interest - expected).abs() < 1e-8,
+            "{} versus {expected}",
+            flows[0].interest
+        );
     }
 }

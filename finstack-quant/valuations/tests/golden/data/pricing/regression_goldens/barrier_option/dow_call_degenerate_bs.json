@@ -147,7 +147,7 @@
           "currency": "USD"
         },
         "day_count": "act_365f",
-        "use_gobet_miri": false,
+        "monitoring": {"type": "continuous"},
         "discount_curve_id": "USD-OIS",
         "spot_id": "SPX-SPOT",
         "vol_surface_id": "SPX-VOL",

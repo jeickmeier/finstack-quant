@@ -92,93 +92,34 @@ pub struct BinomialTree {
 }
 
 impl BinomialTree {
-    /// Create new binomial tree with specified steps and type
-    pub fn new(steps: usize, tree_type: TreeType) -> Self {
-        Self { steps, tree_type }
-    }
-
-    /// Create a Leisen-Reimer tree (recommended for accuracy)
-    ///
-    /// Note: Leisen-Reimer achieves best accuracy with odd step counts.
-    /// Consider using [`leisen_reimer_odd`](Self::leisen_reimer_odd) for automatic
-    /// adjustment to the nearest odd number.
-    ///
-    /// # Warning
-    ///
-    /// Even step counts may exhibit slower convergence due to the Leisen-Reimer
-    /// inversion properties. For optimal accuracy, prefer [`leisen_reimer_odd`](Self::leisen_reimer_odd).
-    pub fn leisen_reimer(steps: usize) -> Self {
-        if steps.is_multiple_of(2) {
-            tracing::warn!(
-                target: "finstack_quant_valuations::trees",
-                steps,
-                "BinomialTree::leisen_reimer called with even step count; odd steps converge faster \
-                 (consider leisen_reimer_odd)"
-            );
-        }
-        Self::new(steps, TreeType::LeisenReimer)
-    }
-
-    /// Create a Leisen-Reimer tree with odd step count for optimal accuracy.
-    ///
-    /// Leisen-Reimer trees converge faster with odd step counts. This constructor
-    /// automatically rounds the requested steps to the nearest odd number:
-    /// - Even steps are rounded up (e.g., 100 → 101)
-    /// - Odd steps are kept as-is
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_models::trees::BinomialTree;
-    ///
-    /// let tree = BinomialTree::leisen_reimer_odd(100);
-    /// assert_eq!(tree.steps, 101);
-    ///
-    /// let tree = BinomialTree::leisen_reimer_odd(99);
-    /// assert_eq!(tree.steps, 99);
-    /// ```
+    /// Create a binomial tree, rounding positive even LR step counts upward.
     ///
     /// # Arguments
     ///
-    /// * `steps` - Steps used by the algorithm, subject to the enclosing type invariants and documented units.
-    pub fn leisen_reimer_odd(steps: usize) -> Self {
-        let odd_steps = if steps.is_multiple_of(2) {
+    /// * `steps` - Requested positive interval count; LR uses the next odd count.
+    ///   Zero remains invalid and is rejected on pricing.
+    /// * `tree_type` - CRR moment construction or strike-centered Leisen-Reimer construction.
+    pub fn new(steps: usize, tree_type: TreeType) -> Self {
+        let steps = if tree_type == TreeType::LeisenReimer && steps > 0 && steps.is_multiple_of(2) {
             steps + 1
         } else {
             steps
         };
-        Self::new(odd_steps, TreeType::LeisenReimer)
+        Self { steps, tree_type }
+    }
+
+    /// Create a Leisen-Reimer tree with the next positive odd interval count.
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - Positive requested interval count; 100 becomes 101 and 99 stays 99.
+    pub fn leisen_reimer(steps: usize) -> Self {
+        Self::new(steps, TreeType::LeisenReimer)
     }
 
     /// Create a standard CRR tree
     pub fn crr(steps: usize) -> Self {
         Self::new(steps, TreeType::CRR)
-    }
-
-    /// Peizer–Pratt inversion used by Leisen–Reimer to map normal quantiles to
-    /// binomial cumulative probabilities. Uses the common closed form used in LR (1996).
-    fn peizer_pratt_inversion(&self, z: f64, n: usize) -> f64 {
-        if n == 0 {
-            return 0.5;
-        }
-        if z.abs() < 1e-14 {
-            return 0.5;
-        }
-
-        // LR recommend an odd number of steps for best accuracy; use nearest upper odd in mapping
-        let n_eff = (if n.is_multiple_of(2) { n + 1 } else { n }) as f64;
-        let sign = if z >= 0.0 { 1.0 } else { -1.0 };
-        let z2 = z * z;
-
-        // Peizer–Pratt mapping (standard LR form):
-        // beta = z^2 * (m + 1/6) / (m + 1/3 + 0.1/(m+1))
-        // H^{-1}(z) = 0.5 + sign(z)*0.5 * sqrt(1 - exp(-beta))
-        let denom = n_eff + 1.0 / 3.0 + 0.1 / (n_eff + 1.0);
-        let beta = z2 * (n_eff + 1.0 / 6.0) / denom;
-        let p = 0.5 + sign * 0.5 * (1.0 - (-beta).exp()).sqrt();
-
-        // Numerically enforce bounds
-        p.clamp(0.0, 1.0)
     }
 
     /// Calculate tree parameters based on model type
@@ -191,55 +132,75 @@ impl BinomialTree {
         t: f64,
         q: f64,
     ) -> Result<(f64, f64, f64)> {
-        if t <= 0.0 {
-            return Err(Error::internal(format!(
+        if !t.is_finite() || t <= 0.0 {
+            return Err(Error::Validation(format!(
                 "binomial tree requires positive time_to_maturity, got {t}"
             )));
         }
-        if sigma <= 0.0 {
-            return Err(Error::internal(format!(
-                "binomial tree requires positive volatility, got {sigma}"
+        if !sigma.is_finite() || sigma < 0.0 {
+            return Err(Error::Validation(format!(
+                "binomial tree requires non-negative finite volatility, got {sigma}"
             )));
         }
-
+        if self.steps == 0 || !r.is_finite() || !q.is_finite() {
+            return Err(Error::Validation(
+                "binomial tree requires positive steps and finite rate/carry".into(),
+            ));
+        }
+        if self.tree_type == TreeType::LeisenReimer
+            && (self.steps.is_multiple_of(2)
+                || !spot.is_finite()
+                || spot <= 0.0
+                || !strike.is_finite()
+                || strike <= 0.0)
+        {
+            return Err(Error::Validation("Leisen-Reimer requires an odd grid and positive finite spot and strike; generic payoffs must select a compatible tree".into()));
+        }
         let dt = t / self.steps as f64;
+        if sigma == 0.0 {
+            let growth = ((r - q) * dt).exp();
+            return Ok((growth, growth, 0.5));
+        }
 
         let (u, d, p) = match self.tree_type {
             TreeType::LeisenReimer => {
-                // Fallback to CRR if strike/spot are not usable (e.g., generic tree)
-                if spot <= 0.0 || strike <= 0.0 {
-                    return Self::crr_parameters(sigma, r, q, dt);
-                }
-
-                // Leisen–Reimer: use Peizer–Pratt inversion to determine probabilities
-                let (_d1, d2) = d1_d2(spot, strike, r, sigma, t, q);
-
-                // Probabilities via PP inversion
-                let eps = 1e-12;
-                let p = self
-                    .peizer_pratt_inversion(d2, self.steps)
-                    .clamp(eps, 1.0 - eps);
-
-                // Mean/variance-matched u,d with PP probability (stable LR variant)
-                let m1 = ((r - q) * dt).exp();
-                let var = m1 * m1 * ((sigma * sigma * dt).exp() - 1.0);
-                let one_minus_p = 1.0 - p;
-                let denom = p * one_minus_p;
-                if denom <= 0.0 {
-                    return Err(Error::internal(
-                        "Leisen-Reimer probability denominator must be positive",
+                // QuantLib / Leisen-Reimer: p=PP(d2), p'=PP(d1),
+                // u=exp((r-q)dt)*p'/p, d=exp((r-q)dt)*(1-p')/(1-p).
+                let (d1, d2) = d1_d2(spot, strike, r, sigma, t, q);
+                let n = self.steps as f64;
+                let denominator = n + 1.0 / 3.0 + 0.1 / (n + 1.0);
+                let coefficient = (n + 1.0 / 6.0) / denominator.powi(2);
+                let beta1 = coefficient * d1 * d1;
+                let beta2 = coefficient * d2 * d2;
+                let root1 = (-(-beta1).exp_m1()).sqrt();
+                let root2 = (-(-beta2).exp_m1()).sqrt();
+                let large_change = root1.ln_1p() - root2.ln_1p();
+                // d1²-d2² = 2*log(F/K): avoid subtracting huge squares
+                // in near-deterministic deep-ITM/OTM inversion brackets.
+                let beta_change = 2.0 * coefficient * ((spot / strike).ln() + (r - q) * t);
+                let small_change = -beta_change - large_change;
+                let (log_up_ratio, log_down_ratio) = if d2 >= 0.0 {
+                    (large_change, small_change)
+                } else if d1 <= 0.0 {
+                    (small_change, large_change)
+                } else {
+                    (
+                        root1.ln_1p() + beta2 + root2.ln_1p(),
+                        -beta1 - root1.ln_1p() - root2.ln_1p(),
+                    )
+                };
+                let p = if d2 >= 0.0 {
+                    0.5 * (1.0 + root2)
+                } else {
+                    (-beta2).exp() / (2.0 * (1.0 + root2))
+                };
+                let u = ((r - q) * dt + log_up_ratio).exp();
+                let d = ((r - q) * dt + log_down_ratio).exp();
+                if !u.is_finite() || !d.is_finite() || u < d || d <= 0.0 || !p.is_finite() {
+                    return Err(Error::Validation(
+                        "Leisen-Reimer factors exceed finite numerical range".into(),
                     ));
                 }
-                let delta = (var / denom).sqrt();
-                let d = m1 - p * delta;
-                let u = m1 + one_minus_p * delta;
-
-                if !(u.is_finite() && d.is_finite() && u > 1.0 && d < 1.0 && u > d) {
-                    return Err(Error::internal(
-                        "Leisen-Reimer up/down factors are internally inconsistent",
-                    ));
-                }
-
                 (u, d, p)
             }
             TreeType::CRR => Self::crr_parameters(sigma, r, q, dt)?,
@@ -477,11 +438,8 @@ impl BinomialTree {
 
     /// Generic [`TreeModel`] pricing for an arbitrary [`TreeValuator`].
     ///
-    /// **Leisen-Reimer note:** this generic path has no spot/strike, so it
-    /// calls `calculate_parameters` with `spot = strike = 0.0`. A tree
-    /// configured as `TreeType::LeisenReimer` therefore silently uses the
-    /// CRR fallback here and loses LR's superior convergence — use the
-    /// dedicated vanilla pricing entry points to get genuine LR behavior.
+    /// This entry point has no contractual strike, so it requires CRR.
+    /// Leisen-Reimer requires a strike and must use the dedicated option methods.
     #[inline(never)] // Prevent inlining to reduce coverage metadata conflicts
     pub fn price_generic<V: TreeValuator>(
         &self,
@@ -700,15 +658,15 @@ mod tests {
     }
 
     #[test]
-    fn test_leisen_reimer_odd_helper() {
-        // Test that leisen_reimer_odd rounds to nearest odd
-        let tree_even = BinomialTree::leisen_reimer_odd(100);
+    fn test_leisen_reimer_helper() {
+        // Test that leisen_reimer rounds to nearest odd
+        let tree_even = BinomialTree::leisen_reimer(100);
         assert_eq!(tree_even.steps, 101, "Even steps should round up to odd");
 
-        let tree_odd = BinomialTree::leisen_reimer_odd(99);
+        let tree_odd = BinomialTree::leisen_reimer(99);
         assert_eq!(tree_odd.steps, 99, "Odd steps should stay as-is");
 
-        let tree_200 = BinomialTree::leisen_reimer_odd(200);
+        let tree_200 = BinomialTree::leisen_reimer(200);
         assert_eq!(tree_200.steps, 201, "200 should become 201");
     }
 
@@ -746,7 +704,7 @@ mod tests {
         let bs_analytical = 10.4506;
 
         // LR with odd steps (101) should be within 1 cent of BS
-        let lr_tree = BinomialTree::leisen_reimer_odd(100);
+        let lr_tree = BinomialTree::leisen_reimer(100);
         assert_eq!(lr_tree.steps, 101, "Should be rounded to odd");
 
         let lr_price = lr_tree
@@ -764,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_parameters_rejects_non_positive_time_or_volatility() {
+    fn test_calculate_parameters_rejects_invalid_time_or_volatility() {
         let tree = BinomialTree::crr(100);
 
         let time_err = tree
@@ -773,10 +731,12 @@ mod tests {
         assert!(time_err.to_string().contains("positive time_to_maturity"));
 
         let vol_err = tree
-            .calculate_parameters(100.0, 100.0, 0.05, 0.0, 1.0, 0.0)
-            .expect_err("zero volatility should fail");
+            .calculate_parameters(100.0, 100.0, 0.05, -0.1, 1.0, 0.0)
+            .expect_err("negative volatility should fail");
         assert!(
-            vol_err.to_string().contains("positive volatility"),
+            vol_err
+                .to_string()
+                .contains("non-negative finite volatility"),
             "a volatility error must name volatility, not maturity: {vol_err}"
         );
     }
@@ -804,15 +764,31 @@ mod tests {
     }
 
     #[test]
-    fn test_leisen_reimer_falls_back_to_crr_when_spot_or_strike_non_positive() {
+    fn test_leisen_reimer_rejects_missing_spot_or_strike() {
         let tree = BinomialTree::leisen_reimer(51);
-
-        for (spot, strike) in [(0.0, 100.0), (100.0, 0.0), (-1.0, 100.0)] {
-            let (u, d, p) = tree
+        for (spot, strike) in [(0.0, 100.0), (100.0, 0.0), (-1.0, 100.0), (f64::NAN, 100.0)] {
+            assert!(tree
                 .calculate_parameters(spot, strike, 0.03, 0.25, 1.0, 0.01)
-                .expect("fallback parameters should succeed");
-            assert!(u > 1.0 && d < 1.0 && u > d);
-            assert!((0.0..=1.0).contains(&p));
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn leisen_reimer_deterministic_limit_is_finite() {
+        let tree = BinomialTree::leisen_reimer(201);
+        for spot in [50.0, 100.0, 200.0] {
+            for volatility in [0.0, 1e-8, 1e-4] {
+                let mut params = OptionMarketParams::call(spot, 100.0, 0.05, volatility, 1.0);
+                params.dividend_yield = 0.02;
+                let actual = tree
+                    .price_european(&params)
+                    .expect("finite deterministic price");
+                let expected = (spot * (-0.02_f64).exp() - 100.0 * (-0.05_f64).exp()).max(0.0);
+                assert!(
+                    (actual - expected).abs() < 1e-8,
+                    "{spot}/{volatility}: {actual} vs {expected}"
+                );
+            }
         }
     }
 }

@@ -321,6 +321,21 @@ pub(crate) fn compute_key_rate_cs01_series_with_context_raw<RevalFn>(
     hazard_id: &CurveId,
     series_id: MetricId,
     request: &Cs01Request,
+    revalue_raw: RevalFn,
+) -> finstack_quant_core::Result<f64>
+where
+    RevalFn: FnMut(&MarketContext) -> finstack_quant_core::Result<f64>,
+{
+    let hazard = context.curves.get_hazard(hazard_id.as_str())?;
+    compute_key_rate_cs01_series_for_hazard(context, hazard, series_id, request, revalue_raw)
+}
+
+/// The same exact-quote bucketing for a hazard embedded in a credit index.
+pub(crate) fn compute_key_rate_cs01_series_for_hazard<RevalFn>(
+    context: &mut MetricContext,
+    hazard: Arc<HazardCurve>,
+    series_id: MetricId,
+    request: &Cs01Request,
     mut revalue_raw: RevalFn,
 ) -> finstack_quant_core::Result<f64>
 where
@@ -335,8 +350,6 @@ where
     } = request;
     let bump_bp = *bump_bp;
     let curves = Arc::clone(&context.curves);
-    let base_ctx = curves.as_ref();
-    let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
     let hazard_ref = hazard.as_ref();
     require_hazard_replay(hazard_ref, "quote-space bucketed CS01")?;
     let discount_id = require_cs01_discount_id(Some(discount_curve_id), hazard_ref)?;

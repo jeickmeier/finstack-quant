@@ -234,6 +234,8 @@ impl PyFxMatrix {
     }
 
     /// Set an authoritative FX quote scoped to one date and policy.
+    /// Pair-global quotes in either orientation take priority; this fixing
+    /// takes priority over provider observations.
     #[pyo3(text_signature = "(self, base, quote, date, policy, rate)")]
     fn set_quote_on(
         &self,
@@ -253,6 +255,8 @@ impl PyFxMatrix {
     }
 
     /// Look up an FX rate.
+    /// Global quotes precede pinned fixings, then provider observations;
+    /// source priority is resolved before taking reciprocals.
     ///
     /// Parameters
     /// ----------

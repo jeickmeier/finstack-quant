@@ -272,16 +272,24 @@ fn test_repo_with_multiple_currencies() {
     let collateral = treasury_collateral();
 
     // GBP repo
-    let gbp_repo = Repo::term(
-        "GBP_REPO",
-        Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"),
-        collateral,
-        0.045,
-        date(2025, 1, 15),
-        date(2025, 4, 15),
-        "USD-OIS",
-    )
-    .expect("Repo construction should succeed");
+    let gbp_repo = Repo::builder()
+        .id("EXPLICIT-GBP".into())
+        .cash_amount(Money::new(1_000_000.0, Currency::GBP).expect("cash"))
+        .collateral(collateral)
+        .repo_rate(rust_decimal::Decimal::try_from(0.045).expect("rate"))
+        .start_date(date(2025, 1, 15))
+        .maturity(date(2025, 4, 15))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .calendar_id_opt(Some("gblo".into()))
+        .business_day_convention(
+            finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+        )
+        .haircut(0.02)
+        .repo_type(finstack_quant_valuations::instruments::rates::repo::RepoType::Term)
+        .triparty(false)
+        .discount_curve_id("USD-OIS".into())
+        .build()
+        .expect("explicit repo terms");
 
     let interest = gbp_repo.interest_amount().unwrap();
     assert_eq!(interest.currency(), Currency::GBP);

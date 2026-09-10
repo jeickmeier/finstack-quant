@@ -2,7 +2,7 @@
 
 Pure presentation — reads pre-computed node values (including margin/growth
 formula nodes) and lays them out. No financial calculation; the only value
-transform is display-unit scaling for variance percentages, matching the
+transform is decimal-to-percent scaling for ratios, growth and variance percentages, matching the
 ``performance.py`` idiom.
 
 Examples:
@@ -29,7 +29,7 @@ __all__ = [
 
 ALL_SECTIONS = ["summary", "trend", "margins", "variance"]
 
-# (label, node_id, formatter). Money rows first, then percent-valued margin/growth nodes.
+# (label, node_id, formatter). Money rows first, then decimal margin/growth nodes.
 _PL_ROWS: list[tuple[str, str, Any]] = [
     ("Revenue", "revenue", fmt.money),
     ("COGS", "cogs", fmt.money),
@@ -38,10 +38,10 @@ _PL_ROWS: list[tuple[str, str, Any]] = [
     ("EBITDA", "ebitda", fmt.money),
     ("EBIT", "ebit", fmt.money),
     ("Net Income", "net_income", fmt.money),
-    ("Gross Margin", "gross_margin", fmt.pct),
-    ("EBITDA Margin", "ebitda_margin", fmt.pct),
-    ("Net Margin", "net_margin", fmt.pct),
-    ("Revenue Growth", "revenue_growth", lambda v: fmt.pct(v, signed=True)),
+    ("Gross Margin", "gross_margin", lambda v: fmt.pct(v * 100 if v is not None else None)),
+    ("EBITDA Margin", "ebitda_margin", lambda v: fmt.pct(v * 100 if v is not None else None)),
+    ("Net Margin", "net_margin", lambda v: fmt.pct(v * 100 if v is not None else None)),
+    ("Revenue Growth", "revenue_growth", lambda v: fmt.pct(v * 100 if v is not None else None, signed=True)),
 ]
 
 
@@ -64,8 +64,8 @@ def _section_trend(view: Any, periods: list[str], theme: Theme) -> Section:
 
 
 def _section_margins(view: Any, periods: list[str], theme: Theme) -> Section | None:
-    gm = [view.get("gross_margin", p) for p in periods]
-    em = [view.get("ebitda_margin", p) for p in periods]
+    gm = [v * 100 if (v := view.get("gross_margin", p)) is not None else None for p in periods]
+    em = [v * 100 if (v := view.get("ebitda_margin", p)) is not None else None for p in periods]
     if all(v is None for v in (*gm, *em)):
         return None
     gm_svg = charts.line_chart(list(periods), gm, theme=theme, y_pct=True, color=theme.ink)
@@ -150,7 +150,7 @@ def statement_tearsheet(
         kpis = [
             KPI("Revenue", fmt.money(_latest("revenue")), ""),
             KPI("EBITDA", fmt.money(_latest("ebitda")), ""),
-            KPI("EBITDA Margin", fmt.pct(_latest("ebitda_margin")), ""),
+            KPI("EBITDA Margin", fmt.pct(v * 100 if (v := _latest("ebitda_margin")) is not None else None), ""),
             KPI("Net Income", fmt.money(net_income), fmt.sign_class(net_income)),
         ]
 

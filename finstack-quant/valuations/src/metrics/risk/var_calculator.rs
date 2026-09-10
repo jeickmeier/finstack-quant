@@ -367,18 +367,23 @@ fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
 /// * `config` - VaR method, confidence level, horizon, and scenario/pricing
 ///   policy controlling the returned risk measures.
 ///
+/// * `provider` - Quote recalibration service required for nonzero credit-spread
+///   scenarios and quote-based Taylor sensitivities. Other inputs accept `None`.
+///
 /// # Returns
 ///
 /// VaR result including VaR, ES, and full P&L distribution
 ///
 /// This function revalues every supplied instrument under every scenario in
-/// [`MarketHistory`]. If the history is empty, the returned VaR/ES will be zero.
+/// [`MarketHistory`]. An empty instrument list returns zero VaR/ES. A non-empty
+/// portfolio requires at least one scenario; missing history returns an error.
 pub fn calculate_var<I>(
     instruments: &[&I],
     base_market: &MarketContext,
     history: &MarketHistory,
     as_of: Date,
     config: &VarConfig,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult>
 where
     I: Instrument,
@@ -387,7 +392,14 @@ where
         .iter()
         .map(|inst| *inst as &dyn Instrument)
         .collect();
-    calculate_var_dyn(&instrument_refs, base_market, history, as_of, config)
+    calculate_var_dyn(
+        &instrument_refs,
+        base_market,
+        history,
+        as_of,
+        config,
+        provider.clone(),
+    )
 }
 
 fn calculate_var_dyn(
@@ -396,6 +408,7 @@ fn calculate_var_dyn(
     history: &MarketHistory,
     as_of: Date,
     config: &VarConfig,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     calculate_var_with_pricing(
         instruments,
@@ -404,6 +417,7 @@ fn calculate_var_dyn(
         as_of,
         config,
         PricingDispatch::InstrumentDefault,
+        provider.clone(),
     )
 }
 
@@ -421,6 +435,8 @@ fn calculate_var_dyn(
 ///   valuations. [`PricingDispatch::InstrumentDefault`] uses each instrument's
 ///   canonical default; [`PricingDispatch::Registered`] preserves one explicit
 ///   model-registry pair throughout the calculation.
+/// * `provider` - Quote recalibration service forwarded to historical credit
+///   shocks and nested quote sensitivities; required when those operations run.
 pub fn calculate_var_with_pricing(
     instruments: &[&dyn Instrument],
     base_market: &MarketContext,
@@ -428,6 +444,7 @@ pub fn calculate_var_with_pricing(
     as_of: Date,
     config: &VarConfig,
     dispatch: PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     config.validate()?;
 
@@ -458,10 +475,17 @@ pub fn calculate_var_with_pricing(
             as_of,
             config,
             &dispatch,
+            provider.clone(),
         ),
-        VarMethod::TaylorApproximation => {
-            calculate_var_taylor(instruments, base_market, history, as_of, config, &dispatch)
-        }
+        VarMethod::TaylorApproximation => calculate_var_taylor(
+            instruments,
+            base_market,
+            history,
+            as_of,
+            config,
+            &dispatch,
+            provider.clone(),
+        ),
     }
 }
 
@@ -483,12 +507,13 @@ fn aggregate_scenario_pnls_par<F>(
     history: &MarketHistory,
     base_market: &MarketContext,
     scenario_pnl: F,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<Vec<f64>>
 where
     F: Fn(&MarketContext) -> Result<f64> + Send + Sync,
 {
     let map_scenario = |scenario: &super::market_history::MarketScenario| {
-        let scenario_market = scenario.apply(base_market)?;
+        let scenario_market = scenario.apply(base_market, provider.as_deref())?;
         scenario_pnl(&scenario_market)
     };
 
@@ -512,6 +537,7 @@ fn calculate_var_full_revaluation(
     as_of: Date,
     config: &VarConfig,
     dispatch: &PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     let _span = tracing::debug_span!(
         "historical_var.full_revaluation",
@@ -558,7 +584,7 @@ fn calculate_var_full_revaluation(
         Ok(acc.total())
     };
 
-    let pnls = aggregate_scenario_pnls_par(history, base_market, scenario_pnl)?;
+    let pnls = aggregate_scenario_pnls_par(history, base_market, scenario_pnl, provider.clone())?;
 
     VarResult::from_distribution(pnls, config.confidence_level)
 }
@@ -570,6 +596,7 @@ fn calculate_var_taylor(
     as_of: Date,
     config: &VarConfig,
     dispatch: &PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     let _span = tracing::debug_span!(
         "historical_var.taylor",
@@ -586,10 +613,19 @@ fn calculate_var_taylor(
             as_of,
             config,
             dispatch,
+            provider.clone(),
         );
     }
 
-    calculate_portfolio_var_taylor(instruments, base_market, history, as_of, config, dispatch)
+    calculate_portfolio_var_taylor(
+        instruments,
+        base_market,
+        history,
+        as_of,
+        config,
+        dispatch,
+        provider.clone(),
+    )
 }
 
 // Taylor Approximation
@@ -700,6 +736,7 @@ fn calculate_var_taylor_approximation(
     as_of: Date,
     config: &VarConfig,
     dispatch: &PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     let base_value = reprice_with_dispatch(instrument, base_market, as_of, dispatch)?;
     let reporting_currency = resolve_reporting_currency_from_values(
@@ -707,8 +744,14 @@ fn calculate_var_taylor_approximation(
         config.reporting_currency,
         "Historical VaR",
     )?;
-    let sensitivities =
-        compute_taylor_sensitivities(instrument, base_market, as_of, base_value, dispatch)?;
+    let sensitivities = compute_taylor_sensitivities(
+        instrument,
+        base_market,
+        as_of,
+        base_value,
+        dispatch,
+        provider.clone(),
+    )?;
 
     let mut spot_cache: HashMap<String, f64> = HashMap::default();
     let mut pnls = Vec::with_capacity(history.len());
@@ -735,7 +778,7 @@ fn calculate_var_taylor_approximation(
         // same-currency case the conversion ignores the market, so the
         // expensive `scenario.apply` rebuild is skipped.
         let converted = if needs_fx_conversion {
-            let scenario_market = scenario.apply(base_market)?;
+            let scenario_market = scenario.apply(base_market, provider.as_deref())?;
             convert_money_to_reporting(
                 pnl_money,
                 reporting_currency,
@@ -770,6 +813,7 @@ fn compute_taylor_sensitivities(
     as_of: Date,
     base_value: Money,
     dispatch: &PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<TaylorSensitivities> {
     let instrument_type = instrument.key();
     let registry = standard_registry();
@@ -784,6 +828,7 @@ fn compute_taylor_sensitivities(
     context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
     context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
     context.set_pricer_dispatch(dispatch.clone());
+    context.set_recalibration_provider(provider);
 
     let candidate_metrics = [
         MetricId::BucketedDv01,
@@ -1101,6 +1146,7 @@ fn calculate_portfolio_var_taylor(
     as_of: Date,
     config: &VarConfig,
     dispatch: &PricingDispatch,
+    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
     if instruments.is_empty() {
         return Ok(VarResult {
@@ -1125,6 +1171,7 @@ fn calculate_portfolio_var_taylor(
             as_of,
             base_value,
             dispatch,
+            provider.clone(),
         )?);
     }
     let reporting_currency = resolve_reporting_currency_from_values(
@@ -1149,7 +1196,7 @@ fn calculate_portfolio_var_taylor(
         // converted to the reporting currency at the scenario's FX rates,
         // matching the full-revaluation path.
         let scenario_market = if needs_fx_conversion {
-            Some(scenario.apply(base_market)?)
+            Some(scenario.apply(base_market, provider.as_deref())?)
         } else {
             None
         };
@@ -1416,7 +1463,7 @@ mod tests {
             &base_market,
             &history,
             as_of,
-            &VarConfig::var_95(),
+            &VarConfig::var_95(), None,
         )
         .expect_err(
             "mixed-currency VaR must not aggregate native-currency P&L without a reporting currency",
@@ -1475,6 +1522,7 @@ mod tests {
             &history,
             as_of,
             &VarConfig::var_95().with_reporting_currency(Currency::USD),
+            None,
         )?;
         assert!((result.pnl_distribution[0] - 30.0).abs() < 1e-12);
         Ok(())
@@ -1496,8 +1544,15 @@ mod tests {
         let full_config = VarConfig::var_95();
         let taylor_config = VarConfig::var_95().with_method(VarMethod::TaylorApproximation);
 
-        let full = calculate_var(&[&bond], &base_market, &history, as_of, &full_config)?;
-        let taylor = calculate_var(&[&bond], &base_market, &history, as_of, &taylor_config)?;
+        let full = calculate_var(&[&bond], &base_market, &history, as_of, &full_config, None)?;
+        let taylor = calculate_var(
+            &[&bond],
+            &base_market,
+            &history,
+            as_of,
+            &taylor_config,
+            None,
+        )?;
 
         assert!(
             taylor.var < 0.0,
@@ -1538,11 +1593,19 @@ mod tests {
 
         // Full revaluation: direct repricing under shifted curve
         let full_config = VarConfig::var_95();
-        let full_result = calculate_var(&[&bond], &base_market, &history, as_of, &full_config)?;
+        let full_result =
+            calculate_var(&[&bond], &base_market, &history, as_of, &full_config, None)?;
 
         // Taylor approximation: P&L ≈ DV01 × shift_bp
         let taylor_config = VarConfig::var_95().with_method(VarMethod::TaylorApproximation);
-        let taylor_result = calculate_var(&[&bond], &base_market, &history, as_of, &taylor_config)?;
+        let taylor_result = calculate_var(
+            &[&bond],
+            &base_market,
+            &history,
+            as_of,
+            &taylor_config,
+            None,
+        )?;
 
         // With a single scenario, VaR = P&L magnitude
         // For a linear instrument, Taylor should closely match full revaluation
@@ -1720,6 +1783,7 @@ mod tests {
             as_of,
             Money::from((100_i64, Currency::USD)),
             &PricingDispatch::InstrumentDefault,
+            None,
         ) else {
             panic!("Taylor sensitivity build should fail on missing market inputs")
         };
@@ -1912,6 +1976,7 @@ mod tests {
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            None,
         )
         .expect("Taylor VaR must degrade gracefully for a vol-exposed instrument");
 
@@ -2093,6 +2158,7 @@ mod tests {
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            None,
         )?;
         assert!(
             taylor.skipped_fx,
@@ -2106,6 +2172,7 @@ mod tests {
             &history,
             as_of,
             &VarConfig::var_95(),
+            None,
         )?;
         assert!(
             !full.skipped_fx && !full.skipped_vol,
@@ -2219,7 +2286,7 @@ mod tests {
 
         // Scenario-market conversion (the FIXED behavior used by the Taylor
         // path) must use the shifted rate (3.0) -> 30 USD.
-        let scenario_market = scenario.apply(&base_market)?;
+        let scenario_market = scenario.apply(&base_market, None)?;
         let scenario_converted = convert_money_to_reporting(
             local_pnl,
             Currency::USD,
@@ -2340,7 +2407,7 @@ mod tests {
         let config = VarConfig::var_95();
 
         // Calculate VaR
-        let result = calculate_var(&[&bond], &base_market, &history, as_of, &config)?;
+        let result = calculate_var(&[&bond], &base_market, &history, as_of, &config, None)?;
 
         // Verify results
         assert_eq!(result.num_scenarios, 3);
@@ -2375,7 +2442,7 @@ mod tests {
         let history = history_from_scenarios(as_of, 0, vec![]);
         let config = VarConfig::var_95();
 
-        let error = calculate_var(&[&bond], &base_market, &history, as_of, &config)
+        let error = calculate_var(&[&bond], &base_market, &history, as_of, &config, None)
             .expect_err("empty history must not report zero risk");
         assert!(error.to_string().contains("at least one market scenario"));
         Ok(())
@@ -2393,6 +2460,7 @@ mod tests {
             as_of,
             &VarConfig::var_95(),
             PricingDispatch::InstrumentDefault,
+            None,
         )?;
         assert_eq!(result.var, 0.0);
         assert_eq!(result.expected_shortfall, 0.0);
@@ -2421,14 +2489,20 @@ mod tests {
         let config = VarConfig::var_95();
 
         // Calculate individual VaRs
-        let var1 = calculate_var(&[&bond1], market.as_ref(), &history, as_of, &config)?;
-        let var2 = calculate_var(&[&bond2], market.as_ref(), &history, as_of, &config)?;
+        let var1 = calculate_var(&[&bond1], market.as_ref(), &history, as_of, &config, None)?;
+        let var2 = calculate_var(&[&bond2], market.as_ref(), &history, as_of, &config, None)?;
         let sum_individual_vars = var1.var.abs() + var2.var.abs();
 
         // Calculate portfolio VaR
         let instruments: Vec<&dyn Instrument> = vec![&bond1, &bond2];
-        let portfolio_var =
-            calculate_var_dyn(&instruments, market.as_ref(), &history, as_of, &config)?;
+        let portfolio_var = calculate_var_dyn(
+            &instruments,
+            market.as_ref(),
+            &history,
+            as_of,
+            &config,
+            None,
+        )?;
 
         // Verify portfolio VaR <= sum of individual VaRs
         // With only a few scenarios and both bonds having similar rate sensitivity,

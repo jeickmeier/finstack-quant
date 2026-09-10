@@ -1235,6 +1235,7 @@ fn inflation_curve_swap_repricing() {
             .day_count(conventions.day_count)
             .side(PayReceive::Pay)
             .lag_override_opt(Some(lag))
+            .interpolation_override_opt(Some(conventions.interpolation))
             .base_cpi_opt(Some(base_cpi))
             .business_day_convention(conventions.business_day_convention)
             .calendar_id_opt(Some(conventions.calendar_id.clone().into()))

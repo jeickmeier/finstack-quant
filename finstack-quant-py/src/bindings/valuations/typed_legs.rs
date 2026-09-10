@@ -705,6 +705,10 @@ impl PyPremiumLegSpec {
     ///     Fixed running spread in basis points (``100.0`` = 100bp = 1%).
     /// discount_curve_id : str
     ///     Discount curve identifier for pricing this leg.
+    /// standard_imm_dates : bool
+    ///     True for prescribed quarterly CDS 20th dates; false for bespoke
+    ///     frequency/stub schedules. Standard dates require quarterly frequency
+    ///     and a short-front stub when the leg is priced.
     /// stub : str | StubKind, default "short_front"
     ///     Stub period handling rule.
     /// business_day_convention : str, default "modified_following"
@@ -731,14 +735,15 @@ impl PyPremiumLegSpec {
     /// >>> from finstack_quant.valuations.instruments import PremiumLegSpec
     /// >>> leg = PremiumLegSpec(
     /// ...     "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS",
+    /// ...     standard_imm_dates=True,
     /// ... )
     /// >>> leg.spread_bp
     /// 100.0
     #[new]
-    #[pyo3(signature = (start, end, frequency, day_count, spread_bp, discount_curve_id, *,
+    #[pyo3(signature = (start, end, frequency, day_count, spread_bp, discount_curve_id, *, standard_imm_dates,
                         stub = None, business_day_convention = "modified_following", calendar_id = None))]
     #[pyo3(
-        text_signature = "(start, end, frequency, day_count, spread_bp, discount_curve_id, *, \
+        text_signature = "(start, end, frequency, day_count, spread_bp, discount_curve_id, *, standard_imm_dates, \
 stub='short_front', business_day_convention='modified_following', calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
@@ -750,12 +755,14 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         day_count: PyRef<'_, PyDayCount>,
         spread_bp: &Bound<'_, PyAny>,
         discount_curve_id: &str,
+        standard_imm_dates: bool,
         stub: Option<&Bound<'_, PyAny>>,
         business_day_convention: &str,
         calendar_id: Option<String>,
     ) -> PyResult<Self> {
         let spread_bp = bps_from_py(spread_bp, "spread_bp")?;
         let inner = finstack_quant_valuations::instruments::PremiumLegSpec {
+            standard_imm_dates,
             start: extract_date(start)?,
             end: extract_date(end)?,
             frequency: frequency.inner,
@@ -819,6 +826,12 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner)
+    }
+
+    /// Whether the leg uses prescribed quarterly CDS 20th dates.
+    #[getter]
+    fn standard_imm_dates(&self) -> bool {
+        self.inner.standard_imm_dates
     }
 
     /// Protection / accrual start date.

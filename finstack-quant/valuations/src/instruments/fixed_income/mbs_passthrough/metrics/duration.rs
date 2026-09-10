@@ -7,7 +7,7 @@
 use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -39,6 +39,35 @@ fn rate_shift_prepayment(model: &PrepaymentModelSpec, rate_shift: f64) -> Prepay
     }
 }
 
+/// Reproject the pool's prepayment speed under a changed financing curve.
+/// The refinancing proxy is the continuously compounded rate through current
+/// WAM, measured from valuation date. Parallel and bucketed risk use this same
+/// rate difference and the existing empirical prepayment multiplier.
+pub(crate) fn rate_risk_pool(
+    mbs: &AgencyMbsPassthrough,
+    base: &MarketContext,
+    bumped: &MarketContext,
+    as_of: Date,
+) -> Result<AgencyMbsPassthrough> {
+    let end = as_of.add_months(mbs.wam as i32);
+    let base_curve = base.get_discount(&mbs.discount_curve_id)?;
+    let bumped_curve = bumped.get_discount(&mbs.discount_curve_id)?;
+    let horizon = base_curve
+        .day_count()
+        .year_fraction(as_of, end, DayCountContext::default())?;
+    if horizon <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "MBS rate risk requires positive remaining WAM".into(),
+        ));
+    }
+    let shift = (base_curve.df_between_dates(as_of, end)?.ln()
+        - bumped_curve.df_between_dates(as_of, end)?.ln())
+        / horizon;
+    let mut pool = mbs.clone();
+    pool.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, shift);
+    Ok(pool)
+}
+
 /// Duration and convexity result.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // public API result struct
@@ -65,7 +94,7 @@ pub(crate) struct DurationResult {
 /// # Formula
 ///
 /// ```text
-/// Duration = -(P_down - P_up) / (2 × P_base × Δy)
+/// Duration = (P_down - P_up) / (2 × P_base × Δy)
 /// ```
 ///
 /// # Arguments
@@ -131,6 +160,11 @@ pub(crate) fn duration_convexity(
     shock_bp: Option<f64>,
 ) -> Result<DurationResult> {
     let shock_bp = shock_bp.unwrap_or(25.0);
+    if !shock_bp.is_finite() || shock_bp <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "MBS rate shock must be finite and positive in basis points".into(),
+        ));
+    }
     let shock = shock_bp / 10_000.0; // Convert to decimal
 
     let base_price = price_mbs(mbs, market, as_of)?.amount();
@@ -162,18 +196,16 @@ pub(crate) fn duration_convexity(
     // re-shift the pool's prepayment model in each bumped scenario: rates up
     // slow prepayment, rates down speed it up. (A static PSA bump alone leaves
     // cashflows unchanged and yields near-zero convexity.)
-    let mut mbs_up = mbs.clone();
-    mbs_up.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, shock);
-    let mut mbs_down = mbs.clone();
-    mbs_down.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, -shock);
+    let mbs_up = rate_risk_pool(mbs, market, &market_up, as_of)?;
+    let mbs_down = rate_risk_pool(mbs, market, &market_down, as_of)?;
 
     // Get bumped prices (curve bump + rate-dependent prepayment).
     let price_up = price_mbs(&mbs_up, &market_up, as_of)?.amount();
     let price_down = price_mbs(&mbs_down, &market_down, as_of)?.amount();
 
     // Calculate effective duration
-    // Duration = -(dP/dY) / P = -(P_down - P_up) / (2 × P_base × shock)
-    let duration = -(price_down - price_up) / (2.0 * base_price * shock);
+    // Duration = -(dP/dY) / P.
+    let duration = (price_down - price_up) / (2.0 * base_price * shock);
 
     // Calculate effective convexity
     // Convexity = (d²P/dY²) / P = (P_up + P_down - 2×P_base) / (P_base × shock²)
@@ -410,5 +442,80 @@ mod tests {
         let df_bumped = bumped.df(5.0);
 
         assert!(df_bumped < df_original);
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use crate::instruments::{Instrument, PricingOptions};
+    use crate::metrics::MetricId;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    #[test]
+    fn mbs_dv01_reprojects_the_same_prepayments_as_duration() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .build()
+                .expect("curve"),
+        );
+        let dynamic = duration_convexity(&mbs, &market, as_of, Some(1.0)).expect("duration");
+        let result = mbs
+            .price_with_metrics(&market, as_of, &[MetricId::Dv01], PricingOptions::default())
+            .expect("metrics");
+        let expected = (dynamic.price_up - dynamic.price_down) / 2.0;
+        assert!(
+            (result.measures["dv01"] - expected).abs() < 1e-7,
+            "dv01 {} versus {expected}",
+            result.measures["dv01"]
+        );
+    }
+
+    #[test]
+    fn mbs_bucketed_rate_risk_reconciles_with_parallel_projection_risk() {
+        let as_of = date!(2024 - 01 - 15);
+        let mbs = AgencyMbsPassthrough::example().expect("mbs");
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .build()
+                .expect("curve"),
+        );
+        let result = mbs
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01, MetricId::BucketedDv01],
+                PricingOptions::default(),
+            )
+            .expect("metrics");
+        let parallel = result.measures["dv01"];
+        let bucketed = result.measures["bucketed_dv01"];
+        assert!(
+            (parallel - bucketed).abs() < 0.001 * parallel.abs(),
+            "parallel {parallel} versus buckets {bucketed}"
+        );
+    }
+
+    #[test]
+    fn duration_is_positive_for_a_fixed_prepayment_pool() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.prepayment_model = PrepaymentModelSpec::psa(0.0);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .build()
+                .expect("curve"),
+        );
+        assert!(effective_duration(&mbs, &market, as_of, None).expect("duration") > 0.0);
     }
 }

@@ -6,32 +6,12 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::OptionType;
+use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-/// Contractual barrier-monitoring convention.
-#[derive(PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Monitoring {
-    /// Monitor continuously from `monitoring_start_date` through expiry.
-    #[default]
-    Continuous,
-    /// Monitor only at the stated contractual observation dates.
-    Discrete {
-        /// Strictly increasing dates on which the barrier level is observed.
-        #[serde(with = "finstack_quant_core::wire::dates")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-        )]
-        observation_dates: Vec<Date>,
-    },
-}
-
 /// FX barrier option instrument.
 #[derive(
     PartialEq,

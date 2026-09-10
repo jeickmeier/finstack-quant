@@ -3,7 +3,7 @@
 //! Yield-to-maturity is computed from the fixings-applied pricing schedule's
 //! cash-settlement flows (including future DDTL funding legs, excluding PIK
 //! capitalization) with an initial price leg at settlement equal to the
-//! forward-valued base PV. Uses the same IRR engine and day-count as the loan
+//! settlement-date base PV. Uses the same IRR engine and day-count as the loan
 //! for consistency.
 
 use crate::cashflow::primitives::is_cash_settlement_kind;
@@ -11,9 +11,7 @@ use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::money::Money;
 
-use super::irr_helpers::{
-    cached_full_schedule, settlement_discount_factor, target_price_from_quote_or_model,
-};
+use super::irr_helpers::{cached_full_schedule, target_price_from_quote_or_model};
 
 /// Yield-to-maturity calculator for term loans.
 ///
@@ -48,16 +46,9 @@ impl MetricCalculator for YtmCalculator {
             Vec::with_capacity(holder_flows.len() + 1);
 
         // Add initial price leg at settlement_date (negative = outflow for purchase).
-        // The model PV is forward-valued to settlement so the price leg and the
-        // discounted future flows share one origin.
-        let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
-        let target_price = target_price_from_quote_or_model(
-            loan,
-            &schedule,
-            as_of,
-            context.base_value,
-            settle_df,
-        )?;
+        // Model PV and quoted dirty prices already share the settlement origin.
+        let target_price =
+            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value)?;
         flows.push((
             settlement_date,
             Money::new(-target_price.amount(), target_price.currency())?,

@@ -9,7 +9,7 @@ use crate::discount_forward_curve_support::flat_discount_with_tenor;
 use crate::option_support::{equity_option_european_call, fx_option_european_call};
 use crate::volatility_support::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
@@ -267,24 +267,11 @@ fn fx_vanna_and_volga_match_reference_fd() -> finstack_quant_core::Result<()> {
     let vanna = *res.get(&MetricId::Vanna).expect("vanna present");
     let volga = *res.get(&MetricId::Volga).expect("volga present");
 
-    // Explicit reference using the calculator's own bump conventions:
-    // bump a single surface point by ±1% and divide by the corresponding absolute Δσ.
-    let t = opt
-        .day_count
-        .year_fraction(as_of, expiry, DayCountContext::default())?;
-    let surf = market.get_surface(opt.vol_surface_id.as_str())?;
-    let sigma = finstack_quant_models::volatility::get_surface_vol_clamped(&surf, t, opt.strike);
-    let vol_bump_pct = VOL_BUMP_PCT;
-    let delta_sigma = (sigma * vol_bump_pct).abs().max(1e-12);
-
-    let curves_up = {
-        let bumped = surf.bump_point(t, opt.strike, vol_bump_pct)?;
-        market.clone().insert_surface(bumped)
-    };
-    let curves_dn = {
-        let bumped = surf.bump_point(t, opt.strike, -vol_bump_pct)?;
-        market.insert_surface(bumped)
-    };
+    // Scalar vanna/volga shift the entire effective volatility quote by one
+    // absolute vol point; interpolation must not dilute a nearest-node bump.
+    let delta_sigma = VOL_BUMP_PCT;
+    let curves_up = bump_surface_vol_absolute(&market, opt.vol_surface_id.as_str(), delta_sigma)?;
+    let curves_dn = bump_surface_vol_absolute(&market, opt.vol_surface_id.as_str(), -delta_sigma)?;
 
     let metrics = [MetricId::Delta, MetricId::Vega];
     let result_up = opt.price_with_metrics(

@@ -869,6 +869,11 @@
       "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
       "oneOf": [
         {
+          "const": "one_one",
+          "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+          "type": "string"
+        },
+        {
           "const": "act_360",
           "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
           "type": "string"
@@ -931,7 +936,7 @@
       ]
     },
     "HazardBumpMode": {
-      "description": "How ParCDS operations deliver a spread shock onto a hazard curve.\n\n[`Self::SolveToPar`] is the production default: implied par CDS spreads are\nshocked and the hazard is re-bootstrapped so the curve still prices those\nquotes. [`Self::FirstOrderShift`] applies\n[`HazardCurve::with_parallel_hazard_rate_bump_bp`](finstack_quant_core::market_data::term_structures::HazardCurve::with_parallel_hazard_rate_bump_bp)\ndirectly to hazard knots for screening and large hierarchy fan-out.",
+      "description": "How ParCDS operations deliver a spread shock onto a hazard curve.\n\n[`Self::SolveToPar`] is the production default: implied par CDS spreads are\nshocked and the hazard is re-bootstrapped so the curve still prices those\nquotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard\nshift using `delta_hazard = delta_spread / (1 - recovery)` and emits an\napproximation warning. It does not reconcile the resulting par quotes.",
       "oneOf": [
         {
           "const": "solve_to_par",
@@ -940,7 +945,7 @@
         },
         {
           "const": "first_order_shift",
-          "description": "Shift hazard knots in place without recovering par (first-order).",
+          "description": "Convert spread to hazard using loss given default, without exact par repricing.",
           "type": "string"
         }
       ]

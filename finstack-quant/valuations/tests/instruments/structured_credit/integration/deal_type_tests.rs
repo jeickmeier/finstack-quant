@@ -6,8 +6,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PrepaymentCurve, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, PrepaymentCurve, PrepaymentModelSpec, StructuredCredit,
+    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -95,9 +95,9 @@ fn test_clo_default_assumptions() {
     );
 
     // Assert: CLO standard assumptions
-    assert_eq!(clo.default_assumptions.base_cdr_annual, 0.02); // 2% CDR
-    assert_eq!(clo.default_assumptions.base_recovery_rate, 0.40); // 40% recovery
-    assert_eq!(clo.default_assumptions.base_cpr_annual, 0.15); // 15% CPR
+    assert_eq!(clo.credit_model.default_spec.cdr, 0.02); // 2% CDR
+    assert_eq!(clo.credit_model.recovery_spec.rate, 0.40); // 40% recovery
+    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.15); // 15% CPR
 }
 
 // ABS-specific Tests
@@ -131,9 +131,17 @@ fn test_abs_default_assumptions() {
     );
 
     // Assert: Auto ABS standard assumptions
-    assert_eq!(abs.default_assumptions.base_cdr_annual, 0.02); // 2% CDR
-    assert_eq!(abs.default_assumptions.base_recovery_rate, 0.45); // 45% recovery (updated)
-    assert_eq!(abs.default_assumptions.abs_speed_monthly, Some(0.015)); // 1.5% ABS
+    assert_eq!(abs.credit_model.default_spec.cdr, 0.02); // 2% CDR
+    assert_eq!(abs.credit_model.recovery_spec.rate, 0.45); // 45% recovery (updated)
+    assert!(
+        (abs.credit_model
+            .prepayment_spec
+            .smm(0)
+            .expect("monthly ABS speed")
+            - 0.015)
+            .abs()
+            < 1e-14
+    ); // 1.5% ABS
 }
 
 // RMBS-specific Tests
@@ -189,26 +197,12 @@ fn test_rmbs_default_assumptions() {
     );
 
     // Assert: RMBS standard assumptions
-    assert_eq!(rmbs.default_assumptions.base_cdr_annual, 0.006); // 0.6% CDR
-    assert_eq!(rmbs.default_assumptions.base_recovery_rate, 0.60); // 60% recovery
-    assert_eq!(rmbs.default_assumptions.psa_speed, Some(1.0)); // 100% PSA
-    assert_eq!(rmbs.default_assumptions.sda_speed, Some(1.0)); // 100% SDA
-}
-
-#[test]
-fn test_rmbs_default_credit_factors() {
-    // Arrange & Act
-    let rmbs = StructuredCredit::new_rmbs(
-        "TEST_RMBS",
-        create_minimal_pool(DealType::Rmbs),
-        create_minimal_tranches(),
-        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
-        maturity_date(),
-        "USD-OIS",
-    );
-
-    // Assert: RMBS should have LTV set
-    assert_eq!(rmbs.credit_factors.ltv, Some(0.80)); // 80% LTV typical
+    assert_eq!(rmbs.credit_model.default_spec.cdr, 0.006); // 0.6% CDR
+    assert_eq!(rmbs.credit_model.recovery_spec.rate, 0.60); // 60% recovery
+    assert_eq!(
+        rmbs.credit_model.prepayment_spec,
+        PrepaymentModelSpec::psa(1.0)
+    ); // 100% PSA
 }
 
 // CMBS-specific Tests
@@ -242,9 +236,9 @@ fn test_cmbs_default_assumptions() {
     );
 
     // Assert: CMBS standard assumptions
-    assert_eq!(cmbs.default_assumptions.base_cdr_annual, 0.005); // 0.5% CDR
-    assert_eq!(cmbs.default_assumptions.base_recovery_rate, 0.65); // 65% recovery
-    assert_eq!(cmbs.default_assumptions.base_cpr_annual, 0.10); // 10% CPR
+    assert_eq!(cmbs.credit_model.default_spec.cdr, 0.005); // 0.5% CDR
+    assert_eq!(cmbs.credit_model.recovery_spec.rate, 0.65); // 65% recovery
+    assert_eq!(cmbs.credit_model.prepayment_spec.cpr, 0.10); // 10% CPR
 }
 
 // Cross-Instrument Consistency Tests

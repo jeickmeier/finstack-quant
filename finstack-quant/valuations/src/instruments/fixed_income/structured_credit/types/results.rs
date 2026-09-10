@@ -6,10 +6,65 @@
 use crate::cashflow::traits::DatedFlows;
 use crate::metrics::MetricId;
 use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::money::Money;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+
+/// Contractual coupon accrual retained independently of paid or deferred cash.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TrancheAccrualPeriod {
+    /// Unadjusted inclusive contractual accrual boundary.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start: Date,
+    /// Unadjusted exclusive contractual accrual boundary.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub end: Date,
+    /// Adjusted date on which the coupon is payable.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Outstanding note balance at the start of the period, in note currency.
+    pub opening_balance: Money,
+    /// Annual decimal coupon after any contractual available-funds cap.
+    pub coupon_rate: f64,
+    /// Contractual convention used to accrue this note's coupon.
+    pub day_count: DayCount,
+}
+
+impl TrancheAccrualPeriod {
+    /// Calculate unpaid current-period accrued interest in note currency units.
+    ///
+    /// # Arguments
+    ///
+    /// * `settlement` - Buyer settlement date. Accrual starts at the contractual
+    ///   boundary, is capped at the contractual end, and resets on payment.
+    pub fn accrued(&self, settlement: Date) -> finstack_quant_core::Result<f64> {
+        if settlement <= self.start || settlement >= self.payment_date {
+            return Ok(0.0);
+        }
+        let fraction = self.day_count.year_fraction(
+            self.start,
+            settlement.min(self.end),
+            DayCountContext::default(),
+        )?;
+        Ok(self.opening_balance.amount() * self.coupon_rate * fraction)
+    }
+}
 
 /// Result containing tranche-specific cashflows and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +78,8 @@ pub struct TrancheCashflows {
     pub cashflows: DatedFlows,
     /// Detailed cashflows with proper classification using CFKind.
     pub detailed_flows: Vec<CashFlow>,
+    /// Contractual coupon periods with balances before projected principal events.
+    pub accrual_periods: Vec<TrancheAccrualPeriod>,
     /// Interest cashflows (component of total).
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub interest_flows: DatedFlows,
@@ -69,11 +126,11 @@ pub struct TrancheValuation {
     pub tranche_id: String,
     /// Present value of all cashflows.
     pub pv: Money,
-    /// Clean price (as percentage of par).
+    /// Clean settlement price as a percentage of original note balance.
     pub clean_price: f64,
-    /// Dirty price (as percentage of par).
+    /// Dirty settlement price as a percentage of original note balance.
     pub dirty_price: f64,
-    /// Accrued interest.
+    /// Current-period accrued interest at buyer settlement in note currency.
     pub accrued: Money,
     /// Weighted average life.
     pub wal: f64,
@@ -83,7 +140,7 @@ pub struct TrancheValuation {
     pub z_spread_bp: f64,
     /// CS01 (credit DV01).
     pub cs01: f64,
-    /// Yield to maturity.
+    /// Decimal yield reproducing the dirty settlement target (annual by default).
     pub ytm: f64,
     /// Additional metrics.
     pub metrics: BTreeMap<MetricId, f64>,
@@ -101,6 +158,7 @@ mod tests {
             tranche_id: "AAA".to_string(),
             cashflows: vec![],
             detailed_flows: vec![],
+            accrual_periods: Vec::new(),
             interest_flows: vec![],
             principal_flows: vec![
                 (

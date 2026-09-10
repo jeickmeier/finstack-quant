@@ -6,6 +6,12 @@ import type { HullWhiteVolatilityMode } from "./HullWhiteVolatilityMode";
  */
 export type CapFloorHullWhiteStepParams = {
 /**
+ * Required positive maximum implied-quote error in quoted volatility units.
+ * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+ * This acceptance budget is independent of the numerical solver tolerance.
+ */
+fit_tolerance: number,
+/**
  * Discount curve ID (must already exist in market context).
  */
 discount_curve_id: string,

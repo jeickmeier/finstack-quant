@@ -64,7 +64,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
     let mut optional_fields: Vec<(syn::Ident, syn::Type)> = Vec::new();
     let mut defaults: HashMap<syn::Ident, Expr> = HashMap::new();
     let mut field_docs: HashMap<syn::Ident, String> = HashMap::new();
-    let mut issue_field_ident: Option<syn::Ident> = None;
 
     let mut custom_validator: Option<Expr> = None;
     for attr in &input.attrs {
@@ -161,9 +160,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
 
             let is_option_ty = matches!(ty, syn::Type::Path(ref tp) if tp.path.segments.last().map(|s| s.ident == "Option").unwrap_or(false));
 
-            if ident == format_ident!("issue") || ident == format_ident!("issue_date") {
-                issue_field_ident = Some(ident.clone());
-            }
             // Optional if Option<T> or the field is `attributes`
             if is_option_ty || ident == format_ident!("attributes") {
                 optional_fields.push((ident, ty));
@@ -276,19 +272,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         }
     });
 
-    // Resolve the maturity field identifier for issue-date fallback generation.
-    let maturity_field_ident = if required_fields.iter().any(|(id, _)| id == "maturity")
-        || optional_fields.iter().any(|(id, _)| id == "maturity")
-    {
-        Some(format_ident!("maturity"))
-    } else if required_fields.iter().any(|(id, _)| id == "maturity_date")
-        || optional_fields.iter().any(|(id, _)| id == "maturity_date")
-    {
-        Some(format_ident!("maturity_date"))
-    } else {
-        None
-    };
-
     // Build expression: required fields unwrap, optional fields carry through
     // (unwrap_or(None)) and initialize attributes if present. A missing required
     // field fails with a validation error naming the builder and the field.
@@ -301,22 +284,6 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         if let Some(expr) = defaults.get(id) {
             let expr_clone = expr.clone();
             quote! { #id: self.#id.unwrap_or(#expr_clone) }
-        } else if issue_field_ident.as_ref() == Some(id) {
-            if let Some(ref mat_ident) = maturity_field_ident {
-                let missing_maturity = missing_error(mat_ident);
-                quote! {
-                    #id: match self.#id {
-                        ::core::option::Option::Some(d) => d,
-                        ::core::option::Option::None => {
-                            let mat = self.#mat_ident.ok_or_else(|| #missing_maturity)?;
-                            mat.checked_sub(::time::Duration::days(365)).unwrap_or(mat)
-                        }
-                    }
-                }
-            } else {
-                let missing = missing_error(id);
-                quote! { #id: self.#id.ok_or_else(|| #missing)? }
-            }
         } else {
             let missing = missing_error(id);
             quote! { #id: self.#id.ok_or_else(|| #missing)? }

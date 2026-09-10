@@ -187,7 +187,16 @@ fn test_clo_warf_calculator_uses_default_factor_for_missing_ratings() {
 
 #[test]
 fn test_rmbs_cpr_and_cdr_use_current_deal_seasoning() {
-    let pool = AssetPool::new("POOL", DealType::Rmbs, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::Rmbs, Currency::USD);
+    // Seasoning is weighted over actual collateral, so supply the mortgage
+    // whose six-month age is being measured rather than an empty pool.
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "MORTGAGE",
+        Money::from((1_000_000_i64, Currency::USD)),
+        0.05,
+        maturity_date(),
+        DayCount::Thirty360,
+    ));
     let mut instrument = StructuredCredit::new_rmbs(
         "TEST_RMBS_SPEEDS",
         pool,

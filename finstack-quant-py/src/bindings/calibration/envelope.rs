@@ -1217,7 +1217,7 @@ impl PyCalibrationStep {
     ///     Optional wire fields: ``forward_id``, ``vol_convention``,
     ///     ``sabr_beta``, ``target_expiries``, ``target_tenors``,
     ///     ``sabr_interpolation``, ``calendar_id``, ``fixed_day_count``,
-    ///     ``swap_index``, ``vol_tolerance``, ``sabr_tolerance``,
+    ///     ``swap_index``, ``vol_tolerance``,
     ///     ``sabr_extrapolation``, ``allow_sabr_missing_bucket_fallback``.
     ///
     /// Raises

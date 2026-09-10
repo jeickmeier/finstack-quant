@@ -14,7 +14,7 @@ pub(crate) struct AccruedInterestCalculator;
 impl MetricCalculator for AccruedInterestCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
-        calculate_accrued_interest(bond, context.as_of)
+        calculate_accrued_interest(bond, &context.curves, context.as_of)
     }
 }
 
@@ -25,7 +25,7 @@ impl MetricCalculator for CleanPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &ConvertibleBond = context.instrument_as()?;
         let dirty_price = context.base_value.amount();
-        let accrued = calculate_accrued_interest(bond, context.as_of)?;
+        let accrued = calculate_accrued_interest(bond, &context.curves, context.as_of)?;
         Ok(dirty_price - accrued)
     }
 }

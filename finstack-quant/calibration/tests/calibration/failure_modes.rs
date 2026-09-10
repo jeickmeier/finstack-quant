@@ -222,7 +222,6 @@ fn swaption_vol_preflight_rejects_invalid_shift() {
             fixed_day_count: None,
             swap_index: None,
             vol_tolerance: None,
-            sabr_tolerance: None,
             sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
             allow_sabr_missing_bucket_fallback: false,
         }),

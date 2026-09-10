@@ -31,8 +31,7 @@ mod tests {
             Date::from_calendar_date(2024, Month::June, 15).unwrap(),  // First payment
             Date::from_calendar_date(2031, Month::March, 15).unwrap(), // Maturity (7yr)
             Tenor::quarterly(),
-        )
-        .with_reinvestment_end(Date::from_calendar_date(2026, Month::March, 15).unwrap()); // 2yr reinvestment
+        );
 
         // Step 2: Get standard CLO configuration
         let config = DealConfig::clo_standard(dates, Currency::USD);

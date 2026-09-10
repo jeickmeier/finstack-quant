@@ -253,7 +253,9 @@ def test_builder_repr_renders_fields_set_so_far() -> None:
 def test_leg_specs_pickle_round_trip() -> None:
     fixed = _fixed_leg(calendar_id="usny", stub="none")
     floating = _float_leg(reset_lag_days=2, fixing_calendar_id="usny")
-    premium = PremiumLegSpec("2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS")
+    premium = PremiumLegSpec(
+        "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", standard_imm_dates=True
+    )
     protection = ProtectionLegSpec("ACME-HZD", 0.4, 3)
     for leg in (fixed, floating, premium, protection):
         clone = pickle.loads(pickle.dumps(leg))  # noqa: S301
@@ -270,7 +272,9 @@ def test_leg_specs_accept_rate_and_bps_objects() -> None:
     assert fixed.rate == pytest.approx(0.04)
     floating = _float_leg(spread_bp=Bps(25))
     assert floating.spread_bp == pytest.approx(25.0)
-    premium = PremiumLegSpec(AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS")
+    premium = PremiumLegSpec(
+        AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS", standard_imm_dates=True
+    )
     assert premium.spread_bp == pytest.approx(100.0)
     with pytest.raises(TypeError):
         _fixed_leg(rate="4%")
@@ -494,6 +498,21 @@ def test_bond_getters_and_pricing_helpers() -> None:
 def test_bond_builder_missing_field_is_named() -> None:
     with pytest.raises(ValueError, match=r"BondBuilder.*missing required field"):
         Bond.builder().id("B").build()
+
+
+def test_bond_builder_requires_contractual_issue_date() -> None:
+    base = Bond.example().to_dict()
+    builder = (
+        Bond
+        .builder()
+        .id("MISSING-ISSUE")
+        .notional(1_000_000.0, currency="USD")
+        .maturity("2034-01-15")
+        .cashflow_spec(base["cashflow_spec"])
+        .discount_curve_id("USD-OIS")
+    )
+    with pytest.raises(ValueError, match=r"BondBuilder.*missing required field 'issue_date'"):
+        builder.build()
 
 
 # --------------------------------------------------------------------------- term loans

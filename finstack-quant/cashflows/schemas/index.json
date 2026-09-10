@@ -26,7 +26,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
-      "bytes": 8072,
+      "bytes": 8098,
       "kind": "component",
       "path": "schemas/cashflow/1/fee_specs.schema.json",
       "summary": "Recurring or one-off fees attached to a schedule.",

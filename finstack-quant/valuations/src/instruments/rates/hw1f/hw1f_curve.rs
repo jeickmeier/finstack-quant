@@ -35,7 +35,7 @@
 //! Brigo & Mercurio (2006) *Interest Rate Models — Theory and Practice*
 //! §3.3.1 (HW1F affine bond price, eqs. 3.39–3.40); Hull & White (1990). `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models` `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::process::ou::{
@@ -62,10 +62,10 @@ const THETA_GRID_SPACING_YEARS: f64 = 1.0 / 12.0;
 /// factor *re-based to `as_of`*:
 ///
 /// ```text
-/// P(as_of, as_of + t) = DF_curve(t_asof + t) / DF_curve(t_asof)
+/// P(as_of, date(t)) = DF_curve(date(t)) / DF_curve(as_of)
 /// ```
 ///
-/// where `t_asof` is the year fraction from the curve base date to `as_of`.
+/// Dates use ACT/365F model time and the curve's own date/day-count mapping.
 ///
 /// # Errors
 ///
@@ -75,29 +75,8 @@ fn rebased_discount_fn<'a>(
     curve: &'a dyn Discounting,
     as_of: Date,
 ) -> Result<impl Fn(f64) -> f64 + 'a> {
-    let base = curve.base_date();
-    let day_count = curve.day_count();
-    let t_asof = if as_of == base {
-        0.0
-    } else {
-        day_count.year_fraction(base, as_of, DayCountContext::default())?
-    };
-    let df_asof = curve.df(t_asof);
-    if !df_asof.is_finite() || df_asof <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "HW1F curve fit: discount factor at as_of ({as_of}) is non-positive ({df_asof})"
-        )));
-    }
-    Ok(move |t: f64| {
-        let df = curve.df(t_asof + t);
-        // Re-base to as_of. Guard the (curve-extrapolation) degenerate case so
-        // the calibrator never sees a non-finite discount factor.
-        if df.is_finite() && df > 0.0 {
-            df / df_asof
-        } else {
-            0.0
-        }
-    })
+    let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(curve, as_of)?;
+    Ok(move |t| model_curve.df(t))
 }
 
 /// Prepare time-dependent HW1F parameters θ(t) from a discount curve.

@@ -175,7 +175,12 @@ fn run_margin(
     let mut aggregator =
         PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
     let result = aggregator
-        .calculate(&portfolio, &MarketContext::new(), as_of)
+        .calculate(
+            &portfolio,
+            &MarketContext::new(),
+            as_of,
+            &finstack_quant_core::HashMap::default(),
+        )
         .expect("margin run should succeed");
     // MO-16 is expected here: this fixture's netting set carries no CSA, so
     // its VM is the unadjusted gross MTM. That is recorded rather than passed
@@ -322,7 +327,12 @@ fn run_margin_for(
     let mut aggregator =
         PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
     let result = aggregator
-        .calculate(&portfolio, market, as_of)
+        .calculate(
+            &portfolio,
+            market,
+            as_of,
+            &finstack_quant_core::HashMap::default(),
+        )
         .expect("margin run should succeed");
     let unexpected: Vec<_> = result
         .degraded_positions

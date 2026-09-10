@@ -246,6 +246,7 @@ mod tests {
             .build()
             .expect("forward");
         let surface = VolSurface::builder("USD-CAP-VOL")
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
             .expiries(&[0.1, 0.5, 1.0])
             .strikes(&[0.01, 0.04, 0.08])
             .row(&[0.005, 0.005, 0.005])

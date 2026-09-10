@@ -198,15 +198,6 @@ impl PyTranche {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Expected maturity as ``datetime.date``, or ``None``.
-    #[getter]
-    fn expected_maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .expected_maturity
-            .map(|d| date_to_py(py, d))
-            .transpose()
-    }
-
     /// Payment priority rank (1 = most senior).
     #[getter]
     fn payment_priority(&self) -> u32 {

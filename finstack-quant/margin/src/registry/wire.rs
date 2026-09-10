@@ -204,6 +204,26 @@ pub(super) struct SimmFile {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct SimmRecord {
+    pub(super) ir_subcurve_correlation: f64,
+    pub(super) commodity_intra_bucket_correlations: Value,
+    pub(super) ir_historical_volatility_ratio: f64,
+    pub(super) equity_historical_volatility_ratio: f64,
+    pub(super) fx_historical_volatility_ratio: f64,
+    pub(super) commodity_historical_volatility_ratio: f64,
+    pub(super) fx_high_delta_weight: f64,
+    pub(super) fx_regular_high_correlation: f64,
+    pub(super) fx_high_high_correlation: f64,
+    pub(super) cq_same_issuer_correlation: f64,
+    pub(super) credit_residual_correlation: f64,
+    pub(super) ir_delta_weights_low: Value,
+    pub(super) ir_delta_weights_high: Value,
+    pub(super) ir_delta_concentration_thresholds: Value,
+    pub(super) ir_vega_concentration_thresholds: Value,
+    pub(super) fx_delta_concentration_thresholds: Value,
+    pub(super) fx_vega_concentration_thresholds: Value,
+    pub(super) commodity_delta_concentration_thresholds: Value,
+    pub(super) commodity_vega_concentration_thresholds: Value,
+    pub(super) vega_concentration_thresholds: Value,
     pub(super) mpor_days: u32,
     pub(super) ir_delta_weights: Value,
     #[serde(default)]
@@ -211,36 +231,25 @@ pub(super) struct SimmRecord {
     pub(super) cnq_delta_weight: f64,
     pub(super) equity_delta_weight: f64,
     pub(super) fx_delta_weight: f64,
-    #[serde(default)]
-    pub(super) fx_intra_bucket_correlation: Option<f64>,
+    pub(super) fx_intra_bucket_correlation: f64,
     pub(super) risk_class_correlations: Vec<RiskClassCorrelationRecord>,
     pub(super) commodity_bucket_weights: Value,
     #[serde(default)]
     pub(super) commodity_inter_bucket_correlations: Vec<f64>,
     #[serde(default)]
     pub(super) ir_tenor_correlations: Value,
-    #[serde(default)]
-    pub(super) ir_inter_currency_correlation: Option<f64>,
-    #[serde(default)]
-    pub(super) ir_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) cq_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) cq_intra_bucket_correlation: Option<f64>,
+    pub(super) ir_inter_currency_correlation: f64,
+    pub(super) ir_vega_weight: f64,
+    pub(super) cq_vega_weight: f64,
+    pub(super) cq_intra_bucket_correlation: f64,
     #[serde(default)]
     pub(super) cq_inter_bucket_correlations: Value,
     #[serde(default)]
     pub(super) cq_concentration_thresholds: Value,
-    #[serde(default)]
-    pub(super) cnq_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) equity_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) fx_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) commodity_vega_weight: Option<f64>,
-    #[serde(default)]
-    pub(super) curvature_scale_factor: Option<f64>,
+    pub(super) cnq_vega_weight: f64,
+    pub(super) equity_vega_weight: f64,
+    pub(super) fx_vega_weight: f64,
+    pub(super) commodity_vega_weight: f64,
     #[serde(default)]
     pub(super) concentration_thresholds: Value,
 }

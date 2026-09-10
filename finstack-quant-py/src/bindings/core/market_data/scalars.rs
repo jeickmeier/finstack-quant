@@ -447,7 +447,7 @@ impl PyInflationIndex {
     ///     Contract date.
     /// lag_months : int
     ///     Calendar months to look back (``3`` for TIPS/gilts). Observations
-    ///     must exist on the first of their month; missing months are not
+    ///     must be unique within each reference month; missing months are not
     ///     interpolated. The first of the contract month needs only the first
     ///     lagged observation.
     ///
@@ -461,7 +461,7 @@ impl PyInflationIndex {
     /// KeyError
     ///     If a required monthly CPI observation is missing.
     /// ValueError
-    ///     If the contract date cannot be parsed.
+    ///     If the contract date cannot be parsed or a required month has multiple observations.
     #[pyo3(text_signature = "(self, date, lag_months)")]
     fn ref_cpi_months_lag(&self, date: &Bound<'_, PyAny>, lag_months: u32) -> PyResult<f64> {
         self.inner

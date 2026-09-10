@@ -295,3 +295,19 @@ guarantees: [INVARIANTS.md](../../INVARIANTS.md).
 ## License
 
 MIT OR Apache-2.0
+
+### Realized-forward fixing and credit contracts
+
+Historical VaR credit-spread scenarios require the existing quote recalibration
+provider and replay the source hazard calibration recipe against the shifted
+dependency market. Valuations does not parse calibration-owned recipe schemas.
+The explicitly selected `first_order_shift` scenario mode converts spread basis
+points to hazard basis points by dividing by `1 - recovery`; its application
+report retains a `hazard_spread_first_order` approximation warning.
+
+Time rolls materialize index observations crossed in `(old_date, new_date]`
+from the pre-roll canonical cashflow schedules before moving curve dates. Rate
+fixings exclude coupon spread, gearing, caps and floors; overnight coupons retain
+each raw daily observation, and FX resets retain their contractual orientation.
+Existing exact-date observations take precedence. Missing or conflicting required
+projections fail before market/date mutation. Repeated rolls preserve fixings.

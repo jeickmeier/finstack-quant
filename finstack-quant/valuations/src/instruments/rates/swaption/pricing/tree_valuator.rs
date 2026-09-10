@@ -17,7 +17,7 @@
 //! use finstack_quant_valuations::instruments::rates::swaption::{BermudanSwaption, PreparedHullWhiteModel, pricing::BermudanSwaptionTreeValuator};
 //!
 //! let swaption = BermudanSwaption::example();
-//! # let discount_curve: &dyn finstack_quant_core::market_data::traits::Discounting = todo!();
+//! # let discount_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve = todo!();
 //! # let as_of = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 //!
 //! // Create calibrated model
@@ -26,21 +26,24 @@
 //!     HullWhiteCalibrationParams::default(),
 //!     100,
 //!     discount_curve,
+//!     as_of,
 //!     ttm,
+//!     &swaption.exercise_times(as_of).unwrap(),
 //! ).unwrap();
 //!
 //! // Create valuator and price
 //! let valuator = BermudanSwaptionTreeValuator::new(&swaption, &model, discount_curve, as_of).unwrap();
 //! let price = valuator.price().unwrap();
 //! ```
-use crate::instruments::common_impl::parameters::OptionType;
+use super::hw_cashflows::{HwExerciseNode, HwExerciseTerms, HwSwaptionCashflows};
 use crate::instruments::rates::swaption::types::BermudanType;
 use crate::instruments::rates::swaption::BermudanSwaption;
 use crate::instruments::rates::swaption::PreparedHullWhiteModel;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::Result;
+use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
 
 /// Tree valuator for Bermudan swaption pricing.
 ///
@@ -51,29 +54,9 @@ pub struct BermudanSwaptionTreeValuator<'a> {
     swaption: &'a BermudanSwaption,
     /// Reference to the calibrated Hull-White model
     model: &'a PreparedHullWhiteModel,
-    /// Reference to the discount curve
-    discount_curve: &'a dyn Discounting,
-    /// Valuation date.
-    ///
-    /// Stored for potential future use in:
-    /// - Theta calculations (time decay from as_of to as_of + 1 day)
-    /// - Exercise boundary reporting with actual dates
-    /// - Diagnostic output including the valuation date
-    ///
-    /// Currently the valuator uses pre-computed year fractions for all calculations,
-    /// so this field is not actively used in pricing. It is retained for API
-    /// consistency and future extensibility.
-    _as_of: Date,
-    /// Exercise step indices (mapped from exercise dates)
+    discount_curve: ModelDiscountCurve<'a>,
     exercise_steps: HashSet<usize>,
-    /// Swap payment times (year fractions from as_of)
-    payment_times: Vec<f64>,
-    /// Accrual fractions for each payment period
-    accrual_fractions: Vec<f64>,
-    /// Swap start time (year fraction)
-    swap_start_time: f64,
-    /// Swap end time (year fraction)
-    swap_end_time: f64,
+    exercise_cashflows: finstack_quant_core::HashMap<usize, HwSwaptionCashflows>,
     /// Strike rate as f64, validated at construction
     strike: f64,
 }
@@ -94,7 +77,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     pub fn new(
         swaption: &'a BermudanSwaption,
         model: &'a PreparedHullWhiteModel,
-        discount_curve: &'a dyn Discounting,
+        discount_curve: &'a DiscountCurve,
         as_of: Date,
     ) -> Result<Self> {
         if swaption.get_forward_curve_id() != swaption.get_discount_curve_id() {
@@ -117,37 +100,37 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
             ));
         }
 
+        model.validate_reuse(discount_curve, as_of, swaption.time_to_maturity(as_of)?)?;
         let tree = model.tree();
         let exercise_times = swaption.exercise_times(as_of)?;
         let exercise_steps: HashSet<usize> = exercise_times
             .iter()
-            .map(|&t| tree.time_to_step(t))
-            .collect();
-
-        let (_payment_dates, accrual_fractions) = swaption.build_swap_schedule()?;
-        let payment_times = swaption.payment_times(as_of)?;
-
-        let ctx = finstack_quant_core::dates::DayCountContext::default();
-        let swap_start_time =
-            swaption
-                .get_day_count()
-                .year_fraction(as_of, swaption.get_swap_start(), ctx)?;
-        let swap_end_time =
-            swaption
-                .get_day_count()
-                .year_fraction(as_of, swaption.get_swap_end(), ctx)?;
+            .map(|&t| tree.step_at_time(t))
+            .collect::<Result<_>>()?;
+        let mut exercise_cashflows = finstack_quant_core::HashMap::default();
+        for &date in &swaption.bermudan_schedule.exercise_dates {
+            let time = model_time(as_of, date);
+            if !exercise_times.iter().any(|&t| (t - time).abs() < 1e-10) {
+                continue;
+            }
+            let step = tree.step_at_time(time)?;
+            let flows = HwSwaptionCashflows::new(
+                &swaption.underlying_fixed_leg,
+                &swaption.underlying_float_leg,
+                date,
+                as_of,
+            )?;
+            model.validate_reuse(discount_curve, as_of, flows.horizon())?;
+            exercise_cashflows.insert(step, flows);
+        }
         let strike = swaption.strike_f64()?;
 
         Ok(Self {
             swaption,
             model,
-            discount_curve,
-            _as_of: as_of,
+            discount_curve: ModelDiscountCurve::new(discount_curve, as_of)?,
             exercise_steps,
-            payment_times,
-            accrual_fractions,
-            swap_start_time,
-            swap_end_time,
+            exercise_cashflows,
             strike,
         })
     }
@@ -196,48 +179,24 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     /// For a payer swaption: max(0, (S - K) × A × N)
     /// For a receiver swaption: max(0, (K - S) × A × N)
     fn exercise_value(&self, step: usize, node_idx: usize) -> f64 {
-        let t = self.tree().time_at_step(step);
-
-        // OPTIMIZATION: Find start index without allocating
-        // payment_times is sorted by construction (from swaption schedule)
-        let start_idx = self.payment_times.partition_point(|&pt| pt <= t);
-
-        if start_idx >= self.payment_times.len() {
-            return 0.0;
-        }
-
-        // Use slices instead of allocating new vectors
-        let remaining_payment_times = &self.payment_times[start_idx..];
-        let remaining_accruals = &self.accrual_fractions[start_idx..];
-
-        // Compute forward swap rate at this node
-        let swap_start = self.swap_start_time.max(t); // Swap starts at exercise time
-        let swap_rate = self.tree().forward_swap_rate(
-            step,
-            node_idx,
-            swap_start,
-            self.swap_end_time,
-            remaining_payment_times,
-            remaining_accruals,
-            self.discount_curve,
-        );
-
-        let annuity = self.tree().annuity(
-            step,
-            node_idx,
-            remaining_payment_times,
-            remaining_accruals,
-            self.discount_curve,
-        );
-
-        let notional = self.swaption.notional.amount();
-
-        let intrinsic = match self.swaption.option_type {
-            OptionType::Call => (swap_rate - self.strike).max(0.0),
-            OptionType::Put => (self.strike - swap_rate).max(0.0),
-        };
-
-        intrinsic * annuity * notional
+        self.exercise_cashflows.get(&step).map_or(0.0, |flows| {
+            flows.value(
+                HwExerciseNode {
+                    tree: self.tree(),
+                    step,
+                    index: node_idx,
+                    discount: &self.discount_curve,
+                },
+                HwExerciseTerms {
+                    strike: self.strike,
+                    notional: self.swaption.notional.amount(),
+                    option_type: self.swaption.option_type,
+                    settlement: self.swaption.settlement,
+                    cash_method: crate::instruments::rates::swaption::CashSettlementMethod::default(
+                    ),
+                },
+            )
+        })
     }
 
     /// Compute exercise probabilities at each exercise date.
@@ -358,6 +317,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::common_impl::parameters::OptionType;
     use crate::instruments::rates::swaption::{
         BermudanSchedule, BermudanSwaption, PreparedHullWhiteModel,
     };
@@ -417,7 +377,9 @@ mod tests {
             HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
             50,
             &curve,
+            as_of,
             ttm,
+            &swaption.exercise_times(as_of).expect("exercise times"),
         )
         .expect("Calibration should succeed");
 
@@ -436,7 +398,9 @@ mod tests {
             HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
             50,
             &curve,
+            as_of,
             ttm,
+            &swaption.exercise_times(as_of).expect("exercise times"),
         )
         .expect("Calibration should succeed");
 
@@ -460,10 +424,11 @@ mod tests {
 
         let ttm = swaption.time_to_maturity(as_of).expect("Valid ttm");
         let exercise_times = swaption.exercise_times(as_of).expect("exercise times");
-        let model = PreparedHullWhiteModel::prepare_with_times(
+        let model = PreparedHullWhiteModel::prepare(
             HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
             50,
             &curve,
+            as_of,
             ttm,
             &exercise_times,
         )

@@ -244,6 +244,13 @@ fn bracket_solve_1d_impl(
 
     let v0 = objective(initial);
     diag.update(initial, v0);
+    // An exact root at the preferred initial point is conclusive; scanning
+    // cannot improve its residual or distance from the requested guess.
+    if v0 == 0.0 && tol > 0.0 {
+        diag.bracket_found = true;
+        diag.is_sign_change_bracket = true;
+        return Ok((Some(initial), diag));
+    }
     if v0.is_finite() && v0.abs() < OBJECTIVE_VALID_ABS_MAX {
         valid_points.push((initial, v0));
     }
@@ -926,5 +933,31 @@ mod tests {
         let scan = [0.0, 1.0]; // only 2 points
         let _ =
             bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-12, 100).expect("solver error");
+    }
+}
+
+#[cfg(test)]
+mod production_credit_solver_audit {
+    use super::*;
+    use std::cell::Cell;
+
+    #[test]
+    fn production_credit_audit_exact_initial_root_needs_one_evaluation() {
+        let calls = Cell::new(0);
+        let objective = |x: f64| {
+            calls.set(calls.get() + 1);
+            x - 6.0
+        };
+        let (root, diagnostics) = bracket_solve_1d_with_diagnostics(
+            &objective,
+            6.0,
+            &[2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0],
+            1e-10,
+            100,
+        )
+        .expect("exact initial root");
+        assert_eq!(root, Some(6.0));
+        assert!(diagnostics.is_sign_change_bracket);
+        assert_eq!(calls.get(), 1, "an exact initial root requires no scan");
     }
 }

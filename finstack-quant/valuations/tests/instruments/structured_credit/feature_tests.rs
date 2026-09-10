@@ -68,10 +68,12 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             obligor_id: Some(format!("OB_{}", i)),
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: Some(as_of()),
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
     }
@@ -662,37 +664,41 @@ mod excess_spread_tests {
     }
 
     #[test]
-    fn trap_retains_spread_and_reduces_equity() {
-        let baseline = equity_cash(&deal(None));
-        let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
-            trap_loss_pct: Some(0.01),
-        })));
-        assert!(
-            trapped < baseline - 1.0,
-            "trap-breached spread account must retain enhancement and reduce equity \
-             (trapped={trapped}, baseline={baseline})"
-        );
+    fn spread_capture_delays_equity_cash_without_destroying_it() {
+        let base = run_simulation(&deal(None), &market(), closing()).unwrap();
+        let trapped = run_simulation(
+            &deal(Some(ExcessSpreadSpec {
+                target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
+                trap_loss_pct: Some(0.01),
+            })),
+            &market(),
+            closing(),
+        )
+        .unwrap();
+        let first = base["EQ"].interest_flows[0].0;
+        let paid_at = |result: &finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCashflows| result.interest_flows.iter()
+            .filter(|(date, _)| *date == first).map(|(_, cash)| cash.amount()).sum::<f64>();
+        assert!(paid_at(&trapped["EQ"]) < paid_at(&base["EQ"]));
+        // The senior retires in full. All retained interest ultimately belongs
+        // to equity, including cash held while the loss trigger remains breached.
+        assert!((trapped["SR"].total_principal.amount() - 800_000.0).abs() < 1e-6);
+        let total = |result: &finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCashflows| result.total_interest.amount() + result.total_principal.amount();
+        assert!((total(&trapped["EQ"]) - total(&base["EQ"])).abs() < 1e-6);
     }
 
     #[test]
-    fn untrapped_spread_releases_more_to_equity_than_trapped() {
-        // Same deal, same target: with no trap trigger the account is released
-        // to equity at deal end; with the trap breached it is retained. So the
-        // released case must leave equity strictly better off than the trapped
-        // case (by roughly the retained account balance).
+    fn terminal_trap_releases_surplus_after_senior_is_repaid() {
         let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
+            target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
             trap_loss_pct: Some(0.01),
         })));
         let released = equity_cash(&deal(Some(ExcessSpreadSpec {
-            target_balance: Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
+            target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
             trap_loss_pct: None,
         })));
         assert!(
-            released > trapped + 1.0,
-            "releasing the account must return more to equity than trapping it \
-             (released={released}, trapped={trapped})"
+            (released - trapped).abs() < 1e-6,
+            "a fully retired senior cannot extinguish residual capital or interest"
         );
     }
 
@@ -1248,11 +1254,13 @@ mod shifting_interest_tests {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: Some(closing()),
             day_count: DayCount::Thirty360,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
         let tranches = TrancheStructure::new(vec![
@@ -1520,6 +1528,10 @@ mod early_amortization_tests {
         let mut sc =
             StructuredCredit::new_abs("ABS-EA", pool, tranches, closing(), maturity(), "USD-OIS")
                 .with_payment_calendar("nyse");
+        for tranche in &mut sc.tranches.tranches {
+            tranche.is_revolving = true;
+            tranche.can_reinvest = true;
+        }
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);

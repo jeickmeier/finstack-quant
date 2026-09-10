@@ -26,6 +26,7 @@ from finstack_quant.margin import (
     MarginUtilization,
     ScheduleImCalculator,
     SimmCalculator,
+    SimmCurvatureSensitivity,
     SimmSensitivities,
     VmCalculator,
     VmResult,
@@ -372,7 +373,7 @@ def test_simm_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
     df = SimmSensitivities("USD").to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
-    assert list(df.columns) == SENSITIVITY_COLUMNS
+    assert list(df.columns) == [*SENSITIVITY_COLUMNS, "expiry_tenor"]
 
 
 def test_simm_sensitivities_to_dataframe_is_long_and_sorted() -> None:
@@ -385,12 +386,12 @@ def test_simm_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens.add_equity_delta("AAPL", 250_000.0)
     sens.add_fx_delta("EUR", 75_000.0)
     sens.add_commodity_delta("crude", 30_000.0)
-    sens.add_curvature("interest_rate", 5_000.0)
+    sens.add_curvature(SimmCurvatureSensitivity("interest_rate", "USD", "OIS", "1Y", 5_000.0, "5Y"))
 
     df = sens.to_dataframe()
 
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == SENSITIVITY_COLUMNS
+    assert list(df.columns) == [*SENSITIVITY_COLUMNS, "expiry_tenor"]
     assert len(df) == 9
 
     keys = _sort_keys(df)

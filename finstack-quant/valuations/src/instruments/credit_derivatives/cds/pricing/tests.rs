@@ -316,6 +316,7 @@ fn test_doc_clause_default_when_omitted() {
         .convention(crate::instruments::credit_derivatives::cds::CdsConvention::IsdaNa)
         .premium(
             crate::instruments::common_impl::parameters::legs::PremiumLegSpec {
+                standard_imm_dates: true,
                 start: as_of,
                 end: as_of.add_months(60),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -765,4 +766,31 @@ fn test_protection_start_helper() {
     let mut fwd = spot;
     fwd.protection_effective_date = Some(fwd_date);
     assert_eq!(fwd.protection_start(), fwd_date);
+}
+
+#[test]
+fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
+    use finstack_quant_core::dates::{StubKind, Tenor};
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2026 - 04 - 01);
+    let mut cds = create_test_cds("BESPOKE-SCHEDULE", start, end, 100.0, 0.4);
+    cds.premium.standard_imm_dates = false;
+    cds.premium.calendar_id = None;
+    cds.premium.frequency = Tenor::semi_annual();
+    cds.premium.stub = StubKind::ShortFront;
+    let pricer = CDSPricer::new();
+    let front = pricer.coupon_periods(&cds, start).expect("front schedule");
+    let front_ends: Vec<_> = front.iter().map(|p| p.accrual_end).collect();
+    assert_eq!(
+        front_ends,
+        vec![date!(2025 - 04 - 01), date!(2025 - 10 - 01), end]
+    );
+    cds.premium.stub = StubKind::LongFront;
+    let long = pricer
+        .coupon_periods(&cds, start)
+        .expect("long front schedule");
+    assert_eq!(
+        long.iter().map(|p| p.accrual_end).collect::<Vec<_>>(),
+        vec![date!(2025 - 10 - 01), end]
+    );
 }

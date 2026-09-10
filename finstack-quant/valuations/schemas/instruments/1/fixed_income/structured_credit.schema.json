@@ -99,7 +99,7 @@
           "description": "Reinvestment management\nReinvestment period configuration (if applicable)"
         },
         "rep_lines": {
-          "description": "Aggregated representative lines (optional optimization)\nIf present, pricing engine will use these instead of individual assets.",
+          "description": "Aggregated representative lines (optional optimization)\nMust be used with an empty `assets` vector; normalized into the same engine.",
           "items": {
             "$ref": "#/$defs/RepLine"
           },
@@ -1123,44 +1123,9 @@
       ],
       "type": "object"
     },
-    "CreditEnhancement": {
-      "additionalProperties": false,
-      "description": "Credit-enhancement amounts and flags available to a tranche.",
-      "properties": {
-        "cash_trap_active": {
-          "description": "Whether residual cash is currently trapped or turboed into principal.",
-          "type": "boolean"
-        },
-        "excess_spread": {
-          "description": "Excess spread available to absorb losses, as an annual decimal rate.",
-          "format": "double",
-          "type": "number"
-        },
-        "overcollateralization": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Collateral balance in excess of rated tranche balance."
-        },
-        "reserve_account": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Cash reserve balance available as credit enhancement."
-        },
-        "subordination": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Principal subordination supplied by junior tranches."
-        }
-      },
-      "required": [
-        "subordination",
-        "overcollateralization",
-        "reserve_account",
-        "excess_spread",
-        "cash_trap_active"
-      ],
-      "type": "object"
-    },
     "CreditFactors": {
       "additionalProperties": false,
-      "description": "Credit factors affecting default probability.",
+      "description": "Optional monetary inputs for CMBS debt-service coverage metrics.",
       "properties": {
         "annual_debt_service": {
           "anyOf": [
@@ -1183,59 +1148,8 @@
             }
           ],
           "description": "Annual net operating income for CMBS collateral, when provided."
-        },
-        "credit_score": {
-          "description": "Current FICO/credit score.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "custom_factors": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "description": "Additional custom factors.",
-          "type": "object"
-        },
-        "delinquency_days": {
-          "description": "Payment delinquency status (days).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "dti": {
-          "description": "Debt-to-income ratio.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "ltv": {
-          "description": "Loan-to-value ratio.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unemployment_rate": {
-          "description": "Unemployment rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
-      "required": [
-        "delinquency_days",
-        "custom_factors"
-      ],
       "type": "object"
     },
     "CreditRating": {
@@ -1501,84 +1415,6 @@
         }
       ]
     },
-    "DefaultAssumptions": {
-      "additionalProperties": false,
-      "description": "Default assumptions for structured credit modeling",
-      "properties": {
-        "abs_speed_monthly": {
-          "description": "ABS monthly prepayment speed (for auto ABS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "base_cdr_annual": {
-          "description": "Base annual CDR (Constant Default Rate)",
-          "format": "double",
-          "type": "number"
-        },
-        "base_cpr_annual": {
-          "description": "Base annual CPR (Constant Prepayment Rate)",
-          "format": "double",
-          "type": "number"
-        },
-        "base_recovery_rate": {
-          "description": "Base recovery rate on defaults",
-          "format": "double",
-          "type": "number"
-        },
-        "cdr_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific annual CDRs",
-          "type": "object"
-        },
-        "cpr_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific annual CPRs",
-          "type": "object"
-        },
-        "psa_speed": {
-          "description": "PSA speed multiplier (for RMBS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "recovery_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific recovery rates",
-          "type": "object"
-        },
-        "sda_speed": {
-          "description": "SDA speed multiplier (for RMBS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "base_cdr_annual",
-        "base_recovery_rate",
-        "base_cpr_annual"
-      ],
-      "type": "object"
-    },
     "DefaultCurve": {
       "description": "Default curve shape.",
       "oneOf": [
@@ -1665,14 +1501,14 @@
     },
     "ExcessSpreadSpec": {
       "additionalProperties": false,
-      "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. Any balance unused at deal end is released back to equity, unless a\ncumulative-loss trap trigger is breached.",
+      "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. At termination it pays deferred debt coupons; a breached loss trap\nthen applies remaining interest to debt principal before releasing the\nsurplus to the residual holder.",
       "properties": {
         "target_balance": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Target funded balance of the spread account (currency units)."
         },
         "trap_loss_pct": {
-          "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which any remaining spread-account balance is\n*retained* in the deal at maturity rather than released to equity. When\n`None`, the unused balance is always released to equity.",
+          "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which terminal spread-account cash repays\ndebt principal after deferred coupons. Any surplus reaches the residual\nholder. `None` releases surplus after deferred coupons without this\ninterest-to-principal transfer.",
           "format": "double",
           "type": [
             "number",
@@ -2163,7 +1999,7 @@
         },
         "threshold": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "IM threshold (aggregate group level).\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
         }
       },
       "required": [
@@ -2332,55 +2168,14 @@
       "additionalProperties": false,
       "description": "Market conditions that affect prepayment behavior.",
       "properties": {
-        "custom_factors": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "description": "Custom market factors.",
-          "type": "object"
-        },
-        "hpa": {
-          "description": "Home price appreciation (for mortgages).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "original_rate": {
-          "description": "Rate at origination for refinancing incentive calculation.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "refi_rate": {
-          "description": "Current refinancing rate.",
+          "description": "Finite annual decimal refinancing rate for Richard-Roll incentives; may be negative.",
           "format": "double",
           "type": "number"
-        },
-        "seasonal_factor": {
-          "description": "Seasonal adjustment factor.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unemployment": {
-          "description": "Unemployment rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
       "required": [
-        "refi_rate",
-        "custom_factors"
+        "refi_rate"
       ],
       "type": "object"
     },
@@ -2949,22 +2744,22 @@
       "oneOf": [
         {
           "const": "fee",
-          "description": "Fee payment",
+          "description": "Fee payment funded from interest collections.",
           "type": "string"
         },
         {
           "const": "interest",
-          "description": "Interest payment",
+          "description": "Coupon payment funded from interest collections.",
           "type": "string"
         },
         {
           "const": "principal",
-          "description": "Principal payment",
+          "description": "Capital repayment funded from principal collections.",
           "type": "string"
         },
         {
           "const": "residual",
-          "description": "Residual/equity distribution",
+          "description": "Excess-interest distribution; does not retire equity principal.",
           "type": "string"
         }
       ]
@@ -3019,6 +2814,18 @@
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day-count convention used for coupon and accrual calculations."
+        },
+        "default_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Economic default date for the outstanding recovery claim; required for defaulted assets."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -3088,6 +2895,15 @@
             }
           ],
           "description": "Realized or modeled recovery amount when the asset is defaulted."
+        },
+        "recovery_rate": {
+          "default": null,
+          "description": "Per-asset recovery fraction in [0, 1]; overrides the deal recovery model.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "smm_override": {
           "default": null,
@@ -3273,16 +3089,12 @@
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
-        "apply_eligibility_criteria": {
-          "description": "Must satisfy eligibility criteria",
-          "type": "boolean"
-        },
         "maintain_credit_quality": {
-          "description": "Must maintain credit quality distribution",
+          "description": "Require the surviving credit-quality distribution; pro-rata replacement always preserves it.",
           "type": "boolean"
         },
         "maintain_wal": {
-          "description": "Must maintain weighted average life",
+          "description": "Require the surviving principal-payment profile; pro-rata replacement always preserves it.",
           "type": "boolean"
         },
         "max_price": {
@@ -3291,7 +3103,7 @@
           "type": "number"
         },
         "min_yield": {
-          "description": "Minimum yield requirement",
+          "description": "Minimum annual decimal current yield: replacement coupon divided by purchase-price fraction.",
           "format": "double",
           "type": "number"
         }
@@ -3300,8 +3112,7 @@
         "max_price",
         "min_yield",
         "maintain_credit_quality",
-        "maintain_wal",
-        "apply_eligibility_criteria"
+        "maintain_wal"
       ],
       "type": "object"
     },
@@ -3333,6 +3144,10 @@
       "additionalProperties": false,
       "description": "Representative line for aggregated pool modeling",
       "properties": {
+        "asset_type": {
+          "$ref": "#/$defs/AssetType",
+          "description": "Contractual asset classification; determines level-pay amortization."
+        },
         "balance": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Aggregated balance"
@@ -3402,6 +3217,7 @@
       },
       "required": [
         "id",
+        "asset_type",
         "balance",
         "rate",
         "maturity",
@@ -4033,58 +3849,6 @@
           "$ref": "#/$defs/DealType",
           "description": "Deal classification (ABS/CLO/CMBS/RMBS)."
         },
-        "default_assumptions": {
-          "$ref": "#/$defs/DefaultAssumptions",
-          "default": {
-            "abs_speed_monthly": null,
-            "base_cdr_annual": 0.02,
-            "base_cpr_annual": 0.05,
-            "base_recovery_rate": 0.4,
-            "cdr_by_asset_type": {
-              "abs_auto": 0.02,
-              "auto": 0.02,
-              "card": 0.048,
-              "clo": 0.02,
-              "commercial": 0.02,
-              "consumer": 0.02,
-              "corporate": 0.02,
-              "credit_card": 0.048,
-              "mortgage": 0.002,
-              "rmbs": 0.002
-            },
-            "cpr_by_asset_type": {
-              "abs_auto": 0.18,
-              "auto": 0.18,
-              "card": 0.15,
-              "cc": 0.15,
-              "cmbs": 0.1,
-              "commercial": 0.1,
-              "cre": 0.1,
-              "credit_card": 0.15,
-              "mortgage": 0.06,
-              "rmbs": 0.06,
-              "student": 0.03,
-              "student_loan": 0.03
-            },
-            "psa_speed": null,
-            "recovery_by_asset_type": {
-              "abs_auto": 0.45,
-              "auto": 0.45,
-              "card": 0.05,
-              "clo": 0.4,
-              "collateral": 0.6,
-              "commercial": 0.4,
-              "consumer": 0.45,
-              "corporate": 0.4,
-              "credit_card": 0.05,
-              "mortgage": 0.6,
-              "rmbs": 0.6,
-              "unsecured": 0.05
-            },
-            "sda_speed": null
-          },
-          "description": "Default behavioral assumptions for the deal."
-        },
         "default_spec": {
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
           "default": {
@@ -4174,15 +3938,7 @@
           },
           "description": "Prepayment model specification."
         },
-        "recovery_spec": {
-          "$ref": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",
-          "default": {
-            "rate": 0.5,
-            "recovery_lag": 12
-          },
-          "description": "Recovery model specification."
-        },
-        "reinvestment_end_date": {
+        "quote_settlement_date": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -4191,8 +3947,15 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "End of reinvestment period (if applicable)."
+          "description": "Buyer settlement date for clean/dirty price and spread metrics.\n`None` uses the valuation date. Cashflows payable on or before settlement\nbelong to the seller; model PV remains measured on the valuation date."
+        },
+        "recovery_spec": {
+          "$ref": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",
+          "default": {
+            "rate": 0.5,
+            "recovery_lag": 12
+          },
+          "description": "Recovery model specification."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -4319,10 +4082,6 @@
           "$ref": "#/$defs/TrancheCoupon",
           "description": "Interest specification"
         },
-        "credit_enhancement": {
-          "$ref": "#/$defs/CreditEnhancement",
-          "description": "Credit enhancement details"
-        },
         "current_balance": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Current outstanding balance (after amortization and losses)"
@@ -4339,18 +4098,6 @@
           "description": "Detachment point as percentage (upper loss bound for this tranche)",
           "format": "double",
           "type": "number"
-        },
-        "expected_maturity": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Expected maturity date (may be earlier than legal maturity for CLOs)"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -4440,7 +4187,6 @@
         "original_balance",
         "current_balance",
         "coupon",
-        "credit_enhancement",
         "frequency",
         "day_count",
         "deferred_interest",
@@ -4568,24 +4314,6 @@
           "const": "stop_reinvestment",
           "description": "Stop Reinvestment variant.",
           "type": "string"
-        },
-        {
-          "const": "reduce_manager_fee",
-          "description": "Reduce Manager Fee variant.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Custom variant.",
-          "properties": {
-            "custom": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "custom"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -4856,14 +4584,7 @@
             "sda_speed_multiplier": null
           },
           "closing_date": "2024-01-01",
-          "credit_factors": {
-            "credit_score": null,
-            "custom_factors": {},
-            "delinquency_days": 0,
-            "dti": null,
-            "ltv": null,
-            "unemployment_rate": null
-          },
+          "credit_factors": {},
           "deal_metadata": {
             "manager_id": null,
             "master_servicer_id": null,
@@ -4872,23 +4593,12 @@
             "trustee_id": null
           },
           "deal_type": "clo",
-          "default_assumptions": {
-            "abs_speed_monthly": null,
-            "base_cdr_annual": 0.02,
-            "base_cpr_annual": 0.15,
-            "base_recovery_rate": 0.4,
-            "cdr_by_asset_type": {},
-            "cpr_by_asset_type": {},
-            "psa_speed": null,
-            "recovery_by_asset_type": {},
-            "sda_speed": null
-          },
           "default_spec": {
             "cdr": 0.02,
             "curve": null
           },
           "discount_curve_id": "USD-OIS",
-          "first_payment_date": "2025-04-01",
+          "first_payment_date": "2024-04-01",
           "frequency": {
             "count": 3,
             "unit": "months"
@@ -4896,12 +4606,7 @@
           "hedge_swaps": [],
           "id": "CLO-EXAMPLE",
           "market_conditions": {
-            "custom_factors": {},
-            "hpa": null,
-            "original_rate": null,
-            "refi_rate": 0.04,
-            "seasonal_factor": 1.0,
-            "unemployment": null
+            "refi_rate": 0.04
           },
           "maturity": "2034-01-01",
           "payment_calendar_id": "nyse",
@@ -4920,6 +4625,7 @@
                 "contractual_payment": null,
                 "credit_quality": null,
                 "day_count": "act_360",
+                "default_date": null,
                 "id": "COLLATERAL-1",
                 "index_id": null,
                 "industry": null,
@@ -4930,6 +4636,7 @@
                 "purchase_price": null,
                 "rate": 0.07,
                 "recovery_amount": null,
+                "recovery_rate": null,
                 "smm_override": null,
                 "spread_bp": null
               }
@@ -4976,7 +4683,6 @@
             "rate": 0.4,
             "recovery_lag": 18
           },
-          "reinvestment_end_date": null,
           "tranches": {
             "total_size": {
               "amount": "100000000",
@@ -4993,22 +4699,6 @@
                     "rate": 0.06
                   }
                 },
-                "credit_enhancement": {
-                  "cash_trap_active": false,
-                  "excess_spread": 0.0,
-                  "overcollateralization": {
-                    "amount": "0",
-                    "currency": "USD"
-                  },
-                  "reserve_account": {
-                    "amount": "0",
-                    "currency": "USD"
-                  },
-                  "subordination": {
-                    "amount": "0",
-                    "currency": "USD"
-                  }
-                },
                 "current_balance": {
                   "amount": "100000000",
                   "currency": "USD"
@@ -5019,7 +4709,6 @@
                   "currency": "USD"
                 },
                 "detachment_point": 100.0,
-                "expected_maturity": null,
                 "frequency": {
                   "count": 3,
                   "unit": "months"

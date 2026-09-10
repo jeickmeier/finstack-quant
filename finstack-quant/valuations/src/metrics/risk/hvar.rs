@@ -29,6 +29,7 @@ fn calculate_var_result(
         context.as_of,
         &config,
         dispatch,
+        context.get_recalibration_provider(),
     )
 }
 
@@ -202,6 +203,7 @@ mod tests {
             history.as_ref(),
             as_of,
             &VarConfig::var_95(),
+            None,
         )?;
 
         // Calculate VaR + ES via metrics framework

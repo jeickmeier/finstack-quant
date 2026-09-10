@@ -77,8 +77,9 @@ pub(crate) fn diff_sparse(series: &[Option<f64>]) -> Vec<Option<f64>> {
 /// # Arguments
 ///
 /// * `inputs` - Validated calibration inputs whose spread panel, generic
-///   series, and `as_of_spreads` are still in decimal units. Mutated in place
-///   so every subsequent peel/vol step sees basis points.
+///   series, `as_of_spreads`, and annualized idiosyncratic-vol overrides are
+///   still in decimal spread units. Mutated in place so every subsequent
+///   peel/vol step sees basis points (volatility per square-root year).
 pub(super) fn convert_inputs_to_bp(inputs: &mut CreditCalibrationInputs) {
     for series in inputs.history_panel.spreads.values_mut() {
         for spread in series.iter_mut().flatten() {
@@ -90,6 +91,9 @@ pub(super) fn convert_inputs_to_bp(inputs: &mut CreditCalibrationInputs) {
     }
     for spread in inputs.as_of_spreads.values_mut() {
         *spread = decimal_to_bp(*spread);
+    }
+    for volatility in inputs.idiosyncratic_overrides.values_mut() {
+        *volatility = decimal_to_bp(*volatility);
     }
 }
 

@@ -16,6 +16,7 @@ Examples:
 from __future__ import annotations
 
 import datetime as dt
+from html import escape
 import json
 import math
 from typing import Any
@@ -149,18 +150,32 @@ def _section_buckets(metrics: dict[str, Any] | None, theme: Theme) -> Section | 
     return Section("Tenor Risk Profile", body)
 
 
-def _section_cashflows(cashflows: dict[str, Any] | None, base_currency: str, theme: Theme) -> Section | None:
+def _section_cashflows(cashflows: dict[str, Any] | None, theme: Theme) -> Section | None:
     by_date = (cashflows or {}).get("by_date") or {}
     if not by_date:
         return None
-    pairs = net_in_currency_by_date(json.dumps({"by_date": by_date}), base_currency)
-    if not pairs:
-        return None
-    dates, values = zip(*pairs, strict=True)
+    currencies = sorted({currency for per_currency in by_date.values() for currency in per_currency})
+    payload = json.dumps({"by_date": by_date})
+    parts = []
+    rows = []
+    for currency in currencies:
+        pairs = net_in_currency_by_date(payload, currency)
+        if pairs:
+            dates, values = zip(*pairs, strict=True)
+            parts.append(
+                f'<p class="sub">{escape(currency)} cashflows</p>'
+                + charts.bar_chart(list(dates), list(values), theme=theme)
+            )
+    for date, per_currency in by_date.items():
+        for currency, per_kind in per_currency.items():
+            for kind, amount in per_kind.items():
+                value, label = _money(amount)
+                if label != currency:
+                    raise ValueError("cashflow currency key must match its Money currency")
+                rows.append({"Date": date, "Currency": currency, "Kind": kind, "Amount": fmt.money(value, currency)})
+    parts.append(tables.data_table(rows, columns=["Date", "Currency", "Kind", "Amount"]))
     return Section(
-        "Cashflow Ladder",
-        charts.bar_chart(list(dates), list(values), theme=theme),
-        subtitle=f"Net base-currency ({base_currency}) cashflow by date.",
+        "Cashflow Ladder", "".join(parts), subtitle="Native-currency cashflows, shown separately by currency."
     )
 
 
@@ -233,7 +248,7 @@ def portfolio_tearsheet(
         secs.append(s)
     if "buckets" in wanted and (s := _section_buckets(metrics_d, theme)) is not None:
         secs.append(s)
-    if "cashflows" in wanted and (s := _section_cashflows(cashflows_d, base_currency, theme)) is not None:
+    if "cashflows" in wanted and (s := _section_cashflows(cashflows_d, theme)) is not None:
         secs.append(s)
 
     pvs = val.get("position_values") or {}

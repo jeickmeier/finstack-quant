@@ -171,6 +171,23 @@ fn ndf_fx01_base_per_settlement_matches_finite_difference_one_pct() {
         (fx01 - fd_central).abs() < 1e-6 * scale,
         "BasePerSettlement Fx01 must match central FD: fx01={fx01}, fd_central={fd_central}"
     );
+    assert!(
+        fx01 > 0.0,
+        "a stronger base currency raises long-base value"
+    );
+    let mut reciprocal = ndf.clone();
+    reciprocal.quote_convention = NdfQuoteConvention::SettlementPerBase;
+    reciprocal.contract_rate = ndf.contract_rate.recip();
+    assert!((fx01_of(&reciprocal, &base_market, as_of) - fx01).abs() < 1e-8);
+    assert!(
+        (reciprocal
+            .value(&base_market, as_of)
+            .expect("reciprocal PV")
+            .amount()
+            - ndf.value(&base_market, as_of).expect("inverse PV").amount())
+        .abs()
+            < 1e-8
+    );
 }
 
 /// Post-fixing NDFs are not sensitive to spot — Fx01 must be exactly 0.

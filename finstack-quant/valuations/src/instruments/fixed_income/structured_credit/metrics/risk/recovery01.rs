@@ -15,7 +15,9 @@ pub(crate) struct Recovery01Calculator;
 
 impl MetricCalculator for Recovery01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context.instrument_as::<StructuredCredit>()?.clone();
+        let instrument = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let as_of = context.as_of;
 
         use crate::cashflow::builder::RecoveryModelSpec;

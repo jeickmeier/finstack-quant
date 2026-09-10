@@ -92,8 +92,50 @@ pub(super) fn require_quote_vega(
 pub(super) const HW_NUM_RESTARTS: usize = 5;
 /// Halton perturbation scale (50%) applied to each parameter on restart.
 pub(super) const HW_PERTURB_SCALE: f64 = 0.5;
-/// Validation tolerance reported on the HW1F calibration report.
-pub(super) const HW_VALIDATION_TOLERANCE: f64 = 1e-6;
+/// Validate a required quote-space acceptance tolerance.
+pub(super) fn validate_fit_tolerance(tolerance: f64) -> finstack_quant_core::Result<()> {
+    if !tolerance.is_finite() || tolerance <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Hull-White fit_tolerance must be finite and positive in quoted volatility units"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Replace optimizer residual diagnostics with final implied quote errors.
+pub(super) fn quote_fit_report(
+    report: CalibrationReport,
+    residuals: BTreeMap<String, f64>,
+    tolerance: f64,
+) -> CalibrationReport {
+    let mut fit = CalibrationReport::for_type_with_tolerance(
+        "hull_white_1f",
+        residuals,
+        report.iterations,
+        tolerance,
+    );
+    fit.metadata.extend(report.metadata);
+    fit.metadata
+        .insert("optimizer_termination".into(), report.convergence_reason);
+    fit.metadata
+        .insert("residual_units".into(), "quoted_volatility".into());
+    fit.metadata.insert(
+        "optimizer_objective".into(),
+        report.objective_value.to_string(),
+    );
+    fit.solver_config = report.solver_config;
+    fit.results_meta = report.results_meta;
+    fit.model_version = report.model_version;
+    fit.explanation = report.explanation;
+    fit = fit.with_validation_result(report.validation_passed, report.validation_error);
+    if let Some(count) = fit.metadata.get("final_params_clamped") {
+        if count != "0" {
+            fit = fit.with_has_penalty_residuals(true);
+        }
+    }
+    fit
+}
 
 /// Pre-computed market data for one swaption quote, captured once before
 /// LM iteration so that the residual loop is a pure numeric computation.

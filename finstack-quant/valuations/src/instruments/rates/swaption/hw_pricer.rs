@@ -25,8 +25,6 @@
 //! - Brigo, D. & Mercurio, F. (2006). *Interest Rate Models - Theory and
 //!   Practice*, Chapter 4. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
-use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
 use crate::instruments::rates::swaption::types::Swaption;
@@ -34,7 +32,6 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
@@ -113,42 +110,21 @@ impl SwaptionHullWhitePricer {
                 )
             })?;
 
-        // Time to expiry
-        let time_to_expiry = year_fraction(swaption.get_day_count(), as_of, swaption.expiry)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-
-        if time_to_expiry <= 0.0 {
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
-
-        // Time horizon is swap end (need the tree to cover the full swap)
-        let ctx = DayCountContext::default();
-        let swap_end_time = swaption
-            .get_day_count()
-            .year_fraction(as_of, swaption.get_swap_end(), ctx)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-
-        if swap_end_time <= 0.0 {
-            return Ok(ValuationResult::stamped(
-                swaption.id.as_str(),
-                as_of,
-                Money::from((0_i64, swaption.notional.currency())),
-            ));
-        }
+        let time_to_expiry =
+            finstack_quant_models::rates::clock::model_time(as_of, swaption.expiry);
+        let discount =
+            finstack_quant_models::rates::clock::ModelDiscountCurve::new(disc.as_ref(), as_of)
+                .map_err(|e| {
+                    PricingError::from_core(e, PricingErrorContext::from_instrument(swaption))
+                })?;
+        let cashflows = super::pricing::hw_cashflows::HwSwaptionCashflows::new(
+            &swaption.underlying_fixed_leg,
+            &swaption.underlying_float_leg,
+            swaption.expiry,
+            as_of,
+        )
+        .map_err(|e| PricingError::from_core(e, PricingErrorContext::from_instrument(swaption)))?;
+        let swap_end_time = cashflows.horizon().max(time_to_expiry);
 
         // Resolve only complete explicit or pre-calibrated HW1F parameters.
         let hw_params = resolve_hw1f_params(
@@ -166,76 +142,24 @@ impl SwaptionHullWhitePricer {
         // Build and calibrate HW tree with the expiry threaded as a
         // mandatory grid date so the exercise decision lands exactly on a
         // grid point.
-        let config = HullWhiteTreeConfig::new(hw_params.kappa, hw_params.sigma, self.tree_steps);
+        let config = HullWhiteTreeConfig::new(
+            hw_params.kappa,
+            hw_params.sigma,
+            swaption
+                .instrument_pricing_overrides
+                .model_config
+                .tree_steps
+                .unwrap_or(self.tree_steps),
+        );
         let tree = HullWhiteTree::calibrate_with_times(
             config,
-            disc.as_ref(),
+            &discount,
             swap_end_time,
             &[time_to_expiry],
         )
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
-
-        let fixed_leg = &swaption.underlying_fixed_leg;
-        let calendar_id = fixed_leg
-            .calendar_id
-            .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: fixed_leg.start,
-                end: fixed_leg.end,
-                frequency: fixed_leg.frequency,
-                stub: fixed_leg.stub,
-                business_day_convention: fixed_leg.business_day_convention,
-                calendar_id,
-                end_of_month: fixed_leg.end_of_month,
-                day_count: fixed_leg.day_count,
-                payment_lag_days: fixed_leg.payment_lag_days,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        if periods.is_empty() {
-            return Err(PricingError::model_failure_with_context(
-                "Swap schedule has fewer than 2 dates".to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        let mut payment_times = Vec::with_capacity(periods.len());
-        let mut accrual_fractions = Vec::with_capacity(periods.len());
-        for period in periods {
-            let t = swaption
-                .get_day_count()
-                .year_fraction(as_of, period.payment_date, ctx)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
-            let accrual = period.accrual_year_fraction;
-            payment_times.push(t);
-            accrual_fractions.push(accrual);
-        }
-
-        let swap_start_time = swaption
-            .get_day_count()
-            .year_fraction(as_of, swaption.get_swap_start(), ctx)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
 
         let strike = swaption.strike_f64().map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
@@ -258,45 +182,21 @@ impl SwaptionHullWhitePricer {
         let pv = tree
             .backward_induction(&terminal, |step, node_idx, continuation| {
                 if step == exercise_step {
-                    let t = tree.time_at_step(step);
-
-                    let start_idx = payment_times.partition_point(|&pt| pt <= t);
-                    if start_idx >= payment_times.len() {
-                        return continuation;
-                    }
-
-                    let remaining_payment_times = &payment_times[start_idx..];
-                    let remaining_accruals = &accrual_fractions[start_idx..];
-
-                    let swap_start = swap_start_time.max(t);
-                    let swap_rate = tree.forward_swap_rate(
-                        step,
-                        node_idx,
-                        swap_start,
-                        swap_end_time,
-                        remaining_payment_times,
-                        remaining_accruals,
-                        disc.as_ref(),
+                    let exercise_value = cashflows.value(
+                        super::pricing::hw_cashflows::HwExerciseNode {
+                            tree: &tree,
+                            step,
+                            index: node_idx,
+                            discount: &discount,
+                        },
+                        super::pricing::hw_cashflows::HwExerciseTerms {
+                            strike,
+                            notional,
+                            option_type: swaption.option_type,
+                            settlement: swaption.settlement,
+                            cash_method: swaption.cash_settlement_method,
+                        },
                     );
-
-                    let annuity = tree.annuity(
-                        step,
-                        node_idx,
-                        remaining_payment_times,
-                        remaining_accruals,
-                        disc.as_ref(),
-                    );
-
-                    let intrinsic = match swaption.option_type {
-                        OptionType::Call => (swap_rate - strike).max(0.0),
-                        OptionType::Put => (strike - swap_rate).max(0.0),
-                    };
-
-                    let exercise_value = intrinsic * annuity * notional;
-
-                    // European: take max of continuation and exercise at the single
-                    // exercise date (for a well-calibrated tree these should be close,
-                    // but max handles numerical edge cases).
                     continuation.max(exercise_value)
                 } else {
                     continuation
@@ -348,8 +248,121 @@ mod tests {
     }
 
     use super::*;
+    use crate::instruments::common_impl::parameters::OptionType;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
+
+    #[test]
+    fn b7_hw_price_is_invariant_to_equivalent_curve_date_clocks() {
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        let (as_of, mut swaption, _) = example_single_curve();
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(0.01);
+        let mut prices = Vec::new();
+        for base in [as_of, date(2024, 7, 1)] {
+            for (day_count, days) in [(DayCount::Act365F, 365.0), (DayCount::Act360, 360.0)] {
+                let shift = (as_of - base).whole_days() as f64 / 365.0;
+                let log_df = |t: f64| -0.02 * t - 0.003 * t * t;
+                let mut knots = vec![(0.0, 1.0)];
+                for t in [0.0, 1.0, 3.0, 10.0] {
+                    if t + shift > 0.0 {
+                        knots.push((
+                            (t + shift) * 365.0 / days,
+                            (log_df(t) - log_df(-shift)).exp(),
+                        ));
+                    }
+                }
+                let curve = DiscountCurve::builder(swaption.get_discount_curve_id().clone())
+                    .base_date(base)
+                    .day_count(day_count)
+                    .knots(knots)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("curve");
+                let market = MarketContext::new().insert(curve);
+                prices.push(
+                    SwaptionHullWhitePricer::default()
+                        .price_internal(&swaption, &market, as_of)
+                        .expect("price")
+                        .value
+                        .amount(),
+                );
+            }
+        }
+        for price in &prices {
+            assert!(
+                (price - prices[0]).abs() < 1e-6,
+                "equivalent curve PVs {prices:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn m2_hw_partial_coupon_and_spread_match_deterministic_cashflows() {
+        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+        use rust_decimal::Decimal;
+        let as_of = date(2025, 1, 1);
+        let mut swaption = Swaption::example();
+        swaption.expiry = date(2026, 4, 1);
+        swaption.option_type = OptionType::Call;
+        let fixed = &mut swaption.underlying_fixed_leg;
+        fixed.start = date(2026, 1, 1);
+        fixed.end = date(2028, 1, 1);
+        fixed.frequency = Tenor::annual();
+        fixed.day_count = DayCount::Act365F;
+        fixed.business_day_convention = BusinessDayConvention::Unadjusted;
+        fixed.payment_lag_days = 0;
+        fixed.rate = Decimal::new(2, 2);
+        let float = &mut swaption.underlying_float_leg;
+        float.start = fixed.start;
+        float.end = fixed.end;
+        float.frequency = fixed.frequency;
+        float.day_count = fixed.day_count;
+        float.business_day_convention = fixed.business_day_convention;
+        float.payment_lag_days = 0;
+        float.reset_lag_days = 0;
+        float.forward_curve_id = fixed.discount_curve_id.clone();
+        float.spread_bp = Decimal::from(100);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(1e-7);
+        let market = MarketContext::new().insert(flat_discount_with_tenor(
+            swaption.get_discount_curve_id().as_str(),
+            as_of,
+            0.04,
+            10.0,
+        ));
+        let mut expected = 0.0;
+        let mut start = swaption.expiry;
+        for end in [date(2027, 1, 1), date(2028, 1, 1)] {
+            let tau = (end - start).whole_days() as f64 / 365.0;
+            let t = (end - as_of).whole_days() as f64 / 365.0;
+            expected += ((0.04 * tau).exp() - 1.0 + (0.01 - 0.02) * tau) * (-0.04 * t).exp();
+            start = end;
+        }
+        expected *= swaption.notional.amount();
+        let actual = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption, &market, as_of)
+            .expect("price")
+            .value
+            .amount();
+        assert!(
+            (actual - expected).abs() < 0.01,
+            "actual={actual}, expected={expected}"
+        );
+    }
 
     /// Pricing a European swaption via the HW pricer with explicit fitted
     /// parameters must produce a finite PV.

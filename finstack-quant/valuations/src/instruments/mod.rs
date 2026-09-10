@@ -270,8 +270,8 @@ pub use common_impl::parameters::{
     BasisSwapLeg, BondConvention, CommodityUnderlyingParams, ContractSpec, CreditParams,
     EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FinancingRateCompounding,
     FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IRSConvention, IndexUnderlyingParams,
-    OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec,
-    ScheduleSpec, SettlementType, TotalReturnLegSpec,
+    Monitoring, OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec,
+    ProtectionLegSpec, QuantoSpec, ScheduleSpec, SettlementType, TotalReturnLegSpec,
 };
 
 pub use common_impl::parameters::trs_common::{TrsScheduleSpec, TrsSide};

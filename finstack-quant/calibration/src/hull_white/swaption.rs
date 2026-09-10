@@ -1,6 +1,7 @@
 use super::targets::{
-    reject_at_bound_params, require_quote_vega, HullWhiteSwaptionTarget, PreparedSwaption,
-    HW_NUM_RESTARTS, HW_PERTURB_SCALE, HW_VALIDATION_TOLERANCE, SWAPTION_VEGA_FLOOR,
+    quote_fit_report, reject_at_bound_params, require_quote_vega, validate_fit_tolerance,
+    HullWhiteSwaptionTarget, PreparedSwaption, HW_NUM_RESTARTS, HW_PERTURB_SCALE,
+    SWAPTION_VEGA_FLOOR,
 };
 use super::*;
 use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
@@ -24,6 +25,9 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 ///   times, accruals, and unlagged maturities (preserving calendars, stubs,
 ///   and payment lags).
 /// * `initial_guess` - Optional seed for (κ, σ). Pass `None` to use built-in defaults.
+/// * `fit_tolerance` - Required positive maximum absolute implied-quote error;
+///   normal quotes use decimal rate volatility and Black quotes relative volatility.
+///   Independent of solver tolerance; a failed fit returns `report.success = false`.
 ///
 /// # Returns
 ///
@@ -40,21 +44,11 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 ///
 /// # Residual scaling (ATM assumption)
 ///
-/// Each per-quote residual is `(price_model − price_mkt) / vega`, where
-/// `vega` is the *ATM* Bachelier / Black-76 vega evaluated via
-/// `swaption_atm_vega` (strike = forward swap rate). This linearisation
-/// converges to the right minimiser when the calibration set is at-the-money
-/// or close to it: at ATM the strike-vol slope is small and the ATM-vega
-/// is a good proxy for the true `dPrice/dVol`. For materially off-ATM
-/// quotes (deep ITM/OTM swaptions), the ATM-vega proxy under- or over-scales
-/// the residual depending on the smile, and the LM objective is then a
-/// *distorted* (but still descent-compatible) surface. If you need to
-/// calibrate to a smile, weight or down-weight off-ATM quotes externally,
-/// or invest in true implied-vol-error iteration as in Andersen-Piterbarg
-/// (*Interest Rate Modeling* Vol III §3.3). Quotes whose ATM vega falls
-/// below the `SWAPTION_VEGA_FLOOR` are rejected up front (their `1/vega`
-/// residual scaling would dominate the objective); drop or repair such
-/// quotes before calibrating.
+/// The numerical optimizer uses `(price_model - price_market) / market_vega`
+/// for the ATM quotes supported by this API. Final prices are inverted using
+/// each quote's Normal or Black convention; the report and `fit_tolerance`
+/// use those actual implied-volatility errors, not the optimizer's linear
+/// approximation. Quotes with vanishing market vega are rejected.
 ///
 /// # Post-calibration sanity
 ///
@@ -84,7 +78,9 @@ pub fn calibrate_hull_white_to_swaptions(
     frequency: SwapFrequency,
     schedules: Option<&[SwaptionSchedule]>,
     initial_guess: Option<HullWhiteCalibrationParams>,
+    fit_tolerance: f64,
 ) -> finstack_quant_core::Result<(HullWhiteCalibrationParams, CalibrationReport)> {
+    validate_fit_tolerance(fit_tolerance)?;
     let schedule_source = schedules.is_some().then_some("real_day_count");
     if quotes.len() < 2 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -177,9 +173,47 @@ pub fn calibrate_hull_white_to_swaptions(
         &target,
         quotes,
         &config,
-        HW_VALIDATION_TOLERANCE,
+        fit_tolerance,
         Some(&multi_start),
     )?;
+
+    let mut quote_residuals = BTreeMap::new();
+    for (idx, (quote, pre)) in quotes.iter().zip(&target.prepared).enumerate() {
+        let (annuity, forward) = compute_swap_annuity_and_rate_inner(
+            df,
+            quote.expiry,
+            quote.tenor,
+            ppy,
+            pre.schedule.as_ref(),
+        );
+        let price = hw1f_swaption_price_inner(Hw1fSwaptionPriceInput {
+            kappa: params.kappa,
+            sigma: params.sigma,
+            df,
+            t0: quote.expiry,
+            tenor: quote.tenor,
+            swap_rate: forward,
+            periods_per_year: ppy,
+            schedule: pre.schedule.as_ref(),
+        });
+        let implied = if quote.is_normal_vol {
+            price / annuity * (2.0 * std::f64::consts::PI / quote.expiry).sqrt()
+        } else {
+            let probability = 0.5 * (1.0 + price / (annuity * forward));
+            2.0 * finstack_quant_core::math::special_functions::standard_normal_inv_cdf(probability)
+                / quote.expiry.sqrt()
+        };
+        if !implied.is_finite() || implied < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Hull-White quote {idx} has no finite implied volatility"
+            )));
+        }
+        quote_residuals.insert(
+            format!("{idx}:{}Yx{}Y", quote.expiry, quote.tenor),
+            implied - quote.volatility,
+        );
+    }
+    report = quote_fit_report(report, quote_residuals, fit_tolerance);
 
     // Override the report type tag (stored in metadata["type"]) and add
     // HW-specific metadata. The framework reports a generic "global_fit"
@@ -193,7 +227,7 @@ pub fn calibrate_hull_white_to_swaptions(
         .with_metadata("initial_sigma", format!("{sigma_init:.6}"))
         .with_metadata("multi_start_restarts", HW_NUM_RESTARTS.to_string())
         .with_metadata(
-            "residual_weighting",
+            "optimizer_residual_weighting",
             "1/vega (vega-weighted price residual)".to_string(),
         )
         .with_metadata(
@@ -227,7 +261,7 @@ pub fn calibrate_hull_white_to_swaptions(
 /// checks on the model-implied surface are unnecessary; the failure modes
 /// this guards against are numerical — a degenerate Jamshidian `r*` solve or
 /// pathological discount inputs producing a price a swaption cannot have.
-/// Fit quality is judged separately from the report residuals.
+/// Fit quality is judged from the final implied-quote report residuals.
 fn validate_model_price_sanity(
     df: &dyn Fn(f64) -> f64,
     quotes: &[SwaptionQuote],

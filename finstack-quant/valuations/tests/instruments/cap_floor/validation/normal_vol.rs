@@ -50,6 +50,7 @@ fn flat_disc(rate: f64, base: Date, id: &str) -> DiscountCurve {
 fn flat_normal_vol_surface(sigma: f64, id: &str) -> VolSurface {
     // Normal vol surface with rate-level strikes (can be negative)
     VolSurface::builder(id)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
         .strikes(&[-0.02, -0.01, 0.0, 0.01, 0.02])
         .row(&[sigma, sigma, sigma, sigma, sigma])

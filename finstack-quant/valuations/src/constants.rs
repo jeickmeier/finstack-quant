@@ -140,9 +140,6 @@ pub mod bloomberg_cdso {
 
     /// Step size for the Bloomberg CDSO standard-normal quadrature grid.
     pub const Z_STEP: f64 = 0.05;
-
-    /// CDX option front-end-protection fallback start lag in business days.
-    pub const INDEX_OPTION_FEP_START_LAG_BD: i32 = 2;
 }
 
 /// ISDA 2014 standard recovery constant used by the engine.

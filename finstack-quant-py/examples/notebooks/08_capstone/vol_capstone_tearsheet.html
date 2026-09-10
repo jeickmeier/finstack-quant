@@ -58,7 +58,7 @@
 .fq-ts svg .fq-mk { fill:#7c2230; stroke:#fff; stroke-width:1; pointer-events:none; }
 .fq-ts .fq-scroll { max-height:240px; overflow:auto; border:1px solid #e4e1d8; border-radius:4px; }
 .fq-ts .fq-scroll table.dd th { position:sticky; top:0; background:#f3f1ea; }
-</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow"></div><div class="title">Analyst vol capstone — reference submission</div><div class="subtitle">Synthetic inputs; actual native repricing. Physical UST future theta is unavailable.</div></div><div class="meta">Generated 15 Jan 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">Combined value</div><div class="val ">USD 5,693,206.15</div></div><div class="kpi"><div class="lbl">Stress P&amp;L</div><div class="val ">USD -226,588.79</div></div><div class="kpi"><div class="lbl">IRS SIMM v2.6</div><div class="val ">USD 31,562.51</div></div><div class="kpi"><div class="lbl">Linked active return</div><div class="val ">0.1184%</div></div></div><div class="secttl">PM recommendation</div>Reduce the long Treasury future from 10 to 5 contracts while its delivery-basket basis is reviewed. Closing 5 contracts at the model mark transfers USD 1,362.88 into cash and reduces this composed stress loss by USD 51,158.01; initial mark-plus-cash wealth is unchanged before costs. The benefit is scenario-specific, not a forecast of expected profit. The remaining 5 contracts still carry duration, repo and CTD-switch risk, and the native fixed-deliverable proxy omits the delivery option. Recompute the delivery ranking and gross basis on every candidate price update; a changed CTD blocks new exposure until the basket economics are reviewed. Retain the variance position only with its stated USD 1m variance notional, and recheck the finite-strike replication if its residual exceeds USD 1,000. That bound is an analytical diagnostic, not a stop-loss or a guarantee of hedge liquidity. Add USD 0 to the borrower loan until the four DSCR forecasts clear 1.10x or underwriting remediation is documented.<div class="secttl">Position values</div><table border="1" class="dataframe">
+</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow"></div><div class="title">Analyst vol capstone — reference submission</div><div class="subtitle">Synthetic inputs; actual native repricing. Physical UST future theta is unavailable.</div></div><div class="meta">Generated 15 Jan 2025</div></div><div class="kpis"><div class="kpi"><div class="lbl">Combined value</div><div class="val ">USD 5,693,190.46</div></div><div class="kpi"><div class="lbl">Stress P&amp;L</div><div class="val ">USD -226,593.16</div></div><div class="kpi"><div class="lbl">IRS SIMM v2.6</div><div class="val ">USD 35,028.43</div></div><div class="kpi"><div class="lbl">Linked active return</div><div class="val ">0.1184%</div></div></div><div class="secttl">PM recommendation</div>Reduce the long Treasury future from 10 to 5 contracts while its delivery-basket basis is reviewed. Closing 5 contracts at the model mark transfers USD 1,362.88 into cash and reduces this composed stress loss by USD 51,158.01; initial mark-plus-cash wealth is unchanged before costs. The benefit is scenario-specific, not a forecast of expected profit. The remaining 5 contracts still carry duration, repo and CTD-switch risk, and the native fixed-deliverable proxy omits the delivery option. Recompute the delivery ranking and gross basis on every candidate price update; a changed CTD blocks new exposure until the basket economics are reviewed. Retain the variance position only with its stated USD 1m variance notional, and recheck the finite-strike replication if its residual exceeds USD 1,000. That bound is an analytical diagnostic, not a stop-loss or a guarantee of hedge liquidity. Add USD 0 to the borrower loan until the four DSCR forecasts clear 1.10x or underwriting remediation is documented.<div class="secttl">Position values</div><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th>position</th>
@@ -113,8 +113,8 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>USD</td>
-      <td>1.097890e+06</td>
-      <td>1.097890e+06</td>
+      <td>1.097874e+06</td>
+      <td>1.097874e+06</td>
     </tr>
     <tr>
       <td>UST-FUTURE</td>
@@ -772,22 +772,22 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_cs01</td>
-      <td>-3.785152e+02</td>
+      <td>-3.785469e+02</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01</td>
-      <td>-4.647705e+01</td>
+      <td>-4.650915e+01</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>cs01</td>
-      <td>-3.785152e+02</td>
+      <td>-3.785469e+02</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>dv01</td>
-      <td>-4.647704e+01</td>
+      <td>-4.650913e+01</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
@@ -827,12 +827,12 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_cs01::BORROWER-TL::3y</td>
-      <td>-3.081911e+01</td>
+      <td>-3.082692e+01</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_cs01::BORROWER-TL::5y</td>
-      <td>-3.157342e+02</td>
+      <td>-3.157582e+02</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
@@ -867,7 +867,7 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01::USD-OIS::2y</td>
-      <td>-4.825983e+01</td>
+      <td>-4.823346e+01</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
@@ -877,17 +877,17 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01::USD-OIS::3m</td>
-      <td>-1.553715e+00</td>
+      <td>-1.553723e+00</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01::USD-OIS::3y</td>
-      <td>-8.021961e-01</td>
+      <td>-8.017553e-01</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01::USD-OIS::5y</td>
-      <td>-3.152994e+02</td>
+      <td>-3.153576e+02</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
@@ -897,7 +897,7 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>bucketed_dv01::USD-OIS::7y</td>
-      <td>-3.493622e+00</td>
+      <td>-3.494267e+00</td>
     </tr>
     <tr>
       <td>BORROWER-TL</td>
@@ -957,7 +957,7 @@
     <tr>
       <td>BORROWER-TL</td>
       <td>cs01::BORROWER-TL</td>
-      <td>-3.785152e+02</td>
+      <td>-3.785469e+02</td>
     </tr>
     <tr>
       <td>UST-FUTURE</td>
@@ -1245,14 +1245,14 @@
     <tr>
       <td>0.95</td>
       <td>504</td>
-      <td>24753.275147</td>
-      <td>33341.738742</td>
+      <td>24753.373702</td>
+      <td>33341.898921</td>
       <td>26</td>
-      <td>21676.287875</td>
-      <td>29913.394896</td>
-      <td>28828.032933</td>
-      <td>36187.347946</td>
-      <td>-106.151426</td>
+      <td>21676.424312</td>
+      <td>29913.521622</td>
+      <td>28828.132672</td>
+      <td>36187.514486</td>
+      <td>-106.141327</td>
       <td>11</td>
     </tr>
   </tbody>
@@ -1268,57 +1268,57 @@
   <tbody>
     <tr>
       <td>USD_zero_and_forward_decimal</td>
-      <td>-1.873694</td>
-      <td>-1.066733e+07</td>
-      <td>9.323249e-07</td>
+      <td>-1.873756</td>
+      <td>-1.066765e+07</td>
+      <td>9.323832e-07</td>
     </tr>
     <tr>
       <td>EUR_zero_decimal</td>
-      <td>-1.349423</td>
+      <td>-1.349426</td>
       <td>-7.682542e+06</td>
-      <td>4.532074e-07</td>
+      <td>4.532140e-07</td>
     </tr>
     <tr>
       <td>hazard_log_change</td>
       <td>0.009777</td>
       <td>5.566124e+04</td>
-      <td>2.303108e-07</td>
+      <td>2.303123e-07</td>
     </tr>
     <tr>
       <td>equity_log_return</td>
       <td>0.054496</td>
       <td>3.102558e+05</td>
-      <td>1.088714e-07</td>
+      <td>1.088705e-07</td>
     </tr>
     <tr>
       <td>absolute_volatility_change</td>
-      <td>0.122567</td>
+      <td>0.122568</td>
       <td>6.978008e+05</td>
-      <td>1.009171e-06</td>
+      <td>1.009178e-06</td>
     </tr>
     <tr>
       <td>EURUSD_log_return</td>
-      <td>0.331985</td>
+      <td>0.331986</td>
       <td>1.890062e+06</td>
-      <td>4.199294e-06</td>
+      <td>4.199318e-06</td>
     </tr>
     <tr>
       <td>energy_log_return</td>
       <td>0.004066</td>
       <td>2.314819e+04</td>
-      <td>2.596568e-08</td>
+      <td>2.596570e-08</td>
     </tr>
     <tr>
       <td>WTI_basis_log_return</td>
       <td>0.065490</td>
       <td>3.728479e+05</td>
-      <td>3.060247e-07</td>
+      <td>3.060257e-07</td>
     </tr>
     <tr>
       <td>nonlinear_residual</td>
       <td>0.000000</td>
       <td>0.000000e+00</td>
-      <td>1.796618e-09</td>
+      <td>1.796628e-09</td>
     </tr>
   </tbody>
 </table><div class="secttl">Historical-pattern fixed-date stress</div><table border="1" class="dataframe">
@@ -1375,9 +1375,9 @@
     </tr>
     <tr>
       <td>BORROWER-TL</td>
-      <td>1.097890e+06</td>
-      <td>1.085075e+06</td>
-      <td>-12815.431119</td>
+      <td>1.097874e+06</td>
+      <td>1.085058e+06</td>
+      <td>-12816.499443</td>
     </tr>
     <tr>
       <td>UST-FUTURE</td>
@@ -1452,9 +1452,9 @@
     </tr>
     <tr>
       <td>BORROWER-TL</td>
-      <td>1.097890e+06</td>
-      <td>1.044544e+06</td>
-      <td>-53345.792291</td>
+      <td>1.097874e+06</td>
+      <td>1.044524e+06</td>
+      <td>-53350.157729</td>
     </tr>
     <tr>
       <td>UST-FUTURE</td>
@@ -1715,33 +1715,33 @@
   <tbody>
     <tr>
       <td>2025-01-15</td>
-      <td>5.693206e+06</td>
+      <td>5.693190e+06</td>
       <td>0.0</td>
-      <td>5.693206e+06</td>
+      <td>5.693190e+06</td>
       <td>1.080000</td>
       <td>2725.750486</td>
     </tr>
     <tr>
       <td>2025-01-22</td>
-      <td>5.699820e+06</td>
+      <td>5.699805e+06</td>
       <td>0.0</td>
-      <td>5.699820e+06</td>
+      <td>5.699805e+06</td>
       <td>1.079222</td>
       <td>4075.478558</td>
     </tr>
     <tr>
       <td>2025-01-29</td>
-      <td>5.706364e+06</td>
+      <td>5.706350e+06</td>
       <td>0.0</td>
-      <td>5.706364e+06</td>
+      <td>5.706350e+06</td>
       <td>1.078444</td>
       <td>5418.616660</td>
     </tr>
     <tr>
       <td>2025-02-05</td>
-      <td>5.713058e+06</td>
+      <td>5.713045e+06</td>
       <td>0.0</td>
-      <td>5.713058e+06</td>
+      <td>5.713045e+06</td>
       <td>1.077667</td>
       <td>6755.137011</td>
     </tr>
@@ -1785,15 +1785,15 @@
   <tbody>
     <tr>
       <td>elapsed accrual/financing at initial forward variance</td>
-      <td>-2218.795623</td>
+      <td>-2216.365135</td>
     </tr>
     <tr>
       <td>realized squared returns</td>
-      <td>3.796723</td>
+      <td>3.665801</td>
     </tr>
     <tr>
       <td>remaining implied forward variance</td>
-      <td>25.582793</td>
+      <td>25.584503</td>
     </tr>
   </tbody>
 </table><div class="secttl">CTD and gross basis</div><table border="1" class="dataframe">
@@ -1865,8 +1865,8 @@
       <th>1</th>
       <td>track_extension</td>
       <td>0.0</td>
-      <td>0.003962</td>
-      <td>-0.003905</td>
+      <td>0.003990</td>
+      <td>-0.003933</td>
       <td>0.000057</td>
     </tr>
   </tbody>

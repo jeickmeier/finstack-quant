@@ -411,7 +411,7 @@ fn credit_carry_total_equals_generic_levels_and_adder() {
 /// equals `carry_detail.total`. The partition identity is the load-bearing one;
 /// the pre-fix code failed it by exactly `pull_to_par`.
 #[test]
-fn rates_carry_total_matches_rates_source_lines_minus_funding() {
+fn rates_carry_total_matches_gross_rates_source_lines() {
     let attribution = run_metrics_based_with_model(Some(make_model()));
     let detail = attribution
         .carry_detail
@@ -446,11 +446,6 @@ fn rates_carry_total_matches_rates_source_lines_minus_funding() {
         .and_then(|l| l.credit_part)
         .map(|m| m.amount())
         .unwrap_or(0.0);
-    let funding = detail
-        .funding_cost
-        .as_ref()
-        .map(|m| m.amount())
-        .unwrap_or(0.0);
     let pull_to_par = detail
         .pull_to_par
         .as_ref()
@@ -459,7 +454,7 @@ fn rates_carry_total_matches_rates_source_lines_minus_funding() {
 
     // The two pull_to_par shares must be complementary…
     let credit_ptp_share = cc.credit_carry_total.amount() - (coupon_credit + roll_credit);
-    let rates_ptp_share = cc.rates_carry_total.amount() - (coupon_rates + roll_rates - funding);
+    let rates_ptp_share = cc.rates_carry_total.amount() - (coupon_rates + roll_rates);
     assert!(
         (credit_ptp_share + rates_ptp_share - pull_to_par).abs() < TOL,
         "pull_to_par shares must be complementary: credit={credit_ptp_share}, \

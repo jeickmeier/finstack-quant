@@ -29,6 +29,7 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.cashflows import aggregation as aggregation
 from finstack_quant.cashflows import builder as builder
+from finstack_quant.cashflows import fixings as fixings
 from finstack_quant.cashflows import primitives as primitives
 from finstack_quant.cashflows import schema as schema
 
@@ -40,6 +41,7 @@ __all__ = [
     "build_cashflow_schedule",
     "build_cashflow_schedule_json",
     "builder",
+    "fixings",
     "cdr_to_mdr",
     "cpr_to_smm",
     "dated_flows",
@@ -135,7 +137,8 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
         ``CashflowScheduleBuildSpec`` as a JSON string or an equivalent dict
         (``notional``, ``issue``, ``maturity``, ``coupon_program``,
         ``payment_program``, ``fees``, ``principal_events``,
-        ``principal_exchange``).
+        ``principal_exchange``). Each principal event requires economic ``date``
+        and cash ``payment_date``; these dates may differ after payment adjustment.
     market : MarketContext or str, optional
         Market context (or its JSON) for floating-rate projection.
 

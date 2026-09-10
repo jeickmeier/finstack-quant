@@ -5,7 +5,6 @@
     "vega": 200.3346178474272
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -36,7 +35,8 @@
         "vol_type": "lognormal"
       },
       "type": "cap_floor"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

@@ -11,6 +11,7 @@ pub mod contract;
 pub mod conventions;
 pub mod legs;
 pub mod market;
+pub mod monitoring;
 pub mod quanto;
 pub mod trs_common;
 pub mod underlying;
@@ -24,6 +25,7 @@ pub use legs::{
     ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
 };
 pub use market::{CreditParams, ExerciseStyle, OptionType, SettlementType};
+pub use monitoring::Monitoring;
 pub use quanto::QuantoSpec;
 pub use underlying::{
     CommodityUnderlyingParams, EquityUnderlyingParams, FxUnderlyingParams, IndexUnderlyingParams,

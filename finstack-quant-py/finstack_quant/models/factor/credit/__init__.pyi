@@ -317,7 +317,7 @@ class CreditFactorModel:
                 ``issuer_id``, ``tags`` (dict), ``mode`` (``"issuer_beta"`` /
                 ``"bucket_only"``), ``beta_pc``, ``beta_levels`` (list aligned with
                 ``level_names()``; ``0.0`` marks a folded level), ``adder_at_anchor``
-                (bp), ``adder_vol_annualized`` (bp), ``adder_vol_source``,
+                (bp), ``adder_vol_annualized`` (bp per square-root year), ``adder_vol_source``,
                 ``r_squared`` and ``n_obs`` (``NaN`` for bucket-only rows) and
                 ``spread_duration`` (years).
 
@@ -448,7 +448,8 @@ class CreditCalibrator:
                 ``history_panel`` (``dates`` + per-issuer decimal spread lists),
                 ``issuer_tags``, ``generic_factor``, ``as_of``, ``as_of_spreads``
                 and optional ``idiosyncratic_overrides`` / ``spread_durations``.
-                Spreads are decimal (``0.01`` = 100 bp).
+                Spreads are decimal (``0.01`` = 100 bp). Overrides are decimal
+                spread volatility per square-root year (``0.001`` = 10 bp/√year).
 
             Returns
             -------

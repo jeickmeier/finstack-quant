@@ -695,3 +695,97 @@ fn test_recovery01_metric_via_price_with_metrics() {
         "Recovery01 should be materially non-zero for a default-exposed tranche, got {recovery01}"
     );
 }
+
+mod production_credit_audit {
+    use super::*;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{
+        BaseCorrelationCurve, CreditIndexData,
+    };
+    use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    fn dispersed_market(spread_bump_bp: f64) -> MarketContext {
+        let mut market = replayable_market_context();
+        let original = market.get_credit_index("CDX.NA.IG.42").expect("index");
+        let mut issuers = BTreeMap::new();
+        for (id, spread) in [("ISSUER-A", 150.0), ("ISSUER-B", 500.0)] {
+            let hazard = Arc::new(
+                crate::test_support::credit::calibrated_hazard_curve_with_pillars(
+                    &market,
+                    base_date(),
+                    id,
+                    id,
+                    "USD-OIS",
+                    &[(5 * 365, spread + spread_bump_bp)],
+                )
+                .expect("issuer calibration"),
+            );
+            market = market.insert(Arc::clone(&hazard));
+            issuers.insert(id.to_owned(), hazard);
+        }
+        let correlation = BaseCorrelationCurve::builder("FLAT-BC")
+            .knots([(3.0, 0.3), (100.0, 0.3)])
+            .build()
+            .expect("correlation");
+        let index = CreditIndexData::builder()
+            .num_constituents(2)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::clone(&original.index_credit_curve))
+            .base_correlation_curve(Arc::new(correlation))
+            .issuer_curves(issuers)
+            .build()
+            .expect("index");
+        market.insert_credit_index("CDX.NA.IG.42", index)
+    }
+
+    #[test]
+    fn tranche_cs01_rebootstraps_consumed_issuer_quotes() {
+        let mut tranche = mezzanine_tranche();
+        tranche.attach_pct = 0.0;
+        tranche.detach_pct = 100.0;
+        let market = dispersed_market(0.0);
+        let expected = (tranche
+            .value_raw(&dispersed_market(1.0), base_date())
+            .expect("up")
+            - tranche
+                .value_raw(&dispersed_market(-1.0), base_date())
+                .expect("down"))
+            / 2.0;
+        assert!(
+            expected < -1.0,
+            "seller spread exposure must be negative: {expected}"
+        );
+        let result = tranche
+            .price_with_metrics(
+                &market,
+                base_date(),
+                &[MetricId::Cs01, MetricId::BucketedCs01],
+                crate::test_support::credit::pricing_options(),
+            )
+            .expect("metrics");
+        let cs01 = *result.measures.get("cs01").expect("CS01");
+        assert!(
+            (cs01 - expected).abs() < 1e-4 * expected.abs(),
+            "consumed-issuer CS01 {cs01} vs independently recalibrated quotes {expected}"
+        );
+        let bucketed = sum_bucketed_cs01(&result);
+        assert!((bucketed - expected).abs() < 1e-4 * expected.abs());
+        for id in ["ISSUER-A", "ISSUER-B"] {
+            assert!(
+                result
+                    .measures
+                    .keys()
+                    .any(|key| key.as_str().starts_with(&format!("bucketed_cs01::{id}::"))),
+                "missing risk labels for {id}"
+            );
+        }
+        let provider =
+            finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
+        let direct = CDSTranchePricer::new()
+            .calculate_cs01(&tranche, &market, base_date(), &provider)
+            .expect("direct hedge sensitivity");
+        assert!((direct - expected).abs() < 1e-4 * expected.abs());
+    }
+}

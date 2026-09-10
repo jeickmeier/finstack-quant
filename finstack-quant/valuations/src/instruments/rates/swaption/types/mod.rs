@@ -11,14 +11,9 @@ mod bermudan;
 mod definitions;
 mod swaption;
 
-#[cfg(test)]
-mod tests;
-
 pub use bermudan::BermudanSwaption;
 pub use definitions::{
     BermudanSchedule, BermudanType, CashSettlementMethod, SwaptionExercise, SwaptionSettlement,
     VolatilityModel,
 };
 pub use swaption::{GreekInputs, Swaption, SwaptionBuilder};
-
-pub(crate) use bermudan::{lognormal_to_normal_vol, lognormal_to_normal_vol_jacobian};

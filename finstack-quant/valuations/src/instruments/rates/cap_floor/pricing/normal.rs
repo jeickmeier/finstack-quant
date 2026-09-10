@@ -20,7 +20,7 @@ pub(crate) fn price_caplet_floorlet(
     let strike = inputs.strike;
     let forward = inputs.forward;
     let df = inputs.discount_factor;
-    let sigma = inputs.volatility;
+    let sigma = crate::instruments::common_impl::vol_resolution::validate_sigma(inputs.volatility)?;
     let t_fix = inputs.time_to_fixing;
     let tau = inputs.accrual_year_fraction;
     let ccy = inputs.currency;

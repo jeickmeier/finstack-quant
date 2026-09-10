@@ -160,10 +160,22 @@ pub struct FutureBreach {
 
 /// Minimal read-only adapter to query model time-series values and map periods to dates.
 pub trait ModelTimeSeries: Send + Sync {
-    /// Get scalar value for a metric node and period
+    /// Read the metric observation, or None when unavailable.
+    ///
+    /// # Arguments
+    /// * `node_id` - Exact metric identifier in the model.
+    /// * `period` - Model period identifying the observation.
     fn get_scalar(&self, node_id: &str, period: &PeriodId) -> Option<f64>;
-    /// Get end date for a given period
-    fn period_end_date(&self, period: &PeriodId) -> Date;
+    /// Resolve the inclusive period end from the model calendar; unknown periods fail.
+    ///
+    /// # Arguments
+    /// * `period` - Exact model period, including fiscal identity.
+    fn period_end_date(&self, period: &PeriodId) -> Result<Date>;
+    /// Resolve the inclusive period start from the model calendar; unknown periods fail.
+    ///
+    /// # Arguments
+    /// * `period` - Exact model period, including fiscal identity.
+    fn period_start_date(&self, period: &PeriodId) -> Result<Date>;
 }
 
 /// Forecast one numeric covenant across supplied model periods.
@@ -270,7 +282,7 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
     let mut activation_flags: Vec<bool> = Vec::with_capacity(periods.len());
 
     for pid in periods {
-        let date = model.period_end_date(pid);
+        let date = model.period_end_date(pid)?;
         test_dates.push(date);
 
         let thr = engine
@@ -344,13 +356,17 @@ fn forecast_covenant_impl<MTS: ModelTimeSeries>(
             "starting stochastic breach probability calculation"
         );
 
-        let ref_date = config.reference_date.unwrap_or_else(|| {
-            periods[0]
-                .prev()
-                .ok()
-                .map(|prev| model.period_end_date(&prev))
-                .unwrap_or(test_dates[0])
-        });
+        let ref_date = match config.reference_date {
+            Some(date) => date,
+            None => model
+                .period_start_date(&periods[0])?
+                .previous_day()
+                .ok_or_else(|| {
+                    Error::Validation(
+                        "forecast reference date precedes supported date range".into(),
+                    )
+                })?,
+        };
 
         let mut eligible: Vec<usize> = Vec::new();
         let mut horizons: Vec<f64> = Vec::new();
@@ -497,7 +513,7 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     // Window replacements are distinct spec objects; group by identity.
     let mut groups: Vec<(&CovenantSpec, Vec<PeriodId>)> = Vec::new();
     for period in periods {
-        for spec in engine.applicable_specs(model.period_end_date(period)) {
+        for spec in engine.applicable_specs(model.period_end_date(period)?) {
             if spec.covenant.scope != config.scope
                 || spec.covenant.covenant_type.bound_kind().is_none()
             {
@@ -516,11 +532,14 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     let mut config = config;
     if config.reference_date.is_none() {
         config.reference_date = Some(
-            periods[0]
-                .prev()
-                .ok()
-                .map(|p| model.period_end_date(&p))
-                .unwrap_or_else(|| model.period_end_date(&periods[0])),
+            model
+                .period_start_date(&periods[0])?
+                .previous_day()
+                .ok_or_else(|| {
+                    Error::Validation(
+                        "forecast reference date precedes supported date range".into(),
+                    )
+                })?,
         );
     }
     let mut breaches = Vec::new();
@@ -590,7 +609,12 @@ fn validate_periods<MTS: ModelTimeSeries>(
     }
     let mut previous = None;
     for period in periods {
-        let date = model.period_end_date(period);
+        let date = model.period_end_date(period)?;
+        if model.period_start_date(period)? > date {
+            return Err(Error::Validation(
+                "model period starts after its end".into(),
+            ));
+        }
         if previous.is_some_and(|p| date <= p) || reference.is_some_and(|r| date < r) {
             return Err(Error::Validation(
                 "forecast dates must be strictly increasing and on or after reference_date".into(),
@@ -801,14 +825,22 @@ mod tests {
                 .get(&(node_id.to_string(), period.to_string()))
                 .copied()
         }
-        fn period_end_date(&self, period: &PeriodId) -> Date {
+        fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
             let m = [3u8, 6, 9, 12][(period.index as usize - 1).min(3)];
-            Date::from_calendar_date(
+            Ok(Date::from_calendar_date(
                 period.year,
                 Month::try_from(m).expect("Valid month (1-12)"),
                 30,
             )
-            .expect("Valid test date")
+            .expect("Valid test date"))
+        }
+        fn period_start_date(&self, period: &PeriodId) -> Result<Date> {
+            Ok(Date::from_calendar_date(
+                period.year,
+                Month::try_from(1 + 3 * (period.index as u8 - 1)).unwrap(),
+                1,
+            )
+            .unwrap())
         }
     }
 
@@ -838,7 +870,7 @@ mod tests {
         assert!(engine
             .evaluate_and_track(
                 &metrics,
-                model.period_end_date(&period),
+                model.period_end_date(&period).unwrap(),
                 crate::CovenantScope::Maintenance
             )
             .is_err());
@@ -984,7 +1016,7 @@ mod tests {
         assert_eq!(deterministic.breach_probability[0], 1.0);
         assert_eq!(
             deterministic.first_breach_date,
-            Some(mts.period_end_date(&periods[0]))
+            Some(mts.period_end_date(&periods[0]).unwrap())
         );
 
         let stochastic = forecast_covenant_generic(

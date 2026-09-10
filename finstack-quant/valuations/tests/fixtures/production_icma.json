@@ -1,0 +1,64 @@
+{
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "bond",
+      "spec": {
+        "id": "ICMA-HOST",
+        "notional": { "amount": "100", "currency": "USD" },
+        "issue_date": "2024-02-29",
+        "maturity": "2025-02-28",
+        "cashflow_spec": {
+          "fixed": {
+            "coupon_type": "cash",
+            "rate": "0.04",
+            "frequency": { "count": 6, "unit": "months" },
+            "day_count": "act_act_isma",
+            "business_day_convention": "unadjusted",
+            "calendar_id": "weekends_only",
+            "stub": "none",
+            "end_of_month": true,
+            "payment_lag_days": 0
+          }
+        },
+        "discount_curve_id": "FLAT",
+        "attributes": {},
+        "settlement_days": 0,
+        "instrument_pricing_overrides": {
+          "market_quotes": { "quoted_clean_price": 100.0 }
+        }
+      }
+    }
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "FLAT",
+        "base": "2024-02-29",
+        "day_count": "act_365f",
+        "knot_points": [
+          [0.0, 1.0],
+          [2.0, 1.0]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 0.000001
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

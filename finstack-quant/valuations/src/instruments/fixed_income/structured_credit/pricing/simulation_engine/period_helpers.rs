@@ -180,6 +180,8 @@ pub(super) struct TrancheAccrualDates {
 
 #[derive(Clone, Copy)]
 pub(super) struct SimulationPeriod {
+    pub(super) accrual_start: Date,
+    pub(super) accrual_end: Date,
     pub(super) payment: Date,
     pub(super) valuation: Date,
 }

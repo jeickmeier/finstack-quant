@@ -174,9 +174,9 @@ mod mtm_reset_builder_tests {
         assert_eq!(
             swap.notional_exchange,
             NotionalExchange::MtmResetting {
-                resetting_side: ResettingSide::Leg1,
+                resetting_side: ResettingSide::Leg2,
             },
-            "G10 pair should default to MtM-resetting on leg1 (non-USD)"
+            "EUR/USD should default to MtM-resetting on leg2 (USD)"
         );
     }
 }

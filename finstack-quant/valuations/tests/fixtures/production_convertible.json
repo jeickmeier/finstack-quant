@@ -1,0 +1,108 @@
+{
+  "description": "Input-only fixed-coupon convertible: clean par call on 2025-04-01, 1000 USD face, 5% ACT/365F coupons, zero discounting and negligible equity conversion. Expected payment is calculated independently in host tests.",
+  "as_of": "2025-04-01",
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {},
+        "call_put": {
+          "calls": [
+            {
+              "start_date": "2025-04-01",
+              "end_date": "2025-04-02",
+              "price_pct_of_par": 100.0,
+              "make_whole": null
+            }
+          ],
+          "puts": []
+        },
+        "conversion": {
+          "anti_dilution": "none",
+          "dilution_events": [],
+          "dividend_adjustment": "none",
+          "policy": "voluntary",
+          "price": null,
+          "ratio": 0.001
+        },
+        "credit_curve_id": null,
+        "discount_curve_id": "USD-OIS",
+        "fixed_coupon": {
+          "business_day_convention": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "cash",
+          "day_count": "act_365f",
+          "end_of_month": false,
+          "frequency": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.05",
+          "stub": "none"
+        },
+        "floating_coupon": null,
+        "id": "CONVERTIBLE-AUDIT",
+        "issue_date": "2025-01-01",
+        "maturity": "2026-01-01",
+        "notional": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "recovery_rate": null,
+        "underlying_equity_id": "AAPL"
+      },
+      "type": "convertible_bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-04-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {
+      "AAPL": {
+        "unitless": 1.0
+      },
+      "AAPL-VOL": {
+        "unitless": 0.2
+      },
+      "AAPL-DIVYIELD": {
+        "unitless": 0.0
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

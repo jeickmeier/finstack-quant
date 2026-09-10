@@ -36,6 +36,7 @@ mod pool_flow_source;
 mod pool_flows;
 mod simulate_period;
 mod state;
+mod triggers;
 
 use conservation::{assert_cash_conserved, recycle_reinvestment_principal};
 use period_helpers::{

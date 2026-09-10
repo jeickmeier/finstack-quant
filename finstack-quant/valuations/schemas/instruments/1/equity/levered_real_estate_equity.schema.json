@@ -475,10 +475,10 @@
               "type": "null"
             }
           ],
-          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(price_pct_of_par, PV of remaining cashflows at reference_rate + spread)`\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
+          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(clean_floor, PV of remaining cashflows - accrued) + accrued`\n\nHere `clean_floor` is notional times `price_pct_of_par / 100`; the\nreference PV discounts remaining cashflows at the reference curve plus\nspread, and accrued interest is paid exactly once.\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
         },
         "price_pct_of_par": {
-          "description": "Redemption price as percentage of par amount.",
+          "description": "Clean redemption price as percentage of par amount (100 means par).\nAccrued coupon interest at exercise is added to determine the cash payment.",
           "format": "double",
           "type": "number"
         },
@@ -550,6 +550,17 @@
         "kind": {
           "$ref": "#/$defs/CFKind",
           "description": "Category/kind of cash-flow."
+        },
+        "principal_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
         },
         "principal_delta": {
           "anyOf": [
@@ -695,6 +706,13 @@
             }
           ],
           "description": "Contractual maturity date, distinct from an adjusted final payment date."
+        },
+        "projected_fixings": {
+          "description": "Raw index observations used by projected floating coupons, before spread,\ngearing, caps and floors; retained for deterministic time-roll fixings.",
+          "items": {
+            "$ref": "#/$defs/ProjectedFixing"
+          },
+          "type": "array"
         },
         "representation": {
           "$ref": "#/$defs/CashflowRepresentation",
@@ -2215,6 +2233,33 @@
       "required": [
         "date",
         "enable_pik"
+      ],
+      "type": "object"
+    },
+    "ProjectedFixing": {
+      "additionalProperties": false,
+      "description": "One raw index observation needed by a projected floating coupon.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual index observation date, after fixing-calendar adjustments."
+        },
+        "series_id": {
+          "description": "Canonical market-series identifier, including the `FIXING:` prefix.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, or quote currency per base\ncurrency for an FX fixing series. The series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "series_id",
+        "date"
       ],
       "type": "object"
     },

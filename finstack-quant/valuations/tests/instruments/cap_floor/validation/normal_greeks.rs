@@ -47,6 +47,7 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
 
 fn build_normal_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
         .expiries(&[0.25, 1.0, 5.0, 10.0])
         .strikes(&[-0.02, 0.0, 0.03, 0.05, 0.10])
         .row(&[vol, vol, vol, vol, vol])

@@ -57,10 +57,12 @@ fn create_test_pool() -> AssetPool {
             obligor_id: Some(format!("OBLIGOR_{i}")),
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: Some(test_date()),
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
     }
@@ -127,9 +129,8 @@ fn create_test_deal() -> StructuredCredit {
     .with_payment_calendar("nyse")
 }
 
-/// A by-class waterfall: Class A interest AND principal rank ahead of any
-/// Class B payment — inexpressible with the sequential template, which pays
-/// all interest before any principal.
+/// A by-class waterfall interleaves interest and principal tiers. Each tier
+/// retains its account restriction; cross-account diversion requires a trigger.
 fn by_class_waterfall() -> Waterfall {
     Waterfall::builder(Currency::USD)
         .add_tier(
@@ -229,61 +230,22 @@ fn attaching_the_template_waterfall_is_an_exact_identity() {
 // Config sensitivity: a different structure must move the output
 
 #[test]
-fn by_class_waterfall_delays_subordinated_interest() {
+fn principal_tier_priority_does_not_transfer_subordinated_interest() {
     let template_deal = create_test_deal();
     let custom_deal = create_test_deal()
         .with_waterfall(by_class_waterfall())
         .expect("by-class waterfall must validate");
     let market = create_test_market();
-
     let template_b = template_deal
         .get_tranche_cashflows("SUB_B", &market, test_date())
-        .expect("template SUB_B flows");
+        .unwrap();
     let custom_b = custom_deal
         .get_tranche_cashflows("SUB_B", &market, test_date())
-        .expect("custom SUB_B flows");
-
-    // Under the template, all note interest is paid before any principal, so
-    // SUB_B receives interest at the first payment date. Under the by-class
-    // waterfall, SENIOR_A's untargeted principal tier sweeps every remaining
-    // dollar until A retires, so SUB_B's first interest arrives strictly later.
-    let first_interest = |flows: &finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCashflows| {
-        flows
-            .interest_flows
-            .iter()
-            .find(|(_, m)| m.amount() > 0.0)
-            .map(|(d, _)| *d)
-    };
-
-    let template_first = first_interest(&template_b).expect("template SUB_B receives interest");
-    // `None` is the even stronger outcome: A never retires early enough for B
-    // to see any interest at all.
-    if let Some(custom_first) = first_interest(&custom_b) {
-        assert!(
-            custom_first > template_first,
-            "by-class waterfall must delay SUB_B interest: template {template_first}, \
-             custom {custom_first}"
-        );
-    }
-
-    // Timing, not lifetime totals, is the correct yardstick: assert the
-    // structural change moved per-period allocation at the first payment date.
-    let template_first_amount = template_b
-        .interest_flows
-        .iter()
-        .find(|(d, _)| *d == template_first)
-        .map(|(_, m)| m.amount())
-        .unwrap_or(0.0);
-    let custom_first_amount = custom_b
-        .interest_flows
-        .iter()
-        .find(|(d, _)| *d == template_first)
-        .map(|(_, m)| m.amount())
-        .unwrap_or(0.0);
-    assert_ne!(
-        template_first_amount, custom_first_amount,
-        "the waterfall change must alter SUB_B's first-period interest"
-    );
+        .unwrap();
+    // Interleaving senior principal ahead of junior interest does not authorize
+    // an interest-to-principal transfer. The two accounts remain independent.
+    assert_eq!(custom_b.interest_flows, template_b.interest_flows);
+    assert_eq!(custom_b.principal_flows, template_b.principal_flows);
 }
 
 // Claim definition (F3): the waterfall spec defines what interest is OWED

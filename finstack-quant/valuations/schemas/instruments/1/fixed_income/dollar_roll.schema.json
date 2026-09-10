@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AgencyProgram": {
-      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively.",
+      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively.",
       "oneOf": [
         {
           "const": "FNMA",
@@ -15,7 +15,7 @@
         },
         {
           "const": "GNMA_I",
-          "description": "Ginnie Mae I - single-issuer pools with 14-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 14-day stated delay from month-end.",
+          "description": "Ginnie Mae I - single-issuer pools with 45-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 45-day stated delay from accrual start.",
           "type": "string"
         },
         {
@@ -128,7 +128,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional repo/financing curve identifier (carry-only).\n\nUsed exclusively for implied financing rate and roll specialness\ncalculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
+          "description": "Optional repo/financing curve identifier (carry-only).\n\nForward curve used by roll specialness to calculate the simple\nfinancing rate over the front/back settlement interval on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",

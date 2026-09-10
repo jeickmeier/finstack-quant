@@ -966,7 +966,8 @@ fn idiosyncratic_override_wins_over_history() {
     let fixture = fixture_panel();
     let override_vol = 0.9999_f64;
     let mut overrides = BTreeMap::new();
-    overrides.insert(IssuerId::new("ISSUER-A"), override_vol);
+    // Caller inputs are decimal spread volatility; model rows retain bp units.
+    overrides.insert(IssuerId::new("ISSUER-A"), override_vol / 10_000.0);
 
     let inputs = CreditCalibrationInputs {
         idiosyncratic_overrides: overrides,
@@ -1019,7 +1020,8 @@ fn idiosyncratic_override_wins_over_bucket_only_peer_proxy() {
     let fixture = fixture_panel();
     let override_vol = 0.7777_f64;
     let mut overrides = BTreeMap::new();
-    overrides.insert(IssuerId::new("ISSUER-D"), override_vol);
+    // Caller inputs are decimal spread volatility; model rows retain bp units.
+    overrides.insert(IssuerId::new("ISSUER-D"), override_vol / 10_000.0);
 
     let inputs = CreditCalibrationInputs {
         idiosyncratic_overrides: overrides,

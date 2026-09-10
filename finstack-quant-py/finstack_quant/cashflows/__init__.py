@@ -16,6 +16,7 @@ from finstack_quant.finstack_quant import cashflows as _cashflows
 accrual = _cashflows.accrual
 aggregation = _cashflows.aggregation
 builder = _cashflows.builder
+fixings = _cashflows.fixings
 primitives = _cashflows.primitives
 schema = _cashflows.schema
 
@@ -23,6 +24,7 @@ _submodules = {
     "accrual": accrual,
     "aggregation": aggregation,
     "builder": builder,
+    "fixings": fixings,
     "primitives": primitives,
     "schema": schema,
 }
@@ -75,6 +77,7 @@ __all__: list[str] = [
     "cpr_to_smm",
     "dated_flows",
     "dated_flows_json",
+    "fixings",
     "mdr_to_cdr",
     "primitives",
     "schedule_from_classified_flows",

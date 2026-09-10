@@ -139,6 +139,37 @@ pub struct CsaSpec {
 }
 
 impl CsaSpec {
+    /// Apply the CSA's allocated IM threshold and MTA to one collateral account.
+    ///
+    /// # Arguments
+    ///
+    /// * `gross_initial_margin` - Gross IM summed over this CSA's netting sets,
+    ///   in `base_currency` and already calculated for the elected MPOR.
+    /// * `current_collateral` - Existing nonnegative one-way IM balance in
+    ///   `base_currency`, excluding VM and the opposite party's IM account.
+    ///
+    /// # Returns
+    ///
+    /// Target collateral, signed transfer (positive posts), and segregation
+    /// requirement, alongside gross IM and the existing collateral balance.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a CSA without IM terms, invalid terms, negative/non-finite amounts
+    /// or amounts in another currency. No implicit FX conversion is performed.
+    pub fn apply_im_terms(
+        &self,
+        gross_initial_margin: Money,
+        current_collateral: Money,
+    ) -> Result<super::thresholds::ImCollateralResult> {
+        self.validate()?;
+        let params = self
+            .im_params
+            .as_ref()
+            .ok_or_else(|| finstack_quant_core::Error::Validation("CSA has no IM terms".into()))?;
+        params.apply_collateral_terms(gross_initial_margin, current_collateral)
+    }
+
     /// Create a standard regulatory CSA for USD derivatives.
     ///
     /// This represents post-2016 regulatory compliant terms with:

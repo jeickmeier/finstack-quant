@@ -1435,7 +1435,7 @@ mod tests {
         TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
@@ -1502,6 +1502,7 @@ mod tests {
             tranche_id: "A".to_string(),
             cashflows: principal_flows.clone(),
             detailed_flows: Vec::new(),
+            accrual_periods: Vec::new(),
             interest_flows: Vec::new(),
             principal_flows,
             pik_flows: Vec::new(),
@@ -1566,7 +1567,7 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(12, 2),
+            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
         )
         .with_pricing_mode(PricingMode::MonteCarlo {
             num_paths: 1,
@@ -1588,7 +1589,7 @@ mod tests {
         let config = StochasticPricerConfig::new(
             test_date(),
             test_discount_curve(),
-            ScenarioTreeConfig::new(12, 2),
+            ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
         )
         .with_pricing_mode(PricingMode::Hybrid {
             tree_periods: 3,
@@ -2167,7 +2168,7 @@ mod per_name_copula_tests {
         let deal = clo_deal(80);
 
         let run = || {
-            StochasticPricer::new(copula_config(0.04, 0.25, 24, PoolGranularity::PerName, 500))
+            StochasticPricer::new(copula_config(0.04, 0.25, 36, PoolGranularity::PerName, 500))
                 .price(&deal, &market)
                 .expect("per-name pricing")
         };
@@ -2213,7 +2214,7 @@ mod per_name_copula_tests {
             StochasticPricer::new(copula_config(
                 0.12, // high base CDR
                 0.45, // high correlation ⇒ clustered (multi-) defaults
-                24,
+                36,
                 PoolGranularity::PerName,
                 400,
             ))
@@ -2398,7 +2399,7 @@ mod per_name_copula_tests {
         let deal = clo_deal(60);
 
         let unexpected_loss_for = |override_rho: Option<f64>| -> f64 {
-            let mut cfg = copula_config(0.06, 0.10, 24, PoolGranularity::PerName, 4_000);
+            let mut cfg = copula_config(0.06, 0.10, 36, PoolGranularity::PerName, 4_000);
             cfg.tree_config.asset_correlation_override = override_rho;
             StochasticPricer::new(cfg)
                 .price(&deal, &market)
@@ -2560,7 +2561,7 @@ mod per_name_copula_tests {
         // proves the prepay channel is reading its own series.
         let deal = clo_deal(40);
         let smm_for = |spec: LatentFactorSpec| -> f64 {
-            let mut cfg = copula_config(0.06, 0.20, 24, PoolGranularity::PerName, 16);
+            let mut cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 16);
             cfg.tree_config.factor_spec = spec;
             // A STOCHASTIC prepay model, or the factor is ignored entirely and
             // the comparison is vacuous.
@@ -2664,7 +2665,7 @@ mod per_name_copula_tests {
             StochasticPricer::new(antithetic_copula_config(
                 0.05,
                 0.30,
-                24,
+                36,
                 PoolGranularity::PerName,
                 400, // even ⇒ antithetic pairing is active
             ))
@@ -2883,7 +2884,7 @@ mod per_name_copula_tests {
                 0.04,
                 0.25,
                 6.0,
-                24,
+                36,
                 PoolGranularity::PerName,
                 500,
             ))
@@ -2922,7 +2923,7 @@ mod per_name_copula_tests {
                 0.04,
                 0.25,
                 6.0,
-                24,
+                36,
                 PoolGranularity::LargeHomogeneous,
                 500,
             ))

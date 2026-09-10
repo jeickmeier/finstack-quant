@@ -200,8 +200,8 @@ def demo_pl_builder(
     for line_id, vals in (values or {}).items():
         builder.value(line_id, _pairs(line_id, vals))
     if margins:
-        builder.compute("gross_margin", "gross_profit / revenue * 100")
-        builder.compute("ebitda_margin", "ebitda / revenue * 100")
+        builder.compute("gross_margin", "gross_profit / revenue")
+        builder.compute("ebitda_margin", "ebitda / revenue")
     for line_id, formula in (computes or {}).items():
         builder.compute(line_id, formula)
     return builder

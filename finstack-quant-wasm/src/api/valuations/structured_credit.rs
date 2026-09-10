@@ -41,7 +41,7 @@ fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, Js
 /// @param tranche_id - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
 /// @param market_json - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
 /// @param as_of - ISO-8601 valuation date used for projection and discounting.
-/// @param target_pv - Target present value in the tranche's currency; values above model PV produce a negative result and values below model PV produce a positive result.
+/// @param target_pv - Positive dirty settlement amount in tranche currency, including accrued interest once; settlement uses the deal's quote_settlement_date or the valuation date.
 /// @returns The z-spread-equivalent discount margin in decimal units.
 /// @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, target_pv is non-finite, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
 #[wasm_bindgen(js_name = structuredCreditTrancheDiscountMargin)]
@@ -95,7 +95,9 @@ pub fn structured_credit_tranche_breakeven_cdr(
 /// shape Python exposes through its typed `OasResult` wrapper. Pass it to
 /// `JSON.stringify` if a wire string is needed.
 ///
-/// `marketPricePct` is the quoted price as a percentage of original balance.
+/// `marketPricePct` is the clean settlement quote as a percentage of original balance.
+/// The deal's `quote_settlement_date` defaults to valuation. Accrued interest
+/// is added exactly once; payments on or before settlement belong to the seller.
 /// `configJson`, when present, is a JSON `OasConfig`; the default is used
 /// otherwise.
 ///
@@ -108,7 +110,7 @@ pub fn structured_credit_tranche_breakeven_cdr(
 /// a JavaScript value.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
-/// @param market_price_pct - Tranche market price as a percentage of original balance.
+/// @param market_price_pct - Clean settlement quote as a percentage of original balance; accrued interest is added once.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param config_json - Optional OasConfig JSON; omit to use the default OAS solver configuration.
@@ -177,9 +179,10 @@ pub fn structured_credit_tranche_scenario_table(
 /// Per-tranche risk/spread metrics (PV, price, WAL, z-spread, CS01, spread/
 /// modified duration, convexity) computed from one tranche's own cashflows.
 ///
-/// `marketPricePct`, when provided, is the quoted price (% of original balance)
-/// the z-spread and CS01 are solved against; otherwise the tranche's own model
-/// price is used (zero z-spread). Returns a typed `TrancheMetrics` object —
+/// `marketPricePct` is a clean settlement quote (% of original balance). The
+/// deal's `quote_settlement_date` defaults to valuation; accrued interest is
+/// added once and seller-owned payments are excluded. When omitted the deal
+/// quote is used, or its model clean settlement price if no quote is supplied. Returns a typed `TrancheMetrics` object —
 /// a plain JavaScript object with the same snake_case fields (`tranche_id`,
 /// `currency`, `pv`, `price_pct`, `wal`, `z_spread_bp`, `cs01`,
 /// `spread_duration`, `modified_duration`, `convexity`, `target_price_pct`)
@@ -196,7 +199,7 @@ pub fn structured_credit_tranche_scenario_table(
 /// @param tranche_id - Stable tranche identifier used to select the required domain object.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param market_price_pct - Optional tranche market price as a percentage of original balance; omit for model price.
+/// @param market_price_pct - Optional clean settlement quote as a percentage of original balance; omit to use the deal quote, or its model clean price when no quote is supplied.
 #[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
 pub fn structured_credit_tranche_metrics(
     instrument_json: &str,

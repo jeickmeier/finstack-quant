@@ -36,7 +36,7 @@ pub(crate) fn register_basket_metrics(
         &[InstrumentType::Basket],
     )?;
     registry.register_metric(
-        MetricId::custom("weight_risk"),
+        MetricId::WeightRisk,
         Arc::new(WeightRiskCalculator),
         &[InstrumentType::Basket],
     )?;

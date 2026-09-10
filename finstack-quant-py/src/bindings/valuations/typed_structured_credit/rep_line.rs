@@ -40,6 +40,8 @@ impl PyRepLine {
     ///     Weighted average seasoning in months.
     /// day_count : DayCount
     ///     Day count convention.
+    /// asset_type : dict
+    ///     Canonical Rust AssetType JSON object specifying amortization behavior.
     /// spread_bp : float | Bps, optional
     ///     Weighted average spread over the reference index, in basis
     ///     points (e.g. ``150.0`` = 150bp), for floating-rate lines.
@@ -77,27 +79,29 @@ impl PyRepLine {
     /// >>> from finstack_quant.valuations.instruments import RepLine
     /// >>> line = RepLine(
     /// ...     "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...     datetime.date(2031, 1, 15), 12, DayCount.ACT_360,
+    /// ...     datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan", "industry": None},
     /// ...     cpr=0.10, cdr=0.02, recovery_rate=0.45,
     /// ... )
     /// >>> "LINE-1" in repr(line)
     /// True
     #[new]
-    #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *,
+    #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
                         spread_bp = None, index_id = None, cpr = None, cdr = None,
                         recovery_rate = None))]
     #[pyo3(
-        text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, \
+        text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, asset_type, \
 spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
+        py: Python<'_>,
         id: &str,
         balance: &Bound<'_, PyAny>,
         rate: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         seasoning_months: u32,
         day_count: PyRef<'_, PyDayCount>,
+        asset_type: &Bound<'_, PyAny>,
         spread_bp: Option<&Bound<'_, PyAny>>,
         index_id: Option<String>,
         cpr: Option<f64>,
@@ -114,12 +118,13 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
             id,
             balance,
             rate,
-            spread_bp,
-            index_id,
             maturity,
-            seasoning_months,
             day_count.inner,
+            crate::bindings::module_utils::py_to_serde(py, asset_type, "asset_type")?,
         );
+        inner.spread_bp = spread_bp;
+        inner.index_id = index_id;
+        inner.seasoning_months = seasoning_months;
         if let Some(cpr) = cpr {
             inner = inner.with_cpr(cpr);
         }
@@ -173,6 +178,12 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
     #[getter]
     fn id(&self) -> String {
         self.inner.id.clone()
+    }
+
+    /// Canonical asset classification, including its amortization behavior.
+    #[getter]
+    fn asset_type<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.asset_type)
     }
 
     /// Aggregated balance.

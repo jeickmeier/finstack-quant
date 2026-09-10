@@ -282,7 +282,14 @@ mod tests {
             observed_barrier_breached: None,
             notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,
-            use_gobet_miri: true,
+            monitoring: finstack_quant_valuations::instruments::Monitoring::Discrete {
+                observation_dates: vec![
+                    date!(2024 - 04 - 01),
+                    date!(2024 - 07 - 01),
+                    date!(2024 - 10 - 01),
+                    expiry,
+                ],
+            },
             discount_curve_id: "USD-OIS".into(),
             vol_surface_id: "SPOT_VOL".into(),
             div_yield_id: None,
@@ -292,7 +299,6 @@ mod tests {
             attributes: Default::default(),
             rebate: None,
             rebate_timing: Default::default(),
-            monitoring_frequency: None,
         };
 
         let market = create_mc_market(as_of, 100.0, 0.25, 0.05);

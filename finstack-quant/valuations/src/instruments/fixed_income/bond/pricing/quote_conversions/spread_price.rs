@@ -138,7 +138,8 @@ pub fn price_from_oas(
 ///   the quoted margin and re-discounted at the shifted rate.
 /// * `curves` - Market context supplying discounting and floating-rate reset
 ///   data.
-/// * `as_of` - Valuation date used for schedule construction and discounting.
+/// * `as_of` - Valuation/trade date used for projection. Settlement is derived
+///   internally once, and the returned dirty price is valued at settlement.
 /// * `dm` - Annual discount margin as a decimal added to the discount rate
 ///   (`0.01` = 100 bp).
 pub fn price_from_dm(

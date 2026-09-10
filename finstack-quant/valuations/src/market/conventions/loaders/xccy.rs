@@ -78,7 +78,7 @@ mod mtm_reset_loader_tests {
     use crate::instruments::rates::xccy_swap::{NotionalExchange, ResettingSide};
 
     #[test]
-    fn eur_usd_xccy_convention_defaults_to_mtm_resetting_on_leg1() {
+    fn eur_usd_xccy_convention_defaults_to_mtm_resetting_on_usd_leg2() {
         let registry = load_registry().expect("xccy registry loads");
         let conv = registry
             .get(&XccyConventionId::new("EUR/USD-XCCY"))
@@ -86,7 +86,7 @@ mod mtm_reset_loader_tests {
         assert_eq!(
             conv.notional_exchange,
             NotionalExchange::MtmResetting {
-                resetting_side: ResettingSide::Leg1,
+                resetting_side: ResettingSide::Leg2,
             },
         );
     }

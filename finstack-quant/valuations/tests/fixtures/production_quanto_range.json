@@ -1,0 +1,171 @@
+{
+  "description": "Inputs only: EUR asset financing at 10%, USD payoff discounting at zero, asset/FX volatilities 20%/10%, correlation 0.5 to USD per EUR. Independent lognormal interval probability is calculated in tests.",
+  "as_of": "2025-01-02",
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "accrual_start_date": "2025-01-02",
+        "attributes": {},
+        "bounds_type": "absolute",
+        "coupon_rate": 0.08,
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": null,
+        "id": "RANGE-SPX-1Y",
+        "lower_bound": 80.0,
+        "notional": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "observation_dates": [
+          "2026-01-02"
+        ],
+        "past_fixings_in_range": null,
+        "payment_date": null,
+        "spot_id": "SPX-SPOT",
+        "total_past_observations": null,
+        "underlying_ticker": "SPX",
+        "upper_bound": 120.0,
+        "vol_surface_id": "SPX-VOL",
+        "quanto": {
+          "asset_currency": "EUR",
+          "asset_discount_curve_id": "EUR-OIS",
+          "correlation": 0.5,
+          "fx_vol_surface_id": "FX-VOL",
+          "fx_spot_id": "EURUSD"
+        }
+      },
+      "type": "range_accrual"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-02",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "discount",
+        "id": "EUR-OIS",
+        "base": "2025-01-02",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            2.0,
+            0.8187307530779818
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [
+      {
+        "id": "SPX-VOL",
+        "expiries": [
+          0.5,
+          1.0,
+          2.0
+        ],
+        "strikes": [
+          50.0,
+          100.0,
+          150.0
+        ],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
+        "vols_row_major": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ]
+      },
+      {
+        "id": "FX-VOL",
+        "expiries": [
+          0.5,
+          1.0,
+          2.0
+        ],
+        "strikes": [
+          0.8,
+          1.1,
+          1.5
+        ],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
+        "vols_row_major": [
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1,
+          0.1
+        ]
+      }
+    ],
+    "prices": {
+      "SPX-SPOT": {
+        "price": {
+          "amount": "100",
+          "currency": "EUR"
+        }
+      },
+      "EURUSD": {
+        "unitless": 1.1
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

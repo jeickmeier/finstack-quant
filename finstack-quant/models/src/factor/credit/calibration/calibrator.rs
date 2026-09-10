@@ -63,7 +63,8 @@ impl CreditCalibrator {
     ///
     /// * `inputs` - History panel, tags, generic series, `as_of` cross-section,
     ///   and optional idiosyncratic-vol overrides. Spreads and the generic
-    ///   series are **decimal** (`0.01` = 100 bp); they are converted to bp
+    ///   series are **decimal** (`0.01` = 100 bp), and volatility overrides
+    ///   are decimal spread per square-root year. All are converted to bp
     ///   immediately after validation. The panel must be a complete regular
     ///   grid of `config.panel_frequency` with no `None` issuer observations.
     pub fn calibrate(&self, inputs: CreditCalibrationInputs) -> Result<CreditFactorModel> {

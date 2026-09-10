@@ -3,7 +3,6 @@
     "npv": 22059.77344291721
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -21,6 +20,10 @@
         "expiry": "2026-07-30",
         "foreign_discount_curve_id": "EUR-OIS",
         "id": "EURUSD-UP-OUT-CALL-3M-QUANTLIB",
+        "monitoring": {
+          "type": "continuous"
+        },
+        "monitoring_start_date": "2026-04-30",
         "notional": {
           "amount": "1000000",
           "currency": "EUR"
@@ -29,14 +32,11 @@
         "quote_currency": "USD",
         "rebate": null,
         "strike": 1.1,
-        "monitoring": {
-          "type": "continuous"
-        },
-        "vol_surface_id": "EURUSD-BARRIER-VOL-QL",
-        "monitoring_start_date": "2026-04-30"
+        "vol_surface_id": "EURUSD-BARRIER-VOL-QL"
       },
       "type": "fx_barrier_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {
@@ -97,6 +97,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_quotes": [],
         "quotes": [
           [
             "EUR",

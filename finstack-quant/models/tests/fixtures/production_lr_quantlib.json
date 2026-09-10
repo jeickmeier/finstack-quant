@@ -1,0 +1,270 @@
+{
+  "provenance": "QuantLib 1.43, BinomialVanillaEngine(process, 'lr', steps)",
+  "source": "https://github.com/lballabio/QuantLib/blob/master/ql/methods/lattices/binomialtree.cpp",
+  "as_of": "2025-01-01",
+  "expiry": "2026-01-01",
+  "spot": 100.0,
+  "strike": 100.0,
+  "rate": 0.05,
+  "dividend_yield": 0.02,
+  "exercise_days": [
+    91,
+    182,
+    273,
+    365
+  ],
+  "cases": [
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "european",
+      "steps": 51,
+      "pv": 9.226864785088383
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "european",
+      "steps": 101,
+      "pv": 9.226969089164786
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "european",
+      "steps": 201,
+      "pv": 9.226996241890545
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "american",
+      "steps": 51,
+      "pv": 9.226864793200363
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "american",
+      "steps": 101,
+      "pv": 9.226969107205878
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "american",
+      "steps": 201,
+      "pv": 9.226996267450955
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 51,
+      "pv": 9.226864785252246
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 101,
+      "pv": 9.226969090132497
+    },
+    {
+      "volatility": 0.2,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 201,
+      "pv": 9.226996243765338
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "european",
+      "steps": 51,
+      "pv": 6.329939904483146
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "european",
+      "steps": 101,
+      "pv": 6.3300442085588156
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "european",
+      "steps": 201,
+      "pv": 6.330071361284629
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "american",
+      "steps": 51,
+      "pv": 6.658078888418979
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "american",
+      "steps": 101,
+      "pv": 6.659392925382268
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "american",
+      "steps": 201,
+      "pv": 6.6601648261916635
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 51,
+      "pv": 6.562814595106815
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 101,
+      "pv": 6.568116624398728
+    },
+    {
+      "volatility": 0.2,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 201,
+      "pv": 6.566798924986912
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "european",
+      "steps": 51,
+      "pv": 35.00355837893106
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "european",
+      "steps": 101,
+      "pv": 35.00396583048521
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "european",
+      "steps": 201,
+      "pv": 35.004071934789806
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "american",
+      "steps": 51,
+      "pv": 35.05748416323965
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "american",
+      "steps": 101,
+      "pv": 35.058591040911544
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "american",
+      "steps": 201,
+      "pv": 35.05907812283408
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 51,
+      "pv": 35.04027413942128
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 101,
+      "pv": 35.041282309850196
+    },
+    {
+      "volatility": 0.9,
+      "side": "call",
+      "style": "bermudan",
+      "steps": 201,
+      "pv": 35.04185655927351
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "european",
+      "steps": 51,
+      "pv": 32.10663349832548
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "european",
+      "steps": 101,
+      "pv": 32.10704094987899
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "european",
+      "steps": 201,
+      "pv": 32.10714705418483
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "american",
+      "steps": 51,
+      "pv": 32.63003502687932
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "american",
+      "steps": 101,
+      "pv": 32.629256135642805
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "american",
+      "steps": 201,
+      "pv": 32.6282691115201
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 51,
+      "pv": 32.46190036914156
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 101,
+      "pv": 32.46030664806677
+    },
+    {
+      "volatility": 0.9,
+      "side": "put",
+      "style": "bermudan",
+      "steps": 201,
+      "pv": 32.46080323991557
+    }
+  ]
+}

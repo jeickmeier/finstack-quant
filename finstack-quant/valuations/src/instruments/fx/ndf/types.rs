@@ -26,7 +26,7 @@ use finstack_quant_core::Result;
 ///
 /// Settlement formula:
 /// ```text
-/// Settlement = Notional_base × (1/F_contract - 1/F_fixing)
+/// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
 /// ```
 ///
 /// This is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)
@@ -50,7 +50,7 @@ use finstack_quant_core::Result;
 #[non_exhaustive]
 pub enum NdfQuoteConvention {
     /// Rate quoted as base currency per settlement currency (e.g., 7.25 CNY per USD).
-    /// Settlement = Notional_base × (1/F_contract - 1/F_fixing)
+    /// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
     #[default]
     BasePerSettlement,
     /// Rate quoted as settlement currency per base currency (e.g., 0.138 USD per CNY).
@@ -252,7 +252,8 @@ impl std::str::FromStr for NdfFixingSource {
 /// # Pricing
 ///
 /// ## Pre-Fixing (fixing_rate = None)
-/// Forward rate is estimated via covered interest rate parity or fallback.
+/// Forward rate uses the explicit override or covered interest rate parity
+/// with both currency curves.
 ///
 /// ## Post-Fixing (fixing_rate = Some)
 /// Uses the observed fixing rate for settlement calculation.
@@ -261,7 +262,7 @@ impl std::str::FromStr for NdfFixingSource {
 ///
 /// **BasePerSettlement:**
 /// ```text
-/// Settlement = Notional_base × (1/F_contract - 1/F_fixing)
+/// Settlement = Notional_base × (1/F_fixing - 1/F_contract)
 /// PV = Settlement × DF_settlement(T)
 /// ```
 ///
@@ -884,7 +885,7 @@ impl Ndf {
         Ok(())
     }
 
-    fn settlement_amount_for_schedule(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+    fn settlement_amount(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let fixing_rate = if let Some(fixed_rate) = self.fixing_rate {
             fixed_rate
         } else if crate::instruments::fx::shared::event_has_occurred(self.fixing_date, as_of) {
@@ -899,14 +900,14 @@ impl Ndf {
         Self::validate_rate("contract_rate", self.contract_rate)?;
         Self::validate_rate("fixing_rate", fixing_rate)?;
 
-        let n_base = self.notional.amount();
-        let settlement_amount = match self.quote_convention {
-            NdfQuoteConvention::BasePerSettlement => {
-                n_base * (1.0 / self.contract_rate - 1.0 / fixing_rate)
-            }
-            NdfQuoteConvention::SettlementPerBase => n_base * (fixing_rate - self.contract_rate),
+        // Express both rates in settlement currency per unit of base, then
+        // value the same long-base position under either quotation convention.
+        let settlement_per_base = |rate: f64| match self.quote_convention {
+            NdfQuoteConvention::BasePerSettlement => rate.recip(),
+            NdfQuoteConvention::SettlementPerBase => rate,
         };
-        Ok(settlement_amount)
+        Ok(self.notional.amount()
+            * (settlement_per_base(fixing_rate) - settlement_per_base(self.contract_rate)))
     }
 }
 
@@ -937,25 +938,6 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         self.validate()?;
-        // Reject economically impossible NDFs where the fixing date falls after
-        // maturity. `Ndf::validate` enforces this at construction, but a direct
-        // field assignment can bypass it; guarding here ensures the value path
-        // never silently prices a malformed contract.
-        if self.fixing_date > self.maturity {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "NDF {} fixing_date ({}) must be on or before maturity ({})",
-                self.id, self.fixing_date, self.maturity
-            )));
-        }
-
-        Self::validate_rate("contract_rate", self.contract_rate)?;
-        if let Some(rate) = self.fixing_rate {
-            Self::validate_rate("fixing_rate", rate)?;
-        }
-        if let Some(rate) = self.spot_rate_override {
-            Self::validate_rate("spot_rate_override", rate)?;
-        }
-
         // End-of-day policy: settlement remains live on maturity.
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
             return Ok(Money::from((0_i64, self.settlement_currency)));
@@ -964,45 +946,7 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         let settlement_disc = market.get_discount(self.domestic_discount_curve_id.as_str())?;
         let df_settlement = settlement_disc.df_between_dates(as_of, self.maturity)?;
 
-        let effective_forward = if let Some(fixed_rate) = self.fixing_rate {
-            // Post-fixing: use observed rate
-            fixed_rate
-        } else if crate::instruments::fx::shared::event_has_occurred(self.fixing_date, as_of) {
-            // Past fixing date but no rate set - this is an error condition
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "NDF {} is past fixing date ({}) but no fixing_rate is set. \
-                 Use with_fixing_rate() to set the observed rate.",
-                self.id, self.fixing_date
-            )));
-        } else {
-            // Pre-fixing: estimate forward rate
-            self.estimate_forward_rate(market, as_of)?
-        };
-        Self::validate_rate("effective_forward", effective_forward)?;
-
-        if self.notional.currency() != self.base_currency {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
-                actual: self.notional.currency(),
-            });
-        }
-        let n_base = self.notional.amount();
-
-        // Compute settlement amount based on quote convention
-        let settlement_amount = match self.quote_convention {
-            NdfQuoteConvention::BasePerSettlement => {
-                // Rate is base per settlement (e.g., 7.25 CNY per USD)
-                // Settlement = N_base × (1/F_contract - 1/F_fixing)
-                // Positive when F_fixing > F_contract (base currency depreciated)
-                n_base * (1.0 / self.contract_rate - 1.0 / effective_forward)
-            }
-            NdfQuoteConvention::SettlementPerBase => {
-                // Rate is settlement per base (e.g., 0.138 USD per CNY)
-                // Settlement = N_base × (F_fixing - F_contract)
-                // Positive when F_fixing > F_contract (base currency appreciated)
-                n_base * (effective_forward - self.contract_rate)
-            }
-        };
+        let settlement_amount = self.settlement_amount(market, as_of)?;
 
         let pv = settlement_amount * df_settlement;
         Money::new(pv, self.settlement_currency)
@@ -1021,6 +965,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        self.validate()?;
         if crate::instruments::fx::shared::event_has_occurred(self.maturity, as_of) {
             return Ok(crate::cashflow::traits::schedule_from_classified_flows(
                 Vec::new(),
@@ -1035,7 +980,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
                 },
             ));
         }
-        let settlement_amount = self.settlement_amount_for_schedule(market, as_of)?;
+        let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![(self.maturity, Money::new(settlement_amount, ccy)?)],
@@ -1139,51 +1084,27 @@ mod tests {
 
     #[test]
     fn test_ndf_base_per_settlement_settlement_formula() {
-        // Test the settlement formula for BasePerSettlement convention
-        // Contract rate: 7.25 CNY/USD
-        // Fixing rate: 7.30 CNY/USD (CNY depreciated)
-        // Notional: 10,000,000 CNY
-        //
-        // Expected settlement (in USD):
-        // = 10,000,000 * (1/7.25 - 1/7.30)
-        // = 10,000,000 * (0.13793 - 0.13699)
-        // = 10,000,000 * 0.00094
-        // ≈ 9,430 USD (positive, we receive)
-
-        let contract_rate = 7.25;
-        let fixing_rate = 7.30;
-        let notional = 10_000_000.0;
-
-        let settlement: f64 = notional * (1.0 / contract_rate - 1.0 / fixing_rate);
-        assert!(settlement > 0.0, "Settlement should be positive");
-        assert!(
-            (settlement - 9430.0).abs() < 100.0,
-            "Settlement should be approximately 9,430 USD"
-        );
+        let mut ndf = Ndf::example();
+        ndf.contract_rate = 7.25;
+        ndf.fixing_rate = Some(7.30);
+        // Long 10m CNY loses USD value on the five-cent depreciation.
+        let expected = -500_000.0 / 52.925;
+        let settlement = ndf
+            .settlement_amount(&MarketContext::new(), ndf.fixing_date)
+            .expect("settlement");
+        assert!((settlement - expected).abs() < 1e-8);
     }
 
     #[test]
     fn test_ndf_settlement_per_base_settlement_formula() {
-        // Test the settlement formula for SettlementPerBase convention
-        // Contract rate: 0.138 USD/CNY
-        // Fixing rate: 0.140 USD/CNY (CNY appreciated)
-        // Notional: 10,000,000 CNY
-        //
-        // Expected settlement (in USD):
-        // = 10,000,000 * (0.140 - 0.138)
-        // = 10,000,000 * 0.002
-        // = 20,000 USD (positive, we receive)
-
-        let contract_rate = 0.138;
-        let fixing_rate = 0.140;
-        let notional = 10_000_000.0;
-
-        let settlement: f64 = notional * (fixing_rate - contract_rate);
-        assert!(settlement > 0.0, "Settlement should be positive");
-        assert!(
-            (settlement - 20_000.0).abs() < 1.0,
-            "Settlement should be exactly 20,000 USD"
-        );
+        let mut ndf = Ndf::example();
+        ndf.quote_convention = NdfQuoteConvention::SettlementPerBase;
+        ndf.contract_rate = 0.138;
+        ndf.fixing_rate = Some(0.140);
+        let settlement = ndf
+            .settlement_amount(&MarketContext::new(), ndf.fixing_date)
+            .expect("settlement");
+        assert!((settlement - 20_000.0).abs() < 1e-8);
     }
 
     #[test]
@@ -1438,7 +1359,8 @@ mod tests {
         assert_eq!(flows.len(), 1, "fixed NDF should emit one settlement flow");
         assert_eq!(flows[0].0, maturity);
         assert_eq!(flows[0].1.currency(), Currency::USD);
-        assert!(flows[0].1.amount() > 0.0);
+        // CNY weakens: the long-CNY settlement loses 10m * (1/7.30 - 1/7.25) USD.
+        assert!((flows[0].1.amount() + 500_000.0 / 52.925).abs() < 1e-8);
     }
 
     fn create_test_market(as_of: Date) -> MarketContext {

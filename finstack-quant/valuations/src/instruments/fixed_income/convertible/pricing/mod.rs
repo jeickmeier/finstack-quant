@@ -18,7 +18,7 @@ mod tree_pricer;
 mod tsiveriotis_zhang;
 mod valuator;
 
-pub(crate) use engine::{build_convertible_schedule, compute_conversion_value};
+pub(crate) use engine::{build_convertible_schedule, compute_conversion_value, price_bond_floor};
 pub use engine::{
     calculate_accrued_interest, calculate_conversion_premium, calculate_convertible_greeks,
     calculate_parity, price_convertible_bond, settlement_date, ConvertibleTreeType,

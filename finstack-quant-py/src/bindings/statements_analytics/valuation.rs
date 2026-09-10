@@ -1114,8 +1114,8 @@ impl PyCorporateAnalysis {
 ///     DCF valuation date and, with ``market``, the statement visibility and
 ///     market-data date. Defaults to the first forecast boundary.
 /// exit_multiple_metric_node : str | None
-///     Statement node whose last-forecast-period value replaces
-///     ``terminal_metric`` on an exit-multiple terminal.
+///     Statement monetary flow node whose complete trailing-year sum replaces
+///     ``terminal_metric`` on an exit-multiple terminal. Actual period boundaries must cover one complete contiguous calendar year; otherwise omit this node and supply an explicit annual metric.
 ///
 /// Returns
 /// -------
@@ -1253,7 +1253,7 @@ fn evaluate_dcf<'py>(
 /// market : MarketContext | str | None
 ///     Market context for statement evaluation (not WACC discounting).
 /// exit_multiple_metric_node : str | None
-///     Statement node supplying the exit-multiple terminal metric.
+///     Statement monetary flow node supplying the complete trailing-year terminal metric; insufficient or noncontiguous history raises ValueError.
 ///
 /// Returns
 /// -------

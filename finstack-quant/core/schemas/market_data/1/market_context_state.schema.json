@@ -1571,6 +1571,11 @@
       "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
       "oneOf": [
         {
+          "const": "one_one",
+          "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+          "type": "string"
+        },
+        {
           "const": "act_360",
           "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
           "type": "string"
@@ -1921,6 +1926,27 @@
           },
           "type": "array"
         },
+        "provider_quotes": {
+          "description": "Captured provider quotes, below explicit global and date/policy-pinned\nquotes in lookup priority. Market-context restoration uses these to\nrebuild a quote-only provider; arbitrary live provider behavior is not\nserialized. Required even when the provider has no snapshot quotes.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
         "quotes": {
           "description": "Pair-global quotes as source, target, rate tuples.",
           "items": {
@@ -1946,6 +1972,7 @@
       "required": [
         "config",
         "quotes",
+        "provider_quotes",
         "pinned_quotes"
       ],
       "type": "object"
@@ -2040,7 +2067,7 @@
     },
     "InflationIndex": {
       "additionalProperties": false,
-      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
+      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
       "properties": {
         "currency": {
           "$ref": "#/$defs/Currency",

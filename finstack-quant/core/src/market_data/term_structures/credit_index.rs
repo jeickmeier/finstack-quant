@@ -41,8 +41,9 @@ pub struct CreditIndexData {
     pub index_credit_curve: Arc<HazardCurve>,
     /// Base correlation curve mapping detachment points to correlations
     pub base_correlation_curve: Arc<BaseCorrelationCurve>,
-    /// Optional individual hazard curves for each constituent issuer
-    /// Key is the issuer identifier (e.g., ticker or CUSIP)
+    /// Optional complete set of individual hazard curves for every constituent.
+    /// Keys are issuer identifiers (e.g., ticker or CUSIP); when provided the
+    /// map must contain exactly `num_constituents` distinct issuers.
     pub issuer_credit_curves: Option<BTreeMap<String, Arc<HazardCurve>>>,
     /// Optional individual recovery rates for each constituent issuer
     /// Key is the issuer identifier (e.g., ticker or CUSIP)
@@ -196,8 +197,8 @@ impl CreditIndexDataBuilder {
     /// Entries are stored by issuer identifier in lexicographic order so
     /// snapshots are deterministic. If `curves` repeats an identifier, the
     /// last curve yielded by the iterator replaces earlier values. Validation
-    /// is deferred until [`build`](Self::build), which rejects an explicitly
-    /// empty collection and a collection larger than `num_constituents`.
+    /// is deferred until [`build`](Self::build), which requires exactly
+    /// `num_constituents` distinct issuer curves so no pool weight is omitted.
     ///
     /// # Arguments
     ///
@@ -205,7 +206,8 @@ impl CreditIndexDataBuilder {
     ///   caller-defined stable keys and must be reused by
     ///   [`issuer_recovery_rates`](Self::issuer_recovery_rates) and
     ///   [`issuer_weights`](Self::issuer_weights); each curve supplies that
-    ///   issuer's default-probability term structure.
+    ///   issuer's default-probability term structure. Supply the complete
+    ///   constituent set; partial coverage is rejected at build time.
     pub fn issuer_curves<I>(mut self, curves: I) -> Self
     where
         I: IntoIterator<Item = (String, Arc<HazardCurve>)>,
@@ -313,9 +315,9 @@ fn validate_issuer_curves(
                 "issuer_credit_curves must not be empty when provided".to_string(),
             ));
         }
-        if curves.len() > usize::from(num_constituents) {
+        if curves.len() != usize::from(num_constituents) {
             return Err(crate::Error::Validation(format!(
-                "issuer_credit_curves has {} entries, which exceeds num_constituents={num_constituents}",
+                "issuer_credit_curves has {} entries; complete coverage requires exactly num_constituents={num_constituents}",
                 curves.len()
             )));
         }
@@ -410,4 +412,37 @@ fn validate_issuer_weights(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod production_credit_audit {
+    use super::*;
+    use crate::dates::{Date, Month};
+
+    #[test]
+    fn issuer_curves_cover_every_constituent() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let hazard = Arc::new(
+            HazardCurve::builder("A")
+                .base_date(base)
+                .recovery_rate(0.4)
+                .knots([(1.0, 0.02)])
+                .build()
+                .expect("hazard"),
+        );
+        let correlation = Arc::new(
+            BaseCorrelationCurve::builder("BC")
+                .knots([(3.0, 0.3), (100.0, 0.3)])
+                .build()
+                .expect("correlation"),
+        );
+        let result = CreditIndexData::builder()
+            .num_constituents(2)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::clone(&hazard))
+            .base_correlation_curve(correlation)
+            .issuer_curves(BTreeMap::from([("A".to_owned(), hazard)]))
+            .build();
+        assert!(result.is_err(), "one issuer must not price a two-name pool");
+    }
 }

@@ -21,7 +21,10 @@ use indexmap::IndexMap;
 /// `t1` is valued on the market after
 /// [`MarketContext::roll_forward`](finstack_quant_core::market_data::context::MarketContext::roll_forward)
 /// (curves realize their forwards). It is not a frozen-knot lookup of the
-/// unrolled market at a shifted `as_of`.
+/// unrolled market at a shifted `as_of`. Before rolling curves, raw coupon
+/// observations crossed in `(t0, t1]` are materialized from the canonical
+/// pre-roll schedules. Existing exact-date observations retain priority. A
+/// missing or conflicting required projection returns an error atomically.
 ///
 /// # Arguments
 /// - `ctx`: Execution context providing the mutable valuation date, market data,
@@ -140,7 +143,28 @@ pub(crate) fn apply_time_roll_forward_with_credit(
     // curves preserve hazard rates, forward curves preserve forwards,
     // inflation rebases CPI, price/vol-index curves set spot to the old
     // forward). Vol surfaces, FX spot, and fixings stay static.
-    let mut rolled_market = ctx.market.roll_forward(day_shift)?;
+    let schedules = ctx.instruments.as_ref().map_or_else(
+        || Ok(Vec::new()),
+        |instruments| {
+            instruments
+                .iter()
+                .map(|instrument| {
+                    instrument
+                        .cashflow_schedule(ctx.market, old_date)
+                        .map_err(|error| {
+                            Error::Validation(format!(
+                                "pre-roll fixing projection for '{}' failed: {error}",
+                                instrument.id()
+                            ))
+                        })
+                })
+                .collect::<Result<Vec<_>>>()
+        },
+    )?;
+    let projected_market = finstack_quant_cashflows::fixings::materialize_fixings(
+        ctx.market, &schedules, old_date, new_date,
+    )?;
+    let mut rolled_market = projected_market.roll_forward(day_shift)?;
     for (hazard_id, discount_id) in hazard_rolls {
         use finstack_quant_valuations::recalibration::{
             HazardRecalibrationAction, HazardRecalibrationRequest,
@@ -454,8 +478,26 @@ mod tests {
     }
 
     #[test]
-    fn cashflow_failure_excludes_instrument_from_carry() {
-        let mut market = MarketContext::new();
+    fn fixing_projection_failure_leaves_market_and_date_unchanged() {
+        use finstack_quant_core::market_data::{
+            context::MarketContextState, scalars::ScalarTimeSeries,
+        };
+
+        let origin = date!(2025 - 01 - 01);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(origin)
+            .knots([(0.0, 1.0), (1.0, 0.98)])
+            .build()
+            .unwrap();
+        let mut market = MarketContext::new().insert(curve).insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR",
+                vec![(origin, 0.035)],
+                Some(Currency::USD),
+            )
+            .unwrap(),
+        );
+        let before = serde_json::to_value(MarketContextState::from(&market)).unwrap();
         let mut instruments: Vec<Box<dyn Instrument>> =
             vec![Box::new(MissingCashflows(Attributes::new()))];
         let mut ctx = ExecutionContext {
@@ -464,16 +506,49 @@ mod tests {
             instruments: Some(&mut instruments),
             rate_bindings: None,
             calendar: None,
-            as_of: date!(2025 - 01 - 01),
+            as_of: origin,
         };
-        let report =
-            apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays).expect("roll");
-        assert!(report.instrument_carry.is_empty());
-        assert!(report.total_carry.is_empty());
-        assert_eq!(report.failed_instruments.len(), 1);
-        assert!(report.failed_instruments[0]
+        let error = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays)
+            .expect_err("fixing projection must fail before committing the roll");
+        assert!(matches!(error, crate::Error::Validation(_)));
+        let message = error.to_string();
+        for detail in [
+            "pre-roll fixing projection",
+            "missing-cashflows",
+            "missing fixing for coupon",
+        ] {
+            assert!(message.contains(detail), "{message}");
+        }
+        assert_eq!(ctx.as_of, origin);
+        assert_eq!(
+            serde_json::to_value(MarketContextState::from(&*ctx.market)).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn cashflow_failure_excludes_instrument_from_carry() {
+        let market = MarketContext::new();
+        let instruments: Vec<Box<dyn Instrument>> =
+            vec![Box::new(MissingCashflows(Attributes::new()))];
+        let (instrument_carry, total_carry, failed_instruments) = calculate_instrument_pnl(
+            &instruments,
+            &market,
+            &market,
+            date!(2025 - 01 - 01),
+            date!(2025 - 02 - 01),
+        )
+        .expect("carry failures are reported per instrument");
+        assert!(instrument_carry.is_empty());
+        assert!(total_carry.is_empty());
+        assert_eq!(failed_instruments.len(), 1);
+        assert_eq!(failed_instruments[0].0, "missing-cashflows");
+        assert!(failed_instruments[0]
             .1
             .contains("cashflow collection failed:"));
+        assert!(failed_instruments[0]
+            .1
+            .contains("missing fixing for coupon"));
     }
 
     #[test]

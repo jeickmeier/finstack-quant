@@ -26,10 +26,12 @@
 //! approach zero naturally), we apply a near-expiry threshold for consistency
 //! with other Greeks and to avoid potential numerical issues with d1 calculation.
 
-use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
+use crate::instruments::common_impl::vol_resolution::ResolvedVolatility;
+use crate::instruments::rates::swaption::Swaption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bachelier_vega, black_vega};
+use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Minimum time to expiry (in years) for valid vega calculation.
 ///
@@ -56,62 +58,18 @@ impl MetricCalculator for VegaCalculator {
             return Ok(0.0);
         }
 
-        // Black (lognormal) Greeks are undefined for non-positive forward or
-        // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
-        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
-        let use_normal = normal_by_model || normal_by_negative_rate;
-        let (vega_raw, quote_axis_jacobian) = if use_normal {
-            // For the negative-rate fallback `inputs.sigma` is a lognormal vol;
-            // convert it to a normal vol so the Bachelier d-value — and hence
-            // the vega — is correctly scaled. (Vega here measures sensitivity
-            // to the normal vol on this path, consistent with the Bachelier
-            // pricer the fallback uses.)
-            let normal_sigma = if normal_by_model {
-                inputs.sigma
-            } else {
-                super::resolved_normal_sigma(
-                    option,
-                    inputs.forward,
-                    strike,
-                    inputs.sigma,
-                    inputs.time_to_expiry,
-                )
-            };
-            let jacobian = if normal_by_model {
-                1.0
-            } else {
-                let bump = (inputs.sigma.abs() * 1.0e-5).max(1.0e-7);
-                let lower = (inputs.sigma - bump).max(0.0);
-                let upper = inputs.sigma + bump;
-                let normal_upper = super::resolved_normal_sigma(
-                    option,
-                    inputs.forward,
-                    strike,
-                    upper,
-                    inputs.time_to_expiry,
-                );
-                let normal_lower = super::resolved_normal_sigma(
-                    option,
-                    inputs.forward,
-                    strike,
-                    lower,
-                    inputs.time_to_expiry,
-                );
-                (normal_upper - normal_lower) / (upper - lower)
-            };
-            (
-                bachelier_vega(inputs.forward, strike, normal_sigma, inputs.time_to_expiry),
-                jacobian,
-            )
-        } else {
-            (
-                black_vega(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry),
-                1.0,
-            )
+        let (forward, strike) = ResolvedVolatility {
+            sigma: inputs.sigma,
+            convention: inputs.volatility_convention,
+        }
+        .model_rates(inputs.forward, strike)?;
+        let vega_raw = match inputs.volatility_convention {
+            VolatilityConvention::Normal => {
+                bachelier_vega(forward, strike, inputs.sigma, inputs.time_to_expiry)
+            }
+            _ => black_vega(forward, strike, inputs.sigma, inputs.time_to_expiry),
         };
-
-        let vega = vega_raw * quote_axis_jacobian / super::config::VOL_PCT_SCALE;
+        let vega = vega_raw / super::config::VOL_PCT_SCALE;
         // Scale by notional and annuity for cash vega
         Ok(vega * option.notional.amount() * inputs.annuity)
     }

@@ -53,76 +53,6 @@ fn emit_revolving_fee_on(
     }
 }
 
-/// Compute the time-weighted average of a value over a date range using a history map.
-///
-/// Given a history of `(date, outstanding)` snapshots, computes:
-///
-/// ```text
-/// TWA = sum(outstanding_i * delta_t_i) / sum(delta_t_i)
-/// ```
-///
-/// where `outstanding_i` is the outstanding at each snapshot date that falls within
-/// `[accrual_start, accrual_end)`, and `delta_t_i` is the number of days until the
-/// next snapshot or `accrual_end`.
-///
-/// If no history entries exist for the period, returns the `fallback` value.
-fn compute_time_weighted_average(
-    outstanding_history: &[(Date, Decimal)],
-    accrual_start: Date,
-    accrual_end: Date,
-    fallback: Decimal,
-    entries_buf: &mut Vec<(Date, Decimal)>,
-) -> Decimal {
-    debug_assert!(
-        outstanding_history.windows(2).all(|w| w[0].0 <= w[1].0),
-        "compute_time_weighted_average requires ascending history"
-    );
-
-    let hi = outstanding_history.partition_point(|(date, _)| *date < accrual_end);
-    if hi == 0 {
-        return fallback;
-    }
-    let lo = outstanding_history.partition_point(|(date, _)| *date < accrual_start);
-
-    entries_buf.clear();
-    if !(lo < hi && outstanding_history[lo].0 == accrual_start) {
-        let carry_in = if lo == 0 {
-            fallback
-        } else {
-            outstanding_history[lo - 1].1
-        };
-        entries_buf.push((accrual_start, carry_in));
-    }
-    entries_buf.extend_from_slice(&outstanding_history[lo..hi]);
-    let entries = entries_buf;
-
-    let mut weighted_sum = Decimal::ZERO;
-    let mut total_days = 0i64;
-
-    for i in 0..entries.len() {
-        let (date_i, val_i) = entries[i];
-        if date_i >= accrual_end {
-            break;
-        }
-        let next_date = if i + 1 < entries.len() {
-            entries[i + 1].0.min(accrual_end)
-        } else {
-            accrual_end
-        };
-        let days = (next_date - date_i).whole_days();
-        if days > 0 {
-            weighted_sum += val_i * Decimal::from(days);
-            total_days += days;
-        }
-    }
-
-    if total_days > 0 {
-        weighted_sum / Decimal::from(total_days)
-    } else {
-        fallback
-    }
-}
-
 /// Emit fee cashflows on a specific date.
 ///
 /// Processes both periodic fees (based on drawn/undrawn balances) and fixed
@@ -133,10 +63,10 @@ fn compute_time_weighted_average(
 ///
 /// When a fee's `accrual_basis` is `PointInTime`, the outstanding balance is
 /// sampled at the period's accrual start from `outstanding_history` (falling
-/// back to the live `outstanding` only when no entry exists), matching the
-/// coupon convention. When it is `TimeWeightedAverage`, the balance is the
-/// time-weighted average over the accrual period — useful for commitment fees
-/// on revolving facilities where the outstanding changes within the period.
+/// back to the live `outstanding` only when no history exists). With
+/// `TimeWeightedAverage`, each constant-balance interval uses the contractual
+/// day count and emits its own accrual metadata. This preserves leap-year,
+/// intraperiod balance changes, and undrawn-limit clipping semantics.
 ///
 /// Any non-zero fee amount is emitted; negative fees (rebates) are preserved
 /// as negative cashflows for both periodic and fixed fees.
@@ -149,77 +79,89 @@ pub(in crate::builder) fn emit_fees_on(
     ccy: Currency,
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
-    let mut twa_buf: Vec<(Date, Decimal)> = Vec::new();
-
     for pf in periodic_fees {
-        let Some(period) = pf.prev.get(&d) else {
-            continue;
-        };
-        let is_termination_date = pf.terminal_accrual_end == Some(period.accrual_end);
-        let yf = pf.day_count.year_fraction(
-            period.accrual_start,
-            period.accrual_end,
-            finstack_quant_core::dates::DayCountContext {
-                calendar: Some(pf.calendar),
-                frequency: Some(pf.frequency),
-                bus_basis: None,
-                coupon_period: None,
-                end_is_termination_date: is_termination_date,
-            },
-        )?;
-
-        // PointInTime samples outstanding at accrual start, not the live payment-date balance.
-        let effective_outstanding = match pf.accrual_basis {
-            FeeAccrualBasis::PointInTime => outstanding_history
-                .binary_search_by_key(&period.accrual_start, |(date, _)| *date)
-                .map_or(outstanding, |idx| outstanding_history[idx].1),
-            FeeAccrualBasis::TimeWeightedAverage => compute_time_weighted_average(
+        let first = pf.dates.partition_point(|date| {
+            pf.prev
+                .get(date)
+                .is_none_or(|period| period.accrual_end < d)
+        });
+        for period in pf.dates[first..]
+            .iter()
+            .filter_map(|date| pf.prev.get(date))
+            .take_while(|period| period.accrual_end == d)
+        {
+            let mut segments = super::balances::balance_segments(
                 outstanding_history,
                 period.accrual_start,
                 period.accrual_end,
                 outstanding,
-                &mut twa_buf,
-            ),
-        };
-
-        let base_amt = match &pf.base {
-            FeeBase::Drawn => effective_outstanding,
-            FeeBase::Undrawn { facility_limit } => {
-                if facility_limit.currency() != ccy {
-                    return Err(InputError::Invalid.into());
-                }
-                let facility_limit_dec = f64_to_decimal(facility_limit.amount())?;
-                (facility_limit_dec - effective_outstanding).max(Decimal::ZERO)
-            }
-        };
-
-        let yf_dec = f64_to_decimal(yf)?;
-        let fee_amt_dec = base_amt * pf.bp * BP_TO_RATE * yf_dec;
-        let fee_amt = decimal_to_f64(fee_amt_dec)?;
-
-        let rate_dec = pf.bp * BP_TO_RATE;
-        let rate = decimal_to_f64(rate_dec)?;
-
-        if fee_amt != 0.0 {
-            new_flows.push(
-                CashFlow::new(
-                    d,
-                    None,
-                    Money::new(fee_amt, ccy)?,
-                    CFKind::Fee,
-                    yf,
-                    Some(rate),
-                )
-                .with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: is_termination_date,
-                    calendar_id: Some(pf.calendar_id.clone()),
-                    start: period.accrual_start,
-                    end: period.accrual_end,
-                    day_count: pf.day_count,
-                    projected_index_rate: None,
-                }),
             );
+            if pf.accrual_basis == FeeAccrualBasis::PointInTime {
+                if let Some(first) = segments.first().copied() {
+                    segments = vec![(period.accrual_start, period.accrual_end, first.2)];
+                }
+            }
+            for (accrual_start, accrual_end, effective_outstanding) in segments {
+                let is_termination_date = pf.terminal_accrual_end == Some(accrual_end);
+                let coupon_period = crate::builder::date_generation::icma_coupon_period(
+                    period.unadjusted_start,
+                    period.unadjusted_end,
+                    pf.frequency,
+                    pf.stub,
+                    false,
+                );
+                let yf = pf.day_count.year_fraction(
+                    accrual_start,
+                    accrual_end,
+                    finstack_quant_core::dates::DayCountContext {
+                        calendar: Some(pf.calendar),
+                        frequency: Some(pf.frequency),
+                        bus_basis: None,
+                        coupon_period,
+                        end_is_termination_date: is_termination_date,
+                    },
+                )?;
+
+                let base_amt = match &pf.base {
+                    FeeBase::Drawn => effective_outstanding,
+                    FeeBase::Undrawn { facility_limit } => {
+                        if facility_limit.currency() != ccy {
+                            return Err(InputError::Invalid.into());
+                        }
+                        let facility_limit_dec = f64_to_decimal(facility_limit.amount())?;
+                        (facility_limit_dec - effective_outstanding).max(Decimal::ZERO)
+                    }
+                };
+
+                let yf_dec = f64_to_decimal(yf)?;
+                let fee_amt_dec = base_amt * pf.bp * BP_TO_RATE * yf_dec;
+                let fee_amt = decimal_to_f64(fee_amt_dec)?;
+
+                let rate_dec = pf.bp * BP_TO_RATE;
+                let rate = decimal_to_f64(rate_dec)?;
+
+                if fee_amt != 0.0 {
+                    new_flows.push(
+                        CashFlow::new(
+                            period.payment_date,
+                            None,
+                            Money::new(fee_amt, ccy)?,
+                            CFKind::Fee,
+                            yf,
+                            Some(rate),
+                        )
+                        .with_accrual(CashFlowAccrual {
+                            coupon_period,
+                            end_is_termination_date: is_termination_date,
+                            calendar_id: Some(pf.calendar_id.clone()),
+                            start: accrual_start,
+                            end: accrual_end,
+                            day_count: pf.day_count,
+                            projected_index_rate: None,
+                        }),
+                    );
+                }
+            }
         }
     }
 
@@ -353,13 +295,43 @@ mod tests {
             bp,
             day_count: DayCount::Act360,
             frequency: Tenor::quarterly(),
+            stub: finstack_quant_core::dates::StubKind::ShortBack,
             calendar: crate::builder::calendar::resolve_calendar_strict("weekends_only")
                 .expect("weekends_only calendar should resolve"),
-            dates: vec![accrual_start, accrual_end],
+            dates: vec![payment_date],
             prev,
             accrual_basis,
             terminal_accrual_end: Some(accrual_end),
         }
+    }
+
+    #[test]
+    fn b14_fee_uses_contract_daycount_on_each_balance_segment() {
+        let start = time::macros::date!(2023 - 12 - 01);
+        let event = time::macros::date!(2023 - 12 - 31);
+        let end = time::macros::date!(2024 - 03 - 01);
+        let mut fee = make_periodic_fee(
+            start,
+            end,
+            end,
+            dec!(50),
+            FeeAccrualBasis::TimeWeightedAverage,
+            FeeBase::Drawn,
+        );
+        fee.day_count = DayCount::ActAct;
+        let mut flows = Vec::new();
+        emit_fees_on(
+            end,
+            &[fee],
+            &[],
+            Decimal::ZERO,
+            &[(start, dec!(1000000)), (event, Decimal::ZERO)],
+            Currency::USD,
+            &mut flows,
+        )
+        .expect("valid fee accrual");
+        let amount: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
+        assert!((amount - 1_000_000.0 * 0.005 * 30.0 / 365.0).abs() < 1e-8);
     }
 
     #[test]
@@ -492,8 +464,8 @@ mod tests {
         )
         .expect("valid date");
 
-        assert_eq!(flows.len(), 1);
-        let fee = flows[0].amount.amount();
+        assert_eq!(flows.len(), 2);
+        let fee: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
         let expected_twa = (1_000_000.0 * 30.0 + 500_000.0 * 60.0) / 90.0;
         let expected_fee = expected_twa * 0.005 * (90.0 / 360.0);
         assert!(
@@ -538,48 +510,17 @@ mod tests {
         )
         .expect("valid date");
 
-        assert_eq!(flows.len(), 1);
+        assert_eq!(flows.len(), 2);
         let twa_outstanding = (1_000_000.0 * 30.0 + 500_000.0 * 60.0) / 90.0;
         let undrawn = facility_limit - twa_outstanding;
         let expected_fee = undrawn * 0.005 * (90.0 / 360.0);
-        let fee = flows[0].amount.amount();
+        let fee: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
         assert!(
             (fee - expected_fee).abs() < 0.02,
             "Expected ~{:.2}, got {:.2}",
             expected_fee,
             fee
         );
-    }
-
-    #[test]
-    fn compute_twa_no_history_returns_fallback() {
-        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let history: Vec<(Date, Decimal)> = Vec::new();
-        let mut buf = Vec::new();
-        let result = compute_time_weighted_average(&history, start, end, dec!(42), &mut buf);
-        assert_eq!(result, dec!(42));
-    }
-
-    #[test]
-    fn compute_twa_single_entry_at_start() {
-        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000))];
-        let mut buf = Vec::new();
-        let result = compute_time_weighted_average(&history, start, end, dec!(0), &mut buf);
-        assert_eq!(result, dec!(1000000), "Expected 1M, got {}", result);
-    }
-
-    #[test]
-    fn compute_twa_entry_before_start() {
-        let before = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-        let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let history: Vec<(Date, Decimal)> = vec![(before, dec!(1000000))];
-        let mut buf = Vec::new();
-        let result = compute_time_weighted_average(&history, start, end, dec!(0), &mut buf);
-        assert_eq!(result, dec!(1000000), "Expected 1M, got {}", result);
     }
 
     #[test]

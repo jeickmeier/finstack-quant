@@ -254,6 +254,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
         side: PayReceive::Pay,
         convention: conv.family,
         premium: PremiumLegSpec {
+            standard_imm_dates: true,
             start: dates.start,
             end: dates.maturity,
             frequency: conv.frequency,

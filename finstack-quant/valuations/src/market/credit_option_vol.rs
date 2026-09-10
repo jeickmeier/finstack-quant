@@ -245,7 +245,7 @@ fn native_atm_coordinate(option: &CDSOption, market: &MarketContext, as_of: Date
     let surv = market.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), &cds, as_of, 0.0)?;
     match option.strike.kind() {
-        CDSOptionStrikeKind::Spread => Ok(ctx.display_forward_par_spread),
+        CDSOptionStrikeKind::Spread => Ok(ctx.forward_par_spread),
         CDSOptionStrikeKind::CleanPricePct => ctx.native_atm_forward_clean_price_pct(),
     }
 }

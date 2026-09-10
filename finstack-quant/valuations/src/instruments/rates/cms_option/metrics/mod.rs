@@ -222,7 +222,7 @@ impl MetricCalculator for VannaCalculator {
                 time_to_fixing,
                 inst.cms_tenor,
                 forward_swap_rate,
-                reference_swap.payments_per_year(),
+                reference_swap.payments_per_year()?,
             );
             let d_conv_d_vol = if vol.abs() > 1e-10 {
                 2.0 * conv_adj / vol

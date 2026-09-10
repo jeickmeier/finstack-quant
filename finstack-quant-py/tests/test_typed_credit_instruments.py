@@ -97,6 +97,7 @@ def _cds_hand_written_json() -> str:
                 "side": "pay",
                 "convention": "isda_na",
                 "premium": {
+                    "standard_imm_dates": True,
                     "start": "2024-03-20",
                     "end": "2029-06-20",
                     "frequency": {"count": 3, "unit": "months"},
@@ -271,6 +272,7 @@ class TestPremiumLegSpecTyped:
             100.0,
             "USD-OIS",
             stub=stub,
+            standard_imm_dates=False,
         )
         assert "spread_bp=100" in repr(leg)
 

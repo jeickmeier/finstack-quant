@@ -615,6 +615,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_id = format!("CDS_{}", i);
         let convention = CdsConvention::IsdaNa;
         let premium = PremiumLegSpec {
+            standard_imm_dates: true,
             start: base,
             end: maturity_5y(),
             frequency: convention.frequency(),
@@ -1017,7 +1018,9 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         .with_payment_calendar("nyse");
         // Spread metrics require an external quote; using model dirty price
         // as its own Z-spread target would force a circular zero spread.
-        sc.metric_pricing_overrides.quoted_price_pct = Some(98.5);
+        sc.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(98.5);
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

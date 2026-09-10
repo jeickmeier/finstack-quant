@@ -32,7 +32,7 @@ import math
 import os
 from pathlib import Path
 import shutil
-import subprocess
+import subprocess  # nosec B404 # fixed Cargo benchmark command, no shell
 
 import numpy as np
 import pytest
@@ -169,7 +169,7 @@ def _materialization_fixture_bytes(name: str) -> bytes:
 def _regenerate_materialization_fixtures() -> None:
     if _CARGO is None:
         raise RuntimeError("cargo is required to regenerate materialization fixtures")
-    subprocess.run(  # noqa: S603 -- resolved executable and fixed argument vector
+    subprocess.run(  # nosec B603 # noqa: S603 -- resolved executable and fixed argument vector
         [
             _CARGO,
             "run",

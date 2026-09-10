@@ -256,9 +256,9 @@ pub(super) fn year_fraction_act_act_isma_with_ctx(
 /// Returns true when `[start, end)` is an integer number of `frequency` coupons.
 ///
 /// A span is regular when some positive multiple of the tenor steps from
-/// `start` to `end`, or the same check run backward from `end` (month-end
-/// clamping can make the forward step miss). Irregular stubs fail both
-/// directions and require an explicit `coupon_period`.
+/// `start` to `end`, matching the forward quasi-coupon grid. A backward
+/// match alone cannot establish regularity because month clamping is not
+/// invertible; such spans require an explicit `coupon_period`.
 fn is_regular_frequency_period(start: Date, end: Date, frequency: Tenor) -> bool {
     if start >= end {
         return false;
@@ -276,10 +276,11 @@ fn is_regular_frequency_period(start: Date, end: Date, frequency: Tenor) -> bool
         let Some(step) = k.checked_mul(months) else {
             break;
         };
-        if start.add_months(step) == end || end.add_months(-step) == start {
+        let boundary = start.add_months(step);
+        if boundary == end {
             return true;
         }
-        if start.add_months(step) > end && end.add_months(-step) < start {
+        if boundary > end {
             break;
         }
         k += 1;

@@ -917,15 +917,10 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
 }
 
 // ---------------------------------------------------------------------------
-// Golden bit-hash regression
-//
-// Pins the complete `StochasticPricingResult` floating-point surface (every
-// f64 field via `to_bits`, deal-level and per-tranche) across pricing modes
-// and stochastic specs. The stochastic engine must be refactored under a
-// bit-identical constraint: any change in summation order, RNG consumption,
-// or model-construction inputs shifts at least one hash here. When an
-// arithmetic change is INTENTIONAL, review the diff and update the expected
-// hashes in this test.
+// Reproducibility across stochastic configurations. Economic reference values
+// are derived in stochastic_waterfall_matches_independent_cashflow_vectors below.
+// The former self-captured hashes encoded unrestricted coupon/principal funding;
+// see docs/audits/2026-09-08-production-remediation-progress.md, slice 14.
 // ---------------------------------------------------------------------------
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
@@ -980,7 +975,7 @@ fn result_bit_hash(result: &StochasticPricingResult) -> u64 {
 }
 
 #[test]
-fn stochastic_pricing_result_bit_hash_is_stable() {
+fn stochastic_pricing_result_is_reproducible_across_configurations() {
     // (label, deal id, spec builder applied to a fresh ABS deal, pricing mode)
     struct Case {
         label: &'static str,
@@ -1038,11 +1033,15 @@ fn stochastic_pricing_result_bit_hash_is_stable() {
         },
     ];
 
-    let mut hashes = Vec::with_capacity(cases.len());
     for case in &cases {
         // Exact-tree expansion over the standard 6-year schedule exceeds the
         // path cap; tree/hybrid cases price the one-year-horizon deal.
         let mut sc = build_sc(case.label, 1_000_000.0);
+        // Preserve the original economic inputs of this bit-level benchmark:
+        // a contractual long first period and 18% annual CPR. Constructor
+        // payment-date and monthly-speed defaults have separate regressions.
+        sc.first_payment_date = Date::from_calendar_date(2025, Month::February, 1).expect("date");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.18);
         if case.stochastic {
             sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
                 PrepaymentModelSpec::constant_cpr(0.15),
@@ -1074,50 +1073,144 @@ fn stochastic_pricing_result_bit_hash_is_stable() {
             .price_stochastic_with_mode(&market, closing_date(), case.mode.clone())
             .unwrap_or_else(|err| panic!("{} should price: {err}", case.label));
 
-        let hash = result_bit_hash(&result);
-        hashes.push((case.label, hash));
-    }
-
-    // Regenerate golden values by pasting the actual values from a failing
-    // run's message, or set SC_GOLDEN_PRINT=<file> to append ready-to-paste
-    // constants to <file>.
-    let expected: &[(&str, u64)] = &[
-        ("abs_mc", GOLDEN_ABS_MC),
-        (
-            "clo_standard_mc_antithetic",
-            GOLDEN_CLO_STANDARD_MC_ANTITHETIC,
-        ),
-        ("clo_standard_mc", GOLDEN_CLO_STANDARD_MC),
-        ("abs_hybrid", GOLDEN_ABS_HYBRID),
-        ("factor_correlated_mc", GOLDEN_FACTOR_CORRELATED_MC),
-    ];
-    for ((label, actual), (expected_label, expected_hash)) in hashes.iter().zip(expected) {
-        if let Ok(path) = std::env::var("SC_GOLDEN_PRINT") {
-            use std::fmt::Write as _;
-            let mut file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&path)
-                .expect("golden print target must be writable");
-            let mut line = String::new();
-            let _ = writeln!(&mut line, "const GOLDEN_{label}: u64 = {actual:#x};");
-            use std::io::Write as _;
-            file.write_all(line.as_bytes())
-                .expect("golden print write must succeed");
-            continue;
-        }
-        assert_eq!(label, expected_label, "case order drifted");
+        let repeated = sc
+            .price_stochastic_with_mode(&market, closing_date(), case.mode.clone())
+            .expect("repeat pricing");
         assert_eq!(
-            actual, expected_hash,
-            "bit-hash drift on '{label}': got {actual:#018x}, expected {expected_hash:#018x}. \
-             If this arithmetic change is intentional, update the golden constant."
+            result_bit_hash(&result),
+            result_bit_hash(&repeated),
+            "{}",
+            case.label
         );
     }
 }
 
-// Golden bit-hash constants pinning the engine's current arithmetic.
-const GOLDEN_ABS_MC: u64 = 0x6ab0_0fbc_b56a_34ee;
-const GOLDEN_CLO_STANDARD_MC_ANTITHETIC: u64 = 0xda1e_5327_0705_a509;
-const GOLDEN_CLO_STANDARD_MC: u64 = 0xfe91_e0f4_96d5_6e70;
-const GOLDEN_ABS_HYBRID: u64 = 0x2e96_f10c_fcd0_02fd;
-const GOLDEN_FACTOR_CORRELATED_MC: u64 = 0xc77e_3707_bfc1_19af;
+/// Closed-form cash vectors, independent of the waterfall and simulation code.
+/// Four actual/360 coupons fall on Apr 2, Jul 2, Oct 2 and Jan 2; the year has
+/// 91, 91, 92 and 92 days. Prepayments occur after interest; defaults earn half
+/// the period coupon. No fees, funded accounts, discounting or reinvestment.
+#[test]
+fn stochastic_waterfall_matches_independent_cashflow_vectors() {
+    use finstack_quant_cashflows::builder::{DefaultModelSpec, RecoveryModelSpec};
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use time::macros::date;
+    let start = date!(2024 - 01 - 02);
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .unwrap(),
+    );
+    for periods in [1_usize, 4] {
+        let end = if periods == 1 {
+            date!(2024 - 04 - 02)
+        } else {
+            date!(2025 - 01 - 02)
+        };
+        for (cpr, cdr) in [(0.36_f64, 0.0_f64), (0.0, 0.36)] {
+            let mut pool = AssetPool::new("REFERENCE", DealType::Abs, Currency::USD);
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                "LOAN",
+                Money::new(100_000_000.0, Currency::USD).unwrap(),
+                0.07,
+                end,
+                DayCount::Act360,
+            ));
+            let tranches = TrancheStructure::new(vec![
+                Tranche::new(
+                    "SR",
+                    0.0,
+                    80.0,
+                    TrancheSeniority::Senior,
+                    Money::new(80_000_000.0, Currency::USD).unwrap(),
+                    TrancheCoupon::Fixed { rate: 0.20 },
+                    end,
+                )
+                .unwrap(),
+                Tranche::new(
+                    "EQ",
+                    80.0,
+                    100.0,
+                    TrancheSeniority::Equity,
+                    Money::new(20_000_000.0, Currency::USD).unwrap(),
+                    TrancheCoupon::Fixed { rate: 0.0 },
+                    end,
+                )
+                .unwrap(),
+            ])
+            .unwrap();
+            let mut sc =
+                StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
+                    .with_payment_calendar("nyse");
+            sc.frequency = Tenor::quarterly();
+            sc.first_payment_date = date!(2024 - 04 - 02);
+            sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
+            sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+            sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);
+            let survival = ((1.0 - cpr) * (1.0 - cdr)).powf(0.25);
+            let default_probability = 1.0 - (1.0 - cdr).powf(0.25);
+            let interest = 100_000_000.0
+                * 0.07
+                * (1.0 - default_probability / 2.0)
+                * [91.0, 91.0, 92.0, 92.0]
+                    .into_iter()
+                    .take(periods)
+                    .enumerate()
+                    .map(|(i, days)| survival.powi(i as i32) * days / 360.0)
+                    .sum::<f64>();
+            let loss = 100_000_000.0 * (1.0 - (1.0 - cdr).powf(periods as f64 / 4.0)) * 0.6;
+            let senior_loss = (loss - 20_000_000.0).max(0.0);
+            let senior_value = 80_000_000.0 - senior_loss + interest;
+            let equity_value = (20_000_000.0 - loss).max(0.0);
+            let mut modes = vec![
+                PricingMode::MonteCarlo {
+                    num_paths: 8,
+                    antithetic: true,
+                },
+                PricingMode::Hybrid {
+                    tree_periods: 2,
+                    mc_paths: 8,
+                },
+            ];
+            // Exact trees branch monthly and intentionally cap terminal paths.
+            // The one-quarter vector verifies that engine within its supported size.
+            if periods == 1 {
+                modes.push(PricingMode::Tree);
+            }
+            for mode in modes {
+                let result = sc
+                    .price_stochastic_with_mode(&market, start, mode.clone())
+                    .unwrap();
+                let senior = result
+                    .tranche_results
+                    .iter()
+                    .find(|t| t.tranche_id == "SR")
+                    .unwrap();
+                let equity = result
+                    .tranche_results
+                    .iter()
+                    .find(|t| t.tranche_id == "EQ")
+                    .unwrap();
+                for (label, actual, expected) in [
+                    ("senior PV", senior.npv.amount(), senior_value),
+                    ("equity PV", equity.npv.amount(), equity_value),
+                    (
+                        "deal PV",
+                        result.npv.amount(),
+                        100_000_000.0 - loss + interest,
+                    ),
+                    ("senior loss", senior.expected_loss.amount(), senior_loss),
+                    ("deal loss", result.expected_loss.amount(), loss),
+                ] {
+                    assert!(
+                        (actual - expected).abs() < 1e-6,
+                        "{mode:?} CPR={cpr} CDR={cdr} {label}: {actual}, required {expected}"
+                    );
+                }
+                assert!(result.pv_std_error < 1e-6);
+                assert!(result.unexpected_loss.amount().abs() < 1e-6);
+            }
+        }
+    }
+}

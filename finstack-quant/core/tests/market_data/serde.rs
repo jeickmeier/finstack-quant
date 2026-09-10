@@ -619,7 +619,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
     issuer_weights.insert("ISSUER2".to_string(), 0.4);
 
     let credit_index = CreditIndexData::builder()
-        .num_constituents(125)
+        .num_constituents(2)
         .recovery_rate(0.4)
         .index_credit_curve(std::sync::Arc::new(hazard.clone()))
         .base_correlation_curve(std::sync::Arc::new(base_corr.clone()))
@@ -874,7 +874,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     issuer_curves.insert("ISSUER".to_string(), Arc::new(issuer_haz.clone()));
 
     let credit_index = CreditIndexData::builder()
-        .num_constituents(125)
+        .num_constituents(1)
         .recovery_rate(0.4)
         .index_credit_curve(Arc::new(haz.clone()))
         .base_correlation_curve(Arc::new(bc.clone()))

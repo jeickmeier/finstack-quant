@@ -3,7 +3,6 @@
     "npv": 6.280140237180916
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -37,7 +36,8 @@
         "vol_surface_id": "SPX-ASIAN-VOL-QL"
       },
       "type": "asian_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

@@ -109,6 +109,7 @@ pub(crate) fn generate_cashflows(
 
             principal_events.push(PrincipalEvent {
                 date: ev.date,
+                payment_date: ev.date,
                 delta: ev.amount,
                 cash: cash_inflow,
                 kind: CFKind::Notional,
@@ -117,6 +118,7 @@ pub(crate) fn generate_cashflows(
     } else if loan.notional_limit.amount() != 0.0 {
         principal_events.push(PrincipalEvent {
             date: loan.issue_date,
+            payment_date: loan.issue_date,
             delta: loan.notional_limit,
             cash: loan.notional_limit,
             kind: CFKind::Notional,
@@ -139,6 +141,7 @@ pub(crate) fn generate_cashflows(
             if sweep.amount.amount() > 0.0 {
                 principal_events.push(PrincipalEvent {
                     date: sweep.date,
+                    payment_date: sweep.date,
                     delta: Money::new(-sweep.amount.amount(), sweep.amount.currency())?,
                     cash: sweep.amount,
                     kind: CFKind::Amortization,
@@ -151,6 +154,7 @@ pub(crate) fn generate_cashflows(
             if amt.amount() > 0.0 {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
+                    payment_date: *dt,
                     delta: Money::new(-amt.amount(), amt.currency())?,
                     cash: *amt,
                     kind: CFKind::Amortization,
@@ -162,7 +166,7 @@ pub(crate) fn generate_cashflows(
     // Coupon dates for amortization conversion, plus the unadjusted
     // accrual-period start grid used to snap floating margin step-ups to
     // whole-period boundaries.
-    let (coupon_dates, accrual_starts): (Vec<Date>, Vec<Date>) = {
+    let (coupon_dates, accrual_starts): (Vec<(Date, Date)>, Vec<Date>) = {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
         let schedule = loan_schedule_params(loan);
@@ -172,16 +176,13 @@ pub(crate) fn generate_cashflows(
             loan.maturity,
             None,
         ))?;
-        let adjust_dates = loan.calendar_id.is_some();
         let accrual_starts: Vec<Date> = periods.iter().map(|period| period.accrual_start).collect();
-        let coupon_dates: Vec<Date> = std::iter::once(loan.issue_date)
-            .chain(periods.into_iter().map(|period| {
-                if adjust_dates {
-                    period.payment_date
-                } else {
-                    period.accrual_end
-                }
-            }))
+        let coupon_dates = std::iter::once((loan.issue_date, loan.issue_date))
+            .chain(
+                periods
+                    .into_iter()
+                    .map(|period| (period.accrual_end, period.payment_date)),
+            )
             .collect();
         (coupon_dates, accrual_starts)
     };
@@ -193,6 +194,7 @@ pub(crate) fn generate_cashflows(
             for (dt, amt) in items {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
+                    payment_date: *dt,
                     delta: Money::new(-amt.amount(), amt.currency())?,
                     cash: *amt,
                     kind: CFKind::Amortization,
@@ -211,7 +213,7 @@ pub(crate) fn generate_cashflows(
             existing_events.sort_by_key(|(date, _)| *date);
             let mut next_event = 0usize;
             let mut running_balance = 0.0_f64;
-            for d in coupon_dates.iter().copied().skip(1) {
+            for (d, payment_date) in coupon_dates.iter().copied().skip(1) {
                 while next_event < existing_events.len() && existing_events[next_event].0 <= d {
                     running_balance = (running_balance + existing_events[next_event].1).max(0.0);
                     next_event += 1;
@@ -220,6 +222,7 @@ pub(crate) fn generate_cashflows(
                 let pay = Money::new(amort_amount, loan.currency)?;
                 principal_events.push(PrincipalEvent {
                     date: d,
+                    payment_date,
                     delta: Money::new(-pay.amount(), pay.currency())?,
                     cash: pay,
                     kind: CFKind::Amortization,
@@ -228,29 +231,23 @@ pub(crate) fn generate_cashflows(
             }
         }
         super::spec::AmortizationSpec::PercentOfOriginalNotional { bp } => {
-            // For DDTL loans, use the actual drawn (funded) amount as the original notional.
-            // For regular loans, use notional_limit.
-            let original_notional = if let Some(ddtl) = &loan.ddtl {
-                let draw_stop = effective_draw_stop(loan);
-                ddtl.draws
-                    .iter()
-                    .filter(|ev| {
-                        ev.date >= ddtl.availability_start
-                            && ev.date <= ddtl.availability_end
-                            && draw_stop.is_none_or(|ds| ev.date < ds)
-                    })
-                    .map(|ev| ev.amount.amount())
-                    .sum::<f64>()
-                    .min(loan.notional_limit.amount())
-            } else {
-                loan.notional_limit.amount()
-            };
+            let funding: Vec<_> = principal_events
+                .iter()
+                .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
+                .map(|event| (event.date, event.delta.amount()))
+                .collect();
             let pct = f64::from(*bp) * 1e-4;
-            let flat_payment = original_notional * pct;
-            for d in coupon_dates.iter().copied().skip(1) {
+            for (d, payment_date) in coupon_dates.iter().copied().skip(1) {
+                let funded: f64 = funding
+                    .iter()
+                    .filter(|(date, _)| *date < d)
+                    .map(|(_, amount)| amount)
+                    .sum();
+                let flat_payment = funded * pct;
                 let pay = Money::new(flat_payment, loan.currency)?;
                 principal_events.push(PrincipalEvent {
                     date: d,
+                    payment_date,
                     delta: Money::new(-pay.amount(), pay.currency())?,
                     cash: pay,
                     kind: CFKind::Amortization,
@@ -258,30 +255,42 @@ pub(crate) fn generate_cashflows(
             }
         }
         super::spec::AmortizationSpec::Linear { start, end } => {
-            // Amortization payments occur at period END dates strictly after the
-            // start date and up to (and including) the end date.  Using `> *start`
-            // prevents generating a spurious amortization event at the origination
-            // date when `start == issue`.
-            let steps: Vec<Date> = coupon_dates
+            // Each funded draw has its own remaining contractual repayment
+            // schedule. Undrawn commitment never enters the principal base.
+            let mut repayments = BTreeMap::<(Date, Date), f64>::new();
+            for funding in principal_events
                 .iter()
-                .copied()
-                .filter(|d| *d > *start && *d <= *end)
-                .collect();
-            if !steps.is_empty() {
-                // Divide notional evenly across the amortization steps.
-                // Using `steps.len()` directly ensures the total amortization
-                // equals the notional exactly, regardless of how many coupon
-                // dates fall in the amortization window.
-                let per_step = loan.notional_limit.amount() / (steps.len() as f64);
-                for d in steps {
-                    let pay = Money::new(per_step, loan.currency)?;
-                    principal_events.push(PrincipalEvent {
-                        date: d,
-                        delta: Money::new(-pay.amount(), pay.currency())?,
-                        cash: pay,
-                        kind: CFKind::Amortization,
-                    });
+                .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
+            {
+                let steps: Vec<_> = coupon_dates
+                    .iter()
+                    .copied()
+                    .filter(|(date, _)| *date > *start && *date <= *end && *date > funding.date)
+                    .collect();
+                if steps.is_empty() {
+                    continue;
                 }
+                let funded = funding.delta.amount();
+                let per_step = funded / steps.len() as f64;
+                let last = steps.len() - 1;
+                for (index, dates) in steps.into_iter().enumerate() {
+                    let payment = if index == last {
+                        funded - per_step * last as f64
+                    } else {
+                        per_step
+                    };
+                    *repayments.entry(dates).or_default() += payment;
+                }
+            }
+            for ((date, payment_date), amount) in repayments {
+                let pay = Money::new(amount, loan.currency)?;
+                principal_events.push(PrincipalEvent {
+                    date,
+                    payment_date,
+                    delta: Money::new(-amount, loan.currency)?,
+                    cash: pay,
+                    kind: CFKind::Amortization,
+                });
             }
         }
     }
@@ -323,7 +332,13 @@ pub(crate) fn generate_cashflows(
         )
         .amortization(crate::cashflow::builder::AmortizationSpec::None);
     for event in &principal_events {
-        let _ = builder.add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
+        let _ = builder.add_principal_event(
+            event.date,
+            event.payment_date,
+            event.delta,
+            Some(event.cash),
+            event.kind,
+        );
     }
 
     match &loan.rate {
@@ -502,7 +517,7 @@ pub(crate) fn generate_cashflows(
                     crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
                 }),
                 stub: loan.stub,
-                accrual_basis: Default::default(),
+                accrual_basis: crate::cashflow::builder::FeeAccrualBasis::TimeWeightedAverage,
             });
         }
     }

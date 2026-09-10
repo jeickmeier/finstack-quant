@@ -1,6 +1,6 @@
 //! Convertible contract mapping and node exercise decisions.
 
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
@@ -29,9 +29,6 @@ pub(super) struct ConvertibleBondValuator {
     conversion_policy: ConversionPolicy,
     /// Base date for time calculations
     base_date: Date,
-    /// Day-count convention for time mapping in the tree.
-    day_count: DayCount,
-    day_count_frequency: Option<Tenor>,
     /// Conversion price per share (for soft-call trigger evaluation).
     conversion_price: f64,
     /// Optional soft-call trigger condition.
@@ -79,20 +76,9 @@ impl ConvertibleBondValuator {
             Error::internal("convertible tree pricer requires effective conversion ratio")
         })?;
 
-        // Map cashflows to tree steps
-        let day_count_frequency = bond
-            .fixed_coupon
-            .as_ref()
-            .map(|coupon| coupon.schedule.frequency)
-            .or_else(|| {
-                bond.floating_coupon
-                    .as_ref()
-                    .map(|coupon| coupon.schedule.frequency)
-            });
-        let day_count_ctx = DayCountContext {
-            frequency: day_count_frequency,
-            ..Default::default()
-        };
+        // Date mapping uses the same ACT/365F clock as the equity process.
+        // Coupon day counts determine amounts only, never event locations.
+        let day_count_ctx = DayCountContext::default();
         let dt = time_to_maturity / steps as f64;
         let mut time_steps = Vec::with_capacity(steps + 1);
         let mut step_dates = Vec::with_capacity(steps + 1);
@@ -108,7 +94,7 @@ impl ConvertibleBondValuator {
             step_dates.push(base_date + time::Duration::days(offset_days));
         }
 
-        // Process coupon cashflows (exclude reset-only events) using schedule day count
+        // Process coupon cashflows (exclude reset-only events) on the model clock
         let mut coupon_map: HashMap<usize, f64> = HashMap::default();
         for cf in cashflow_schedule.coupons() {
             if cf.date <= base_date {
@@ -119,7 +105,7 @@ impl ConvertibleBondValuator {
                 cf.date,
                 bond.maturity,
                 steps,
-                cashflow_schedule.get_day_count(),
+                DayCount::Act365F,
                 day_count_ctx,
             )?;
             *coupon_map.entry(bounded_step).or_insert(0.0) += cf.amount.amount();
@@ -131,14 +117,14 @@ impl ConvertibleBondValuator {
 
         if let Some(ref call_put) = bond.call_put {
             for call in &call_put.calls {
-                if call.end_date > base_date && call.start_date <= bond.maturity {
+                if call.end_date >= base_date && call.start_date <= bond.maturity {
                     let floor_price = bond.notional.amount() * (call.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
                         call.start_date.max(base_date),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.get_day_count(),
+                        DayCount::Act365F,
                         day_count_ctx,
                     )?;
 
@@ -148,7 +134,7 @@ impl ConvertibleBondValuator {
                         call.end_date.min(bond.maturity),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.get_day_count(),
+                        DayCount::Act365F,
                         day_count_ctx,
                     )?;
 
@@ -169,6 +155,11 @@ impl ConvertibleBondValuator {
                         .take(end_step + 1)
                         .skip(start_step)
                     {
+                        let accrued = super::engine::accrued_interest_at(
+                            bond,
+                            cashflow_schedule,
+                            exercise_date,
+                        )?;
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
                             for cashflow in cashflow_schedule
@@ -185,9 +176,9 @@ impl ConvertibleBondValuator {
                                 pv_remaining +=
                                     cashflow.amount.amount() * df * (-spread * tau).exp();
                             }
-                            floor_price.max(pv_remaining)
+                            (floor_price + accrued).max(pv_remaining)
                         } else {
-                            floor_price
+                            floor_price + accrued
                         };
                         call_map
                             .entry(s)
@@ -198,14 +189,14 @@ impl ConvertibleBondValuator {
             }
 
             for put in &call_put.puts {
-                if put.end_date > base_date && put.start_date <= bond.maturity {
+                if put.end_date >= base_date && put.start_date <= bond.maturity {
                     let put_price = bond.notional.amount() * (put.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
                         put.start_date.max(base_date),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.get_day_count(),
+                        DayCount::Act365F,
                         day_count_ctx,
                     )?;
 
@@ -214,17 +205,28 @@ impl ConvertibleBondValuator {
                         put.end_date.min(bond.maturity),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.get_day_count(),
+                        DayCount::Act365F,
                         day_count_ctx,
                     )?;
 
                     // For overlapping put windows, the holder will select the *highest*
                     // put price available at each step.
-                    for s in start_step..=end_step {
+                    for (s, &exercise_date) in step_dates
+                        .iter()
+                        .enumerate()
+                        .take(end_step + 1)
+                        .skip(start_step)
+                    {
+                        let dirty_put_price = put_price
+                            + super::engine::accrued_interest_at(
+                                bond,
+                                cashflow_schedule,
+                                exercise_date,
+                            )?;
                         put_map
                             .entry(s)
-                            .and_modify(|p| *p = p.max(put_price))
-                            .or_insert(put_price);
+                            .and_modify(|p| *p = p.max(dirty_put_price))
+                            .or_insert(dirty_put_price);
                     }
                 }
             }
@@ -321,8 +323,6 @@ impl ConvertibleBondValuator {
             put_map,
             conversion_policy: bond.conversion.policy.clone(),
             base_date,
-            day_count: cashflow_schedule.get_day_count(),
-            day_count_frequency,
             conversion_price,
             soft_call_trigger: bond.soft_call_trigger.clone(),
             rf_step_dfs,
@@ -363,10 +363,7 @@ impl ConvertibleBondValuator {
     /// structures) is not modeled; before the mandatory step the holder simply
     /// carries the continuation value.
     pub(super) fn conversion_allowed(&self, step: usize, node_spot: f64) -> Result<bool> {
-        let ctx = DayCountContext {
-            frequency: self.day_count_frequency,
-            ..Default::default()
-        };
+        let ctx = DayCountContext::default();
         let allowed = match &self.conversion_policy {
             ConversionPolicy::Voluntary => true,
             ConversionPolicy::MandatoryOn(date) => {
@@ -376,7 +373,7 @@ impl ConvertibleBondValuator {
                     *date,
                     self.maturity,
                     self.num_steps,
-                    self.day_count,
+                    DayCount::Act365F,
                     ctx,
                 )?;
                 step == target_step
@@ -387,7 +384,7 @@ impl ConvertibleBondValuator {
                     *start,
                     self.maturity,
                     self.num_steps,
-                    self.day_count,
+                    DayCount::Act365F,
                     ctx,
                 )?;
                 let end_step = map_date_to_step(
@@ -395,7 +392,7 @@ impl ConvertibleBondValuator {
                     *end,
                     self.maturity,
                     self.num_steps,
-                    self.day_count,
+                    DayCount::Act365F,
                     ctx,
                 )?;
                 step >= start_step && step <= end_step
@@ -425,7 +422,7 @@ impl ConvertibleBondValuator {
                     *conversion_date,
                     self.maturity,
                     self.num_steps,
-                    self.day_count,
+                    DayCount::Act365F,
                     ctx,
                 )?;
                 step == target_step

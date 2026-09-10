@@ -24,11 +24,6 @@ pub const ONE_BP: f64 = 0.0001;
 /// 5Y is the most liquid CDS tenor and standard for SIMM sensitivity assignment.
 pub const STANDARD_CDS_MATURITY_YEARS: f64 = 5.0;
 
-/// Default bond index duration assumption.
-///
-/// Used when actual duration data is unavailable for fixed income indices.
-pub const DEFAULT_BOND_INDEX_DURATION: f64 = 5.0;
-
 /// SIMM tenor bucket boundaries in years.
 pub mod tenor_buckets {
     /// 3 month bucket threshold (short-dated).

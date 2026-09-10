@@ -106,9 +106,8 @@ pub(super) fn assert_cash_conserved(
 /// vanishing at the reinvestment-end reconciliation.
 ///
 /// If no performing assets remain (the whole pool has defaulted/amortized),
-/// the cash cannot be placed into new collateral and the recycle is a no-op;
-/// the deal is structurally at its end and the cleanup/exhaustion logic takes
-/// over.
+/// the returned cash-spent amount is zero and principal remains available to
+/// the waterfall. Successful purchases return the cash actually spent.
 ///
 /// `price_fraction` is the reinvestment price as a fraction of par (e.g. `0.97`
 /// for a 97-price). Reinvesting `recyclable` cash at a discount buys
@@ -117,9 +116,58 @@ pub(super) fn assert_cash_conserved(
 /// `1.0` reproduces 1:1 par recycling.
 pub(super) fn recycle_reinvestment_principal(
     state: &mut SimulationState,
-    recyclable: f64,
+    recyclable: Money,
     price_fraction: f64,
-) {
+    payment_date: Date,
+    market: &MarketContext,
+) -> Result<Money> {
+    if !price_fraction.is_finite() || price_fraction <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "reinvestment price must be finite and positive".into(),
+        ));
+    }
+    let Some(period) = state.pool.reinvestment_period.as_ref() else {
+        return Ok(Money::from((0_i64, state.base_currency)));
+    };
+    let criteria = &period.criteria;
+    if !criteria.max_price.is_finite()
+        || criteria.max_price <= 0.0
+        || !criteria.min_yield.is_finite()
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "invalid reinvestment price/yield criteria".into(),
+        ));
+    }
+    if price_fraction * 100.0 > criteria.max_price || recyclable.amount() <= 0.0 {
+        return Ok(Money::from((0_i64, state.base_currency)));
+    }
+    // Replacement collateral keeps the surviving pool's composition and
+    // contractual maturities. Requiring every component to be eligible avoids
+    // silently changing credit-quality weights or WAL by selective purchases.
+    for i in 0..state.pool_state.len() {
+        if state.pool_state.is_defaulted[i] || state.pool_state.balances[i] <= 0.0 {
+            continue;
+        }
+        let coupon = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
+            collateral_asset_rate_for_period(
+                market
+                    .get_forward(&state.pool_state.unique_curves[curve_idx])?
+                    .as_ref(),
+                market,
+                payment_date,
+                state.pool_state.rates[i],
+                state.pool_state.spread_bp[i],
+                state.floating_rate_shift,
+            )?
+        } else {
+            state.pool_state.rates[i]
+        };
+        if state.pool_state.maturities[i] <= payment_date
+            || coupon / price_fraction < criteria.min_yield
+        {
+            return Ok(Money::from((0_i64, state.base_currency)));
+        }
+    }
     let performing_total: f64 = state
         .pool_state
         .is_defaulted
@@ -131,11 +179,11 @@ pub(super) fn recycle_reinvestment_principal(
 
     if performing_total <= 0.0 {
         // No surviving collateral to reinvest into — recycle is a no-op.
-        return;
+        return Ok(Money::from((0_i64, state.base_currency)));
     }
 
     // Par acquired by spending `recyclable` cash at the reinvestment price.
-    let par_acquired = par_acquired_at_price(recyclable, price_fraction);
+    let par_acquired = par_acquired_at_price(recyclable.amount(), price_fraction);
 
     let n = state.pool_state.len();
     for i in 0..n {
@@ -148,19 +196,18 @@ pub(super) fn recycle_reinvestment_principal(
         }
         let share = balance / performing_total;
         state.pool_state.balances[i] = balance + par_acquired * share;
+        if let Some(payment) = &mut state.pool_state.level_payments[i] {
+            *payment *= state.pool_state.balances[i] / balance;
+        }
     }
+    Ok(recyclable)
 }
 
 /// Par acquired when reinvesting `cash` at `price_fraction` (a fraction of par).
 ///
 /// Buying at a discount price `p < 1` acquires `cash / p` of par (par build);
-/// at par (`p == 1`) it is `cash`. Falls back to par recycling for a
-/// non-positive price.
+/// at par (`p == 1`) it is `cash`. The caller validates a finite positive price.
 #[inline]
 pub(super) fn par_acquired_at_price(cash: f64, price_fraction: f64) -> f64 {
-    if price_fraction > 0.0 {
-        cash / price_fraction
-    } else {
-        cash
-    }
+    cash / price_fraction
 }

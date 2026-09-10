@@ -589,13 +589,33 @@ fn par_cds_effects(
     match env.mode {
         HazardBumpMode::FirstOrderShift => {
             bump_req.validate()?;
+            if bump_req.is_zero() {
+                return Ok(update_effects(base_curve.as_ref().clone(), extra_warnings));
+            }
+            let loss_given_default = 1.0 - base_curve.recovery_rate();
+            if loss_given_default <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "first-order par-spread shock requires recovery below one for '{curve_id}'"
+                )));
+            }
             let new_curve = match bump_req {
-                QuoteBump::ParallelBp(bp) => base_curve.with_parallel_hazard_rate_bump_bp(*bp)?,
+                QuoteBump::ParallelBp(bp) => {
+                    base_curve.with_parallel_hazard_rate_bump_bp(*bp / loss_given_default)?
+                }
                 QuoteBump::TenorsBp(targets) => {
-                    base_curve.with_tenor_hazard_rate_bumps_bp(targets)?
+                    let hazard_targets: Vec<_> = targets
+                        .iter()
+                        .map(|(tenor, bp)| (*tenor, *bp / loss_given_default))
+                        .collect();
+                    base_curve.with_tenor_hazard_rate_bumps_bp(&hazard_targets)?
                 }
             };
-            Ok(update_effects(new_curve, extra_warnings))
+            let mut warnings = extra_warnings;
+            warnings.push(Warning::HazardSpreadFirstOrder {
+                curve_id: curve_id.to_string(),
+                recovery_rate: base_curve.recovery_rate(),
+            });
+            Ok(update_effects(new_curve, warnings))
         }
         HazardBumpMode::SolveToPar => {
             let provider = env.provider.ok_or_else(|| {

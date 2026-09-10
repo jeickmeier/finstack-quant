@@ -112,6 +112,7 @@ impl MetricCalculator for YtmCalculator {
                 })
             })?;
 
+        let quote = super::super::quote::SettlementQuote::from_context(context)?;
         let flows = context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -120,10 +121,18 @@ impl MetricCalculator for YtmCalculator {
 
         // Convert price points back to currency using original notional.
         let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(context)?;
-        let target_value = notional * (dirty_price / 100.0);
+        let target_value = quote.external_target(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?)?.unwrap_or(notional * (dirty_price / 100.0));
 
-        if flows.is_empty() {
-            return Ok(0.0);
+        let settlement = super::super::quote::settlement_date(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?, context.as_of)?;
+        if !flows
+            .iter()
+            .any(|(date, amount)| *date > settlement && amount.amount() > 0.0)
+            || target_value <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "structured-credit yield requires a positive settlement target and future cashflow"
+                    .into(),
+            ));
         }
 
         // Day count for year fractions
@@ -139,7 +148,7 @@ impl MetricCalculator for YtmCalculator {
             }
             let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for (date, amount) in flows {
-                if *date <= context.as_of {
+                if *date <= settlement {
                     continue;
                 }
 
@@ -159,8 +168,7 @@ impl MetricCalculator for YtmCalculator {
                 // `BrentSolver::find_bracket` rejects a non-finite objective
                 // and surfaces `SolverConvergenceFailed`, which is a loud
                 // failure rather than a confident wrong number.
-                let Ok(t) =
-                    day_count.year_fraction(context.as_of, *date, DayCountContext::default())
+                let Ok(t) = day_count.year_fraction(settlement, *date, DayCountContext::default())
                 else {
                     return f64::NAN;
                 };

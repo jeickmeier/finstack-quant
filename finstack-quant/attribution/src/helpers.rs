@@ -509,8 +509,8 @@ fn reprice_funding_cost(
 /// curve that is present on the carry market. It is a financing overlay and
 /// is **not** subtracted from `total`: the waterfall/parallel factor is
 /// all-in price carry. Economic carry net of financing is `total − funding`.
-/// On the metrics path, `CarryTotal` is already net of funding and the
-/// PORT identity `coupon + ptp + rolldown − funding = total` holds there.
+/// The metrics path adds funding back to the net `CarryTotal` metric to
+/// preserve the same gross carry basis.
 pub(crate) fn apply_total_return_carry(
     attribution: &mut PnlAttribution,
     theta: Money,

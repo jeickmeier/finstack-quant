@@ -37,15 +37,15 @@ pub mod waterfall {
 pub use types::{
     calculate_pool_stats, AfcSpec, AllocationMode, AssetPool, AssetType, ConcentrationCheckResult,
     ConcentrationViolation, ControlledAccumulationSpec, CoverageTestConfig, CoverageTestType,
-    CoverageTrigger, CreditEnhancement, CreditModelConfig, DealConfig, DealDates, DealFees,
-    DealType, DefaultAssumptions, EarlyAmortizationSpec, ExcessSpreadSpec, ManagementFeeType,
-    Metadata, Overrides, PaymentCalculation, PaymentMode, PaymentRecord, PaymentType, PoolAsset,
-    PoolStats, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
+    CoverageTrigger, CreditModelConfig, DealConfig, DealDates, DealFees, DealType,
+    DefaultAssumptions, EarlyAmortizationSpec, ExcessSpreadSpec, ManagementFeeType, Metadata,
+    Overrides, PaymentCalculation, PaymentMode, PaymentRecord, PaymentType, PoolAsset, PoolStats,
+    Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
     RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
-    StructuredCredit, StructuredCreditBuilder, Tranche, TrancheBehaviorType, TrancheBuilder,
-    TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure, TrancheValuation,
-    TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
-    WaterfallTier, WaterfallWorkspace,
+    StructuredCredit, StructuredCreditBuilder, Tranche, TrancheAccrualPeriod, TrancheBehaviorType,
+    TrancheBuilder, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
+    WaterfallRules, WaterfallTier, WaterfallWorkspace,
 };
 
 pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};

@@ -295,8 +295,4 @@ pub enum TriggerConsequence {
     AccelerateAmortization,
     /// Stop Reinvestment variant.
     StopReinvestment,
-    /// Reduce Manager Fee variant.
-    ReduceManagerFee,
-    /// Custom variant.
-    Custom(String),
 }

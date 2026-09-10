@@ -239,7 +239,7 @@ impl CmsReplicationPricer {
         // Payments-per-year for the par annuity closed form.
         // Matches the fixed-leg payment frequency of the underlying CMS swap.
         let reference_swap = inst.reference_swap();
-        let m = reference_swap.payments_per_year();
+        let m = reference_swap.payments_per_year()?;
 
         for (i, &fixing_date) in inst.fixing_dates.iter().enumerate() {
             let payment_date = inst.payment_dates[i];

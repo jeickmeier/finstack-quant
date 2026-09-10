@@ -1,23 +1,11 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{
-    CDSTranchePricer, ElWdPoint, PoolExposure, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW,
-    NUMERICAL_TOLERANCE, PROBABILITY_CLIP,
-};
+use super::config::{CDSTranchePricer, ElWdPoint, PoolExposure};
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::math::standard_normal_inv_cdf;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::correlation::recovery::RecoveryModel;
-
-/// Magnitude below which a negative base-correlation tranchelet difference is
-/// treated as benign numerical noise (quadrature / interpolation rounding)
-/// rather than genuine base-correlation arbitrage. A senior equity
-/// tranchelet `EL(0,D)` should never fall below the junior `EL(0,A)`; a gap
-/// at or below this size is consistent with floating-point integration error
-/// on EL values that are themselves `O(1e-2)`.
-const BASE_CORR_ARBITRAGE_TOL: f64 = 1e-9;
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 struct ElInvariants {
@@ -248,8 +236,8 @@ impl CDSTranchePricer {
     /// `[A, D]` strikes.
     ///
     /// Behaviour:
-    /// - A negative gap within `BASE_CORR_ARBITRAGE_TOL` is benign quadrature
-    ///   / interpolation noise and is clamped to zero silently.
+    /// - A negative gap within the sum of both converged integration budgets
+    ///   and floating-point subtraction error is clamped to zero.
     /// - A negative gap *beyond* the tolerance is genuine base-correlation
     ///   arbitrage and returns an explicit [`Error::Validation`] naming the
     ///   strikes and the magnitude, so the caller cannot unknowingly price a
@@ -263,7 +251,14 @@ impl CDSTranchePricer {
         date: Date,
     ) -> Result<f64> {
         let diff = el_to_detach - el_to_attach;
-        if diff >= -BASE_CORR_ARBITRAGE_TOL {
+        let error_budget = 2.0 * self.params.integration_tolerance
+            + 16.0 * f64::EPSILON * (el_to_detach.abs() + el_to_attach.abs());
+        if !diff.is_finite() {
+            return Err(Error::Validation(
+                "non-finite base-correlation loss difference".to_owned(),
+            ));
+        }
+        if diff >= -error_budget {
             // Non-negative (up to numerical noise) — clamp the tiny residual.
             return Ok(diff.max(0.0));
         }
@@ -272,10 +267,9 @@ impl CDSTranchePricer {
         Err(Error::Validation(format!(
             "base-correlation arbitrage at strikes [{attach_pct:.4}%, {detach_pct:.4}%] \
                  on {date:?}: equity EL(0,{detach_pct:.4}%)={el_to_detach:.8} is below \
-                 EL(0,{attach_pct:.4}%)={el_to_attach:.8} (gap {diff:.2e}). The base-correlation \
+                 EL(0,{attach_pct:.4}%)={el_to_attach:.8} (gap {diff:.2e}, integration budget {error_budget:.2e}). The base-correlation \
                  curve is not arbitrage-free at these detachment points; pricing this tranche \
-                 would assign it negative protection. Re-fit the base-correlation curve (e.g. \
-                 isotonic / PAVA smoothing)."
+                 would assign it negative protection. Recalibrate with nonnegative tranche-loss constraints."
         )))
     }
 
@@ -427,117 +421,68 @@ impl CDSTranchePricer {
                 exposure,
             )
         } else {
-            // Homogeneous: use index marginals
-            let num_constituents = index_data.num_constituents as usize;
-            let base_recovery = index_data.recovery_rate;
-
-            // Build recovery model if configured, otherwise use constant
-            let recovery_model: Option<Box<dyn RecoveryModel>> =
-                self.params.recovery_spec.as_ref().map(|spec| spec.build());
-            let exposure_at = |z: f64| -> f64 {
-                let recovery = match &recovery_model {
-                    Some(model) => model.conditional_recovery(z),
-                    None => base_recovery,
-                };
-                match exposure {
-                    PoolExposure::Loss => 1.0 - recovery,
-                    PoolExposure::Recovery => recovery.clamp(0.0, 1.0),
-                }
-            };
-            // The exposure the bootstrapped index curve implies: its default
-            // probabilities were stripped from index spreads assuming the
-            // flat `index_data.recovery_rate`. A stochastic recovery override
-            // must be renormalized against this so the 0–100% tranche EL
-            // still reproduces the index EL (see
-            // `stochastic_recovery_exposure_scale`).
-            let base_exposure = match exposure {
-                PoolExposure::Loss => 1.0 - base_recovery,
-                PoolExposure::Recovery => base_recovery.clamp(0.0, 1.0),
-            };
-            let recovery_is_stochastic = recovery_model
-                .as_ref()
-                .is_some_and(|model| model.is_stochastic());
-
-            let cap_notional = cap_pct / 100.0;
-            let maturity_years = self.years_from_base(index_data, maturity)?;
-            let default_prob = self.get_default_probability(index_data, maturity_years)?;
-            let correlation = self.smooth_correlation_boundary(correlation);
-
-            if self.params.copula_spec.is_gaussian() {
-                let quad = self.select_quadrature()?;
-                // Clamp to the same open-interval guard used by the heterogeneous
-                // path (`default_threshold_for_copula`).  `get_default_probability`
-                // already clamps to `[0, 1]`, but extreme values at the boundary
-                // (0 → −∞, 1 → +∞) still produce non-finite thresholds and
-                // incorrect EL integrals.  Clamping to `[PROBABILITY_CLIP, 1−PROBABILITY_CLIP]`
-                // keeps the probit finite and matches the heterogeneous branch.
-                let default_prob_clamped =
-                    default_prob.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP);
-                let default_threshold = standard_normal_inv_cdf(default_prob_clamped);
-                let conditional_p = |z: f64| {
-                    self.conditional_default_probability_enhanced(default_threshold, correlation, z)
-                };
-                let scale = if recovery_is_stochastic {
-                    let unconditional_pool_exposure =
-                        quad.integrate(|z| conditional_p(z) * exposure_at(z));
-                    stochastic_recovery_exposure_scale(
-                        default_prob_clamped * base_exposure,
-                        unconditional_pool_exposure,
-                    )
-                } else {
-                    1.0
-                };
-                let integrand = |z: f64| {
-                    self.conditional_equity_tranche_capped(
-                        num_constituents,
-                        cap_notional,
-                        conditional_p(z),
-                        scale * exposure_at(z),
-                    )
-                };
-                let expected = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
-                    .contains(&correlation)
-                {
-                    quad.try_integrate_adaptive(integrand, NUMERICAL_TOLERANCE)?
-                } else {
-                    quad.try_integrate(integrand)?
-                };
-                Ok(expected)
-            } else {
-                let copula_ref = self.copula();
-                let default_threshold = self.default_threshold_for_copula(default_prob);
-                let conditional_p = |factors: &[f64]| {
-                    self.conditional_default_prob_copula(
-                        copula_ref,
-                        default_threshold,
-                        factors,
-                        correlation,
-                    )
-                };
-                let scale = if recovery_is_stochastic {
-                    let unconditional_pool_exposure = copula_ref.integrate_fn(&|factors| {
-                        let recovery_driver = self.recovery_driver_for_factors(factors);
-                        conditional_p(factors) * exposure_at(recovery_driver)
-                    });
-                    stochastic_recovery_exposure_scale(
-                        default_prob * base_exposure,
-                        unconditional_pool_exposure,
-                    )
-                } else {
-                    1.0
-                };
-                let expected = copula_ref.try_integrate_fn(&|factors| {
-                    let recovery_driver = self.recovery_driver_for_factors(factors);
-                    self.conditional_equity_tranche_capped(
-                        num_constituents,
-                        cap_notional,
-                        conditional_p(factors),
-                        scale * exposure_at(recovery_driver),
-                    )
-                })?;
-                Ok(expected)
-            }
+            let t = self.years_from_base(index_data, maturity)?;
+            self.homogeneous_capped_expectation(
+                cap_pct / 100.0,
+                index_data.num_constituents as usize,
+                self.get_default_probability(index_data, t)?,
+                index_data.recovery_rate,
+                self.smooth_correlation_boundary(correlation),
+                exposure,
+            )
         }
+    }
+
+    /// Shared uniform-pool engine, including a configured recovery specification.
+    pub(super) fn homogeneous_capped_expectation(
+        &self,
+        cap: f64,
+        count: usize,
+        default_prob: f64,
+        base_recovery: f64,
+        correlation: f64,
+        exposure: PoolExposure,
+    ) -> Result<f64> {
+        let recovery_model: Option<Box<dyn RecoveryModel>> =
+            self.params.recovery_spec.as_ref().map(|spec| spec.build());
+        let exposure_of = |recovery: f64| match exposure {
+            PoolExposure::Loss => 1.0 - recovery,
+            PoolExposure::Recovery => recovery,
+        };
+        let exposure_at = |factors: &[f64]| {
+            exposure_of(recovery_model.as_ref().map_or(base_recovery, |model| {
+                model.conditional_recovery(self.recovery_driver_for_factors(factors))
+            }))
+        };
+        let threshold = self.default_threshold_for_copula(default_prob);
+        let conditional_p = |factors: &[f64]| {
+            if self.params.copula_spec.is_gaussian() {
+                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
+            } else {
+                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
+            }
+        };
+        let scale = if recovery_model
+            .as_ref()
+            .is_some_and(|model| model.is_stochastic())
+        {
+            let model_exposure = self
+                .integrate_factors(&|factors| Ok(conditional_p(factors) * exposure_at(factors)))?;
+            stochastic_recovery_exposure_scale(
+                default_prob * exposure_of(base_recovery),
+                model_exposure,
+            )
+        } else {
+            1.0
+        };
+        self.integrate_factors(&|factors| {
+            self.conditional_equity_tranche_capped(
+                count,
+                cap,
+                conditional_p(factors),
+                scale * exposure_at(factors),
+            )
+        })
     }
 }
 
@@ -565,4 +510,31 @@ pub(super) fn stochastic_recovery_exposure_scale(
         return 1.0;
     }
     index_implied_pool_exposure / model_pool_exposure
+}
+
+#[cfg(test)]
+mod production_credit_audit {
+    use super::super::config::CDSTranchePricerConfig;
+    use super::*;
+    use finstack_quant_core::dates::Month;
+    #[test]
+    fn base_correlation_clamps_only_configured_numerical_budget() {
+        let date = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+        for tolerance in [1e-8, 1e-10, 1e-12] {
+            let pricer = CDSTranchePricer::with_params(
+                CDSTranchePricerConfig::default().with_integration_tolerance(tolerance),
+            )
+            .expect("pricer");
+            assert_eq!(
+                pricer
+                    .resolve_tranchelet_difference(0.01 - tolerance, 0.01, 3.0, 7.0, date)
+                    .expect("noise"),
+                0.0
+            );
+            let error = pricer
+                .resolve_tranchelet_difference(0.01 - 4.0 * tolerance, 0.01, 3.0, 7.0, date)
+                .expect_err("materially negative loss");
+            assert!(error.to_string().contains("integration budget"));
+        }
+    }
 }

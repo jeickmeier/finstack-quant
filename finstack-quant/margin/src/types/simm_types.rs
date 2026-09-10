@@ -4,11 +4,12 @@
 //! used by the [`Marginable`](crate::traits::Marginable) trait
 //! and SIMM calculator.
 
+use super::SimmCurvatureSensitivity;
 use core::hash::Hash;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::HashMap;
 
-/// The thirteen signed-amount maps of [`SimmSensitivities`], listed once so
+/// The twelve signed-amount maps of [`SimmSensitivities`], listed once so
 /// `is_empty`, `merge`, and `scale_amounts` walk them in one place.
 macro_rules! amount_maps {
     (@fields $($args:tt)*) => {
@@ -18,8 +19,7 @@ macro_rules! amount_maps {
             credit_non_qualifying_delta, credit_non_qualifying_vega,
             equity_delta, equity_vega,
             fx_delta, fx_vega,
-            commodity_delta, commodity_vega,
-            curvature)
+            commodity_delta, commodity_vega)
     };
     (is_empty $s:ident) => { amount_maps!(@fields @is_empty $s) };
     (@is_empty $s:ident; $($f:ident),*) => { true $(&& $s.$f.is_empty())* };
@@ -260,9 +260,9 @@ pub struct SimmSensitivitiesJson {
     /// Commodity vega buckets as `(bucket, amount)`.
     #[serde(default)]
     pub commodity_vega: Vec<(String, f64)>,
-    /// Curvature buckets as `(risk_class, amount)`.
+    /// Expiry-resolved volatility-weighted vega inputs before curvature scaling.
     #[serde(default)]
-    pub curvature: Vec<(SimmRiskClass, f64)>,
+    pub curvature: Vec<SimmCurvatureSensitivity>,
 }
 
 impl From<&SimmSensitivities> for SimmSensitivitiesJson {
@@ -333,11 +333,7 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
                 .iter()
                 .map(|(bucket, amount)| (bucket.clone(), *amount))
                 .collect(),
-            curvature: sens
-                .curvature
-                .iter()
-                .map(|(risk_class, amount)| (*risk_class, *amount))
-                .collect(),
+            curvature: sens.curvature.clone(),
         };
         for entries in [&mut json.ir_delta, &mut json.ir_vega] {
             entries.sort_by(|left, right| {
@@ -366,8 +362,26 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
         for entries in [&mut json.commodity_delta, &mut json.commodity_vega] {
             entries.sort_by(|left, right| left.0.cmp(&right.0));
         }
-        json.curvature
-            .sort_by_key(|entry| simm_risk_class_sort_key(entry.0));
+        json.curvature.sort_by(|a, b| {
+            (
+                simm_risk_class_sort_key(a.risk_class),
+                &a.bucket,
+                &a.factor,
+                &a.risk_tenor,
+                &a.expiry_tenor,
+            )
+                .cmp(&(
+                    simm_risk_class_sort_key(b.risk_class),
+                    &b.bucket,
+                    &b.factor,
+                    &b.risk_tenor,
+                    &b.expiry_tenor,
+                ))
+                .then_with(|| {
+                    a.volatility_weighted_vega
+                        .total_cmp(&b.volatility_weighted_vega)
+                })
+        });
         for entries in [
             &mut json.credit_qualifying_delta,
             &mut json.credit_qualifying_vega,
@@ -451,9 +465,7 @@ impl From<SimmSensitivitiesJson> for SimmSensitivities {
         for (bucket, amount) in value.commodity_vega {
             sens.add_commodity_vega(bucket, amount);
         }
-        for (risk_class, amount) in value.curvature {
-            sens.add_curvature(risk_class, amount);
-        }
+        sens.curvature = value.curvature;
         sens
     }
 }
@@ -470,6 +482,11 @@ impl From<SimmSensitivitiesJson> for SimmSensitivities {
 ///   rates or basis-point quote moves.
 /// - For rate and credit buckets, callers should provide DV01/CS01-style
 ///   amounts in currency per 1bp move before loading them into this struct.
+/// - Equity, FX and commodity deltas are currency P&L per 1% relative
+///   price move: `price * dPV/dprice * 0.01`, before concentration or risk weights.
+/// - All vegas are `sigma * dPV/dsigma` in currency before HVR, VRW and
+///   concentration. For non-IR classes sigma uses SIMM paragraph 10(b)'s proxy.
+/// - Curvature inputs preserve expiry and factor identity before tenor scaling.
 /// - Tenor labels must be one of [`SIMM_TENORS`] (`2W`, `1M`, `3M`, `6M`,
 ///   `1Y`, `2Y`, `3Y`, `5Y`, `10Y`, `15Y`, `20Y`, `30Y`); [`Self::validate`]
 ///   rejects anything else and the calculator runs it before pricing.
@@ -519,8 +536,9 @@ pub struct SimmSensitivities {
 
     /// Interest rate vega by `(currency, tenor bucket)`.
     ///
-    /// Values should already be expressed in currency units compatible with the
-    /// SIMM vega weights.
+    /// Values are sigma times dPV/dsigma in currency before VRW or concentration.
+    /// This legacy two-dimensional vega input collapses underlying-maturity detail;
+    /// curvature has the separate full expiry-resolved input.
     pub ir_vega: HashMap<(Currency, String), f64>,
 
     /// Credit qualifying delta by `(sector, issuer/index, tenor bucket)`.
@@ -550,7 +568,7 @@ pub struct SimmSensitivities {
 
     /// Equity delta by underlier.
     ///
-    /// Values are signed currency sensitivities, not percentage deltas.
+    /// Values are signed currency P&L per 1% relative equity-price increase.
     pub equity_delta: HashMap<String, f64>,
 
     /// Equity vega by underlier.
@@ -558,14 +576,14 @@ pub struct SimmSensitivities {
 
     /// FX delta by currency.
     ///
-    /// Values are signed currency sensitivities to the reporting FX risk factor
-    /// used by the caller's SIMM mapping, not spot levels or percentage moves.
+    /// Values are signed currency P&L per 1% relative FX-price increase,
+    /// before risk weighting or concentration. USD is the calculation currency.
     pub fx_delta: HashMap<Currency, f64>,
 
     /// FX vega by currency pair.
     pub fx_vega: HashMap<(Currency, Currency), f64>,
 
-    /// Commodity delta by bucket.
+    /// Commodity delta P&L per 1% relative price increase by bucket.
     ///
     /// Bucket labels should match the SIMM commodity bucket naming expected by
     /// the calculator's registry-backed lookup table.
@@ -578,11 +596,11 @@ pub struct SimmSensitivities {
     /// risk weight replaces the per-bucket delta weights.
     pub commodity_vega: HashMap<String, f64>,
 
-    /// Curvature risk by risk class.
-    ///
-    /// Values should be the signed curvature contributions in currency units
-    /// before the SIMM curvature scale factor is applied.
-    pub curvature: HashMap<SimmRiskClass, f64>,
+    /// Expiry-resolved signed `sigma * dPV/dsigma` inputs before SF, HVR,
+    /// vega risk weights or concentration. Entries are retained separately
+    /// until expiry scaling, so opposite vegas at different expiries do not
+    /// incorrectly cancel curvature.
+    pub curvature: Vec<SimmCurvatureSensitivity>,
 }
 
 impl SimmSensitivities {
@@ -611,7 +629,7 @@ impl SimmSensitivities {
             fx_vega: HashMap::default(),
             commodity_delta: HashMap::default(),
             commodity_vega: HashMap::default(),
-            curvature: HashMap::default(),
+            curvature: Vec::new(),
         }
     }
 
@@ -750,9 +768,14 @@ impl SimmSensitivities {
         *self.commodity_vega.entry(key).or_insert(0.0) += vega;
     }
 
-    /// Add a curvature contribution for a SIMM risk class.
-    pub fn add_curvature(&mut self, risk_class: SimmRiskClass, amount: f64) {
-        *self.curvature.entry(risk_class).or_insert(0.0) += amount;
+    /// Preserve one option-expiry contribution until curvature scaling is applied.
+    ///
+    /// # Arguments
+    ///
+    /// * `sensitivity` - Signed volatility-weighted vega with explicit factor,
+    ///   risk tenor and option expiry. Validation occurs in `validate` and the calculator.
+    pub fn add_curvature(&mut self, sensitivity: SimmCurvatureSensitivity) {
+        self.curvature.push(sensitivity);
     }
 
     /// Validate tenor labels, commodity buckets, identifiers and amounts.
@@ -795,6 +818,9 @@ impl SimmSensitivities {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "SIMM sensitivity {field} contains a non-finite amount"
             )));
+        }
+        for sensitivity in &self.curvature {
+            sensitivity.validate()?;
         }
         for (currency, label) in self.ir_delta.keys().chain(self.ir_vega.keys()) {
             tenor(&format!("ir ({currency})"), label)?;
@@ -839,13 +865,12 @@ impl SimmSensitivities {
     ///
     /// Returns a validation error when the JSON cannot be deserialized.
     pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
-        serde_json::from_str::<SimmSensitivitiesJson>(json)
-            .map(Self::from)
-            .map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "invalid SIMM sensitivities JSON: {e}"
-                ))
-            })
+        let wire = serde_json::from_str::<SimmSensitivitiesJson>(json).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!("invalid SIMM sensitivities JSON: {e}"))
+        })?;
+        let value = Self::from(wire);
+        value.validate()?;
+        Ok(value)
     }
 
     /// Serialize sensitivities to the canonical JSON representation.
@@ -867,7 +892,7 @@ impl SimmSensitivities {
     /// Note: This checks bucket existence, not whether net sensitivities are zero.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        amount_maps!(is_empty self)
+        amount_maps!(is_empty self) && self.curvature.is_empty()
     }
 
     /// Merge another set of sensitivities into this one.
@@ -879,6 +904,7 @@ impl SimmSensitivities {
     /// * `other` - Second operand used by the binary arithmetic or merge operation
     pub fn merge(&mut self, other: &SimmSensitivities) {
         amount_maps!(merge self, other);
+        self.curvature.extend(other.curvature.iter().cloned());
     }
 
     /// Return a copy of these sensitivities re-expressed in `target_currency`.
@@ -942,6 +968,9 @@ impl SimmSensitivities {
     /// signed amounts are rescaled.
     fn scale_amounts(&mut self, factor: f64) {
         amount_maps!(scale self, factor);
+        for input in &mut self.curvature {
+            input.volatility_weighted_vega *= factor;
+        }
     }
 
     /// Get total IR delta across all currencies and tenors.
@@ -1020,6 +1049,22 @@ pub fn ordered_credit_sector_pair(
 mod tests {
     use super::*;
 
+    fn curvature_input(class: SimmRiskClass, amount: f64) -> SimmCurvatureSensitivity {
+        SimmCurvatureSensitivity {
+            risk_class: class,
+            bucket: if class == SimmRiskClass::InterestRate {
+                "USD"
+            } else {
+                "residual"
+            }
+            .into(),
+            factor: "TEST".into(),
+            risk_tenor: (class == SimmRiskClass::InterestRate).then(|| "5Y".into()),
+            expiry_tenor: "1Y".into(),
+            volatility_weighted_vega: amount,
+        }
+    }
+
     fn insert_entries<K>(map: &mut HashMap<K, f64>, mut entries: [(K, f64); 2], reverse: bool)
     where
         K: Eq + Hash,
@@ -1081,17 +1126,20 @@ mod tests {
         );
         insert_entries(
             &mut sensitivities.commodity_delta,
-            [("Power".to_string(), 170.0), ("Crude".to_string(), 180.0)],
-            reverse,
-        );
-        insert_entries(
-            &mut sensitivities.curvature,
             [
-                (SimmRiskClass::Equity, 190.0),
-                (SimmRiskClass::InterestRate, 200.0),
+                ("EuropeanPowerAndCarbon".to_string(), 170.0),
+                ("Crude".to_string(), 180.0),
             ],
             reverse,
         );
+        sensitivities.curvature = vec![
+            curvature_input(SimmRiskClass::Equity, 190.0),
+            curvature_input(SimmRiskClass::InterestRate, 200.0),
+        ];
+        if reverse {
+            sensitivities.curvature.reverse();
+        }
+
         insert_entries(
             &mut sensitivities.credit_qualifying_delta,
             [
@@ -1132,7 +1180,7 @@ mod tests {
         );
         sens.add_fx_vega(Currency::EUR, Currency::USD, 1_000.0);
         sens.add_commodity_delta("energy", 2_000.0);
-        sens.add_curvature(SimmRiskClass::Equity, 3_000.0);
+        sens.add_curvature(curvature_input(SimmRiskClass::Equity, 3_000.0));
 
         assert!(!sens.is_empty());
         assert_eq!(sens.total_ir_delta(), 150_000.0);
@@ -1143,7 +1191,7 @@ mod tests {
         );
         assert_eq!(sens.fx_vega[&(Currency::EUR, Currency::USD)], 1_000.0);
         assert_eq!(sens.commodity_delta["energy"], 2_000.0);
-        assert_eq!(sens.curvature[&SimmRiskClass::Equity], 3_000.0);
+        assert_eq!(sens.curvature[0].volatility_weighted_vega, 3_000.0);
     }
 
     #[test]
@@ -1184,7 +1232,7 @@ mod tests {
         sens.add_commodity_delta("Crude", 1.0);
         sens.add_commodity_delta("light_ends", 1.0);
         sens.add_commodity_delta("17", 1.0);
-        sens.add_curvature(SimmRiskClass::Equity, 1.0);
+        sens.add_curvature(curvature_input(SimmRiskClass::Equity, 1.0));
         sens.validate().expect("canonical labels validate");
         assert_eq!(commodity_bucket_id(" Precious Metals "), Some(12));
         assert_eq!(commodity_bucket_id("0"), None);
@@ -1217,8 +1265,8 @@ mod tests {
         let mut sens = SimmSensitivities::new(Currency::USD);
         sens.add_ir_delta(Currency::USD, "5Y", 100.0);
         sens.add_fx_vega(Currency::EUR, Currency::USD, 25.0);
-        sens.add_commodity_delta("energy", 10.0);
-        sens.add_curvature(SimmRiskClass::Equity, 5.0);
+        sens.add_commodity_delta("crude", 10.0);
+        sens.add_curvature(curvature_input(SimmRiskClass::Equity, 5.0));
 
         let json = sens.to_json().expect("serialize sensitivities");
         let round_tripped = SimmSensitivities::from_json(&json).expect("deserialize sensitivities");
@@ -1228,8 +1276,8 @@ mod tests {
             100.0
         );
         assert_eq!(round_tripped.fx_vega[&(Currency::EUR, Currency::USD)], 25.0);
-        assert_eq!(round_tripped.commodity_delta["energy"], 10.0);
-        assert_eq!(round_tripped.curvature[&SimmRiskClass::Equity], 5.0);
+        assert_eq!(round_tripped.commodity_delta["crude"], 10.0);
+        assert_eq!(round_tripped.curvature[0].volatility_weighted_vega, 5.0);
     }
 
     #[test]
@@ -1266,7 +1314,7 @@ mod tests {
         assert_eq!(json.fx_delta[0].0, Currency::USD);
         assert_eq!(json.fx_vega[0].0, Currency::USD);
         assert_eq!(json.commodity_delta[0].0, "Crude");
-        assert_eq!(json.curvature[0].0, SimmRiskClass::InterestRate);
+        assert_eq!(json.curvature[0].risk_class, SimmRiskClass::InterestRate);
     }
 
     #[test]

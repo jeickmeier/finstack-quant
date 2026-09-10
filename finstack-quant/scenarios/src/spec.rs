@@ -119,9 +119,9 @@ pub struct ScenarioSpec {
 ///
 /// [`Self::SolveToPar`] is the production default: implied par CDS spreads are
 /// shocked and the hazard is re-bootstrapped so the curve still prices those
-/// quotes. [`Self::FirstOrderShift`] applies
-/// [`HazardCurve::with_parallel_hazard_rate_bump_bp`](finstack_quant_core::market_data::term_structures::HazardCurve::with_parallel_hazard_rate_bump_bp)
-/// directly to hazard knots for screening and large hierarchy fan-out.
+/// quotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard
+/// shift using `delta_hazard = delta_spread / (1 - recovery)` and emits an
+/// approximation warning. It does not reconcile the resulting par quotes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -129,7 +129,7 @@ pub enum HazardBumpMode {
     /// Shock implied par CDS spreads and re-bootstrap the hazard curve.
     #[default]
     SolveToPar,
-    /// Shift hazard knots in place without recovering par (first-order).
+    /// Convert spread to hazard using loss given default, without exact par repricing.
     FirstOrderShift,
 }
 

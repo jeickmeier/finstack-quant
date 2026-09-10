@@ -11,8 +11,9 @@
 //! (spot, next_spot) pair into a barrier hit probability. When the
 //! [`PathState`] carries a stochastic variance
 //! (e.g. Heston's `VARIANCE` key), [`BarrierOptionPayoff::on_event`]
-//! substitutes `sqrt(variance)` for the configured flat [`BarrierOptionPayoff::sigma`].
-//! This makes the reported payoff consistent with the path-level dynamics
+//! substitutes `sqrt(variance)` (including zero) for the configured flat [`BarrierOptionPayoff::sigma`].
+//! Freezing the local variance over the step approximates stochastic-volatility crossings;
+//! it requires time-step convergence. This makes the reported payoff consistent with the path-level dynamics
 //! under stochastic-vol models; for deterministic-vol processes the state
 //! carries no variance entry and the configured sigma is used unchanged.
 
@@ -261,8 +262,13 @@ impl Payoff for BarrierOptionPayoff {
                             state.step,
                         )?;
                         let local_sigma = match state.variance() {
-                            Some(v) if v.is_finite() && v > 0.0 => v.sqrt(),
-                            _ => self.sigma,
+                            Some(v) if v.is_finite() && v >= 0.0 => v.sqrt(),
+                            Some(v) => {
+                                return Err(finstack_quant_core::Error::Validation(format!(
+                                    "Barrier path variance must be finite and non-negative, got {v}"
+                                )));
+                            }
+                            None => self.sigma,
                         };
                         check_barrier_hit(
                             self.previous_spot,
@@ -600,6 +606,31 @@ mod tests {
             "payoff must use sqrt(variance) from PathState when present, \
              ignoring the fallback self.sigma",
         );
+    }
+
+    #[test]
+    fn production_barrier_zero_path_variance_has_no_bridge_crossing() {
+        let time_grid = TimeGrid::uniform(1.0, 1).expect("grid");
+        let mut payoff = BarrierOptionPayoff::new(
+            100.0,
+            120.0,
+            BarrierType::UpAndOut,
+            OptionKind::Call,
+            None,
+            1.0,
+            1,
+            2.0,
+            &time_grid,
+            BarrierMonitoring::Continuous { start_step: 0 },
+        );
+        for (step, spot) in [(0, 110.0), (1, 115.0)] {
+            let mut state = PathState::new(step, step as f64);
+            state.set(state_keys::SPOT, spot);
+            state.set(state_keys::VARIANCE, 0.0);
+            state.set_uniform_random(0.5);
+            payoff.on_event(&mut state).expect("zero-variance event");
+        }
+        assert_eq!(payoff.value(Currency::USD).expect("payoff").amount(), 15.0);
     }
 
     #[test]

@@ -3,6 +3,7 @@
 pub(crate) mod accrual;
 pub(crate) mod aggregation;
 pub(crate) mod builder;
+pub(crate) mod fixings;
 pub(crate) mod primitives;
 mod schema;
 
@@ -433,6 +434,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     accrual::register(py, &m)?;
     aggregation::register(py, &m)?;
     schema::register(py, &m)?;
+    fixings::register(py, &m)?;
 
     m.add_class::<PyScheduleBuildOpts>()?;
     m.add_function(wrap_pyfunction!(accrued_interest, &m)?)?;
@@ -477,6 +479,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "accrual",
             "accrued_interest",
             "aggregation",
+            "fixings",
             "build_cashflow_schedule",
             "build_cashflow_schedule_json",
             "builder",

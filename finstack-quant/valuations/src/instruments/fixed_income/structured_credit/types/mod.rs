@@ -21,6 +21,7 @@ pub(crate) mod waterfall;
 mod constructors;
 mod instrument;
 mod pricing_methods;
+mod resolved;
 mod stochastic;
 mod structured_credit_impl;
 
@@ -35,8 +36,7 @@ pub use pool::{
 pub(crate) use pool_state::PoolState;
 
 pub use tranches::{
-    CoverageTrigger, CreditEnhancement, Tranche, TrancheBehaviorType, TrancheBuilder,
-    TrancheCoupon, TrancheStructure,
+    CoverageTrigger, Tranche, TrancheBehaviorType, TrancheBuilder, TrancheCoupon, TrancheStructure,
 };
 
 pub use setup::{CoverageTestConfig, DealConfig, DealDates, DealFees, DefaultAssumptions};
@@ -50,7 +50,7 @@ pub use waterfall::{
     WaterfallTier, WaterfallWorkspace,
 };
 
-pub use results::{TrancheCashflows, TrancheValuation};
+pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
 
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
@@ -63,7 +63,6 @@ use crate::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 /// Market conditions that affect prepayment behavior.
@@ -71,43 +70,21 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MarketConditions {
-    /// Current refinancing rate.
+    /// Finite annual decimal refinancing rate for Richard-Roll incentives; may be negative.
     pub refi_rate: f64,
-    /// Rate at origination for refinancing incentive calculation.
-    pub original_rate: Option<f64>,
-    /// Home price appreciation (for mortgages).
-    pub hpa: Option<f64>,
-    /// Unemployment rate.
-    pub unemployment: Option<f64>,
-    /// Seasonal adjustment factor.
-    pub seasonal_factor: Option<f64>,
-    /// Custom market factors.
-    pub custom_factors: IndexMap<String, f64>,
 }
 
-/// Credit factors affecting default probability.
+/// Optional monetary inputs for CMBS debt-service coverage metrics.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CreditFactors {
-    /// Current FICO/credit score.
-    pub credit_score: Option<u32>,
-    /// Debt-to-income ratio.
-    pub dti: Option<f64>,
-    /// Loan-to-value ratio.
-    pub ltv: Option<f64>,
-    /// Payment delinquency status (days).
-    pub delinquency_days: u32,
-    /// Unemployment rate.
-    pub unemployment_rate: Option<f64>,
     /// Annual net operating income for CMBS collateral, when provided.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annual_noi: Option<Money>,
     /// Annual debt service for CMBS collateral, when provided.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annual_debt_service: Option<Money>,
-    /// Additional custom factors.
-    pub custom_factors: IndexMap<String, f64>,
 }
 
 /// Deal metadata (counterparties and identifiers).
@@ -220,13 +197,6 @@ pub struct StructuredCredit {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub first_payment_date: Date,
-    /// End of reinvestment period (if applicable).
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    pub reinvestment_end_date: Option<Date>,
     /// Legal final maturity date.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -234,6 +204,21 @@ pub struct StructuredCredit {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub maturity: Date,
+
+    /// Buyer settlement date for clean/dirty price and spread metrics.
+    /// `None` uses the valuation date. Cashflows payable on or before settlement
+    /// belong to the seller; model PV remains measured on the valuation date.
+    #[builder(default)]
+    #[serde(
+        default,
+        with = "finstack_quant_core::wire::optional_date",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub quote_settlement_date: Option<Date>,
 
     /// Payment frequency for the structure.
     pub frequency: Tenor,
@@ -297,10 +282,6 @@ pub struct StructuredCredit {
     /// Behavioral assumption overrides.
     #[serde(default)]
     pub behavior_overrides: Overrides,
-
-    /// Default behavioral assumptions for the deal.
-    #[serde(default)]
-    pub default_assumptions: DefaultAssumptions,
 
     /// Interest rate swaps used to hedge basis or interest rate risk.
     #[serde(default)]

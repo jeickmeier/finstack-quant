@@ -25,6 +25,8 @@ pub(crate) struct PoolState {
     pub(crate) smm_overrides: Vec<Option<f64>>,
     /// MDR overrides
     pub(crate) mdr_overrides: Vec<Option<f64>>,
+    /// Explicit per-asset recovery fractions.
+    pub(crate) recovery_rates: Vec<Option<f64>>,
     /// Integer indices for curve lookups (optimization)
     pub(crate) curve_indices: Vec<Option<usize>>,
     /// Unique curve identifiers (referenced by curve_indices)
@@ -57,13 +59,18 @@ impl PoolState {
         let mut is_defaulted = Vec::with_capacity(n);
         let mut smm_overrides = Vec::with_capacity(n);
         let mut mdr_overrides = Vec::with_capacity(n);
+        let mut recovery_rates = Vec::with_capacity(n);
         let mut level_payments = Vec::with_capacity(n);
 
         let mut is_amortizing = Vec::with_capacity(n);
 
         for asset in &pool.assets {
             ids.push(asset.id.to_string());
-            balances.push(asset.balance.amount());
+            balances.push(if asset.is_defaulted {
+                0.0
+            } else {
+                asset.balance.amount()
+            });
             rates.push(asset.rate);
             spread_bp.push(asset.spread_bp);
             index_ids.push(asset.index_id.clone());
@@ -72,6 +79,7 @@ impl PoolState {
             is_defaulted.push(asset.is_defaulted);
             smm_overrides.push(asset.smm_override);
             mdr_overrides.push(asset.mdr_override);
+            recovery_rates.push(asset.recovery_rate);
             level_payments.push(asset.contractual_payment.map(|m| m.amount()));
             is_amortizing.push(asset.asset_type.is_amortizing());
         }
@@ -102,6 +110,7 @@ impl PoolState {
             is_defaulted,
             smm_overrides,
             mdr_overrides,
+            recovery_rates,
             curve_indices,
             unique_curves,
             is_amortizing,

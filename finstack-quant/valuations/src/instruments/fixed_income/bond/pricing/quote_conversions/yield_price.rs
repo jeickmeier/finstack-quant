@@ -317,7 +317,7 @@ pub(super) fn df_moosmuller_with_first_period(
 ///   [`finstack_quant_core::dates::DayCount::ActActIsma`] yields a period.
 /// * `frequency` - Contractual coupon frequency defining the quasi-coupon
 ///   grid; week/day frequencies are unsupported by ICMA and yield `None`.
-/// * `flows` - Dated bond cashflows in payment-date order; the first date
+/// * `dates` - Coupon payment dates in ascending order; the first date
 ///   strictly after `as_of` anchors the grid.
 /// * `as_of` - Settlement/valuation date the reference period must surround.
 ///
@@ -327,7 +327,7 @@ pub(super) fn df_moosmuller_with_first_period(
 pub(crate) fn icma_reference_period(
     day_count: finstack_quant_core::dates::DayCount,
     frequency: finstack_quant_core::dates::Tenor,
-    flows: &[(Date, Money)],
+    dates: impl IntoIterator<Item = Date>,
     as_of: Date,
 ) -> Option<(Date, Date)> {
     use finstack_quant_core::dates::{DateExt, DayCount, TenorUnit};
@@ -342,7 +342,7 @@ pub(crate) fn icma_reference_period(
     if months <= 0 {
         return None;
     }
-    let next = flows.iter().map(|&(d, _)| d).find(|d| *d > as_of)?;
+    let next = dates.into_iter().find(|d| *d > as_of)?;
     let mut prev = next.add_months(-months);
     // Preserve the end-of-month roll so the quasi-coupon grid matches an
     // EOM schedule (mirrors the traversal's own EOM handling).
@@ -393,7 +393,12 @@ pub fn price_from_ytm_compounded_params(
     // settlement and stub spans that are not whole coupon multiples.
     let dc_ctx = DayCountContext {
         frequency: Some(frequency),
-        coupon_period: icma_reference_period(day_count, frequency, flows, as_of),
+        coupon_period: icma_reference_period(
+            day_count,
+            frequency,
+            flows.iter().map(|(d, _)| *d),
+            as_of,
+        ),
         ..DayCountContext::default()
     };
 
@@ -605,22 +610,31 @@ pub(crate) fn exercise_principal_and_replaced_redemption(
     maturity: Date,
 ) -> finstack_quant_core::Result<(f64, f64)> {
     let after_events = outstanding_principal_at_date(schedule, exercise_date)?;
-    let replaced_redemption = if exercise_date == maturity {
+    let (principal_redeemed, replaced_redemption) = if exercise_date == maturity {
         schedule
             .get_flows()
             .iter()
             .filter(|flow| {
-                flow.date == exercise_date
+                flow.get_balance_date() == exercise_date
                     && flow.kind == CFKind::Notional
                     && flow.amount.amount() > 0.0
             })
-            .map(|flow| flow.amount.amount())
-            .sum()
+            .fold((0.0, 0.0), |(principal, same_day_cash), flow| {
+                (
+                    principal + flow.amount.amount(),
+                    same_day_cash
+                        + if flow.date == exercise_date {
+                            flow.amount.amount()
+                        } else {
+                            0.0
+                        },
+                )
+            })
     } else {
-        0.0
+        (0.0, 0.0)
     };
     Ok((
-        (after_events + replaced_redemption).max(0.0),
+        (after_events + principal_redeemed).max(0.0),
         replaced_redemption,
     ))
 }

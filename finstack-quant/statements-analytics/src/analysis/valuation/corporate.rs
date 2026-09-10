@@ -104,11 +104,12 @@ pub struct DcfOptions {
     /// happens to contain a curve with the conventional name cannot be
     /// mistaken for the discounting basis.
     pub discount_curve_id: Option<CurveId>,
-    /// Statement node whose last-forecast-period value supplies the
+    /// Statement flow node whose complete trailing calendar year supplies the
     /// [`TerminalValueSpec::ExitMultiple`] metric (default: `None`).
     ///
-    /// When `Some`, that period's node value replaces `terminal_metric` on
-    /// the spec. The value must exist and be finite. When `None`, the
+    /// When `Some`, sum contiguous actual and forecast periods over the year ending
+    /// at the last forecast boundary. Values must be finite and monetary. Missing
+    /// history or a partial boundary requires an explicit annual metric. When `None`, the
     /// spec's explicit `terminal_metric` is used. Ignored for Gordon
     /// Growth and H-Model terminals.
     pub exit_multiple_metric_node: Option<String>,
@@ -1045,18 +1046,41 @@ fn resolve_exit_multiple_metric(
             "Exit-multiple metric node requires a forecast period".into(),
         ));
     };
-    if results.get(node, &last_forecast.id).is_none() {
-        return Err(finstack_quant_statements::error::Error::Eval(format!(
-            "Exit-multiple metric node '{node}' has no value at last forecast period {}",
-            last_forecast.id
-        )));
+    let end = last_forecast.end;
+    let year = end.year() - 1;
+    let start = Date::from_calendar_date(year, end.month(), end.day())
+        .or_else(|_| Date::from_calendar_date(year, end.month(), 28))
+        .map_err(|_| {
+            finstack_quant_statements::error::Error::Eval(
+                "Trailing-year date is out of range".into(),
+            )
+        })?;
+    let incomplete = || {
+        finstack_quant_statements::error::Error::Eval(format!(
+        "Exit-multiple metric '{node}' requires complete contiguous history from {start} to {end}; set exit_multiple_metric_node=None and supply an explicit annual terminal_metric when history is insufficient"
+    ))
+    };
+    let currency = extract_currency_from_model(model)?;
+    let mut cursor = end;
+    let mut metric = 0.0;
+    for period in model
+        .periods
+        .iter()
+        .rev()
+        .filter(|period| period.end <= end)
+    {
+        if cursor == start {
+            break;
+        }
+        if period.end != cursor || period.start < start || period.start >= period.end {
+            return Err(incomplete());
+        }
+        metric += monetary_node_value(results, node, &period.id, currency)?;
+        cursor = period.start;
     }
-    let metric = monetary_node_value(
-        results,
-        node,
-        &last_forecast.id,
-        extract_currency_from_model(model)?,
-    )?;
+    if cursor != start || !metric.is_finite() {
+        return Err(incomplete());
+    }
     Ok(TerminalValueSpec::ExitMultiple {
         terminal_metric: metric,
         multiple,
@@ -1431,6 +1455,71 @@ mod tests {
             (tv - 1_200.0).abs() < 1e-9,
             "last-forecast EBITDA 150 × 8x must yield TV 1200, got {tv}"
         );
+    }
+
+    #[test]
+    fn exit_multiple_metric_requires_complete_trailing_year() {
+        use time::macros::date;
+        for boundaries in [
+            [
+                date!(2024 - 01 - 01),
+                date!(2024 - 04 - 01),
+                date!(2024 - 07 - 01),
+                date!(2024 - 10 - 01),
+                date!(2025 - 01 - 01),
+            ],
+            [
+                date!(2023 - 03 - 01),
+                date!(2023 - 06 - 01),
+                date!(2023 - 09 - 01),
+                date!(2023 - 12 - 01),
+                date!(2024 - 03 - 01),
+            ],
+        ] {
+            let vals: Vec<_> = (1..=4)
+                .map(|q| {
+                    (
+                        PeriodId::quarter(2024, q).unwrap(),
+                        AmountOrScalar::amount(f64::from(q) * 10., Currency::USD).unwrap(),
+                    )
+                })
+                .collect();
+            let mut model = ModelBuilder::new("ltm")
+                .periods("2024Q1..Q4", Some("2024Q2"))
+                .unwrap()
+                .value("ebitda", &vals)
+                .with_meta("currency", serde_json::json!("USD"))
+                .build()
+                .unwrap();
+            for (p, w) in model.periods.iter_mut().zip(boundaries.windows(2)) {
+                p.start = w[0];
+                p.end = w[1];
+            }
+            let results = Evaluator::new().evaluate(&model).unwrap();
+            let terminal = TerminalValueSpec::ExitMultiple {
+                terminal_metric: 999.,
+                multiple: 8.,
+            };
+            let resolved =
+                resolve_exit_multiple_metric(&model, &results, terminal.clone(), Some("ebitda"))
+                    .unwrap();
+            let TerminalValueSpec::ExitMultiple {
+                terminal_metric, ..
+            } = resolved
+            else {
+                unreachable!()
+            };
+            assert_eq!(terminal_metric, 100.);
+            model.periods.remove(0);
+            assert!(resolve_exit_multiple_metric(
+                &model,
+                &results,
+                terminal.clone(),
+                Some("ebitda")
+            )
+            .is_err());
+            assert!(resolve_exit_multiple_metric(&model, &results, terminal, None).is_ok());
+        }
     }
 
     #[test]

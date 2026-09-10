@@ -1,0 +1,280 @@
+{
+  "description": "Input-only agency mortgage contracts. One remaining monthly period, zero discounting, 60000 current / 100000 original collateral face. Independent coupon and settlement arithmetic is in host tests.",
+  "as_of": "2026-03-01",
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2026-03-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            40.0,
+            1.0
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  },
+  "tba": {
+    "instrument": {
+      "spec": {
+        "agency": "FNMA",
+        "attributes": {
+          "meta": {
+            "program": "fnma"
+          },
+          "tags": [
+            "agency",
+            "tba"
+          ]
+        },
+        "coupon": 0.04,
+        "discount_curve_id": "USD-OIS",
+        "id": "FN30-4.0-202703",
+        "notional": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "settlement_month": 3,
+        "settlement_year": 2026,
+        "term": "thirty_year",
+        "trade_price": 100.0,
+        "settlement_date": "2026-03-11",
+        "assumed_pool": {
+          "agency": "FNMA",
+          "attributes": {
+            "meta": {
+              "program": "fnma"
+            },
+            "tags": [
+              "agency",
+              "mbs"
+            ]
+          },
+          "current_face": {
+            "amount": "60000",
+            "currency": "USD"
+          },
+          "current_factor": 0.6,
+          "day_count": "30_360",
+          "discount_curve_id": "USD-OIS",
+          "guarantee_fee_rate": 0.0025,
+          "id": "FN-MA1234",
+          "issue_date": "2026-03-01",
+          "maturity": "2026-04-01",
+          "original_face": {
+            "amount": "100000",
+            "currency": "USD"
+          },
+          "pass_through_rate": 0.04,
+          "pool_id": "MA1234",
+          "pool_type": "generic",
+          "prepayment_model": {
+            "cpr": 0.0
+          },
+          "servicing_fee_rate": 0.0025,
+          "wac": 0.045,
+          "wam": 1
+        }
+      },
+      "type": "agency_tba"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "cmo": {
+    "instrument": {
+      "spec": {
+        "agency": "FNMA",
+        "attributes": {
+          "meta": {
+            "deal": "fnr-2024-1"
+          },
+          "tags": [
+            "agency",
+            "cmo"
+          ]
+        },
+        "collateral_wac": 0.045,
+        "collateral_wam": 1,
+        "deal_name": "FNR 2024-1",
+        "discount_curve_id": "USD-OIS",
+        "id": "FNR-2024-1-A",
+        "issue_date": "2026-03-01",
+        "reference_tranche_id": "IO",
+        "waterfall": {
+          "pro_rata_same_priority": false,
+          "tranches": [
+            {
+              "coupon": 0.01,
+              "current_face": {
+                "amount": "60000",
+                "currency": "USD"
+              },
+              "id": "IO",
+              "original_face": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "priority": 1,
+              "tranche_type": "interest_only"
+            },
+            {
+              "coupon": 0.0,
+              "current_face": {
+                "amount": "60000",
+                "currency": "USD"
+              },
+              "id": "PO",
+              "original_face": {
+                "amount": "100000",
+                "currency": "USD"
+              },
+              "priority": 2,
+              "tranche_type": "principal_only"
+            }
+          ]
+        },
+        "collateral": {
+          "agency": "FNMA",
+          "attributes": {
+            "meta": {
+              "program": "fnma"
+            },
+            "tags": [
+              "agency",
+              "mbs"
+            ]
+          },
+          "current_face": {
+            "amount": "60000",
+            "currency": "USD"
+          },
+          "current_factor": 0.6,
+          "day_count": "30_360",
+          "discount_curve_id": "USD-OIS",
+          "guarantee_fee_rate": 0.0025,
+          "id": "FN-MA1234",
+          "issue_date": "2026-03-01",
+          "maturity": "2026-04-01",
+          "original_face": {
+            "amount": "100000",
+            "currency": "USD"
+          },
+          "pass_through_rate": 0.04,
+          "pool_id": "MA1234",
+          "pool_type": "generic",
+          "prepayment_model": {
+            "cpr": 0.0
+          },
+          "servicing_fee_rate": 0.0025,
+          "wac": 0.045,
+          "wam": 1
+        }
+      },
+      "type": "agency_cmo"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "mbs": {
+    "instrument": {
+      "spec": {
+        "agency": "FNMA",
+        "attributes": {
+          "meta": {
+            "program": "fnma"
+          },
+          "tags": [
+            "agency",
+            "mbs"
+          ]
+        },
+        "current_face": {
+          "amount": "60000",
+          "currency": "USD"
+        },
+        "current_factor": 0.6,
+        "day_count": "30_360",
+        "discount_curve_id": "USD-OIS",
+        "guarantee_fee_rate": 0.0025,
+        "id": "FN-MA1234",
+        "issue_date": "2026-03-01",
+        "maturity": "2026-04-01",
+        "original_face": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "pass_through_rate": 0.04,
+        "pool_id": "MA1234",
+        "pool_type": "generic",
+        "prepayment_model": {
+          "cpr": 0.0
+        },
+        "servicing_fee_rate": 0.0025,
+        "wac": 0.045,
+        "wam": 1
+      },
+      "type": "agency_mbs_passthrough"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "roll": {
+    "instrument": {
+      "spec": {
+        "agency": "FNMA",
+        "attributes": {
+          "meta": {
+            "program": "fnma"
+          },
+          "tags": [
+            "agency",
+            "dollar_roll"
+          ]
+        },
+        "back_price": 98.0,
+        "back_settlement_month": 4,
+        "back_settlement_year": 2026,
+        "coupon": 0.04,
+        "discount_curve_id": "USD-OIS",
+        "front_price": 98.5,
+        "front_settlement_month": 3,
+        "front_settlement_year": 2026,
+        "id": "FN30-4.0-ROLL-0326-0426",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "term": "thirty_year",
+        "front_settlement_date": "2026-03-11",
+        "back_settlement_date": "2026-04-11"
+      },
+      "type": "dollar_roll"
+    },
+    "schema": "finstack_quant.instrument/1"
+  }
+}

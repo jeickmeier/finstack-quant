@@ -48,6 +48,32 @@ from finstack_quant.core.types import Bps, CreditRating, Percentage, Rate
 from finstack_quant.models.credit import moodys_warf_factor
 
 
+def test_quantile_nan_probability_preserves_nan_and_endpoint_clamping() -> None:
+    from finstack_quant.core.math.stats import quantile, quantile_linear_or_nan
+
+    for values in ([], [1.0], [1.0, 2.0, 3.0]):
+        assert math.isnan(quantile_linear_or_nan(values, math.nan))
+        assert math.isnan(quantile(values, math.nan))
+    assert quantile_linear_or_nan([1.0, 2.0, 3.0], -1.0) == 1.0
+    assert quantile_linear_or_nan([1.0, 2.0, 3.0], 2.0) == 3.0
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        (date(2025, 2, 28), date(2025, 3, 31)),
+        (date(2024, 2, 29), date(2024, 3, 31)),
+        (date(2025, 4, 30), date(2025, 5, 31)),
+    ],
+)
+def test_icma_backward_only_month_roll_requires_reference_period(start: date, end: date) -> None:
+    ctx = DayCountContext(frequency=Tenor.monthly())
+    with pytest.raises(ValueError, match="coupon_period"):
+        DayCount.ACT_ACT_ISMA.year_fraction(start, end, ctx)
+    reference = DayCountContext(frequency=Tenor.monthly(), coupon_period=(start, end))
+    assert DayCount.ACT_ACT_ISMA.year_fraction(start, end, reference) == pytest.approx(1 / 12, abs=1e-12)
+
+
 def test_icma_reference_period_preserves_february_coupon_tenor() -> None:
     start, end = date(2024, 8, 30), date(2025, 2, 28)
     ctx = DayCountContext(frequency=Tenor.semi_annual(), coupon_period=(start, end))
@@ -681,6 +707,26 @@ class TestFxMatrixParity:
         usd = Currency("USD")
         result = fx.rate(usd, usd, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.0)
+
+    @pytest.mark.parametrize("pinned", [False, True])
+    def test_quote_update_invalidates_cached_cross(self, pinned: bool) -> None:
+        fx = FxMatrix()
+        fixing_date = date(2025, 1, 2)
+        fx.set_quote("GBP", "USD", 1.25)
+        if pinned:
+            fx.set_quote_on("EUR", "USD", fixing_date, "cashflow_date", 1.10)
+        else:
+            fx.set_quote("EUR", "USD", 1.10)
+        assert fx.rate("EUR", "GBP", fixing_date).rate == pytest.approx(0.88)
+        if pinned:
+            fx.set_quote_on("EUR", "USD", fixing_date, "cashflow_date", 1.20)
+        else:
+            fx.set_quote("EUR", "USD", 1.20)
+        result = fx.rate("EUR", "GBP", fixing_date)
+        assert result.rate == pytest.approx(0.96)
+        assert result.triangulated
+        assert fx.rate("GBP", "EUR", fixing_date).rate == pytest.approx(1 / 0.96)
+        assert fx.rate("GBP", "USD", fixing_date).rate == pytest.approx(1.25)
 
     def test_date_scoped_quote_does_not_shadow_other_dates(self) -> None:
         fx = FxMatrix()

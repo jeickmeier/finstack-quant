@@ -23,6 +23,7 @@ fn test_wal_calculation_equal_payments() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (
@@ -72,6 +73,7 @@ fn test_wal_calculation_front_loaded_payments() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (
@@ -117,6 +119,7 @@ fn test_wal_calculation_back_loaded_payments() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (
@@ -162,6 +165,7 @@ fn test_wal_calculation_single_payment() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![(
             Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -197,6 +201,7 @@ fn test_wal_calculation_empty_cashflows() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![],
         pik_flows: vec![],
@@ -229,6 +234,7 @@ fn test_wal_ignores_past_cashflows() {
         tranche_id: "TEST".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (
@@ -272,6 +278,7 @@ fn test_wal_rmbs_with_psa() {
         tranche_id: "RMBS_AAA".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (
@@ -317,6 +324,7 @@ fn test_wal_clo_short_duration() {
         tranche_id: "CLO_AAA".to_string(),
         cashflows: vec![],
         detailed_flows: vec![],
+        accrual_periods: Vec::new(),
         interest_flows: vec![],
         principal_flows: vec![
             (

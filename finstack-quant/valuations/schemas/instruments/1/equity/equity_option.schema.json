@@ -11,7 +11,7 @@
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "default": "act_365f",
-          "description": "Day count convention"
+          "description": "Model year fraction for volatility, dividend carry and exercise times; defaults to ACT/365F. Discount factors retain the curve's own date convention."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

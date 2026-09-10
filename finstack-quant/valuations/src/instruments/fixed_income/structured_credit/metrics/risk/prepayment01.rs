@@ -77,7 +77,9 @@ pub(crate) struct Prepayment01Calculator;
 
 impl MetricCalculator for Prepayment01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context.instrument_as::<StructuredCredit>()?.clone();
+        let instrument = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let as_of = context.as_of;
 
         let (prepayment_up, prepayment_down, achieved_bump) =

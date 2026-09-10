@@ -10,8 +10,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 use super::irr_helpers::{
-    cached_full_schedule, exercisable_call_candidates, outstanding_before,
-    settlement_discount_factor, solve_irr_to_exercise, target_price_from_quote_or_model,
+    cached_full_schedule, exercisable_call_candidates, outstanding_before, solve_irr_to_exercise,
+    target_price_from_quote_or_model,
 };
 
 /// Yield-to-worst calculator for callable term loans.
@@ -29,15 +29,14 @@ impl MetricCalculator for YtwCalculator {
         let schedule = cached_full_schedule(context)?;
 
         // Snapshot scalar fields off the loan after populating the cache.
-        let (currency, maturity, settle_df, candidate_calls) = {
+        let (currency, maturity, candidate_calls) = {
             let loan: &TermLoan = context.instrument_as()?;
-            let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
             let calls = exercisable_call_candidates(loan, &schedule, as_of)?;
-            (loan.currency, loan.maturity, settle_df, calls)
+            (loan.currency, loan.maturity, calls)
         };
         let dirty_now = {
             let loan: &TermLoan = context.instrument_as()?;
-            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value, settle_df)?
+            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value)?
         };
         let out_path = schedule.outstanding_by_date()?;
 

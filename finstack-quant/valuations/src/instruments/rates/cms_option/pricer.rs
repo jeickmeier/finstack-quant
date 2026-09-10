@@ -122,56 +122,12 @@ impl CmsOptionPricer {
             let (forward_swap_rate, _) =
                 reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
 
-            // Negative-rate regimes (EUR/JPY/CHF): Black-76 and the Hagan
-            // lognormal convexity adjustment are undefined for F ≤ 0. Fall
-            // back to the Bachelier (normal) model — matching the swaption
-            // and cap/floor pricers — with the surface's lognormal vol
-            // converted to a normal vol. The lognormal convexity adjustment
-            // scales with F²σ²T and vanishes as F → 0, so it is omitted on
-            // this path.
-            if forward_swap_rate <= 0.0 {
-                let time_to_fixing = DayCount::Act365F.year_fraction(
-                    as_of,
-                    fixing_date,
-                    DayCountContext::default(),
-                )?;
-                let option_val = if time_to_fixing <= 0.0 {
-                    match inst.option_type {
-                        crate::instruments::OptionType::Call => {
-                            (forward_swap_rate - strike).max(0.0)
-                        }
-                        crate::instruments::OptionType::Put => {
-                            (strike - forward_swap_rate).max(0.0)
-                        }
-                    }
-                } else {
-                    let strike_vol = finstack_quant_models::volatility::get_surface_vol_clamped(
-                        &vol_surface,
-                        time_to_fixing,
-                        strike,
-                    );
-                    let normal_vol =
-                        crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
-                            strike_vol,
-                            forward_swap_rate,
-                            strike,
-                            time_to_fixing,
-                            None,
-                        );
-                    finstack_quant_models::volatility::normal::bachelier_price(
-                        inst.option_type,
-                        forward_swap_rate,
-                        strike,
-                        normal_vol,
-                        time_to_fixing,
-                        1.0,
-                    )
-                };
-                let df_pay =
-                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
-                total_pv += option_val * accrual_fraction * df_pay;
-                continue;
+            if forward_swap_rate <= 0.0 || strike <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation("Black CMS option requires positive forward and strike; no normal-volatility conversion is inferred".to_owned()));
             }
+            vol_surface.require_quote_type(
+                finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            )?;
 
             // 2. Calculate Convexity Adjustment
             // Time to fixing is calendar time for the vol-surface axis: ACT/365F.
@@ -216,7 +172,7 @@ impl CmsOptionPricer {
                     time_to_fixing,
                     inst.cms_tenor,
                     forward_swap_rate,
-                    reference_swap.payments_per_year(),
+                    reference_swap.payments_per_year()?,
                 )
             } else {
                 0.0

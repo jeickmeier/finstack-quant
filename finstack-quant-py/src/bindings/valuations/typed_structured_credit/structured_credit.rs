@@ -7,8 +7,8 @@ use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    CreditFactors, DealFees, DealType, DefaultAssumptions, MarketConditions, Metadata, Overrides,
-    StructuredCredit, WaterfallRules,
+    CreditFactors, DealFees, DealType, MarketConditions, Metadata, Overrides, StructuredCredit,
+    WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -48,7 +48,7 @@ impl PyStructuredCredit {
     /// Create a fluent builder (mirrors Rust ``StructuredCredit::builder()``).
     ///
     /// The builder pre-seeds ``market_conditions``, ``credit_factors``,
-    /// ``deal_metadata``, ``behavior_overrides``, ``default_assumptions``,
+    /// ``deal_metadata``, ``behavior_overrides``,
     /// and ``hedge_swaps`` with their Rust ``Default`` values (the Rust
     /// builder fields have no default), which the corresponding setters
     /// (``market_conditions``, ``credit_factors``, ``waterfall_rules``,
@@ -78,7 +78,6 @@ impl PyStructuredCredit {
                     .credit_factors(CreditFactors::default())
                     .deal_metadata(Metadata::default())
                     .behavior_overrides(Overrides::default())
-                    .default_assumptions(DefaultAssumptions::default())
                     .hedge_swaps(Vec::new()),
             ),
         }
@@ -123,7 +122,7 @@ impl PyStructuredCredit {
     /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
     /// ...     RepLine(
     /// ...         "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360,
+    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan", "industry": None},
     /// ...     )
     /// ... ])
     /// >>> senior = (
@@ -347,12 +346,12 @@ impl PyStructuredCredit {
         date_to_py(py, self.inner.first_payment_date)
     }
 
-    /// Reinvestment period end as ``datetime.date``, or ``None``.
+    /// Buyer quote settlement date as ``datetime.date``, or ``None`` for valuation date.
     #[getter]
-    fn reinvestment_end_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    fn quote_settlement_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
-            .reinvestment_end_date
-            .map(|d| date_to_py(py, d))
+            .quote_settlement_date
+            .map(|date| date_to_py(py, date))
             .transpose()
     }
 
@@ -562,32 +561,32 @@ impl PyStructuredCreditBuilder {
         Ok(slf)
     }
 
-    /// Set the end of the reinvestment period.
+    /// Set buyer settlement for clean/dirty price, yield and spread metrics.
     ///
     /// Parameters
     /// ----------
     /// value : datetime.date
-    ///     End date of the reinvestment period. Optional; when never set,
-    ///     the deal has no reinvestment period.
+    ///     Buyer settlement date, on or after valuation and closing. Payments
+    ///     on or before this date belong to the seller. When omitted, metrics
+    ///     settle on the valuation date; model PV retains its valuation date.
     ///
     /// Returns
     /// -------
     /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
+    ///     This builder for further configuration.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If this builder was already consumed by a prior call to
-    ///     :meth:`StructuredCreditBuilder.build`.
+    ///     If the date is invalid or the builder was already consumed.
     #[pyo3(text_signature = "($self, value)")]
-    fn reinvestment_end_date<'py>(
+    fn quote_settlement_date<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
         let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.reinvestment_end_date(date));
+        slf.inner = Some(b.quote_settlement_date(date));
         Ok(slf)
     }
 
@@ -736,10 +735,9 @@ impl PyStructuredCreditBuilder {
     /// Parameters
     /// ----------
     /// value : dict | str
-    ///     ``MarketConditions`` object as a dict or JSON string (refinancing rate, home
-    ///     price appreciation, unemployment, seasonal factor, custom
-    ///     factors). :meth:`StructuredCredit.builder` pre-seeds the registry
-    ///     default, which this overrides.
+    ///     ``MarketConditions`` object containing finite annual decimal ``refi_rate``
+    ///     for Richard-Roll refinancing incentives; negative rates are accepted.
+    ///     This replaces the registry default. Unknown macro-factor fields fail.
     ///
     /// Returns
     /// -------
@@ -768,10 +766,9 @@ impl PyStructuredCreditBuilder {
     /// Parameters
     /// ----------
     /// value : dict | str
-    ///     ``CreditFactors`` object as a dict or JSON string (credit score, DTI, LTV,
-    ///     delinquency, unemployment, CMBS NOI/debt-service, custom
-    ///     factors). :meth:`StructuredCredit.builder` pre-seeds
-    ///     ``CreditFactors::default()``, which this overrides.
+    ///     ``CreditFactors`` object with optional ``annual_noi`` and
+    ///     ``annual_debt_service`` Money values for CMBS coverage metrics.
+    ///     Unknown macro-factor fields fail; missing values remain absent.
     ///
     /// Returns
     /// -------

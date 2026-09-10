@@ -501,26 +501,36 @@ mod tests {
         let mut opt = CmsSpreadOption::example();
         opt.swap_convention = None;
         assert_eq!(
-            opt.reference_swap().resolved_fixed_frequency(),
+            opt.reference_swap()
+                .resolved_fixed_frequency()
+                .expect("registry"),
             Tenor::semi_annual()
         );
         assert_eq!(
-            opt.reference_swap().resolved_float_frequency(),
+            opt.reference_swap()
+                .resolved_float_frequency()
+                .expect("registry"),
             Tenor::quarterly()
         );
         assert_eq!(
-            opt.reference_swap().resolved_fixed_day_count(),
+            opt.reference_swap()
+                .resolved_fixed_day_count()
+                .expect("registry"),
             DayCount::Thirty360
         );
         assert_eq!(
-            opt.reference_swap().resolved_float_day_count(),
+            opt.reference_swap()
+                .resolved_float_day_count()
+                .expect("registry"),
             DayCount::Act360
         );
 
         // EUR convention -> annual fixed leg (the case the hard-coded path got wrong).
         opt.swap_convention = Some(IRSConvention::EurEstr);
         assert_eq!(
-            opt.reference_swap().resolved_fixed_frequency(),
+            opt.reference_swap()
+                .resolved_fixed_frequency()
+                .expect("registry"),
             Tenor::annual(),
             "EUR CMS swap fixed leg must be annual, not the hard-coded semi-annual"
         );
@@ -529,7 +539,9 @@ mod tests {
         opt.swap_fixed_frequency =
             Some(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"));
         assert_eq!(
-            opt.reference_swap().resolved_fixed_frequency(),
+            opt.reference_swap()
+                .resolved_fixed_frequency()
+                .expect("registry"),
             Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
         );
     }

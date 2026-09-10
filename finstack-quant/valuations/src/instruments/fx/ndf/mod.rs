@@ -30,7 +30,7 @@
 //! Example: USD/CNY = 7.25 means 7.25 CNY per 1 USD.
 //!
 //! ```text
-//! Settlement = Notional_base × (1/F_contract - 1/F_fixing)
+//! Settlement = Notional_base × (1/F_fixing - 1/F_contract)
 //! ```
 //!
 //! ## SettlementPerBase
@@ -47,8 +47,8 @@
 //!
 //! ## Pre-Fixing (before fixing date)
 //!
-//! Forward rate is estimated via covered interest rate parity when foreign curve
-//! is available, otherwise falls back to spot rate.
+//! Forward rate is projected using both currency curves unless an explicit
+//! `forward_rate_override` is supplied in the contract's quote convention.
 //!
 //! ## Post-Fixing (after fixing date, before settlement)
 //!

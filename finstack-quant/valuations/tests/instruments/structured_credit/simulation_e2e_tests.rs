@@ -76,10 +76,12 @@ fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
         obligor_id: Some("OBLIGOR_1".to_string()),
         is_defaulted: false,
         recovery_amount: None,
+        default_date: None,
         purchase_price: None,
         acquisition_date: Some(as_of()),
         smm_override: None,
         mdr_override: None,
+        recovery_rate: None,
         contractual_payment: None,
     });
     pool
@@ -927,10 +929,12 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
             obligor_id: Some(format!("OB_{}", i)),
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: Some(as_of()),
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
     }

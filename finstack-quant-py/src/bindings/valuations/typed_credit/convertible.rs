@@ -516,10 +516,11 @@ impl PyConvertibleBond {
             .map_err(core_to_py)
     }
 
-    /// Conversion value (parity) of the bond.
+    /// Policy-specific conversion value divided by notional.
     ///
-    /// Mirrors Rust ``ConvertibleBond::parity``: ``effective_conversion_ratio
-    /// * spot`` where spot is the market price of ``underlying_equity_id``.
+    /// Mirrors Rust ``ConvertibleBond::parity``. Ordinary conversion uses the
+    /// effective ratio times spot; mandatory-variable contracts use their
+    /// lower-price, variable-share and upper-price delivery regimes.
     ///
     /// Parameters
     /// ----------
@@ -529,13 +530,15 @@ impl PyConvertibleBond {
     /// Returns
     /// -------
     /// float
-    ///     Parity in notional currency units per bond.
+    ///     Dimensionless conversion-value-to-notional ratio; 1.0 means par.
     ///
     /// Raises
     /// ------
     /// KeyError
     ///     If the underlying price is missing from ``market``.
     /// ValueError
+    ///     If conversion terms or the nonnegative finite equity price are invalid.
+    /// RuntimeError
     ///     If the bond has no ``underlying_equity_id``.
     #[pyo3(text_signature = "($self, market)")]
     fn parity(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
@@ -546,7 +549,7 @@ impl PyConvertibleBond {
     /// Conversion premium over parity.
     ///
     /// Mirrors Rust ``ConvertibleBond::conversion_premium``:
-    /// ``bond_price / parity - 1``.
+    /// ``bond_price / conversion_value - 1``, using policy-specific share delivery.
     ///
     /// Parameters
     /// ----------
@@ -565,7 +568,9 @@ impl PyConvertibleBond {
     /// KeyError
     ///     If the underlying price is missing from ``market``.
     /// ValueError
-    ///     If the bond has no ``underlying_equity_id`` or parity is zero.
+    ///     If conversion value is nonpositive/non-finite or bond price is negative/non-finite.
+    /// RuntimeError
+    ///     If the bond has no ``underlying_equity_id``.
     #[pyo3(text_signature = "($self, market, bond_price)")]
     fn conversion_premium(
         &self,
@@ -586,7 +591,9 @@ impl PyConvertibleBond {
     /// Parameters
     /// ----------
     /// market : MarketContext | str
-    ///     Market carrying the curves, underlying price and volatility.
+    ///     Curves, equity price and volatility. Active volatility overrides take
+    ///     precedence; surfaces are sampled at conversion strike. Floating
+    ///     coupons require the forward curve and realized historical fixings.
     /// as_of : datetime.date | str
     ///     Valuation date.
     /// bump_size : float | None
@@ -604,6 +611,8 @@ impl PyConvertibleBond {
     ///     If required market data is missing.
     /// RuntimeError
     ///     If the tree pricer fails.
+    /// ValueError
+    ///     If inputs violate the selected lattice's admissible numerical domain.
     #[pyo3(signature = (market, as_of, bump_size=None))]
     #[pyo3(text_signature = "($self, market, as_of, bump_size=None)")]
     fn greeks<'py>(

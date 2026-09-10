@@ -31,9 +31,9 @@ pub const PERCENTAGE_MULTIPLIER: f64 = 100.0;
 
 /// Solver tolerance for Z-spread calculations (decimal spread).
 ///
-/// Market standard: 0.1 bp = 0.0001% = 1e-6 in decimal terms.
-/// Z-spread is quoted in bp to 1 decimal place (e.g., 125.3 bp).
-pub const Z_SPREAD_SOLVER_TOLERANCE: f64 = 1e-6;
+/// The price objective is relative to the dirty settlement target. A tight
+/// decimal-spread tolerance preserves clean/dirty round trips across notionals.
+pub const Z_SPREAD_SOLVER_TOLERANCE: f64 = 1e-12;
 
 /// Solver tolerance for YTM calculations (decimal yield).
 ///

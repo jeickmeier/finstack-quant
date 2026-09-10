@@ -69,6 +69,7 @@ pub fn calculate_tranche_breakeven_cdr(
     as_of: Date,
 ) -> Result<f64> {
     deal.validate_for_pricing()?;
+    let deal = deal.resolved_for_pricing()?;
 
     // SC-m03: scale the "first dollar of loss" threshold to this tranche.
     let original_balance = deal

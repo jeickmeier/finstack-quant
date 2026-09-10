@@ -9,8 +9,7 @@ use super::{
     Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
-use crate::instruments::fixed_income::structured_credit::types::setup::DefaultAssumptions;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
@@ -172,9 +171,9 @@ impl StructuredCredit {
             pool: params.pool,
             tranches: params.tranches,
             closing_date,
-            first_payment_date: config.first_payment_date,
-            reinvestment_end_date: None,
+            first_payment_date: config.first_payment_date.min(params.maturity),
             maturity: params.maturity,
+            quote_settlement_date: None,
             frequency: config.frequency,
             payment_calendar_id: None,
             payment_business_day_convention: None,
@@ -195,7 +194,6 @@ impl StructuredCredit {
             credit_factors: config.credit_factors,
             deal_metadata: config.deal_metadata,
             behavior_overrides: config.behavior_overrides,
-            default_assumptions: DefaultAssumptions::default(),
             // Hedge swaps default to empty
             hedge_swaps: Vec::new(),
             cleanup_call_pct: None,
@@ -208,6 +206,18 @@ impl StructuredCredit {
 
     /// Create a new ABS instrument from its building blocks.
     ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable deal identifier used for pricing results and risk labels.
+    /// * `pool` - Current collateral balances and contractual asset terms; supply
+    ///   either individual assets or representative lines, in the pool currency.
+    /// * `tranches` - Capital structure, current note balances and coupon terms.
+    /// * `closing_date` - Contractual deal inception; the first accrual boundary
+    ///   is one registry payment period later (capped at maturity). Payment dates
+    ///   are adjusted by the configured calendar during schedule generation.
+    /// * `maturity` - Legal final date, strictly after closing.
+    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
+    ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_abs(
         id: impl Into<String>,
@@ -218,7 +228,7 @@ impl StructuredCredit {
         discount_curve_id: impl Into<String>,
     ) -> Self {
         let disc_id_str = discount_curve_id.into();
-        let mut inst = Self::new_with_deal_config(
+        Self::new_with_deal_config(
             id,
             DealType::Abs,
             InstrumentParams {
@@ -227,14 +237,24 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: &disc_id_str,
             },
-            deal_config_from_registry("abs_auto_standard"),
+            deal_config_from_registry("abs_auto_standard", closing_date),
             closing_date,
-        );
-        inst.default_assumptions = DefaultAssumptions::abs_auto_standard();
-        inst
+        )
     }
 
     /// Create a new CLO instrument from its building blocks.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable deal identifier used for pricing results and risk labels.
+    /// * `pool` - Current collateral balances and contractual asset terms; supply
+    ///   either individual assets or representative lines, in the pool currency.
+    /// * `tranches` - Capital structure, current note balances and coupon terms.
+    /// * `closing_date` - Contractual deal inception; the first accrual boundary
+    ///   is one registry payment period later (capped at maturity). Payment dates
+    ///   are adjusted by the configured calendar during schedule generation.
+    /// * `maturity` - Legal final date, strictly after closing.
+    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_clo(
@@ -246,7 +266,7 @@ impl StructuredCredit {
         discount_curve_id: impl Into<String>,
     ) -> Self {
         let disc_id_str = discount_curve_id.into();
-        let mut inst = Self::new_with_deal_config(
+        Self::new_with_deal_config(
             id,
             DealType::Clo,
             InstrumentParams {
@@ -255,14 +275,24 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: &disc_id_str,
             },
-            deal_config_from_registry("clo_standard"),
+            deal_config_from_registry("clo_standard", closing_date),
             closing_date,
-        );
-        inst.default_assumptions = DefaultAssumptions::clo_standard();
-        inst
+        )
     }
 
     /// Create a new CMBS instrument from its building blocks.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable deal identifier used for pricing results and risk labels.
+    /// * `pool` - Current collateral balances and contractual asset terms; supply
+    ///   either individual assets or representative lines, in the pool currency.
+    /// * `tranches` - Capital structure, current note balances and coupon terms.
+    /// * `closing_date` - Contractual deal inception; the first accrual boundary
+    ///   is one registry payment period later (capped at maturity). Payment dates
+    ///   are adjusted by the configured calendar during schedule generation.
+    /// * `maturity` - Legal final date, strictly after closing.
+    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_cmbs(
@@ -274,7 +304,7 @@ impl StructuredCredit {
         discount_curve_id: impl Into<String>,
     ) -> Self {
         let disc_id_str = discount_curve_id.into();
-        let mut inst = Self::new_with_deal_config(
+        Self::new_with_deal_config(
             id,
             DealType::Cmbs,
             InstrumentParams {
@@ -283,14 +313,24 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: &disc_id_str,
             },
-            deal_config_from_registry("cmbs_standard"),
+            deal_config_from_registry("cmbs_standard", closing_date),
             closing_date,
-        );
-        inst.default_assumptions = DefaultAssumptions::cmbs_standard();
-        inst
+        )
     }
 
     /// Create a new RMBS instrument from its building blocks.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Stable deal identifier used for pricing results and risk labels.
+    /// * `pool` - Current collateral balances and contractual asset terms; supply
+    ///   either individual assets or representative lines, in the pool currency.
+    /// * `tranches` - Capital structure, current note balances and coupon terms.
+    /// * `closing_date` - Contractual deal inception; the first accrual boundary
+    ///   is one registry payment period later (capped at maturity). Payment dates
+    ///   are adjusted by the configured calendar during schedule generation.
+    /// * `maturity` - Legal final date, strictly after closing.
+    /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
     #[allow(clippy::expect_used)] // Builder with valid default dates
     pub fn new_rmbs(
@@ -302,7 +342,7 @@ impl StructuredCredit {
         discount_curve_id: impl Into<String>,
     ) -> Self {
         let disc_id_str = discount_curve_id.into();
-        let mut inst = Self::new_with_deal_config(
+        Self::new_with_deal_config(
             id,
             DealType::Rmbs,
             InstrumentParams {
@@ -311,25 +351,25 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: &disc_id_str,
             },
-            deal_config_from_registry("rmbs_standard"),
+            deal_config_from_registry("rmbs_standard", closing_date),
             closing_date,
-        );
-        inst.default_assumptions = DefaultAssumptions::rmbs_standard();
-        inst
+        )
     }
 }
 
 #[allow(clippy::expect_used)]
-fn deal_config_from_registry(profile_id: &str) -> DealConfig {
+fn deal_config_from_registry(profile_id: &str, closing_date: Date) -> DealConfig {
     let defaults = required_assumption(
         embedded_registry_or_panic().constructor_defaults(profile_id),
         "constructor defaults",
     );
-    let month =
-        time::Month::try_from(defaults.first_payment_month).expect("validated first payment month");
     DealConfig {
-        first_payment_date: Date::from_calendar_date(2025, month, 1)
-            .expect("valid structured-credit first payment date"),
+        first_payment_date: closing_date.add_months(
+            defaults
+                .frequency
+                .months()
+                .expect("validated month-based frequency") as i32,
+        ),
         frequency: defaults.frequency,
         prepayment_spec: defaults.prepayment_spec,
         default_spec: defaults.default_spec,

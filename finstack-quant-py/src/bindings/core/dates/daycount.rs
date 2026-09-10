@@ -86,6 +86,12 @@ fn context_from_args(
 
 #[pymethods]
 impl PyDayCount {
+    /// One unit per nonempty contractual accrual period; empty periods return zero.
+    #[classattr]
+    const ONE_ONE: PyDayCount = PyDayCount {
+        inner: DayCount::OneOne,
+    };
+
     /// Actual/360 (money market).
     #[classattr]
     const ACT_360: PyDayCount = PyDayCount {

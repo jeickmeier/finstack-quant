@@ -10,15 +10,17 @@
 //! implied volatilities. Calling this metric on a `Cap` or `Floor` instrument
 //! will return an error directing the caller to the appropriate workflow.
 
-use crate::instruments::rates::cap_floor::pricing::black::price_caplet_floorlet;
-use crate::instruments::rates::cap_floor::pricing::normal;
+use crate::instruments::common_impl::vol_resolution::ResolvedVolatility;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
-use crate::instruments::rates::cap_floor::pricing::pricer::price_lognormal_quote_with_fallback;
+use crate::instruments::rates::cap_floor::pricing::pricer::{
+    price_caplet_quote, resolve_caplet_volatility,
+};
 use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
-use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
+use crate::instruments::rates::cap_floor::{CapFloor, RateOptionType};
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
+use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Implied volatility calculator using the cap/floor's quoted-volatility model.
 ///
@@ -94,26 +96,22 @@ impl MetricCalculator for ImpliedVolCalculator {
         // Use curve-consistent helpers for forward rate and discount factor
         // (same as in the main pricing implementation)
         let forward_rate = projection.forward;
-        let vol_shift = option.resolved_vol_shift();
-        let resolved_vol_type = option.vol_type;
-        match resolved_vol_type {
-            CapFloorVolType::Lognormal if forward_rate <= 0.0 || strike <= 0.0 => {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Lognormal implied vol requires positive forward and strike; got \
-                     forward={forward_rate:.6}, strike={strike:.6}"
-                )));
-            }
-            CapFloorVolType::ShiftedLognormal
-                if forward_rate + vol_shift <= 0.0 || strike + vol_shift <= 0.0 =>
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Shifted-lognormal implied vol requires positive shifted forward and strike; \
-                     got forward+shift={:.6}, strike+shift={:.6}",
-                    forward_rate + vol_shift,
-                    strike + vol_shift
-                )));
-            }
-            _ => {}
+        let mut quote_option = option.clone();
+        quote_option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        let quote = resolve_caplet_volatility(
+            &quote_option,
+            context.curves.as_ref(),
+            time_to_fixing,
+            strike,
+        )?;
+        quote.model_rates(forward_rate, strike)?;
+        if !market_price.is_finite() || market_price < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "implied volatility requires a finite non-negative option price".to_owned(),
+            ));
         }
 
         let discount_factor = resolved_inputs.discount_factor;
@@ -136,38 +134,22 @@ impl MetricCalculator for ImpliedVolCalculator {
             currency: option.notional.currency(),
         };
 
-        // Objective function: convention-specific model price - market price = 0.
-        let objective = |vol: f64| {
-            let mut inputs = base_inputs;
-            inputs.volatility = vol.max(0.0);
-            let price = match resolved_vol_type {
-                CapFloorVolType::Normal => normal::price_caplet_floorlet(inputs),
-                CapFloorVolType::Lognormal => price_caplet_floorlet(inputs),
-                CapFloorVolType::ShiftedLognormal => price_caplet_floorlet(CapletFloorletInputs {
-                    forward: inputs.forward + vol_shift,
-                    strike: inputs.strike + vol_shift,
-                    ..inputs
-                }),
-                CapFloorVolType::Auto => price_lognormal_quote_with_fallback(inputs),
-            };
-            match price {
-                Ok(price) => price.amount() - market_price,
-                Err(_) => f64::NAN,
-            }
+        let objective = |sigma: f64| {
+            price_caplet_quote(base_inputs, ResolvedVolatility { sigma, ..quote })
+                .map_or(f64::NAN, |price| {
+                    (price.amount() - market_price) / option.notional.amount()
+                })
         };
-
-        // Solve for implied volatility using Brent solver
-        let mut solver = BrentSolver::new().tolerance(1e-6);
-        solver.max_iterations = 50;
-
-        let initial_guess = match resolved_vol_type {
-            CapFloorVolType::Normal => 0.01,
-            _ => 0.20,
+        let mut solver = BrentSolver::new().tolerance(1e-12);
+        solver.max_iterations = 100;
+        let upper = match quote.convention {
+            VolatilityConvention::Normal => 1.0,
+            _ => 5.0,
         };
-        let implied_vol = solver.solve(objective, initial_guess)?;
+        let implied_vol = solver.solve_in_bracket(objective, 0.0, upper)?;
 
         // Sanity check result
-        if implied_vol > 0.0 && implied_vol < 5.0 {
+        if implied_vol >= 0.0 && implied_vol <= upper {
             Ok(implied_vol)
         } else {
             Err(finstack_quant_core::Error::Validation(

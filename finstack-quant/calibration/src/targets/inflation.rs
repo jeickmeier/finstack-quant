@@ -16,7 +16,7 @@ use crate::build::prepared::PreparedQuote;
 use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -122,31 +122,19 @@ impl InflationCurveTarget {
         }
 
         let base_date = self.params.base_date;
-        let has_index_fixings = self
-            .base_context
-            .get_inflation_index(self.params.curve_id.as_str())
-            .is_ok();
-
-        let (lag, base_cpi) = if let Ok(index) = self
+        let lag = self.parse_lag(&self.params.observation_lag)?;
+        if let Ok(index) = self
             .base_context
             .get_inflation_index(self.params.curve_id.as_str())
         {
-            let base_cpi = index.value_on(base_date).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Failed to resolve base CPI from inflation index '{}': {}",
-                    self.params.curve_id.as_str(),
-                    e
-                ))
-            })?;
-            (index.lag(), base_cpi)
-        } else {
-            // Use conventions lag if available, otherwise params
-            (
-                self.parse_lag(&conventions.inflation_lag.to_string())
-                    .or_else(|_| self.parse_lag(&self.params.observation_lag))?,
-                self.params.base_cpi,
-            )
-        };
+            if index.interpolation() != conventions.interpolation {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Inflation quote interpolation differs from the observed index convention"
+                        .into(),
+                ));
+            }
+        }
+        let base_cpi = self.effective_base_cpi()?;
 
         let swap: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
             if let Some(frequency) = frequency {
@@ -161,11 +149,13 @@ impl InflationCurveTarget {
                         )
                     })?)
                     .frequency(frequency)
+                    .base_cpi_opt(Some(base_cpi))
                     .inflation_index_id(self.params.curve_id.clone())
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
                     .side(PayReceive::Pay)
-                    .lag_override_opt(if has_index_fixings { None } else { Some(lag) })
+                    .lag_override_opt(Some(lag))
+                    .interpolation_override_opt(Some(conventions.interpolation))
                     .business_day_convention(conventions.business_day_convention)
                     .calendar_id_opt(Some(conventions.calendar_id.clone().into()))
                     .build()
@@ -186,12 +176,9 @@ impl InflationCurveTarget {
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
                     .side(PayReceive::Pay)
-                    .lag_override_opt(if has_index_fixings { None } else { Some(lag) })
-                    .base_cpi_opt(if has_index_fixings {
-                        None
-                    } else {
-                        Some(base_cpi)
-                    })
+                    .lag_override_opt(Some(lag))
+                    .interpolation_override_opt(Some(conventions.interpolation))
+                    .base_cpi_opt(Some(base_cpi))
                     .business_day_convention(conventions.business_day_convention)
                     .calendar_id_opt(Some(conventions.calendar_id.clone().into()))
                     .build()
@@ -199,10 +186,23 @@ impl InflationCurveTarget {
                 Arc::new(instrument)
             };
 
-        // Calculate pillar time (lagged)
-        let fixing_date = Self::apply_lag(maturity, lag);
+        // The final required monthly anchor bounds projection exposure. A daily
+        // reference index after day one consumes the next monthly observation.
+        let fixing_date = if let InflationLag::Months(months) = lag {
+            let first = maturity
+                .replace_day(1)
+                .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
+            let anchor = first.add_months(-i32::from(months));
+            if conventions.interpolation == InflationInterpolation::Linear && maturity.day() > 1 {
+                anchor.add_months(1)
+            } else {
+                anchor
+            }
+        } else {
+            Self::apply_lag(maturity, lag)
+        };
         let pillar_time = DayCount::Act365F.year_fraction(
-            self.params.base_date,
+            self.reference_date()?,
             fixing_date,
             DayCountContext::default(),
         )?;
@@ -229,6 +229,14 @@ impl InflationCurveTarget {
             InflationLag::Days(d) => date - time::Duration::days(d as i64),
             _ => date,
         }
+    }
+
+    /// Date represented by the lagged reference CPI at zero curve time.
+    fn reference_date(&self) -> Result<finstack_quant_core::dates::Date> {
+        Ok(Self::apply_lag(
+            self.params.base_date,
+            self.parse_lag(&self.params.observation_lag)?,
+        ))
     }
 
     /// Resolve the effective base CPI level (from index or params).
@@ -380,7 +388,7 @@ impl BootstrapTarget for InflationCurveTarget {
 
         InflationCurve::builder(self.params.curve_id.to_string())
             .base_cpi(base_cpi)
-            .base_date(self.params.base_date)
+            .base_date(self.reference_date()?)
             .knots(full_knots)
             .interp(self.params.interpolation)
             .build()
@@ -487,7 +495,7 @@ Global solve requires strictly increasing times.",
 
         InflationCurve::builder(self.params.curve_id.to_string())
             .base_cpi(base_cpi)
-            .base_date(self.params.base_date)
+            .base_date(self.reference_date()?)
             .knots(knots)
             .interp(self.params.interpolation)
             .build()

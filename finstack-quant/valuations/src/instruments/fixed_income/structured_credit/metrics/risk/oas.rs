@@ -84,9 +84,9 @@ impl Default for OasConfig {
 pub struct OasResult {
     /// Option-adjusted spread (decimal; `0.01` = 100 bp).
     pub oas: f64,
-    /// Model price (% of original balance) at the solved OAS.
+    /// Model clean settlement price (% of original balance) at the solved OAS.
     pub model_price: f64,
-    /// Target market price (% of original balance).
+    /// Target clean settlement price (% of original balance).
     pub market_price: f64,
     /// Number of scenarios used.
     pub num_paths: usize,
@@ -103,7 +103,8 @@ pub struct OasResult {
 /// * `tranche_id` - Identifier of the tranche whose option-adjusted spread is
 ///   solved.
 /// * `market_price_pct` - Observed clean price as a percentage of original
-///   tranche balance.
+///   tranche balance. Accrued interest is added exactly once at the deal's
+///   quote settlement date; payments on or before settlement are excluded.
 /// * `market` - Market context supplying the discount curve and stochastic
 ///   scenario dependencies.
 /// * `as_of` - Valuation date used for projected tranche cashflows and
@@ -135,7 +136,14 @@ pub fn calculate_tranche_oas(
             })
         })?;
     let original_balance = tranche.original_balance.amount();
-    let target_pv = market_price_pct / 100.0 * original_balance;
+    let base_cashflows = deal.get_tranche_cashflows(tranche_id, market, as_of)?;
+    let quote = super::super::quote::SettlementQuote::for_tranche(
+        deal,
+        as_of,
+        original_balance,
+        &base_cashflows,
+    )?;
+    let target_pv = quote.clean_target(market_price_pct)?;
 
     let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let maturity = deal
@@ -261,12 +269,12 @@ pub fn calculate_tranche_oas(
 
         let mut entries = Vec::with_capacity(cashflows.len());
         for (date, amount) in cashflows {
-            if *date <= as_of {
+            if *date <= quote.settlement {
                 continue;
             }
-            let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+            let t = day_count.year_fraction(quote.settlement, *date, DayCountContext::default())?;
             // Exact curve DF times the convexity-adjusted OU factor.
-            let mut base_df = disc.df_between_dates(as_of, *date)?;
+            let mut base_df = disc.df_between_dates(quote.settlement, *date)?;
             if let Some(dev) = &deviation {
                 let month = as_of.months_until(*date) as usize;
                 base_df *= ou_discount_factor(dev, month);
@@ -310,11 +318,7 @@ pub fn calculate_tranche_oas(
         })
         .collect();
     let mean_pv = path_pvs.iter().sum::<f64>() / path_count;
-    let model_price = if original_balance > 0.0 {
-        mean_pv / original_balance * 100.0
-    } else {
-        0.0
-    };
+    let model_price = quote.clean_price(mean_pv);
     let price_std_error = if num_paths > 1 && original_balance > 0.0 {
         // Bessel-corrected standard error of the mean: sqrt(var / n).
         let var = path_pvs

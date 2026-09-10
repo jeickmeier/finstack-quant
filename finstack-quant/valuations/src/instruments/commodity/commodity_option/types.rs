@@ -745,7 +745,7 @@ impl Instrument for CommodityOption {
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
-                let tree = BinomialTree::leisen_reimer_odd(steps);
+                let tree = BinomialTree::leisen_reimer(steps);
                 let params = OptionMarketParams {
                     spot: inputs.spot,
                     strike: self.strike,
@@ -769,7 +769,7 @@ impl Instrument for CommodityOption {
                     .model_config
                     .tree_steps
                     .unwrap_or(201);
-                let tree = BinomialTree::leisen_reimer_odd(steps);
+                let tree = BinomialTree::leisen_reimer(steps);
                 let params = OptionMarketParams {
                     spot: inputs.spot,
                     strike: self.strike,

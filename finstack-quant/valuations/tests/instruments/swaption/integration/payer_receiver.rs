@@ -99,7 +99,8 @@ fn test_normal_vol_surface_uses_underlying_tenor_axis() {
         &[1.0],
         &[5.0, 10.0],
         &[0.01, 0.02],
-        VolGridOpts::new(VolSurfaceAxis::Tenor, VolInterpolationMode::Vol),
+        VolGridOpts::new(VolSurfaceAxis::Tenor, VolInterpolationMode::Vol)
+            .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
     )
     .unwrap();
     let market = create_flat_market(as_of, 0.05, 0.30).insert_surface(tenor_surface);

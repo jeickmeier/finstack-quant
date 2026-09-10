@@ -1,0 +1,116 @@
+{
+  "description": "Two annual coupons, exercise inside first accrual period, flat 4 percent discount curve, 1 percent floating spread and 2 percent strike. Values checked from discounted cashflows in host tests.",
+  "as_of": "2025-01-01",
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "bermudan_swaption",
+      "spec": {
+        "id": "SWPN-1Yx5Y-USD",
+        "option_type": "call",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "settlement": "cash",
+        "vol_surface_id": "USD-SWPNVOL",
+        "underlying_fixed_leg": {
+          "discount_curve_id": "USD-OIS",
+          "rate": "0.02",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "day_count": "act_365f",
+          "business_day_convention": "unadjusted",
+          "calendar_id": null,
+          "stub": "none",
+          "start": "2026-01-01",
+          "end": "2028-01-01",
+          "par_method": null,
+          "compounding_simple": true,
+          "payment_lag_days": 0,
+          "end_of_month": false
+        },
+        "underlying_float_leg": {
+          "discount_curve_id": "USD-OIS",
+          "forward_curve_id": "USD-OIS",
+          "spread_bp": "100",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "day_count": "act_365f",
+          "business_day_convention": "unadjusted",
+          "calendar_id": null,
+          "stub": "none",
+          "reset_lag_days": 0,
+          "fixing_calendar_id": null,
+          "start": "2026-01-01",
+          "end": "2028-01-01",
+          "compounding": {
+            "compounded_in_arrears": {
+              "lookback_days": 0
+            }
+          },
+          "payment_lag_days": 0,
+          "end_of_month": false
+        },
+        "attributes": {},
+        "bermudan_type": "co_terminal",
+        "bermudan_schedule": {
+          "exercise_dates": [
+            "2026-04-01"
+          ],
+          "notice_days": 0
+        },
+        "instrument_pricing_overrides": {
+          "model_config": {
+            "hw1f_mean_reversion": 0.05,
+            "hw1f_sigma": 1e-07
+          }
+        }
+      }
+    }
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.9607894391523232
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

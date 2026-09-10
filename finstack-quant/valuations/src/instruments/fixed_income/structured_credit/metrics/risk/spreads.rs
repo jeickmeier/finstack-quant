@@ -22,37 +22,21 @@ const Z_SPREAD_MIN: f64 = -0.05;
 const Z_SPREAD_MAX: f64 = 0.50;
 const RELATIVE_BASE_PV_EPSILON: f64 = 1e-12;
 
-fn quoted_target_value(context: &MetricContext) -> Result<(f64, f64)> {
-    let price_pct = context
-        .get_metric_overrides()
-        .and_then(|overrides| overrides.quoted_price_pct)
+fn quoted_target_value(context: &mut MetricContext) -> Result<(f64, f64)> {
+    let deal = context.instrument_as::<StructuredCredit>()?;
+    let quotes = &deal.instrument_pricing_overrides.market_quotes;
+    if quotes.quoted_clean_price.is_none() && quotes.quoted_dirty_price_currency.is_none() {
+        return Err(finstack_quant_core::Error::Validation(
+            "structured-credit spread metrics require quoted_clean_price or quoted_dirty_price_currency".into(),
+        ));
+    }
+    let quote = super::super::quote::SettlementQuote::from_context(context)?;
+    let target = quote
+        .external_target(context.instrument_as::<StructuredCredit>()?)?
         .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "structured-credit spread metrics require \
-                 MetricPricingOverrides.quoted_price_pct (price as a percentage of original \
-                 balance); a model DirtyPrice cannot be used as its own spread target"
-                    .to_string(),
-            )
+            finstack_quant_core::Error::Validation("missing structured-credit quote target".into())
         })?;
-    if !price_pct.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "structured-credit quoted_price_pct must be finite; got {price_pct}"
-        )));
-    }
-
-    let notional =
-        crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(
-            context,
-        )?;
-    let target_value = notional * (price_pct / 100.0);
-    if !target_value.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "structured-credit quote-reproducing target PV must be finite; \
-             notional={notional}, quoted_price_pct={price_pct}, target PV={target_value}"
-        )));
-    }
-
-    Ok((target_value, notional))
+    Ok((target, quote.notional))
 }
 
 /// Calculates Z-spread for structured credit.
@@ -82,112 +66,29 @@ pub struct ZSpreadCalculator;
 
 impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // Z-spread requires an external quote. Using model `DirtyPrice`
-        // (`base_value / notional * 100`) would make the objective
-        // `PV(curve + z) == PV(curve)` and force a circular zero spread.
-        // Convert price points back to currency using original notional.
-        let (target_value, _) = quoted_target_value(context)?;
-
+        let (target, _) = quoted_target_value(context)?;
+        let deal = context.instrument_as::<StructuredCredit>()?;
+        let settlement = super::super::quote::settlement_date(deal, context.as_of)?;
         let flows = context.cashflows.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "context.cashflows".to_string(),
-            })
-        })?;
-
-        let disc_curve_id = context.discount_curve_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "discount_curve_id".to_string(),
-            })
-        })?;
-
-        let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let as_of = context.as_of;
-        let day_count =
-            crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
-
-        // Pre-compute (t, df, amount) for deterministic, fallible date handling.
-        // Discount from the valuation date `as_of` (settlement convention) so the
-        // PV matches the as-of base value the target price is derived from; this
-        // keeps the metric-registry z-spread consistent with the standalone
-        // `calculate_tranche_z_spread` even when `as_of != curve.base_date()`.
-        let cached_flows: Vec<(f64, f64, f64)> = flows
-            .iter()
-            .filter(|(date, _)| *date > as_of)
-            .map(
-                |(date, amount)| -> finstack_quant_core::Result<(f64, f64, f64)> {
-                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-                    let df = disc.df_between_dates(as_of, *date)?;
-                    Ok((t, df, amount.amount()))
-                },
+            finstack_quant_core::Error::Validation(
+                "structured-credit Z-spread requires projected cashflows".into(),
             )
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-
-        // Objective function: PV(z) - target = 0
-        let objective = |z: f64| -> f64 {
-            let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-            for (t, df, amt) in &cached_flows {
-                let df_z = df * (-z * t).exp();
-                pv.add(amt * df_z);
-            }
-            pv.total() - target_value
-        };
-
-        // Solve for z-spread using Brent's method with adaptive bracketing
-        //
-        // Credit spread characteristics:
-        // - Investment grade: 50-300 bp (0.005-0.03)
-        // - High yield: 300-1000 bp (0.03-0.10)
-        // - Distressed: 1000+ bp (0.10+)
-        // - Premium bonds may have negative Z-spread
-        //
-        // We start with a moderate bracket and allow expansion for edge cases.
-        // Tolerance: 1e-6 = 0.01 bp precision (market standard)
-        let solver = BrentSolver::new()
-            .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
-            .initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
-
-        let valid_range = Z_SPREAD_MIN..=Z_SPREAD_MAX;
-
-        // Try solving with standard initial guess
-        match solver.solve(objective, 0.01) {
-            Ok(z) if valid_range.contains(&z) => Ok(z),
-            _ => {
-                // Adaptive retry: try with a different initial guess
-                // For distressed credits, start higher
-                let z_high_guess = solver.solve(objective, 0.10);
-                if let Ok(z) = z_high_guess {
-                    if valid_range.contains(&z) {
-                        return Ok(z);
-                    }
-                }
-
-                // For premium bonds, try negative initial guess
-                let z_low_guess = solver.solve(objective, -0.01);
-                if let Ok(z) = z_low_guess {
-                    if valid_range.contains(&z) {
-                        return Ok(z);
-                    }
-                }
-
-                // Final fallback: wider bracket with explicit bounds
-                let wide_solver = BrentSolver::new()
-                    .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
-                    .initial_bracket_size(Some(0.20)); // ±2000 bp
-
-                // Wide-bracket fallback must still respect `valid_range`.
-                let z = wide_solver.solve(objective, 0.05)?;
-                if valid_range.contains(&z) {
-                    Ok(z)
-                } else {
-                    Err(finstack_quant_core::Error::Validation(format!(
-                        "z-spread solved to {z} which is outside the plausible \
-                         range [{}, {}]; the objective is likely ill-posed for \
-                         this target price",
-                        Z_SPREAD_MIN, Z_SPREAD_MAX
-                    )))
-                }
-            }
+        })?;
+        let curve = context
+            .curves
+            .get_discount(deal.discount_curve_id.as_str())?;
+        let spread = calculate_tranche_z_spread(
+            flows,
+            &curve,
+            Money::new(target, deal.pool.get_base_currency())?,
+            settlement,
+        )? * 1e-4;
+        if !(Z_SPREAD_MIN..=Z_SPREAD_MAX).contains(&spread) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "structured-credit z-spread {spread} is outside [{Z_SPREAD_MIN}, {Z_SPREAD_MAX}]"
+            )));
         }
+        Ok(spread)
     }
 
     fn dependencies(&self) -> &[MetricId] {
@@ -262,7 +163,10 @@ impl MetricCalculator for Cs01Calculator {
         })?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let as_of = context.as_of;
+        let as_of = super::super::quote::settlement_date(
+            context.instrument_as::<StructuredCredit>()?,
+            context.as_of,
+        )?;
         let day_count =
             crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
 
@@ -396,6 +300,19 @@ pub fn calculate_tranche_z_spread(
     target_pv: Money,
     as_of: Date,
 ) -> Result<f64> {
+    if !target_pv.amount().is_finite() || target_pv.amount() <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Z-spread requires a finite positive dirty settlement target".into(),
+        ));
+    }
+    if cashflows
+        .iter()
+        .any(|(date, amount)| *date > as_of && amount.currency() != target_pv.currency())
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "Z-spread target and cashflows must share one currency".into(),
+        ));
+    }
     let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let cached_flows: Vec<(f64, f64, f64)> = cashflows
         .iter()
@@ -414,10 +331,10 @@ pub fn calculate_tranche_z_spread(
 
             pv.add(*amount * df_z);
         }
-        pv.total() - target_pv.amount()
+        pv.total() / target_pv.amount() - 1.0
     };
 
-    // Tolerance: 1e-6 = 0.01 bp precision (market standard)
+    // Solve the relative-price objective with a scale-independent tolerance.
     let solver = BrentSolver::new()
         .tolerance(Z_SPREAD_SOLVER_TOLERANCE)
         .initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
@@ -518,7 +435,9 @@ pub fn calculate_tranche_cs01(
 /// * `context` - Market context supplying the discount curve and any forward
 ///   curves or historical fixings required to project contractual cashflows.
 /// * `as_of` - Valuation date used for cashflow projection and discounting.
-/// * `target_pv` - Target present value in the tranche's currency. The sign of
+/// * `target_pv` - Dirty settlement value in the tranche's currency, including
+///   accrued interest once. The buyer owns only flows after the deal's
+///   `quote_settlement_date` (valuation date when absent). The sign of
 ///   the result is negative above model PV and positive below model PV.
 ///
 /// # Returns
@@ -562,6 +481,18 @@ pub fn calculate_tranche_discount_margin(
             deal, tranche_id, context, as_of,
         )?;
 
+    let quote = super::super::quote::SettlementQuote::for_tranche(
+        deal,
+        as_of,
+        tranche.original_balance.amount(),
+        &cashflows,
+    )?;
+    if target_pv.currency() != tranche.original_balance.currency() {
+        return Err(finstack_quant_core::Error::Validation(
+            "discount-margin target currency must match the tranche".into(),
+        ));
+    }
+    quote.dirty_target(target_pv.amount())?;
     let disc_curve_id = deal.discount_curve_id.as_str();
     let discount_curve = context.get_discount(disc_curve_id)?;
 
@@ -569,7 +500,7 @@ pub fn calculate_tranche_discount_margin(
         &cashflows.cashflows,
         discount_curve.as_ref(),
         target_pv,
-        as_of,
+        quote.settlement,
     )?;
 
     if !z_spread_bp.is_finite() || z_spread_bp.abs() > 5000.0 {
@@ -634,7 +565,10 @@ impl MetricCalculator for BucketedCs01Calculator {
                 })
             })?;
         let bumped_spread = base_spread + ONE_BASIS_POINT;
-        let as_of = context.as_of;
+        let as_of = super::super::quote::settlement_date(
+            context.instrument_as::<StructuredCredit>()?,
+            context.as_of,
+        )?;
 
         let disc_curve_id = context.discount_curve_id.clone().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
@@ -702,7 +636,7 @@ impl MetricCalculator for BucketedCs01Calculator {
 #[cfg(test)]
 mod zspread_quote_tests {
     use super::*;
-    use crate::instruments::MetricPricingOverrides;
+    use crate::instruments::MarketQuoteOverrides;
     use crate::metrics::standard_registry;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -732,15 +666,20 @@ mod zspread_quote_tests {
         context.discount_curve_id = Some(discount_curve_id);
         context.notional = Some(Money::from((100_i64, Currency::USD)));
         context.computed.insert(MetricId::DirtyPrice, 95.0);
+        context.structured_credit_accruals = Some(Vec::new());
         context
     }
 
     fn context_with_quote(quoted_price_pct: f64) -> MetricContext {
         let mut context = context_without_quote();
-        context.set_metric_overrides(Some(MetricPricingOverrides {
-            quoted_price_pct: Some(quoted_price_pct),
-            ..Default::default()
-        }));
+        let mut deal = context
+            .instrument_as::<StructuredCredit>()
+            .expect("deal")
+            .clone();
+        deal.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(quoted_price_pct);
+        context.set_instrument(Arc::new(deal));
         context
     }
 
@@ -758,7 +697,7 @@ mod zspread_quote_tests {
                 .expect_err("quote-dependent spread metrics must require an external quote");
             let message = err.to_string();
             assert!(
-                message.contains("quoted_price_pct"),
+                message.contains("quoted_clean_price"),
                 "{requested} must identify the missing quote; got: {message}"
             );
         }
@@ -827,18 +766,18 @@ mod zspread_quote_tests {
 
     /// An external quote breaks the model-price spread circularity.
     #[test]
-    fn quoted_price_override_is_carried_on_metric_overrides() {
-        let mut overrides = MetricPricingOverrides::default();
+    fn quoted_price_override_has_one_market_quote_owner() {
+        let mut overrides = MarketQuoteOverrides::default();
         assert!(
-            overrides.quoted_price_pct.is_none(),
+            overrides.quoted_clean_price.is_none(),
             "no quote by default, so existing behaviour is unchanged"
         );
 
-        overrides.quoted_price_pct = Some(98.5);
+        overrides.quoted_clean_price = Some(98.5);
         assert_eq!(
-            overrides.quoted_price_pct,
+            overrides.quoted_clean_price,
             Some(98.5),
-            "a quoted price must survive on MetricPricingOverrides so ZSpread \
+            "a quoted price must survive on MarketQuoteOverrides so ZSpread \
              has a target that did not come from the model"
         );
     }
@@ -846,25 +785,25 @@ mod zspread_quote_tests {
     /// The external quote round-trips through JSON binding inputs.
     #[test]
     fn quoted_price_override_round_trips_through_json() {
-        let overrides = MetricPricingOverrides {
-            quoted_price_pct: Some(102.25),
+        let overrides = MarketQuoteOverrides {
+            quoted_clean_price: Some(102.25),
             ..Default::default()
         };
 
         let json = serde_json::to_string(&overrides).expect("serialize");
         assert!(
-            json.contains("quoted_price_pct"),
+            json.contains("quoted_clean_price"),
             "a set quote must serialize; got {json}"
         );
 
-        let parsed: MetricPricingOverrides = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.quoted_price_pct, Some(102.25));
+        let parsed: MarketQuoteOverrides = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.quoted_clean_price, Some(102.25));
 
         // And an absent quote must not bloat the wire format.
-        let empty = MetricPricingOverrides::default();
+        let empty = MarketQuoteOverrides::default();
         let empty_json = serde_json::to_string(&empty).expect("serialize");
         assert!(
-            !empty_json.contains("quoted_price_pct"),
+            !empty_json.contains("quoted_clean_price"),
             "an unset quote must be skipped on the wire; got {empty_json}"
         );
     }

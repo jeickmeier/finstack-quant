@@ -30,9 +30,8 @@ use tracing::debug;
 #[derive(Debug, Clone)]
 pub(super) struct BuildState {
     pub(super) flows: Vec<CashFlow>,
-    pub(super) outstanding_after: finstack_quant_core::HashMap<Date, Decimal>,
-    /// Same entries as `outstanding_after`, kept in ascending date order for
-    /// range scans (TWA fees). The map remains for point lookups by date.
+    pub(super) projected_fixings: Vec<crate::fixings::ProjectedFixing>,
+    /// Economic balances in ascending effective-date order for accrual scans.
     pub(super) outstanding_history: Vec<(Date, Decimal)>,
     /// Outstanding balance tracked as `Decimal` for accounting-grade precision.
     ///
@@ -55,17 +54,17 @@ pub(super) struct BuildState {
 ///
 /// # Interest-base convention
 ///
-/// Coupons accrue on the outstanding balance as of each period's **accrual
-/// start** (after all events dated on that day). An event dated strictly
-/// inside a coupon period therefore changes interest only from the next
-/// period onward — there is no intra-period pro-rata accrual on the changed
-/// balance. Instruments that need daily accrual on the actual outstanding
-/// (e.g. revolvers) should date events on accrual boundaries or use the
-/// dedicated revolving-credit pricer in the valuation crates.
+/// Coupons accrue separately over each interval with a constant outstanding
+/// balance. Draws and repayments change interest from their event date,
+/// including events inside a coupon period. Scheduled amortization and PIK
+/// change the balance at the contractual accrual boundary, independently of
+/// adjusted cash payment dates. Term-index reset dates remain contractual.
 #[derive(Debug, Clone)]
 pub struct PrincipalEvent {
-    /// Event date
+    /// Economic date on which outstanding principal changes.
     pub date: Date,
+    /// Cash settlement date, independent of the economic balance date.
+    pub payment_date: Date,
     /// Outstanding delta (positive = increases balance, negative = repays)
     pub delta: Money,
     /// Cash leg paid/received (may differ from delta for OID/fees)
@@ -77,6 +76,7 @@ pub struct PrincipalEvent {
 #[derive(Debug, Clone)]
 pub(super) struct AmortizationSetup {
     pub(super) amort_dates: finstack_quant_core::HashSet<Date>,
+    pub(super) payment_dates: finstack_quant_core::HashMap<Date, Date>,
     pub(super) step_remaining_map: Option<finstack_quant_core::HashMap<Date, Money>>, // for StepRemaining
     pub(super) custom_principal_map: Option<finstack_quant_core::HashMap<Date, Money>>,
     pub(super) linear_delta: Option<Decimal>, // for LinearTo
@@ -147,12 +147,22 @@ fn derive_amortization_setup(
     float_schedules: &[FloatSchedule],
 ) -> finstack_quant_core::Result<AmortizationSetup> {
     // Rate groups and fixed/float switches partition coupon windows, not amortization cadence.
-    let mut amort_base: Vec<Date> = fixed_schedules
+    let mut payment_dates = finstack_quant_core::HashMap::default();
+    for period in fixed_schedules
         .iter()
-        .flat_map(|s| s.dates.iter())
-        .chain(float_schedules.iter().flat_map(|s| s.dates.iter()))
-        .copied()
-        .collect();
+        .flat_map(|s| s.prev.values())
+        .chain(float_schedules.iter().flat_map(|s| s.prev.values()))
+    {
+        if let Some(previous) = payment_dates.insert(period.accrual_end, period.payment_date) {
+            if previous != period.payment_date {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "ambiguous amortization payment dates for accrual boundary {}",
+                    period.accrual_end
+                )));
+            }
+        }
+    }
+    let mut amort_base: Vec<Date> = payment_dates.keys().copied().collect();
     amort_base.sort_unstable();
     amort_base.dedup();
     if amort_base.is_empty()
@@ -215,6 +225,7 @@ fn derive_amortization_setup(
 
     Ok(AmortizationSetup {
         amort_dates,
+        payment_dates,
         step_remaining_map,
         custom_principal_map,
         linear_delta,
@@ -255,14 +266,15 @@ fn initialize_build_state(
             };
             flows.push(
                 CashFlow::new(
-                    ev.date,
+                    ev.payment_date,
                     None,
                     Money::new(flow_amount, ev.cash.currency())?,
                     ev.kind,
                     0.0,
                     None,
                 )
-                .with_principal_delta(ev.delta),
+                .with_principal_delta(ev.delta)
+                .with_principal_date(ev.date),
             );
             outstanding += f64_to_decimal(ev.delta.amount())?;
             if outstanding < Decimal::ZERO {
@@ -274,17 +286,12 @@ fn initialize_build_state(
         }
     }
 
-    let mut outstanding_after: finstack_quant_core::HashMap<Date, Decimal> =
-        finstack_quant_core::HashMap::default();
-    outstanding_after.reserve(estimated_dates);
-    outstanding_after.insert(issue, outstanding);
-
     let mut outstanding_history: Vec<(Date, Decimal)> = Vec::with_capacity(estimated_dates);
     outstanding_history.push((issue, outstanding));
 
     Ok(BuildState {
+        projected_fixings: Vec::new(),
         flows,
-        outstanding_after,
         outstanding_history,
         outstanding,
     })
@@ -292,11 +299,11 @@ fn initialize_build_state(
 
 /// Redemption follows the payment date of the coupon ending at maturity.
 /// With no coupon leg, principal is paid on the raw maturity date.
-fn compute_redemption_date(
+fn compute_redemption_dates(
     maturity: Date,
     fixed_schedules: &[FixedSchedule],
     float_schedules: &[FloatSchedule],
-) -> Date {
+) -> (Date, Date) {
     let fixed_periods = fixed_schedules
         .iter()
         .flat_map(|schedule| schedule.prev.values());
@@ -306,9 +313,9 @@ fn compute_redemption_date(
     fixed_periods
         .chain(float_periods)
         .filter(|period| period.unadjusted_end == maturity)
-        .map(|period| period.payment_date)
-        .max()
-        .unwrap_or(maturity)
+        .map(|period| (period.payment_date, period.accrual_end))
+        .reduce(|previous, dates| (previous.0.max(dates.0), previous.1.max(dates.1)))
+        .unwrap_or((maturity, maturity))
 }
 
 fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::Result<Vec<Date>> {
@@ -434,6 +441,7 @@ struct CompiledCashFlowPlan {
     dates: Vec<Date>,
     amort_setup: AmortizationSetup,
     redemption_date: Date,
+    redemption_effective_date: Date,
     principal_exchange: PrincipalExchange,
 }
 
@@ -453,10 +461,9 @@ impl CashFlowBuilder {
     ///
     /// # Conventions
     ///
-    /// - **Interest base:** each coupon accrues on the outstanding balance as
-    ///   of its accrual start. Principal events strictly inside a period
-    ///   change interest only from the next period (see
-    ///   [`PrincipalEvent`]'s interest-base convention).
+    /// - **Interest base:** coupons accrue on each constant-balance interval;
+    ///   principal events change interest from their economic effective date
+    ///   (see [`PrincipalEvent`]'s interest-base convention).
     /// - **Redemption conventions:** business-day adjustment and payment lag
     ///   follow the coupon window ending at maturity.
     /// - **Amortization cadence:** `LinearTo` / `PercentOfOriginalPerPeriod`
@@ -525,7 +532,8 @@ impl CashFlowBuilder {
             .into());
         }
 
-        let redemption_date = compute_redemption_date(maturity, &fixed_schedules, &float_schedules);
+        let (redemption_date, redemption_effective_date) =
+            compute_redemption_dates(maturity, &fixed_schedules, &float_schedules);
         let date_inputs = DateCollectionInputs {
             issue,
             maturity,
@@ -560,6 +568,7 @@ impl CashFlowBuilder {
             dates,
             amort_setup,
             redemption_date,
+            redemption_effective_date,
             principal_exchange: self.principal_exchange,
         })
     }
@@ -595,6 +604,7 @@ impl CompiledCashFlowPlan {
             ccy,
             issue: self.issue,
             redemption_date: self.redemption_date,
+            redemption_effective_date: self.redemption_effective_date,
             principal_exchange: self.principal_exchange,
             notional: &self.notional,
             fixed_schedules: &self.fixed_schedules,
@@ -695,6 +705,7 @@ impl CompiledCashFlowPlan {
             &self.float_schedules,
             Some(self.issue),
             Some(self.maturity),
+            state.projected_fixings,
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
         let schedule =

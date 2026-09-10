@@ -112,7 +112,8 @@ impl MetricCalculator for ConvexityCalculator {
         })?;
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
 
-        calculate_tranche_convexity(flows, disc.as_ref(), context.as_of)
+        let settlement = super::super::quote::settlement_date(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?, context.as_of)?;
+        calculate_tranche_convexity(flows, disc.as_ref(), settlement)
     }
 
     fn dependencies(&self) -> &[MetricId] {

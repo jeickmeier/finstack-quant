@@ -5,12 +5,12 @@
       "oneOf": [
         {
           "const": "point_in_time",
-          "description": "Use the outstanding balance at the period's accrual start, matching the\ncoupon convention (same-date amortization/PIK on the payment date does\nnot affect the fee base).",
+          "description": "Use the outstanding balance at the period's accrual start, after\nall principal movements effective on that day.",
           "type": "string"
         },
         {
           "const": "time_weighted_average",
-          "description": "Time-weighted average outstanding over the accrual period.",
+          "description": "Accrue separately on each constant-balance interval using the fee's\ncontractual day count; principal changes apply from their effective date.",
           "type": "string"
         }
       ]

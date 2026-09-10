@@ -56,7 +56,7 @@ fn girr_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 
     // Group by currency bucket, carrying option maturity and underlying
     // tenor so intra-bucket correlation can reflect both dimensions per
-    // MAR21.89.
+    // MAR21.93.
     // Entry: (ws, option_maturity_years, underlying_tenor_years)
     type VegaEntry = (f64, (f64, f64)); // (weighted_vega, (option_maturity_years, underlying_tenor_years))
     let mut by_currency: HashMap<_, Vec<VegaEntry>> = HashMap::default();
@@ -74,18 +74,16 @@ fn girr_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 
     let inter_gamma = scenario.scale_correlation(girr::GIRR_INTER_BUCKET_CORRELATION);
 
-    // Intra-bucket aggregation with MAR21.89 correlation
+    // Intra-bucket aggregation with MAR21.93 correlation
     // rho = min(rho_opt_mat * rho_under_mat, 1)
     // rho_opt_mat = exp(-alpha * |T_k - T_l| / min(T_k, T_l)), alpha=0.01
-    // rho_under_mat = exp(-alpha * |U_k - U_l| / min(U_k, U_l)), alpha=0.03
-    // (option-maturity alpha uses the standard Basel value; underlying-
-    // tenor alpha reuses the GIRR delta tenor formula.)
+    // rho_under_mat = exp(-alpha * |U_k - U_l| / min(U_k, U_l)), alpha=0.01
     let bucket_results: Vec<_> = by_currency
         .values()
         .map(|entries| {
             intra_bucket_pairwise(entries, |&(t_opt_i, t_und_i), &(t_opt_j, t_und_j)| {
                 let rho_opt = exp_decay_rho(t_opt_i, t_opt_j, 0.01);
-                let rho_und = girr::girr_tenor_correlation(t_und_i, t_und_j);
+                let rho_und = exp_decay_rho(t_und_i, t_und_j, 0.01);
                 scenario.scale_correlation((rho_opt * rho_und).min(1.0))
             })
         })
@@ -322,7 +320,7 @@ mod tests {
         // WS_k = vega_k * 1.00 (FX vega risk weight, MAR21.92 Table 13,
         // LH = 40 days -> 0.55 * sqrt(4) = 1.10, capped at 100%).
         //
-        // FX is a single bucket with a uniform 60% correlation (MAR21.89):
+        // FX is a single bucket with a uniform 60% correlation (MAR21.93):
         //   K^2 = (1 - 0.60) * (300_000^2 + 100_000^2)
         //         + 0.60 * (400_000)^2
         //       = 0.40 * 1.0e11 + 0.60 * 1.6e11 = 1.36e11

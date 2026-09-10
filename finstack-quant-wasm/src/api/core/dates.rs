@@ -166,6 +166,16 @@ impl JsDayCount {
             .map_err(to_js_err)
     }
 
+    /// One unit per nonempty contractual accrual period; empty periods return zero.
+    /// @returns The 1/1 convention used for annual inflation accrual periods.
+    /// @throws This constructor does not throw.
+    #[wasm_bindgen(js_name = oneOne)]
+    pub fn one_one() -> JsDayCount {
+        JsDayCount {
+            inner: RustDayCount::OneOne,
+        }
+    }
+
     /// Actual/360.
     #[wasm_bindgen(js_name = act360)]
     pub fn act360() -> JsDayCount {

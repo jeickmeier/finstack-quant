@@ -6,6 +6,7 @@
 mod calculators;
 mod frame;
 mod im;
+mod im_curvature;
 mod metrics;
 mod regulatory;
 mod schema;
@@ -50,6 +51,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "FundingConfig",
             "Haircut01",
             "HaircutImCalculator",
+            "ImCollateralResult",
             "ImDecayProfile",
             "ImMethodology",
             "ImProfile",
@@ -65,6 +67,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "SaCcrTrade",
             "ScheduleImCalculator",
             "SimmCalculator",
+            "SimmCurvatureSensitivity",
             "SimmSensitivities",
             "VmCalculator",
             "VmResult",

@@ -1,8 +1,8 @@
 use super::pricing::{cap_floor_bachelier_vega, cap_floor_periods, forward_rate_from_df};
 use super::targets::{
-    reject_at_bound_params, require_quote_vega, HullWhiteCapFloorTarget, PreparedCapFloor,
-    HW_NUM_RESTARTS, HW_PERTURB_SCALE, HW_VALIDATION_TOLERANCE, KAPPA_MAX, KAPPA_MIN, SIGMA_MAX,
-    SWAPTION_VEGA_FLOOR,
+    quote_fit_report, reject_at_bound_params, require_quote_vega, validate_fit_tolerance,
+    HullWhiteCapFloorTarget, PreparedCapFloor, HW_NUM_RESTARTS, HW_PERTURB_SCALE, KAPPA_MAX,
+    KAPPA_MIN, SIGMA_MAX, SWAPTION_VEGA_FLOOR,
 };
 use super::*;
 
@@ -32,6 +32,7 @@ pub fn calibrate_hull_white_to_cap_floors(
     quotes: &[CapFloorQuote],
     config: CapFloorCalibrationConfig,
 ) -> finstack_quant_core::Result<(HullWhiteCalibrationParams, CalibrationReport)> {
+    validate_fit_tolerance(config.fit_tolerance)?;
     if quotes.is_empty() {
         return Err(finstack_quant_core::Error::Validation(
             "Need at least one cap/floor quote for HW1F calibration".to_string(),
@@ -112,9 +113,8 @@ pub fn calibrate_hull_white_to_cap_floors(
         // Guardrail parity with the two-parameter path: the fixed κ must
         // satisfy the same band the LM box constraints enforce, the σ search
         // spans up to SIGMA_MAX (not an arbitrary smaller cap), an at-bound
-        // σ is rejected, and the report residuals are vega-scaled so the
-        // validation tolerance is applied on the vol scale, matching the
-        // two-parameter objective.
+        // σ is rejected. Final report residuals are reconstructed normal
+        // quote errors under the required fit_tolerance.
         let fixed = HullWhiteCalibrationParams::new(fixed_kappa, 1e-4)?.kappa;
         if !(KAPPA_MIN..=KAPPA_MAX).contains(&fixed) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -148,10 +148,13 @@ pub fn calibrate_hull_white_to_cap_floors(
                     if quote.is_cap { "cap" } else { "floor" },
                     quote.strike
                 ),
-                // Vega-scaled (vol-units) residual, matching the
-                // two-parameter LM objective so HW_VALIDATION_TOLERANCE
-                // means the same thing on both paths.
-                (model_price - market_prices[idx]) / vegas[idx],
+                // Reconstruct the quote exactly for the acceptance decision.
+                super::pricing::cap_floor_implied_normal_vol(
+                    model_price,
+                    discount_df,
+                    forward_df,
+                    spec,
+                )? - quote.volatility,
             );
         }
         let moneyness = cap_floor_moneyness_summary(quotes, forward_df, frequency);
@@ -160,7 +163,7 @@ pub fn calibrate_hull_white_to_cap_floors(
                 "hull_white_1f_cap_floor",
                 residuals,
                 1,
-                HW_VALIDATION_TOLERANCE,
+                config.fit_tolerance,
             ),
             fixed,
             sigma,
@@ -205,7 +208,7 @@ pub fn calibrate_hull_white_to_cap_floors(
         &target,
         quotes,
         &config_lm,
-        HW_VALIDATION_TOLERANCE,
+        config.fit_tolerance,
         Some(&multi_start),
     )?;
 
@@ -214,6 +217,27 @@ pub fn calibrate_hull_white_to_cap_floors(
         params.sigma,
         "Hull-White cap/floor calibration",
     )?;
+
+    let residuals = quotes
+        .iter()
+        .enumerate()
+        .map(|(idx, quote)| {
+            let spec = CapFloorPriceSpec::from_quote(quote, frequency);
+            let price =
+                hw1f_cap_floor_price(params.kappa, params.sigma, discount_df, forward_df, spec);
+            Ok((
+                format!(
+                    "{idx}:{}Y_{}_{:.6}",
+                    quote.maturity,
+                    if quote.is_cap { "cap" } else { "floor" },
+                    quote.strike
+                ),
+                super::pricing::cap_floor_implied_normal_vol(price, discount_df, forward_df, spec)?
+                    - quote.volatility,
+            ))
+        })
+        .collect::<finstack_quant_core::Result<BTreeMap<_, _>>>()?;
+    let report = quote_fit_report(report, residuals, config.fit_tolerance);
 
     let moneyness = cap_floor_moneyness_summary(quotes, forward_df, frequency);
     let report = enrich_cap_floor_report(
@@ -249,8 +273,13 @@ fn enrich_cap_floor_report(
         .with_metadata("quote_count", quote_count.to_string())
         .with_metadata("fixed_kappa", fixed_kappa.to_string())
         .with_metadata(
-            "residual_weighting",
-            "1/vega (vega-weighted price residual)".to_string(),
+            "optimizer_residual_weighting",
+            if fixed_kappa {
+                "unweighted price residual"
+            } else {
+                "1/vega (vega-weighted price residual)"
+            }
+            .to_string(),
         )
         .with_metadata("calibration_family", "cap_floor_hw1f".to_string())
         .with_metadata("frequency", frequency.to_string())
@@ -429,6 +458,10 @@ pub(super) fn solve_cap_floor_sigma_for_fixed_kappa(
 /// Fixed-κ settings for sequential piecewise HW1F volatility calibration.
 #[derive(Debug, Clone, Copy)]
 pub struct PiecewiseSigmaCalibrationConfig {
+    /// Required positive maximum implied-quote error in quoted volatility units.
+    /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+    /// This acceptance budget is independent of the numerical solver tolerance.
+    pub fit_tolerance: f64,
     /// Mean reversion held fixed while bootstrapping the volatility schedule.
     pub fixed_kappa: f64,
     /// Inclusive lower short-rate volatility search bound.
@@ -442,6 +475,7 @@ pub struct PiecewiseSigmaCalibrationConfig {
 impl PiecewiseSigmaCalibrationConfig {
     /// Validate bootstrap settings.
     fn validate(self) -> finstack_quant_core::Result<()> {
+        validate_fit_tolerance(self.fit_tolerance)?;
         if !(KAPPA_MIN..=KAPPA_MAX).contains(&self.fixed_kappa) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "piecewise HW1F fixed_kappa={} outside [{KAPPA_MIN}, {KAPPA_MAX}]",
@@ -567,7 +601,12 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
                 quote.maturity, config.sigma_max
             )));
         }
-        let residual_value = model_price(solved)? - market_price;
+        let residual_value = super::pricing::cap_floor_implied_normal_vol(
+            model_price(solved)?,
+            discount_df,
+            forward_df,
+            spec,
+        )? - quote.volatility;
         residuals.insert(format!("{}Y", quote.maturity), residual_value);
         sigmas.push(solved);
         if index + 1 < ordered.len() {
@@ -580,10 +619,11 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
         "hull_white_1f_cap_floor_piecewise",
         residuals,
         ordered.len(),
-        HW_VALIDATION_TOLERANCE,
+        config.fit_tolerance,
     )
     .with_metadata("fixed_kappa", config.fixed_kappa.to_string())
-    .with_metadata("volatility_mode", "piecewise".to_string());
+    .with_metadata("volatility_mode", "piecewise".to_string())
+    .with_metadata("residual_units", "quoted_volatility".to_string());
     Ok((model, report))
 }
 

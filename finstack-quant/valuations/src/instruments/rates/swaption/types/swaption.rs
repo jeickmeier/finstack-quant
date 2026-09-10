@@ -5,11 +5,13 @@ use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
+use crate::instruments::common_impl::vol_resolution::{
+    resolve_volatility, validate_sigma, ResolvedVolatility, VolatilityRequest,
+};
 use crate::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use crate::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
 };
-use crate::market::resolve_vol_source;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -17,6 +19,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_models::volatility::VolatilityConvention;
 use finstack_quant_models::SabrModel;
 use finstack_quant_models::SabrParameters;
 use rust_decimal::prelude::ToPrimitive;
@@ -611,8 +614,9 @@ impl Swaption {
         model_fn: F,
     ) -> Result<Money>
     where
-        F: Fn(f64, f64, f64, f64, f64) -> f64, // forward, strike, vol, t, annuity -> value
+        F: Fn(f64, f64, f64, f64, f64) -> Result<f64>, // forward, strike, vol, t, annuity -> value
     {
+        validate_sigma(volatility)?;
         if let Some(value) = self.terminal_value(curves, as_of)? {
             return Ok(value);
         }
@@ -623,145 +627,131 @@ impl Swaption {
         let annuity = self.annuity(disc.as_ref(), as_of, forward_rate)?;
         let strike = self.strike_f64()?;
 
-        let value = model_fn(forward_rate, strike, volatility, time_to_expiry, annuity);
+        let value = model_fn(forward_rate, strike, volatility, time_to_expiry, annuity)?;
 
         Money::new(value * self.notional.amount(), self.notional.currency())
     }
 
-    /// Black (lognormal) model PV.
+    /// Black PV using the configured SABR/cube displacement on both rates.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Projection and discount curves; a present SABR cube supplies its model displacement.
+    /// * `volatility` - Finite non-negative relative volatility as a decimal per square-root year.
+    /// * `as_of` - Valuation date; past expiry has no remaining option value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing curves, invalid volatility, or non-positive shifted forward/strike.
     pub fn price_black(
         &self,
         curves: &MarketContext,
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
-        use super::lognormal_to_normal_vol;
-
-        let time_to_expiry = self.time_to_expiry(as_of)?;
-        if time_to_expiry <= 0.0 {
-            // Delegate to the shared base path: 0 past expiry, model-free
-            // intrinsic at the expiry instant (the closure is never invoked).
-            return self.price_model_base(curves, volatility, as_of, |_, _, _, _, _| 0.0);
-        }
-
-        let strike = self.strike_f64()?;
-        let forward = self.forward_swap_rate(curves, as_of)?;
-        if forward <= 0.0 || strike <= 0.0 {
-            // Black (lognormal) pricing is undefined for a non-positive forward
-            // or strike. In negative-rate regimes (EUR/JPY/CHF) fall back to
-            // the Bachelier (normal) model, which prices negative rates
-            // natively. `volatility` here is a LOGNORMAL vol — it must be
-            // converted to a normal (Bachelier) vol before the normal pricer,
-            // otherwise the magnitude is wrong by roughly a factor of the
-            // forward rate. Use any configured SABR shift so the conversion
-            // can operate on positive shifted rates.
-            let shift = self.sabr_params.as_ref().and_then(|p| p.shift);
-            let normal_vol =
-                lognormal_to_normal_vol(volatility, forward, strike, time_to_expiry, shift);
-            return self.price_normal(curves, normal_vol, as_of);
-        }
-
-        self.price_model_base(curves, volatility, as_of, |fwd, strike, vol, t, annuity| {
-            use finstack_quant_models::closed_form::{black_call, black_put};
-            // A non-finite vol is treated as degenerate (intrinsic), matching
-            // the `vol <= 0` limit the closed forms already return.
-            let vol = if vol.is_finite() { vol } else { 0.0 };
-            let unit = match self.option_type {
-                OptionType::Call => black_call(fwd, strike, vol, t),
-                OptionType::Put => black_put(fwd, strike, vol, t),
-            };
-            unit * annuity
-        })
+        let mut overrides = self.instrument_pricing_overrides.market_quotes.clone();
+        overrides.implied_volatility = Some(validate_sigma(volatility)?);
+        let convention = self
+            .sabr_params
+            .as_ref()
+            .and_then(|p| p.shift)
+            .map_or(VolatilityConvention::Lognormal, |shift| {
+                VolatilityConvention::ShiftedLognormal { shift }
+            });
+        let quote = resolve_volatility(
+            &overrides,
+            curves,
+            self.vol_surface_id.as_str(),
+            VolatilityRequest {
+                expiry: self.time_to_expiry(as_of)?,
+                tenor: self.underlying_tenor_years()?,
+                strike: self.strike_f64()?,
+                convention: Some(convention),
+                clamp: true,
+            },
+        )?;
+        self.price_resolved_quote(curves, quote, as_of)
     }
 
-    /// Bachelier (normal) model PV.
+    fn price_resolved_quote(
+        &self,
+        curves: &MarketContext,
+        quote: ResolvedVolatility,
+        as_of: Date,
+    ) -> Result<Money> {
+        self.price_model_base(
+            curves,
+            quote.sigma,
+            as_of,
+            |forward, strike, sigma, t, annuity| {
+                use finstack_quant_models::closed_form::{black_call, black_put};
+                use finstack_quant_models::volatility::normal::bachelier_price;
+                let (forward, strike) = quote.model_rates(forward, strike)?;
+                let unit = match quote.convention {
+                    VolatilityConvention::Normal => {
+                        bachelier_price(self.option_type, forward, strike, sigma, t, 1.0)
+                    }
+                    _ => match self.option_type {
+                        OptionType::Call => black_call(forward, strike, sigma, t),
+                        OptionType::Put => black_put(forward, strike, sigma, t),
+                    },
+                };
+                Ok(unit * annuity)
+            },
+        )
+    }
+
+    /// Bachelier PV in absolute normal-volatility units.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Curves used to project the underlying swap and discount its annuity.
+    /// * `volatility` - Finite non-negative normal volatility in decimal rate units per square-root year.
+    /// * `as_of` - Valuation date; past expiry has no remaining option value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing curves, invalid volatility, or invalid contractual cashflows.
     pub fn price_normal(
         &self,
         curves: &MarketContext,
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
-        self.price_model_base(curves, volatility, as_of, |fwd, strike, vol, t, annuity| {
-            use finstack_quant_models::volatility::normal::bachelier_price;
-            bachelier_price(self.option_type, fwd, strike, vol, t, annuity)
-        })
+        self.price_resolved_quote(
+            curves,
+            ResolvedVolatility {
+                sigma: validate_sigma(volatility)?,
+                convention: VolatilityConvention::Normal,
+            },
+            as_of,
+        )
     }
 
-    /// SABR-implied volatility PV with model-aware pricing.
+    /// Price the configured SABR model in the instrument's quote convention.
     ///
-    /// The SABR formula (Hagan 2002) outputs lognormal (Black) volatility by default.
-    /// When `vol_model == Normal`, we convert the lognormal vol to approximate
-    /// normal (Bachelier) vol using the standard approximation:
+    /// Explicit implied-volatility overrides take precedence. Normal models use
+    /// the normal SABR expansion directly; Black models preserve displacement.
     ///
-    /// ```text
-    /// σ_normal ≈ σ_lognormal × forward × (1 - ε) where ε is a small correction
-    /// ```
+    /// # Arguments
     ///
-    /// For ATM options, this approximation is exact. For OTM/ITM options,
-    /// the approximation is accurate to within a few basis points for typical
-    /// market conditions.
+    /// * `curves` - Projection and discount curves for the underlying swap.
+    /// * `as_of` - Valuation date used for remaining option time and cashflow entitlement.
     ///
-    /// # Negative Rates
+    /// # Errors
     ///
-    /// When SABR `shift` is set, the lognormal-to-normal conversion operates on
-    /// shifted rates (F + shift, K + shift) which are guaranteed positive.
-    /// Without a shift, non-positive rates fall back to a crude approximation.
-    /// For negative-rate currencies (EUR, JPY, CHF), always use shifted SABR
-    /// via [`SabrParameters::new_with_shift`].
-    ///
-    /// # References
-    ///
-    /// - Hagan, P. et al. (2002). "Managing Smile Risk" *Wilmott Magazine* `docs/REFERENCES.md#hagan-2002-sabr`
-    /// - Antonov, A. et al. (2015). "SABR/Free Sabr" for normal vol extensions `docs/REFERENCES.md#hagan-2002-sabr`
+    /// Returns an error for missing model inputs, incompatible Black/normal-SABR
+    /// configuration, or an undefined expansion.
     pub fn price_sabr(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
-        use super::lognormal_to_normal_vol;
-
         if let Some(value) = self.terminal_value(curves, as_of)? {
             return Ok(value);
         }
-
-        let params = self
-            .sabr_params
-            .as_ref()
-            .ok_or_else(|| Error::internal("swaption SABR pricing requires sabr_params"))?;
-        let model = SabrModel::new(params.clone());
-        let time_to_expiry = self.time_to_expiry(as_of)?;
-        let forward_rate = self.forward_swap_rate(curves, as_of)?;
-        let strike = self.strike_f64()?;
-
-        // SABR output convention is β-dependent: lognormal (Black) vol for
-        // β>0, normal (Bachelier) vol for β≈0. Branch on the tag instead of
-        // assuming Black — converting a Bachelier vol as if it were lognormal
-        // silently misprices by orders of magnitude in rate space.
-        let (sabr_vol, sabr_vol_type) =
-            model.implied_volatility_with_type(forward_rate, strike, time_to_expiry)?;
-
-        use finstack_quant_models::volatility::sabr::SabrVolType;
-        match (self.vol_model, sabr_vol_type) {
-            (VolatilityModel::Black, SabrVolType::Black) => {
-                self.price_black(curves, sabr_vol, as_of)
-            }
-            (VolatilityModel::Normal, SabrVolType::Black) => {
-                let sabr_normal_vol = lognormal_to_normal_vol(
-                    sabr_vol,
-                    forward_rate,
-                    strike,
-                    time_to_expiry,
-                    params.shift,
-                );
-                self.price_normal(curves, sabr_normal_vol, as_of)
-            }
-            // β≈0 SABR already produces the normal vol Bachelier needs.
-            (VolatilityModel::Normal, SabrVolType::Normal) => {
-                self.price_normal(curves, sabr_vol, as_of)
-            }
-            (VolatilityModel::Black, SabrVolType::Normal) => Err(Error::Validation(format!(
-                "Swaption {}: SABR with β≈0 produces a normal (Bachelier) vol, which cannot \
-                 feed the Black pricing model directly. Set vol_model to Normal (the natural \
-                 pairing for normal-SABR) or calibrate SABR with β>0.",
-                self.id
-            ))),
-        }
+        let quote = self.resolve_volatility_quote(
+            curves,
+            self.forward_swap_rate(curves, as_of)?,
+            self.time_to_expiry(as_of)?,
+        )?;
+        self.price_resolved_quote(curves, quote, as_of)
     }
 
     /// Calculate annuity based on settlement type and cash settlement method.
@@ -1008,60 +998,99 @@ impl Swaption {
         Ok(float_pv / fixed_annuity)
     }
 
-    /// Resolve volatility from SABR parameters, pricing override, or volatility surface.
+    /// Resolve the active volatility in the configured pricing convention.
     ///
-    /// This consolidates the volatility resolution logic used by Greek calculators.
-    /// Priority order:
-    /// 1. SABR model parameters (if set)
-    /// 2. Pricing override implied volatility (if set)
-    /// 3. Volatility surface lookup
+    /// Scalar overrides precede SABR parameters, which precede the market source.
+    /// Normal volatility is in decimal rate units; Black volatility is relative.
     ///
     /// # Arguments
-    /// * `curves` - Market context containing volatility surfaces
-    /// * `forward` - Forward swap rate
-    /// * `time_to_expiry` - Time to option expiry in years
     ///
-    /// # Returns
-    /// Resolved volatility value
+    /// * `curves` - Market context containing the configured volatility source.
+    /// * `forward` - Unshifted forward swap rate as a decimal.
+    /// * `time_to_expiry` - Finite positive remaining option expiry in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for missing inputs, incompatible quote conventions, or invalid volatility.
     pub fn resolve_volatility(
         &self,
         curves: &MarketContext,
         forward: f64,
         time_to_expiry: f64,
     ) -> Result<f64> {
-        // 1. SABR model (highest priority)
-        if let Some(sabr) = &self.sabr_params {
-            let model = SabrModel::new(sabr.clone());
-            return model.implied_volatility(forward, self.strike_f64()?, time_to_expiry);
-        }
+        Ok(self
+            .resolve_volatility_quote(curves, forward, time_to_expiry)?
+            .sigma)
+    }
 
-        // 2. Pricing override
-        if let Some(impl_vol) = self
+    fn resolve_volatility_quote(
+        &self,
+        curves: &MarketContext,
+        forward: f64,
+        time_to_expiry: f64,
+    ) -> Result<ResolvedVolatility> {
+        let convention = match self.vol_model {
+            VolatilityModel::Normal => VolatilityConvention::Normal,
+            VolatilityModel::Black => self
+                .sabr_params
+                .as_ref()
+                .and_then(|p| p.shift)
+                .map_or(VolatilityConvention::Lognormal, |shift| {
+                    VolatilityConvention::ShiftedLognormal { shift }
+                }),
+        };
+        let strike = self.strike_f64()?;
+        if self
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
+            .is_none()
         {
-            return Ok(impl_vol);
-        }
-
-        // 3. Volatility provider. Strike surfaces use the strike coordinate;
-        // tenor surfaces and SABR cubes use the underlying swap tenor.
-        let vol_source = resolve_vol_source(curves, self.vol_surface_id.as_str())?;
-        let strike = self.strike_f64()?;
-        let underlying_tenor = self.underlying_tenor_years()?;
-        match self
-            .instrument_pricing_overrides
-            .model_config
-            .vol_surface_extrapolation
-        {
-            VolSurfaceExtrapolation::Clamp | VolSurfaceExtrapolation::LinearInVariance => {
-                // LinearInVariance falls back to Clamp until surface impl is ready
-                Ok(vol_source.get_vol_clamped(time_to_expiry, underlying_tenor, strike))
+            if let Some(params) = &self.sabr_params {
+                let sigma = match self.vol_model {
+                    VolatilityModel::Normal => {
+                        params.implied_vol_normal(forward, strike, time_to_expiry)?
+                    }
+                    VolatilityModel::Black => {
+                        let model = SabrModel::new(params.clone());
+                        let (sigma, quote_type) =
+                            model.implied_volatility_with_type(forward, strike, time_to_expiry)?;
+                        if quote_type != finstack_quant_models::volatility::sabr::SabrVolType::Black
+                        {
+                            return Err(Error::Validation(
+                                "normal SABR cannot supply a Black volatility quote".to_owned(),
+                            ));
+                        }
+                        sigma
+                    }
+                };
+                let quote = ResolvedVolatility {
+                    sigma: validate_sigma(sigma)?,
+                    convention,
+                };
+                quote.model_rates(forward, strike)?;
+                return Ok(quote);
             }
-            VolSurfaceExtrapolation::Error => {
-                vol_source.get_vol(time_to_expiry, underlying_tenor, strike)
-            }
         }
+        let quote = resolve_volatility(
+            &self.instrument_pricing_overrides.market_quotes,
+            curves,
+            self.vol_surface_id.as_str(),
+            VolatilityRequest {
+                expiry: time_to_expiry,
+                tenor: self.underlying_tenor_years()?,
+                strike,
+                convention: Some(convention),
+                clamp: !matches!(
+                    self.instrument_pricing_overrides
+                        .model_config
+                        .vol_surface_extrapolation,
+                    VolSurfaceExtrapolation::Error
+                ),
+            },
+        )?;
+        quote.model_rates(forward, strike)?;
+        Ok(quote)
     }
 
     /// Pre-compute common Greek calculation inputs.
@@ -1089,12 +1118,13 @@ impl Swaption {
 
         let forward = self.forward_swap_rate(curves, as_of)?;
         let annuity = self.annuity(disc.as_ref(), as_of, forward)?;
-        let sigma = self.resolve_volatility(curves, forward, t)?;
+        let quote = self.resolve_volatility_quote(curves, forward, t)?;
 
         Ok(Some(GreekInputs {
             forward,
             annuity,
-            sigma,
+            sigma: quote.sigma,
+            volatility_convention: quote.convention,
             time_to_expiry: t,
         }))
     }
@@ -1151,6 +1181,8 @@ pub struct GreekInputs {
     pub annuity: f64,
     /// Resolved volatility (from SABR, override, or surface)
     pub sigma: f64,
+    /// Quote convention and displacement used by both pricing and Greek inputs.
+    pub volatility_convention: VolatilityConvention,
     /// Time to option expiry in years
     pub time_to_expiry: f64,
 }

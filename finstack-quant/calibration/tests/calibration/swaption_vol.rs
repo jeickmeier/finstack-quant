@@ -189,8 +189,6 @@ fn swaption_vol_step_builds_and_inserts_surface() {
                 swap_index: Some("USD-SOFR-3M".into()),
                 // Vendor-grade surface fit requirements (normal vols in decimal).
                 vol_tolerance: Some(tolerances::SWAPTION_VOL_FIT_TOL_NORMAL_DECIMAL),
-                // Internal SABR solver tolerance (root-finder tolerance).
-                sabr_tolerance: Some(1e-6),
                 sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
                 allow_sabr_missing_bucket_fallback: false,
             }),
@@ -229,8 +227,12 @@ fn swaption_vol_step_builds_and_inserts_surface() {
         .expect("vol cube inserted");
 
     // ATM strikes for each bucket (approximate).
-    let v_1y_1y = vol_provider.get_vol_clamped(1.0, 1.0, 0.043);
-    let v_1y_5y = vol_provider.get_vol_clamped(1.0, 5.0, 0.045);
+    let v_1y_1y = vol_provider
+        .get_normal_vol_clamped(1.0, 1.0, 0.043)
+        .expect("clamped vol");
+    let v_1y_5y = vol_provider
+        .get_normal_vol_clamped(1.0, 5.0, 0.045)
+        .expect("clamped vol");
     assert!(v_1y_1y.is_finite() && v_1y_1y > 0.0);
     assert!(v_1y_5y.is_finite() && v_1y_5y > 0.0);
 }
@@ -271,7 +273,6 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
                 vol_tolerance: None,
-                sabr_tolerance: None,
                 sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
                 allow_sabr_missing_bucket_fallback: false,
             }),
@@ -306,16 +307,16 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
     .with_vol_model(VolatilityModel::Normal);
     let swaption = Swaption::new("SWPT-1Yx5Y", &params, "USD-OIS", "USD-SOFR-3M", "USD-SWPT");
 
-    // With VolCube calibration, the vol cube is stored separately from surfaces.
-    // The SimpleSwaptionBlackPricer uses the valuations volatility resolver,
-    // so pricing should succeed. The legacy Swaption::value() path still uses
-    // get_surface(), so it won't find the cube.
+    // Normal calibration preserves its quote convention on the expiry/tenor
+    // cube. It cannot be read as a Black strike surface.
     let vol_provider = finstack_quant_valuations::market::resolve_vol_source(
         &ctx,
         swaption.vol_surface_id.as_str(),
     )
     .expect("vol cube should resolve as a volatility source");
-    let vol = vol_provider.get_vol_clamped(1.0, 5.0, 0.045);
+    let vol = vol_provider
+        .get_normal_vol_clamped(1.0, 5.0, 0.045)
+        .expect("clamped vol");
     assert!(
         vol.is_finite() && vol > 0.0,
         "VolCube should produce a valid vol"
@@ -358,7 +359,6 @@ fn swaption_vol_out_of_bounds_targets_error_by_default() {
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
                 vol_tolerance: None,
-                sabr_tolerance: None,
                 sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
                 allow_sabr_missing_bucket_fallback: false,
             }),
@@ -416,7 +416,6 @@ fn swaption_vol_out_of_bounds_targets_can_clamp_when_configured() {
                 fixed_day_count: None,
                 swap_index: Some("USD-SOFR-3M".into()),
                 vol_tolerance: None,
-                sabr_tolerance: None,
                 sabr_extrapolation: SurfaceExtrapolationPolicy::Clamp,
                 allow_sabr_missing_bucket_fallback: false,
             }),
@@ -510,7 +509,6 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
                     fixed_day_count: Some(DayCount::Act365F),
                     swap_index: Some("USD-SOFR-3M".into()),
                     vol_tolerance: Some(tolerances::SWAPTION_VOL_FIT_TOL_NORMAL_DECIMAL),
-                    sabr_tolerance: Some(1.0e-6),
                     sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
                     allow_sabr_missing_bucket_fallback: false,
                 }),
@@ -531,7 +529,7 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
     let cube = finstack_quant_valuations::market::resolve_vol_source(&context, "USD-SWPT-SETTLED")
         .expect("contractual-coordinate cube");
     assert!(cube
-        .get_vol(expiry_time, contractual_tenor, 0.043)
+        .get_normal_vol(expiry_time, contractual_tenor, 0.043)
         .expect("exact contractual cube node")
         .is_finite());
 

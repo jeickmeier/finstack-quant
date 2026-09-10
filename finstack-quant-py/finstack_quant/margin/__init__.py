@@ -24,8 +24,10 @@ EligibleCollateralSchedule = _margin.EligibleCollateralSchedule
 CONSTANTS = _margin.CONSTANTS
 VmResult = _margin.VmResult
 VmCalculator = _margin.VmCalculator
+ImCollateralResult = _margin.ImCollateralResult
 ImResult = _margin.ImResult
 SimmSensitivities = _margin.SimmSensitivities
+SimmCurvatureSensitivity = _margin.SimmCurvatureSensitivity
 SimmCalculator = _margin.SimmCalculator
 ScheduleImCalculator = _margin.ScheduleImCalculator
 HaircutImCalculator = _margin.HaircutImCalculator
@@ -75,6 +77,7 @@ __all__: list[str] = [
     "FundingConfig",
     "Haircut01",
     "HaircutImCalculator",
+    "ImCollateralResult",
     "ImDecayProfile",
     "ImMethodology",
     "ImProfile",
@@ -90,6 +93,7 @@ __all__: list[str] = [
     "SaCcrTrade",
     "ScheduleImCalculator",
     "SimmCalculator",
+    "SimmCurvatureSensitivity",
     "SimmSensitivities",
     "VmCalculator",
     "VmResult",

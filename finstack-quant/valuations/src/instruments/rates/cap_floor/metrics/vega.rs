@@ -1,7 +1,7 @@
 //! Vega calculator for interest rate options (caps/floors/caplets/floorlets).
 
 use crate::instruments::rates::cap_floor::hw_pricer::resolve_capfloor_hw1f_model_params;
-use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
+use crate::instruments::rates::cap_floor::CapFloor;
 use crate::metrics::bump_surface_vol_absolute;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::pricer::ModelKey;
@@ -49,12 +49,7 @@ impl MetricCalculator for VegaCalculator {
         ) {
             return hull_white_surface_vega_per_pct(option, context);
         }
-        let strike = option.strike_f64()?;
-        let vol_type = option.vol_type;
-        let vol_shift = option.resolved_vol_shift();
-        super::common::aggregate_over_caplets(option, context, |c: CapletInputs| {
-            caplet_vega(vol_type, strike, vol_shift, c)
-        })
+        super::common::aggregate_over_caplets(option, context, |c: CapletInputs| caplet_vega(c))
     }
 }
 
@@ -73,24 +68,14 @@ impl MetricCalculator for HwSigmaVegaCalculator {
     }
 }
 
-fn caplet_vega(vol_type: CapFloorVolType, strike: f64, vol_shift: f64, c: CapletInputs) -> f64 {
-    use super::common::lognormal_vega_with_fallback;
-    use crate::instruments::rates::cap_floor::pricing::black;
-    let t = c.fixing_t;
-    match vol_type {
-        // `Auto` is a lognormal surface; both share the Black-with-Bachelier
-        // fallback path so the Greek matches the pricer for any rate sign.
-        CapFloorVolType::Lognormal | CapFloorVolType::Auto => {
-            lognormal_vega_with_fallback(strike, c.forward, c.sigma, t)
+fn caplet_vega(c: CapletInputs) -> f64 {
+    use crate::instruments::rates::cap_floor::pricing::{black, normal};
+    use finstack_quant_models::volatility::VolatilityConvention;
+    match c.convention {
+        VolatilityConvention::Normal => {
+            normal::vega_per_pct(c.strike, c.forward, c.sigma, c.fixing_t)
         }
-        CapFloorVolType::ShiftedLognormal => {
-            black::vega_per_pct(strike + vol_shift, c.forward + vol_shift, c.sigma, t)
-        }
-        CapFloorVolType::Normal => {
-            crate::instruments::rates::cap_floor::pricing::normal::vega_per_pct(
-                strike, c.forward, c.sigma, t,
-            )
-        }
+        _ => black::vega_per_pct(c.strike, c.forward, c.sigma, c.fixing_t),
     }
 }
 
@@ -156,34 +141,5 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
     } else {
         let pv_base = context.reprice_instrument_raw(option, market, context.as_of)?;
         Ok((pv_up - pv_base) / bump * 0.01)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::instruments::rates::cap_floor::pricing::{black, normal};
-    use crate::instruments::rates::swaption::types::lognormal_to_normal_vol;
-
-    /// A lognormal cap whose forward turns negative must still report a finite
-    /// vega: the metric falls back to Bachelier with a converted normal vol,
-    /// matching the pricer rather than producing a NaN.
-    #[test]
-    fn lognormal_vega_falls_back_to_bachelier_on_negative_forward() {
-        let strike = 0.0;
-        let forward = -0.005;
-        let sigma = 0.20; // lognormal vol on the surface
-        let t = 0.5;
-
-        let vega = super::super::common::lognormal_vega_with_fallback(strike, forward, sigma, t);
-        assert!(vega.is_finite(), "vega must be finite, got {vega}");
-
-        // Equals the Bachelier vega computed with the converted normal vol.
-        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
-        let expected = normal::vega_per_pct(strike, forward, normal_vol, t);
-        assert!((vega - expected).abs() < 1e-15);
-
-        // Positive forward stays on the Black path.
-        let black_vega = super::super::common::lognormal_vega_with_fallback(0.03, 0.04, sigma, t);
-        assert!((black_vega - black::vega_per_pct(0.03, 0.04, sigma, t)).abs() < 1e-15);
     }
 }

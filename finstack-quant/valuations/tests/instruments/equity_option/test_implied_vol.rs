@@ -422,7 +422,7 @@ fn test_implied_vol_low_volatility() {
 }
 
 #[test]
-fn test_implied_vol_returns_zero_for_expired() {
+fn test_implied_vol_rejects_expired() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = as_of; // Already expired
     let strike = 100.0;
@@ -451,19 +451,15 @@ fn test_implied_vol_returns_zero_for_expired() {
         .meta
         .insert("market_price".to_string(), market_price.to_string());
 
-    let result = call
+    let error = call
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::ImpliedVol],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .unwrap();
-
-    let implied_vol = *result.measures.get("implied_vol").unwrap();
-
-    // Expired option should return 0 implied vol
-    approx_eq(implied_vol, 0.0, TIGHT_TOL, "Expired implied vol");
+        .expect_err("expired volatility is unidentifiable");
+    assert!(error.to_string().contains("live, unexercised"));
 }
 
 /// A malformed `market_price` attribute must surface as an error, not be

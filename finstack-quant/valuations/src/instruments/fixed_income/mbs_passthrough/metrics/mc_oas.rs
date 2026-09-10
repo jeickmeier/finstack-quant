@@ -164,7 +164,7 @@ fn simulate_rate_paths(
 struct McStepSchedule {
     /// Extra discounting time (years) from each step's grid endpoint
     /// `(m+1)/12` to the pool's actual payment date. May be negative:
-    /// GNMA I pays inside the accrual month, and walked-back in-flight
+    /// Walked-back in-flight
     /// periods pay before their grid endpoint. Combined with the cumulative
     /// grid discount factor this discounts each cashflow to its actual
     /// payment date.
@@ -364,7 +364,8 @@ fn price_on_path(
 /// # Arguments
 ///
 /// * `mbs` - Agency MBS passthrough instrument
-/// * `market_price_pct` - Market price as percentage of face (e.g., 98.5)
+/// * `market_price_pct` - Clean price as a percentage of current face (e.g., 98.5);
+///   calendar-month accrued interest at `as_of` is added to the solver target.
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
 /// * `config` - Monte Carlo configuration (paths, HW params, seed)
@@ -393,7 +394,10 @@ pub(crate) fn calculate_mc_oas(
     as_of: Date,
     config: &McOasConfig,
 ) -> Result<f64> {
-    let market_price = market_price_pct / 100.0 * mbs.current_face.amount();
+    let market_price = market_price_pct / 100.0 * mbs.current_face.amount()
+        + crate::instruments::fixed_income::mbs_passthrough::pricer::settlement_accrued_interest(
+            mbs, as_of,
+        )?;
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let num_steps = config.num_steps.unwrap_or(mbs.wam as usize);
@@ -705,7 +709,12 @@ mod tests {
             .sum();
         let avg_price: f64 = total / 64.0;
 
-        let market_price_pct = avg_price / mbs.current_face.amount() * 100.0;
+        let accrued =
+            crate::instruments::fixed_income::mbs_passthrough::pricer::settlement_accrued_interest(
+                &mbs, as_of,
+            )
+            .expect("accrued");
+        let market_price_pct = (avg_price - accrued) / mbs.current_face.amount() * 100.0;
 
         // MC OAS at model price should be approximately 0
         let oas =
@@ -722,7 +731,7 @@ mod tests {
     /// Finding 14 regression: longer agency payment delay must lower path PV.
     ///
     /// FNMA pays on the 25th of the month following accrual (~55-day stated
-    /// delay) while GNMA I pays on the 15th of the accrual month. The same
+    /// delay) while GNMA I pays on the 15th of the following month. The same
     /// cashflows received later must be worth less under positive rates.
     #[test]
     fn longer_payment_delay_lowers_path_pv() {
@@ -735,7 +744,7 @@ mod tests {
 
         let fnma = create_test_mbs(); // FNMA: pays 25th of following month
         let mut gnma1 = create_test_mbs();
-        gnma1.agency = AgencyProgram::GnmaI; // pays 15th of accrual month
+        gnma1.agency = AgencyProgram::GnmaI; // pays 15th of following month
 
         let fnma_steps = mc_step_schedule(&fnma, as_of, wam).expect("fnma steps");
         let gnma1_steps = mc_step_schedule(&gnma1, as_of, wam).expect("gnma steps");
@@ -990,5 +999,43 @@ mod tests {
             (oas1 - oas2).abs() < 1e-12,
             "Same seed should give identical OAS"
         );
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    #[test]
+    fn mbs_clean_quote_reprices_at_zero_oas_in_zero_vol_limit() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.issue_date = date!(2024 - 01 - 01);
+        mbs.wam = 12;
+        mbs.maturity = date!(2025 - 01 - 01);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (5.0, 1.0)])
+                .build()
+                .expect("curve"),
+        );
+        let dirty = generate_cashflows(&mbs, as_of, None)
+            .expect("flows")
+            .iter()
+            .map(|cf| cf.total)
+            .sum::<f64>();
+        let accrued = mbs.current_face.amount() * mbs.pass_through_rate * 14.0 / 360.0;
+        let clean = (dirty - accrued) / mbs.current_face.amount() * 100.0;
+        let config = McOasConfig {
+            num_paths: 2,
+            hw_sigma: 1e-10,
+            ..McOasConfig::default()
+        };
+        let oas = calculate_mc_oas(&mbs, clean, &market, as_of, &config).expect("oas");
+        assert!(oas.abs() < 1e-8, "oas {oas}");
     }
 }

@@ -300,12 +300,9 @@ impl CmsSwap {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
-        let calendar_id = swap_convention.calendar_id().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "CMS swap convention has no reference calendar".to_string(),
-            )
-        })?;
-        let reset_lag_days = swap_convention.reset_lag_days();
+        let reference_conventions = swap_convention.conventions()?;
+        let calendar_id = &reference_conventions.market_calendar_id;
+        let reset_lag_days = reference_conventions.market_settlement_days;
 
         let cms_periods = build_periods(BuildPeriodsParams {
             start: start_date,
@@ -313,7 +310,7 @@ impl CmsSwap {
             frequency: cms_frequency,
             stub: StubKind::ShortFront,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: &calendar_id,
+            calendar_id,
             end_of_month: false,
             day_count: cms_day_count,
             payment_lag_days: 0,
@@ -346,7 +343,7 @@ impl CmsSwap {
                     frequency: cms_frequency,
                     stub: StubKind::ShortFront,
                     business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                    calendar_id: &calendar_id,
+                    calendar_id,
                     end_of_month: false,
                     day_count,
                     payment_lag_days: 0,
@@ -375,7 +372,7 @@ impl CmsSwap {
                     frequency: cms_frequency,
                     stub: StubKind::ShortFront,
                     business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                    calendar_id: &calendar_id,
+                    calendar_id,
                     end_of_month: false,
                     day_count,
                     payment_lag_days: 0,
@@ -744,10 +741,42 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
+        let mut projected_fixings = Vec::new();
+        for &fixing_date in &self.cms_fixing_dates {
+            if fixing_date > as_of {
+                projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                    series_id: finstack_quant_core::market_data::fixings::cms_fixing_series_id(
+                        self.forward_curve_id.as_str(),
+                        self.cms_tenor,
+                    ),
+                    date: fixing_date,
+                    value: Some(
+                        super::pricer::cms_forward_and_ttf(self, market, as_of, fixing_date)?.0,
+                    ),
+                });
+            }
+        }
+        let funding_flows = self.funding_leg_flows(market, as_of)?;
+        if let FundingLeg::Floating {
+            forward_curve_id, ..
+        } = &self.funding_leg
+        {
+            for flow in &funding_flows {
+                if let (Some(date), Some(accrual)) = (flow.reset_date, &flow.accrual) {
+                    projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                        series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
+                            forward_curve_id.as_str(),
+                        ),
+                        date,
+                        value: accrual.projected_index_rate,
+                    });
+                }
+            }
+        }
         let flows = self
             .cms_leg_flows(market, as_of)?
             .into_iter()
-            .chain(self.funding_leg_flows(market, as_of)?)
+            .chain(funding_flows)
             .collect();
         let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             flows,
@@ -755,6 +784,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
                 meta: crate::cashflow::builder::CashFlowMeta {
+                    projected_fixings,
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     ..Default::default()
                 },
@@ -933,6 +963,39 @@ mod tests {
             builder = builder.cms_floor_opt(Some(f));
         }
         builder.build().expect("CMS swap should build")
+    }
+
+    #[test]
+    fn production_risk_cms_buckets_cover_projection_horizon() {
+        use crate::metrics::MetricId;
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        let as_of = date(2025, 1, 1);
+        let swap = one_period_cms_swap(None, None);
+        let forward = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
+            .base_date(as_of)
+            .knots(
+                (0..=30)
+                    .map(|year| (f64::from(year), 0.03))
+                    .collect::<Vec<_>>(),
+            )
+            .build()
+            .expect("dense forward");
+        let market = recon_market(as_of).insert(forward);
+        let result = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Dv01, MetricId::BucketedDv01],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("risk");
+        let key = "bucketed_dv01::USD-LIBOR-3M::10y";
+        let actual = result.measures[key];
+        assert!(
+            actual.abs() > 0.01,
+            "CMS coupons project beyond payment: {actual}"
+        );
+        assert!((result.measures["bucketed_dv01"] - result.measures["dv01"]).abs() < 0.01);
     }
 
     /// C13 regression: discounting cms_leg_flows must reconcile with base_value

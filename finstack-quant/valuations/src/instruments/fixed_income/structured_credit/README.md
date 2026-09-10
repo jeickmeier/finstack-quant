@@ -29,7 +29,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `StochasticPrepaySpec`, `StochasticDefaultSpec`, `CorrelationStructure`, `PoolGranularity` | Models-owned stochastic inputs; import from `finstack_quant_models::credit::pool`. |
 | `StochasticPricingResult`, `TranchePricingResult` | Stochastic output. |
 | `ReinvestmentPeriod`, `ReinvestmentCriteria` | CLO reinvestment contract used by the simulation engine. |
-| `EarlyAmortizationSpec`, `ControlledAccumulationSpec`, `ExcessSpreadSpec`, `CreditEnhancement` | ABS/credit-card structural features. |
+| `EarlyAmortizationSpec`, `ControlledAccumulationSpec`, `ExcessSpreadSpec` | ABS/credit-card structural features. |
 | `run_simulation`, `generate_cashflows`, `generate_tranche_cashflows` | Deterministic projection entry points. |
 | `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution`, `resolve_waterfall` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
@@ -356,3 +356,39 @@ registry — it does not validate this file's contents.
 - [`../../../metrics/README.md`](../../../metrics/README.md) — metric ids and calculators
 - [`INVARIANTS.md`](../../../../../../INVARIANTS.md) — Decimal/f64, determinism and serde invariants
 - [`docs/REFERENCES.md`](../../../../../../docs/REFERENCES.md) — bibliography
+
+
+### Collection accounts and current-state inputs
+
+The waterfall keeps interest and principal in separate accounts. Fees and coupons
+consume interest; principal pays capital or buys replacement collateral. A coverage
+cure or acceleration explicitly transfers interest into debt principal. Equity
+interest distributions do not retire its loss-absorbing balance. Undistributed cash
+carries forward by account and is distributed at termination; a cash trap cannot
+extinguish the balance.
+
+Supply current collateral and note balances. For an already-defaulted asset,
+`balance` is its defaulted par, `default_date` is its economic default date, and
+`recovery_amount` is the outstanding, unreceived claim. Performing collateral excludes
+that par. The claim enters the recovery queue once, with payment at the default date
+plus the canonical recovery lag. Current note balances must already reflect past
+losses; those losses inform cumulative triggers without another write-down.
+
+`pool.reinvestment_period` is the sole reinvestment configuration. Both `is_active`
+and its inclusive end date control purchases. Revolving notes retain their configured
+`target_balance`, or current balance when no target is supplied; other notes amortize.
+Principal that cannot be invested stays in the principal account until eligible
+placement or the end of the revolving period. Replacements preserve the surviving
+collateral profile pro rata, including credit-quality weights, maturities, and level
+payments. `max_price` is percent of par; `min_yield` is annual decimal current yield
+(coupon divided by price fraction). Floating replacement coupons use the current
+projection. No unspecified eligibility filter is assumed.
+
+Tranche coverage triggers retain their first breach date until the cure ratio is
+reached. `divert_cash_flow` pays the coverage cure from divertible interest;
+`trap_excess_spread` holds residual interest until cure; `stop_reinvestment` suspends
+purchases; `accelerate_amortization` also uses residual interest to repay debt below
+revolving targets. A subsequent breach starts a new breach date. Configure an OC or IC
+test in either the tranche or waterfall, avoiding duplicate definitions of the same
+test. Removed fields include duplicate reinvestment end dates, expected maturity,
+tranche credit-enhancement balances, and consequences without executable parameters.

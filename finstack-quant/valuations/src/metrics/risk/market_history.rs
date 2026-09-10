@@ -5,6 +5,10 @@
 //! rather than absolute levels, enabling efficient scenario application.
 
 use crate::metrics::risk::RiskFactorType;
+use crate::recalibration::{
+    provider_missing, HazardRecalibrationAction, HazardRecalibrationRequest, QuoteBump,
+    RecalibrationProvider,
+};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
@@ -12,6 +16,7 @@ use finstack_quant_core::market_data::bumps::{
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use std::sync::Arc;
 
 /// Historical shift for a single risk factor on a single date.
 ///
@@ -51,18 +56,32 @@ impl MarketScenario {
     /// Apply this scenario to a base market context.
     ///
     /// Creates a new `MarketContext` with all risk factor shifts applied.
-    /// Uses key-rate triangular bumps for rate/credit shifts at specific tenors,
-    /// preserving curve shape information. Equity and vol shifts are applied
-    /// as multiplicative and additive bumps respectively.
+    /// Rate shifts use triangular key-rate bumps. Credit spreads are additive
+    /// par-quote changes, replayed together for each hazard curve through the
+    /// supplied calibration provider against the shifted dependency market.
+    /// Equity and volatility shifts are multiplicative and additive, respectively.
     ///
     /// # Arguments
     ///
-    /// * `base_market` - The base market context (current market state)
+    /// * `base_market` - Current market state, including the source hazard recipes
+    ///   and discount curves needed to verify and replay credit spread quotes.
+    /// * `provider` - Quote-recalibration service. Required for a nonzero credit
+    ///   spread shock; other scenarios accept `None`. No direct hazard-rate
+    ///   approximation is substituted when a provider or recipe is unavailable.
     ///
     /// # Returns
     ///
     /// New market context with historical shifts applied
-    pub fn apply(&self, base_market: &MarketContext) -> Result<MarketContext> {
+    /// # Errors
+    ///
+    /// Returns an error for non-finite shifts, invalid credit tenors, missing
+    /// dependencies or providers, or failed quote recalibration. The source
+    /// market remains unchanged on every failure.
+    pub fn apply(
+        &self,
+        base_market: &MarketContext,
+        provider: Option<&dyn RecalibrationProvider>,
+    ) -> Result<MarketContext> {
         // Collect every shift into a single bump batch so the (potentially
         // expensive) `MarketContext` clone happens once instead of once per
         // shift. `bump` applies the slice in order, identical to the prior
@@ -78,8 +97,14 @@ impl MarketScenario {
         // surface bumps). Approximate instead with ONE parallel bump per
         // surface equal to the MEAN of that surface's point shifts.
         let mut vol_shifts_by_surface: Vec<(CurveId, Vec<f64>)> = Vec::new();
+        let mut credit_shifts: Vec<(CurveId, Vec<(f64, f64)>)> = Vec::new();
 
         for shift in &self.shifts {
+            if !shift.shift.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "historical scenario shifts must be finite".to_string(),
+                ));
+            }
             let bump = match &shift.factor {
                 RiskFactorType::DiscountRate {
                     curve_id,
@@ -88,13 +113,31 @@ impl MarketScenario {
                 | RiskFactorType::ForwardRate {
                     curve_id,
                     tenor_years,
-                }
-                | RiskFactorType::CreditSpread {
-                    curve_id,
-                    tenor_years,
                 } => {
                     let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
                     MarketBump::Curve { id, spec }
+                }
+                RiskFactorType::CreditSpread {
+                    curve_id,
+                    tenor_years,
+                } => {
+                    if !tenor_years.is_finite() || *tenor_years <= 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "historical credit tenor for '{curve_id}' must be finite and positive"
+                        )));
+                    }
+                    if shift.shift == 0.0 {
+                        continue;
+                    }
+                    let target = (*tenor_years, shift.shift * 10_000.0);
+                    if let Some((_, targets)) =
+                        credit_shifts.iter_mut().find(|(id, _)| id == curve_id)
+                    {
+                        targets.push(target);
+                    } else {
+                        credit_shifts.push((curve_id.clone(), vec![target]));
+                    }
+                    continue;
                 }
                 RiskFactorType::EquitySpot { ticker } => MarketBump::Curve {
                     id: CurveId::from(ticker.as_str()),
@@ -174,6 +217,25 @@ impl MarketScenario {
             remaining = deferred;
         }
 
+        if !credit_shifts.is_empty() {
+            let provider = provider.ok_or_else(|| provider_missing("historical_credit_spread"))?;
+            let source_market = Arc::new(base_market.clone());
+            for (curve_id, targets) in credit_shifts {
+                let hazard = base_market.get_hazard(&curve_id)?;
+                let discount_curve_id = provider.get_hazard_discount_curve_id(&hazard)?;
+                let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                    hazard,
+                    source_market: Arc::clone(&source_market),
+                    target_market: Arc::new(bumped_market.clone()),
+                    discount_curve_id,
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                    deal_quote_override: None,
+                    action: HazardRecalibrationAction::SpreadBump(QuoteBump::TenorsBp(targets)),
+                })?;
+                bumped_market = bumped_market.insert(rebuilt.as_ref().clone());
+            }
+        }
         Ok(bumped_market)
     }
 }
@@ -406,7 +468,7 @@ mod tests {
             ],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         assert!(bumped.get_discount("USD-OIS").is_ok());
 
         Ok(())
@@ -438,7 +500,7 @@ mod tests {
         );
 
         // Apply scenario
-        let bumped_market = scenario.apply(&base_market)?;
+        let bumped_market = scenario.apply(&base_market, None)?;
 
         // Verify bumped market has the curve
         assert!(bumped_market.get_discount("USD-OIS").is_ok());
@@ -494,7 +556,7 @@ mod tests {
             }],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         match bumped.get_price("AAPL")? {
             MarketScalar::Unitless(v) => assert!((v - 110.0).abs() < 1e-9),
             other @ MarketScalar::Price(_) => panic!("unexpected scalar variant: {:?}", other),
@@ -520,7 +582,7 @@ mod tests {
             }],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         let rate = bumped
             .fx()
             .expect("FX matrix should be present")
@@ -576,7 +638,7 @@ mod tests {
             ],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         let surface = bumped.get_surface("EQ-VOL")?;
         let vol = finstack_quant_models::volatility::get_surface_vol(&surface, 0.5, 100.0)
             .expect("grid point lookup should succeed");
@@ -629,7 +691,7 @@ mod tests {
             ],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         let eq_surface = bumped.get_surface("EQ-VOL")?;
         let eq_vol = finstack_quant_models::volatility::get_surface_vol(&eq_surface, 1.0, 100.0)
             .expect("grid point");
@@ -666,7 +728,7 @@ mod tests {
             }],
         );
 
-        let bumped = scenario.apply(&base_market)?;
+        let bumped = scenario.apply(&base_market, None)?;
         let bumped_surface = bumped.get_surface("EQ-VOL")?;
         let vol = finstack_quant_models::volatility::get_surface_vol(&bumped_surface, 1.0, 100.0)
             .expect("grid point lookup should succeed");

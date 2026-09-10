@@ -180,7 +180,7 @@ mod gbm_barrier {
             // false: no extra Gobet-Miri barrier shift. Both pricers still apply
             // the same Brownian-bridge hit correction inside the shared payoff;
             // keeping the flag identical is what makes the barrier cancel.
-            use_gobet_miri: false,
+            monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
             discount_curve_id: "USD-OIS".into(),
             spot_id: "SPX".into(),
             vol_surface_id: "SPX-VOL".into(),
@@ -188,7 +188,6 @@ mod gbm_barrier {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            monitoring_frequency: None,
             attributes: Attributes::new(),
         }
     }

@@ -29,27 +29,23 @@
 //! - `m` is calibrated so `F_0` matches the bootstrapped clean forward swap
 //!   value.
 //! - `ξ = +1` for payer (call), `ξ = −1` for receiver (put).
-//! - For index CDS options, expected front-end protection is represented as
-//!   part of the deterministic exercise payoff `D`, not as an extra term in
-//!   `F_0`.
+//! - For index CDS options, expected front-end protection enters the
+//!   loss-adjusted calibration anchor `F_0` exactly once. The deterministic
+//!   exercise term `D` contains only already-realized losses.
 //!
-//! # Dual Annuity Convention
-//!
-//! The calibration anchor and quadrature integrand intentionally use different
-//! annuity sources. `F_0` is anchored to the bootstrapped forward CDS annuity
-//! `L_te` from the Bloomberg CDS curve, while the integrand evaluates
-//! `V_te(s) = (s - c)L(s)` with the flat-spread / credit-triangle annuity
-//! specified in DOCS 2055833 §2.5. On `cdx_ig_46`, these differ by roughly
-//! 0.66% at par; using the bootstrapped anchor with the flat-spread integrand
-//! is the source-backed convention that reconciles the Bloomberg CDSO Market
-//! Value.
+//! The curve anchor and random-state annuity share contractual coupon dates
+//! and clean accrued premium. The anchor uses observed survival; the
+//! stochastic state uses the model's flat hazard. The calibrated expectation
+//! equals the forward CDS value. Future protection starts at expiry and
+//! front-end protection ends there. Only knockout options condition that
+//! forward value on survival to expiry.
 //!
 //! # Numerical integration
 //!
-//! Trapezoidal rule on the standard normal density over `z ∈ [−6, 6]` with
-//! step `Δz = 0.05`. The integrand is smooth (lognormal × piecewise-linear
-//! in `(s−c)L(s)`) so 240 quadrature nodes give 1e-9 absolute precision —
-//! well below the precision the calibration achieves.
+//! The smooth calibration expectation uses a trapezoidal normal-driver
+//! grid with step `Δz = 0.05`. The option payoff has an exercise kink, so
+//! it uses adaptive Simpson integration with a total absolute error target
+//! of `1e-12` per unit notional. Integration failures propagate to callers.
 //!
 //! All time inputs use **calendar days / 365** (DOCS 2055833 §2.1, matching
 //! FinancePy's `bloomberg_cdso::G_DAYS_IN_YEAR = 365.0`). Premium-leg accrual factors come
@@ -61,9 +57,10 @@ use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::instruments::credit_derivatives::cds_option::CDSOption;
-use finstack_quant_core::dates::{adjust, calendar_by_id, BusinessDayConvention, Date, DateExt};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -93,7 +90,7 @@ pub fn npv(
     let m = calibrate_lognormal_mean(&ctx)?;
 
     // Eq. 2.5: O = P(t_e) · E_0[(ξV_te + H(K) + D)+]
-    let pv_per_n = price_with_calibrated_mean(&ctx, m, ctx.t_expiry.max(0.0));
+    let pv_per_n = price_with_calibrated_mean(&ctx, m, ctx.t_expiry.max(0.0))?;
     Money::new(
         pv_per_n * option.notional.amount(),
         option.notional.currency(),
@@ -116,9 +113,9 @@ pub fn theta(
         return Ok(0.0);
     }
     let m = calibrate_lognormal_mean(&ctx)?;
-    let base = price_with_calibrated_mean(&ctx, m, ctx.t_expiry);
+    let base = price_with_calibrated_mean(&ctx, m, ctx.t_expiry)?;
     let shortened_t = (ctx.t_expiry - (1.0 / bloomberg_cdso::THETA_DAYS_IN_YEAR)).max(0.0);
-    let bumped = price_with_calibrated_mean(&ctx, m, shortened_t);
+    let bumped = price_with_calibrated_mean(&ctx, m, shortened_t)?;
     Ok((bumped - base) * option.notional.amount())
 }
 
@@ -133,7 +130,7 @@ pub fn forward_par_at_expiry_bp(
     let disc = curves.get_discount(&option.discount_curve_id)?;
     let surv = curves.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), cds, as_of, 0.0)?;
-    Ok(ctx.display_forward_par_spread * BASIS_POINTS_PER_UNIT)
+    Ok(ctx.forward_par_spread * BASIS_POINTS_PER_UNIT)
 }
 
 // Pre-computed deterministic inputs
@@ -182,22 +179,15 @@ pub struct ForwardCdsContext {
     pub t_expiry: f64,
     /// `σ` from the vol surface or instrument override.
     pub sigma: f64,
-    /// `df(t_e)` from valuation date to expiry, on the option's discount
-    /// curve.
-    pub df_to_expiry: f64,
+    /// Discount factor to the contractual exercise-payment date.
+    pub df_to_settlement: f64,
     /// Conditional survival probability from valuation date to expiry on
     /// the bootstrapped credit curve.
     pub survival_to_expiry: f64,
-    /// Bootstrapped forward par spread `s_par` (decimal), computed using
-    /// the PCD-corrected annuity. Used as the calibration anchor for the
-    /// clean forward F_0 = (par − c) · L_te (DOCS 2055833 §2.3).
+    /// Bootstrapped forward spread (decimal), using the clean annuity.
+    /// For non-knockout indices this includes expected front-end loss per
+    /// unit annuity. Pricing, volatility lookup and spread Greeks share it.
     pub forward_par_spread: f64,
-    /// Bloomberg HELP CDSO "ATM Fwd" display value (decimal): same
-    /// `spot_protection_pv` numerator, but with the Bloomberg-screen
-    /// drop-first-cashflow annuity in the denominator. Reported to the
-    /// metrics framework via [`forward_par_at_expiry_bp`] but NOT used in
-    /// the option NPV calibration.
-    pub display_forward_par_spread: f64,
     /// Bootstrapped clean RPV01 of the forward CDS *expressed at expiry*
     /// (i.e. divided by `df_te · q_te`). Used in the F_0 calibration target.
     pub bootstrapped_l_at_expiry: f64,
@@ -227,8 +217,9 @@ pub struct ForwardCdsContext {
     pub scale: f64,
     /// Realized index loss per unit of original notional.
     pub realized_index_loss: f64,
-    /// Expected front-end protection per unit notional for index options,
-    /// measured from the option FEP start date to legal expiry.
+    /// Expected pre-expiry default loss per unit current notional.
+    /// Index options include it in the loss-adjusted forward; a non-knockout
+    /// single-name payer receives it as a separate default claim.
     pub front_end_protection: f64,
     /// True for index options. Drives `loss_settlement` (settlement of
     /// already-realised index losses and expected front-end protection on
@@ -267,6 +258,11 @@ impl ForwardCdsContext {
 
         let t_expiry = option.time_to_expiry(as_of)?;
         let df_to_expiry = DiscountCurve::df_between_dates(disc, as_of, option.expiry)?;
+        let df_to_settlement = DiscountCurve::df_between_dates(
+            disc,
+            as_of,
+            option.exercise_settlement_date.unwrap_or(option.expiry),
+        )?;
         let sp_asof_raw = surv.sp_on_date(as_of)?;
         let sp_asof = sp_asof_raw.clamp(numerical::ZERO_TOLERANCE, 1.0);
         let sp_expiry_raw = surv.sp_on_date(option.expiry)?;
@@ -304,8 +300,6 @@ impl ForwardCdsContext {
         let mut accrual_factors = Vec::with_capacity(cashflows.len());
         let mut fwd_discount_factors = Vec::with_capacity(cashflows.len());
         let mut raw_annuity_at_value_dt_no_aod = 0.0_f64;
-        let mut first_post_expiry_pv01_at_value_dt = 0.0_f64;
-        let mut seen_first_post_expiry = false;
         for (pay_date, accrual) in cashflows.iter() {
             if *pay_date <= option.expiry {
                 continue;
@@ -326,10 +320,6 @@ impl ForwardCdsContext {
             fwd_discount_factors.push(fwd_df);
             let cf_pv01 = *accrual * df_pay * sp_pay_cond;
             raw_annuity_at_value_dt_no_aod += cf_pv01;
-            if !seen_first_post_expiry {
-                first_post_expiry_pv01_at_value_dt = cf_pv01;
-                seen_first_post_expiry = true;
-            }
         }
 
         // Pre-expiry "previous coupon date" → expiry year-fraction. For a
@@ -354,125 +344,41 @@ impl ForwardCdsContext {
             )?
         };
 
-        // Bootstrapped forward par spread and clean forward RPV01 — the
-        // Bloomberg CDSO "ATM Fwd" computation, per the published Help
-        // methodology (HELP CDSO <GO> "Calculating ATM Forward Spread for
-        // CDSO"):
-        //
-        //   ATM Fwd = Default_Leg(0, T_mat) / Premium_Leg(T_exp, T_mat)
-        //
-        //   Default Leg: PV of expected loss from the **valuation date** to
-        //   the underlying CDS maturity — i.e., the *spot* protection PV.
-        //   Premium Leg: PV of a 1bp premium stream from [T_exp + 1, T_mat]
-        //   on the underlying CDS schedule, **subtracting the PV01 of the
-        //   first cashflow** (Bloomberg's verbatim wording — the first
-        //   post-expiry coupon, i.e. the one whose accrual period straddles
-        //   T_exp, is dropped in full).
-        //
-        // A plain post-expiry premium-leg sum includes the first coupon in full;
-        // `pv_protection_leg` integrates from `max(as_of, protection_start)`
-        // to maturity — when the synthetic CDS has `premium.start ≤ as_of`
-        // and `protection_effective_date = None` (the spot configuration set
-        // up by `synthetic_underlying_cds`), this is exactly the spot
-        // Default_Leg(0, T_mat) Bloomberg's formula calls for.
-        let denom_te = (df_to_expiry * survival_to_expiry).max(numerical::ZERO_TOLERANCE);
-        // Bloomberg HELP CDSO ATM Fwd: "subtract the PV01 of the first
-        // cashflow." Apply this rule only when there is a STRADDLING
-        // first period (premium.start strictly before T_exp), in which
-        // case dropping the full first cashflow PV01 is the BBG screen
-        // formula. When `premium.start ≥ T_exp` (no straddle), the first
-        // post-expiry cashflow is a stub starting at premium.start with
-        // no pre-expiry component to net out, and dropping it would
-        // distort the option's internal forward vs. the standard CDS
-        // par_spread of the same underlying — so we leave the annuity
-        // unchanged in that case (matching the legacy PCD behaviour
-        // that the put/call-parity-at-forward invariant relies on).
-        // For the calibration target F_0 = (par − c) · L_te and the
-        // quadrature integrand V_te(s) = (s − c) · L_te(s), we use the
-        // economically-meaningful "PCD subtraction" — the pre-expiry
-        // portion of the period straddling expiry. This preserves
-        // put/call parity at ATF for forward CDSes whose schedule starts
-        // at T_exp (no straddle ⇒ no subtraction), and gives a
-        // self-consistent calibration.
-        let pcd_stub_at_value_dt = accrual_pcd_to_expiry * denom_te;
+        // Both the curve anchor and spread-state annuity use the same
+        // post-expiry coupons and clean accrued-premium subtraction. Their
+        // survival probabilities differ: observed term structure for the
+        // anchor, the model's flat spread state inside the expectation.
+        let survival_denom = if option.knockout || !option.underlying_is_index {
+            survival_to_expiry
+        } else {
+            1.0
+        };
+        let denom_te = df_to_expiry * survival_denom;
+        if denom_te <= numerical::ZERO_TOLERANCE {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS option has no surviving discounted exercise notional".into(),
+            ));
+        }
+        let pcd_stub_at_value_dt = accrual_pcd_to_expiry * df_to_expiry * survival_to_expiry;
         let risky_annuity_at_value_dt = raw_annuity_at_value_dt_no_aod - pcd_stub_at_value_dt;
         let bootstrapped_l_at_expiry = risky_annuity_at_value_dt / denom_te;
+        if risky_annuity_at_value_dt <= numerical::ZERO_TOLERANCE {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS option '{}' has non-positive forward clean risky annuity {}",
+                option.id, risky_annuity_at_value_dt,
+            )));
+        }
 
-        // Bloomberg HELP CDSO ATM Fwd display formula: "Premium Leg = PV
-        // of 1bp stream from [T_exp+1, T_mat], subtracting the PV01 of
-        // the first cashflow." When the synthetic CDS schedule has a
-        // straddling first period (premium.start strictly < T_exp), this
-        // is the literal full-first-cashflow drop. When there's no
-        // straddle, the Bloomberg formula degenerates to the standard
-        // post-expiry sum (the "first cashflow" is then a thin stub
-        // already starting at T_exp). The displayed `forward_par_spread`
-        // uses this annuity; the calibration/integrand use the PCD
-        // version above. Decoupling display from math is necessary
-        // because the drop-first formula moves par by ~0.16 bp on
-        // cdx_ig_46 while the calibration would overshoot if it tracked
-        // the same shift.
-        let drop_first_cashflow = cds.premium.start < option.expiry;
-        let display_annuity_at_value_dt = if drop_first_cashflow {
-            raw_annuity_at_value_dt_no_aod - first_post_expiry_pv01_at_value_dt
-        } else {
-            risky_annuity_at_value_dt
-        };
-
-        // Bloomberg DOCS 2057273 §3 protection-leg convention:
-        // "Protection starts immediately, therefore the full number of days
-        // for protection and coupon is (TM − T + 1)." We honour the +1-day
-        // inclusive end of protection here (scoped to the option pricer) by
-        // building a temporary CDS with `premium.end + 1 day` and computing
-        // protection on that. We don't change `pv_protection_leg` globally
-        // because non-forward-CDS pricing in finstack-quant assumes the standard
-        // [T, TM] integration; the +1-day rule is a CDSO-specific tightening
-        // that closes ~0.05 bp of the cdx_ig_46 ATM Fwd residual.
-        // The same Bloomberg formula integrates the default leg from the
-        // valuation date itself; the synthetic CDS carries the
-        // `BloombergCdswClean` convention, whose protection step-in is 0
-        // days (see `CdsValuationConvention::protection_step_in_days`).
-        let spot_cds_plus_one = super::pricer::cds_with_bloomberg_protection_end_extension(cds);
-        let spot_protection_pv = cds_pricer
-            .pv_protection_leg(&spot_cds_plus_one, disc, surv, as_of)?
+        // The delivered CDS protects only from expiry onward. In particular,
+        // a knockout option cannot receive any pre-expiry default payment.
+        // Index front-end loss is added exactly once in the exercise payoff.
+        let mut forward_cds = super::pricer::cds_with_bloomberg_protection_end_extension(cds);
+        forward_cds.protection_effective_date = Some(cds.protection_start().max(option.expiry));
+        let forward_protection_pv = cds_pricer
+            .pv_protection_leg(&forward_cds, disc, surv, as_of)?
             .amount();
-        // ECONOMIC forward par — used for calibration target F_0 = h1 + (par − c) · L_te.
-        // Uses the same PCD-corrected annuity as `bootstrapped_l_at_expiry` so the
-        // calibration is internally self-consistent.
-        //
-        // A non-positive annuity is a degenerate curve / schedule and would
-        // silently inflate the par spread by `1 / ZERO_TOLERANCE` if clamped;
-        // surface it as an error so callers see the underlying problem.
-        let economic_denom_par_raw = risky_annuity_at_value_dt * cds.notional.amount();
-        if economic_denom_par_raw <= numerical::ZERO_TOLERANCE {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "degenerate economic risky annuity for CDS option '{}' par-spread \
-                 denominator: annuity={:.6e}, notional={}; cannot compute F_0 \
-                 calibration anchor",
-                option.id,
-                risky_annuity_at_value_dt,
-                cds.notional.amount()
-            )));
-        }
-        let forward_par_spread = spot_protection_pv / economic_denom_par_raw;
-        // DISPLAY-ONLY par (Bloomberg HELP CDSO ATM Fwd formula). Reported via
-        // `forward_par_at_expiry_bp` for the par_spread metric. Differs from
-        // the economic par when the synthetic CDS schedule has a straddling
-        // first period (premium.start strictly < T_exp); decoupling it from
-        // the calibration anchor lets us reproduce Bloomberg's screen ATM
-        // Fwd to within 0.05 bp without inducing a calibration shift in the
-        // option NPV path.
-        let display_denom_par_raw = display_annuity_at_value_dt * cds.notional.amount();
-        if display_denom_par_raw <= numerical::ZERO_TOLERANCE {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "degenerate display risky annuity for CDS option '{}' par-spread \
-                 denominator: annuity={:.6e}, notional={}; cannot compute display \
-                 ATM-forward",
-                option.id,
-                display_annuity_at_value_dt,
-                cds.notional.amount()
-            )));
-        }
-        let display_forward_par_spread = spot_protection_pv / display_denom_par_raw;
+        let mut forward_par_spread =
+            forward_protection_pv / (risky_annuity_at_value_dt * cds.notional.amount());
 
         let coupon = decimal_to_f64(option.effective_underlying_cds_coupon()?)?;
         let strike = match &option.strike {
@@ -500,34 +406,37 @@ impl ForwardCdsContext {
             1.0
         };
         let realized_index_loss = option.realized_index_loss.unwrap_or(0.0);
-        let front_end_protection = if option.underlying_is_index && !option.knockout {
-            let fep_start = index_option_front_end_protection_start(option, as_of)?;
+        let front_end_protection = if !option.knockout {
+            let fep_start = as_of;
             if fep_start >= option.expiry {
                 0.0
             } else {
                 let sp_start = surv
                     .sp_on_date(fep_start)?
                     .clamp(numerical::ZERO_TOLERANCE, 1.0);
-                // Match the CDS protection-leg convention used for the
-                // underlying CDSO default leg: protection includes the legal
-                // expiry date, so the survival ratio is measured through
-                // expiry + 1 calendar day.
-                let fep_end = option.expiry + time::Duration::days(1);
-                let sp_end = surv.sp_on_date(fep_end)?.clamp(0.0, 1.0);
+                // Adjacent front-end and delivered-CDS windows share expiry
+                // as their boundary, with no overlap or omitted day.
+                let sp_end = surv.sp_on_date(option.expiry)?.clamp(0.0, 1.0);
                 lgd * (1.0 - (sp_end / sp_start).clamp(0.0, 1.0))
             }
         } else {
             0.0
         };
 
+        // Index ATM spread is loss-adjusted. Store that same coordinate for
+        // pricing, volatility lookup and spread Greeks; do not add FEP again
+        // when constructing the calibration target or exercise payoff.
+        if option.underlying_is_index {
+            forward_par_spread += front_end_protection / bootstrapped_l_at_expiry;
+        }
+
         Ok(Self {
             lgd,
             t_expiry,
             sigma,
-            df_to_expiry,
+            df_to_settlement,
             survival_to_expiry,
             forward_par_spread,
-            display_forward_par_spread,
             bootstrapped_l_at_expiry,
             times_from_expiry,
             accrual_factors,
@@ -642,12 +551,12 @@ impl ForwardCdsContext {
             return 0.0;
         }
         let scale = self.scale.max(numerical::ZERO_TOLERANCE);
-        self.sign() * (self.realized_index_loss / scale + self.front_end_protection)
+        self.sign() * self.realized_index_loss / scale
     }
 
     /// Knockout options exercise only if the underlying survives to expiry.
     pub fn exercise_survival_multiplier(&self) -> f64 {
-        if self.knockout {
+        if self.knockout || !self.is_index {
             self.survival_to_expiry
         } else {
             1.0
@@ -657,18 +566,16 @@ impl ForwardCdsContext {
     /// `F_0/N` — the clean forward swap value, used as the calibration anchor
     /// for `m` (DOCS 2055833 Eq 2.3).
     ///
-    /// The calibration anchor is `(s_par − c) · L_te`. Index front-end
-    /// protection enters [`Self::signed_loss_settlement_per_n`] as an exercise
-    /// payoff term, consistent with index CDS option mechanics.
+    /// The calibration anchor is `(s_par − c) · L_te`; the stored index
+    /// spread already includes front-end loss per unit annuity exactly once. Only already-realized index losses enter the separate exercise
+    /// settlement term.
     ///
-    /// Note on L_te self-consistency: the integrand `V_te(s) = (s − c)·L(s)`
-    /// uses the credit-triangle `L(s)` per DOCS 2055833 §2.5 (λ(s) =
-    /// s/(1−R)), while F_0 uses the bootstrapped term-structure `L_te`.
-    /// On cdx_ig_46 these differ by ~0.66% at par. Empirically, the
-    /// bootstrap-anchored F_0 plus the index FEP payoff convention matches
-    /// Bloomberg Market Value to sub-dollar precision, while calibrating
-    /// against the credit-triangle F_0 overshoots materially.
-    pub fn no_knockout_forward(&self) -> f64 {
+    /// The curve anchor uses observed survival; the random spread-state
+    /// annuity uses the model's flat hazard. The same coupon dates, accrued
+    /// premium, and forward protection window apply to both. Calibration
+    /// enforces the expectation identity rather than substituting a flat
+    /// hazard for the observed curve.
+    pub fn forward_value(&self) -> f64 {
         (self.forward_par_spread - self.coupon) * self.bootstrapped_l_at_expiry
     }
 
@@ -680,10 +587,10 @@ impl ForwardCdsContext {
     /// payoff used by the quadrature — not from a separate price
     /// approximation. With `F0 = E[V_te]` from the lognormal-mean
     /// calibration anchor, payer − receiver telescopes to
-    /// `df · (f·F0 + (K − 1)·f0 + L + f·FEP)`, so the parity strike is
+    /// `df · (f·F0 + (K − 1)·f0 + L)`, so the parity strike is
     ///
     /// ```text
-    /// K_ATM = 1 − (f·F0 + L + f·FEP) / f0
+    /// K_ATM = 1 − (f·F0 + L) / f0
     /// ```
     ///
     /// returned as `100 · K_ATM`. In the limiting case `f = f0 = 1`,
@@ -707,11 +614,7 @@ impl ForwardCdsContext {
         };
         let f = self.scale.max(numerical::ZERO_TOLERANCE);
         let f0 = strike_index_factor.max(numerical::ZERO_TOLERANCE);
-        let k_atm = 1.0
-            - (f * self.no_knockout_forward()
-                + self.realized_index_loss
-                + f * self.front_end_protection)
-                / f0;
+        let k_atm = 1.0 - (f * self.forward_value() + self.realized_index_loss) / f0;
         Ok(100.0 * k_atm)
     }
 }
@@ -742,7 +645,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
         )));
     }
 
-    let target = ctx.no_knockout_forward();
+    let target = ctx.forward_value();
     let t_expiry = ctx.t_expiry.max(0.0);
     let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
     let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
@@ -834,9 +737,21 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
 // Quadrature integrand (DOCS 2055833 Eq. 2.5)
 
 /// `O / N = P(t_e) · E_0 [ (ξ V_te + H(K) + D)+ ]` per Eq. 2.5, evaluated
-/// by trapezoidal rule on the standard normal density. The `scale` factor
+/// by adaptive integration against the standard normal density. The `scale` factor
 /// folds in the index-factor adjustment for re-versioned indices.
-pub fn price_with_calibrated_mean(ctx: &ForwardCdsContext, m: f64, t_expiry: f64) -> f64 {
+///
+/// # Arguments
+///
+/// - `ctx`: Curve-derived forward, coupon, strike, survival and payment inputs.
+/// - `m`: Calibrated mean of the lognormal decimal spread state; strictly positive.
+/// - `t_expiry`: Remaining spread-variance horizon in Actual/365F years. Theta
+///   may shorten it while holding the calibrated forward and curves fixed.
+///
+/// # Errors
+///
+/// Returns an integration error when the payoff is non-finite or adaptive
+/// quadrature cannot meet its absolute error target of `1e-12` per notional.
+pub fn price_with_calibrated_mean(ctx: &ForwardCdsContext, m: f64, t_expiry: f64) -> Result<f64> {
     quadrature_payoff(
         ctx,
         m,
@@ -846,25 +761,65 @@ pub fn price_with_calibrated_mean(ctx: &ForwardCdsContext, m: f64, t_expiry: f64
     )
 }
 
+/// Integrate the signed exercise payoff and add any single-name default claim.
+///
+/// # Arguments
+///
+/// - `ctx`: Curve-derived forward, volatility, survival and payment inputs.
+/// - `m`: Calibrated positive mean of the lognormal decimal spread state.
+/// - `h_k`: Signed deterministic strike adjustment per current notional.
+/// - `d_loss`: Signed realized-loss exercise payment per current notional.
+/// - `t_expiry`: Spread-variance horizon in Actual/365F years; negative values
+///   are treated as zero, giving a deterministic spread state.
+///
+/// # Errors
+///
+/// Returns an integration error for a non-finite payoff or unmet quadrature
+/// tolerance, rather than returning an unconverged option value.
 pub fn quadrature_payoff(
     ctx: &ForwardCdsContext,
     m: f64,
     h_k: f64,
     d_loss: f64,
     t_expiry: f64,
-) -> f64 {
+) -> Result<f64> {
     let t_expiry = t_expiry.max(0.0);
     let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
     let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
     let sign = ctx.sign();
 
-    let expected_payoff =
-        normal_integral(bloomberg_cdso::Z_STEP, z_limit(ctx.sigma, t_expiry), |z| {
-            let s = m * s0 * (sigma_sqrt_t * z).exp();
-            let v = ctx.swap_value_per_n(s); // V_te / N
-            (sign * v + h_k + d_loss).max(0.0)
-        });
-    ctx.scale * ctx.exercise_survival_multiplier() * expected_payoff * ctx.df_to_expiry
+    let limit = z_limit(ctx.sigma, t_expiry);
+    let density_weighted_payoff = |z: f64| {
+        let s = m * s0 * (sigma_sqrt_t * z).exp();
+        (sign * ctx.swap_value_per_n(s) + h_k + d_loss).max(0.0)
+            * (-0.5 * z * z).exp()
+            * INV_SQRT_2_PI
+    };
+    // Refine the exercise kink instead of sampling it on the calibration
+    // grid. Seed half-standard-deviation panels so a small tail exercise
+    // region cannot be missed by the initial Simpson samples.
+    let panels = (4.0 * limit).ceil() as usize;
+    let width = 2.0 * limit / panels as f64;
+    let mut expected_payoff = 0.0;
+    for panel in 0..panels {
+        let low = -limit + panel as f64 * width;
+        expected_payoff += adaptive_simpson(
+            density_weighted_payoff,
+            low,
+            low + width,
+            1e-12 / panels as f64,
+            32,
+        )?;
+    }
+    let default_payment = if !ctx.is_index && !ctx.knockout && ctx.option_type == OptionType::Call {
+        ctx.front_end_protection
+    } else {
+        0.0
+    };
+    Ok(
+        (ctx.scale * ctx.exercise_survival_multiplier() * expected_payoff + default_payment)
+            * ctx.df_to_settlement,
+    )
 }
 
 fn decimal_to_f64(value: Decimal) -> Result<f64> {
@@ -873,24 +828,6 @@ fn decimal_to_f64(value: Decimal) -> Result<f64> {
             "Bloomberg CDSO quadrature: cannot represent {value} as f64"
         ))
     })
-}
-
-/// Effective start date for expected front-end protection on index CDS options.
-#[doc(hidden)]
-pub fn index_option_front_end_protection_start(option: &CDSOption, as_of: Date) -> Result<Date> {
-    if let Some(cash_settlement_date) = option.cash_settlement_date {
-        return Ok(cash_settlement_date);
-    }
-
-    let calendar_id = option.underlying_convention.default_calendar();
-    let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "missing CDS option calendar '{calendar_id}' for {:?}",
-            option.underlying_convention
-        ))
-    })?;
-    let trade_date = adjust(as_of, BusinessDayConvention::Following, calendar)?;
-    trade_date.add_business_days(bloomberg_cdso::INDEX_OPTION_FEP_START_LAG_BD, calendar)
 }
 
 /// Bloomberg CDSO standard-normal quadrature half-width.
@@ -1013,13 +950,19 @@ mod tests {
     }
 
     fn deterministic_payoff_per_n(ctx: &ForwardCdsContext) -> f64 {
-        ctx.scale
+        let exercise = ctx.scale
             * ctx.exercise_survival_multiplier()
-            * ctx.df_to_expiry
-            * (ctx.sign() * ctx.no_knockout_forward()
+            * (ctx.sign() * ctx.forward_value()
                 + ctx.signed_strike_adjustment_per_n()
                 + ctx.signed_loss_settlement_per_n())
-            .max(0.0)
+            .max(0.0);
+        let default_payment =
+            if !ctx.is_index && !ctx.knockout && ctx.option_type == OptionType::Call {
+                ctx.front_end_protection
+            } else {
+                0.0
+            };
+        (exercise + default_payment) * ctx.df_to_settlement
     }
 
     fn normal_cdf(x: f64) -> f64 {
@@ -1045,7 +988,7 @@ mod tests {
         let vol_sqrt_t = ctx.sigma * ctx.t_expiry.sqrt();
         let d1 = ((f / k).ln() + 0.5 * vol_sqrt_t * vol_sqrt_t) / vol_sqrt_t;
         let d2 = d1 - vol_sqrt_t;
-        ctx.df_to_expiry
+        ctx.df_to_settlement
             * ctx.exercise_survival_multiplier()
             * ctx.bootstrapped_l_at_expiry
             * (f * normal_cdf(d1) - k * normal_cdf(d2))
@@ -1088,34 +1031,20 @@ mod tests {
     }
 
     #[test]
-    fn index_fep_start_honours_explicit_cash_settlement_date() {
+    fn index_fep_is_independent_of_premium_payment_date() {
         let as_of = date!(2025 - 01 - 02);
         let mut option = option(as_of, OptionType::Call, 100.0, 0.30);
         option.underlying_is_index = true;
         option.knockout = false;
-        option.index_factor = Some(1.0);
-        option.underlying_cds_coupon = Some(bp_to_decimal(100.0));
-        option.cash_settlement_date = Some(date!(2025 - 01 - 09));
-
-        let start =
-            index_option_front_end_protection_start(&option, as_of).expect("FEP start date");
-
-        assert_eq!(start, date!(2025 - 01 - 09));
-    }
-
-    #[test]
-    fn index_fep_start_falls_back_to_t_plus_two_business_days() {
-        let as_of = date!(2025 - 01 - 02);
-        let mut option = option(as_of, OptionType::Call, 100.0, 0.30);
-        option.underlying_is_index = true;
-        option.knockout = false;
-        option.index_factor = Some(1.0);
-        option.underlying_cds_coupon = Some(bp_to_decimal(100.0));
-
-        let start =
-            index_option_front_end_protection_start(&option, as_of).expect("FEP start date");
-
-        assert_eq!(start, date!(2025 - 01 - 06));
+        let market = market(as_of);
+        let expected = context_for(&option, &market, as_of, 0.3).front_end_protection;
+        for settlement in [date!(2025 - 01 - 09), date!(2025 - 07 - 01)] {
+            option.cash_settlement_date = Some(settlement);
+            assert_eq!(
+                context_for(&option, &market, as_of, 0.3).front_end_protection,
+                expected
+            );
+        }
     }
 
     #[test]
@@ -1245,10 +1174,13 @@ mod tests {
             let expected = call.notional.amount()
                 * call_ctx.scale
                 * call_ctx.exercise_survival_multiplier()
-                * call_ctx.df_to_expiry
-                * (call_ctx.no_knockout_forward()
+                * call_ctx.df_to_settlement
+                * (call_ctx.forward_value()
                     + call_ctx.signed_strike_adjustment_per_n()
-                    + call_ctx.signed_loss_settlement_per_n());
+                    + call_ctx.signed_loss_settlement_per_n())
+                + call.notional.amount()
+                    * call_ctx.df_to_settlement
+                    * call_ctx.front_end_protection;
 
             assert!(
                 (call_pv - put_pv - expected).abs() < 1e-3,
@@ -1297,10 +1229,13 @@ mod tests {
             let expected = call.notional.amount()
                 * call_ctx.scale
                 * call_ctx.exercise_survival_multiplier()
-                * call_ctx.df_to_expiry
-                * (call_ctx.no_knockout_forward()
+                * call_ctx.df_to_settlement
+                * (call_ctx.forward_value()
                     + call_ctx.signed_strike_adjustment_per_n()
-                    + call_ctx.signed_loss_settlement_per_n());
+                    + call_ctx.signed_loss_settlement_per_n())
+                + call.notional.amount()
+                    * call_ctx.df_to_settlement
+                    * call_ctx.front_end_protection;
 
             // For deep-OTM strikes with c ≠ K, |expected| can dwarf the
             // ATM scale (the (c−K)L(K) term grows linearly with the
@@ -1372,7 +1307,7 @@ mod tests {
 
         // F_0 is the clean forward swap value and does not include an index
         // front-end-protection term for single-name options.
-        let f0_gap = non_knockout_ctx.no_knockout_forward() - knockout_ctx.no_knockout_forward();
+        let f0_gap = non_knockout_ctx.forward_value() - knockout_ctx.forward_value();
         assert!(
             f0_gap.abs() < 1e-12,
             "single-name F_0 must not add index FEP: gap={f0_gap}",
@@ -1415,10 +1350,11 @@ mod tests {
 
         // Reference recomputation: same calibrated m, only shift t_expiry.
         let m = calibrate_lognormal_mean(&ctx).expect("calibration");
-        let base = price_with_calibrated_mean(&ctx, m, ctx.t_expiry);
+        let base = price_with_calibrated_mean(&ctx, m, ctx.t_expiry).expect("payoff integration");
         let expected = {
             let shortened = (ctx.t_expiry - 1.0 / bloomberg_cdso::THETA_DAYS_IN_YEAR).max(0.0);
-            (price_with_calibrated_mean(&ctx, m, shortened) - base) * option.notional.amount()
+            (price_with_calibrated_mean(&ctx, m, shortened).expect("payoff integration") - base)
+                * option.notional.amount()
         };
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -1429,8 +1365,10 @@ mod tests {
         // realistic notionals); regressing it would silently move every
         // CDSO theta. Lock the difference > 0 so a typo would fail.
         let shortened_365 = (ctx.t_expiry - 1.0 / 365.0).max(0.0);
-        let theta_365 =
-            (price_with_calibrated_mean(&ctx, m, shortened_365) - base) * option.notional.amount();
+        let theta_365 = (price_with_calibrated_mean(&ctx, m, shortened_365)
+            .expect("payoff integration")
+            - base)
+            * option.notional.amount();
         assert!(
             (actual - theta_365).abs() > 0.0,
             "theta with 1/365.25 must differ from theta with 1/365.0; if equal, day basis was changed"
@@ -1462,7 +1400,9 @@ mod tests {
         let m_tomorrow = calibrate_lognormal_mean(&ctx_tomorrow).expect("calibration tomorrow");
         let as_of_shift_theta =
             (price_with_calibrated_mean(&ctx_tomorrow, m_tomorrow, ctx_tomorrow.t_expiry)
-                - price_with_calibrated_mean(&ctx_today, m_today, ctx_today.t_expiry))
+                .expect("payoff integration")
+                - price_with_calibrated_mean(&ctx_today, m_today, ctx_today.t_expiry)
+                    .expect("payoff integration"))
                 * option.notional.amount();
 
         let actual = theta(&option, &cds, &market, 0.30, as_of).expect("theta");
@@ -1479,53 +1419,20 @@ mod tests {
         );
     }
 
-    /// Item 3 (audit): the Bloomberg CDSO model intentionally uses TWO
-    /// different risky annuities — the bootstrapped term-structure annuity
-    /// `bootstrapped_l_at_expiry` for the `F_0` calibration anchor, and the
-    /// credit-triangle flat-hazard annuity `flat_annuity` inside the
-    /// quadrature integrand. They differ by design (~0.6% NPV on cdx_ig_46).
-    ///
-    /// The audit flagged this as a possible inconsistency. It is NOT a bug:
-    /// the module documentation on `no_knockout_forward` records that making
-    /// the annuity consistent (credit-triangle `F_0`) moves the cdx_ig_46
-    /// option NPV from +0.61% to +6.5% versus the Bloomberg CDSO screen —
-    /// i.e. the dual-annuity design is what reproduces Bloomberg. The
-    /// Bloomberg-screen golden `cdx_ig_46_payer_atm_jun26.json` is an
-    /// immutable external oracle that locks the current behaviour.
-    ///
-    /// This test PINS the dual-annuity design: it asserts the two annuities
-    /// are genuinely different at the bootstrapped forward par spread, so a
-    /// future refactor that "unifies" them (and silently regresses the
-    /// Bloomberg reconciliation) fails loudly here instead.
+    /// With a flat observed hazard, identical survival inputs must give
+    /// the same annuity in the curve anchor and the spread-state model.
     #[test]
-    fn f0_anchor_and_integrand_annuities_are_intentionally_distinct() {
+    fn curve_and_state_annuities_share_the_same_cashflow_convention() {
         let as_of = date!(2025 - 01 - 01);
         let market = market(as_of);
-        let option = option(as_of, OptionType::Call, 100.0, 0.30);
+        let mut option = option(as_of, OptionType::Call, 100.0, 0.30);
+        option.knockout = true;
         let ctx = context_for(&option, &market, as_of, 0.30);
-
-        // The integrand's credit-triangle annuity, evaluated at the same
-        // forward par spread that anchors F_0.
-        let triangle_annuity = ctx.flat_annuity(ctx.forward_par_spread);
-        // The F_0 calibration anchor's bootstrapped term-structure annuity.
-        let bootstrapped_annuity = ctx.bootstrapped_l_at_expiry;
-
+        let triangle_annuity = ctx.flat_annuity(0.02 * ctx.lgd);
         assert!(
-            triangle_annuity > 0.0 && bootstrapped_annuity > 0.0,
-            "both annuities must be positive: triangle={triangle_annuity}, \
-             bootstrapped={bootstrapped_annuity}"
-        );
-        // They must be DISTINCT — the dual-annuity design is deliberate.
-        // If a refactor unifies them this difference collapses to ~0 and the
-        // assertion fires, prompting a re-check against the Bloomberg golden.
-        let rel_diff = (triangle_annuity - bootstrapped_annuity).abs() / bootstrapped_annuity.abs();
-        assert!(
-            rel_diff > 1e-4,
-            "F_0-anchor and integrand annuities must remain distinct (Bloomberg \
-             CDSO dual-annuity design): triangle={triangle_annuity}, \
-             bootstrapped={bootstrapped_annuity}, rel_diff={rel_diff}. If this \
-             fails, a refactor unified the two annuities — re-verify the \
-             cdx_ig_46 Bloomberg golden before accepting the change."
+            (triangle_annuity - ctx.bootstrapped_l_at_expiry).abs() < 1e-12,
+            "same hazard must give same annuity: state={triangle_annuity}, curve={}",
+            ctx.bootstrapped_l_at_expiry
         );
     }
 
@@ -1705,7 +1612,7 @@ mod tests {
     }
 
     /// Payer/receiver parity for the price-strike payoff:
-    /// `payer − receiver = df · (f·F0 + (K − 1)·f0 + L + f·FEP)` per unit
+    /// `payer − receiver = df · (f·F0 + (K − 1)·f0 + L)` per unit
     /// notional, both node-by-node (max(x,0) − max(−x,0) = x) and after
     /// integration against the calibrated lognormal density.
     #[test]
@@ -1729,11 +1636,8 @@ mod tests {
             price_strike_option(as_of, OptionType::Put, k_pct, 500.0, vol, f0, f, Some(loss));
         let ctx = context_for(&payer, &mkt, as_of, vol);
 
-        let parity_rhs = ctx.df_to_expiry
-            * (f * ctx.no_knockout_forward()
-                + (k_pct / 100.0 - 1.0) * f0
-                + loss
-                + f * ctx.front_end_protection);
+        let parity_rhs =
+            ctx.df_to_settlement * (f * ctx.forward_value() + (k_pct / 100.0 - 1.0) * f0 + loss);
         let lhs =
             npv_per_unit(&payer, &mkt, as_of, vol) - npv_per_unit(&receiver, &mkt, as_of, vol);
         assert!(
@@ -1795,25 +1699,23 @@ mod tests {
     }
 
     /// Limiting identity: `f = f0 = 1`, `L = 0`, `FEP = 0` reduces the ATM
-    /// coordinate to `K_ATM = 1 − F0`. FEP is forced to zero by placing the
-    /// FEP start at expiry via an explicit cash settlement date.
+    /// coordinate to `K_ATM = 1 − F0` when valued at legal expiry.
     #[test]
     fn native_atm_forward_limit_reduces_to_one_minus_f0() {
         let as_of = date!(2025 - 01 - 01);
         let mkt = market(as_of);
-        let mut option =
+        let option =
             price_strike_option(as_of, OptionType::Call, 107.0, 500.0, 0.35, 1.0, 1.0, None);
-        option.cash_settlement_date = Some(option.expiry);
-        let ctx = context_for(&option, &mkt, as_of, 0.35);
+        let ctx = context_for(&option, &mkt, option.expiry, 0.35);
         assert!(
             ctx.front_end_protection == 0.0,
-            "FEP must be zero when its start is at expiry"
+            "FEP must be zero at legal expiry"
         );
         let k_atm = ctx
             .native_atm_forward_clean_price_pct()
             .expect("ATM coordinate")
             / 100.0;
-        let expected = 1.0 - ctx.no_knockout_forward();
+        let expected = 1.0 - ctx.forward_value();
         assert!(
             (k_atm - expected).abs() < 1e-12,
             "limiting K_ATM mismatch: got {k_atm}, expected {expected}"
@@ -1890,6 +1792,149 @@ mod tests {
                 (priced - intrinsic).abs() < 1e-6,
                 "{option_type:?}: small-vol limit {priced} must approach \
                  deterministic intrinsic {intrinsic}"
+            );
+        }
+    }
+
+    mod production_cds_option_audit {
+        use super::*;
+
+        #[test]
+        fn exercise_payment_date_changes_discounting_without_changing_variance() {
+            let as_of = date!(2025 - 01 - 01);
+            let curves = market(as_of);
+            let mut option = option(as_of, OptionType::Call, 100.0, 0.3);
+            option.knockout = true;
+            let cds = synthetic_underlying_cds(&option, as_of).expect("CDS");
+            let original = npv(&option, &cds, &curves, 0.3, as_of)
+                .expect("price")
+                .amount();
+            option.exercise_settlement_date = Some(option.expiry + time::Duration::days(5));
+            let delayed = npv(&option, &cds, &curves, 0.3, as_of)
+                .expect("price")
+                .amount();
+            assert!((delayed - original * (-0.03_f64 * 5.0 / 365.0).exp()).abs() < 1e-8);
+        }
+
+        #[test]
+        fn non_knockout_single_name_pays_front_end_protection_only_to_payer() {
+            let as_of = date!(2025 - 01 - 01);
+            let curves = market(as_of);
+            for side in [OptionType::Call, OptionType::Put] {
+                let mut option = option(as_of, side, 100.0, 0.3);
+                let cds = synthetic_underlying_cds(&option, as_of).expect("CDS");
+                option.knockout = true;
+                let ko = npv(&option, &cds, &curves, 0.3, as_of)
+                    .expect("KO")
+                    .amount();
+                option.knockout = false;
+                let nko = npv(&option, &cds, &curves, 0.3, as_of)
+                    .expect("NKO")
+                    .amount();
+                let t = (option.expiry - as_of).whole_days() as f64 / 365.0;
+                let expected = if side == OptionType::Call {
+                    option.notional.amount() * (-0.03 * t).exp() * 0.6 * (1.0 - (-0.02 * t).exp())
+                } else {
+                    0.0
+                };
+                assert!(
+                    (nko - ko - expected).abs() < 1e-8,
+                    "{side:?}: NKO-KO={} vs FEP={expected}",
+                    nko - ko
+                );
+            }
+        }
+
+        #[test]
+        fn valuation_clock_ignores_fixed_premium_and_exercise_settlement_dates() {
+            let initial = date!(2025 - 01 - 01);
+            let later = date!(2025 - 07 - 01);
+            let mut option = option(initial, OptionType::Call, 100.0, 0.3);
+            option.cash_settlement_date = Some(date!(2025 - 01 - 06));
+            option.exercise_settlement_date = Some(option.expiry + time::Duration::days(5));
+            let expected = (option.expiry - later).whole_days() as f64 / 365.0;
+            assert!(
+                (option.time_to_expiry(later).expect("time") - expected).abs() < 1e-14,
+                "model time must run from current valuation date to legal expiry"
+            );
+        }
+
+        #[test]
+        fn front_end_protection_window_advances_with_valuation_date() {
+            let initial = date!(2025 - 01 - 01);
+            let later = date!(2025 - 07 - 01);
+            let mut option = option(initial, OptionType::Call, 100.0, 0.3);
+            option.underlying_is_index = true;
+            option.knockout = false;
+            option.cash_settlement_date = Some(date!(2025 - 01 - 06));
+            let curves = market(initial);
+            let ctx = context_for(&option, &curves, later, 0.3);
+            let t = (option.expiry - later).whole_days() as f64 / 365.0;
+            assert!((ctx.front_end_protection - 0.6 * (1.0 - (-0.02 * t).exp())).abs() < 1e-12);
+        }
+
+        #[test]
+        fn index_parity_contains_front_end_protection_once() {
+            let as_of = date!(2025 - 01 - 01);
+            let curves = MarketContext::new()
+                .insert(flat_discount("USD-OIS", as_of, 0.0))
+                .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02));
+            let mut payer = option_with_coupon(as_of, OptionType::Call, 100.0, 100.0, 0.3);
+            payer.underlying_is_index = true;
+            payer.knockout = false;
+            payer.strike =
+                super::super::super::strike::CDSOptionStrike::CleanPricePct(Decimal::from(100));
+            payer.strike_index_factor = Some(1.0);
+            let mut receiver = payer.clone();
+            receiver.option_type = OptionType::Put;
+            let cds = synthetic_underlying_cds(&payer, as_of).expect("CDS");
+            let p = npv(&payer, &cds, &curves, 0.3, as_of)
+                .expect("payer")
+                .amount();
+            let r = npv(&receiver, &cds, &curves, 0.3, as_of)
+                .expect("receiver")
+                .amount();
+            // With no discounting and a par clean-price strike, add back
+            // the running premium PV to isolate the complete protection leg.
+            let t =
+                (payer.cds_maturity + time::Duration::days(1) - as_of).whole_days() as f64 / 365.0;
+            let ctx = context_for(&payer, &curves, as_of, 0.3);
+            let expiry_t = (payer.expiry - as_of).whole_days() as f64 / 365.0;
+            let annuity: f64 = ctx
+                .accrual_factors
+                .iter()
+                .zip(&ctx.times_from_expiry)
+                .map(|(a, t)| a * (-0.02 * (expiry_t + t)).exp())
+                .sum::<f64>()
+                - ctx.accrual_pcd_to_expiry * (-0.02 * expiry_t).exp();
+            let expected =
+                payer.notional.amount() * (0.6 * (1.0 - (-0.02 * t).exp()) - 0.01 * annuity);
+            assert!(
+                (p - r - expected).abs() < 1e-7 * payer.notional.amount(),
+                "payer-receiver {} vs single protection amount {expected}",
+                p - r
+            );
+        }
+
+        #[test]
+        fn knockout_forward_excludes_pre_expiry_defaults() {
+            let as_of = date!(2025 - 01 - 01);
+            let curves = MarketContext::new()
+                .insert(flat_discount("USD-OIS", as_of, 0.0))
+                .insert(flat_hazard("HZ-SN", as_of, 0.4, 0.02));
+            let mut option = option_with_coupon(as_of, OptionType::Call, 100.0, 100.0, 0.3);
+            option.knockout = true;
+            let ctx = context_for(&option, &curves, as_of, 0.3);
+            let expiry_t = (option.expiry - as_of).whole_days() as f64 / 365.0;
+            let maturity_t =
+                (option.cds_maturity + time::Duration::days(1) - as_of).whole_days() as f64 / 365.0;
+            let expected = 0.6 * ((-0.02 * expiry_t).exp() - (-0.02 * maturity_t).exp());
+            let actual = (ctx.forward_value() + ctx.coupon * ctx.bootstrapped_l_at_expiry)
+                * ctx.df_to_settlement
+                * ctx.survival_to_expiry;
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "KO forward protection {actual} vs post-expiry-only {expected}"
             );
         }
     }

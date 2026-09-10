@@ -1,7 +1,7 @@
 //! Hull-White 1F and range-accrual exotic pricing benchmarks.
 //!
 //! Covers the rate-note engines that were previously unmeasured:
-//! - [`RangeAccrual`]: default static-replication (digital call-spread) path
+//! - [`RangeAccrual`]: analytic pricing and cross-currency quanto pricing through analytic/GBM paths
 //! - [`CallableRangeAccrual`]: HW1F LSMC with Bermudan call dates
 //! - [`Snowball`]: path-dependent HW1F Monte Carlo
 //! - [`Tarn`]: target-redemption HW1F Monte Carlo
@@ -14,14 +14,19 @@
 #![allow(clippy::expect_used)]
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::{
-    CallableRangeAccrual, Instrument, InstrumentPricingOverrides, PricingOptions, RangeAccrual,
-    Snowball, Tarn,
+    CallableRangeAccrual, Instrument, InstrumentPricingOverrides, PricingOptions, QuantoSpec,
+    RangeAccrual, Snowball, Tarn,
+};
+use finstack_quant_valuations::pricer::{
+    standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
 };
 use std::hint::black_box;
 use time::Month;
@@ -107,6 +112,60 @@ fn bench_range_accrual_analytic(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_quanto_range_accrual(c: &mut Criterion) {
+    let as_of = date(2024, Month::January, 1);
+    let market = equity_range_market(as_of)
+        .insert(
+            DiscountCurve::builder("EUR-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (2.0, (-0.2_f64).exp())])
+                .build()
+                .unwrap(),
+        )
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+        )
+        .insert_price("EURUSD", MarketScalar::Unitless(1.1))
+        .insert_surface(
+            VolSurface::builder("FX-VOL")
+                .expiries(&[1.0])
+                .strikes(&[1.1])
+                .row(&[0.1])
+                .build()
+                .unwrap(),
+        );
+    let mut inst = RangeAccrual::example();
+    inst.quanto = Some(QuantoSpec {
+        asset_currency: Currency::EUR,
+        asset_discount_curve_id: "EUR-OIS".into(),
+        correlation: 0.5,
+        fx_vol_surface_id: "FX-VOL".into(),
+        fx_spot_id: "EURUSD".into(),
+    });
+    inst.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_mc_paths(MC_PATHS as usize);
+    let mut group = c.benchmark_group("quanto_range_accrual");
+    group.bench_function("analytic_12_observations", |b| {
+        b.iter(|| inst.value(black_box(&market), black_box(as_of)).unwrap());
+    });
+    let registry = standard_pricer_registry();
+    let pricer = registry
+        .get_pricer(PricerKey::new(
+            InstrumentType::RangeAccrual,
+            ModelKey::MonteCarloGBM,
+        ))
+        .unwrap();
+    group.bench_function("gbm_2500_paths_12_observations", |b| {
+        b.iter(|| {
+            pricer
+                .price_dyn(black_box(&inst), black_box(&market), black_box(as_of))
+                .unwrap()
+        });
+    });
+    group.finish();
+}
+
 fn bench_callable_range_accrual_lsmc(c: &mut Criterion) {
     let mut group = c.benchmark_group("callable_range_accrual_lsmc");
     group.throughput(Throughput::Elements(MC_PATHS));
@@ -185,6 +244,7 @@ fn bench_tarn_mc(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_range_accrual_analytic,
+    bench_quanto_range_accrual,
     bench_callable_range_accrual_lsmc,
     bench_snowball_mc,
     bench_tarn_mc,

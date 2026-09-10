@@ -70,7 +70,8 @@ fn override_positive_f64(value: Option<f64>, key: &str) -> Result<Option<f64>> {
 ///
 /// # Errors
 ///
-/// Returns a validation error for invalid, partial, or missing parameters.
+/// Returns a validation error for invalid, partial, or missing parameters, or
+/// a volatility schedule supplied to a scalar-only pricing path.
 pub fn resolve_hw1f_params(
     family: Hw1fParamFamily,
     curve_id: &str,
@@ -79,6 +80,11 @@ pub fn resolve_hw1f_params(
     context: &str,
     market: &MarketContext,
 ) -> Result<HullWhiteCalibrationParams> {
+    if config.hw1f_sigma_schedule.is_some() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{context}: this Hull-White pricing path requires scalar volatility; hw1f_sigma_schedule requires a schedule-capable engine"
+        )));
+    }
     let override_kappa = override_positive_f64(config.hw1f_mean_reversion, "hw1f_kappa")?;
     let override_sigma = override_positive_f64(config.hw1f_sigma, "hw1f_sigma")?;
     match (override_kappa, override_sigma) {
@@ -120,6 +126,23 @@ pub fn resolve_hw1f_params(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scalar_hw_resolver_does_not_ignore_a_volatility_schedule() {
+        let config = ModelConfig {
+            hw1f_mean_reversion: Some(0.05),
+            hw1f_sigma: Some(0.01),
+            hw1f_sigma_schedule: Some(
+                finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(
+                    vec![0.0, 1.0],
+                    vec![0.01, 0.02],
+                )
+                .expect("schedule"),
+            ),
+            ..Default::default()
+        };
+        assert!(resolve(&config, None, &MarketContext::new()).is_err());
+    }
 
     fn resolve(
         config: &ModelConfig,

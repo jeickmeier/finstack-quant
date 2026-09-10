@@ -83,7 +83,7 @@ fn test_convention_eu_mappings() {
 #[test]
 fn test_convention_as_mappings() {
     let conv = CdsConvention::IsdaAs;
-    assert_eq!(conv.day_count(), DayCount::Act365F);
+    assert_eq!(conv.day_count(), DayCount::Act360);
     assert_eq!(conv.frequency(), Tenor::quarterly());
     assert_eq!(conv.settlement_delay(), 3);
 }
@@ -115,6 +115,7 @@ fn test_builder_pattern() {
         .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
+            standard_imm_dates: true,
             start,
             end,
             frequency: convention.frequency(),

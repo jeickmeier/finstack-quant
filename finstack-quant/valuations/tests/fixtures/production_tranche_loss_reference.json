@@ -1,0 +1,106 @@
+{
+  "source": "SciPy 1.18.1 binomial CDF; QUADPACK and composite GL32",
+  "gaussian_tail_mass_bound": 1.5239706048321186e-23,
+  "cases": [
+    {
+      "n": 125,
+      "pd": 0.01,
+      "correlation": 0.3,
+      "cap": 0.03,
+      "recovery": 0.4,
+      "expected_loss": 0.004849053828078889,
+      "estimated_error": 5.383531207579939e-17,
+      "independent_legendre": 0.004849053828078892
+    },
+    {
+      "n": 125,
+      "pd": 0.05,
+      "correlation": 0.7,
+      "cap": 0.03,
+      "recovery": 0.4,
+      "expected_loss": 0.008025738229960557,
+      "estimated_error": 1.9640666373602075e-14,
+      "independent_legendre": 0.008025738229960567
+    },
+    {
+      "n": 125,
+      "pd": 0.1,
+      "correlation": 0.95,
+      "cap": 0.07,
+      "recovery": 0.4,
+      "expected_loss": 0.012357024883196257,
+      "estimated_error": 3.677577624223601e-14,
+      "independent_legendre": 0.012357024883196255
+    },
+    {
+      "n": 125,
+      "pd": 0.05,
+      "correlation": 0.99,
+      "cap": 0.03,
+      "recovery": 0.4,
+      "expected_loss": 0.00221297287473554,
+      "estimated_error": 5.371191321836062e-14,
+      "independent_legendre": 0.00221297287473554
+    },
+    {
+      "n": 125,
+      "pd": 0.001,
+      "correlation": 0.3,
+      "cap": 0.1,
+      "recovery": 0.4,
+      "expected_loss": 0.0005994591196411865,
+      "estimated_error": 1.0187014843537593e-17,
+      "independent_legendre": 0.0005994591196411868
+    },
+    {
+      "n": 10,
+      "pd": 0.05,
+      "correlation": 0.3,
+      "cap": 0.03,
+      "recovery": 0.4,
+      "expected_loss": 0.009215859211470376,
+      "estimated_error": 1.023165908827825e-16,
+      "independent_legendre": 0.009215859211470374
+    },
+    {
+      "n": 125,
+      "pd": 0.08,
+      "correlation": 0.95,
+      "cap": 0.15,
+      "recovery": 0.4,
+      "expected_loss": 0.018932052802616835,
+      "estimated_error": 8.048512500869287e-16,
+      "independent_legendre": 0.018932052802616842
+    },
+    {
+      "n": 125,
+      "pd": 0.08,
+      "correlation": 0.95,
+      "cap": 0.3,
+      "recovery": 0.4,
+      "expected_loss": 0.031841179025434756,
+      "estimated_error": 3.448291657843843e-15,
+      "independent_legendre": 0.031841179025434756
+    },
+    {
+      "n": 125,
+      "pd": 0.08,
+      "correlation": 0.99,
+      "cap": 0.15,
+      "recovery": 0.4,
+      "expected_loss": 0.014943622301473034,
+      "estimated_error": 4.243046129195211e-14,
+      "independent_legendre": 0.014943622301447523
+    },
+    {
+      "n": 125,
+      "pd": 0.08,
+      "correlation": 0.99,
+      "cap": 0.3,
+      "recovery": 0.4,
+      "expected_loss": 0.027530413018787957,
+      "estimated_error": 2.3462549741093115e-14,
+      "independent_legendre": 0.027530413018794254
+    }
+  ]
+}

@@ -117,11 +117,7 @@ test('SabrCalibrator surface: withTolerance, calibrate, calibrateAutoShift, para
   const smile = new wasm.SabrSmile(base, forward, t);
   const vols = smile.generateSmile(strikes);
 
-  // 1e-6 on the vega-weighted SSE objective is attainable within the default
-  // iteration budget; tighter tolerances fail loudly under the strict
-  // non-convergence semantics of core `minimize` because rho is weakly
-  // identified on this near-symmetric strike set (mirrors the Rust unit test
-  // in src/api/valuations/sabr.rs).
+  // Calibration uses normalized residuals and verifies the final quote fit.
   const calibrator = new wasm.SabrCalibrator().withTolerance(1e-6);
   const fitted = calibrator.calibrate(forward, strikes, vols, t, beta);
   assert.equal(fitted.beta, beta);
@@ -142,7 +138,9 @@ test('calibrateAutoShift fits a negative-rate smile with a shift', () => {
   const strikes = [-0.015, -0.01, -0.005, 0.0, 0.005];
   const t = 1.0;
   const beta = 0.5;
-  const shifted = new wasm.SabrParameters(0.05, beta, 0.4, -0.1, 0.03);
+  // The documented ladder rounds -min(strike) + 10bp = 1.6% up to 2%.
+  // Synthetic quotes must use that same displacement convention.
+  const shifted = new wasm.SabrParameters(0.05, beta, 0.4, -0.1, 0.02);
   const smile = new wasm.SabrSmile(shifted, forward, t);
   const vols = smile.generateSmile(strikes);
 
@@ -150,4 +148,9 @@ test('calibrateAutoShift fits a negative-rate smile with a shift', () => {
   assert.equal(typeof fitted.shift, 'number', 'negative-rate fit must carry a shift');
   assert.ok(fitted.shift > 0);
   assert.ok(fitted.isShifted());
+  assert.equal(fitted.shift, 0.02);
+  const repriced = new wasm.SabrSmile(fitted, forward, t).generateSmile(strikes);
+  for (let i = 0; i < vols.length; ++i) {
+    assert.ok(Math.abs(repriced[i] - vols[i]) < 1e-6, 'fitted quotes preserve the selected convention');
+  }
 });

@@ -193,12 +193,52 @@ fn test_vanna_computable() {
         analytical_vanna
     );
 
-    // Pin the per-vol-point convention: vanna is reported per 1 vol point
-    // (0.01 absolute vol) on the σ axis, consistent with Vega. This value is
-    // the deterministic analytic result for `CmsOption::example()` under the
-    // standard market; the pre-convention (per decimal vol) value was 100x
-    // larger (-2_389_204.95261703).
-    let expected_vanna = -23_892.049_526_170_3;
+    // Independently differentiate the Black delta of the convexity-adjusted
+    // forward with respect to one absolute vol point. This replaces the old
+    // self-captured value, which embedded obsolete reference-swap defaults.
+    use finstack_quant_core::dates::{DateExt, DayCountContext};
+    use finstack_quant_core::math::norm_cdf;
+    use finstack_quant_valuations::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency;
+    let disc = market
+        .get_discount(inst.discount_curve_id.as_str())
+        .unwrap();
+    let surface = market.get_surface(inst.vol_surface_id.as_str()).unwrap();
+    let reference = inst.reference_swap();
+    let strike: f64 = inst.strike.to_string().parse().unwrap();
+    let h = 1e-5;
+    let mut expected_vanna = 0.0;
+    for (i, fixing) in inst.fixing_dates.iter().copied().enumerate() {
+        let t = DayCount::Act365F
+            .year_fraction(as_of, fixing, DayCountContext::default())
+            .unwrap();
+        if t <= 1e-6 {
+            continue;
+        }
+        let start = reference.reference_swap_start(fixing).unwrap();
+        let end = start.add_months((12.0 * inst.cms_tenor).round() as i32);
+        let (forward, _) = reference
+            .forward_rate_and_annuity(&market, as_of, start, end)
+            .unwrap();
+        let vol = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, strike);
+        let delta = |sigma: f64| {
+            let convexity = convexity_adjustment_with_frequency(
+                sigma,
+                t,
+                inst.cms_tenor,
+                forward,
+                reference.payments_per_year().unwrap(),
+            );
+            let adjusted = forward + convexity;
+            let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());
+            norm_cdf(d1)
+        };
+        let df = disc.df_on_date_curve(inst.payment_dates[i]).unwrap()
+            / disc.df_on_date_curve(as_of).unwrap();
+        expected_vanna += df * inst.accrual_fractions[i] * (delta(vol + h) - delta(vol - h))
+            / (2.0 * h)
+            * 0.01
+            * inst.notional.amount();
+    }
     assert!(
         (analytical_vanna - expected_vanna).abs() < 1e-6 * expected_vanna.abs(),
         "Vanna should be per vol point: expected {}, got {}",

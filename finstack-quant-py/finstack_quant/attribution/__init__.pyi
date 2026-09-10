@@ -624,7 +624,7 @@ class PnlAttribution:
     @property
     def carry_detail(self) -> dict[str, Any] | None:
         """
-        Carry decomposition detail payload.
+        Gross carry decomposition detail payload; funding is a separate financing overlay.
 
         Returns
         -------

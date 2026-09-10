@@ -1,0 +1,104 @@
+{
+  "description": "Input-only bespoke CDS premium schedule: semiannual Jan-1-2025 to Apr-1-2026, Act/360, zero hazard, flat 3% discount, 100bp coupon, 1000 USD notional.",
+  "as_of": "2025-01-01",
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {},
+        "convention": "isda_na",
+        "id": "CDS-CORP-5Y",
+        "notional": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "premium": {
+          "business_day_convention": "modified_following",
+          "calendar_id": null,
+          "day_count": "act_360",
+          "discount_curve_id": "USD-OIS",
+          "end": "2026-04-01",
+          "frequency": {
+            "count": 6,
+            "unit": "months"
+          },
+          "spread_bp": "100",
+          "start": "2025-01-01",
+          "stub": "short_front",
+          "standard_imm_dates": false
+        },
+        "protection": {
+          "credit_curve_id": "HZ",
+          "recovery_rate": 0.4,
+          "settlement_delay": 3
+        },
+        "side": "pay",
+        "valuation_convention": "isda_dirty"
+      },
+      "type": "credit_default_swap"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            40,
+            0.30119421191220214
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "hazard",
+        "id": "HZ",
+        "base": "2025-01-01",
+        "knot_points": [
+          [
+            0,
+            0
+          ],
+          [
+            40,
+            0
+          ]
+        ],
+        "recovery_rate": 0.4,
+        "issuer": null,
+        "seniority": null,
+        "currency": null,
+        "day_count": "act_365f",
+        "par_points": [],
+        "par_interp": "linear",
+        "hazard_calibration": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

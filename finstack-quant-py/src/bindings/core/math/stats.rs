@@ -68,7 +68,7 @@ fn median_or_nan(data: Vec<f64>) -> f64 {
     stats::median_or_nan(&data)
 }
 
-/// Linearly interpolated quantile (R-7), or ``nan`` for empty input or ``q`` outside ``[0, 1]``.
+/// Linearly interpolated quantile (R-7); clamps ``q`` to ``[0, 1]`` and returns ``nan`` for NaN ``q`` or empty/non-finite data.
 #[pyfunction]
 #[pyo3(text_signature = "(data, q)")]
 fn quantile_linear_or_nan(data: Vec<f64>, q: f64) -> f64 {

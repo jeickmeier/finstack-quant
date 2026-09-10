@@ -291,7 +291,7 @@ impl CmsSwapReplicationPricer {
         let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
         // Fixed-leg payments per year of the reference swap, matching the
         // Hagan path's frequency argument.
-        let payments_per_year = inst.reference_swap().payments_per_year();
+        let payments_per_year = inst.reference_swap().payments_per_year()?;
 
         let mut total_pv = 0.0;
         for (i, &fixing_date) in inst.cms_fixing_dates.iter().enumerate() {
@@ -416,24 +416,30 @@ pub(super) fn cms_coupon_rate(
             inst.cms_tenor,
             fixing_date,
         )?;
-        return Ok(apply_cms_cap_floor(
+        return apply_cms_cap_floor(
             observed,
             inst.cms_spread,
             inst.cms_cap,
             inst.cms_floor,
             &vol_surface,
             0.0,
-        ));
+        );
     }
 
     let (forward_swap_rate, time_to_fixing) =
         cms_forward_and_ttf(inst, market, as_of, fixing_date)?;
 
-    let adj = if time_to_fixing > 0.0 && forward_swap_rate > 0.0 {
-        // The lognormal Hagan convexity adjustment is undefined at
-        // non-positive forwards. In negative-rate regimes, keep the linear CMS
-        // coupon and let embedded cap/floor optionality use the Bachelier
-        // fallback in `cms_embedded_option_value`.
+    if time_to_fixing > 0.0 {
+        vol_surface.require_quote_type(
+            finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+        )?;
+        if forward_swap_rate <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "lognormal CMS convexity adjustment requires positive forward".to_owned(),
+            ));
+        }
+    }
+    let adj = if time_to_fixing > 0.0 {
         crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
             finstack_quant_models::volatility::get_surface_vol_clamped(
                 &vol_surface,
@@ -443,20 +449,20 @@ pub(super) fn cms_coupon_rate(
             time_to_fixing,
             inst.cms_tenor,
             forward_swap_rate,
-            inst.reference_swap().payments_per_year(),
+            inst.reference_swap().payments_per_year()?,
         ) * convexity_scale
     } else {
         0.0
     };
 
-    Ok(apply_cms_cap_floor(
+    apply_cms_cap_floor(
         forward_swap_rate + adj,
         inst.cms_spread,
         inst.cms_cap,
         inst.cms_floor,
         &vol_surface,
         time_to_fixing,
-    ))
+    )
 }
 
 /// Forward swap rate of the CMS reference swap and calendar time to fixing
@@ -511,7 +517,7 @@ pub(super) fn apply_cms_cap_floor(
     floor: Option<f64>,
     vol_surface: &finstack_quant_core::market_data::surfaces::VolSurface,
     time_to_fixing: f64,
-) -> f64 {
+) -> Result<f64> {
     let mut coupon_rate = adjusted_forward + cms_spread;
 
     if let Some(cap) = cap {
@@ -524,7 +530,7 @@ pub(super) fn apply_cms_cap_floor(
             vol_surface,
             time_to_fixing,
             crate::instruments::OptionType::Call,
-        );
+        )?;
         coupon_rate -= caplet;
     }
     if let Some(floor) = floor {
@@ -537,11 +543,11 @@ pub(super) fn apply_cms_cap_floor(
             vol_surface,
             time_to_fixing,
             crate::instruments::OptionType::Put,
-        );
+        )?;
         coupon_rate += floorlet;
     }
 
-    coupon_rate
+    Ok(coupon_rate)
 }
 
 /// Undiscounted value of an embedded CMS caplet / floorlet on the
@@ -552,60 +558,42 @@ pub(super) fn apply_cms_cap_floor(
 /// **convexity-adjusted** CMS forward (the payment-measure martingale forward);
 /// the smile vol is taken at `strike`.
 ///
-/// Returns the intrinsic value when the option has expired or is degenerate
-/// (`time_to_fixing ≤ 0` or non-positive vol). When the forward or strike is
-/// non-positive (negative-rate regimes), prices under the Bachelier (normal)
-/// model with the surface's lognormal vol converted to a normal vol — the
-/// same fallback the swaption and cap/floor pricers use — instead of
-/// collapsing to intrinsic and dropping all time value.
+/// Returns intrinsic after fixing. Before fixing, quote metadata and the Black
+/// model domain are checked; incompatible inputs are returned as errors.
 pub(super) fn cms_embedded_option_value(
     adjusted_forward: f64,
     strike: f64,
     vol_surface: &finstack_quant_core::market_data::surfaces::VolSurface,
     time_to_fixing: f64,
     option_type: crate::instruments::OptionType,
-) -> f64 {
-    use crate::instruments::rates::swaption::types::lognormal_to_normal_vol;
+) -> Result<f64> {
+    use crate::instruments::common_impl::vol_resolution::{validate_sigma, ResolvedVolatility};
     use crate::instruments::OptionType;
     use finstack_quant_models::closed_form::{black_call, black_put};
-    use finstack_quant_models::volatility::normal::bachelier_price;
-
-    let intrinsic = match option_type {
-        OptionType::Call => (adjusted_forward - strike).max(0.0),
-        OptionType::Put => (strike - adjusted_forward).max(0.0),
-    };
-
+    use finstack_quant_models::volatility::VolatilityConvention;
     if time_to_fixing <= 0.0 {
-        return intrinsic;
+        return Ok(match option_type {
+            OptionType::Call => (adjusted_forward - strike).max(0.0),
+            OptionType::Put => (strike - adjusted_forward).max(0.0),
+        });
     }
-    let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
+    vol_surface.require_quote_type(
+        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+    )?;
+    let sigma = validate_sigma(finstack_quant_models::volatility::get_surface_vol_clamped(
         vol_surface,
         time_to_fixing,
         strike,
-    );
-    if vol <= 0.0 {
-        return intrinsic;
-    }
-
-    // Black-76 is undefined for non-positive forward/strike: fall back to
-    // Bachelier, which prices negative rates natively.
-    if adjusted_forward <= 0.0 || strike <= 0.0 {
-        let normal_vol =
-            lognormal_to_normal_vol(vol, adjusted_forward, strike, time_to_fixing, None);
-        return bachelier_price(
-            option_type,
-            adjusted_forward,
-            strike,
-            normal_vol,
-            time_to_fixing,
-            1.0,
-        );
-    }
-
-    match option_type {
-        OptionType::Call => black_call(adjusted_forward, strike, vol, time_to_fixing),
-        OptionType::Put => black_put(adjusted_forward, strike, vol, time_to_fixing),
-    }
+    ))?;
+    let quote = ResolvedVolatility {
+        sigma,
+        convention: VolatilityConvention::Lognormal,
+    };
+    let (forward, strike) = quote.model_rates(adjusted_forward, strike)?;
+    Ok(match option_type {
+        OptionType::Call => black_call(forward, strike, sigma, time_to_fixing),
+        OptionType::Put => black_put(forward, strike, sigma, time_to_fixing),
+    })
 }
 
 #[cfg(test)]
@@ -705,11 +693,9 @@ mod tests {
             .insert_surface(builder.build().expect("vol surface"))
     }
 
-    /// Negative-rate regimes: the embedded caplet/floorlet must fall back to
-    /// the Bachelier model and retain time value instead of collapsing to
-    /// intrinsic when the (adjusted) forward or strike is non-positive.
+    /// Black quotes do not define a normal-volatility model at negative rates.
     #[test]
-    fn embedded_option_bachelier_fallback_keeps_time_value_for_negative_rates() {
+    fn embedded_black_option_rejects_negative_rates() {
         use finstack_quant_core::market_data::surfaces::VolSurface;
 
         let strikes = vec![0.005, 0.02, 0.04, 0.10];
@@ -722,33 +708,22 @@ mod tests {
         }
         let surface = builder.build().expect("vol surface");
 
-        // ATM with a negative forward: intrinsic is 0, so any positive value
-        // is genuine Bachelier time value.
-        let v = cms_embedded_option_value(
+        assert!(cms_embedded_option_value(
             -0.005,
             -0.005,
             &surface,
             1.0,
-            crate::instruments::OptionType::Call,
-        );
-        assert!(
-            v > 0.0 && v.is_finite(),
-            "negative-rate embedded caplet must keep Bachelier time value, got {v}"
-        );
-
-        // Deep ITM put on a negative forward: value must be at least intrinsic.
-        let intrinsic = 0.02 - (-0.005_f64);
-        let p = cms_embedded_option_value(
+            crate::instruments::OptionType::Call
+        )
+        .is_err());
+        assert!(cms_embedded_option_value(
             -0.005,
             0.02,
             &surface,
             1.0,
-            crate::instruments::OptionType::Put,
-        );
-        assert!(
-            p >= intrinsic,
-            "ITM floorlet under Bachelier must dominate intrinsic: {p} < {intrinsic}"
-        );
+            crate::instruments::OptionType::Put
+        )
+        .is_err());
     }
 
     /// Build a 1-period CMS swap fixing 1Y out (so the embedded option has
@@ -819,7 +794,7 @@ mod tests {
     }
 
     #[test]
-    fn cms_swap_leg_allows_negative_forward_rates() {
+    fn cms_swap_log_normal_convexity_rejects_negative_forward_rates() {
         let as_of = date(2025, 1, 1);
         let swap = capped_cms_swap(None);
         let market = cms_market_with_vol(as_of, 0.25).insert(flat_forward_with_tenor(
@@ -829,14 +804,10 @@ mod tests {
             2.0,
         ));
 
-        let pv = CmsSwapPricer::new()
+        let error = CmsSwapPricer::new()
             .pv_cms_leg(&swap, &market, as_of, 1.0)
-            .expect("negative forward CMS leg should price");
-
-        assert!(
-            pv.is_finite() && pv < 0.0,
-            "uncapped negative-forward CMS coupon should price as a finite negative leg PV, got {pv}"
-        );
+            .expect_err("lognormal convexity requires positive forward");
+        assert!(error.to_string().contains("positive forward"));
     }
 
     /// With `convexity_scale = 0` the embedded caplet collapses to intrinsic.

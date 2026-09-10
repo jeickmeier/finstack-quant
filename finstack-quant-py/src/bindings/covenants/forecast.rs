@@ -60,8 +60,12 @@ impl ModelTimeSeries for FrameTimeSeries {
         self.values.get(period)?.get(node_id).copied()
     }
 
-    fn period_end_date(&self, period: &PeriodId) -> Date {
-        Date::from_ordinal_date(period.year, period.index).unwrap_or(Date::MIN)
+    fn period_end_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
+        Date::from_ordinal_date(period.year, period.index)
+            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
+    }
+    fn period_start_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
+        self.period_end_date(period)
     }
 }
 

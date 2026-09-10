@@ -18,7 +18,7 @@
               "type": "null"
             }
           ],
-          "description": "Cash premium settlement date for Black time-to-expiry, when the screen\nquotes option time from premium settlement rather than valuation date."
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "cds_maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -41,7 +41,7 @@
               "type": "null"
             }
           ],
-          "description": "Exercise settlement date for Black time-to-expiry, when distinct from\nthe legal option expiration date."
+          "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
         },
         "exercise_style": {
           "$ref": "#/$defs/ExerciseStyle",
@@ -222,7 +222,7 @@
         },
         {
           "const": "isda_as",
-          "description": "Standard Asian convention (quarterly, Act/365F).",
+          "description": "Standard Asian convention (quarterly, Act/360).",
           "type": "string"
         },
         {

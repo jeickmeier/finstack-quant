@@ -79,7 +79,7 @@ fn test_cds_settlement_delays_isda_standard() {
 /// Verify day count conventions match ISDA standards.
 ///
 /// - North America/Europe: ACT/360
-/// - Asia: ACT/365F
+/// - Asia: ACT/360
 #[test]
 fn test_cds_day_count_conventions() {
     // North American: ACT/360
@@ -96,11 +96,11 @@ fn test_cds_day_count_conventions() {
         "European CDS should use ACT/360"
     );
 
-    // Asian: ACT/365F
+    // Asian: ACT/360
     assert_eq!(
         CdsConvention::IsdaAs.day_count(),
-        DayCount::Act365F,
-        "Asian CDS should use ACT/365F"
+        DayCount::Act360,
+        "Asian CDS should use ACT/360"
     );
 }
 

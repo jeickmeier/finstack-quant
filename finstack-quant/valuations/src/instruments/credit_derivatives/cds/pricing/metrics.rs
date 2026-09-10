@@ -7,7 +7,9 @@ use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::credit_derivatives::cds::{
     CdsValuationConvention, CreditDefaultSwap, PayReceive,
 };
-use finstack_quant_core::dates::{adjust, next_cds_date, Date, DayCountContext};
+use finstack_quant_core::dates::{
+    Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::{Error, Result};
 use rust_decimal::prelude::ToPrimitive;
@@ -33,120 +35,71 @@ pub(crate) enum AccrualDayCountPolicy {
 }
 
 impl CDSPricer {
-    /// Generate ISDA standard coupon dates (20th of Mar/Jun/Sep/Dec).
-    ///
-    /// Payment dates are adjusted using the CDS calendar and business day
-    /// convention (Modified Following per ISDA 2014 standard). If no calendar
-    /// is specified, dates are returned unadjusted.
-    pub(crate) fn generate_isda_schedule(&self, cds: &CreditDefaultSwap) -> Result<Vec<Date>> {
-        let mut schedule = vec![cds.premium.start];
-        let mut current = cds.premium.start;
-
-        // Resolve calendar for business day adjustment
-        let calendar = cds
-            .premium
-            .calendar_id
-            .as_deref()
-            .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
-
-        while current < cds.premium.end {
-            current = next_cds_date(current);
-            if current <= cds.premium.end {
-                // Apply business day adjustment if calendar is available.
-                // Adjustment failure (e.g. unparseable holiday data) propagates
-                // rather than silently using an unadjusted date, which would
-                // produce wrong premium accrual periods.
-                let adjusted = if let Some(cal) = calendar {
-                    adjust(current, cds.premium.business_day_convention, cal)?
-                } else {
-                    current
-                };
-                schedule.push(adjusted);
-            }
+    /// Generate contractual accrual and payment dates from the premium terms.
+    fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
+        if cds.premium.standard_imm_dates
+            && (cds.premium.frequency != Tenor::quarterly()
+                || cds.premium.stub != StubKind::ShortFront)
+        {
+            return Err(Error::Validation(
+                "standard CDS IMM dates require quarterly frequency and short-front stub; set standard_imm_dates=false for bespoke premium terms".into(),
+            ));
         }
-
-        // Handle maturity date - ensure it's in the schedule
-        let maturity_adjusted = if let Some(cal) = calendar {
-            adjust(cds.premium.end, cds.premium.business_day_convention, cal)?
+        let mut builder = ScheduleBuilder::new(cds.premium.start, cds.premium.end)?;
+        if cds.premium.standard_imm_dates {
+            builder = builder.cds_imm();
         } else {
-            cds.premium.end
-        };
-
-        if schedule.last() != Some(&maturity_adjusted) {
-            schedule.push(maturity_adjusted);
+            builder = builder
+                .frequency(cds.premium.frequency)
+                .stub_rule(cds.premium.stub);
         }
-
+        if let Some(calendar_id) = cds.premium.calendar_id.as_deref() {
+            builder = builder.adjust_with_id(cds.premium.business_day_convention, calendar_id);
+        }
+        let mut schedule = builder.build()?;
+        // The standard grid includes the previous roll date. The explicit
+        // premium start remains the contractual first accrual boundary.
+        if let Some(first) = schedule.dates.first_mut() {
+            *first = cds.premium.start;
+        }
         Ok(schedule)
+    }
+
+    pub(crate) fn generate_isda_schedule(&self, cds: &CreditDefaultSwap) -> Result<Vec<Date>> {
+        let schedule = self.premium_schedule(cds)?;
+        let mut dates = vec![cds.premium.start];
+        dates.extend(schedule.payment_dates);
+        Ok(dates)
     }
 
     pub(crate) fn coupon_periods(
         &self,
         cds: &CreditDefaultSwap,
-        as_of: Date,
-    ) -> Result<Vec<CouponPeriod>> {
-        self.generate_isda_coupon_periods(cds, as_of)
-    }
-
-    fn generate_isda_coupon_periods(
-        &self,
-        cds: &CreditDefaultSwap,
         _as_of: Date,
     ) -> Result<Vec<CouponPeriod>> {
-        if cds.uses_adjusted_premium_accrual_dates() {
-            // Degenerate schedules (start >= end) have no future premium
-            // cashflows. Returning an empty list mirrors the unadjusted
-            // ISDA path and avoids spurious one-day phantom periods that
-            // can appear when the maturity is on a holiday and gets
-            // business-day-adjusted forward.
-            if cds.premium.start >= cds.premium.end {
-                return Ok(Vec::new());
-            }
-            let schedule = self.generate_isda_schedule(cds)?;
-            return Ok(schedule
-                .windows(2)
-                .enumerate()
-                .map(|window| CouponPeriod {
-                    accrual_start: window.1[0],
-                    accrual_end: window.1[1],
-                    payment_date: window.1[1],
-                    is_final: window.0 + 2 == schedule.len(),
-                })
-                .collect());
+        if cds.premium.start >= cds.premium.end {
+            return Ok(Vec::new());
         }
-
-        let mut accrual_dates = vec![cds.premium.start];
-        let mut current = cds.premium.start;
-        let calendar = cds
-            .premium
-            .calendar_id
-            .as_deref()
-            .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
-
-        while current < cds.premium.end {
-            current = next_cds_date(current);
-            if current <= cds.premium.end {
-                accrual_dates.push(current);
-            }
-        }
-        if accrual_dates.last() != Some(&cds.premium.end) {
-            accrual_dates.push(cds.premium.end);
-        }
-
-        let mut periods = Vec::with_capacity(accrual_dates.len().saturating_sub(1));
-        for (idx, window) in accrual_dates.windows(2).enumerate() {
-            let payment_date = if let Some(cal) = calendar {
-                adjust(window[1], cds.premium.business_day_convention, cal)?
-            } else {
-                window[1]
-            };
-            periods.push(CouponPeriod {
-                accrual_start: window[0],
-                accrual_end: window[1],
-                payment_date,
-                is_final: idx + 2 == accrual_dates.len(),
-            });
-        }
-        Ok(periods)
+        let schedule = self.premium_schedule(cds)?;
+        let adjusted = cds.uses_adjusted_premium_accrual_dates();
+        Ok(schedule
+            .dates
+            .windows(2)
+            .enumerate()
+            .map(|(idx, dates)| {
+                let payment_date = schedule.payment_dates[idx];
+                CouponPeriod {
+                    accrual_start: if adjusted && idx > 0 {
+                        schedule.payment_dates[idx - 1]
+                    } else {
+                        dates[0]
+                    },
+                    accrual_end: if adjusted { payment_date } else { dates[1] },
+                    payment_date,
+                    is_final: idx + 1 == schedule.payment_dates.len(),
+                }
+            })
+            .collect())
     }
 
     pub(crate) fn coupon_accrual(

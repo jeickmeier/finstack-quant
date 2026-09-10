@@ -128,12 +128,22 @@ impl GbmWithDividends {
 
     /// Find dividends that occur in the time interval (t, t+dt].
     ///
+    /// Both boundaries use the same floating-point equality tolerance so a
+    /// dividend on a grid knot is included in the preceding interval exactly
+    /// once even when reconstructing `t + dt` differs by one rounding unit.
+    ///
     /// Returns vector of (dividend_time, dividend) for dividends in the interval.
     pub fn dividends_in_interval(&self, t: f64, dt: f64) -> Vec<(f64, &Dividend)> {
         let t_end = t + dt;
+        let before_or_same = |event: f64, boundary: f64| {
+            event <= boundary
+                || event - boundary <= 4.0 * f64::EPSILON * event.abs().max(boundary.abs())
+        };
         self.dividends
             .iter()
-            .filter(|(div_time, _)| *div_time > t && *div_time <= t_end)
+            .filter(|(div_time, _)| {
+                !before_or_same(*div_time, t) && before_or_same(*div_time, t_end)
+            })
             .map(|(div_time, div)| (*div_time, div))
             .collect()
     }

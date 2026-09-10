@@ -68,20 +68,15 @@ fixed_day_count: string | null,
  */
 swap_index: string | null,
 /**
- * Reporting tolerance used to determine calibration success.
+ * Maximum absolute error of any fitted volatility quote; defaults to 0.0015.
  *
  * This is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol
  * calibration, success should reflect whether the fitted smile residuals are within a
- * market-appropriate tolerance (e.g., 10–20 vol bp), not machine epsilon.
+ * market-appropriate tolerance (e.g., 10–20 normal vol bp), not machine epsilon.
+ * Normal quotes use decimal rate per square-root year; Black quotes use
+ * dimensionless annual volatility. Errors are never scaled by vega.
  */
 vol_tolerance: number | null,
-/**
- * Solver tolerance used inside the SABR calibration routines.
- *
- * This is an algorithmic convergence tolerance (not a market quoting tolerance).
- * If unset, the SABR calibrator default is used.
- */
-sabr_tolerance: number | null,
 /**
  * Extrapolation policy used when interpolating SABR parameters across the
  * expiry–tenor grid for target points that do not have a directly calibrated bucket.

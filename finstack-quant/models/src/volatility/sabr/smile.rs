@@ -142,38 +142,40 @@ impl SabrSmile {
         Ok(vols)
     }
 
-    /// Generate strike from forward (spot-undiscounted) delta.
+    /// Generate strike from absolute forward delta using the ATM volatility.
     ///
-    /// Inverts the Black-76 forward delta `Δ_call = N(d1)` with
-    /// `d1 = (ln(F/K) + σ²T/2)/(σ√T)`:
+    /// Uses Bachelier delta for beta=0 and Black delta on displaced coordinates
+    /// otherwise. This is an ATM-vol approximation, not a smile-consistent solve.
     ///
-    /// ```text
-    /// K_call = F · exp(−σ√T·N⁻¹(Δ) + σ²T/2)
-    /// K_put  = F · exp(+σ√T·N⁻¹(Δ) + σ²T/2)   (Δ = |Δ_put|, positive input)
-    /// ```
+    /// # Arguments
     ///
-    /// Uses the ATM vol as an approximation of the smile vol at the solved
-    /// strike (no iterative smile-consistent solve). A 25Δ call therefore
-    /// lands above the forward and a 25Δ put below, as the market quotes
-    /// them.
+    /// * `delta` - Absolute undiscounted forward delta strictly between zero and one.
+    /// * `is_call` - True selects call delta; false selects absolute put delta.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid delta, expiry, or forward/model coordinates.
     pub fn strike_from_delta(&self, delta: f64, is_call: bool) -> Result<f64> {
-        let atm_vol = self
-            .model
-            .atm_volatility(self.forward, self.time_to_expiry)?;
-        let variance = atm_vol.powi(2) * self.time_to_expiry;
-        let std_dev = variance.sqrt();
-
-        // N⁻¹(Δ) for the requested (positive) delta.
+        if !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
+            return Err(Error::Validation(
+                "absolute delta must lie strictly between zero and one".into(),
+            ));
+        }
+        let atm_vol = self.atm_vol()?;
+        let std_dev = atm_vol * self.time_to_expiry.sqrt();
         let z = finstack_quant_core::math::standard_normal_inv_cdf(delta);
-
-        // d1 = z for calls (Δ = N(d1)); d1 = −z for puts (|Δ| = N(−d1)).
-        let exponent = if is_call {
-            -std_dev * z + 0.5 * variance
-        } else {
-            std_dev * z + 0.5 * variance
-        };
-
-        let strike = self.forward * exponent.exp();
+        let signed_z = if is_call { z } else { -z };
+        if self.model.parameters().beta < super::model::BETA_SNAP_TOL {
+            return Ok(self.forward - std_dev * signed_z);
+        }
+        let shift = self.model.parameters().shift.unwrap_or(0.0);
+        let strike =
+            (self.forward + shift) * (-std_dev * signed_z + 0.5 * std_dev.powi(2)).exp() - shift;
+        if !strike.is_finite() {
+            return Err(Error::Validation(
+                "delta strike calculation overflowed".into(),
+            ));
+        }
         Ok(strike)
     }
 

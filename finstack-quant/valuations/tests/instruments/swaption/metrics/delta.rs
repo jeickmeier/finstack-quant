@@ -225,10 +225,7 @@ fn test_delta_volatility_independence() {
 }
 
 #[test]
-fn test_delta_falls_back_to_bachelier_for_negative_forward() {
-    // A negative forward swap rate is undefined for the Black (lognormal)
-    // model; the delta calculator must fall back to the Bachelier (normal)
-    // model rather than erroring, so negative-rate swaptions stay priceable.
+fn test_delta_rejects_black_model_for_negative_forward() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = MarketContext::new()
@@ -243,14 +240,6 @@ fn test_delta_falls_back_to_bachelier_for_negative_forward() {
             &[MetricId::Delta],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .expect("delta should fall back to Bachelier for a negative forward");
-    let delta = result
-        .measures
-        .get(MetricId::Delta.as_str())
-        .copied()
-        .expect("delta measure should be present");
-    assert!(
-        delta.is_finite(),
-        "Bachelier-fallback delta should be finite, got {delta}"
-    );
+        .expect_err("Black delta requires valid model coordinates");
+    assert!(result.to_string().contains("positive forward and strike"));
 }

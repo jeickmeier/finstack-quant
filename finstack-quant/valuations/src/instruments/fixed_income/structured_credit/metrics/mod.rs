@@ -38,6 +38,7 @@ pub(crate) const METRIC_TIME_BASIS: finstack_quant_core::dates::DayCount =
 pub(crate) mod deal_specific;
 pub(crate) mod pool;
 pub(crate) mod pricing;
+pub(crate) mod quote;
 pub(crate) mod risk;
 pub(crate) mod scenario;
 pub(crate) mod summary;

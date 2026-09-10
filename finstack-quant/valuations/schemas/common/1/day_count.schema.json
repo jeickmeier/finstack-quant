@@ -9,6 +9,11 @@
   ],
   "oneOf": [
     {
+      "const": "one_one",
+      "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+      "type": "string"
+    },
+    {
       "const": "act_360",
       "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
       "type": "string"

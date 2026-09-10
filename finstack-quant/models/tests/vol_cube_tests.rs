@@ -454,7 +454,9 @@ fn test_market_context_surface_builds_vol_source() {
         .unwrap();
     let ctx = MarketContext::new().insert_surface(surface);
     let provider = VolSource::Surface(ctx.get_surface("EQ-VOL").unwrap());
-    let vol = provider.get_vol_clamped(1.5, 999.0, 95.0);
+    let vol = provider
+        .get_vol_clamped(1.5, 999.0, 95.0)
+        .expect("clamped vol");
     assert!(vol > 0.0);
 }
 

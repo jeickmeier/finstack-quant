@@ -15,7 +15,7 @@
         },
         {
           "const": "isda_as",
-          "description": "Standard Asian convention (quarterly, Act/365F).",
+          "description": "Standard Asian convention (quarterly, Act/360).",
           "type": "string"
         },
         {
@@ -492,7 +492,7 @@
         },
         "threshold": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "IM threshold (aggregate group level).\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
         }
       },
       "required": [
@@ -700,6 +700,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
           "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)"
         },
+        "standard_imm_dates": {
+          "description": "Whether to use the standard quarterly CDS roll grid (20 March,\nJune, September and December), including a final maturity stub.\nRequires quarterly `frequency` and `ShortFront` `stub`. Set false\nfor bespoke schedules generated from the supplied frequency/stub.",
+          "type": "boolean"
+        },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Start date of protection"
@@ -711,6 +715,7 @@
         }
       },
       "required": [
+        "standard_imm_dates",
         "start",
         "end",
         "frequency",
@@ -971,6 +976,7 @@
               "unit": "months"
             },
             "spread_bp": "100",
+            "standard_imm_dates": true,
             "start": "2024-03-20",
             "stub": "short_front"
           },

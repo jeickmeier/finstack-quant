@@ -389,6 +389,12 @@ convention_record_methods!(PyInflationSwapConventions, InflationSwapConventions)
 
 #[pymethods]
 impl PyInflationSwapConventions {
+    /// Monthly reference-index rule: ``linear`` daily weights or ``step`` monthly values.
+    #[getter]
+    fn interpolation(&self) -> String {
+        self.inner.interpolation.to_string()
+    }
+
     /// Calendar identifier for schedule rolls.
     #[getter]
     fn calendar_id(&self) -> String {

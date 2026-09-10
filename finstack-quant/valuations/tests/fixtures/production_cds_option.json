@@ -1,0 +1,105 @@
+{
+  "description": "Input-only CDS option with flat discount zero and flat 2% hazard. Premium payment date cannot change option variance.",
+  "as_of": "2025-01-01",
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {},
+        "cds_maturity": "2030-01-01",
+        "credit_curve_id": "HZ",
+        "discount_curve_id": "USD-OIS",
+        "exercise_style": "european",
+        "expiry": "2026-01-01",
+        "id": "CDSOPT-CALL-CORP-5Y",
+        "index_factor": null,
+        "knockout": true,
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "option_type": "call",
+        "protection_start_convention": "spot",
+        "recovery_rate": 0.4,
+        "settlement": "cash",
+        "strike": {
+          "spread": "0.01"
+        },
+        "underlying_cds_coupon": "0.01",
+        "underlying_convention": "isda_na",
+        "underlying_is_index": false,
+        "vol_surface_id": "CDSOPT-VOL",
+        "cash_settlement_date": "2025-01-06",
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "implied_volatility": 0.3
+          }
+        }
+      },
+      "type": "cds_option"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            40.0,
+            1.0
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "hazard",
+        "id": "HZ",
+        "base": "2025-01-01",
+        "knot_points": [
+          [
+            0,
+            0.02
+          ],
+          [
+            40,
+            0.02
+          ]
+        ],
+        "recovery_rate": 0.4,
+        "issuer": null,
+        "seniority": null,
+        "currency": null,
+        "day_count": "act_365f",
+        "par_points": [],
+        "par_interp": "linear",
+        "hazard_calibration": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

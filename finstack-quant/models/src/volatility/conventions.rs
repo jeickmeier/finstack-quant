@@ -11,13 +11,13 @@ use finstack_quant_core::Result;
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum VolatilityConvention {
-    /// Normal (absolute) volatility in basis points
+    /// Normal absolute volatility in decimal rate units per square-root year
     Normal,
-    /// Lognormal (Black) volatility as percentage
+    /// Lognormal (Black) relative volatility as a decimal per square-root year
     Lognormal,
     /// Shifted lognormal for negative rates
     ShiftedLognormal {
-        /// Shift amount for negative rate handling
+        /// Additive displacement in the same decimal rate or price units as forward and strike
         shift: f64,
     },
 }

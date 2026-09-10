@@ -4243,8 +4243,10 @@ class FxMatrix:
     """
     Foreign-exchange rate matrix for currency conversion.
 
-    Explicit quotes are pair-global; date-scoped fixings can be pinned with
-    :meth:`set_quote_on`. Missing pairs are triangulated through the pivot
+    Explicit pair-global quotes take priority in either orientation, followed
+    by date/policy-scoped fixings pinned with :meth:`set_quote_on`, then provider
+    observations. Market-context JSON retains those distinct source roles.
+    Missing pairs are triangulated through the pivot
     currency (USD by default). Matrices obtained from a
     :class:`MarketContext` share state with it.
 
@@ -4366,6 +4368,9 @@ class FxMatrix:
         """
         Set an authoritative FX quote scoped to one date and policy.
 
+        A pair-global quote in either orientation takes priority over this
+        fixing. The fixing takes priority over provider observations.
+
         Parameters
         ----------
         base : Currency or str
@@ -4395,6 +4400,9 @@ class FxMatrix:
     ) -> FxRateResult:
         """
         Look up an FX rate, triangulating through the pivot when needed.
+
+        Source priority precedes orientation: global quotes, pinned fixings,
+        then provider observations, taking a reciprocal within each source.
 
         Parameters
         ----------
@@ -4861,7 +4869,7 @@ class InflationIndex:
             Contract date.
         lag_months : int
             Calendar months to look back (``3`` for TIPS/gilts). Observations
-            must exist on the first of their month; missing months are not
+            must be unique within each reference month; missing months are not
             interpolated. The first of the contract month needs only the first
             lagged observation.
 
@@ -4875,7 +4883,7 @@ class InflationIndex:
         KeyError
             If a required monthly CPI observation is missing.
         ValueError
-            If the contract date cannot be parsed.
+            If the contract date cannot be parsed or a required month has multiple observations.
         """
         ...
 

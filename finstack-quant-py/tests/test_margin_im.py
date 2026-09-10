@@ -13,6 +13,7 @@ from finstack_quant.margin import (
     ImResult,
     ScheduleImCalculator,
     SimmCalculator,
+    SimmCurvatureSensitivity,
     SimmSensitivities,
 )
 
@@ -54,8 +55,8 @@ def test_simm_sensitivities_json_round_trip() -> None:
     sens.add_ir_delta("USD", "2Y", 10_000.0)
     sens.add_fx_vega("EUR", "USD", 2_500.0)
     sens.add_credit_qualifying_delta("sovereign", "GOVT_A", "5Y", 4_000.0)
-    sens.add_commodity_delta("energy", 7_500.0)
-    sens.add_curvature("equity", 1_250.0)
+    sens.add_commodity_delta("Crude", 7_500.0)
+    sens.add_curvature(SimmCurvatureSensitivity("equity", "residual", "ACME", "1Y", 1_250.0))
 
     out = SimmSensitivities.from_json(sens.to_json())
     parsed = json.loads(out.to_json())
@@ -145,7 +146,7 @@ def test_simm_sensitivities_dataframe_round_trip_and_helpers() -> None:
     sens.add_fx_vega("EUR", "USD", 2_500.0)
     sens.add_commodity_delta("Crude", 7_500.0)
     sens.add_commodity_vega("Crude", 750.0)
-    sens.add_curvature("equity", 1_250.0)
+    sens.add_curvature(SimmCurvatureSensitivity("equity", "residual", "ACME", "1Y", 1_250.0))
 
     restored = SimmSensitivities.from_dataframe(sens.to_dataframe(), "USD")
     assert json.loads(restored.to_json()) == json.loads(sens.to_json())

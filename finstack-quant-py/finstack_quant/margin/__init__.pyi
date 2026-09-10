@@ -68,7 +68,7 @@ __all__ = [
 # Rust ``finstack_quant_margin::constants`` plus the registry/calculator
 # constants needed to interpret results. Keys: ``CALENDAR_DAYS_PER_YEAR``,
 # ``DURATION_APPROXIMATION_FACTOR``, ``ONE_BP``, ``STANDARD_CDS_MATURITY_YEARS``,
-# ``DEFAULT_BOND_INDEX_DURATION`` (floats), ``tenor_buckets`` (dict of
+# ``tenor_buckets`` (dict of
 # ``BUCKET_3M`` .. ``BUCKET_20Y`` -> years), ``BCBS_IOSCO_SCHEDULE_ID`` (str),
 # ``HAIRCUT_MPOR_DAYS`` (business days), ``SIMM_TENORS`` (the valid SIMM tenor
 # labels, ``"2W"`` .. ``"30Y"``) and ``SIMM_COMMODITY_BUCKET_COUNT`` (17).
@@ -1120,6 +1120,111 @@ class NettingSetId:
     def __repr__(self) -> str: ...
     def __str__(self) -> str: ...
 
+class ImCollateralResult:
+    """One-way IM account with gross model risk and contractual transfer separated.
+
+    Obtain this immutable result from CsaSpec.apply_im_terms. IM remains separate
+    from VM; segregation requires custody without reuse to meet VM obligations.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import CsaSpec
+    >>> csa = CsaSpec.usd_regulatory().with_im("simm", 10, 1000.0, 100.0)
+    >>> result = csa.apply_im_terms(2000.0, 950.0)
+    >>> result.required_collateral, result.transfer, result.segregated
+    (1000.0, 0.0, True)
+    """
+
+    @property
+    def gross_initial_margin(self) -> float:
+        """Gross model IM before terms, in major units of currency.
+
+        Returns
+        -------
+        float
+            Gross model IM before terms, in major units of currency.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def required_collateral(self) -> float:
+        """Target balance after the CSA threshold, in major units of currency.
+
+        Returns
+        -------
+        float
+            Target balance after the CSA threshold, in major units of currency.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def current_collateral(self) -> float:
+        """Existing IM balance, in major units of currency.
+
+        Returns
+        -------
+        float
+            Existing IM balance, in major units of currency.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def transfer(self) -> float:
+        """Signed transfer in major units of currency: positive posts, negative returns; zero below MTA.
+
+        Returns
+        -------
+        float
+            Signed transfer in major units of currency: positive posts, negative returns; zero below MTA.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def currency(self) -> str:
+        """ISO currency shared by all account amounts.
+
+        Returns
+        -------
+        str
+            ISO currency shared by all account amounts.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def segregated(self) -> bool:
+        """Whether required IM must be segregated without reuse for VM.
+
+        Returns
+        -------
+        bool
+            Whether required IM must be segregated without reuse for VM.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class CsaSpec:
     """
     Credit Support Annex specification (ISDA standard).
@@ -1265,6 +1370,31 @@ class CsaSpec:
         >>> csa = CsaSpec.usd_regulatory().with_vm_threshold(300_000.0, 50_000.0)
         >>> (csa.vm_threshold, csa.vm_mta, csa.vm_rounding)
         (300000.0, 50000.0, 10000.0)
+        """
+        ...
+
+    def apply_im_terms(self, gross_initial_margin: float, current_collateral: float) -> ImCollateralResult:
+        """Apply the allocated CSA threshold and MTA once to its one-way IM account.
+
+        Parameters
+        ----------
+        gross_initial_margin : float
+            Nonnegative gross IM summed over all this CSA's netting sets in
+            base_currency major units, already calculated for the elected MPOR.
+        current_collateral : float
+            Nonnegative existing IM balance in base_currency, excluding VM and
+            the opposite party's separately collateralized IM account.
+
+        Returns
+        -------
+        ImCollateralResult
+            Gross IM, target balance, signed transfer and segregation requirement.
+            MTA equality triggers a transfer; smaller absolute transfers are zero.
+
+        Raises
+        ------
+        ValueError
+            If amounts are negative or non-finite, CSA terms are invalid or IM is absent.
         """
         ...
 
@@ -2897,7 +3027,7 @@ class ImResult:
 
         Columns: ``risk_class``, ``amount``, ``currency``. One row per
         component label (SIMM: ``IR_Delta``, ``IR_Vega``, ``FX_Delta``,
-        ``Curvature``, ...; schedule: the asset class such as
+        ``IR_Curvature``, ``Equity_Curvature``, ...; schedule: the asset class such as
         ``interest_rate``), sorted by ``risk_class`` so repeated runs are
         byte-identical. Methodologies that publish no breakdown yield a
         zero-row frame that still carries all three columns.
@@ -2916,6 +3046,144 @@ class ImResult:
         """
         ...
 
+class SimmCurvatureSensitivity:
+    """Expiry-resolved historical SIMM curvature input, before scaling and netting.
+
+    Equity and non-qualifying credit currently use residual buckets. IR bucket
+    is a currency; qualifying credit uses a sector; commodity uses 1..17; FX
+    uses ``fx``. The factor is a subcurve, issuer, underlier or ordered FX pair.
+
+    Examples
+    --------
+    >>> from finstack_quant.margin import SimmCurvatureSensitivity
+    >>> c = SimmCurvatureSensitivity("equity", "residual", "ACME", "1Y", 1000.0)
+    >>> c.volatility_weighted_vega
+    1000.0
+    """
+
+    def __init__(
+        self,
+        risk_class: str,
+        bucket: str,
+        factor: str,
+        expiry_tenor: str,
+        volatility_weighted_vega: float,
+        risk_tenor: str | None = None,
+    ) -> None:
+        """Create one factor's volatility-weighted vega at one option expiry.
+
+        Parameters
+        ----------
+        risk_class : str
+            One of interest_rate, credit_qualifying, credit_non_qualifying, equity, commodity or fx.
+        bucket : str
+            Class-specific currency, credit sector, commodity number, fx or residual bucket.
+        factor : str
+            Subcurve, issuer or underlier ID; FX uses an ordered pair such as EUR/USD.
+        expiry_tenor : str
+            SIMM option expiry label (2W through 30Y); used for curvature scaling before netting.
+        volatility_weighted_vega : float
+            Signed sigma times dPV/dsigma in the container's currency, before SF, HVR, VRW or concentration. Non-IR sigma follows SIMM paragraph 10(b).
+        risk_tenor : str | None, default None
+            IR underlying maturity (12 SIMM tenors) or credit tenor (1Y, 2Y, 3Y, 5Y, 10Y); absent for other classes.
+
+        Raises
+        ------
+        ValueError
+            If the class, bucket, factor, tenor combination or finite amount is invalid.
+        """
+        ...
+
+    @property
+    def risk_class(self) -> str:
+        """Risk class selecting the SIMM correlation and scaling rules.
+
+        Returns
+        -------
+        str
+            Risk class selecting the SIMM correlation and scaling rules.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def bucket(self) -> str:
+        """Currency, sector, numbered commodity, fx or residual bucket.
+
+        Returns
+        -------
+        str
+            Currency, sector, numbered commodity, fx or residual bucket.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def factor(self) -> str:
+        """Subcurve, issuer, underlier or ordered FX pair identifier.
+
+        Returns
+        -------
+        str
+            Subcurve, issuer, underlier or ordered FX pair identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def expiry_tenor(self) -> str:
+        """Option expiry used for curvature scaling before netting.
+
+        Returns
+        -------
+        str
+            Option expiry used for curvature scaling before netting.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def risk_tenor(self) -> str | None:
+        """Underlying IR or credit risk tenor; None for other risk classes.
+
+        Returns
+        -------
+        str | None
+            Underlying IR or credit risk tenor; None for other risk classes.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def volatility_weighted_vega(self) -> float:
+        """Signed sigma times dPV/dsigma in the sensitivity currency before scaling.
+
+        Returns
+        -------
+        float
+            Signed sigma times dPV/dsigma in the sensitivity currency before scaling.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class SimmSensitivities:
     """
     ISDA SIMM sensitivity portfolio.
@@ -2923,8 +3191,8 @@ class SimmSensitivities:
     Stores signed sensitivity amounts by SIMM risk class and bucket. Amounts
     are currency amounts in ``base_currency``, not percentages or spot
     levels: rate and credit deltas are DV01/CS01-style amounts per 1bp move,
-    vegas are currency vega amounts compatible with the SIMM vega weights,
-    and curvature is one signed contribution per risk class.
+    vegas are sigma times dPV/dsigma before VRW, HVR and concentration,
+    and curvature preserves factor identity and option expiry before scaling.
 
     Tenor labels must be SIMM buckets (``CONSTANTS["SIMM_TENORS"]``:
     ``"2W"``, ``"1M"``, ``"3M"``, ``"6M"``, ``"1Y"``, ``"2Y"``, ``"3Y"``,
@@ -3026,12 +3294,15 @@ class SimmSensitivities:
         ----------
         frame : pd.DataFrame
             Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-            ``tenor``, ``amount`` with the ``to_dataframe`` encoding:
+            ``tenor``, ``amount``, ``expiry_tenor`` with the ``to_dataframe`` encoding:
             ``issuer`` is the currency for ``interest_rate``/``fx`` delta,
             the ``"CCY1/CCY2"`` pair for FX vega, the issuer for credit and
             the underlier for equity; ``bucket`` is the credit sector or the
             commodity bucket; ``tenor`` is the SIMM tenor where the risk
             class has one; ``kind`` is ``delta``, ``vega`` or ``curvature``.
+            Curvature requires ``expiry_tenor``, uses ``issuer`` as factor,
+            ``bucket`` as the curvature bucket and ``tenor`` as risk tenor.
+            Other kinds may omit the expiry column or leave it null.
         base_currency : str, default "USD"
             Currency in which every ``amount`` is expressed.
 
@@ -3098,8 +3369,8 @@ class SimmSensitivities:
         tenor : str
             SIMM tenor bucket (see ``CONSTANTS["SIMM_TENORS"]``).
         amount : float
-            Signed currency vega amount in ``base_currency``, compatible with
-            the SIMM IR vega weights.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Raises
         ------
@@ -3147,8 +3418,8 @@ class SimmSensitivities:
         tenor : str
             SIMM credit tenor bucket, such as ``"5Y"``.
         amount : float
-            Signed currency vega amount in ``base_currency``, compatible with
-            the SIMM credit-qualifying vega risk weight.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Raises
         ------
@@ -3195,8 +3466,8 @@ class SimmSensitivities:
         tenor : str
             SIMM credit tenor bucket, such as ``"5Y"``.
         amount : float
-            Signed currency vega amount in ``base_currency``, compatible with
-            the SIMM credit-non-qualifying vega risk weight.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Notes
         -----
@@ -3220,8 +3491,8 @@ class SimmSensitivities:
         underlier : str
             Equity underlier or index identifier.
         amount : float
-            Signed currency sensitivity in ``base_currency`` (not a
-            percentage delta).
+            Signed P&L in base_currency per 1% relative price increase,
+            equal to price times dPV/dprice times 0.01 before risk weights.
 
         Notes
         -----
@@ -3238,7 +3509,8 @@ class SimmSensitivities:
         underlier : str
             Equity underlier or index identifier.
         amount : float
-            Signed currency vega amount in ``base_currency``.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Notes
         -----
@@ -3255,8 +3527,8 @@ class SimmSensitivities:
         currency : str
             FX risk-factor currency.
         amount : float
-            Signed currency sensitivity in ``base_currency`` to the FX risk
-            factor (not a spot level or percentage move).
+            Signed P&L in base_currency per 1% relative price increase,
+            equal to price times dPV/dprice times 0.01 before risk weights.
 
         Raises
         ------
@@ -3276,7 +3548,8 @@ class SimmSensitivities:
         ccy2 : str
             Second currency in the FX pair.
         amount : float
-            Signed currency vega amount in ``base_currency``.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Raises
         ------
@@ -3297,7 +3570,8 @@ class SimmSensitivities:
             ``"Precious Metals"``, ...). Unknown labels are rejected by
             ``validate()``.
         amount : float
-            Signed currency sensitivity in ``base_currency``.
+            Signed P&L in base_currency per 1% relative price increase,
+            equal to price times dPV/dprice times 0.01 before risk weights.
 
         Notes
         -----
@@ -3314,7 +3588,8 @@ class SimmSensitivities:
         bucket : str
             SIMM commodity bucket id or name (see ``add_commodity_delta``).
         amount : float
-            Signed currency vega amount in ``base_currency``.
+            Signed sigma times dPV/dsigma in base_currency, before HVR, VRW
+            and concentration. Non-IR sigma follows SIMM paragraph 10(b).
 
         Notes
         -----
@@ -3329,24 +3604,19 @@ class SimmSensitivities:
         """
         ...
 
-    def add_curvature(self, risk_class: str, amount: float) -> None:
-        """
-        Add a curvature contribution for a SIMM risk class.
+    def add_curvature(self, sensitivity: SimmCurvatureSensitivity) -> None:
+        """Append an expiry-resolved curvature input before tenor scaling and netting.
 
         Parameters
         ----------
-        risk_class : str
-            Lower-case SIMM risk class label: ``"interest_rate"``,
-            ``"credit_qualifying"``, ``"credit_non_qualifying"``,
-            ``"equity"``, ``"commodity"`` or ``"fx"``.
-        amount : float
-            Signed curvature contribution in ``base_currency`` before the
-            SIMM curvature scale factor is applied.
+        sensitivity : SimmCurvatureSensitivity
+            Validated factor input in this container's currency, before SF, HVR,
+            VRW and concentration. Expiry is preserved even for offsetting vegas.
 
         Raises
         ------
-        ValueError
-            If ``risk_class`` is not one of the labels above.
+        TypeError
+            If sensitivity is not a SimmCurvatureSensitivity instance.
         """
         ...
 
@@ -3554,8 +3824,8 @@ class SimmSensitivities:
         ``DataFrame``.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-        ``amount``. One row per populated bucket; an empty container still
-        carries all six columns. Long format is used deliberately - a column
+        ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
+        carries all seven columns. Long format is used deliberately - a column
         per bucket would give a different schema for every portfolio, and it
         matches ``FrtbSensitivities.to_dataframe``.
 
@@ -3568,16 +3838,16 @@ class SimmSensitivities:
         ``issuer`` carries the name axis: a currency code for IR and FX delta,
         a ``"CCY1/CCY2"`` pair for FX vega, an issuer or index for credit, an
         underlier for equity. It is ``None`` for commodity (keyed by bucket
-        alone) and for curvature. ``bucket`` holds the SIMM credit sector for
+        alone). Curvature uses ``issuer`` for factor identity. ``bucket`` holds the SIMM credit sector for
         bucketed credit deltas (e.g. ``"sovereign"``) and the commodity bucket
-        label; it is ``None`` elsewhere. ``tenor`` is the SIMM tenor bucket
-        (``"2W"``, ``"1M"``, ..., ``"30Y"``) where the risk class has one.
+        label; it is ``None`` elsewhere. ``tenor`` is the SIMM risk tenor where the risk class has one;
+        ``expiry_tenor`` is required for curvature and null for other kinds.
 
         ``amount`` is a signed currency sensitivity in the container's base
-        currency, in whatever convention the caller supplied - SIMM does not
-        re-scale these on ingest. ``from_dataframe`` accepts this frame back.
+        currency, per 1bp rate/credit or 1% relative equity/FX/commodity move for delta.
+        Vega and curvature use sigma times dPV/dsigma before HVR, VRW or SF. ``from_dataframe`` accepts this frame back.
 
-        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor)`` so
+        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor, expiry_tenor)`` so
         repeated exports of the same portfolio are identical.
 
         Returns
@@ -7747,8 +8017,8 @@ class FrtbSensitivities:
         ``DataFrame``.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-        ``amount``. One row per populated bucket; an empty container still
-        carries all six columns. Long format is used deliberately - a column
+        ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
+        carries all seven columns. Long format is used deliberately - a column
         per bucket would give a different schema for every portfolio.
 
         ``risk_class`` uses the same labels as the ``frtb_sba_charge``
@@ -7775,7 +8045,7 @@ class FrtbSensitivities:
         RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
         back (except ``drc`` rows).
 
-        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor)`` so
+        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor, expiry_tenor)`` so
         repeated exports of the same portfolio are identical.
 
         Returns

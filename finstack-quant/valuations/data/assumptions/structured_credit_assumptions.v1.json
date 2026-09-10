@@ -1,13 +1,12 @@
 {
   "schema": "finstack_quant.structured_credit_assumptions/1",
   "market_conditions": {
-    "refi_rate": 0.04,
-    "seasonal_factor": 1.0
+    "refi_rate": 0.04
   },
   "credit_model_defaults": {
-    "prepayment_cpr_annual": 0.20,
+    "prepayment_cpr_annual": 0.2,
     "default_cdr_annual": 0.02,
-    "recovery_rate": 0.50,
+    "recovery_rate": 0.5,
     "recovery_lag_months": 12
   },
   "cmo_collateral_defaults": {
@@ -18,13 +17,67 @@
     "psa_multiplier": 1.0
   },
   "seasonality": {
-    "mortgage": [0.94, 0.76, 0.74, 0.95, 0.98, 0.92, 1.10, 1.18, 1.22, 1.23, 0.98, 1.00],
-    "credit_card": [1.15, 1.10, 1.0, 0.95, 0.95, 0.95, 0.95, 0.95, 1.0, 1.05, 1.05, 1.10]
+    "mortgage": [
+      0.94,
+      0.76,
+      0.74,
+      0.95,
+      0.98,
+      0.92,
+      1.1,
+      1.18,
+      1.22,
+      1.23,
+      0.98,
+      1.0
+    ],
+    "credit_card": [
+      1.15,
+      1.1,
+      1.0,
+      0.95,
+      0.95,
+      0.95,
+      0.95,
+      0.95,
+      1.0,
+      1.05,
+      1.05,
+      1.1
+    ]
   },
   "scenario_grids": {
-    "psa_speeds": [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0],
-    "cdr_rates": [0.005, 0.01, 0.02, 0.03, 0.05, 0.075, 0.10, 0.15, 0.20],
-    "severity_rates": [0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80]
+    "psa_speeds": [
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      1.25,
+      1.5,
+      2.0,
+      2.5,
+      3.0
+    ],
+    "cdr_rates": [
+      0.005,
+      0.01,
+      0.02,
+      0.03,
+      0.05,
+      0.075,
+      0.1,
+      0.15,
+      0.2
+    ],
+    "severity_rates": [
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8
+    ]
   },
   "simulation": {
     "pool_balance_cleanup_threshold": 100.0,
@@ -36,7 +89,7 @@
     "max_obligor_concentration": 0.02,
     "max_top5_concentration": 0.075,
     "max_top10_concentration": 0.125,
-    "max_second_lien": 0.10,
+    "max_second_lien": 0.1,
     "max_cov_lite": 0.65,
     "max_dip": 0.05
   },
@@ -60,104 +113,252 @@
   "stochastic_calibrations": {
     "rmbs_profiles": [
       {
-        "ids": ["rmbs_standard", "rmbs_agency_standard", "rmbs_prime_standard"],
+        "ids": [
+          "rmbs_standard",
+          "rmbs_agency_standard",
+          "rmbs_prime_standard"
+        ],
         "base_cdr": 0.02,
         "default_correlation": 0.05,
         "base_cpr": 0.06,
         "prepay_factor_loading": 0.4,
-        "cpr_volatility": 0.20,
+        "cpr_volatility": 0.2,
         "default_factor_sensitivity": 0.5,
         "default_mean_reversion": 0.5,
-        "default_volatility": 0.30,
+        "default_volatility": 0.3,
         "refi_sensitivity": 2.0,
-        "burnout_rate": 0.10
+        "burnout_rate": 0.1
       }
     ],
     "clo_profiles": [
       {
-        "ids": ["clo_standard", "clo_bsl_standard"],
+        "ids": [
+          "clo_standard",
+          "clo_bsl_standard"
+        ],
         "base_cdr": 0.03,
-        "default_correlation": 0.20,
+        "default_correlation": 0.2,
         "base_cpr": 0.15,
         "prepay_factor_loading": 0.25,
         "cpr_volatility": 0.15,
         "default_factor_sensitivity": 0.8,
         "default_mean_reversion": 0.3,
-        "default_volatility": 0.40
+        "default_volatility": 0.4
       }
     ],
     "cmbs_profiles": [
       {
-        "ids": ["cmbs_standard", "cmbs_conduit_standard"],
+        "ids": [
+          "cmbs_standard",
+          "cmbs_conduit_standard"
+        ],
         "base_cdr": 0.025,
         "default_correlation": 0.15,
         "base_cpr": 0.03,
-        "prepay_factor_loading": 0.20,
-        "cpr_volatility": 0.10
+        "prepay_factor_loading": 0.2,
+        "cpr_volatility": 0.1
       }
     ]
   },
   "coverage_haircuts": [
-    { "rating": "AAA", "haircut": 0.0 },
-    { "rating": "AA", "haircut": 0.0 },
-    { "rating": "A", "haircut": 0.01 },
-    { "rating": "BBB", "haircut": 0.02 },
-    { "rating": "BB", "haircut": 0.05 },
-    { "rating": "B", "haircut": 0.10 },
-    { "rating": "CCC", "haircut": 0.20 },
-    { "rating": "CC", "haircut": 0.30 },
-    { "rating": "C", "haircut": 0.40 },
-    { "rating": "D", "haircut": 0.50 },
-    { "rating": "NR", "haircut": 0.15 }
+    {
+      "rating": "AAA",
+      "haircut": 0.0
+    },
+    {
+      "rating": "AA",
+      "haircut": 0.0
+    },
+    {
+      "rating": "A",
+      "haircut": 0.01
+    },
+    {
+      "rating": "BBB",
+      "haircut": 0.02
+    },
+    {
+      "rating": "BB",
+      "haircut": 0.05
+    },
+    {
+      "rating": "B",
+      "haircut": 0.1
+    },
+    {
+      "rating": "CCC",
+      "haircut": 0.2
+    },
+    {
+      "rating": "CC",
+      "haircut": 0.3
+    },
+    {
+      "rating": "C",
+      "haircut": 0.4
+    },
+    {
+      "rating": "D",
+      "haircut": 0.5
+    },
+    {
+      "rating": "NR",
+      "haircut": 0.15
+    }
   ],
   "asset_type_defaults": {
     "base_cdr_annual": 0.02,
-    "base_recovery_rate": 0.40,
+    "base_recovery_rate": 0.4,
     "base_cpr_annual": 0.05,
     "cpr_by_asset_type": [
-      { "asset_type": "mortgage", "value": 0.06 },
-      { "asset_type": "rmbs", "value": 0.06 },
-      { "asset_type": "auto", "value": 0.18 },
-      { "asset_type": "abs_auto", "value": 0.18 },
-      { "asset_type": "card", "value": 0.15 },
-      { "asset_type": "credit_card", "value": 0.15 },
-      { "asset_type": "cc", "value": 0.15 },
-      { "asset_type": "commercial", "value": 0.10 },
-      { "asset_type": "cmbs", "value": 0.10 },
-      { "asset_type": "cre", "value": 0.10 },
-      { "asset_type": "student", "value": 0.03 },
-      { "asset_type": "student_loan", "value": 0.03 }
+      {
+        "asset_type": "mortgage",
+        "value": 0.06
+      },
+      {
+        "asset_type": "rmbs",
+        "value": 0.06
+      },
+      {
+        "asset_type": "auto",
+        "value": 0.18
+      },
+      {
+        "asset_type": "abs_auto",
+        "value": 0.18
+      },
+      {
+        "asset_type": "card",
+        "value": 0.15
+      },
+      {
+        "asset_type": "credit_card",
+        "value": 0.15
+      },
+      {
+        "asset_type": "cc",
+        "value": 0.15
+      },
+      {
+        "asset_type": "commercial",
+        "value": 0.1
+      },
+      {
+        "asset_type": "cmbs",
+        "value": 0.1
+      },
+      {
+        "asset_type": "cre",
+        "value": 0.1
+      },
+      {
+        "asset_type": "student",
+        "value": 0.03
+      },
+      {
+        "asset_type": "student_loan",
+        "value": 0.03
+      }
     ],
     "cdr_by_asset_type": [
-      { "asset_type": "mortgage", "value": 0.002 },
-      { "asset_type": "rmbs", "value": 0.002 },
-      { "asset_type": "auto", "value": 0.02 },
-      { "asset_type": "abs_auto", "value": 0.02 },
-      { "asset_type": "consumer", "value": 0.02 },
-      { "asset_type": "card", "value": 0.048 },
-      { "asset_type": "credit_card", "value": 0.048 },
-      { "asset_type": "corporate", "value": 0.02 },
-      { "asset_type": "clo", "value": 0.02 },
-      { "asset_type": "commercial", "value": 0.02 }
+      {
+        "asset_type": "mortgage",
+        "value": 0.002
+      },
+      {
+        "asset_type": "rmbs",
+        "value": 0.002
+      },
+      {
+        "asset_type": "auto",
+        "value": 0.02
+      },
+      {
+        "asset_type": "abs_auto",
+        "value": 0.02
+      },
+      {
+        "asset_type": "consumer",
+        "value": 0.02
+      },
+      {
+        "asset_type": "card",
+        "value": 0.048
+      },
+      {
+        "asset_type": "credit_card",
+        "value": 0.048
+      },
+      {
+        "asset_type": "corporate",
+        "value": 0.02
+      },
+      {
+        "asset_type": "clo",
+        "value": 0.02
+      },
+      {
+        "asset_type": "commercial",
+        "value": 0.02
+      }
     ],
     "recovery_by_asset_type": [
-      { "asset_type": "mortgage", "value": 0.60 },
-      { "asset_type": "rmbs", "value": 0.60 },
-      { "asset_type": "collateral", "value": 0.60 },
-      { "asset_type": "auto", "value": 0.45 },
-      { "asset_type": "abs_auto", "value": 0.45 },
-      { "asset_type": "consumer", "value": 0.45 },
-      { "asset_type": "card", "value": 0.05 },
-      { "asset_type": "credit_card", "value": 0.05 },
-      { "asset_type": "unsecured", "value": 0.05 },
-      { "asset_type": "corporate", "value": 0.40 },
-      { "asset_type": "clo", "value": 0.40 },
-      { "asset_type": "commercial", "value": 0.40 }
+      {
+        "asset_type": "mortgage",
+        "value": 0.6
+      },
+      {
+        "asset_type": "rmbs",
+        "value": 0.6
+      },
+      {
+        "asset_type": "collateral",
+        "value": 0.6
+      },
+      {
+        "asset_type": "auto",
+        "value": 0.45
+      },
+      {
+        "asset_type": "abs_auto",
+        "value": 0.45
+      },
+      {
+        "asset_type": "consumer",
+        "value": 0.45
+      },
+      {
+        "asset_type": "card",
+        "value": 0.05
+      },
+      {
+        "asset_type": "credit_card",
+        "value": 0.05
+      },
+      {
+        "asset_type": "unsecured",
+        "value": 0.05
+      },
+      {
+        "asset_type": "corporate",
+        "value": 0.4
+      },
+      {
+        "asset_type": "clo",
+        "value": 0.4
+      },
+      {
+        "asset_type": "commercial",
+        "value": 0.4
+      }
     ]
   },
   "deal_profiles": [
     {
-      "ids": ["clo_standard", "clo"],
+      "ids": [
+        "clo_standard",
+        "clo"
+      ],
       "deal_type": "clo",
       "fees": {
         "trustee_fee_annual": 50000.0,
@@ -169,24 +370,28 @@
       },
       "assumptions": {
         "base_cdr_annual": 0.02,
-        "base_recovery_rate": 0.40,
+        "base_recovery_rate": 0.4,
         "base_cpr_annual": 0.15,
         "psa_speed": null,
         "sda_speed": null,
         "abs_speed_monthly": null
       },
       "constructor": {
-        "first_payment_month": 4,
         "frequency": "quarterly",
-        "prepayment": { "kind": "constant_cpr", "rate": 0.15 },
+        "prepayment": {
+          "kind": "constant_cpr",
+          "rate": 0.15
+        },
         "default_cdr_annual": 0.02,
-        "recovery_rate": 0.40,
-        "recovery_lag_months": 18,
-        "ltv": null
+        "recovery_rate": 0.4,
+        "recovery_lag_months": 18
       }
     },
     {
-      "ids": ["rmbs_standard", "rmbs"],
+      "ids": [
+        "rmbs_standard",
+        "rmbs"
+      ],
       "deal_type": "rmbs",
       "fees": {
         "trustee_fee_annual": 30000.0,
@@ -198,24 +403,31 @@
       },
       "assumptions": {
         "base_cdr_annual": 0.006,
-        "base_recovery_rate": 0.60,
+        "base_recovery_rate": 0.6,
         "base_cpr_annual": 0.06,
         "psa_speed": 1.0,
         "sda_speed": 1.0,
         "abs_speed_monthly": null
       },
       "constructor": {
-        "first_payment_month": 2,
         "frequency": "monthly",
-        "prepayment": { "kind": "psa", "rate": 1.0 },
+        "prepayment": {
+          "kind": "psa",
+          "rate": 1.0
+        },
         "default_cdr_annual": 0.006,
-        "recovery_rate": 0.60,
-        "recovery_lag_months": 18,
-        "ltv": 0.80
+        "recovery_rate": 0.6,
+        "recovery_lag_months": 18
       }
     },
     {
-      "ids": ["abs_auto_standard", "abs_standard", "abs_auto", "abs", "auto"],
+      "ids": [
+        "abs_auto_standard",
+        "abs_standard",
+        "abs_auto",
+        "abs",
+        "auto"
+      ],
       "deal_type": "abs",
       "fees": {
         "trustee_fee_annual": 25000.0,
@@ -234,17 +446,21 @@
         "abs_speed_monthly": 0.015
       },
       "constructor": {
-        "first_payment_month": 2,
         "frequency": "monthly",
-        "prepayment": { "kind": "monthly_abs_speed", "rate": 0.015 },
+        "prepayment": {
+          "kind": "monthly_abs_speed",
+          "rate": 0.015
+        },
         "default_cdr_annual": 0.02,
         "recovery_rate": 0.45,
-        "recovery_lag_months": 12,
-        "ltv": null
+        "recovery_lag_months": 12
       }
     },
     {
-      "ids": ["cmbs_standard", "cmbs"],
+      "ids": [
+        "cmbs_standard",
+        "cmbs"
+      ],
       "deal_type": "cmbs",
       "fees": {
         "trustee_fee_annual": 75000.0,
@@ -257,19 +473,21 @@
       "assumptions": {
         "base_cdr_annual": 0.005,
         "base_recovery_rate": 0.65,
-        "base_cpr_annual": 0.10,
+        "base_cpr_annual": 0.1,
         "psa_speed": null,
         "sda_speed": null,
         "abs_speed_monthly": null
       },
       "constructor": {
-        "first_payment_month": 2,
         "frequency": "monthly",
-        "prepayment": { "kind": "cmbs_lockout", "rate": 0.10, "lockout_months": 60 },
+        "prepayment": {
+          "kind": "cmbs_lockout",
+          "rate": 0.1,
+          "lockout_months": 60
+        },
         "default_cdr_annual": 0.005,
         "recovery_rate": 0.65,
-        "recovery_lag_months": 24,
-        "ltv": null
+        "recovery_lag_months": 24
       }
     }
   ]

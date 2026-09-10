@@ -714,7 +714,7 @@ class InflationSwapConventions:
         >>> payload = (
         ...     '{"calendar_id":"nyse","settlement_days":2,'
         ...     '"business_day_convention":"modified_following",'
-        ...     '"day_count":"act_360","inflation_lag":{"count":3,"unit":"months"}}'
+        ...     '"day_count":"one_one","inflation_lag":{"count":3,"unit":"months"},"interpolation":"linear"}'
         ... )
         >>> InflationSwapConventions.from_json(payload).inflation_lag
         '3M'
@@ -766,6 +766,22 @@ class InflationSwapConventions:
         -------
         bool
             ``True`` when ``other`` is an ``InflationSwapConventions`` with identical fields.
+        """
+        ...
+
+    @property
+    def interpolation(self) -> str:
+        """Monthly reference-index interpolation convention.
+
+        Returns
+        -------
+        str
+            ``linear`` for daily weights between monthly CPI observations, or
+            ``step`` for the single lagged calendar-month observation.
+
+        Raises
+        ------
+        No exceptions are raised when reading this property.
         """
         ...
 

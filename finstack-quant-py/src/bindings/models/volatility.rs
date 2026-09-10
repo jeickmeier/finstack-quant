@@ -211,7 +211,7 @@ impl PySabrModel {
         }
     }
 
-    /// ``True`` when the underlying parameters include a non-zero shift.
+    /// ``True`` for normal beta=0 dynamics or a configured displacement.
     fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
     }
@@ -438,11 +438,17 @@ impl PySabrCalibrator {
         }
     }
 
-    /// Override the convergence tolerance.
+    /// Override the maximum relative error accepted for any final volatility quote.
     ///
     /// Preserves all other previously-set fields (e.g. the ``max_iter=200``
     /// from :meth:`high_precision`) by cloning the existing calibrator and
     /// only adjusting the tolerance.
+    ///
+    /// Parameters
+    /// ----------
+    /// tolerance : float
+    ///     Positive finite relative quote-error limit; 1e-4 permits at most
+    ///     0.01% of each quoted volatility. Invalid settings fail at calibration.
     fn with_tolerance(&self, tolerance: f64) -> Self {
         Self {
             inner: self.inner.clone().with_tolerance(tolerance),

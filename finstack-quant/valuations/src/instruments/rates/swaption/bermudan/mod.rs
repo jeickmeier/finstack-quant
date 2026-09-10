@@ -8,22 +8,25 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_models::rates::clock::ModelDiscountCurve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use finstack_quant_models::trees::HullWhiteTree;
 use finstack_quant_models::trees::HullWhiteTreeConfig;
 use std::sync::Arc;
 
 // LSMC imports (gated by feature)
-use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::rates::hw1f::hw1f_mc::build_event_aligned_grid;
 use crate::instruments::rates::hw1f::RateExoticMcConfig;
-use crate::instruments::rates::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer as SharedSwaptionLsmcPricer;
-use crate::instruments::rates::swaption::pricing::monte_carlo_payoff::{
-    BermudanSwaptionPayoff, SwapSchedule,
+use crate::instruments::rates::swaption::pricing::hw_cashflows::{
+    HwExerciseTerms, HwSwaptionCashflows,
 };
+use crate::instruments::rates::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer as SharedSwaptionLsmcPricer;
+use crate::instruments::rates::swaption::pricing::swap_rate_utils::HullWhiteBondPrice;
+use crate::instruments::rates::swaption::CashSettlementMethod;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::process::ou::{
     calibrate_theta_from_curve, HullWhite1FProcess,
@@ -67,27 +70,30 @@ impl std::str::FromStr for BermudanPricingMethod {
 #[derive(Debug, Clone)]
 pub struct PreparedHullWhiteModel {
     tree: Arc<HullWhiteTree>,
+    as_of: Date,
+    curve_snapshot: serde_json::Value,
 }
 
 impl PreparedHullWhiteModel {
-    /// Prepare a Hull-White tree from fitted parameters, a discount curve, and a horizon.
+    /// Prepare a dated Hull-White tree from explicit fitted parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Fitted mean reversion in inverse years and short-rate volatility per square-root year.
+    /// * `steps` - Positive tree interval count before mandatory dates are inserted.
+    /// * `disc` - Source discount curve; its full content is retained for reuse validation.
+    /// * `as_of` - Valuation date, defining model time zero and discount normalization.
+    /// * `ttm` - Positive ACT/365F horizon from `as_of`, covering all contractual cashflows.
+    /// * `mandatory_times` - ACT/365F exercise times required exactly on the grid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a pricing error for invalid parameters, curve, horizon or mandatory dates.
     pub fn prepare(
         params: HullWhiteCalibrationParams,
         steps: usize,
-        disc: &dyn Discounting,
-        ttm: f64,
-    ) -> std::result::Result<Self, PricingError> {
-        Self::prepare_with_times(params, steps, disc, ttm, &[])
-    }
-
-    /// Prepare a Hull-White tree whose grid passes exactly through
-    /// the supplied mandatory times (e.g. Bermudan exercise dates), so
-    /// exercise decisions land on grid points instead of nearest-step
-    /// approximations.
-    pub fn prepare_with_times(
-        params: HullWhiteCalibrationParams,
-        steps: usize,
-        disc: &dyn Discounting,
+        disc: &DiscountCurve,
+        as_of: Date,
         ttm: f64,
         mandatory_times: &[f64],
     ) -> std::result::Result<Self, PricingError> {
@@ -98,7 +104,9 @@ impl PreparedHullWhiteModel {
             ));
         }
         let config = HullWhiteTreeConfig::new(params.kappa, params.sigma, steps);
-        let tree = HullWhiteTree::calibrate_with_times(config, disc, ttm, mandatory_times)
+        let discount = ModelDiscountCurve::new(disc, as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let tree = HullWhiteTree::calibrate_with_times(config, &discount, ttm, mandatory_times)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -107,7 +115,33 @@ impl PreparedHullWhiteModel {
             })?;
         Ok(Self {
             tree: Arc::new(tree),
+            as_of,
+            curve_snapshot: serde_json::to_value(disc).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?,
         })
+    }
+
+    pub(crate) fn validate_reuse(
+        &self,
+        disc: &DiscountCurve,
+        as_of: Date,
+        horizon: f64,
+    ) -> finstack_quant_core::Result<()> {
+        let snapshot = serde_json::to_value(disc)
+            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+        if as_of != self.as_of || snapshot != self.curve_snapshot {
+            return Err(finstack_quant_core::Error::Validation("prepared Hull-White model valuation date or curve content differs from the pricing request".into()));
+        }
+        if horizon > self.tree.time_at_step(self.tree.num_steps()) + 1e-9 {
+            return Err(finstack_quant_core::Error::Validation(
+                "prepared Hull-White model horizon does not cover contractual cashflows".into(),
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn tree(&self) -> &Arc<HullWhiteTree> {
@@ -123,28 +157,24 @@ impl PreparedHullWhiteModel {
 /// across multiple instruments by putting the prepared tree on
 /// [`BermudanSwaptionPricerConfig`]:
 ///
-/// ```text
+/// ```
 /// use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 /// use finstack_quant_valuations::instruments::rates::swaption::{
-///     BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
+///     BermudanSwaption, BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
+///     PreparedHullWhiteModel,
 /// };
-/// use finstack_quant_valuations::instruments::rates::swaption::PreparedHullWhiteModel;
-/// use finstack_quant_core::market_data::traits::Discounting;
-///
-/// # fn main() -> finstack_quant_core::Result<()> {
-/// // Prepare once from fitted parameters (discount curve and horizon omitted here)
-/// # let disc: &dyn Discounting = todo!("provide a discount curve from MarketContext");
-/// let ttm = 5.0;
-/// let tree = PreparedHullWhiteModel::prepare(
-///     HullWhiteCalibrationParams::default(),
-///     100,
-///     disc,
-///     ttm,
+/// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use time::macros::date;
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let as_of = date!(2026-01-15);
+/// let swaption = BermudanSwaption::example();
+/// let disc = DiscountCurve::flat("USD-OIS", as_of, 0.03)?;
+/// let model = PreparedHullWhiteModel::prepare(
+///     HullWhiteCalibrationParams::default(), 100, &disc, as_of,
+///     swaption.time_to_maturity(as_of)?, &swaption.exercise_times(as_of)?,
 /// )?;
-///
-/// // Reuse across many instruments
 /// let pricer = BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
-///     prepared_model: Some(tree.clone()),
+///     prepared_model: Some(model),
 ///     ..Default::default()
 /// });
 /// # let _ = pricer;
@@ -170,6 +200,8 @@ pub struct BermudanSwaptionPricer {
     method: BermudanPricingMethod,
     /// Pricer configuration.
     config: BermudanSwaptionPricerConfig,
+    /// Original prepared-model grid retained by request-local risk repricing.
+    risk_template: Option<PreparedHullWhiteModel>,
 }
 
 /// Configuration for Bermudan swaption Hull-White tree and LSMC pricers.
@@ -185,6 +217,10 @@ pub struct BermudanSwaptionPricerConfig {
     ///
     /// When set, the pricer reuses this prepared tree directly. This avoids
     /// repeating O(Steps × Time) deterministic tree preparation per instrument.
+    /// Base valuation rejects a changed curve, valuation date, parameter set,
+    /// horizon, or unsupported exercise date. Risk calculations rebuild the
+    /// tree with the resolved parameters and original grid on each bumped
+    /// market; theta translates mandatory model times to its valuation date.
     pub prepared_model: Option<PreparedHullWhiteModel>,
 }
 
@@ -238,6 +274,7 @@ impl BermudanSwaptionPricer {
         Self {
             method: BermudanPricingMethod::HullWhiteTree,
             config,
+            risk_template: None,
         }
     }
 
@@ -251,6 +288,7 @@ impl BermudanSwaptionPricer {
         Self {
             method: BermudanPricingMethod::Lsmc,
             config,
+            risk_template: None,
         }
     }
 
@@ -349,7 +387,33 @@ impl BermudanSwaptionPricer {
 
         // Use a prepared model if available, otherwise prepare a request-local tree.
         let (pv, used_cached_model) = if let Some(ref cached_tree) = self.config.prepared_model {
-            // Use the prepared model (O(1) per instrument).
+            let cached_config = cached_tree.tree.config();
+            let resolved = resolve_hw1f_params(
+                Hw1fParamFamily::Swaption,
+                swaption.get_discount_curve_id().as_str(),
+                &swaption.instrument_pricing_overrides.model_config,
+                Some(
+                    HullWhiteCalibrationParams::new(cached_config.kappa, cached_config.sigma)
+                        .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?,
+                ),
+                &format!("BermudanSwaption {}", swaption.id),
+                market,
+            )
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+            if resolved.kappa.to_bits() != cached_config.kappa.to_bits()
+                || resolved.sigma.to_bits() != cached_config.sigma.to_bits()
+                || swaption
+                    .instrument_pricing_overrides
+                    .model_config
+                    .tree_steps
+                    .is_some_and(|steps| steps != cached_config.steps)
+            {
+                return Err(PricingError::model_failure_with_context(
+                    "prepared Hull-White model parameters or tree configuration differ from the pricing request",
+                    PricingErrorContext::from_instrument(swaption),
+                ));
+            }
+            // Validate and reuse the prepared model.
             let valuator =
                 BermudanSwaptionTreeValuator::new(swaption, cached_tree, disc.as_ref(), as_of)
                     .map_err(|e| {
@@ -371,12 +435,29 @@ impl BermudanSwaptionPricer {
             // Thread exercise dates into the tree grid so Bermudan exercise
             // decisions land exactly on grid points.
             let tree_steps = self.effective_tree_steps(swaption);
-            let model = PreparedHullWhiteModel::prepare_with_times(
+            let mut mandatory_times = exercise_times;
+            let horizon = if let Some(template) = &self.risk_template {
+                let elapsed =
+                    finstack_quant_models::rates::clock::model_time(template.as_of, as_of);
+                mandatory_times.extend(
+                    template
+                        .tree
+                        .time_grid()
+                        .iter()
+                        .map(|time| time - elapsed)
+                        .filter(|time| *time > 0.0),
+                );
+                (template.tree.time_at_step(template.tree.num_steps()) - elapsed).max(ttm)
+            } else {
+                ttm
+            };
+            let model = PreparedHullWhiteModel::prepare(
                 hw_params,
                 tree_steps,
                 disc.as_ref(),
-                ttm,
-                &exercise_times,
+                as_of,
+                horizon,
+                &mandatory_times,
             )?;
 
             let valuator =
@@ -493,55 +574,30 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        // Build swap schedule (payment times and accrual fractions)
-        let (payment_dates, accrual_fractions) = swaption.build_swap_schedule().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        // Convert payment dates to year fractions
-        let ctx = finstack_quant_core::dates::DayCountContext::default();
-        let payment_times: Vec<f64> = payment_dates
-            .iter()
-            .map(|&d| swaption.get_day_count().year_fraction(as_of, d, ctx))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
+        let exercise_cashflows = swaption
+            .bermudan_schedule
+            .effective_dates()
+            .into_iter()
+            .filter(|date| *date > as_of)
+            .map(|date| {
+                HwSwaptionCashflows::new(
+                    &swaption.underlying_fixed_leg,
+                    &swaption.underlying_float_leg,
+                    date,
+                    as_of,
                 )
-            })?;
-
-        let swap_start_time = swaption
-            .get_day_count()
-            .year_fraction(as_of, swaption.get_swap_start(), ctx)
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-
-        let swap_schedule = SwapSchedule::new(
-            swap_start_time,
-            ttm,
-            payment_times,
-            accrual_fractions,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        let option_type: OptionType = swaption.option_type;
-        let strike = swaption.strike_f64().map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        let payoff = BermudanSwaptionPayoff::new(
-            swap_schedule,
-            strike,
-            option_type,
-            swaption.notional.amount(),
-        );
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let terms = HwExerciseTerms {
+            strike: swaption
+                .strike_f64()
+                .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?,
+            notional: swaption.notional.amount(),
+            option_type: swaption.option_type,
+            settlement: swaption.settlement,
+            cash_method: CashSettlementMethod::CollateralizedCashPrice,
+        };
 
         // Build exercise-aligned time grid
         let (time_grid, exercise_indices) = build_event_aligned_grid(
@@ -561,69 +617,19 @@ impl BermudanSwaptionPricer {
             .filter(|&t| t <= ttm)
             .collect();
 
-        // Discount-curve closure giving `P(as_of, as_of + t)`.
-        //
-        // The HW1F simulation measures time from `t = 0 ≡ as_of`, but the
-        // discount curve is anchored at its own `base_date`. Passing
-        // `|t| disc.df(t)` unrebased treats curve-base time as as_of time:
-        // when `as_of ≠ curve.base_date` the θ(t) calibration, the initial
-        // short rate, and the HW1F bond reconstruction `P(t,T)` are all wrong.
-        // Re-base to `as_of` exactly as `hw1f::hw1f_curve` does:
-        //
-        //   P(as_of, as_of + t) = DF_curve(t_asof + t) / DF_curve(t_asof)
-        //
-        // (the closure is built inline, capturing the `Arc<DiscountCurve>`, so
-        // it stays `Send + Sync` as the LSMC engine requires).
-        let curve_base = disc.base_date();
-        let curve_day_count = disc.day_count();
-        let t_asof = if as_of == curve_base {
-            0.0
-        } else {
-            curve_day_count
-                .year_fraction(
-                    curve_base,
-                    as_of,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?
-        };
-        let df_asof = disc.df(t_asof);
-        if !df_asof.is_finite() || df_asof <= 0.0 {
-            return Err(PricingError::model_failure_with_context(
-                format!(
-                    "Bermudan LSMC: discount factor at as_of ({as_of}) is non-positive ({df_asof})"
-                ),
-                PricingErrorContext::default(),
-            ));
-        }
-        let disc_for_fn = std::sync::Arc::clone(&disc);
-        let discount_fn = move |t: f64| {
-            let df = disc_for_fn.df(t_asof + t);
-            if df.is_finite() && df > 0.0 {
-                df / df_asof
-            } else {
-                0.0
-            }
-        };
+        let model_curve = ModelDiscountCurve::new(disc.as_ref(), as_of)
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+        let discount_fn = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
 
         // Calibrate Hull-White parameters from discount curve
-        let hw_params = calibrate_theta_from_curve(
-            hw_params.kappa,
-            hw_params.sigma,
-            &discount_fn,
-            &theta_times,
-        )
-        .map_err(|error| {
-            PricingError::model_failure_with_context(
-                error.to_string(),
-                PricingErrorContext::default(),
-            )
-        })?;
+        let hw_params =
+            calibrate_theta_from_curve(hw_params.kappa, hw_params.sigma, discount_fn, &theta_times)
+                .map_err(|error| {
+                    PricingError::model_failure_with_context(
+                        error.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
 
         // Initial short rate from the `as_of`-rebased curve: a one-sided
         // forward difference f(0) = −ln P(as_of, as_of+dt) / dt.
@@ -634,7 +640,24 @@ impl BermudanSwaptionPricer {
             0.03
         };
 
-        let hw_process = HullWhite1FProcess::new(hw_params);
+        let exercise_value = |step: usize, short_rate: f64| {
+            let slot = exercise_indices.binary_search(&step).map_err(|_| {
+                finstack_quant_core::Error::Validation(
+                    "LSMC exercise is absent from the prepared schedule".into(),
+                )
+            })?;
+            let t = time_grid.time(step);
+            Ok(exercise_cashflows[slot].evaluate(
+                t,
+                hw_params.kappa,
+                hw_params.sigma_at_time(t),
+                |maturity| {
+                    HullWhiteBondPrice::bond_price(&hw_params, short_rate, t, maturity, discount_fn)
+                },
+                terms,
+            ))
+        };
+        let hw_process = HullWhite1FProcess::new(hw_params.clone());
 
         let mc_paths = self.effective_mc_paths(swaption);
         let lsmc_config = RateExoticMcConfig {
@@ -648,12 +671,11 @@ impl BermudanSwaptionPricer {
 
         let estimate = lsmc_pricer
             .price_bermudan_with_grid(
-                &payoff,
+                exercise_value,
                 initial_rate,
                 &time_grid,
                 &exercise_indices,
                 &basis,
-                discount_fn,
                 swaption.notional.currency(),
             )
             .map_err(|e| {
@@ -698,6 +720,91 @@ impl Default for BermudanSwaptionPricer {
 }
 
 impl Pricer for BermudanSwaptionPricer {
+    fn seed_metric_context(
+        &self,
+        context: &mut crate::metrics::MetricContext,
+        metrics: &[crate::metrics::MetricId],
+    ) -> finstack_quant_core::Result<()> {
+        let mut swaption = context.instrument_as::<BermudanSwaption>()?.clone();
+        let ttm = swaption.time_to_maturity(context.as_of)?;
+        if ttm <= 0.0 || swaption.exercise_times(context.as_of)?.is_empty() {
+            return Ok(());
+        }
+        let cached = self.config.prepared_model.as_ref();
+        let fallback = cached
+            .map(|model| {
+                let cfg = model.tree.config();
+                HullWhiteCalibrationParams::new(cfg.kappa, cfg.sigma)
+            })
+            .transpose()?;
+        let params = resolve_hw1f_params(
+            Hw1fParamFamily::Swaption,
+            swaption.get_discount_curve_id().as_str(),
+            &swaption.instrument_pricing_overrides.model_config,
+            fallback,
+            &format!("BermudanSwaption {}", swaption.id),
+            &context.curves,
+        )?;
+        let steps = cached.map_or_else(
+            || self.effective_tree_steps(&swaption),
+            |model| model.tree.config().steps,
+        );
+        let config = &mut swaption.instrument_pricing_overrides.model_config;
+        config.hw1f_mean_reversion = Some(params.kappa);
+        config.hw1f_sigma = Some(params.sigma);
+        config.tree_steps = Some(steps);
+        let exercise_metric = crate::metrics::MetricId::custom("exercise_probability");
+        if metrics.contains(&exercise_metric) {
+            if self.method != BermudanPricingMethod::HullWhiteTree {
+                return Err(finstack_quant_core::Error::Validation(
+                    "exercise_probability requires the Hull-White tree exercise policy".into(),
+                ));
+            }
+            let disc = context
+                .curves
+                .get_discount(swaption.get_discount_curve_id().as_str())?;
+            let fresh;
+            let model = if let Some(model) = cached {
+                model
+            } else {
+                fresh = PreparedHullWhiteModel::prepare(
+                    params,
+                    steps,
+                    disc.as_ref(),
+                    context.as_of,
+                    ttm,
+                    &swaption.exercise_times(context.as_of)?,
+                )
+                .map_err(finstack_quant_core::Error::from)?;
+                &fresh
+            };
+            let valuator =
+                BermudanSwaptionTreeValuator::new(&swaption, model, disc.as_ref(), context.as_of)?;
+            let expected = super::metrics::bermudan_greeks::expected_exercise_time(&valuator);
+            context.computed.insert(exercise_metric, expected);
+        }
+        context.set_instrument_overrides(Some(swaption.instrument_pricing_overrides.clone()));
+        context.set_instrument(Arc::new(swaption));
+        if let crate::pricer::PricingDispatch::Registered { model, registry } =
+            context.clone_pricer_dispatch()
+        {
+            let mut risk_registry = (*registry).clone();
+            let mut config = self.config.clone();
+            config.prepared_model = None;
+            config.tree_steps = steps;
+            risk_registry.replace(Self {
+                method: self.method,
+                config,
+                risk_template: cached.cloned(),
+            });
+            context.set_pricer_dispatch(crate::pricer::PricingDispatch::registered(
+                model,
+                Arc::new(risk_registry),
+            ));
+        }
+        Ok(())
+    }
+
     fn key(&self) -> PricerKey {
         match self.method {
             BermudanPricingMethod::HullWhiteTree => {

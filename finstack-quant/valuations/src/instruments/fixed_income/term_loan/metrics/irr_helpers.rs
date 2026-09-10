@@ -19,7 +19,6 @@ use crate::instruments::TermLoan;
 use crate::metrics::MetricContext;
 use finstack_quant_core::cashflow::{xirr_with_daycount, CFKind};
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 /// Return the term loan's full internal cashflow schedule — with historical
@@ -65,23 +64,6 @@ pub(super) fn cached_full_schedule(
     Ok(Arc::clone(arc))
 }
 
-/// Discount factor from `as_of` to the loan's settlement date on its discount
-/// curve. Used to forward-value an `as_of` model PV to a settlement-dated price.
-/// Returns 1.0 when settlement coincides with `as_of`.
-pub(super) fn settlement_discount_factor(
-    loan: &TermLoan,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<f64> {
-    let settle = loan.settlement_date(as_of)?;
-    if settle <= as_of {
-        return Ok(1.0);
-    }
-    curves
-        .get_discount(loan.discount_curve_id.as_str())?
-        .df_between_dates(as_of, settle)
-}
-
 /// Dirty purchase price implied by a clean price quote (% of outstanding).
 ///
 /// Loan market convention (LSTA/LMA): a quoted price applies to the
@@ -100,30 +82,51 @@ pub(crate) fn quoted_dirty_from_clean_px(
 ) -> finstack_quant_core::Result<Money> {
     let settlement = loan.settlement_date(as_of)?;
     let out_path = schedule.outstanding_by_date()?;
-    let outstanding = outstanding_before(&out_path, settlement, loan.currency);
+    let outstanding = out_path
+        .iter()
+        .rev()
+        .find(|(date, _)| *date <= settlement)
+        .map_or(schedule.get_notional().initial, |(_, amount)| *amount);
+    // Principal already removed from the interest base but still payable
+    // after settlement is part of the balance purchased with the quote.
+    let pending_principal: f64 = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.get_balance_date() <= settlement && flow.date > settlement)
+        .map(|flow| match flow.principal_delta {
+            Some(delta) => (-delta.amount()).max(0.0),
+            None if matches!(
+                flow.kind,
+                CFKind::Amortization | CFKind::PrePayment | CFKind::Notional
+            ) =>
+            {
+                flow.amount.amount().max(0.0)
+            }
+            _ => 0.0,
+        })
+        .sum();
     let accrued = crate::cashflow::accrual::accrued_interest_amount(
         schedule,
         settlement,
         &loan.accrual_config(),
     )?;
-    Money::new(px / 100.0 * outstanding.amount() + accrued, loan.currency)
+    Money::new(
+        px / 100.0 * (outstanding.amount() + pending_principal) + accrued,
+        loan.currency,
+    )
 }
 
 /// Resolve the target purchase price for quote-derived term-loan yield metrics.
 ///
-/// Uses the quoted clean price when present (already a settlement-date price),
-/// converted to a dirty settlement amount via [`quoted_dirty_from_clean_px`];
-/// otherwise forward-values the `as_of` model PV (`context.base_value`) to the
-/// settlement date via `settle_df = DF(as_of → settlement)`. Anchoring the model
-/// PV at `as_of` while dating the IRR price leg at settlement would otherwise
-/// leave a spurious ~settlement-lag of carry in every quoted yield (the bond
-/// yield path forward-values for exactly this reason).
+/// Uses the quoted clean price when present, converted to a dirty settlement
+/// amount via [`quoted_dirty_from_clean_px`]. Both term-loan pricing engines
+/// already return settlement-date model values, so model-derived yield metrics
+/// use `base_value` directly without a second carry adjustment.
 pub(super) fn target_price_from_quote_or_model(
     loan: &TermLoan,
     schedule: &CashFlowSchedule,
     as_of: Date,
     base_value: Money,
-    settle_df: f64,
 ) -> finstack_quant_core::Result<Money> {
     if let Some(px) = loan
         .instrument_pricing_overrides
@@ -132,10 +135,7 @@ pub(super) fn target_price_from_quote_or_model(
     {
         quoted_dirty_from_clean_px(loan, schedule, as_of, px)
     } else {
-        Ok(Money::new(
-            base_value.amount() / settle_df,
-            base_value.currency(),
-        )?)
+        Ok(base_value)
     }
 }
 

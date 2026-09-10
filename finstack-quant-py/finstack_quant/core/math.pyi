@@ -446,14 +446,14 @@ class stats:
         Parameters
         ----------
         data : Sequence[float] or numpy.ndarray
-            Observations (sorted internally).
+            Finite observations (sorted internally); empty or non-finite data returns ``nan``.
         q : float
-            Quantile in ``[0, 1]``.
+            Quantile probability, clamped to ``[0, 1]``; NaN returns ``nan``.
 
         Returns
         -------
         float
-            Quantile value, or ``nan`` for empty data or ``q`` outside ``[0, 1]``.
+            Quantile value, or ``nan`` for empty/non-finite data or a NaN probability.
 
         Notes
         -----

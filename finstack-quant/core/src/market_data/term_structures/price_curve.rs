@@ -471,7 +471,7 @@ impl PriceCurve {
             return self.with_parallel_bump(bump);
         }
 
-        let bumped_points = bump_knots_triangular(
+        let mut bumped_points = bump_knots_triangular(
             &self.knots,
             &self.prices,
             prev_bucket,
@@ -479,6 +479,11 @@ impl PriceCurve {
             next_bucket,
             bump,
         );
+        for (t, price) in &mut bumped_points {
+            if *t == 0.0 {
+                *price = self.spot_price;
+            }
+        }
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
         PriceCurve::builder(new_id)
             .kind(self.kind)
@@ -835,6 +840,58 @@ mod tests {
             .build()
             .expect("finite signed prices are valid market data");
         assert!((curve.price(0.5) + 15.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn triangular_bumps_preserve_signed_prices() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let curve = PriceCurve::builder("POWER")
+            .base_date(base)
+            .spot_price(-10.0)
+            .knots([(0.25, -5.0), (0.5, -3.0), (1.0, 5.0)])
+            .build()
+            .unwrap();
+        for bump in [0.0, -2.0, 6.0] {
+            let bumped = curve
+                .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), bump)
+                .unwrap();
+            assert_eq!(bumped.price(0.25), -5.0 + bump);
+            assert_eq!(bumped.price(0.5), -3.0);
+            assert_eq!(bumped.price(1.0), 5.0);
+            assert_eq!(bumped.kind(), PriceCurveKind::Price);
+        }
+    }
+
+    #[test]
+    fn triangular_bumps_preserve_spot_anchor() {
+        for curve in [sample_wti_curve(), sample_vix_curve()] {
+            for bump in [-5.0, 0.0, 5.0] {
+                let bumped = curve
+                    .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), bump)
+                    .unwrap();
+                assert_eq!(bumped.knots(), curve.knots());
+                assert_eq!(bumped.spot_price(), curve.spot_price());
+                assert_eq!(bumped.prices()[0], curve.spot_price());
+                assert_eq!(bumped.price(0.0), curve.spot_price());
+                assert!((bumped.price(1e-8) - curve.spot_price()).abs() < 1e-5);
+                assert_eq!(bumped.price(0.25), curve.price(0.25) + bump);
+                assert_eq!(bumped.price(0.5), curve.price(0.5));
+            }
+        }
+        let bumped = sample_vix_curve()
+            .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), -20.0)
+            .expect("zero delivery level is valid while spot stays unchanged");
+        assert_eq!(bumped.price(0.25), 0.0);
+        assert_eq!(bumped.prices()[0], 18.5);
+    }
+
+    #[test]
+    fn triangular_bumps_reject_negative_vol_index_levels() {
+        let curve = sample_vix_curve();
+        let error = curve
+            .with_triangular_key_rate_bump_neighbors(None, 0.25, Some(0.5), -21.0)
+            .expect_err("negative volatility index level must fail");
+        assert!(error.to_string().contains("non-negative"), "{error}");
     }
 
     #[test]

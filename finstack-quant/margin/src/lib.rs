@@ -99,10 +99,10 @@ pub use schema::MarginEnvelope;
 pub use traits::Marginable;
 pub use types::{
     ClearingStatus, CollateralAssetClass, CollateralEligibility, CsaSpec,
-    EligibleCollateralSchedule, ImMethodology, ImParameters, MarginCall, MarginCallTiming,
-    MarginCallType, MarginTenor, MaturityConstraints, NettingSetId, OtcMarginSpec, RepoMarginSpec,
-    RepoMarginType, SimmCreditClassification, SimmCreditSector, SimmRiskClass, SimmSensitivities,
-    VmParameters, SIMM_TENORS,
+    EligibleCollateralSchedule, ImCollateralResult, ImMethodology, ImParameters, MarginCall,
+    MarginCallTiming, MarginCallType, MarginTenor, MaturityConstraints, NettingSetId,
+    OtcMarginSpec, RepoMarginSpec, RepoMarginType, SimmCreditClassification, SimmCreditSector,
+    SimmCurvatureSensitivity, SimmRiskClass, SimmSensitivities, VmParameters, SIMM_TENORS,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.

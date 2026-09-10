@@ -5,7 +5,6 @@
     "vega": 1499.5634006621185
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -15,6 +14,8 @@
             "quantlib"
           ]
         },
+        "cash_settlement_method": "par_yield",
+        "exercise_style": "european",
         "expiry": "2027-04-30",
         "id": "USD-BLACK-1Y1Y-PAYER-SWAPTION-QUANTLIB",
         "notional": {
@@ -59,12 +60,11 @@
           "stub": "none"
         },
         "vol_model": "black",
-        "vol_surface_id": "USD-SWAPTION-VOL-QL",
-        "exercise_style": "european",
-        "cash_settlement_method": "par_yield"
+        "vol_surface_id": "USD-SWAPTION-VOL-QL"
       },
       "type": "swaption"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

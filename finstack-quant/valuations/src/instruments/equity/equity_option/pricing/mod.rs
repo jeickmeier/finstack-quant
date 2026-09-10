@@ -9,10 +9,13 @@
 mod black;
 mod inputs;
 
+#[cfg(test)]
+pub(crate) use inputs::collect_inputs;
+
 pub use black::EquityOptionGreeks;
 pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
 pub(crate) use inputs::{
-    collect_inputs, collect_inputs_extended, has_future_discrete_dividends,
+    collect_inputs_extended, has_future_discrete_dividends,
     reject_future_discrete_dividends_for_stochastic_vol, require_european, resolve_lifecycle_value,
 };
 
@@ -581,7 +584,24 @@ mod tests {
         let american_pv = compute_pv(&american, &curves, as_of).expect("american pv");
 
         assert!(american_pv.amount().is_finite());
-        assert!(american_pv.amount() >= european_pv.amount());
+        // Exercise dominance compares the same discretization. LR's finite
+        // European approximation can lie either side of the analytic value.
+        let (spot, rate, q, sigma, t) = collect_inputs(&european, &curves, as_of).expect("inputs");
+        let mut params = crate::instruments::common_impl::parameters::OptionMarketParams::call(
+            spot,
+            european.strike,
+            rate,
+            sigma,
+            t,
+        );
+        params.dividend_yield = q;
+        let tree_european =
+            finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
+                .price_european(&params)
+                .expect("European lattice")
+                * european.notional.amount();
+        assert!(american_pv.amount() >= tree_european);
+        assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.notional.amount());
     }
 
     #[test]

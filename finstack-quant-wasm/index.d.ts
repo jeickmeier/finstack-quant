@@ -788,6 +788,12 @@ export interface DayCountConstructor {
    */
   act360(): DayCount;
   /**
+   * One unit per nonempty contractual accrual period; empty periods return zero.
+   * @returns The 1/1 convention used for annual inflation accrual periods.
+   * @throws This constructor does not throw.
+   */
+  oneOne(): DayCount;
+  /**
    * Actual/365 Fixed.
    * @returns A `DayCount` handle for this convention.
    */
@@ -1489,7 +1495,7 @@ export interface FxMatrix extends WasmOwned {
    * @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
    * @param date - ISO-8601 date used by the calculation or market-data lookup.
    * @param policy - FX quote-selection policy for resolving direct, inverse, or triangulated rates.
-   * @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
+   * @param rate - Finite positive quote-currency units per one base-currency unit.
    * @throws Error - Throws a JavaScript exception if either currency code is invalid, `date` is not a valid ISO date, or `rate` is non-finite or not strictly positive.
    */
   setQuoteOn(
@@ -4828,7 +4834,7 @@ export interface CashflowsNamespace {
   /**
    * Build a cashflow schedule from a `CashflowScheduleBuildSpec` JSON string.
    *
-   * @param specJson - JSON-encoded `CashflowScheduleBuildSpec`. Optional `principal_exchange` is `"none"` or `"initial_and_final"` (default).
+   * @param specJson - JSON-encoded `CashflowScheduleBuildSpec`. Optional `principal_exchange` is `"none"` or `"initial_and_final"` (default). `principal_events` entries require both economic `date` and cash `payment_date`.
    * @param marketJson - Optional JSON-encoded market context for floating-rate lookups.
    * @returns JSON-encoded `CashFlowSchedule`.
    * @throws If the spec or market JSON is malformed, or schedule construction fails.
@@ -5527,7 +5533,7 @@ export interface ValuationInstrumentsNamespace {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit for the instrument-native model.
-   * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.
    * @param pricingOptions - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).
@@ -5661,7 +5667,7 @@ export interface ValuationInstrumentsNamespace {
    * @param trancheId - Identifier of the floating-rate tranche whose contractual cashflows are spread-discounted.
    * @param marketJson - Canonical market-context JSON supplying the discount curve and any forward curves or historical fixings required for cashflow projection.
    * @param asOf - ISO-8601 valuation date used for projection and discounting.
-   * @param targetPv - Target present value in the tranche's currency; values above model PV produce a negative result and values below model PV produce a positive result.
+   * @param targetPv - Positive dirty settlement amount in tranche currency, including accrued interest once; settlement uses the deal's quote_settlement_date or the valuation date.
    * @returns The z-spread-equivalent discount margin in decimal units.
    * @throws Error - Thrown if JSON or the date is malformed, the deal is invalid, the tranche is missing or fixed-rate, target_pv is non-finite, required market data is unavailable, or the spread solve fails or exceeds ±5000 bp.
    */
@@ -5700,7 +5706,7 @@ export interface ValuationInstrumentsNamespace {
    * @returns Typed `OasResult` object for the tranche.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param trancheId - Stable tranche identifier used to select the required domain object.
-   * @param marketPricePct - Tranche market price as a percentage of original balance.
+   * @param marketPricePct - Clean settlement quote as a percentage of original balance; accrued interest is added once.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
@@ -5752,7 +5758,7 @@ export interface ValuationInstrumentsNamespace {
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param marketPricePct - Optional tranche market price as a percentage of original balance; omit for model price.
+   * @param marketPricePct - Optional clean settlement quote as a percentage of original balance; omit to use the deal quote, or its model clean price when no quote is supplied.
    * @throws Error - Throws a JavaScript exception if the instrument or market JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; a metric fails or is non-finite; or the result cannot be converted to a JavaScript value.
    */
   structuredCreditTrancheMetrics(
@@ -6457,7 +6463,7 @@ export interface SabrCalibrator extends WasmOwned {
    * tolerance, preserving all other settings (e.g. the iteration cap from
    * `highPrecision`).
    * @returns A `SabrCalibrator` handle.
-   * @param tolerance - Non-negative numerical convergence tolerance for the calibration optimizer.
+   * @param tolerance - Positive finite maximum relative error of any final volatility quote; 1e-4 permits 0.01% of each quote. Invalid settings or a fit outside this budget throw during calibration.
    */
   withTolerance(tolerance: number): SabrCalibrator;
   /**
@@ -8529,7 +8535,7 @@ export interface PnlAttribution {
    */
   residual: MoneyValue;
   /**
-   * Detailed carry decomposition, or `null` when not produced.
+   * Gross carry decomposition, with funding reported separately as a financing overlay; or `null` when not produced.
    */
   carry_detail: Record<string, unknown> | null;
   /**
@@ -10819,7 +10825,7 @@ export interface ScenarioSpec {
   resolution_mode: 'most_specific_wins' | 'cumulative';
   /**
    * Optional ParCDS delivery. Omitted when left at the default
-   * `"solve_to_par"`. `"first_order_shift"` shifts hazard knots in place.
+   * `"solve_to_par"`. `"first_order_shift"` applies delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
    */
   hazard_bump_mode?: 'solve_to_par' | 'first_order_shift';
 }
@@ -10951,7 +10957,7 @@ export interface ScenariosNamespace {
    * @param description - Optional human-readable description of the scenario purpose.
    * @param priority - Optional execution priority; lower values run earlier during composition. Omit for the Rust serde default (`0`), matching the Python `priority=0` keyword default.
    * @param resolutionMode - Optional hierarchy conflict policy: `"most_specific_wins"` (default) or `"cumulative"`.
-   * @param hazardBumpMode - Optional ParCDS delivery: `"solve_to_par"` (default) or `"first_order_shift"`.
+   * @param hazardBumpMode - Optional ParCDS delivery: `"solve_to_par"` (default) rebootstraps par quotes; `"first_order_shift"` applies delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
    * @throws Error - Rejects malformed or schema-incompatible `operations`, an unsupported `resolution_mode` or `hazard_bump_mode`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, variant-specific operation violations, or failure to serialize the scenario.
    */
   buildScenarioSpec(

@@ -90,7 +90,7 @@ impl PyAssetPool {
     /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
     /// ...     RepLine(
     /// ...         "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360,
+    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan", "industry": None},
     /// ...     )
     /// ... ])
     /// >>> "POOL-1" in repr(pool)

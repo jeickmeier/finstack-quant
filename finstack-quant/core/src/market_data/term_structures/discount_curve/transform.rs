@@ -24,8 +24,8 @@ impl DiscountCurve {
     ///
     /// Additive bumps are **continuously compounded zero-space** shocks
     /// (`DF *= exp(−δr · t)`), not quote re-bootstraps. This avoids allocating
-    /// intermediate `Vec<(f64, f64)>`, skips ID generation, and skips
-    /// sort/validation (bumps preserve knot ordering).
+    /// intermediate `Vec<(f64, f64)>`, skips ID generation, and avoids
+    /// sorting unchanged knots while rechecking discount-factor validation.
     ///
     /// # Performance
     ///
@@ -83,6 +83,14 @@ impl DiscountCurve {
                 }
             }
         }
+        if dfs.iter().any(|df| !df.is_finite()) {
+            return Err(crate::Error::Validation(
+                "discount-curve shock produced non-finite discount factors".into(),
+            ));
+        }
+        if dfs.iter().any(|df| *df <= 0.0) {
+            return Err(crate::error::InputError::NonPositiveValue.into());
+        }
         let interp = super::super::common::build_interp_input_error(
             self.style,
             self.knots.clone(),
@@ -92,6 +100,11 @@ impl DiscountCurve {
         )?;
         self.dfs = dfs;
         self.interp = interp;
+        // Stress curves retain mathematical validation on JSON round-trips.
+        // The original construction policy remains unchanged on `self`'s
+        // source curve when using the public cloning bump methods.
+        self.allow_non_monotonic = true;
+        self.min_forward_rate = None;
         Ok(())
     }
 
@@ -101,10 +114,17 @@ impl DiscountCurve {
     /// This is a **continuously compounded zero-space** parallel shock of the
     /// already-built curve, not a re-bootstrap of the original market quotes.
     ///
+    /// # Arguments
+    ///
+    /// * `bp` - Finite additive continuously compounded zero-rate shock in
+    ///   basis points; -100 lowers rates by one percentage point.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the bumped knots violate this curve's interpolation,
-    /// discount-factor monotonicity, or forward-rate validation policy.
+    /// Returns an error for non-finite shocks, non-finite/non-positive discount
+    /// factors, or invalid interpolation. Negative rates are permitted under
+    /// stress independently of the source curve's construction policy. The
+    /// shocked curve serializes with permissive rate-policy settings.
     pub fn with_parallel_bump(&self, bp: f64) -> crate::Result<Self> {
         self.bumped_with_id(
             crate::market_data::bumps::id_bump_bp(self.id.as_str(), bp),
@@ -156,7 +176,9 @@ impl DiscountCurve {
     /// A new discount curve with the triangular key-rate bump applied.
     ///
     /// # Errors
-    /// Returns an error if the bumped curve violates validation constraints.
+    /// Returns an error for invalid bucket coordinates, non-finite shocks,
+    /// non-finite/non-positive discount factors, or invalid interpolation.
+    /// Negative rates are allowed independently of construction-policy floors.
     ///
     /// # Examples
     /// ```

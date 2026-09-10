@@ -20,227 +20,154 @@ fn append_residual_principal(
     Ok(())
 }
 
-/// If the deal configures `excess_spread` and the account holds a positive
-/// balance after the final period, that balance is distributed to the equity
-/// tranche as a residual flow — unless a cumulative-loss trap trigger
-/// (`trap_loss_pct`) is breached, in which case the balance is retained in the
-/// deal (consumed enhancement) and permanently reduces equity. No-op when no
-/// `excess_spread` rule is configured (identity).
-///
-/// The release is booked via [`append_residual_principal`] (i.e. as a principal
-/// flow), matching the engine-wide convention that equity/residual distributions
-/// are recorded as principal: the equity tranche carries no coupon, so its Step-5
-/// interest claim is zero and every residual it receives is already classified as
-/// principal. Routing the spread release the same way keeps equity's
-/// interest/principal split internally consistent; the choice is PV-neutral
-/// (NPV, yield and IRR use the total cashflow, not the interest/principal split).
+/// At legal termination retained interest pays deferred coupons, then reaches
+/// the residual holder. An active cash-trap rule first applies it to debt par.
+/// Cash is never extinguished merely because a trap remains breached.
 fn release_spread_account(
     state: &mut SimulationState<'_>,
     instrument: &StructuredCredit,
 ) -> Result<()> {
-    let Some(es) = instrument
+    let mut remaining = state
+        .spread_account
+        .checked_add(state.undistributed_interest)?
+        .amount();
+    let trapped = instrument
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.excess_spread.as_ref())
-    else {
-        return Ok(());
-    };
-
-    let balance = state.spread_account;
-    if balance.amount() <= 0.0 {
-        return Ok(());
-    }
-
-    // Retain (do not release) if the cumulative-loss trap trigger is breached.
-    if let Some(trap) = es.trap_loss_pct {
-        let denom = state.total_pool_balance.amount();
-        let loss_fraction = if denom > 0.0 {
-            state.cumulative_realized_loss / denom
-        } else {
-            0.0
-        };
-        if loss_fraction >= trap {
-            state.spread_account = Money::from((0_i64, state.base_currency));
-            return Ok(());
+        .and_then(|spec| spec.trap_loss_pct)
+        .is_some_and(|threshold| {
+            state.total_pool_balance.amount() > 0.0
+                && state.cumulative_realized_loss / state.total_pool_balance.amount() >= threshold
+        })
+        || state
+            .tranche_triggers
+            .iter()
+            .any(|saved| saved.trigger.breach_date.is_some());
+    let date = state.prev_date.unwrap_or(state.closing_date);
+    let mut order: Vec<_> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
+    for i in &order {
+        let tranche = &state.tranches.tranches[*i];
+        if tranche.seniority == TrancheSeniority::Equity {
+            continue;
+        }
+        let id = tranche.id.to_string();
+        let deferred = state
+            .deferred_interest
+            .get(&id)
+            .map_or(0.0, |amount| amount.amount());
+        let interest = remaining.min(deferred).max(0.0);
+        if interest > 0.0 {
+            append_terminal_interest(state, &id, Money::new(interest, state.base_currency)?, date)?;
+            state.deferred_interest.insert(
+                id.clone(),
+                Money::new(deferred - interest, state.base_currency)?,
+            );
+            remaining -= interest;
+        }
+        if trapped {
+            let balance = state.tranche_balances[&id].amount();
+            let principal = remaining.min(balance).max(0.0);
+            if principal > 0.0 {
+                append_residual_principal(
+                    state,
+                    &id,
+                    Money::new(principal, state.base_currency)?,
+                    date,
+                )?;
+                state
+                    .tranche_balances
+                    .insert(id, Money::new(balance - principal, state.base_currency)?);
+                remaining -= principal;
+            }
         }
     }
-
-    // Release to the residual holder as a residual principal flow.
-    //
-    // N7: the release must not require a tranche with
-    // `TrancheSeniority::Equity` — silently zeroing the account when none
-    // exists destroys cash (the same sink class as the reserve-account defect
-    // SC-C07), and a deal whose most junior class is Subordinated rather than
-    // Equity is a perfectly ordinary structure.
-    //
-    // Falls back to the most-junior tranche by payment priority, matching
-    // `release_reserve_account` and `release_principal_funding_account` so all
-    // three terminal sweeps behave identically and none can strand cash.
-    let residual_id = state
-        .tranches
-        .tranches
-        .iter()
-        .find(|t| t.seniority == TrancheSeniority::Equity)
-        .or_else(|| {
-            state
-                .tranches
-                .tranches
-                .iter()
-                .max_by_key(|t| t.payment_priority)
-        })
-        .map(|t| t.id.as_str().to_string());
-    if let Some(id) = residual_id {
-        let release_date = state.prev_date.unwrap_or(state.closing_date);
-        append_residual_principal(state, &id, balance, release_date)?;
+    if remaining > 0.0 {
+        if let Some(&i) = order.last() {
+            let id = state.tranches.tranches[i].id.to_string();
+            append_terminal_interest(
+                state,
+                &id,
+                Money::new(remaining, state.base_currency)?,
+                date,
+            )?;
+        }
     }
     state.spread_account = Money::from((0_i64, state.base_currency));
+    state.undistributed_interest = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
-/// Release any residual reserve-account balance at deal end, paying it down the
-/// capital structure senior-first with the remainder to the residual holder.
-///
-/// A reserve account is credit enhancement funded at closing and topped up by
-/// `ReserveAccount` waterfall recipients. It is drawn during the deal to cover
-/// debt-interest shortfalls (see the draw in `simulate_period`); whatever
-/// survives to deal end belongs to the transaction, not to the void.
-///
-/// Without this sweep the account was a pure sink: the only mutation anywhere
-/// was the `checked_add` booking deposits, so every deposited dollar was
-/// destroyed and lifetime distributions were understated by the full balance.
-///
-/// Pays outstanding notes most-senior-first (a released reserve is available to
-/// redeem the notes), then routes any excess over the remaining capital
-/// structure to the most-junior / equity tranche — mirroring
-/// [`release_principal_funding_account`], so the two terminal sweeps behave
-/// identically and neither can strand cash.
-fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
-    let mut remaining = state.reserve_balance.amount();
-    if remaining <= 0.0 {
-        return Ok(());
+fn append_terminal_interest(
+    state: &mut SimulationState<'_>,
+    id: &str,
+    amount: Money,
+    date: Date,
+) -> Result<()> {
+    if let Some(result) = state.results.get_mut(id) {
+        result.cashflows.push((date, amount));
+        result.interest_flows.push((date, amount));
+        result.total_interest = result.total_interest.checked_add(amount)?;
     }
+    Ok(())
+}
 
-    let release_date = state.prev_date.unwrap_or(state.closing_date);
-    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
+/// Distribute terminal capital by note priority, then pay residual capital.
+/// Principal collections cannot cure a deferred coupon without an explicit transfer.
+fn distribute_terminal_principal(
+    state: &mut SimulationState<'_>,
+    amount: Money,
+    date: Date,
+) -> Result<()> {
+    let mut remaining = amount.amount();
+    let mut order: Vec<_> = (0..state.tranches.tranches.len()).collect();
     order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
-
-    for i in order {
-        if remaining <= 0.0 {
-            break;
+    for &i in &order {
+        let id = state.tranches.tranches[i].id.to_string();
+        let balance = state.tranche_balances[&id].amount();
+        let paid = remaining.min(balance).max(0.0);
+        if paid > 0.0 {
+            append_residual_principal(state, &id, Money::new(paid, state.base_currency)?, date)?;
+            state
+                .tranche_balances
+                .insert(id, Money::new(balance - paid, state.base_currency)?);
+            remaining -= paid;
         }
-        let id = state.tranches.tranches[i].id.as_str().to_string();
-        let balance = state.tranche_balances.get(&id).map_or(0.0, |m| m.amount());
-        if balance <= 0.0 {
-            continue;
-        }
-        let pay = remaining.min(balance);
-        state
-            .tranche_balances
-            .insert(id.clone(), Money::new(balance - pay, state.base_currency)?);
-        append_residual_principal(
-            state,
-            &id,
-            Money::new(pay, state.base_currency)?,
-            release_date,
-        )?;
-        remaining -= pay;
     }
-
-    if remaining > WRITEDOWN_DE_MINIMIS {
-        let residual_id = state
-            .tranches
-            .tranches
-            .iter()
-            .max_by_key(|t| t.payment_priority)
-            .map(|t| t.id.as_str().to_string());
-        if let Some(id) = residual_id {
+    if remaining > 0.0 {
+        if let Some(&i) = order.last() {
+            let id = state.tranches.tranches[i].id.to_string();
             append_residual_principal(
                 state,
                 &id,
                 Money::new(remaining, state.base_currency)?,
-                release_date,
+                date,
             )?;
         }
     }
+    Ok(())
+}
+
+/// Release funded reserves into principal at legal termination.
+fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
+    distribute_terminal_principal(
+        state,
+        state.reserve_balance,
+        state.prev_date.unwrap_or(state.closing_date),
+    )?;
     state.reserve_balance = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
-/// Release any residual controlled-accumulation funding-account balance at deal
-/// end, paying it down the capital structure senior-first.
-///
-/// During the accumulation period collected pool principal is held in the
-/// funding account and normally released as a bullet at the bullet date. If the
-/// deal terminates before then (cleanup call, pool exhaustion, or a bullet date
-/// beyond the last payment), the in-period bullet never fires; this terminal
-/// sweep distributes the residual to the outstanding tranches (most-senior
-/// first), so the accumulated principal is never stranded. A no-op when no
-/// accumulation rule is configured or the account is already empty (the normal
-/// bullet-release path).
-fn release_principal_funding_account(
-    state: &mut SimulationState<'_>,
-    instrument: &StructuredCredit,
-) -> Result<()> {
-    if instrument
-        .waterfall_rules
-        .as_ref()
-        .and_then(|rules| rules.controlled_accumulation.as_ref())
-        .is_none()
-    {
-        return Ok(());
-    }
-    let mut remaining = state.principal_funding_account.amount();
-    if remaining <= 0.0 {
-        return Ok(());
-    }
-
-    let release_date = state.prev_date.unwrap_or(state.closing_date);
-    // Outstanding tranches, most-senior first by payment priority.
-    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
-    order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
-
-    for i in order {
-        if remaining <= 0.0 {
-            break;
-        }
-        let id = state.tranches.tranches[i].id.as_str().to_string();
-        let balance = state.tranche_balances.get(&id).map_or(0.0, |m| m.amount());
-        if balance <= 0.0 {
-            continue;
-        }
-        let pay = remaining.min(balance);
-        state
-            .tranche_balances
-            .insert(id.clone(), Money::new(balance - pay, state.base_currency)?);
-        append_residual_principal(
-            state,
-            &id,
-            Money::new(pay, state.base_currency)?,
-            release_date,
-        )?;
-        remaining -= pay;
-    }
-    // Any balance beyond the outstanding capital structure (accumulated cash
-    // exceeding every remaining note balance) is residual value to the
-    // most-junior / equity tranche — routed there rather than silently destroyed
-    // by zeroing the account, which would break cash conservation.
-    if remaining > WRITEDOWN_DE_MINIMIS {
-        let residual_id = state
-            .tranches
-            .tranches
-            .iter()
-            .max_by_key(|t| t.payment_priority)
-            .map(|t| t.id.as_str().to_string());
-        if let Some(id) = residual_id {
-            append_residual_principal(
-                state,
-                &id,
-                Money::new(remaining, state.base_currency)?,
-                release_date,
-            )?;
-        }
-    }
+/// Release undistributed and controlled-accumulation principal at termination.
+fn release_principal_funding_account(state: &mut SimulationState<'_>) -> Result<()> {
+    let amount = state
+        .principal_funding_account
+        .checked_add(state.undistributed_principal)?;
+    distribute_terminal_principal(state, amount, state.prev_date.unwrap_or(state.closing_date))?;
     state.principal_funding_account = Money::from((0_i64, state.base_currency));
+    state.undistributed_principal = Money::from((0_i64, state.base_currency));
     Ok(())
 }
 
@@ -255,7 +182,7 @@ pub(crate) struct PreparedDealSimulation {
     /// Valuation date the simulation was prepared for (`as_of`).
     pub(crate) valuation_date: Date,
     /// Future-dated contractual payment dates (>= `valuation_date`).
-    pub(crate) schedule_dates: Vec<Date>,
+    pub(crate) periods: Vec<crate::cashflow::builder::periods::SchedulePeriod>,
     /// Last contractual boundary before `valuation_date`; anchors first accrual.
     pub(crate) state_anchor: Date,
     /// Concrete base waterfall (available-funds cap layered per period).
@@ -285,8 +212,27 @@ pub(crate) fn prepare_deal_simulation(
     let pool = &instrument.pool;
     let tranches = &instrument.tranches;
 
-    if pool.total_balance()?.amount() <= 0.0 {
+    if pool.total_balance()?.amount() <= 0.0
+        && pool.collection_account.amount() <= 0.0
+        && pool.reserve_account.amount() <= 0.0
+        && pool.excess_spread_account.amount() <= 0.0
+        && !pool.assets.iter().any(|asset| {
+            asset
+                .recovery_amount
+                .is_some_and(|amount| amount.amount() > 0.0)
+        })
+    {
         return Ok(None);
+    }
+
+    if pool
+        .assets
+        .iter()
+        .any(|asset| asset.default_date.is_some_and(|date| date > as_of))
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "defaulted collateral has a future default date".into(),
+        ));
     }
 
     // Reject malformed declarative rules up front: an unresolved tranche-id
@@ -317,6 +263,18 @@ pub(crate) fn prepare_deal_simulation(
     // the live collateral WAC (`live_afc_cap_rate`), so the cap tracks pool
     // amortization/prepayment/defaults rather than being frozen at closing.
     let waterfall = instrument.create_waterfall()?;
+    for tranche in &tranches.tranches {
+        if waterfall.coverage_triggers.iter().any(|trigger| {
+            trigger.tranche_id == tranche.id.as_str()
+                && ((trigger.oc_trigger.is_some() && tranche.oc_trigger.is_some())
+                    || (trigger.ic_trigger.is_some() && tranche.ic_trigger.is_some()))
+        }) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "duplicate tranche/waterfall coverage configuration for {}",
+                tranche.id
+            )));
+        }
+    }
 
     // Resolve payment calendar - required for structured credit deals.
     // Silent fallback to weekends-only would shift coupons around holidays,
@@ -358,28 +316,29 @@ pub(crate) fn prepare_deal_simulation(
         instrument.first_payment_date,
         None,
     ))?;
-    let remaining_periods = build_periods(BuildPeriodsParams::from_schedule(
-        &schedule_params,
-        instrument.first_payment_date,
-        instrument.maturity,
-        None,
-    ))?;
-    let payment_dates: Vec<Date> = std::iter::once(first_period.payment_date)
-        .chain(
-            remaining_periods
-                .into_iter()
-                .map(|period| period.payment_date),
-        )
+    let remaining_periods = if instrument.first_payment_date < instrument.maturity {
+        build_periods(BuildPeriodsParams::from_schedule(
+            &schedule_params,
+            instrument.first_payment_date,
+            instrument.maturity,
+            None,
+        ))?
+    } else {
+        // A single contractual coupon has no schedule after its first payment.
+        Vec::new()
+    };
+    let all_periods: Vec<_> = std::iter::once(first_period)
+        .chain(remaining_periods)
         .collect();
-    let state_anchor = payment_dates
+    let state_anchor = all_periods
         .iter()
-        .copied()
+        .map(|period| period.payment_date)
         .filter(|date| *date < as_of)
         .max()
         .unwrap_or(instrument.closing_date);
-    let schedule_dates: Vec<Date> = payment_dates
+    let periods = all_periods
         .into_iter()
-        .filter(|date| *date >= as_of)
+        .filter(|period| period.payment_date >= as_of)
         .collect();
 
     // Freeze the initial-state computation once; each path clones it.
@@ -387,7 +346,7 @@ pub(crate) fn prepare_deal_simulation(
 
     Ok(Some(PreparedDealSimulation {
         valuation_date: as_of,
-        schedule_dates,
+        periods,
         state_anchor,
         waterfall,
         calendar,
@@ -426,9 +385,10 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
     );
 
     // Simulate period-by-period
-    for pay_date in &prepared.schedule_dates {
-        let pay_date = *pay_date;
+    for contractual_period in &prepared.periods {
+        let pay_date = contractual_period.payment_date;
         if state.is_pool_exhausted() {
+            state.prev_date = Some(state.prev_date.unwrap_or(as_of).max(as_of));
             break;
         }
 
@@ -474,7 +434,7 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
 
                 // Pay tranches in seniority order (Senior=0 first, Equity=3 last)
                 let mut redemption_order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
-                redemption_order.sort_by_key(|&i| state.tranches.tranches[i].seniority);
+                redemption_order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
 
                 for &idx in &redemption_order {
                     if available_for_redemption <= WRITEDOWN_DE_MINIMIS {
@@ -534,6 +494,16 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
                     let principal_money = Money::new(principal_paid, state.base_currency)?;
 
                     if let Some(res) = state.results.get_mut(tranche_id_str) {
+                        if tranche.seniority != TrancheSeniority::Equity {
+                            res.accrual_periods.push(crate::instruments::fixed_income::structured_credit::TrancheAccrualPeriod {
+                                start: contractual_period.accrual_start,
+                                end: contractual_period.accrual_end,
+                                payment_date: pay_date,
+                                opening_balance: balance,
+                                coupon_rate,
+                                day_count: tranche.day_count,
+                            });
+                        }
                         res.cashflows.push((pay_date, redemption));
                         if interest_paid > 0.0 {
                             res.interest_flows.push((pay_date, interest_money));
@@ -584,6 +554,8 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
             instrument,
             &prepared.waterfall,
             SimulationPeriod {
+                accrual_start: contractual_period.accrual_start,
+                accrual_end: contractual_period.accrual_end,
                 payment: pay_date,
                 valuation: as_of,
             },
@@ -593,32 +565,25 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
         )?;
     }
 
-    // Drain lagged recoveries still pending at simulation end. When the
-    // simulation terminates via pool exhaustion or the final scheduled date,
-    // recoveries from defaults within `recovery_lag` months of the end have
-    // not yet matured out of the queue; without this drain that recovery cash
-    // is silently dropped and losses are overstated for any deal with
-    // defaults near maturity. Mirrors the cleanup-call branch, which already
-    // realizes the pending queue when it terminates the deal. Each entry is
-    // released at the later of the final simulated date and its own
-    // default-date + recovery lag, business-day adjusted.
-    drain_pending_recoveries_at_end(&mut state, prepared.calendar, prepared.convention)?;
-
-    // Release any unused spread-account balance to equity at deal end (unless a
-    // cumulative-loss trap trigger retains it as consumed enhancement).
+    // Current terminal accounts settle before later, lagged recoveries.
+    // The loss trap can transfer retained interest to outstanding debt par.
     release_spread_account(&mut state, instrument)?;
 
     // Release any controlled-accumulation funding-account balance that was never
     // paid out as a bullet — e.g. the deal hit a cleanup call or its scheduled
     // end before the bullet date. Prevents the accumulated principal from being
     // silently stranded.
-    release_principal_funding_account(&mut state, instrument)?;
+    release_principal_funding_account(&mut state)?;
 
     // Release any reserve-account balance that survived to deal end. The
     // reserve is credit enhancement, drawn during the deal to cover interest
     // shortfalls; whatever remains belongs to the transaction. Without this the
     // account was a pure sink and every deposited dollar was destroyed.
     release_reserve_account(&mut state)?;
+
+    // Each remaining recovery claim settles at its contractual lagged date,
+    // after current terminal distributions have updated outstanding note par.
+    drain_pending_recoveries_at_end(&mut state, prepared.calendar, prepared.convention)?;
 
     Ok(state.finalize())
 }
@@ -637,6 +602,8 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     as_of: Date,
     source: &mut S,
 ) -> Result<HashMap<String, TrancheCashflows>> {
+    let resolved = instrument.resolved_for_pricing()?;
+    let instrument = &resolved;
     match prepare_deal_simulation(instrument, as_of)? {
         Some(prepared) => {
             run_prepared_simulation_with_source(instrument, context, &prepared, source)
@@ -646,121 +613,28 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     }
 }
 
-/// Drain and distribute recoveries still pending in the lag queue when the
-/// simulation terminates (pool exhaustion or final scheduled payment date).
-///
-/// Each pending entry is released on the later of the last simulated payment
-/// date and its natural maturity (`default_date + recovery_lag`), adjusted to
-/// a business day, and distributed through the same terminal path the
-/// cleanup-call branch uses: tranches in seniority order, each tranche's
-/// claim being its deferred interest (senior portion) plus its remaining
-/// principal balance. No new coupon accrues after the final simulated date,
-/// so unlike the mid-life cleanup call there is no stub accrued-interest leg.
+/// Pay each outstanding recovery claim once, after its full contractual lag.
 fn drain_pending_recoveries_at_end(
     state: &mut SimulationState,
     calendar: &dyn HolidayCalendar,
     convention: BusinessDayConvention,
 ) -> Result<()> {
-    let pending = state.recovery_queue.drain_pending();
-    if pending.is_empty() {
-        return Ok(());
-    }
-
+    let mut pending = state.recovery_queue.drain_pending();
+    pending.sort_by_key(|(date, _)| *date);
     let last_date = state.prev_date.unwrap_or(state.closing_date);
-    let lag_months = i32::try_from(state.recovery_lag_months).unwrap_or(i32::MAX);
-
-    // Seniority order: Senior=0 first, Equity=3 last (same as cleanup call).
-    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
-    order.sort_by_key(|&i| state.tranches.tranches[i].seniority);
-
+    let lag_months = i32::try_from(state.recovery_lag_months).map_err(|_| {
+        finstack_quant_core::Error::Validation(
+            "recovery lag exceeds supported calendar range".into(),
+        )
+    })?;
     for (default_date, amount) in pending {
-        let natural_release = default_date.add_months(lag_months);
-        let release_date = adjust(natural_release.max(last_date), convention, calendar)?;
-
-        let mut available = amount.amount();
-        for &idx in &order {
-            if available <= WRITEDOWN_DE_MINIMIS {
-                break;
-            }
-            let tranche_id_str = state.tranches.tranches[idx].id.as_str();
-            let balance = state
-                .tranche_balances
-                .get(tranche_id_str)
-                .map(|m| m.amount())
-                .unwrap_or(0.0);
-            let deferred = state
-                .deferred_interest
-                .get(tranche_id_str)
-                .map(|m| m.amount())
-                .unwrap_or(0.0);
-            let claim = balance + deferred;
-            if claim <= WRITEDOWN_DE_MINIMIS {
-                continue;
-            }
-
-            let paid = claim.min(available);
-            available -= paid;
-
-            // Deferred interest is the senior claim within the distribution;
-            // the remainder retires principal (same split as the cleanup
-            // call's terminal redemption).
-            let interest_paid = paid.min(deferred).max(0.0);
-            let principal_paid = (paid - interest_paid).max(0.0);
-
-            let payment = Money::new(paid, state.base_currency)?;
-            let interest_money = Money::new(interest_paid, state.base_currency)?;
-            let principal_money = Money::new(principal_paid, state.base_currency)?;
-
-            if let Some(res) = state.results.get_mut(tranche_id_str) {
-                res.cashflows.push((release_date, payment));
-                if interest_paid > 0.0 {
-                    res.interest_flows.push((release_date, interest_money));
-                    res.total_interest = res.total_interest.checked_add(interest_money)?;
-                }
-                if principal_paid > 0.0 {
-                    res.principal_flows.push((release_date, principal_money));
-                    res.total_principal = res.total_principal.checked_add(principal_money)?;
-                }
-            }
-            if interest_paid > 0.0 {
-                if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
-                    *def = def
-                        .checked_sub(interest_money)
-                        .unwrap_or(Money::from((0_i64, state.base_currency)));
-                }
-            }
-            if principal_paid > 0.0 {
-                if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
-                    *bal = bal
-                        .checked_sub(principal_money)
-                        .unwrap_or(Money::from((0_i64, state.base_currency)));
-                }
-            }
-        }
-
-        // Any remainder beyond all note claims is the equity holder's
-        // residual — book it to the equity tranche (mirroring the standard
-        // waterfall's Equity residual recipient and step-5's booking of
-        // residual cash as a principal flow), so recovery cash is never
-        // silently dropped.
-        if available > WRITEDOWN_DE_MINIMIS {
-            let equity_idx = order
-                .iter()
-                .rev()
-                .copied()
-                .find(|&i| state.tranches.tranches[i].seniority == TrancheSeniority::Equity);
-            if let Some(idx) = equity_idx {
-                let tranche_id_str = state.tranches.tranches[idx].id.as_str();
-                let residual = Money::new(available, state.base_currency)?;
-                if let Some(res) = state.results.get_mut(tranche_id_str) {
-                    res.cashflows.push((release_date, residual));
-                    res.principal_flows.push((release_date, residual));
-                    res.total_principal = res.total_principal.checked_add(residual)?;
-                }
-            }
-        }
+        let release_date = adjust(
+            default_date.add_months(lag_months).max(last_date),
+            convention,
+            calendar,
+        )?;
+        distribute_terminal_principal(state, amount, release_date)?;
     }
-
     Ok(())
 }
 

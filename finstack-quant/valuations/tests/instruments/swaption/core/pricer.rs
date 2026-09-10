@@ -166,7 +166,9 @@ fn test_bermudan_pricer_cached_model_sets_measure() {
         HullWhiteCalibrationParams::default(),
         50,
         disc.as_ref(),
+        as_of,
         ttm,
+        &swaption.exercise_times(as_of).expect("exercise times"),
     )
     .unwrap();
 

@@ -47,6 +47,7 @@ fn context_for_tranche<'a>(
         tranches,
         tranche_id,
         as_of: test_date(),
+        valuation_date: test_date(),
         period_start: None,
         cash_balance,
         interest_collections,

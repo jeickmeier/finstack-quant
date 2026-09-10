@@ -338,8 +338,14 @@ fn stochastic_default_volatility_changes_loss_dispersion() {
 }
 
 #[test]
-fn non_pik_deferred_interest_is_repaid_before_principal() {
-    let market = fixed_market();
+fn non_pik_deferred_interest_cannot_consume_principal() {
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(as_of())
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .unwrap(),
+    );
     let mut sc = structured_credit(false);
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -371,9 +377,13 @@ fn non_pik_deferred_interest_is_repaid_before_principal() {
         .find(|tranche| tranche.tranche_id == "SR")
         .expect("senior tranche");
 
+    // With no losses or prepayments, senior receives 800,000 principal and
+    // exactly the pool's 1% interest for two 30/360 years. The 20% unpaid
+    // coupon claim cannot consume the equity holder's 200,000 principal.
+    let expected = 800_000.0 + 1_000_000.0 * 0.01 * 2.0;
     assert!(
-        senior.npv.amount() > 800_000.0,
-        "senior should receive deferred interest before principal is classified; got {}",
+        (senior.npv.amount() - expected).abs() < 1e-6,
+        "senior cash {}, required {expected}",
         senior.npv.amount()
     );
 }

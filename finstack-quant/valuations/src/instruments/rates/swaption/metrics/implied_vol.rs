@@ -1,126 +1,59 @@
 //! Implied volatility metric for swaptions.
 //!
-//! Solves for the Black implied volatility that reproduces the current PV
+//! Solves for the configured quoted volatility that reproduces the current PV
 //! (from `context.base_value`) using the `/math` solvers. Uses a robust
-//! parameterization in log-vol space. If inversion is not possible (solver
+//! non-negative volatility bracket. If inversion is not possible (solver
 //! failure or non-converged residual) an error is returned rather than a
 //! fabricated bound value, so risk systems never receive a fake vol.
 
-use crate::instruments::pricing_overrides::VolSurfaceExtrapolation;
-use crate::instruments::rates::swaption::Swaption;
+use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
-use finstack_quant_core::Result;
+use finstack_quant_core::math::solver::BrentSolver;
+use finstack_quant_core::{Error, Result};
 
-/// Implied Volatility calculator for swaptions
+/// Implied volatility in the configured normal or displaced Black quote units.
 pub(crate) struct ImpliedVolCalculator;
 
 impl MetricCalculator for ImpliedVolCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &Swaption = context.instrument_as()?;
-        let strike = option.strike_f64()?;
-
-        // Time to expiry from as_of. ACT/365F matches the pricer's option-time
-        // convention (`Swaption::price_black` uses ACT/365F regardless of the
-        // instrument's accrual day count), so the inverted vol lives on the
-        // same time axis as the vol used for pricing.
-        let t = finstack_quant_core::dates::DayCount::Act365F.signed_year_fraction(
-            context.as_of,
-            option.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        if context.as_of >= option.expiry {
             return Ok(0.0);
         }
-
-        // Target price is the base PV already computed under instrument pricing
-        let target_pv = context.base_value.amount();
-
-        let forward = option.forward_swap_rate(context.curves.as_ref(), context.as_of)?;
-        if option.vol_model == crate::instruments::rates::swaption::VolatilityModel::Black
-            && (forward <= 0.0 || strike <= 0.0)
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Black swaption implied vol requires positive forward and strike, got forward={} strike={}",
-                forward, strike
-            )));
+        let target = context.base_value.amount();
+        let notional = option.notional.amount();
+        if !target.is_finite() || target < 0.0 || notional <= 0.0 {
+            return Err(Error::Validation(
+                "swaption implied vol requires finite non-negative PV and positive notional"
+                    .to_owned(),
+            ));
         }
-
-        // Build objective in log-vol space x = ln(sigma)
-        let f = |x: f64| -> f64 {
-            let sigma = x.exp();
-            // Use Black pricing along the same path as instrument pricing (not SABR)
-            // since we are solving for the equivalent Black vol.
-            match option.price_black(context.curves.as_ref(), sigma, context.as_of) {
-                Ok(m) => m.amount() - target_pv,
-                Err(_) => 1.0e6, // steer solver away from invalid regions
+        let price = |sigma: f64| match option.vol_model {
+            VolatilityModel::Normal => {
+                option.price_normal(context.curves.as_ref(), sigma, context.as_of)
+            }
+            VolatilityModel::Black => {
+                option.price_black(context.curves.as_ref(), sigma, context.as_of)
             }
         };
-
-        // Initial guess: overrides -> SABR ATM -> surface -> 20%
-        let initial_sigma = if let Some(ov) = option
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility
-        {
-            ov
-        } else if let Some(sabr) = &option.sabr_params {
-            let model = finstack_quant_models::SabrModel::new(sabr.clone());
-            model.implied_volatility(forward, strike, t).unwrap_or(0.2)
-        } else {
-            context
-                .curves
-                .get_surface(option.vol_surface_id.as_str())
-                .and_then(|s| {
-                    s.require_secondary_axis(VolSurfaceAxis::Strike)?;
-                    match option
-                        .instrument_pricing_overrides
-                        .model_config
-                        .vol_surface_extrapolation
-                    {
-                        VolSurfaceExtrapolation::Clamp
-                        | VolSurfaceExtrapolation::LinearInVariance => {
-                            // LinearInVariance falls back to Clamp until surface impl is ready
-                            Ok(finstack_quant_models::volatility::get_surface_vol_clamped(
-                                &s, t, strike,
-                            ))
-                        }
-                        VolSurfaceExtrapolation::Error => {
-                            finstack_quant_models::volatility::get_surface_vol(&s, t, strike)
-                        }
-                    }
-                })
-                .unwrap_or(0.2)
+        // Check model/domain errors before entering the scalar solver.
+        price(0.0)?;
+        let objective =
+            |sigma: f64| price(sigma).map_or(f64::NAN, |pv| (pv.amount() - target) / notional);
+        let upper = match option.vol_model {
+            VolatilityModel::Normal => 1.0,
+            VolatilityModel::Black => 5.0,
         };
-
-        let eps = 1e-8;
-        let x0 = (initial_sigma.max(eps)).ln();
-
-        // Try Brent solver; on failure return an error instead of fabricating
-        // a bound endpoint (a 0.0001%/300% vol is indistinguishable from a
-        // real solution downstream).
-        let solver = BrentSolver::new().tolerance(1e-10);
-        let implied_x = solver.solve(f, x0).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "swaption implied vol solver failed (target_pv={target_pv}, forward={forward}, \
-                 strike={strike}): {e}"
-            ))
-        })?;
-
-        // Reject pseudo-roots: the residual at the returned point must
-        // actually reproduce the target PV (e.g. target below discounted
-        // intrinsic has no root and some solvers return a boundary point).
-        let residual = f(implied_x);
-        let pv_tol = 1e-6 * target_pv.abs().max(1.0);
-        if !residual.is_finite() || residual.abs() > pv_tol {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "swaption implied vol did not converge: residual {residual} exceeds tolerance \
-                 {pv_tol} (target_pv={target_pv}, forward={forward}, strike={strike})"
+        let sigma = BrentSolver::new()
+            .tolerance(1e-12)
+            .solve_in_bracket(objective, 0.0, upper)?;
+        let residual = price(sigma)?.amount() - target;
+        let tolerance = 1e-8 * target.abs().max(1.0);
+        if residual.abs() > tolerance {
+            return Err(Error::Validation(format!(
+                "swaption implied vol price residual {residual} exceeds {tolerance}"
             )));
         }
-
-        let sigma = implied_x.exp();
         Ok(sigma)
     }
 }

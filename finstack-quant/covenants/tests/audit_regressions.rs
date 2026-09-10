@@ -346,8 +346,11 @@ impl ModelTimeSeries for Series {
             _ => None,
         }
     }
-    fn period_end_date(&self, period: &PeriodId) -> Date {
-        Date::from_ordinal_date(period.year, period.index).unwrap()
+    fn period_end_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
+        Ok(Date::from_ordinal_date(period.year, period.index).unwrap())
+    }
+    fn period_start_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
+        self.period_end_date(period)
     }
 }
 fn periods() -> Vec<PeriodId> {

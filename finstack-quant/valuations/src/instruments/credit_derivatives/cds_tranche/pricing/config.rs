@@ -3,7 +3,6 @@
 use crate::cashflow::primitives::CashFlow;
 use finstack_quant_core::dates::{Date, StubKind};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
-use finstack_quant_core::math::GaussHermiteQuadrature;
 use finstack_quant_core::types::Percentage;
 use finstack_quant_core::{Error as CoreError, Result as CoreResult};
 use finstack_quant_models::correlation::copula::{Copula, CopulaSpec};
@@ -13,13 +12,8 @@ use std::sync::OnceLock;
 
 // Default Configuration Constants
 
-/// Default quadrature order for Gauss-Hermite integration.
-///
-/// Industry standard (QuantLib, Bloomberg) uses 20-50 points.
-/// 7 points is insufficient for accurate resolution of:
-/// - Step-function-like integrands at extreme correlations
-/// - Student-t heavy tails
-pub(super) const DEFAULT_QUADRATURE_ORDER: u8 = 20;
+/// Absolute error budget for one capped pool expectation, in portfolio fractions.
+pub(super) const DEFAULT_INTEGRATION_TOLERANCE: f64 = 1e-10;
 
 /// Minimum correlation value for numerical stability (avoids division by near-zero)
 const DEFAULT_MIN_CORRELATION: f64 = 0.01;
@@ -56,14 +50,6 @@ pub(super) const NUMERICAL_TOLERANCE: f64 = 1e-10;
 /// Clip parameter for CDF arguments to prevent overflow (±10 sigma)
 pub(super) const CDF_CLIP: f64 = 10.0;
 
-/// Lower correlation threshold for adaptive integration (below this, use higher order).
-/// Rationale: Near ρ=0, conditional probability is highly sensitive to market factor.
-pub(super) const ADAPTIVE_INTEGRATION_LOW: f64 = 0.05;
-
-/// Upper correlation threshold for adaptive integration (above this, use higher order).
-/// Rationale: Near ρ=1, integrand approaches step function requiring more points.
-pub(super) const ADAPTIVE_INTEGRATION_HIGH: f64 = 0.95;
-
 /// Probability clamp epsilon to avoid 0/1 extremes in probits/CDFs
 pub(super) const PROBABILITY_CLIP: f64 = 1e-12;
 
@@ -83,9 +69,6 @@ pub(super) const PROBABILITY_CLIP: f64 = 1e-12;
 /// enough to absorb the floating-point round-off in equal weights built as
 /// `1.0 / n` (worst-case `n·ε ≈ 125 · 2.2e-16 ≈ 3e-14 ≪ 1e-9`).
 pub(super) const HOMOGENEITY_TOLERANCE: f64 = 1e-9;
-
-/// LGD floor to avoid zero exposure in corner cases
-pub(super) const LGD_FLOOR: f64 = 1e-6;
 
 /// Minimum grid step to avoid degenerate convolution buckets
 pub(super) const GRID_STEP_MIN: f64 = 1e-6;
@@ -139,9 +122,14 @@ pub struct CDSTranchePricerConfig {
     /// Recovery model specification (default: use index recovery rate)
     pub recovery_spec: Option<RecoverySpec>,
 
-    /// Number of Gauss-Hermite points. Supported orders are 5, 7, 10, 15,
-    /// and 20; the default is 20.
-    pub quadrature_order: u8,
+    /// Absolute numerical integration budget in portfolio-notional fractions
+    /// (default `1e-10`). Must lie in `[1e-12, 1e-4]`. Tail truncation and
+    /// nested-factor quadrature each consume a share of this budget.
+    pub integration_tolerance: f64,
+    /// Maximum adaptive subdivisions per conditioning interval (default 20).
+    /// Zero permits only the initial refinement check. The summed absolute
+    /// quadrature error must meet the total budget, or pricing fails.
+    pub integration_max_depth: usize,
     /// Whether to use issuer-specific curves if available
     pub use_issuer_curves: bool,
     /// Minimum correlation value for numerical stability
@@ -189,7 +177,8 @@ impl Default for CDSTranchePricerConfig {
             recovery_spec: None, // Use index recovery rate by default
 
             // Numerical integration
-            quadrature_order: DEFAULT_QUADRATURE_ORDER,
+            integration_tolerance: DEFAULT_INTEGRATION_TOLERANCE,
+            integration_max_depth: 20,
             use_issuer_curves: true,
             min_correlation: DEFAULT_MIN_CORRELATION,
             max_correlation: DEFAULT_MAX_CORRELATION,
@@ -246,12 +235,17 @@ impl CDSTranchePricerConfig {
                 .validate()
                 .map_err(|error| CoreError::Validation(error.to_string()))?;
         }
-        GaussHermiteQuadrature::new(usize::from(self.quadrature_order)).map_err(|error| {
-            CoreError::Validation(format!(
-                "unsupported quadrature_order {}: {error}",
-                self.quadrature_order
-            ))
-        })?;
+        validate_range(
+            "integration_tolerance",
+            self.integration_tolerance,
+            1e-12,
+            1e-4,
+        )?;
+        if self.integration_max_depth > 30 {
+            return Err(CoreError::Validation(
+                "integration_max_depth must not exceed 30".to_owned(),
+            ));
+        }
         validate_range("min_correlation", self.min_correlation, 0.0, 1.0)?;
         validate_range("max_correlation", self.max_correlation, 0.0, 1.0)?;
         if self.min_correlation >= self.max_correlation {
@@ -361,15 +355,15 @@ impl CDSTranchePricerConfig {
         self
     }
 
-    /// Set the Gauss-Hermite quadrature order.
+    /// Set the absolute integration error budget for capped pool expectations.
     ///
     /// # Arguments
     ///
-    /// * `order` - Requested number of points. [`CDSTranchePricer::with_params`]
-    ///   accepts only 5, 7, 10, 15, or 20.
+    /// * `tolerance` - Absolute error budget in portfolio-notional fractions,
+    ///   between `1e-12` and `1e-4`. Validated when constructing the pricer.
     #[must_use]
-    pub fn with_quadrature_order(mut self, order: u8) -> Self {
-        self.quadrature_order = order;
+    pub fn with_integration_tolerance(mut self, tolerance: f64) -> Self {
+        self.integration_tolerance = tolerance;
         self
     }
 }
@@ -417,17 +411,16 @@ pub enum HeteroMethod {
 /// Supports multiple copula models (Gaussian, Student-t, RFL, Multi-factor)
 /// and optional stochastic recovery for market-standard tranche pricing.
 ///
-/// The copula instance and quadrature table are constructed lazily on first use
-/// and cached for the pricer's lifetime. Heterogeneous EL evaluation calls into
-/// copula dispatch and quadrature selection from hot integration loops.
+/// The copula instance is constructed lazily and cached for the pricer's
+/// lifetime. Expected losses use adaptive integration over every conditioning
+/// factor with explicit tail and convergence budgets.
 ///
 /// Configuration is validated by [`CDSTranchePricer::with_params`] and remains
-/// immutable for the pricer's lifetime. The cached copula and quadrature
+/// immutable for the pricer's lifetime. The cached copula
 /// therefore cannot drift from the settings used by uncached calculations.
 pub struct CDSTranchePricer {
     pub(super) params: CDSTranchePricerConfig,
     pub(super) copula_cache: OnceLock<Box<dyn Copula + Send + Sync>>,
-    pub(super) quadrature_cache: OnceLock<GaussHermiteQuadrature>,
 }
 
 /// Which per-name exposure a capped pool expectation integrates over.

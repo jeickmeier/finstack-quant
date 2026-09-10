@@ -667,7 +667,7 @@ impl PyGoalSeekResult {
 /// ------
 /// ValueError
 ///     If a period does not parse, the solver fails to converge, or the
-///     bracket does not contain a root.
+///     bracket does not contain a root, or the final objective residual exceeds 1e-9 times max(1, abs(target_value)). Failure leaves the model unchanged.
 /// KeyError
 ///     If ``target_node`` or ``driver_node`` is missing from the model.
 ///

@@ -53,7 +53,8 @@ pub struct CarryResult {
 ///
 /// * `roll` - Dollar roll instrument
 /// * `prepay_rate` - Expected monthly prepayment rate (SMM). When set to
-///   `0.0`, only scheduled amortization is included.
+///   `0.0`, only scheduled amortization is included. This replaces the generic
+///   pool's PSA assumption and must be finite and in `[0, 1]`.
 pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<CarryResult> {
     let days = roll.settlement_days()?;
     let drop = roll.drop();
@@ -62,58 +63,41 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
     let front_settle = roll.front_settle_date()?;
     let back_settle = roll.back_settle_date()?;
 
-    let pool = create_assumed_pool(&front_leg, front_settle)?;
-
-    // Principal paydown: use the model's projection for the roll period.
-    let max_months = ((days as f64 / 28.0).ceil() as u32).max(2) + 1;
-    let cashflows = generate_cashflows(&pool, front_settle, Some(max_months))?;
-
-    let original_face = pool.current_face.amount();
-    let scale = if original_face.abs() > 1e-12 {
-        100.0 / original_face
-    } else {
-        0.0
-    };
-
-    // Sum accrual-period principal between the two settlement dates
-    let mut principal_paydown: f64 = cashflows
-        .iter()
-        .filter(|cf| cf.period_end > front_settle && cf.period_start < back_settle)
-        .map(|cf| cf.scheduled_principal + cf.prepayment)
-        .sum::<f64>()
-        * scale;
-
-    // Layer in user-supplied SMM if it exceeds the model's prepayment
-    if prepay_rate > 0.0 {
-        let model_smm_paydown: f64 = cashflows
-            .iter()
-            .filter(|cf| cf.period_end > front_settle && cf.period_start < back_settle)
-            .map(|cf| cf.prepayment)
-            .sum::<f64>()
-            * scale;
-        let user_smm_paydown = 100.0 * prepay_rate;
-        if user_smm_paydown > model_smm_paydown {
-            principal_paydown += user_smm_paydown - model_smm_paydown;
+    if !prepay_rate.is_finite() || !(0.0..=1.0).contains(&prepay_rate) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Dollar-roll prepayment SMM must be finite and in [0, 1]".into(),
+        ));
+    }
+    let mut pool = create_assumed_pool(&front_leg, front_settle)?;
+    pool.prepayment_model = crate::cashflow::builder::specs::PrepaymentModelSpec::constant_cpr(
+        1.0 - (1.0 - prepay_rate).powi(12),
+    );
+    let months = (back_settle.year() - front_settle.year()) * 12
+        + i32::from(u8::from(back_settle.month()))
+        - i32::from(u8::from(front_settle.month()));
+    let cashflows = generate_cashflows(&pool, front_settle, Some(months as u32 + 1))?;
+    let scale = 100.0 / pool.current_face.amount();
+    let mut principal_paydown = 0.0;
+    let mut coupon_income = 0.0;
+    for cf in &cashflows {
+        // Balance changes once at the next contractual monthly accrual boundary.
+        let boundary = cf.period_end + time::Duration::days(1);
+        let start = cf.period_start.max(front_settle);
+        let end = boundary.min(back_settle);
+        if end > start {
+            coupon_income += cf.beginning_balance
+                * pool.pass_through_rate
+                * pool.day_count.year_fraction(
+                    start,
+                    end,
+                    finstack_quant_core::dates::DayCountContext::default(),
+                )?
+                * scale;
+        }
+        if boundary > front_settle && boundary <= back_settle {
+            principal_paydown += (cf.scheduled_principal + cf.prepayment) * scale;
         }
     }
-
-    // Coupon income accrued between the two settlement dates (per $100).
-    // Dollar-roll carry uses accrued income, not payment-date cashflows,
-    // because the payment delay for agency MBS (55–75 days) typically
-    // pushes the first payment past the back settlement date.
-    //
-    // Interest accrues on the *declining* MBS balance: as the pool amortizes
-    // and prepays over the roll, the balance earning the coupon shrinks.
-    // Accruing the coupon on a constant 100 face overstates income —
-    // materially for fast pools / long rolls. We accrue on the time-weighted
-    // average balance, approximated by the mean of the front-settle balance
-    // (100 per $100) and the back-settle balance (100 − principal_paydown).
-    // `principal_paydown` here is the *total* roll-period paydown, including
-    // any user-supplied SMM layered in above, so the declining balance is
-    // consistent with the realized paydown. The accrual horizon uses the
-    // actual roll days (ACT/360).
-    let avg_balance = (100.0 + (100.0 - principal_paydown).max(0.0)) / 2.0;
-    let coupon_income = roll.coupon * (days as f64 / 360.0) * avg_balance;
 
     // Net financing benefit forgone by the roll seller: coupon income plus the
     // paydown's pull-to-par gain, less the drop captured by buying back cheaper.
@@ -142,8 +126,7 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
 /// * `roll` - Dollar-roll contract whose front and back prices, settlement
 ///   dates, coupon, and TBA pool assumptions determine implied financing.
 /// * `prepay_rate` - Monthly single-month mortality (SMM) assumption as a
-///   decimal. A positive value layers additional prepayment over the modelled
-///   pool projection when it is larger than the model's SMM.
+///   decimal in `[0, 1]`, replacing the generic pool's PSA assumption.
 /// * `repo_rate` - Comparable annualized repo financing rate as a decimal on
 ///   the same ACT/360 basis used for the roll's implied financing rate.
 ///
@@ -242,25 +225,20 @@ mod tests {
             "expected positive principal paydown over the roll"
         );
 
-        // Flat-100-face accrual (the pre-fix formula).
-        let days = result.settlement_days;
-        let flat_100_income = roll.coupon * (days as f64 / 360.0) * 100.0;
-
-        // Declining-balance accrual must be strictly smaller.
-        assert!(
-            result.coupon_income < flat_100_income,
-            "coupon income {} should be below flat-100 accrual {flat_100_income} \
-             once the balance declines",
-            result.coupon_income
-        );
-        // And it must equal the mean-balance accrual.
-        let avg_balance = (100.0 + (100.0 - result.principal_paydown).max(0.0)) / 2.0;
-        let expected = roll.coupon * (days as f64 / 360.0) * avg_balance;
-        assert!(
-            (result.coupon_income - expected).abs() < 1e-9,
-            "coupon income {} should equal mean-balance accrual {expected}",
-            result.coupon_income
-        );
+        let front = roll.front_settle_date().expect("front");
+        let back = roll.back_settle_date().expect("back");
+        let boundary =
+            finstack_quant_core::dates::Date::from_calendar_date(back.year(), back.month(), 1)
+                .expect("boundary");
+        let day_count = finstack_quant_core::dates::DayCount::Thirty360;
+        let first = day_count
+            .year_fraction(front, boundary, Default::default())
+            .expect("first");
+        let second = day_count
+            .year_fraction(boundary, back, Default::default())
+            .expect("second");
+        let expected = roll.coupon * (100.0 * first + (100.0 - result.principal_paydown) * second);
+        assert!((result.coupon_income - expected).abs() < 1e-9);
     }
 
     #[test]
@@ -354,6 +332,38 @@ mod tests {
         assert!(
             s_wide > s_base,
             "larger drop must raise specialness: base={s_base}bp, wide={s_wide}bp"
+        );
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn carry_counts_one_paydown_and_coupon_on_30_360() {
+        let mut roll = DollarRoll::example().expect("roll");
+        roll.front_settlement_date = Some(date!(2026 - 03 - 11));
+        roll.back_settlement_date = Some(date!(2026 - 04 - 11));
+        let carry = implied_financing_rate(&roll, 0.0).expect("carry");
+        let mut pool = create_assumed_pool(&roll.front_leg().expect("leg"), date!(2026 - 03 - 11))
+            .expect("pool");
+        pool.prepayment_model = crate::cashflow::builder::specs::PrepaymentModelSpec::psa(0.0);
+        let cf = generate_cashflows(&pool, date!(2026 - 03 - 11), Some(1)).expect("flows");
+        let principal =
+            (cf[0].scheduled_principal + cf[0].prepayment) / pool.current_face.amount() * 100.0;
+        assert!(
+            (carry.principal_paydown - principal).abs() < 1e-10,
+            "paydown {} versus {principal}",
+            carry.principal_paydown
+        );
+        // Opening face accrues March 11-April 1, remaining face April 1-11.
+        let coupon = roll.coupon * (100.0 * 20.0 + (100.0 - principal) * 10.0) / 360.0;
+        assert!(
+            (carry.coupon_income - coupon).abs() < 1e-10,
+            "coupon {} versus {coupon}",
+            carry.coupon_income
         );
     }
 }

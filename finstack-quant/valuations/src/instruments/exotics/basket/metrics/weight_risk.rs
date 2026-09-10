@@ -6,7 +6,7 @@
 //!
 //! # Formula
 //! ```text
-//! WeightRisk_i = (PV(basket with bumped weight_i) - PV_base) / bump_size
+//! WeightRisk_i = (PV(basket with bumped weight_i) - PV_base) / bump_size * 1e-4
 //! ```
 //! Where bump_size is typically 1bp (0.0001) change in weight.
 
@@ -32,10 +32,7 @@ impl MetricCalculator for WeightRiskCalculator {
 
         // For each constituent, bump its weight and adjust others proportionally
         for (idx, constituent) in basket.constituents.iter().enumerate() {
-            let label = constituent
-                .ticker
-                .clone()
-                .unwrap_or_else(|| constituent.id.clone());
+            let label = constituent.id.clone();
 
             let bumped_weight = (constituent.weight + WEIGHT_BUMP).clamp(0.0, 1.0);
             let weight_change = bumped_weight - constituent.weight;
@@ -74,13 +71,13 @@ impl MetricCalculator for WeightRiskCalculator {
 
             // Weight risk = (PV_bumped - PV_base) / weight_change
             // Result is per 1bp change in weight
-            let risk = (pv_bumped - base_pv) / weight_change * 10_000.0; // Scale to per 1bp
+            let risk = (pv_bumped - base_pv) / weight_change * WEIGHT_BUMP; // Currency per 1bp weight change
 
             series.push((label, risk));
             total_risk += risk;
         }
 
-        context.store_bucketed_series(crate::metrics::MetricId::custom("weight_risk"), series);
+        context.store_bucketed_series(crate::metrics::MetricId::WeightRisk, series);
 
         Ok(total_risk)
     }

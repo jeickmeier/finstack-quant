@@ -1048,14 +1048,6 @@
         "null"
       ]
     },
-    "quoted_price_pct": {
-      "description": "Externally-quoted price as a percentage of original balance (100.0 = par).\n\nStructured-credit spread metrics require this external target to avoid\nthe circular objective `PV(curve + z) == PV(curve)`. They return an error\nwhen it is absent.",
-      "format": "double",
-      "type": [
-        "number",
-        "null"
-      ]
-    },
     "theta_period": {
       "default": null,
       "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",

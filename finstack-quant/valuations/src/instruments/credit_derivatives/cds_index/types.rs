@@ -253,6 +253,7 @@ impl CDSIndex {
             side: PayReceive::Pay,
             convention,
             premium: PremiumLegSpec {
+                standard_imm_dates: true,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
                 frequency,
@@ -341,6 +342,7 @@ impl CDSIndex {
             side,
             convention,
             premium: PremiumLegSpec {
+                standard_imm_dates: true,
                 start,
                 end,
                 frequency,

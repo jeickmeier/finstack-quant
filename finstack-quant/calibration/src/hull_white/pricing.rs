@@ -127,9 +127,23 @@ pub(crate) fn hw1f_cap_floor_implied_normal_vol(
     discount_df: &dyn Fn(f64) -> f64,
     forward_df: &dyn Fn(f64) -> f64,
     spec: CapFloorPriceSpec,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     let target = hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec);
-    let residual = |vol: f64| -> f64 {
+    cap_floor_implied_normal_vol(target, discount_df, forward_df, spec)
+}
+
+pub(super) fn cap_floor_implied_normal_vol(
+    target: f64,
+    discount_df: &dyn Fn(f64) -> f64,
+    forward_df: &dyn Fn(f64) -> f64,
+    spec: CapFloorPriceSpec,
+) -> finstack_quant_core::Result<f64> {
+    if !target.is_finite() || target < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Hull-White cap price must be finite and non-negative for quote inversion".into(),
+        ));
+    }
+    let residual = |vol: f64| {
         bachelier_cap_floor_price(
             discount_df,
             forward_df,
@@ -140,15 +154,13 @@ pub(crate) fn hw1f_cap_floor_implied_normal_vol(
             spec.frequency,
         ) - target
     };
-    let mut hi = sigma.max(0.01);
-    while residual(hi) < 0.0 && hi < 1.0 {
+    let mut hi = 0.01;
+    while residual(hi) < 0.0 && hi < 100.0 {
         hi *= 2.0;
     }
     BrentSolver::new()
-        .tolerance(1e-12)
-        .bracket_bounds(1e-10, hi)
-        .solve(residual, hi * 0.5)
-        .unwrap_or(hi)
+        .tolerance(1e-14)
+        .solve_in_bracket(residual, 0.0, hi)
 }
 
 /// Caplet periods `(t_start, t_end, accrual)` for a spot-start cap quote.

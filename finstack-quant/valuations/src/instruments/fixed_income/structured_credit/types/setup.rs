@@ -52,13 +52,6 @@ pub struct DealDates {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub first_payment_date: Date,
-    /// End of reinvestment period (if applicable)
-    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
-    )]
-    pub reinvestment_end_date: Option<Date>,
     /// Legal final maturity date
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -81,16 +74,9 @@ impl DealDates {
         Self {
             closing_date,
             first_payment_date,
-            reinvestment_end_date: None,
             maturity,
             frequency,
         }
-    }
-
-    /// Add reinvestment period
-    pub fn with_reinvestment_end(mut self, end_date: Date) -> Self {
-        self.reinvestment_end_date = Some(end_date);
-        self
     }
 }
 
@@ -378,7 +364,6 @@ mod tests {
         let dates = DealDates::new(test_date(), test_date(), test_date(), Tenor::quarterly());
 
         assert_eq!(dates.closing_date, test_date());
-        assert!(dates.reinvestment_end_date.is_none());
     }
 
     #[test]

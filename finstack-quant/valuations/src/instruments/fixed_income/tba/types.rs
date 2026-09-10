@@ -160,7 +160,7 @@ pub struct AgencyTba {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub settlement_date: Option<Date>,
-    /// Trade notional (par amount).
+    /// Current face amount purchased at settlement, in the trade currency.
     pub notional: Money,
     /// Trade price (percentage of par, e.g., 98.5).
     pub trade_price: f64,
@@ -173,13 +173,16 @@ pub struct AgencyTba {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub trade_date: Option<Date>,
-    /// Expected pool factor for valuation.
-    /// Defaults to 1.0 (newly issued) if not specified.
+    /// Current/original face ratio in `(0, 1]` for the assumed delivered pool.
+    /// Defaults to 1.0 for a generic pool. Original face is `notional / factor`;
+    /// the purchased current face remains `notional`. When an explicit pool is
+    /// supplied, its factor is used and any specified factor must agree.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pool_factor: Option<f64>,
     /// Optional assumed pool for valuation.
-    /// If not provided, generic pool characteristics are assumed.
+    /// Its current and original faces are scaled together to the trade's
+    /// purchased current face. If absent, generic pool characteristics apply.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assumed_pool: Option<Box<AgencyMbsPassthrough>>,
@@ -235,10 +238,10 @@ impl AgencyTba {
         }
         if self
             .pool_factor
-            .is_some_and(|factor| !factor.is_finite() || !(0.0..=1.0).contains(&factor))
+            .is_some_and(|factor| !factor.is_finite() || factor <= 0.0 || factor > 1.0)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} pool_factor must be finite and in [0, 1]"
+                "{context} pool_factor must be finite and in (0, 1]"
             )));
         }
         if self.discount_curve_id.as_str().trim().is_empty() {

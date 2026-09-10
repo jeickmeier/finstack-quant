@@ -15,14 +15,19 @@ use std::sync::Arc;
 
 /// `__reduce__` payload for the swaption calibration config: callable plus its
 /// `(frequency, fixed_kappa, initial_guess)` constructor arguments.
-type SwaptionConfigReduce<'py> = (
+type ScalarConfigReduce<'py> = (
     Bound<'py, PyAny>,
-    (String, Option<f64>, Option<PyHullWhiteCalibrationParams>),
+    (
+        f64,
+        String,
+        Option<f64>,
+        Option<PyHullWhiteCalibrationParams>,
+    ),
 );
 
 /// `__reduce__` payload for the cap/floor calibration config: callable plus its
 /// `(fixed_kappa, sigma_min, sigma_max, frequency)` constructor arguments.
-type CapFloorConfigReduce<'py> = (Bound<'py, PyAny>, (f64, f64, f64, String));
+type PiecewiseConfigReduce<'py> = (Bound<'py, PyAny>, (f64, f64, f64, f64, String));
 
 /// Docstring for the `finstack_quant.calibration.hull_white` namespace.
 const MODULE_DOC: &str = "Direct Hull-White one-factor calibrators (swaptions, caps/floors, piecewise sigma).\n\nThese take a calibrated DiscountCurve and year-fraction quotes; the plan-level\nequivalents are the `hull_white` / `cap_floor_hull_white` calibration steps.\n\nExamples\n--------\n>>> from finstack_quant.calibration.hull_white import SwaptionQuote\n>>> SwaptionQuote(1.0, 5.0, 0.0065).expiry\n1.0\n";
@@ -495,6 +500,8 @@ impl PyCapFloorCalibrationConfig {
     ///
     /// Parameters
     /// ----------
+    /// fit_tolerance : float
+    ///     Required positive maximum implied normal-vol quote error in decimal rate units.
     /// frequency : str, default "semi_annual"
     ///     Caplet payment frequency: ``"annual"``, ``"semi_annual"`` or ``"quarterly"``.
     /// fixed_kappa : float | None, default None
@@ -507,20 +514,30 @@ impl PyCapFloorCalibrationConfig {
     /// ValueError
     ///     If ``frequency`` is not one of the accepted strings.
     #[new]
-    #[pyo3(signature = (frequency = "semi_annual", fixed_kappa = None, initial_guess = None))]
-    #[pyo3(text_signature = "(frequency='semi_annual', fixed_kappa=None, initial_guess=None)")]
+    #[pyo3(signature = (fit_tolerance, frequency = "semi_annual", fixed_kappa = None, initial_guess = None))]
+    #[pyo3(
+        text_signature = "(fit_tolerance, frequency='semi_annual', fixed_kappa=None, initial_guess=None)"
+    )]
     fn new(
+        fit_tolerance: f64,
         frequency: &str,
         fixed_kappa: Option<f64>,
         initial_guess: Option<PyRef<'_, PyHullWhiteCalibrationParams>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: CapFloorCalibrationConfig {
+                fit_tolerance,
                 frequency: parse_frequency(frequency)?,
                 fixed_kappa,
                 initial_guess: initial_guess.map(|p| p.inner),
             },
         })
+    }
+
+    /// Maximum accepted implied normal-vol quote error in decimal rate units.
+    #[getter]
+    fn fit_tolerance(&self) -> f64 {
+        self.inner.fit_tolerance
     }
 
     /// Caplet payment frequency name.
@@ -544,17 +561,22 @@ impl PyCapFloorCalibrationConfig {
     }
 
     /// Pickle support through the constructor arguments.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<SwaptionConfigReduce<'py>> {
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<ScalarConfigReduce<'py>> {
         Ok((
             py.get_type::<Self>().into_any(),
-            (self.frequency(), self.fixed_kappa(), self.initial_guess()),
+            (
+                self.inner.fit_tolerance,
+                self.frequency(),
+                self.fixed_kappa(),
+                self.initial_guess(),
+            ),
         ))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "CapFloorCalibrationConfig(frequency={:?}, fixed_kappa={}, initial_guess={})",
-            self.frequency(),
+            "CapFloorCalibrationConfig(fit_tolerance={}, frequency={:?}, fixed_kappa={}, initial_guess={})",
+            self.inner.fit_tolerance, self.frequency(),
             self.inner
                 .fixed_kappa
                 .map_or("None".to_string(), |k| k.to_string()),
@@ -569,7 +591,7 @@ impl PyCapFloorCalibrationConfig {
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration.hull_white import PiecewiseSigmaCalibrationConfig
-/// >>> cfg = PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.1)
+/// >>> cfg = PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.1, 1e-4)
 /// >>> (cfg.fixed_kappa, cfg.frequency)
 /// (0.03, 'semi_annual')
 #[pyclass(
@@ -595,6 +617,8 @@ impl PyPiecewiseSigmaCalibrationConfig {
     ///     Lower bracket for each interval's sigma (> 0).
     /// sigma_max : float
     ///     Upper bracket for each interval's sigma (> ``sigma_min``).
+    /// fit_tolerance : float
+    ///     Required positive maximum implied normal-vol quote error in decimal rate units.
     /// frequency : str, default "semi_annual"
     ///     Caplet payment frequency: ``"annual"``, ``"semi_annual"`` or ``"quarterly"``.
     ///
@@ -604,17 +628,32 @@ impl PyPiecewiseSigmaCalibrationConfig {
     ///     If ``frequency`` is not one of the accepted strings. Numeric bounds
     ///     are validated when the bootstrap runs.
     #[new]
-    #[pyo3(signature = (fixed_kappa, sigma_min, sigma_max, frequency = "semi_annual"))]
-    #[pyo3(text_signature = "(fixed_kappa, sigma_min, sigma_max, frequency='semi_annual')")]
-    fn new(fixed_kappa: f64, sigma_min: f64, sigma_max: f64, frequency: &str) -> PyResult<Self> {
+    #[pyo3(signature = (fixed_kappa, sigma_min, sigma_max, fit_tolerance, frequency = "semi_annual"))]
+    #[pyo3(
+        text_signature = "(fixed_kappa, sigma_min, sigma_max, fit_tolerance, frequency='semi_annual')"
+    )]
+    fn new(
+        fixed_kappa: f64,
+        sigma_min: f64,
+        sigma_max: f64,
+        fit_tolerance: f64,
+        frequency: &str,
+    ) -> PyResult<Self> {
         Ok(Self {
             inner: PiecewiseSigmaCalibrationConfig {
+                fit_tolerance,
                 fixed_kappa,
                 sigma_min,
                 sigma_max,
                 frequency: parse_frequency(frequency)?,
             },
         })
+    }
+
+    /// Maximum accepted implied normal-vol quote error in decimal rate units.
+    #[getter]
+    fn fit_tolerance(&self) -> f64 {
+        self.inner.fit_tolerance
     }
 
     /// Fixed mean reversion.
@@ -642,13 +681,14 @@ impl PyPiecewiseSigmaCalibrationConfig {
     }
 
     /// Pickle support through the constructor arguments.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<CapFloorConfigReduce<'py>> {
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<PiecewiseConfigReduce<'py>> {
         Ok((
             py.get_type::<Self>().into_any(),
             (
                 self.inner.fixed_kappa,
                 self.inner.sigma_min,
                 self.inner.sigma_max,
+                self.inner.fit_tolerance,
                 self.frequency(),
             ),
         ))
@@ -656,8 +696,8 @@ impl PyPiecewiseSigmaCalibrationConfig {
 
     fn __repr__(&self) -> String {
         format!(
-            "PiecewiseSigmaCalibrationConfig(fixed_kappa={}, sigma_min={}, sigma_max={}, frequency={:?})",
-            self.inner.fixed_kappa, self.inner.sigma_min, self.inner.sigma_max, self.frequency()
+            "PiecewiseSigmaCalibrationConfig(fixed_kappa={}, sigma_min={}, sigma_max={}, fit_tolerance={}, frequency={:?})",
+            self.inner.fixed_kappa, self.inner.sigma_min, self.inner.sigma_max, self.inner.fit_tolerance, self.frequency()
         )
     }
 }
@@ -685,6 +725,9 @@ fn cap_floor_quotes(quotes: Vec<PyRef<'_, PyCapFloorQuote>>) -> Vec<CapFloorQuot
 ///     Discount curve the swap annuities and forwards are read from.
 /// quotes : list[SwaptionQuote]
 ///     At least two swaption quotes (two free parameters).
+/// fit_tolerance : float
+///     Required positive maximum reconstructed quote error: decimal rate volatility
+///     for normal quotes, relative volatility for Black quotes. Independent of solver tolerance.
 /// frequency : str, default "semi_annual"
 ///     Fixed-leg payment frequency: ``"annual"``, ``"semi_annual"`` or ``"quarterly"``.
 /// initial_guess : HullWhiteCalibrationParams | None, default None
@@ -703,12 +746,15 @@ fn cap_floor_quotes(quotes: Vec<PyRef<'_, PyCapFloorQuote>>) -> Vec<CapFloorQuot
 /// RuntimeError
 ///     If the solver fails to converge.
 #[pyfunction]
-#[pyo3(signature = (discount, quotes, frequency = "semi_annual", initial_guess = None))]
-#[pyo3(text_signature = "(discount, quotes, frequency='semi_annual', initial_guess=None)")]
+#[pyo3(signature = (discount, quotes, fit_tolerance, frequency = "semi_annual", initial_guess = None))]
+#[pyo3(
+    text_signature = "(discount, quotes, fit_tolerance, frequency='semi_annual', initial_guess=None)"
+)]
 fn calibrate_hull_white_to_swaptions(
     py: Python<'_>,
     discount: &Bound<'_, PyAny>,
     quotes: Vec<PyRef<'_, PySwaptionQuote>>,
+    fit_tolerance: f64,
     frequency: &str,
     initial_guess: Option<PyRef<'_, PyHullWhiteCalibrationParams>>,
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
@@ -718,8 +764,19 @@ fn calibrate_hull_white_to_swaptions(
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
-            let df = |t: f64| curve.df(t);
-            rust_hw::calibrate_hull_white_to_swaptions(&df, &quotes, frequency, None, initial_guess)
+            let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                curve.as_ref(),
+                curve.base_date(),
+            )?;
+            let df = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
+            rust_hw::calibrate_hull_white_to_swaptions(
+                &df,
+                &quotes,
+                frequency,
+                None,
+                initial_guess,
+                fit_tolerance,
+            )
         })
         .map_err(core_to_py)?;
     Ok((
@@ -738,8 +795,8 @@ fn calibrate_hull_white_to_swaptions(
 ///     Curve projecting the caplet forwards; ``discount`` when ``None``.
 /// quotes : list[CapFloorQuote]
 ///     Cap/floor quotes (one quote requires ``config.fixed_kappa``).
-/// config : CapFloorCalibrationConfig | None, default None
-///     Frequency, fixed kappa and initial guess; Rust defaults when ``None``.
+/// config : CapFloorCalibrationConfig
+///     Required fit tolerance in normal-vol units, frequency, fixed kappa and initial guess.
 ///
 /// Returns
 /// -------
@@ -754,14 +811,14 @@ fn calibrate_hull_white_to_swaptions(
 /// RuntimeError
 ///     If the solver fails to converge.
 #[pyfunction]
-#[pyo3(signature = (discount, quotes, forward = None, config = None))]
-#[pyo3(text_signature = "(discount, quotes, forward=None, config=None)")]
+#[pyo3(signature = (discount, quotes, config, forward = None))]
+#[pyo3(text_signature = "(discount, quotes, config, forward=None)")]
 fn calibrate_hull_white_to_cap_floors(
     py: Python<'_>,
     discount: &Bound<'_, PyAny>,
     quotes: Vec<PyRef<'_, PyCapFloorQuote>>,
+    config: PyRef<'_, PyCapFloorCalibrationConfig>,
     forward: Option<&Bound<'_, PyAny>>,
-    config: Option<PyRef<'_, PyCapFloorCalibrationConfig>>,
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
     let discount = curve_of(discount, "discount")?;
     let forward = match forward {
@@ -769,11 +826,19 @@ fn calibrate_hull_white_to_cap_floors(
         _ => Arc::clone(&discount),
     };
     let quotes = cap_floor_quotes(quotes);
-    let config = config.map_or_else(CapFloorCalibrationConfig::default, |c| c.inner);
+    let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let discount_df = |t: f64| discount.df(t);
-            let forward_df = |t: f64| forward.df(t);
+            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                discount.as_ref(),
+                discount.base_date(),
+            )?;
+            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                forward.as_ref(),
+                discount.base_date(),
+            )?;
+            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
+            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
             rust_hw::calibrate_hull_white_to_cap_floors(&discount_df, &forward_df, &quotes, config)
         })
         .map_err(core_to_py)?;
@@ -828,8 +893,16 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let discount_df = |t: f64| discount.df(t);
-            let forward_df = |t: f64| forward.df(t);
+            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                discount.as_ref(),
+                discount.base_date(),
+            )?;
+            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                forward.as_ref(),
+                discount.base_date(),
+            )?;
+            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
+            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
             rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
                 &discount_df,
                 &forward_df,

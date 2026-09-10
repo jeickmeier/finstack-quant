@@ -71,7 +71,7 @@ rejected with no compatibility fallback.
 The pricer implements Bloomberg DOCS 2055833 Eq. 2.5:
 
 ```text
-O = P(t_e) · E_0[(ξ · V_te + H(K) + D)+]
+O = P(t_settle) · E_0[(ξ · V_te + H(K) + D)+]
 ```
 
 - `V_te` is the random forward CDS value at option expiry. The state variable is
@@ -81,20 +81,21 @@ O = P(t_e) · E_0[(ξ · V_te + H(K) + D)+]
   - spread strike: `H_spread = ξ · (c − K) · A(K)` (Eq. 2.4);
   - clean-price strike: `H_price = ξ · (K − 1) · f0 / f`, evaluated inside the
     outer current-factor scale `f`.
-- `D` is the deterministic settlement of realized index losses and expected
-  front-end protection: `D = ξ · (L / f + FEP)`. Realized loss appears here
-  exactly once — it is never also folded into an adjusted strike.
+- `D` settles already-realized index losses: `D = ξ · L / f`.
+  Expected future front-end protection enters the calibrated loss-adjusted
+  forward; it is never also added to `D`.
 - The lognormal mean `m` is calibrated so the process reproduces the
-  bootstrapped no-knockout forward value `F_0` (DOCS 2055833 §1.2). Index
-  options trade no-knockout, so the calibration target includes the
-  `(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options knock out on
-  default and skip it.
+  forward CDS value plus `(1−R)·(1−q_te)` for a non-knockout index.
+  Delivered-CDS protection starts at expiry and front-end protection stops
+  there. Both annuities use the same coupon schedule and accrued-premium
+  subtraction. The curve anchor uses observed survival; spread states use
+  the model's flat hazard.
 
 The native ATM-forward clean-price coordinate follows from payer/receiver parity
 under the same payoff:
 
 ```text
-K_ATM = 1 − (f·F0 + L + f·FEP) / f0
+K_ATM = 1 − (f·F0 + L) / f0
 ```
 
 exposed in percentage points (`100 · K_ATM`) for moneyness and surface
@@ -102,8 +103,13 @@ selection. In the limit `f = f0 = 1`, `L = 0`, `FEP = 0` it reduces to
 `K_ATM = 1 − F0`.
 
 Underlying CDS mechanics follow Bloomberg CDSW conventions from DOCS 2057273
-where relevant, including spot default-leg valuation and the CDSO-scoped
-inclusive protection-end adjustment.
+where relevant, including the inclusive protection-end adjustment. The
+option's delivered CDS excludes pre-expiry defaults.
+
+Spread variance uses Actual/365F time from the current valuation date to
+legal expiry. Exercise proceeds are discounted to `exercise_settlement_date`
+(default: expiry). `cash_settlement_date` describes the separately agreed
+trade-premium payment and does not freeze variance or protection windows.
 
 ## Settlement
 

@@ -19,7 +19,8 @@ use tracing::{info, warn};
 use crate::builder::overnight::{OvernightObservationSchedule, OvernightRateConstraints};
 use crate::builder::rate_helpers::ResolvedFloatingRateFallback;
 use crate::builder::{
-    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod, FloatingRateObservation,
+    CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,
+    FloatingCouponSettlement, FloatingRateObservation,
 };
 
 use super::super::compiler::{FixedSchedule, FloatSchedule};
@@ -228,7 +229,7 @@ fn fallback_index_rate(
 pub(crate) fn emit_fixed_coupons_on(
     d: Date,
     fixed_schedules: &[FixedSchedule],
-    outstanding_after: &finstack_quant_core::HashMap<Date, Decimal>,
+    outstanding_history: &[(Date, Decimal)],
     outstanding_fallback: Decimal,
     ccy: Currency,
     out_flows: &mut Vec<CashFlow>,
@@ -238,92 +239,100 @@ pub(crate) fn emit_fixed_coupons_on(
     for schedule in fixed_schedules {
         let spec = &schedule.spec;
         let calendar = schedule.calendar;
-        if let (Some(&first), Some(&last)) = (schedule.dates.first(), schedule.dates.last()) {
-            if d < first || d > last {
-                continue;
+        let first = schedule.dates.partition_point(|date| {
+            schedule
+                .prev
+                .get(date)
+                .is_none_or(|period| period.accrual_end < d)
+        });
+        for period in schedule.dates[first..]
+            .iter()
+            .filter_map(|date| schedule.prev.get(date))
+            .take_while(|period| period.accrual_end == d)
+        {
+            let d = period.payment_date;
+            for (accrual_start, accrual_end, base_out) in super::balances::balance_segments(
+                outstanding_history,
+                period.accrual_start,
+                period.accrual_end,
+                outstanding_fallback,
+            ) {
+                let is_stub = schedule.first_last.contains(&d);
+                let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
+
+                // ACT/ACT ICMA: regular periods use the unadjusted span; stubs use the adjacent regular coupon.
+                let coupon_period = crate::builder::date_generation::icma_coupon_period(
+                    period.unadjusted_start,
+                    period.unadjusted_end,
+                    spec.schedule.frequency,
+                    if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                        spec.schedule.stub
+                    } else {
+                        finstack_quant_core::dates::StubKind::ShortBack
+                    },
+                    spec.schedule.end_of_month,
+                );
+                let yf = spec.schedule.day_count.year_fraction(
+                    accrual_start,
+                    accrual_end,
+                    finstack_quant_core::dates::DayCountContext {
+                        calendar: Some(calendar),
+                        frequency: Some(spec.schedule.frequency),
+                        bus_basis: None,
+                        coupon_period,
+                        end_is_termination_date: is_termination_date,
+                    },
+                )?;
+
+                let yf_dec = f64_to_decimal(yf)?;
+                let coupon_total_dec = base_out * spec.rate * yf_dec;
+                let coupon_total = decimal_to_f64(coupon_total_dec)?;
+
+                let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
+                let cash_pct_f64 = decimal_to_f64(cash_pct)?;
+                let pik_pct_f64 = decimal_to_f64(pik_pct)?;
+
+                let cash_amt = coupon_total * cash_pct_f64;
+                let pik_amt = coupon_total * pik_pct_f64;
+
+                let rate_f64 = decimal_to_f64(spec.rate)?;
+                let accrual = CashFlowAccrual {
+                    coupon_period,
+                    end_is_termination_date: is_termination_date,
+                    calendar_id: Some(spec.schedule.calendar_id.clone()),
+                    start: accrual_start,
+                    end: accrual_end,
+                    day_count: spec.schedule.day_count,
+                    projected_index_rate: None,
+                };
+
+                // Gate on cash split, not amount sign, so negative-rate coupons emit.
+                if cash_pct_f64 > 0.0 {
+                    let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
+                    out_flows.push(
+                        CashFlow::new(
+                            d,
+                            None,
+                            Money::new(cash_amt, ccy)?,
+                            kind,
+                            yf,
+                            Some(rate_f64),
+                        )
+                        .with_accrual(accrual.clone()),
+                    );
+                }
+
+                let pik_added =
+                    add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
+                if pik_added > 0.0 {
+                    if let Some(flow) = out_flows.last_mut() {
+                        flow.principal_date = Some(period.accrual_end);
+                        flow.accrual = Some(accrual);
+                    }
+                }
+                pik_to_add += pik_added;
             }
         }
-
-        let Some(period) = schedule.prev.get(&d).copied() else {
-            continue;
-        };
-        let accrual_start = period.accrual_start;
-        let accrual_end = period.accrual_end;
-        let is_stub = schedule.first_last.contains(&d);
-        let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
-        let base_out = *outstanding_after
-            .get(&accrual_start)
-            .unwrap_or(&outstanding_fallback);
-
-        // ACT/ACT ICMA: regular periods use the unadjusted span; stubs use the adjacent regular coupon.
-        let coupon_period = crate::builder::date_generation::icma_coupon_period(
-            period.unadjusted_start,
-            period.unadjusted_end,
-            spec.schedule.frequency,
-            if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
-                spec.schedule.stub
-            } else {
-                finstack_quant_core::dates::StubKind::ShortBack
-            },
-            spec.schedule.end_of_month,
-        );
-        let yf = spec.schedule.day_count.year_fraction(
-            accrual_start,
-            accrual_end,
-            finstack_quant_core::dates::DayCountContext {
-                calendar: Some(calendar),
-                frequency: Some(spec.schedule.frequency),
-                bus_basis: None,
-                coupon_period,
-                end_is_termination_date: is_termination_date,
-            },
-        )?;
-
-        let yf_dec = f64_to_decimal(yf)?;
-        let coupon_total_dec = base_out * spec.rate * yf_dec;
-        let coupon_total = decimal_to_f64(coupon_total_dec)?;
-
-        let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
-        let cash_pct_f64 = decimal_to_f64(cash_pct)?;
-        let pik_pct_f64 = decimal_to_f64(pik_pct)?;
-
-        let cash_amt = coupon_total * cash_pct_f64;
-        let pik_amt = coupon_total * pik_pct_f64;
-
-        let rate_f64 = decimal_to_f64(spec.rate)?;
-        let accrual = CashFlowAccrual {
-            coupon_period,
-            end_is_termination_date: is_termination_date,
-            calendar_id: Some(spec.schedule.calendar_id.clone()),
-            start: accrual_start,
-            end: accrual_end,
-            day_count: spec.schedule.day_count,
-            projected_index_rate: None,
-        };
-
-        // Gate on cash split, not amount sign, so negative-rate coupons emit.
-        if cash_pct_f64 > 0.0 {
-            let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
-            out_flows.push(
-                CashFlow::new(
-                    d,
-                    None,
-                    Money::new(cash_amt, ccy)?,
-                    kind,
-                    yf,
-                    Some(rate_f64),
-                )
-                .with_accrual(accrual.clone()),
-            );
-        }
-
-        let pik_added = add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
-        if pik_added > 0.0 {
-            if let Some(flow) = out_flows.last_mut() {
-                flow.accrual = Some(accrual);
-            }
-        }
-        pik_to_add += pik_added;
     }
     Ok(pik_to_add)
 }
@@ -360,15 +369,24 @@ pub(crate) struct ResolvedFloatMarket<'a> {
 /// processed on date `d`) that the caller must capitalize into the outstanding
 /// balance for subsequent periods. Cash flows are pushed into `out_flows` as a
 /// side effect; the return value is exclusively the PIK leg.
+pub(crate) struct FloatEmissionOutput<'a> {
+    pub flows: &'a mut Vec<CashFlow>,
+    pub projected_fixings: &'a mut Vec<crate::fixings::ProjectedFixing>,
+}
+
 pub(crate) fn emit_float_coupons_on(
     d: Date,
     float_schedules: &[FloatSchedule],
-    outstanding_after: &finstack_quant_core::HashMap<Date, Decimal>,
+    outstanding_history: &[(Date, Decimal)],
     outstanding_fallback: Decimal,
     ccy: Currency,
     market: ResolvedFloatMarket<'_>,
-    out_flows: &mut Vec<CashFlow>,
+    output: FloatEmissionOutput<'_>,
 ) -> finstack_quant_core::Result<f64> {
+    let FloatEmissionOutput {
+        flows: out_flows,
+        projected_fixings,
+    } = output;
     let mut pik_to_add = 0.0;
 
     for ((schedule, resolved_curve), resolved_fixing) in float_schedules
@@ -378,253 +396,342 @@ pub(crate) fn emit_float_coupons_on(
     {
         let spec = &schedule.spec;
         let calendar = schedule.calendar;
-        if let (Some(&first), Some(&last)) = (schedule.dates.first(), schedule.dates.last()) {
-            if d < first || d > last {
-                continue;
-            }
-        }
+        let first = schedule.dates.partition_point(|date| {
+            schedule
+                .prev
+                .get(date)
+                .is_none_or(|period| period.accrual_end < d)
+        });
+        for period in schedule.dates[first..]
+            .iter()
+            .filter_map(|date| schedule.prev.get(date))
+            .take_while(|period| period.accrual_end == d)
+        {
+            let d = period.payment_date;
+            for (accrual_start, accrual_end, base_out) in super::balances::balance_segments(
+                outstanding_history,
+                period.accrual_start,
+                period.accrual_end,
+                outstanding_fallback,
+            ) {
+                let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
 
-        let Some(period) = schedule.prev.get(&d).copied() else {
-            continue;
-        };
-        let accrual_start = period.accrual_start;
-        let accrual_end = period.accrual_end;
-        let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
-        let base_out = *outstanding_after
-            .get(&accrual_start)
-            .unwrap_or(&outstanding_fallback);
+                // ACT/ACT ICMA uses the payment period, not the reset cadence.
+                let coupon_period = crate::builder::date_generation::icma_coupon_period(
+                    period.unadjusted_start,
+                    period.unadjusted_end,
+                    spec.schedule.frequency,
+                    if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
+                        spec.schedule.stub
+                    } else {
+                        finstack_quant_core::dates::StubKind::ShortBack
+                    },
+                    spec.schedule.end_of_month,
+                );
+                let yf = spec.schedule.day_count.year_fraction(
+                    accrual_start,
+                    accrual_end,
+                    finstack_quant_core::dates::DayCountContext {
+                        calendar: Some(calendar),
+                        frequency: Some(spec.schedule.frequency),
+                        bus_basis: None,
+                        coupon_period,
+                        end_is_termination_date: is_termination_date,
+                    },
+                )?;
 
-        // ACT/ACT ICMA uses the payment period, not the reset cadence.
-        let coupon_period = crate::builder::date_generation::icma_coupon_period(
-            period.unadjusted_start,
-            period.unadjusted_end,
-            spec.schedule.frequency,
-            if matches!(spec.schedule.roll_rule, crate::builder::RollRule::None) {
-                spec.schedule.stub
-            } else {
-                finstack_quant_core::dates::StubKind::ShortBack
-            },
-            spec.schedule.end_of_month,
-        );
-        let yf = spec.schedule.day_count.year_fraction(
-            accrual_start,
-            accrual_end,
-            finstack_quant_core::dates::DayCountContext {
-                calendar: Some(calendar),
-                frequency: Some(spec.schedule.frequency),
-                bus_basis: None,
-                coupon_period,
-                end_is_termination_date: is_termination_date,
-            },
-        )?;
+                let reset_date = compute_reset_date(
+                    period.accrual_start,
+                    spec.rate_spec.reset_lag_days,
+                    spec.schedule.business_day_convention,
+                    schedule.fixing_calendar,
+                )?;
 
-        let reset_date = compute_reset_date(
-            accrual_start,
-            spec.rate_spec.reset_lag_days,
-            spec.schedule.business_day_convention,
-            schedule.fixing_calendar,
-        )?;
+                let runtime_spec = &schedule.runtime_spec;
+                let params = &runtime_spec.params;
+                let spread_bp = params.spread_bp;
+                let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
+                let cash_pct_f64 = decimal_to_f64(cash_pct)?;
+                let pik_pct_f64 = decimal_to_f64(pik_pct)?;
+                let base_out_f64 = decimal_to_f64(base_out)?;
 
-        let runtime_spec = &schedule.runtime_spec;
-        let params = &runtime_spec.params;
-        let spread_bp = params.spread_bp;
-        let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
-        let cash_pct_f64 = decimal_to_f64(cash_pct)?;
-        let pik_pct_f64 = decimal_to_f64(pik_pct)?;
-        let base_out_f64 = decimal_to_f64(base_out)?;
-
-        let observation = if let Some(method) = spec.rate_spec.overnight_compounding {
-            let overnight_basis = spec
-                .rate_spec
-                .overnight_basis
-                .unwrap_or(spec.schedule.day_count);
-            let day_count_basis = match overnight_basis {
-                finstack_quant_core::dates::DayCount::Act360 => 360.0,
-                finstack_quant_core::dates::DayCount::Act365F => 365.0,
-                other => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "overnight compounding requires Act360 or Act365F; got {other:?}"
-                    )))
-                }
-            };
-            let observations = OvernightObservationSchedule::compile(
-                accrual_start,
-                accrual_end,
-                method,
-                schedule.fixing_calendar,
-            )?;
-            if observations.observations().is_empty() {
-                return Err(finstack_quant_core::Error::Validation(format!(
+                let observation = if let Some(method) = spec.rate_spec.overnight_compounding {
+                    let overnight_basis = spec
+                        .rate_spec
+                        .overnight_basis
+                        .unwrap_or(spec.schedule.day_count);
+                    let day_count_basis = match overnight_basis {
+                        finstack_quant_core::dates::DayCount::Act360 => 360.0,
+                        finstack_quant_core::dates::DayCount::Act365F => 365.0,
+                        other => {
+                            return Err(finstack_quant_core::Error::Validation(format!(
+                                "overnight compounding requires Act360 or Act365F; got {other:?}"
+                            )))
+                        }
+                    };
+                    let observations = OvernightObservationSchedule::compile(
+                        period.accrual_start,
+                        period.accrual_end,
+                        method,
+                        schedule.fixing_calendar,
+                    )?;
+                    if observations.observations().is_empty() {
+                        return Err(finstack_quant_core::Error::Validation(format!(
                         "overnight accrual period [{accrual_start}, {accrual_end}) for index '{}' contains no business-day fixings",
                         spec.rate_spec.index_id
                     )));
-            }
-            FloatingRateObservation::Overnight {
-                schedule: observations,
-                day_count_basis,
-                constraints: OvernightRateConstraints {
-                    application: runtime_spec.overnight_index_constraints,
-                    index_floor_bp: params.index_floor_bp,
-                    index_cap_bp: params.index_cap_bp,
-                },
-            }
-        } else {
-            FloatingRateObservation::Term {
-                reset_date,
-                tenor_years: resolved_curve.as_deref().map_or_else(
-                    || {
-                        spec.rate_spec
-                            .index_tenor
-                            .unwrap_or(spec.rate_spec.reset_frequency)
-                            .to_years()
-                    },
-                    ForwardCurve::tenor,
-                ),
-            }
-        };
-        let mut settlement_params = params.clone();
-        if matches!(&observation, FloatingRateObservation::Overnight { .. }) {
-            settlement_params.index_floor_bp = None;
-            settlement_params.index_cap_bp = None;
-        }
-        let compiled = CompiledFloatingCoupon::compile(
-            FloatingCouponPeriod {
-                accrual_start,
-                accrual_end,
-                payment_date: d,
-                day_count: spec.schedule.day_count,
-                accrual_factor: yf,
-            },
-            FloatingCouponEconomics {
-                cash_fraction: cash_pct_f64,
-                pik_fraction: pik_pct_f64,
-                rate_params: settlement_params,
-            },
-            observation,
-        )?;
-
-        let settlement = match compiled.observation() {
-            FloatingRateObservation::Overnight {
-                day_count_basis, ..
-            } => {
-                let fallback = |error: &finstack_quant_core::Error| {
-                    fallback_index_rate(rate_when_projection_fails(
-                        error,
+                    }
+                    FloatingRateObservation::Overnight {
+                        schedule: observations,
+                        day_count_basis,
+                        constraints: OvernightRateConstraints {
+                            application: runtime_spec.overnight_index_constraints,
+                            index_floor_bp: params.index_floor_bp,
+                            index_cap_bp: params.index_cap_bp,
+                        },
+                    }
+                } else {
+                    FloatingRateObservation::Term {
                         reset_date,
-                        spread_bp,
-                        &runtime_spec.fallback,
-                        params,
-                    ))
+                        tenor_years: resolved_curve.as_deref().map_or_else(
+                            || {
+                                spec.rate_spec
+                                    .index_tenor
+                                    .unwrap_or(spec.rate_spec.reset_frequency)
+                                    .to_years()
+                            },
+                            ForwardCurve::tenor,
+                        ),
+                    }
                 };
-                if let Some(fwd) = resolved_curve.as_deref() {
-                    let fixings = resolved_fixing.as_ref();
-                    let index_id = spec.rate_spec.index_id.as_str();
-                    let mut state = compiled.replay_state();
-                    compiled.capture_notional(&mut state, base_out_f64)?;
-                    match compiled.advance_overnight(&mut state, accrual_end, |slice| {
-                        observed_overnight_rate(
-                            slice.observation_date,
-                            slice.rate_tenor_days,
-                            fwd,
-                            *day_count_basis,
-                            fixings,
-                            index_id,
-                        )
-                    }) {
-                        Ok(_) => compiled.settle(&state)?,
-                        Err(error) => {
-                            let index_rate = fallback(&error)?;
+                let mut settlement_params = params.clone();
+                if matches!(&observation, FloatingRateObservation::Overnight { .. }) {
+                    settlement_params.index_floor_bp = None;
+                    settlement_params.index_cap_bp = None;
+                }
+                let compiled = CompiledFloatingCoupon::compile(
+                    FloatingCouponPeriod {
+                        accrual_start,
+                        accrual_end,
+                        payment_date: d,
+                        day_count: spec.schedule.day_count,
+                        accrual_factor: yf,
+                    },
+                    FloatingCouponEconomics {
+                        cash_fraction: cash_pct_f64,
+                        pik_fraction: pik_pct_f64,
+                        rate_params: settlement_params,
+                    },
+                    observation,
+                )?;
+
+                let series_id = format!("FIXING:{}", spec.rate_spec.index_id);
+                // Record required observations even if the coupon's configured
+                // fallback masks an unavailable projection. A roll cannot use
+                // a spread-only fallback as an observed index fixing.
+                match compiled.observation() {
+                    FloatingRateObservation::Term { reset_date, .. } => {
+                        projected_fixings.push(crate::fixings::ProjectedFixing {
+                            series_id: series_id.clone(),
+                            date: *reset_date,
+                            value: None,
+                        });
+                    }
+                    FloatingRateObservation::Overnight { schedule, .. } => {
+                        projected_fixings.extend(schedule.observations().iter().map(
+                            |observation| crate::fixings::ProjectedFixing {
+                                series_id: series_id.clone(),
+                                date: observation.observation_date,
+                                value: None,
+                            },
+                        ));
+                    }
+                }
+                let settlement = match compiled.observation() {
+                    FloatingRateObservation::Overnight {
+                        day_count_basis, ..
+                    } => {
+                        let fallback = |error: &finstack_quant_core::Error| {
+                            fallback_index_rate(rate_when_projection_fails(
+                                error,
+                                reset_date,
+                                spread_bp,
+                                &runtime_spec.fallback,
+                                params,
+                            ))
+                        };
+                        if let Some(fwd) = resolved_curve.as_deref() {
+                            let fixings = resolved_fixing.as_ref();
+                            let index_id = spec.rate_spec.index_id.as_str();
+                            let mut state = compiled.replay_state();
+                            compiled.capture_notional(&mut state, base_out_f64)?;
+                            let mut cumulative =
+                                |cutoff| -> finstack_quant_core::Result<FloatingCouponSettlement> {
+                                    compiled.advance_overnight(&mut state, cutoff, |slice| {
+                                        let value = observed_overnight_rate(
+                                            slice.observation_date,
+                                            slice.rate_tenor_days,
+                                            fwd,
+                                            *day_count_basis,
+                                            fixings,
+                                            index_id,
+                                        )?;
+                                        projected_fixings.push(crate::fixings::ProjectedFixing {
+                                            series_id: series_id.clone(),
+                                            date: slice.observation_date,
+                                            value: Some(value),
+                                        });
+                                        Ok(value)
+                                    })?;
+                                    compiled.settle(&state)
+                                };
+                            let elapsed = |cutoff| {
+                                spec.schedule.day_count.year_fraction(
+                                    period.accrual_start,
+                                    cutoff,
+                                    finstack_quant_core::dates::DayCountContext {
+                                        calendar: Some(calendar),
+                                        frequency: Some(spec.schedule.frequency),
+                                        bus_basis: None,
+                                        coupon_period,
+                                        end_is_termination_date: schedule.terminal_accrual_end
+                                            == Some(cutoff),
+                                    },
+                                )
+                            };
+                            // Non-cumulative compounded-rate accrual retains the
+                            // full period's observation/lockout and compounding clock.
+                            // Weight its cumulative increments by this segment's balance.
+                            let accrued =
+                                (|| -> finstack_quant_core::Result<FloatingCouponSettlement> {
+                                    let start = cumulative(accrual_start)?;
+                                    let end = cumulative(accrual_end)?;
+                                    let before = elapsed(accrual_start)? / yf;
+                                    let through = elapsed(accrual_end)? / yf;
+                                    Ok(FloatingCouponSettlement {
+                                        projected_index_rate: end.projected_index_rate * through
+                                            - start.projected_index_rate * before,
+                                        all_in_rate: end.all_in_rate * through
+                                            - start.all_in_rate * before,
+                                        total_amount: end.total_amount * through
+                                            - start.total_amount * before,
+                                        cash_amount: end.cash_amount * through
+                                            - start.cash_amount * before,
+                                        pik_amount: end.pik_amount * through
+                                            - start.pik_amount * before,
+                                    })
+                                })();
+                            match accrued {
+                                Ok(settlement) => settlement,
+                                Err(error) => {
+                                    let index_rate = fallback(&error)?;
+                                    compiled.settle_index_rate(
+                                        base_out_f64,
+                                        index_rate,
+                                        index_rate,
+                                    )?
+                                }
+                            }
+                        } else {
+                            let index_rate = fallback_index_rate(rate_when_curve_missing(
+                                spec.rate_spec.index_id.as_str(),
+                                reset_date,
+                                spread_bp,
+                                &runtime_spec.fallback,
+                                params,
+                                " (overnight compounding)",
+                            ))?;
                             compiled.settle_index_rate(base_out_f64, index_rate, index_rate)?
                         }
                     }
-                } else {
-                    let index_rate = fallback_index_rate(rate_when_curve_missing(
-                        spec.rate_spec.index_id.as_str(),
-                        reset_date,
-                        spread_bp,
-                        &runtime_spec.fallback,
-                        params,
-                        " (overnight compounding)",
-                    ))?;
-                    compiled.settle_index_rate(base_out_f64, index_rate, index_rate)?
-                }
-            }
-            FloatingRateObservation::Term { .. } => {
-                let index_rate = if let Some(fwd) = resolved_curve.as_deref() {
-                    let same_day_fixing_exists = reset_date == fwd.base_date()
-                        && resolved_fixing
-                            .as_ref()
-                            .is_some_and(|series| series.value_on_exact(reset_date).is_ok());
-                    let projected = if reset_date < fwd.base_date() || same_day_fixing_exists {
-                        require_fixing_value_exact(
-                            resolved_fixing.as_ref(),
-                            spec.rate_spec.index_id.as_str(),
-                            reset_date,
-                            fwd.base_date(),
-                        )
-                    } else {
-                        super::super::rate_helpers::project_index_rate(reset_date, fwd)
-                    };
-                    match projected {
-                        Ok(rate) => rate,
-                        Err(error) => fallback_index_rate(rate_when_projection_fails(
-                            &error,
-                            reset_date,
-                            spread_bp,
-                            &runtime_spec.fallback,
-                            params,
-                        ))?,
+                    FloatingRateObservation::Term { .. } => {
+                        let index_rate = if let Some(fwd) = resolved_curve.as_deref() {
+                            let same_day_fixing_exists = reset_date == fwd.base_date()
+                                && resolved_fixing.as_ref().is_some_and(|series| {
+                                    series.value_on_exact(reset_date).is_ok()
+                                });
+                            let projected =
+                                if reset_date < fwd.base_date() || same_day_fixing_exists {
+                                    require_fixing_value_exact(
+                                        resolved_fixing.as_ref(),
+                                        spec.rate_spec.index_id.as_str(),
+                                        reset_date,
+                                        fwd.base_date(),
+                                    )
+                                } else {
+                                    super::super::rate_helpers::project_index_rate(reset_date, fwd)
+                                };
+                            match projected {
+                                Ok(rate) => {
+                                    projected_fixings.push(crate::fixings::ProjectedFixing {
+                                        series_id: series_id.clone(),
+                                        date: reset_date,
+                                        value: Some(rate),
+                                    });
+                                    rate
+                                }
+                                Err(error) => fallback_index_rate(rate_when_projection_fails(
+                                    &error,
+                                    reset_date,
+                                    spread_bp,
+                                    &runtime_spec.fallback,
+                                    params,
+                                ))?,
+                            }
+                        } else {
+                            fallback_index_rate(rate_when_curve_missing(
+                                spec.rate_spec.index_id.as_str(),
+                                reset_date,
+                                spread_bp,
+                                &runtime_spec.fallback,
+                                params,
+                                "",
+                            ))?
+                        };
+                        let mut state = compiled.replay_state();
+                        compiled.observe_term(&mut state, index_rate)?;
+                        compiled.capture_notional(&mut state, base_out_f64)?;
+                        compiled.settle(&state)?
                     }
-                } else {
-                    fallback_index_rate(rate_when_curve_missing(
-                        spec.rate_spec.index_id.as_str(),
-                        reset_date,
-                        spread_bp,
-                        &runtime_spec.fallback,
-                        params,
-                        "",
-                    ))?
                 };
-                let mut state = compiled.replay_state();
-                compiled.observe_term(&mut state, index_rate)?;
-                compiled.capture_notional(&mut state, base_out_f64)?;
-                compiled.settle(&state)?
-            }
-        };
-        let total_rate = settlement.all_in_rate;
-        let cash_amt = settlement.cash_amount;
-        let pik_amt = settlement.pik_amount;
-        let accrual = CashFlowAccrual {
-            coupon_period,
-            end_is_termination_date: is_termination_date,
-            calendar_id: Some(spec.schedule.calendar_id.clone()),
-            start: accrual_start,
-            end: accrual_end,
-            day_count: spec.schedule.day_count,
-            projected_index_rate: Some(settlement.projected_index_rate),
-        };
+                let total_rate = settlement.all_in_rate;
+                let cash_amt = settlement.cash_amount;
+                let pik_amt = settlement.pik_amount;
+                let accrual = CashFlowAccrual {
+                    coupon_period,
+                    end_is_termination_date: is_termination_date,
+                    calendar_id: Some(spec.schedule.calendar_id.clone()),
+                    start: accrual_start,
+                    end: accrual_end,
+                    day_count: spec.schedule.day_count,
+                    projected_index_rate: Some(settlement.projected_index_rate),
+                };
 
-        if cash_pct_f64 > 0.0 {
-            out_flows.push(
-                CashFlow::new(
-                    d,
-                    Some(reset_date),
-                    Money::new(cash_amt, ccy)?,
-                    CFKind::FloatReset,
-                    yf,
-                    Some(total_rate),
-                )
-                .with_accrual(accrual.clone()),
-            );
-        }
+                if cash_pct_f64 > 0.0 {
+                    out_flows.push(
+                        CashFlow::new(
+                            d,
+                            Some(reset_date),
+                            Money::new(cash_amt, ccy)?,
+                            CFKind::FloatReset,
+                            yf,
+                            Some(total_rate),
+                        )
+                        .with_accrual(accrual.clone()),
+                    );
+                }
 
-        let pik_added = add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(total_rate), yf)?;
-        if pik_added > 0.0 {
-            if let Some(flow) = out_flows.last_mut() {
-                flow.accrual = Some(accrual);
+                let pik_added =
+                    add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(total_rate), yf)?;
+                if pik_added > 0.0 {
+                    if let Some(flow) = out_flows.last_mut() {
+                        flow.principal_date = Some(period.accrual_end);
+                        flow.accrual = Some(accrual);
+                    }
+                }
+                pik_to_add += pik_added;
             }
         }
-        pik_to_add += pik_added;
     }
     Ok(pik_to_add)
 }

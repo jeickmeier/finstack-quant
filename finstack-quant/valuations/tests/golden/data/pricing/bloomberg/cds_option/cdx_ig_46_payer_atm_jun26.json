@@ -6,7 +6,7 @@
     "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
     "valuation_date": "2026-05-07",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.03% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.]",
+    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.63% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.]",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-07",
     "last_reviewed_by": "claude",
@@ -18,7 +18,7 @@
         "path": "screenshots/cdx_ig_46_payer_atm_jun26__main.png",
         "screen": "CDSO",
         "captured_on": "2026-05-07",
-        "description": "Bloomberg CDSO Credit Default Swaption screen for CDX.NA.IG.46 V1 100MM USD ATM payer with strike/ATM forward 55.2848bp, spread vol 36.03%, market value 118781.76, IR DV01 228.21, Spread DV01 25352.02, Vega(1%) 3411.78, Theta -1499.93"
+        "description": "Bloomberg CDSO Credit Default Swaption screen for CDX.NA.IG.46 V1 100MM USD ATM payer with strike/ATM forward 55.2848bp, spread vol 36.63%, market value 118781.76, IR DV01 228.21, Spread DV01 25352.02, Vega(1%) 3411.78, Theta -1499.93"
       },
       {
         "path": "screenshots/cdx_ig_46_payer_atm_jun26__underlying_cds.png",
@@ -537,18 +537,18 @@
           "quote_type": "black_lognormal",
           "interpolation_mode": "vol",
           "vols_row_major": [
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603,
-            0.3603
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663,
+            0.3663
           ]
         }
       ]
@@ -577,7 +577,7 @@
         "underlying_convention": "isda_na",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "implied_volatility": 0.3603
+            "implied_volatility": 0.3663
           }
         },
         "cash_settlement_date": "2026-05-12",
@@ -606,7 +606,7 @@
             "red_pair_code": "2165BYEJ0",
             "position": "Long Payer",
             "trade_date": "2026-05-07",
-            "spread_vol_pct": "36.03",
+            "spread_vol_pct": "36.63",
             "atm_forward_bp": "55.2848",
             "strike_spread_bp": "55.2848",
             "swap_curve": "S531 USD ISDA Swap Curve - Mid",

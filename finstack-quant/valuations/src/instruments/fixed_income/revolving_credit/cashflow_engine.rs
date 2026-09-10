@@ -146,6 +146,7 @@ pub struct CashflowEngine<'a> {
 impl<'a> CashflowEngine<'a> {
     fn schedule_meta(&self) -> crate::cashflow::builder::CashFlowMeta {
         crate::cashflow::builder::CashFlowMeta {
+            projected_fixings: Vec::new(),
             representation: crate::cashflow::builder::CashflowRepresentation::Projected,
             calendar_ids: Vec::new(),
             facility_limit: Some(self.facility.commitment_amount),
@@ -234,6 +235,7 @@ impl<'a> CashflowEngine<'a> {
     /// This is the core deterministic cashflow generation logic, migrated from
     /// the original `cashflows.rs::generate_deterministic_cashflows_internal`.
     fn build_deterministic_schedule(&self) -> Result<CashFlowSchedule> {
+        let mut projected_fixings = Vec::new();
         let mut draw_repay_events = match &self.facility.draw_repay_spec {
             DrawRepaySpec::Deterministic(events) => events.clone(),
             DrawRepaySpec::Stochastic(_) => {
@@ -444,6 +446,7 @@ impl<'a> CashflowEngine<'a> {
                                     attributes: &self.facility.attributes,
                                     fixings: self.fixing_series,
                                 },
+                                Some(&mut projected_fixings),
                             )?
                         } else if fixing_date < self.as_of {
                             let fixing_rate =
@@ -453,6 +456,11 @@ impl<'a> CashflowEngine<'a> {
                                     fixing_date,
                                     self.as_of,
                                 )?;
+                            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                                series_id: format!("FIXING:{}", spec.index_id),
+                                date: fixing_date,
+                                value: Some(fixing_rate),
+                            });
                             crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                                 fixing_rate,
                                 &params,
@@ -463,11 +471,19 @@ impl<'a> CashflowEngine<'a> {
                                     "forward curve required for floating rate".into(),
                                 )
                             })?;
-                            super::utils::project_floating_rate_with_curve(
-                                reset_effective,
-                                spec,
-                                fwd.as_ref(),
-                            )?
+                            let index_rate =
+                                crate::cashflow::builder::rate_helpers::project_index_rate(
+                                    reset_effective,
+                                    fwd.as_ref(),
+                                )?;
+                            projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
+                                series_id: format!("FIXING:{}", spec.index_id),
+                                date: fixing_date,
+                                value: Some(index_rate),
+                            });
+                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                                index_rate, &params,
+                            )
                         };
 
                         let interest = current_balance * (coupon_rate * dt);
@@ -648,7 +664,10 @@ impl<'a> CashflowEngine<'a> {
                     0_i64,
                     self.facility.commitment_amount.currency(),
                 ))),
-                meta: self.schedule_meta(),
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    projected_fixings,
+                    ..self.schedule_meta()
+                },
             },
         ))
     }
@@ -758,6 +777,7 @@ impl<'a> CashflowEngine<'a> {
                                     attributes: &self.facility.attributes,
                                     fixings: self.fixing_series,
                                 },
+                                None,
                             )?,
                             Some(fixing_date),
                         )

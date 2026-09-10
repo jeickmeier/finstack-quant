@@ -37,10 +37,10 @@
               "type": "null"
             }
           ],
-          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(price_pct_of_par, PV of remaining cashflows at reference_rate + spread)`\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
+          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(clean_floor, PV of remaining cashflows - accrued) + accrued`\n\nHere `clean_floor` is notional times `price_pct_of_par / 100`; the\nreference PV discounts remaining cashflows at the reference curve plus\nspread, and accrued interest is paid exactly once.\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
         },
         "price_pct_of_par": {
-          "description": "Redemption price as percentage of par amount.",
+          "description": "Clean redemption price as percentage of par amount (100 means par).\nAccrued coupon interest at exercise is added to determine the cash payment.",
           "format": "double",
           "type": "number"
         },

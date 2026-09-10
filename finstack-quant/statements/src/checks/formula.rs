@@ -24,6 +24,11 @@ impl Check for FormulaCheckSpec {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        if self.tolerance.is_some_and(|t| !t.is_finite() || t < 0.0) {
+            return Err(crate::Error::invalid_input(
+                "Formula-check tolerance must be finite and nonnegative",
+            ));
+        }
         let expression = crate::dsl::parse_and_compile(&self.formula)?;
         let node_to_column = Arc::new(node_columns(context.results));
         let historical_results = Arc::new(period_results(context.results, context.model));
@@ -55,7 +60,7 @@ impl Check for FormulaCheckSpec {
             let passes = if !value.is_finite() {
                 false
             } else if let Some(tolerance) = self.tolerance {
-                value.abs() > tolerance
+                value.abs() <= tolerance
             } else {
                 value != 0.0
             };

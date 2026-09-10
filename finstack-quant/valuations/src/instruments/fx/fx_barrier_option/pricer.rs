@@ -1,11 +1,12 @@
 //! FX barrier option pricers (Monte Carlo and analytical).
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fx::fx_barrier_option::types::{FxBarrierOption, Monitoring};
+use crate::instruments::fx::fx_barrier_option::types::FxBarrierOption;
 use crate::instruments::fx::shared::{
     collect_fx_option_inputs, resolve_fx_spot as resolve_shared_fx_spot, FxOptionInputRequest,
     FxSpotSource,
 };
+use crate::instruments::Monitoring;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -16,13 +17,12 @@ use finstack_quant_core::money::Money;
 
 // MC-specific imports
 use finstack_quant_models::monte_carlo::payoff::barrier::{
-    BarrierMonitoring as McBarrierMonitoring, BarrierOptionPayoff, OptionKind as McOptionKind,
+    BarrierOptionPayoff, OptionKind as McOptionKind,
 };
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 struct FxBarrierPricingOutcome {
     value: Money,
@@ -136,7 +136,13 @@ impl FxBarrierOptionMcPricer {
         };
         config.seed = seed;
 
-        let (time_grid, monitoring) = barrier_time_grid(inst, as_of, t, &config)?;
+        let (time_grid, monitoring) = inst.monitoring.time_grid(
+            as_of,
+            inst.day_count,
+            inst.monitoring_start_date,
+            t,
+            &config,
+        )?;
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier,
@@ -192,65 +198,6 @@ impl FxBarrierOptionMcPricer {
         })
     }
 }
-fn barrier_time_grid(
-    inst: &FxBarrierOption,
-    as_of: Date,
-    time_to_maturity: f64,
-    config: &PathDependentPricerConfig,
-) -> finstack_quant_core::Result<(TimeGrid, McBarrierMonitoring)> {
-    let date_time = |date: Date| {
-        inst.day_count
-            .year_fraction(as_of, date, DayCountContext::default())
-    };
-
-    let required_times = match &inst.monitoring {
-        Monitoring::Continuous => {
-            let start = inst.monitoring_start_date.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "FxBarrierOption requires monitoring_start_date".to_string(),
-                )
-            })?;
-            if start <= as_of {
-                vec![0.0]
-            } else {
-                vec![date_time(start)?]
-            }
-        }
-        Monitoring::Discrete { observation_dates } => observation_dates
-            .iter()
-            .copied()
-            .filter(|date| *date >= as_of)
-            .map(date_time)
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?,
-    };
-    let time_grid = config.build_time_grid(time_to_maturity, &required_times)?;
-    let step_for_time = |required: f64| {
-        let tolerance = 1.0e-12 * required.abs().max(1.0);
-        time_grid
-            .times()
-            .iter()
-            .position(|time| (*time - required).abs() <= tolerance)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Internal(format!(
-                    "FX barrier required monitoring time {required} is missing from the simulation grid"
-                ))
-            })
-    };
-    let monitoring = match &inst.monitoring {
-        Monitoring::Continuous => McBarrierMonitoring::Continuous {
-            start_step: step_for_time(required_times[0])?,
-        },
-        Monitoring::Discrete { .. } => McBarrierMonitoring::Discrete {
-            observation_steps: required_times
-                .iter()
-                .copied()
-                .map(step_for_time)
-                .collect::<finstack_quant_core::Result<Vec<_>>>()?,
-        },
-    };
-    Ok((time_grid, monitoring))
-}
-
 impl Default for FxBarrierOptionMcPricer {
     fn default() -> Self {
         Self::new()

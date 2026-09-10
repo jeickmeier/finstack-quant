@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
-use finstack_quant_margin::{ImMethodology, NettingSetId, SimmSensitivities};
+use finstack_quant_margin::{ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities};
 
 use crate::types::PositionId;
 
@@ -13,9 +13,11 @@ use crate::types::PositionId;
 pub struct NettingSetMargin {
     /// Netting set identifier
     pub netting_set_id: NettingSetId,
+    /// Contractual CSA ID used for one-time IM terms, absent without an OTC CSA.
+    pub csa_id: Option<String>,
     /// Calculation date
     pub as_of: Date,
-    /// Initial margin requirement
+    /// Gross model initial margin before CSA collateral terms.
     pub initial_margin: Money,
     /// Signed desk VM outflow: positive posts, negative collections.
     pub variation_margin: Money,
@@ -55,6 +57,7 @@ impl NettingSetMargin {
         )?;
         Ok(Self {
             netting_set_id,
+            csa_id: None,
             as_of,
             initial_margin,
             variation_margin,
@@ -100,12 +103,20 @@ pub struct PortfolioMarginResult {
     pub as_of: Date,
     /// Base currency for aggregated figures
     pub base_currency: Currency,
-    /// Total initial margin across all netting sets
+    /// Gross model initial margin across all netting sets before CSA terms
     pub total_initial_margin: Money,
     /// Signed desk VM outflow across all netting sets; collections are negative.
     pub total_variation_margin: Money,
-    /// Total margin requirement
+    /// Gross IM plus positive VM by netting set; this is not a collateral transfer
     pub total_margin: Money,
+    /// One-way IM accounts keyed by contractual CSA ID, in each CSA's currency.
+    pub by_csa: HashMap<String, ImCollateralResult>,
+    /// Sum of target IM account balances, converted to the reporting currency.
+    pub total_required_im_collateral: Money,
+    /// Signed IM transfers across CSAs in reporting currency; positive posts.
+    pub total_im_transfer: Money,
+    /// Required IM held in segregated custody, in reporting currency.
+    pub total_segregated_im: Money,
     /// Results by netting set
     pub by_netting_set: HashMap<NettingSetId, NettingSetMargin>,
     /// Number of positions included in margin calculation (i.e. those that
@@ -141,6 +152,10 @@ impl PortfolioMarginResult {
             total_variation_margin: Money::from((0_i64, base_currency)),
             total_margin: Money::from((0_i64, base_currency)),
             by_netting_set: HashMap::default(),
+            by_csa: HashMap::default(),
+            total_required_im_collateral: Money::from((0_i64, base_currency)),
+            total_im_transfer: Money::from((0_i64, base_currency)),
+            total_segregated_im: Money::from((0_i64, base_currency)),
             total_positions: 0,
             positions_without_margin: 0,
             degraded_positions: Vec::new(),

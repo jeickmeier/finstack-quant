@@ -159,6 +159,7 @@ def test_instrument_tearsheet_bond_with_definition_and_cashflows() -> None:
         "date": [dt.date(2027, 3, 15), dt.date(2034, 3, 15)],
         "kind": ["coupon", "principal"],
         "amount": [212500.0, 10000000.0],
+        "currency": ["USD", "USD"],
         "rate": [0.0425, None],
         "discount_factor": [0.98, 0.71],
         "pv": [208000.0, 7100000.0],
@@ -329,11 +330,13 @@ def test_cashflow_blocks_from_dataframe() -> None:
         "date": [dt.date(2027, 3, 15), dt.date(2027, 9, 15), dt.date(2034, 3, 15)],
         "kind": ["coupon", "coupon", "principal"],
         "amount": [212500.0, 212500.0, 10000000.0],
+        "currency": ["USD", "USD", "USD"],
         "rate": [0.0425, 0.0425, None],
         "discount_factor": [0.98, 0.97, 0.71],
         "pv": [208000.0, 206000.0, 7100000.0],
     })
-    ladder, schedule = ins._cashflow_blocks(df)
+    ladders, schedule = ins._cashflow_blocks(df)
+    ladder = ladders["USD"]
     # ladder grouped by year: 2027 has coupons; 2034 has the principal
     years = [p for p, _, _, _ in ladder]
     assert "2034" in years
@@ -420,7 +423,7 @@ def test_instrument_cds_renders_credit_blocks() -> None:
         "as_of": "2026-06-19",
         "value": {"amount": "184200.0", "currency": "USD"},
         "measures": {
-            "par_spread": 0.0137,
+            "par_spread": 137.0,
             "cs01": 4930.0,
             "jump_to_default": -5816000.0,
             "bucketed_cs01::ACME-SR::5y": 2510.0,
@@ -438,6 +441,7 @@ def test_instrument_cds_renders_credit_blocks() -> None:
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": "pay",
             "premium": {
+                "standard_imm_dates": True,
                 "start": "2024-06-20",
                 "end": "2029-06-20",
                 "spread_bp": "100",

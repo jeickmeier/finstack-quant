@@ -568,30 +568,40 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
             return Ok(Some(0.0));
         }
 
-        // Match the existing FX option vanna/volga metric conventions (tests rely on this):
-        // - bump a single surface point by ±1% (relative to the surface value at (t, K))
-        // - divide by the corresponding absolute Δσ = sigma * bump_pct
-        let surf = market.get_surface(self.vol_surface_id.as_str())?;
-        let sigma =
-            finstack_quant_models::volatility::get_surface_vol_clamped(&surf, t, self.strike);
+        let sigma = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            .map(Ok)
+            .unwrap_or_else(|| {
+                let surface = market.get_surface(self.vol_surface_id.as_str())?;
+                Ok::<_, finstack_quant_core::Error>(
+                    finstack_quant_models::volatility::get_surface_vol_clamped(
+                        &surface,
+                        t,
+                        self.strike,
+                    ),
+                )
+            })?;
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
+        let delta_sigma = crate::metrics::bump_sizes::VOLATILITY.min(sigma * 0.5);
+        let (up, curves_up) = crate::metrics::bump_active_volatility(
+            self,
+            market,
+            self.vol_surface_id.as_str(),
+            delta_sigma,
+        )?;
+        let (down, curves_dn) = crate::metrics::bump_active_volatility(
+            self,
+            market,
+            self.vol_surface_id.as_str(),
+            -delta_sigma,
+        )?;
 
-        let vol_bump_pct: f64 = 0.01;
-        let delta_sigma = (sigma * vol_bump_pct).abs().max(1e-12);
-
-        let curves_up = {
-            let bumped = surf.bump_point(t, self.strike, vol_bump_pct)?;
-            market.clone().insert_surface(bumped)
-        };
-        let curves_dn = {
-            let bumped = surf.bump_point(t, self.strike, -vol_bump_pct)?;
-            market.clone().insert_surface(bumped)
-        };
-
-        let delta_up = pricer::compute_greeks(self, &curves_up, as_of)?.delta;
-        let delta_dn = pricer::compute_greeks(self, &curves_dn, as_of)?.delta;
+        let delta_up = pricer::compute_greeks(&up, &curves_up, as_of)?.delta;
+        let delta_dn = pricer::compute_greeks(&down, &curves_dn, as_of)?.delta;
 
         // Report vanna per **vol point** on the σ axis (consistent with vega
         // and `MetricId::Vanna`): normalize by the bump width expressed in
@@ -618,32 +628,45 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
             return Ok(Some(0.0));
         }
 
-        let surf = market.get_surface(self.vol_surface_id.as_str())?;
-        let sigma =
-            finstack_quant_models::volatility::get_surface_vol_clamped(&surf, t, self.strike);
+        let sigma = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            .map(Ok)
+            .unwrap_or_else(|| {
+                let surface = market.get_surface(self.vol_surface_id.as_str())?;
+                Ok::<_, finstack_quant_core::Error>(
+                    finstack_quant_models::volatility::get_surface_vol_clamped(
+                        &surface,
+                        t,
+                        self.strike,
+                    ),
+                )
+            })?;
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
-
-        let vol_bump_pct: f64 = 0.01;
-        let delta_sigma = (sigma * vol_bump_pct).abs().max(1e-12);
-
-        let curves_up = {
-            let bumped = surf.bump_point(t, self.strike, vol_bump_pct)?;
-            market.clone().insert_surface(bumped)
-        };
-        let curves_dn = {
-            let bumped = surf.bump_point(t, self.strike, -vol_bump_pct)?;
-            market.clone().insert_surface(bumped)
-        };
+        let delta_sigma = crate::metrics::bump_sizes::VOLATILITY.min(sigma * 0.5);
+        let (up, curves_up) = crate::metrics::bump_active_volatility(
+            self,
+            market,
+            self.vol_surface_id.as_str(),
+            delta_sigma,
+        )?;
+        let (down, curves_dn) = crate::metrics::bump_active_volatility(
+            self,
+            market,
+            self.vol_surface_id.as_str(),
+            -delta_sigma,
+        )?;
 
         // Volga = d²V/dσ² scaled to "per 1% vol move" convention.
         // The raw second derivative d(vega)/dσ is divided by the bump and then
         // multiplied by 0.01 to express the result per 1 vol-point (1%) change,
         // consistent with the vega convention used across the library (see
         // closed_form::greeks::bs_vega which also scales by 0.01).
-        let vega_up = pricer::compute_greeks(self, &curves_up, as_of)?.vega;
-        let vega_dn = pricer::compute_greeks(self, &curves_dn, as_of)?.vega;
+        let vega_up = pricer::compute_greeks(&up, &curves_up, as_of)?.vega;
+        let vega_dn = pricer::compute_greeks(&down, &curves_dn, as_of)?.vega;
         Ok(Some((vega_up - vega_dn) / (2.0 * delta_sigma) * 0.01))
     }
 }

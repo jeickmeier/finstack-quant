@@ -56,6 +56,56 @@ pub struct FinancialModelSpec {
 }
 
 impl FinancialModelSpec {
+    /// Resolve explicit reporting currency, or infer one unambiguous monetary currency.
+    pub(crate) fn capital_structure_currency(
+        &self,
+    ) -> Result<Option<finstack_quant_core::currency::Currency>> {
+        use finstack_quant_cashflows::CashflowScheduleSource;
+        if let Some(currency) = self
+            .capital_structure
+            .as_ref()
+            .and_then(|cs| cs.reporting_currency)
+        {
+            return Ok(Some(currency));
+        }
+        if let Some(value) = self.meta.get("currency") {
+            let value = value
+                .as_str()
+                .ok_or_else(|| Error::build("Model currency metadata must be a currency code"))?;
+            return value
+                .parse()
+                .map(Some)
+                .map_err(|_| Error::build(format!("Invalid model currency '{value}'")));
+        }
+        let mut currencies = std::collections::HashSet::new();
+        for node in self.nodes.values() {
+            if let Some(crate::types::NodeValueType::Monetary { currency }) = node.value_type {
+                currencies.insert(currency);
+            }
+        }
+        if let Some(cs) = &self.capital_structure {
+            for debt in &cs.debt_instruments {
+                let source: &dyn CashflowScheduleSource = match &debt.spec {
+                    FinancialStatementInstrument::Bond(v) => v,
+                    FinancialStatementInstrument::ConvertibleBond(v) => v,
+                    FinancialStatementInstrument::RevolvingCredit(v) => v,
+                    FinancialStatementInstrument::TermLoan(v) => v,
+                    FinancialStatementInstrument::InterestRateSwap(v) => v,
+                    FinancialStatementInstrument::CapFloor(v) => v,
+                    FinancialStatementInstrument::Swaption(v) => v,
+                };
+                if let Some(notional) = source.notional()? {
+                    currencies.insert(notional.currency());
+                }
+            }
+        }
+        Ok(if currencies.len() == 1 {
+            currencies.into_iter().next()
+        } else {
+            None
+        })
+    }
+
     /// Create a [`crate::builder::ModelBuilder`] for constructing a model specification.
     ///
     /// This is the preferred entry point for staged model creation. The
@@ -319,16 +369,7 @@ impl FinancialModelSpec {
             }
         }
 
-        let capital_structure_currency = self
-            .capital_structure
-            .as_ref()
-            .and_then(|capital_structure| capital_structure.reporting_currency)
-            .or_else(|| {
-                self.meta
-                    .get("currency")
-                    .and_then(serde_json::Value::as_str)
-                    .and_then(|currency| currency.parse().ok())
-            });
+        let capital_structure_currency = self.capital_structure_currency()?;
         let mut node_value_types: IndexMap<NodeId, crate::types::NodeValueType> = self
             .nodes
             .iter()

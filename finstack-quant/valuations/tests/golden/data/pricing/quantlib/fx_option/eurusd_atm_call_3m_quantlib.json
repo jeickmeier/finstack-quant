@@ -102,6 +102,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_quotes": [],
         "quotes": [
           [
             "EUR",

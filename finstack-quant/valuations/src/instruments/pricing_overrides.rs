@@ -1036,14 +1036,6 @@ pub struct MetricPricingOverrides {
     /// Historical VaR / Expected Shortfall configuration override.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub var_config: Option<crate::metrics::risk::VarConfig>,
-
-    /// Externally-quoted price as a percentage of original balance (100.0 = par).
-    ///
-    /// Structured-credit spread metrics require this external target to avoid
-    /// the circular objective `PV(curve + z) == PV(curve)`. They return an error
-    /// when it is absent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quoted_price_pct: Option<f64>,
 }
 
 impl MetricPricingOverrides {

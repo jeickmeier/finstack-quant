@@ -182,7 +182,7 @@ fn test_statement_only_no_equity_no_credit() {
 }
 
 #[test]
-fn test_mixed_currency_capital_structure_does_not_panic_in_dynamic_evaluator() {
+fn test_mixed_currency_capital_structure_requires_reporting_fx() {
     let as_of = time::macros::date!(2025 - 01 - 01);
     let model = ModelBuilder::new("mixed-currency")
         .periods("2025Q1..Q2", None)
@@ -226,13 +226,16 @@ fn test_mixed_currency_capital_structure_does_not_panic_in_dynamic_evaluator() {
         .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
         .insert(flat_discount_curve(0.03, as_of, "EUR-OIS"));
     let mut evaluator = Evaluator::new();
-    let results = evaluator
+    let error = evaluator
         .evaluate_with_market(&model, &market, as_of)
-        .expect("evaluation should succeed");
-
-    let cs = results.cs_cashflows.expect("capital structure cashflows");
-    assert_eq!(cs.totals_by_currency.len(), 2);
-    assert!(cs
-        .get_total_interest(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
-        .is_err());
+        .expect_err("USD reporting requires FX for the EUR debt");
+    // Reporting currency is explicit through metadata. Missing conversion inputs
+    // must return a typed error, without panicking or summing unlike currencies.
+    assert!(matches!(
+        error,
+        finstack_quant_statements::Error::CapitalStructure(ref message)
+            if message.contains("EUR")
+                && message.contains("USD")
+                && message.contains("no FX matrix present")
+    ));
 }

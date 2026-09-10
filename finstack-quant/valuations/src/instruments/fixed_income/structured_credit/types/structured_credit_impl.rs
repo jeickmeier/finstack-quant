@@ -8,18 +8,11 @@ use crate::constants::DECIMAL_TO_PERCENT;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::money::Money;
-use indexmap::IndexMap;
 
 impl Default for MarketConditions {
     fn default() -> Self {
-        let (refi_rate, seasonal_factor) = embedded_registry_or_panic().market_conditions();
         Self {
-            refi_rate,
-            original_rate: None,
-            hpa: None,
-            unemployment: None,
-            seasonal_factor,
-            custom_factors: IndexMap::new(),
+            refi_rate: embedded_registry_or_panic().market_conditions(),
         }
     }
 }

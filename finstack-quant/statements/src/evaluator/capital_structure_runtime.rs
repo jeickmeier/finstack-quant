@@ -73,7 +73,7 @@ impl Evaluator {
         let (contractual_flows, mut contractual_warnings) =
             compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
 
-        let fx_ctx = build_fx_context(model, market_ctx, period);
+        let fx_ctx = build_fx_context(model, market_ctx, period)?;
         let mut cs_cashflows = build_cs_cashflows_from_contractual(&contractual_flows, period_id);
         recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
 
@@ -314,11 +314,11 @@ fn build_fx_context<'a>(
     model: &FinancialModelSpec,
     market_ctx: &'a finstack_quant_core::market_data::context::MarketContext,
     period: &Period,
-) -> Option<CsTotalsContext<'a>> {
-    let cs_spec = model.capital_structure.as_ref()?;
-    let reporting_currency = cs_spec
-        .reporting_currency
-        .or_else(|| market_ctx.fx().map(|fx| fx.config().pivot_currency));
+) -> crate::error::Result<Option<CsTotalsContext<'a>>> {
+    let Some(cs_spec) = model.capital_structure.as_ref() else {
+        return Ok(None);
+    };
+    let reporting_currency = model.capital_structure_currency()?;
     let fx_matrix = market_ctx.fx();
     let fx_policy = cs_spec
         .fx_policy
@@ -328,12 +328,12 @@ fn build_fx_context<'a>(
     } else {
         period.start
     };
-    Some(CsTotalsContext {
+    Ok(Some(CsTotalsContext {
         reporting_currency,
         fx_matrix,
         fx_policy,
         snapshot_date,
-    })
+    }))
 }
 
 struct CsTotalsContext<'a> {
@@ -575,8 +575,9 @@ mod fx_policy_tests {
         });
 
         let market_ctx = MarketContext::new();
-        let ctx =
-            build_fx_context(&model, &market_ctx, &period).expect("capital structure is present");
+        let ctx = build_fx_context(&model, &market_ctx, &period)
+            .expect("valid currencies")
+            .expect("capital structure is present");
         assert_eq!(
             ctx.fx_policy,
             FxConversionPolicy::PeriodEnd,

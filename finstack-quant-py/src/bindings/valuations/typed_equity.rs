@@ -179,17 +179,17 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
 
     /// Implied volatility that reproduces ``market_price``.
     ///
-    /// Mirrors Rust ``EquityOption::implied_vol`` (Black–Scholes inversion on
-    /// the option's day count).
+    /// Uses the configured exercise engine, dividend schedule and model day count;
+    /// trial volatility replaces the active surface or override.
     ///
     /// Parameters
     /// ----------
     /// market : MarketContext | str
     ///     Market carrying the discount curve, spot and (optional) dividend yield.
     /// as_of : datetime.date | str
-    ///     Valuation date.
+    ///     Valuation date strictly before expiry and observed exercise.
     /// market_price : float
-    ///     Observed option value in the same scaling as ``price``.
+    ///     Finite non-negative total trade PV in the notional currency.
     ///
     /// Returns
     /// -------
@@ -198,6 +198,8 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     ///
     /// Raises
     /// ------
+    /// ValueError
+    ///     If PV or notional is invalid, exercise has occurred, or volatility is unidentifiable.
     /// KeyError
     ///     If required market data is missing from ``market``.
     /// RuntimeError

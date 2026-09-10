@@ -554,6 +554,15 @@ pub(crate) fn compute_metrics_dyn(
     let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 
+    if !metrics.is_empty() {
+        if let PricingDispatch::Registered { model, registry } = context.clone_pricer_dispatch() {
+            let key = crate::pricer::PricerKey::new(instrument.key(), model);
+            if let Some(pricer) = registry.get_pricer(key) {
+                pricer.seed_metric_context(&mut context, metrics)?;
+            }
+        }
+    }
+
     let registry = match pricing.metric_registry.as_deref() {
         Some(registry) => registry,
         None => standard_registry(),
@@ -581,14 +590,17 @@ pub(crate) fn compute_metrics_dyn(
     // `context.computed` during calculation.
     //
     // IMPORTANT:
-    // - We only include *custom* (composite) metric IDs to avoid leaking dependency metrics that
-    //   were computed internally but not requested by the caller.
+    // - Include composite/custom outputs and the bucketed-vega reconciliation
+    //   residual, while keeping unrequested internal dependency metrics private.
     // - We insert in a stable order (sorted by key) to ensure deterministic results.
     let mut extras: Vec<(&crate::metrics::MetricId, f64)> = context
         .computed
         .iter()
         .filter_map(|(metric_id, value)| {
-            if metric_id.is_custom() && !measures.contains_key(metric_id) {
+            if (metric_id.is_custom()
+                || metric_id == &crate::metrics::MetricId::BucketedVegaResidual)
+                && !measures.contains_key(metric_id)
+            {
                 Some((metric_id, *value))
             } else {
                 None
@@ -1324,6 +1336,12 @@ pub(crate) fn realized_inflation_index_value(
     effective_date: Date,
     effective_lag: InflationLag,
 ) -> finstack_quant_core::Result<f64> {
+    if matches!(effective_lag, InflationLag::Months(_)) {
+        return index
+            .clone()
+            .with_lag(effective_lag)
+            .value_on(unlagged_date);
+    }
     let (first, last) = index.date_range()?;
     let is_covered = if effective_date < first {
         false
@@ -1351,6 +1369,53 @@ pub(crate) fn realized_inflation_index_value(
         .clone()
         .with_lag(effective_lag)
         .value_on(unlagged_date)
+}
+
+/// Resolve a contractual reference CPI, applying month lag and daily weight once.
+/// Historical reference anchors require observed CPI; future anchors use the curve.
+pub(crate) fn reference_inflation_value(
+    market: &MarketContext,
+    index_id: &str,
+    date: Date,
+    as_of: Date,
+    lag: InflationLag,
+    interpolation: InflationInterpolation,
+) -> finstack_quant_core::Result<f64> {
+    let monthly = matches!(lag, InflationLag::Months(_));
+    let cpi_on = |reference_date: Date| -> finstack_quant_core::Result<f64> {
+        if reference_date <= as_of {
+            let index = market.get_inflation_index(index_id)?;
+            if monthly {
+                index.ref_cpi_months_lag(reference_date, 0)
+            } else {
+                realized_inflation_index_value(
+                    index.as_ref(),
+                    reference_date,
+                    reference_date,
+                    InflationLag::None,
+                )
+            }
+        } else {
+            market
+                .get_inflation_curve(index_id)?
+                .cpi_on_date(reference_date)
+        }
+    };
+    if let InflationLag::Months(months) = lag {
+        let first = date
+            .replace_day(1)
+            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
+        let anchor0 = first.add_months(-i32::from(months));
+        let cpi0 = cpi_on(anchor0)?;
+        if interpolation == InflationInterpolation::Step || date.day() == 1 {
+            return Ok(cpi0);
+        }
+        let cpi1 = cpi_on(anchor0.add_months(1))?;
+        let weight = f64::from(date.day() - 1) / f64::from(date.month().length(date.year()));
+        Ok(cpi0 + weight * (cpi1 - cpi0))
+    } else {
+        cpi_on(apply_inflation_lag(date, lag))
+    }
 }
 
 #[cfg(test)]

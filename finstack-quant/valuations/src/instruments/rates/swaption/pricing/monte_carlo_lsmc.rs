@@ -23,9 +23,6 @@
 //! let pricer = SwaptionLsmcPricer::with_config(RateExoticMcConfig::default(), hw_process);
 //! ```
 
-use super::monte_carlo_payoff::BermudanSwaptionPayoff;
-use super::swap_rate_utils::{ForwardSwapRate, HullWhiteBondPrice};
-use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
@@ -113,31 +110,29 @@ impl SwaptionLsmcPricer {
     ///
     /// # Arguments
     ///
-    /// * `payoff` - Bermudan swaption payoff specification
+    /// * `exercise_value` - Callback receiving the grid index and decimal short rate; returns the par swap rate, fixed-leg annuity and total immediate exercise value in `currency`.
     /// * `initial_short_rate` - Initial short rate r(0)
     /// * `time_grid` - Custom time grid (should include exercise dates exactly)
     /// * `exercise_indices` - Exact step indices for exercise dates
     /// * `basis` - Basis functions for regression
-    /// * `discount_curve_fn` - Function to get discount factors DF(t) for time t
     /// * `currency` - Currency for result
     ///
     /// # Returns
     ///
     /// Statistical estimate of Bermudan swaption value
     #[allow(clippy::too_many_arguments)]
-    pub fn price_bermudan_with_grid<B, F>(
+    pub fn price_bermudan_with_grid<B, E>(
         &self,
-        payoff: &BermudanSwaptionPayoff,
+        exercise_value: E,
         initial_short_rate: f64,
         time_grid: &TimeGrid,
         exercise_indices: &[usize],
         basis: &B,
-        discount_curve_fn: F,
         currency: Currency,
     ) -> Result<MoneyEstimate>
     where
         B: BasisFunctions,
-        F: Fn(f64) -> f64 + Send + Sync,
+        E: Fn(usize, f64) -> Result<(f64, f64, f64)>,
     {
         // Step 1: Generate short rate paths using the custom time grid
         let paths = self.generate_rate_paths_with_grid(initial_short_rate, time_grid)?;
@@ -145,11 +140,10 @@ impl SwaptionLsmcPricer {
         // Step 2: Backward induction with exact exercise indices
         let values = self.backward_induction_swaption_grid(
             &paths,
-            payoff,
+            &exercise_value,
             exercise_indices,
             basis,
             time_grid,
-            &discount_curve_fn,
         )?;
 
         // Step 3: Compute statistics
@@ -331,28 +325,26 @@ impl SwaptionLsmcPricer {
     /// exercise boundary.
     ///
     /// The market discount curve is still consulted inside
-    /// [`HullWhiteBondPrice`] / [`ForwardSwapRate`] to reconstruct the
+    /// the exercise-value callback to reconstruct the
     /// model-consistent zero-coupon bond prices `P(t, T)` — that use is a
     /// curve calibration input, not a payoff-discounting choice.
     ///
     /// See `lsmc.rs` for the flat-rate discounting approach.
     ///
     #[allow(clippy::too_many_arguments)]
-    fn backward_induction_swaption_grid<B, F>(
+    fn backward_induction_swaption_grid<B, E>(
         &self,
         paths: &[Vec<f64>],
-        payoff: &BermudanSwaptionPayoff,
+        exercise_value: &E,
         exercise_steps: &[usize],
         basis: &B,
         time_grid: &TimeGrid,
-        discount_curve_fn: &F,
     ) -> Result<Vec<f64>>
     where
         B: BasisFunctions,
-        F: Fn(f64) -> f64 + Send + Sync,
+        E: Fn(usize, f64) -> Result<(f64, f64, f64)>,
     {
         let num_paths = paths.len();
-        let params = self.hw_process.params();
 
         // Pathwise money-market numéraire B(t) at every grid point, one
         // accumulator per simulated path. Discounting uses ratios of these
@@ -387,56 +379,25 @@ impl SwaptionLsmcPricer {
         let mut regression_x = Vec::with_capacity(paths.len() / 2); // Swap rates
         let mut regression_annuity = Vec::with_capacity(paths.len() / 2);
         let mut regression_y = Vec::with_capacity(paths.len() / 2); // Discounted continuation values
+        let mut regression_immediate = Vec::with_capacity(paths.len() / 2);
         let mut regression_indices = Vec::with_capacity(paths.len() / 2);
 
         for &exercise_step in &sorted_exercise_steps {
-            if exercise_step >= paths[0].len() - 1 {
+            if exercise_step >= paths[0].len() {
                 continue;
             }
-
-            // Get exact time from grid instead of computing from step * dt
-            let t = time_grid.time(exercise_step);
 
             // Clear buffers for this exercise date (reuse capacity)
             regression_x.clear();
             regression_annuity.clear();
             regression_y.clear();
             regression_indices.clear();
+            regression_immediate.clear();
 
             for (i, path) in paths.iter().enumerate() {
                 let r_t = path[exercise_step];
 
-                let swap_rate = ForwardSwapRate::compute(
-                    params,
-                    r_t,
-                    t,
-                    &payoff.swap_schedule,
-                    discount_curve_fn,
-                );
-
-                // Compute exercise value: (S(t) - K) * A(t) * N for payer
-                let swap_value = match payoff.option_type {
-                    OptionType::Call => swap_rate - payoff.strike,
-                    OptionType::Put => payoff.strike - swap_rate,
-                };
-
-                // Compute annuity for proper scaling
-                let mut annuity = 0.0;
-                for (j, &payment_time_j) in payoff.swap_schedule.payment_dates.iter().enumerate() {
-                    if payment_time_j > t {
-                        let p_j = HullWhiteBondPrice::bond_price(
-                            params,
-                            r_t,
-                            t,
-                            payment_time_j,
-                            discount_curve_fn,
-                        );
-                        let tau_j = payoff.swap_schedule.accrual_fractions[j];
-                        annuity += tau_j * p_j;
-                    }
-                }
-
-                let immediate_value = swap_value.max(0.0) * annuity * payoff.notional;
+                let (swap_rate, annuity, immediate_value) = exercise_value(exercise_step, r_t)?;
 
                 // Only regress on ITM paths
                 if immediate_value > 1e-6 {
@@ -459,6 +420,7 @@ impl SwaptionLsmcPricer {
                     regression_annuity.push(annuity);
                     regression_y.push(discounted_cf);
                     regression_indices.push(i);
+                    regression_immediate.push(immediate_value);
                 }
             }
 
@@ -473,22 +435,7 @@ impl SwaptionLsmcPricer {
 
                 // Exercise decision
                 for (j, &i) in regression_indices.iter().enumerate() {
-                    // Reuse the swap rate and annuity already computed in the
-                    // regression-collection pass above. `regression_x` /
-                    // `regression_annuity` were pushed in the same order as
-                    // `regression_indices`, so index `j` corresponds to path
-                    // `i`. This avoids re-running `ForwardSwapRate::compute`
-                    // (bond prices + finite-difference forwards) and the annuity
-                    // bond-price loop a second time per ITM path.
-                    let swap_rate = regression_x[j];
-                    let annuity = regression_annuity[j];
-
-                    let swap_value = match payoff.option_type {
-                        OptionType::Call => swap_rate - payoff.strike,
-                        OptionType::Put => payoff.strike - swap_rate,
-                    };
-
-                    let immediate_value = swap_value.max(0.0) * annuity * payoff.notional;
+                    let immediate_value = regression_immediate[j];
                     let continuation = continuation_values[j];
 
                     // Exercise if immediate value > continuation value.

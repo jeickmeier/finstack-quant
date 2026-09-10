@@ -136,7 +136,10 @@ impl OtcMarginSpec {
     /// This is the standard configuration for large dealer-to-dealer
     /// or dealer-to-client bilateral trades.
     #[must_use]
-    pub fn bilateral_simm(csa: CsaSpec) -> Self {
+    pub fn bilateral_simm(mut csa: CsaSpec) -> Self {
+        if let Some(im) = &mut csa.im_params {
+            im.methodology = ImMethodology::Simm;
+        }
         Self {
             csa,
             clearing_status: ClearingStatus::Bilateral,
@@ -151,7 +154,10 @@ impl OtcMarginSpec {
     ///
     /// Used when SIMM is not implemented or for smaller counterparties.
     #[must_use]
-    pub fn bilateral_schedule(csa: CsaSpec) -> Self {
+    pub fn bilateral_schedule(mut csa: CsaSpec) -> Self {
+        if let Some(im) = &mut csa.im_params {
+            im.methodology = ImMethodology::Schedule;
+        }
         Self {
             csa,
             clearing_status: ClearingStatus::Bilateral,
@@ -279,6 +285,29 @@ impl OtcMarginSpec {
         self
     }
 
+    /// Validate CSA terms and the duplicated methodology elections.
+    ///
+    /// # Errors
+    ///
+    /// Rejects invalid CSA terms, inconsistent IM methodology declarations, or
+    /// a clearing-house methodology on a bilateral trade (and vice versa).
+    pub fn validate(&self) -> Result<()> {
+        self.csa.validate()?;
+        if let Some(im) = &self.csa.im_params {
+            if im.methodology != self.im_methodology {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Conflicting IM methodology declarations in OTC specification and CSA".into(),
+                ));
+            }
+        }
+        if self.is_cleared() != (self.im_methodology == ImMethodology::ClearingHouse) {
+            return Err(finstack_quant_core::Error::Validation(
+                "Clearing status conflicts with IM methodology".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Validate margin terms required by credit-sensitive instruments.
     ///
     /// # Errors
@@ -286,6 +315,7 @@ impl OtcMarginSpec {
     /// Returns a validation error when SIMM is selected without an explicit
     /// credit risk-class and sector classification.
     pub fn validate_for_credit(&self) -> Result<()> {
+        self.validate()?;
         if self.im_methodology == ImMethodology::Simm && self.simm_credit_classification.is_none() {
             return Err(finstack_quant_core::Error::Validation(
                 "SIMM credit products require simm_credit_classification".to_string(),

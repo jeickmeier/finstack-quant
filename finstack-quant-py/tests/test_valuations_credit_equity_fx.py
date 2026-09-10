@@ -125,6 +125,7 @@ def _cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
         DayCount.ACT_360,
         100.0,
         "USD-OIS",
+        standard_imm_dates=True,
     )
     return premium, ProtectionLegSpec("CORP-HAZARD", 0.4, 3)
 
@@ -441,6 +442,35 @@ class TestEquityOption:
         assert option.delta(market, "2024-01-15") == pytest.approx(greeks["delta"])
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
+
+    @pytest.mark.parametrize("style", ["european", "american", "bermudan"])
+    def test_equity_iv_uses_active_exercise_and_day_count(self, style: str) -> None:
+        option = (
+            EquityOption
+            .builder()
+            .id("EQ-AUDIT-IV")
+            .underlying_ticker("SPX")
+            .strike(4500.0)
+            .option_type("put")
+            .exercise_style(style)
+            .expiry("2024-06-21")
+            .day_count("act_360")
+            .notional(Money(100.0, USD))
+            .discount_curve_id("USD-OIS")
+            .spot_id("EQUITY-SPOT")
+            .vol_surface_id("EQUITY-VOL")
+            .discrete_dividends([(datetime.date(2024, 3, 15), 20.0)])
+            .exercise_schedule([datetime.date(2024, 3, 21), datetime.date(2024, 6, 21)])
+            .build()
+        )
+        market = _equity_market()
+        price = option.price(market, "2024-01-15").price
+        assert option.implied_vol(market, "2024-01-15", price) == pytest.approx(0.2, abs=1e-7)
+        for invalid in [-1.0, float("nan"), float("inf")]:
+            with pytest.raises(ValueError, match="non-negative PV"):
+                option.implied_vol(market, "2024-01-15", invalid)
+        with pytest.raises(ValueError, match="live, unexercised"):
+            option.implied_vol(market, "2024-06-21", price)
 
     def test_european_call_defaults_match_rust(self) -> None:
         option = EquityOption.european_call("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0)

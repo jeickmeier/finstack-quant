@@ -3,7 +3,6 @@
     "npv": 16.136470329381833
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -36,7 +35,8 @@
         "vol_surface_id": "SPX-LOOKBACK-VOL-QL"
       },
       "type": "lookback_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

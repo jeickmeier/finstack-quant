@@ -1,0 +1,213 @@
+{
+  "description": "Input-only convertible credit widening from 150bp to 300bp over unchanged 3% risk-free rates. Rates P&L must be zero; credit P&L must dominate the Taylor residual.",
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {},
+        "call_put": null,
+        "conversion": {
+          "anti_dilution": "none",
+          "dilution_events": [],
+          "dividend_adjustment": "none",
+          "policy": "voluntary",
+          "price": null,
+          "ratio": 10.0
+        },
+        "credit_curve_id": "USD-CREDIT",
+        "discount_curve_id": "USD-OIS",
+        "fixed_coupon": {
+          "business_day_convention": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "cash",
+          "day_count": "act_365f",
+          "end_of_month": false,
+          "frequency": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.05",
+          "stub": "none"
+        },
+        "floating_coupon": null,
+        "id": "CONV-CREDIT-ATTR",
+        "issue_date": "2025-01-01",
+        "maturity": "2030-01-01",
+        "notional": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "recovery_rate": 0.0,
+        "underlying_equity_id": "AAPL"
+      },
+      "type": "convertible_bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "market_t0": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1.0
+          ],
+          [
+            1,
+            0.9704455335485082
+          ],
+          [
+            10,
+            0.7408182206817179
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "discount",
+        "id": "USD-CREDIT",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1.0
+          ],
+          [
+            1,
+            0.9559974818331
+          ],
+          [
+            10,
+            0.6376281516217733
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {
+      "AAPL": {
+        "unitless": 50
+      },
+      "AAPL-VOL": {
+        "unitless": 0.25
+      },
+      "AAPL-DIVYIELD": {
+        "unitless": 0.02
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  },
+  "market_t1": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1.0
+          ],
+          [
+            1,
+            0.9704455335485082
+          ],
+          [
+            10,
+            0.7408182206817179
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "discount",
+        "id": "USD-CREDIT",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1.0
+          ],
+          [
+            1,
+            0.9417645335842487
+          ],
+          [
+            10,
+            0.5488116360940264
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {
+      "AAPL": {
+        "unitless": 50
+      },
+      "AAPL-VOL": {
+        "unitless": 0.25
+      },
+      "AAPL-DIVYIELD": {
+        "unitless": 0.02
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  },
+  "as_of_t0": "2025-01-01",
+  "as_of_t1": "2025-01-02"
+}

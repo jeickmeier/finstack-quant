@@ -97,7 +97,7 @@ pub fn create_down_and_out_call(
         observed_barrier_breached: None,
         notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count,
-        use_gobet_miri: false,
+        monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
         discount_curve_id: DISC_ID.into(),
         spot_id: SPOT_ID.into(),
         vol_surface_id: VOL_ID.into(),
@@ -105,7 +105,6 @@ pub fn create_down_and_out_call(
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        monitoring_frequency: None,
         attributes: Default::default(),
     }
 }

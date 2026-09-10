@@ -78,7 +78,7 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
 
         assert_eq!(sc.deal_type, deal_type);
         assert_eq!(sc.frequency, expected_frequency);
-        assert!((sc.default_assumptions.base_cdr_annual - expected_cdr).abs() < 1e-12);
+        assert!((sc.credit_model.default_spec.cdr - expected_cdr).abs() < 1e-12);
     }
 }
 

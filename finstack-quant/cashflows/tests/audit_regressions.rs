@@ -33,6 +33,112 @@ fn close(actual: f64, expected: f64) {
 }
 
 #[test]
+fn b13_adjusted_payment_does_not_delay_amortization_interest_base() {
+    let mut v = spec("2025-02-15", "2026-02-15");
+    v["notional"]["amort"] =
+        json!({"linear_to":{"final_notional":{"amount":"0","currency":"USD"}}});
+    v["coupon_program"][0]["spec"]["rate"] = json!("0.05");
+    v["coupon_program"][0]["spec"]["day_count"] = json!("act_365f");
+    v["coupon_program"][0]["spec"]["business_day_convention"] = json!("following");
+    let schedule = build(v);
+    let last_coupon = schedule.coupons().last().expect("last quarterly coupon");
+    close(last_coupon.amount.amount(), 250_000.0 * 0.05 * 92.0 / 365.0);
+    let replay: CashFlowSchedule =
+        serde_json::from_str(&serde_json::to_string(&schedule).expect("serialize schedule"))
+            .expect("restore schedule");
+    let balances = replay.outstanding_by_date().expect("economic balances");
+    close(
+        balances
+            .iter()
+            .find(|(day, _)| *day == date("2025-11-15"))
+            .expect("Saturday amortization boundary")
+            .1
+            .amount(),
+        250_000.0,
+    );
+    assert!(replay
+        .get_flows()
+        .iter()
+        .any(|flow| flow.kind == CFKind::Amortization
+            && flow.date == date("2025-11-17")
+            && flow.principal_date == Some(date("2025-11-15"))));
+}
+
+#[test]
+fn b14_midperiod_draw_accrues_from_its_event_date() {
+    let mut v = spec("2025-01-01", "2025-04-01");
+    v["notional"]["initial"]["amount"] = json!("0");
+    v["principal_events"] = json!([{
+        "date":"2025-02-01", "payment_date": "2025-02-03", "delta":{"amount":"1000000","currency":"USD"},
+        "cash":{"amount":"1000000","currency":"USD"}, "kind":"notional"
+    }]);
+    let schedule = build(v);
+    let interest: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+    close(interest, 1_000_000.0 * 0.1 * 59.0 / 360.0);
+    let draw = schedule
+        .get_flows()
+        .iter()
+        .find(|flow| flow.amount.amount() < 0.0)
+        .expect("draw cashflow");
+    assert_eq!(draw.date, date("2025-02-03"));
+    assert_eq!(draw.get_balance_date(), date("2025-02-01"));
+}
+
+#[test]
+fn b13_preceding_final_payment_includes_contractual_pik() {
+    let mut v = spec("2024-01-01", "2024-03-31");
+    v["coupon_program"][0]["spec"]["coupon_type"] = json!("pik");
+    v["coupon_program"][0]["spec"]["business_day_convention"] = json!("preceding");
+    let schedule = build(v);
+    let redemption = schedule
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+        .expect("final redemption");
+    assert!(redemption.date < date("2024-03-31"));
+    close(
+        redemption.amount.amount(),
+        1_000_000.0 * (1.0 + 0.1 * 90.0 / 360.0),
+    );
+}
+
+#[test]
+fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
+    use finstack_quant_core::market_data::{context::MarketContext, term_structures::ForwardCurve};
+    let mut v = spec("2025-01-06", "2025-01-08");
+    v["coupon_program"][0]["kind"] = json!("floating");
+    v["coupon_program"][0]["spec"]
+        .as_object_mut()
+        .expect("spec")
+        .remove("rate");
+    v["coupon_program"][0]["spec"]["rate_spec"] = json!({
+        "index_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
+        "reset_lag_days":0, "overnight_compounding":"compounded_in_arrears"
+    });
+    v["principal_events"] = json!([{
+        "date":"2025-01-07", "payment_date":"2025-01-07", "kind":"amortization",
+        "delta":{"amount":"-500000","currency":"USD"}
+    }]);
+    let curve = ForwardCurve::builder("RFR", 0.25)
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .base_date(date("2025-01-06"))
+        .knots([(0.0, 0.1), (1.0, 0.1)])
+        .build()
+        .expect("constant overnight rate");
+    let schedule = serde_json::from_value::<cf::CashflowScheduleBuildSpec>(v)
+        .expect("spec")
+        .build(Some(&MarketContext::new().insert(curve)))
+        .expect("coupon");
+    // Sterling RFR working-group NCCR convention: weight each increment of
+    // the original period's cumulative compounded rate by that day's balance.
+    let first = 0.1 / 360.0;
+    let second = first * (1.0 + first);
+    let expected = 1_000_000.0 * first + 500_000.0 * second;
+    let amount: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+    close(amount, expected);
+}
+
+#[test]
 fn amortization_spans_all_step_up_segments() {
     for amort in [
         json!({"linear_to":{"final_notional":{"amount":"0","currency":"USD"}}}),
@@ -66,7 +172,7 @@ fn discounted_draw_roundtrips_principal_independently_of_cash() {
     let mut v = spec("2025-01-01", "2026-01-01");
     v["notional"]["initial"]["amount"] = json!("1000");
     v["coupon_program"] = json!([]);
-    v["principal_events"] = json!([{"date":"2025-07-01","delta":{"amount":"100","currency":"USD"},"cash":{"amount":"98","currency":"USD"},"kind":"notional"}]);
+    v["principal_events"] = json!([{"date":"2025-07-01", "payment_date": "2025-07-01","delta":{"amount":"100","currency":"USD"},"cash":{"amount":"98","currency":"USD"},"kind":"notional"}]);
     let s = build(v);
     let s: CashFlowSchedule =
         serde_json::from_str(&serde_json::to_string(&s).expect("encode")).expect("decode");
@@ -80,8 +186,7 @@ fn initialization_rejects_over_repayment() {
     for day in ["2024-12-31", "2025-01-01", "2025-01-02"] {
         let mut v = spec("2025-01-01", "2026-01-01");
         v["notional"]["initial"]["amount"] = json!("100");
-        v["principal_events"] =
-            json!([{"date":day,"delta":{"amount":"-150","currency":"USD"},"kind":"amortization"}]);
+        v["principal_events"] = json!([{"date":day,"payment_date":day,"delta":{"amount":"-150","currency":"USD"},"kind":"amortization"}]);
         let spec: cf::CashflowScheduleBuildSpec = serde_json::from_value(v).expect("spec");
         assert!(spec.build(None).is_err(), "over-repayment on {day}");
     }
@@ -132,7 +237,7 @@ fn pik_funded_repayment_validates() {
     let mut v = spec("2025-01-01", "2026-01-01");
     v["notional"]["initial"]["amount"] = json!("100");
     v["coupon_program"][0]["spec"]["coupon_type"] = json!("pik");
-    v["principal_events"] = json!([{"date":"2025-04-01","delta":{"amount":"-102.5","currency":"USD"},"kind":"amortization"}]);
+    v["principal_events"] = json!([{"date":"2025-04-01", "payment_date": "2025-04-01","delta":{"amount":"-102.5","currency":"USD"},"kind":"amortization"}]);
     let s = build(v);
     s.validate().expect("PIK is repayable principal");
     close(
@@ -149,8 +254,7 @@ fn pik_funded_repayment_validates() {
 fn funding_outflow_has_no_default_recovery_payment() {
     let mut v = spec("2025-01-01", "2026-01-01");
     v["coupon_program"] = json!([]);
-    v["principal_events"] =
-        json!([{"date":"2025-07-01","delta":{"amount":"100","currency":"USD"},"kind":"notional"}]);
+    v["principal_events"] = json!([{"date":"2025-07-01", "payment_date": "2025-07-01","delta":{"amount":"100","currency":"USD"},"kind":"notional"}]);
     let s = build(v);
     let draw = s
         .get_flows()

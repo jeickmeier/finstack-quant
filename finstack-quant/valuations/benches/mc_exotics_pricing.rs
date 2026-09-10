@@ -1,9 +1,10 @@
-//! Monte Carlo exotic instrument pricing benchmarks.
+//! Monte Carlo and barrier PDE exotic instrument pricing benchmarks.
 //!
 //! `AsianOption`'s `Instrument::value` uses Turnbull–Wakeman for arithmetic averages; the Asian group
 //! calls `AsianOption::npv_mc` so timings reflect Monte Carlo paths controlled by `InstrumentPricingOverrides::with_mc_paths`.
 //!
 //! `CliquetOption` uses an internal GBM MC engine with step count driven by the number of reset dates.
+//! Barrier cases price total at-hit rebates under continuous and quarterly monitoring.
 
 #![allow(clippy::unwrap_used)]
 
@@ -14,7 +15,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
+use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
+use finstack_quant_models::closed_form::barrier::RebateTiming;
 use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
 use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
@@ -22,7 +24,11 @@ use finstack_quant_valuations::instruments::exotics::lookback_option::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::{
-    AsianOption, AveragingMethod, Instrument, InstrumentPricingOverrides, OptionType,
+    AsianOption, AveragingMethod, BarrierOption, Instrument, InstrumentPricingOverrides,
+    Monitoring, OptionType,
+};
+use finstack_quant_valuations::pricer::{
+    standard_pricer_registry, InstrumentType, ModelKey, PricerKey,
 };
 use std::hint::black_box;
 use time::Month;
@@ -173,7 +179,7 @@ fn bench_lookback_option_mc(c: &mut Criterion) {
     group.throughput(Throughput::Elements(paths));
     let option = lookback_option(paths as usize);
     group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-        b.iter(|| option.value(black_box(&market), black_box(as_of)));
+        b.iter(|| option.value(black_box(&market), black_box(as_of)).unwrap());
     });
     group.finish();
 }
@@ -187,7 +193,7 @@ fn bench_autocallable_mc(c: &mut Criterion) {
     group.throughput(Throughput::Elements(paths));
     let note = autocallable_note(paths as usize);
     group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-        b.iter(|| note.value(black_box(&market), black_box(as_of)));
+        b.iter(|| note.value(black_box(&market), black_box(as_of)).unwrap());
     });
     group.finish();
 }
@@ -249,11 +255,67 @@ fn bench_cliquet_option_mc(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_barrier_monitoring(c: &mut Criterion) {
+    let as_of = as_of();
+    let market = create_mc_market(as_of, 100.0, 0.25, 0.05)
+        .insert_price("HESTON_KAPPA", MarketScalar::Unitless(2.0))
+        .insert_price("HESTON_THETA", MarketScalar::Unitless(0.0625))
+        .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.3))
+        .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5))
+        .insert_price("HESTON_V0", MarketScalar::Unitless(0.0625));
+    let mut option = BarrierOption::example().unwrap();
+    option.expiry = as_of + time::Duration::days(365);
+    option.strike = 100.0;
+    option.barrier = Money::from((120_i64, Currency::USD));
+    option.barrier_type = BarrierType::UpAndOut;
+    option.notional = Money::from((1_000_i64, Currency::USD));
+    option.rebate = Some(Money::from((25_i64, Currency::USD)));
+    option.rebate_timing = RebateTiming::AtHit;
+    option.spot_id = "SPOT".into();
+    option.vol_surface_id = "SPOT_VOL".into();
+    option.div_yield_id = Some("SPOT_DIV".into());
+    option.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_mc_paths(2_500);
+    let registry = standard_pricer_registry();
+    let mut group = c.benchmark_group("barrier_monitoring");
+    for (monitoring_name, monitoring) in [
+        ("continuous", Monitoring::Continuous),
+        (
+            "quarterly",
+            Monitoring::Discrete {
+                observation_dates: [91, 182, 273, 365]
+                    .map(|days| as_of + time::Duration::days(days))
+                    .to_vec(),
+            },
+        ),
+    ] {
+        option.monitoring = monitoring;
+        for (model_name, model) in [
+            ("gbm_2500_paths", ModelKey::MonteCarloGBM),
+            ("heston_2500_paths", ModelKey::MonteCarloHeston),
+            ("pde", ModelKey::PdeCrankNicolson1D),
+        ] {
+            let pricer = registry
+                .get_pricer(PricerKey::new(InstrumentType::BarrierOption, model))
+                .unwrap();
+            group.bench_function(format!("{monitoring_name}/{model_name}"), |b| {
+                b.iter(|| {
+                    pricer
+                        .price_dyn(black_box(&option), black_box(&market), black_box(as_of))
+                        .unwrap()
+                });
+            });
+        }
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_asian_option_mc,
     bench_lookback_option_mc,
     bench_autocallable_mc,
     bench_cliquet_option_mc,
+    bench_barrier_monitoring,
 );
 criterion_main!(benches);

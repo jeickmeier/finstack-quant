@@ -219,32 +219,22 @@ pub(super) fn resolved_overnight_compounding(
     )
 }
 
-/// Project floating rate for revolving credit facility using resolved curve.
-///
-/// Term indices project a single forward from the reset-effective date.
-/// Overnight RFR indices (or an explicit overnight method) compound daily
-/// fixings over `[accrual_start, accrual_end]` via the shared overnight engine.
-/// Gearing, spread, and floors/caps are applied afterwards in both cases.
-pub(super) fn project_floating_rate_with_curve(
-    reset_date: Date,
-    spec: &crate::cashflow::builder::FloatingRateSpec,
-    fwd: &ForwardCurve,
-) -> Result<f64> {
-    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-    crate::cashflow::builder::project_floating_rate(reset_date, fwd, &params)
-}
-
 /// Project a revolver floating coupon, choosing term vs overnight from the spec.
 ///
 /// # Arguments
 ///
 /// * `input` - Accrual window, market curves, and the facility floating spec.
+/// * `projected_fixings` - Optional schedule sink for raw overnight observations;
+///   deterministic schedules retain these for subsequent time-roll scenarios.
 ///
 /// # Errors
 ///
 /// Returns a validation or market-data error when overnight calendars, fixings,
 /// or curve lookups fail.
-pub(super) fn project_revolver_floating_rate(input: RevolverFloatingProjection<'_>) -> Result<f64> {
+pub(super) fn project_revolver_floating_rate(
+    input: RevolverFloatingProjection<'_>,
+    projected_fixings: Option<&mut Vec<crate::cashflow::fixings::ProjectedFixing>>,
+) -> Result<f64> {
     let params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
     let Some(compounding) = resolved_overnight_compounding(input.spec)? else {
         return crate::cashflow::builder::project_floating_rate(
@@ -289,8 +279,17 @@ pub(super) fn project_revolver_floating_rate(input: RevolverFloatingProjection<'
         compounding: &compounding,
         fixing_calendar: calendar,
         compounded_spread: 0.0,
-        need_observation_exposures: false,
+        need_observation_exposures: projected_fixings.is_some(),
     })?;
+    if let Some(out) = projected_fixings {
+        out.extend(projection.observation_exposures.iter().map(|observation| {
+            crate::cashflow::fixings::ProjectedFixing {
+                series_id: format!("FIXING:{}", input.spec.index_id),
+                date: observation.observation_start,
+                value: Some(observation.projected_rate),
+            }
+        }));
+    }
     Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(projection.rate, &params))
 }
 
@@ -573,8 +572,12 @@ mod tests {
             .build()
             .expect("forward curve");
 
-        let rate =
-            project_floating_rate_with_curve(reset, &spec, &forward).expect("projected coupon");
+        let rate = crate::cashflow::builder::project_floating_rate(
+            reset,
+            &forward,
+            &crate::cashflow::builder::FloatingRateParams::try_from(&spec).expect("rate params"),
+        )
+        .expect("projected coupon");
         assert!((rate - 0.02).abs() < 1e-12, "all-in cap must bind: {rate}");
     }
 
@@ -613,18 +616,21 @@ mod tests {
             .build()
             .expect("forward curve");
         let attrs = Attributes::new();
-        let revolver_rate = project_revolver_floating_rate(RevolverFloatingProjection {
-            accrual_start: start,
-            accrual_end: end,
-            as_of: start,
-            spec: &spec,
-            fwd: &forward,
-            day_count: DayCount::Act360,
-            coupon_frequency: Tenor::quarterly(),
-            currency: Currency::USD,
-            attributes: &attrs,
-            fixings: None,
-        })
+        let revolver_rate = project_revolver_floating_rate(
+            RevolverFloatingProjection {
+                accrual_start: start,
+                accrual_end: end,
+                as_of: start,
+                spec: &spec,
+                fwd: &forward,
+                day_count: DayCount::Act360,
+                coupon_frequency: Tenor::quarterly(),
+                currency: Currency::USD,
+                attributes: &attrs,
+                fixings: None,
+            },
+            None,
+        )
         .expect("overnight revolver coupon");
 
         let compounding = resolved_overnight_compounding(&spec)

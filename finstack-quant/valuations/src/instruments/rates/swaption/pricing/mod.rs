@@ -19,7 +19,6 @@
 
 pub mod lmm_bermudan;
 pub mod monte_carlo_lsmc;
-pub mod monte_carlo_payoff;
 pub mod swap_rate_utils;
 pub(crate) mod tree_valuator;
 
@@ -27,3 +26,5 @@ pub(crate) mod tree_valuator;
 mod numeraire_tests;
 
 pub use tree_valuator::BermudanSwaptionTreeValuator;
+
+pub(crate) mod hw_cashflows;

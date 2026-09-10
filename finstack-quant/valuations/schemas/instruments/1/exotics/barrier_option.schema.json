@@ -2,7 +2,7 @@
   "$defs": {
     "BarrierOption": {
       "additionalProperties": false,
-      "description": "Barrier option instrument.\n\nBarrier options are options with a barrier level that can knock in or out.\n\n# Barrier Monitoring\n\nReal-world barriers are typically monitored discretely (e.g., daily closes), not continuously.\nContinuous barrier formulas underestimate discrete barrier option values. The `use_gobet_miri`\nflag enables the Gobet-Miri discrete monitoring correction (β ≈ 0.5826), which adjusts the\neffective barrier level: `H_adj = H × exp(±0.5826 × σ × √Δt)`.\n\n**Recommendation**: Set `use_gobet_miri = true` (the default) for real-world pricing.\nOnly disable for continuous monitoring benchmarks or academic comparisons.\n\n# References\n\n- Broadie, Glasserman & Kou (1997), \"A Continuity Correction for Discrete Barrier Options\" `docs/REFERENCES.md#broadie-glasserman-kou-1997` `docs/REFERENCES.md#glasserman-2004-monte-carlo`\n- Gobet (2000), \"Weak Approximation of Killed Diffusion Using Euler Schemes\"",
+      "description": "Barrier option with a total trade rebate and explicit contractual monitoring.\nContinuous monitoring uses closed-form pricing by default. Discrete monitoring\nobserves only the supplied dates and uses Monte Carlo by default.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -62,13 +62,12 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-only pricing controls."
         },
-        "monitoring_frequency": {
-          "description": "Monitoring frequency for discrete barrier adjustment (years between observations).\n\nWhen set, the analytical pricer applies the Broadie-Glasserman correction\nto adjust the barrier level for discrete monitoring. Common values:\n- `1.0/252.0` — daily monitoring\n- `1.0/52.0` — weekly monitoring\n- `1.0/12.0` — monthly monitoring\n\nWhen `None`, the analytical pricer uses continuous monitoring formulas.\nNote: The MC pricer (`use_gobet_miri = true`) handles discrete monitoring\nindependently via per-step corrections.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "monitoring": {
+          "$ref": "#/$defs/Monitoring",
+          "default": {
+            "type": "continuous"
+          },
+          "description": "Contractual monitoring: continuous or an explicit, strictly increasing\nset of observation dates no later than expiry. Discrete pricing does not\ninterpolate hits between those dates."
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -94,7 +93,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional rebate amount (paid if the barrier condition is met; see\n`rebate_timing` for when a knock-out rebate pays)"
+          "description": "Total contractual trade rebate in the payoff currency, independent of\nnotional. Knock-outs pay on a hit according to `rebate_timing`;\nknock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
           "$ref": "#/$defs/RebateTiming",
@@ -117,11 +116,6 @@
         "underlying_ticker": {
           "description": "Underlying asset ticker symbol",
           "type": "string"
-        },
-        "use_gobet_miri": {
-          "default": true,
-          "description": "Whether to use Gobet-Miri discrete barrier adjustment for Monte Carlo pricing.\n\nWhen `true` (recommended), applies the Broadie-Glasserman-Kou / Gobet-Miri correction\nto account for discrete barrier monitoring. This adjusts the effective barrier by\n`exp(±0.5826 × σ × √Δt)` where Δt is the time step.\n\n# Default Value\n\n**Defaults to `true`** for both builder and serde deserialization, as this\nreflects real-world discrete monitoring (daily closes). Set to `false` only\nfor continuous monitoring benchmarks or academic comparisons.\n\n# Production Recommendation\n\nAlways use `true` for production pricing of barrier options. Continuous\nbarrier formulas systematically underestimate discrete barrier option values.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -174,6 +168,47 @@
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "Monitoring": {
+      "description": "Contractual barrier-monitoring convention.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Monitor continuously through the contractual monitoring interval.",
+          "properties": {
+            "type": {
+              "const": "continuous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Monitor only at the stated contractual observation dates.",
+          "properties": {
+            "observation_dates": {
+              "description": "Strictly increasing dates on which the barrier level is observed.",
+              "items": {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "discrete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "observation_dates"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "OptionType": {
       "description": "Option payoff direction used by analytical and numerical model engines.",
@@ -242,6 +277,9 @@
           "div_yield_id": "SPX-DIV",
           "expiry": "2024-12-20",
           "id": "BAR-SPX-UO-CALL",
+          "monitoring": {
+            "type": "continuous"
+          },
           "notional": {
             "amount": "100000",
             "currency": "USD"
@@ -255,7 +293,6 @@
           "spot_id": "SPX-SPOT",
           "strike": 4500.0,
           "underlying_ticker": "SPX",
-          "use_gobet_miri": true,
           "vol_surface_id": "SPX-VOL"
         },
         "type": "barrier_option"

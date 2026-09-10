@@ -30,7 +30,10 @@ impl RecoveryQueue {
     /// Add a new recovery to the queue.
     pub(crate) fn add_recovery(&mut self, origination_date: Date, amount: Money) {
         if amount.amount() > 0.0 {
-            self.pending.push_back((origination_date, amount));
+            let index = self
+                .pending
+                .partition_point(|(date, _)| *date <= origination_date);
+            self.pending.insert(index, (origination_date, amount));
         }
     }
 
@@ -64,8 +67,12 @@ impl RecoveryQueue {
         let mut released = Money::from((0_i64, base_currency));
 
         while let Some((orig_date, _)) = self.pending.front() {
-            let months_elapsed = orig_date.months_until(current_date);
-            if months_elapsed >= recovery_lag_months {
+            let months = i32::try_from(recovery_lag_months).map_err(|_| {
+                finstack_quant_core::Error::Validation(
+                    "recovery lag exceeds supported calendar range".into(),
+                )
+            })?;
+            if orig_date.add_months(months) <= current_date {
                 if let Some((_, amount)) = self.pending.pop_front() {
                     released = released.checked_add(amount)?;
                 }
@@ -75,5 +82,52 @@ impl RecoveryQueue {
         }
 
         Ok(released)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn production_waterfall_recovery_dates_use_full_lag_and_sort_claims() {
+        let mut queue = RecoveryQueue::new();
+        queue.add_recovery(
+            date!(2024 - 02 - 29),
+            Money::new(20.0, Currency::USD).expect("second claim"),
+        );
+        queue.add_recovery(
+            date!(2024 - 01 - 31),
+            Money::new(10.0, Currency::USD).expect("first claim"),
+        );
+        assert_eq!(
+            queue
+                .release_matured(date!(2024 - 03 - 01), 2, Currency::USD)
+                .expect("early")
+                .amount(),
+            0.0
+        );
+        assert_eq!(
+            queue
+                .release_matured(date!(2024 - 03 - 31), 2, Currency::USD)
+                .expect("first")
+                .amount(),
+            10.0
+        );
+        assert_eq!(
+            queue
+                .release_matured(date!(2024 - 04 - 29), 2, Currency::USD)
+                .expect("second")
+                .amount(),
+            20.0
+        );
+        assert_eq!(
+            queue
+                .release_matured(date!(2024 - 04 - 30), 2, Currency::USD)
+                .expect("repeat")
+                .amount(),
+            0.0
+        );
     }
 }

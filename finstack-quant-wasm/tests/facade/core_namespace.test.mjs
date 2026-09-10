@@ -65,6 +65,22 @@ test('core date integer widths match generated runtime types', () => {
   assert.equal(typeof core.DayCount.act360().calendarDays(start, end), 'bigint');
 });
 
+test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
+  const dayCount = core.DayCount.actActIsma();
+  const context = new core.DayCountContext().withFrequency(core.Tenor.monthly());
+  for (const [year, month, day] of [
+    [2025, 2, 28],
+    [2024, 2, 29],
+    [2025, 4, 30],
+  ]) {
+    const start = core.createDate(year, month, day);
+    const end = core.createDate(year, month + 1, 31);
+    assert.throws(() => dayCount.yearFractionWithContext(start, end, context), /coupon_period/);
+    const reference = context.withCouponPeriod(start, end);
+    assert.ok(Math.abs(dayCount.yearFractionWithContext(start, end, reference) - 1 / 12) < 1e-12);
+  }
+});
+
 test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
   const usd = new core.Currency('USD');
   assert.equal(typeof usd.free, 'function');
@@ -161,6 +177,25 @@ test('core FX pair convention helpers', () => {
   assert.equal(core.fxPipSize('EUR', 'USD'), 0.0001);
   assert.ok(Math.abs(core.invertFxRate(1.1) - 1 / 1.1) < 1e-12);
   assert.equal(core.FxQuoteConvention.direct().toString(), 'direct');
+});
+
+test('core.FxMatrix quote updates invalidate cached crosses', () => {
+  for (const pinned of [false, true]) {
+    const fx = new core.FxMatrix();
+    const policy = core.FxConversionPolicy.cashflowDate();
+    const date = '2025-01-02';
+    fx.setQuote('GBP', 'USD', 1.25);
+    const setEurUsd = (rate) =>
+      pinned ? fx.setQuoteOn('EUR', 'USD', date, policy, rate) : fx.setQuote('EUR', 'USD', rate);
+    setEurUsd(1.1);
+    assert.ok(Math.abs(fx.rateDefault('EUR', 'GBP', date).rate - 0.88) < 1e-12);
+    setEurUsd(1.2);
+    const result = fx.rateDefault('EUR', 'GBP', date);
+    assert.ok(Math.abs(result.rate - 0.96) < 1e-12);
+    assert.equal(result.triangulated, true);
+    assert.ok(Math.abs(fx.rateDefault('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
+    assert.equal(fx.rateDefault('GBP', 'USD', date).rate, 1.25);
+  }
 });
 
 test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', () => {

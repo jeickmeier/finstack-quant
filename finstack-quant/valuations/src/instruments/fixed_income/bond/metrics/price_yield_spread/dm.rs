@@ -181,16 +181,10 @@ impl DiscountMarginCalculator {
         if as_of >= bond.maturity {
             return Ok(self.config.base_bracket_bp / 10_000.0);
         }
-        let day_count = bond.cashflow_spec.day_count();
+        // Bracket sizing is a numerical heuristic, independent of coupon accrual.
+        let day_count = finstack_quant_core::dates::DayCount::Act365F;
         let years = day_count
-            .year_fraction(
-                as_of,
-                bond.maturity,
-                DayCountContext {
-                    frequency: Some(bond.cashflow_spec.frequency()),
-                    ..Default::default()
-                },
-            )?
+            .year_fraction(as_of, bond.maturity, DayCountContext::default())?
             .max(0.0);
 
         // Scale bracket between 1x and 2x base over 0–30y, then clamp.
@@ -239,14 +233,12 @@ impl MetricCalculator for DiscountMarginCalculator {
         }
 
         // Root-find DM such that PV(dm) - dirty = 0
-        // Note: price_from_dm uses as_of for cashflow projection timing.
-        // The DM is still meaningful as it measures the spread that makes the
-        // projected FRN cashflows equal the settlement dirty price.
+        // The public price helper resolves settlement from the valuation date.
         let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
         let quote_date = quote_ctx.quote_date;
 
         let objective = |dm: f64| -> f64 {
-            match Self::pv_given_dm(bond, &context.curves, quote_date, dm) {
+            match Self::pv_given_dm(bond, &context.curves, context.as_of, dm) {
                 Ok(pv) => pv - dirty_currency,
                 Err(e) => {
                     // Capture the first pricing error and map to a large non-zero residual

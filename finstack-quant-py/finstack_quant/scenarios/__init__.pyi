@@ -70,7 +70,8 @@ class ScenarioSpec:
         Hierarchy conflict policy.
     hazard_bump_mode : {"solve_to_par", "first_order_shift"}
         ParCDS delivery. ``solve_to_par`` re-bootstraps hazard from shocked
-        par spreads; ``first_order_shift`` shifts hazard knots in place.
+        par spreads; ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
+        and reports an approximation warning.
 
     Raises
     ------
@@ -203,7 +204,8 @@ class ScenarioSpec:
         ----------
         mode : {"solve_to_par", "first_order_shift"}
             ``solve_to_par`` re-bootstraps hazard from shocked par spreads;
-            ``first_order_shift`` shifts hazard knots in place.
+            ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
+            and reports an approximation warning.
 
         Returns
         -------
@@ -341,7 +343,8 @@ class ScenarioSpec:
         -------
         {"solve_to_par", "first_order_shift"}
             ``solve_to_par`` re-bootstraps hazard from shocked par spreads;
-            ``first_order_shift`` shifts hazard knots in place.
+            ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
+            and reports an approximation warning.
 
         Raises
         ------
@@ -1296,7 +1299,11 @@ def apply_scenario_to_market(
     instruments : Sequence[Instrument | str] | None, default None
         Typed instruments or canonical envelope JSON strings; required for
         instrument-scoped operations, used for carry under
-        ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
+        ``time_roll_forward``. Raw observations crossed in ``(as_of, new_date]``
+        are materialized from canonical pre-roll coupon projections; existing
+        exact-date fixings are preserved. Missing or conflicting projections
+        raise ``ValueError`` before any rolled market is returned. Shocked copies
+        are returned in ``ApplicationResult.instruments``.
     config : FinstackConfig | str | None, default None
         Library configuration; ``None`` uses the default.
 

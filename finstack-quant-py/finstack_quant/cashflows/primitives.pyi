@@ -473,6 +473,47 @@ class CashFlow:
         """
         ...
 
+    @property
+    def principal_date(self) -> datetime.date | None:
+        """Return the explicit economic principal date.
+
+        Returns
+        -------
+        datetime.date or None
+            Date on which principal changes; None uses the payment date. Access does not raise.
+        """
+        ...
+
+    def get_balance_date(self) -> datetime.date:
+        """Resolve the economic date of the principal movement.
+
+        Returns
+        -------
+        datetime.date
+            Explicit principal date, otherwise payment date. Resolution does not raise.
+        """
+        ...
+
+    def with_principal_date(self, date: datetime.date | str) -> CashFlow:
+        """Set the economic principal date on a copy of this row.
+
+        Parameters
+        ----------
+        date : datetime.date | str
+            Balance-effective date, independently of this row's cash settlement date.
+
+        Returns
+        -------
+        CashFlow
+            New row with the supplied principal date and original payment date.
+
+        Raises
+        ------
+        ValueError
+            If the supplied date cannot be parsed.
+        """
+        ...
+
     def with_accrual(self, accrual: CashFlowAccrual) -> CashFlow:
         """Attach contractual metadata to a copy of this row.
 

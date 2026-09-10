@@ -224,6 +224,7 @@ pub fn cds_buy_protection(
         .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
+            standard_imm_dates: true,
             start,
             end: maturity,
             frequency,
@@ -277,6 +278,7 @@ pub fn cds_sell_protection(
         .side(PayReceive::Receive)
         .convention(convention)
         .premium(PremiumLegSpec {
+            standard_imm_dates: true,
             start,
             end: maturity,
             frequency,

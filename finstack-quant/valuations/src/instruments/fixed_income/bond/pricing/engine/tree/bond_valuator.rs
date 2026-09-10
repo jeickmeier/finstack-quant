@@ -390,8 +390,12 @@ impl BondValuator {
         // positive amortization from original par.
         let outstanding_by_date = full_schedule.outstanding_by_date()?;
         let mut outstanding_principal_vec = vec![bond.notional.amount(); num_steps];
-        let mut balance_events = Vec::with_capacity(outstanding_by_date.len());
-        for (date, balance) in &outstanding_by_date {
+        let recovery_path =
+            crate::instruments::fixed_income::bond::pricing::principal::recovery_principal_path(
+                &full_schedule,
+            )?;
+        let mut balance_events = Vec::with_capacity(recovery_path.len());
+        for (date, balance) in &recovery_path {
             // Historical events all belong to the initial node. Some day-count
             // implementations reject reversed date ranges, so do not ask them
             // to manufacture negative model times.
@@ -578,7 +582,7 @@ impl BondValuator {
                         .get_flows()
                         .iter()
                         .filter(|flow| {
-                            flow.date == date
+                            flow.get_balance_date() == date
                                 && flow.kind == CFKind::Notional
                                 && flow.amount.amount() > 0.0
                         })

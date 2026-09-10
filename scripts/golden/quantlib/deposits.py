@@ -50,7 +50,7 @@ def build_deposit() -> dict[str, Any]:
         "market": {
             "kind": "envelope",
             "envelope": {
-                "schema": "finstack_quant.calibration",
+                "schema": "finstack_quant.calibration/1",
                 "plan": {
                     "id": "usd_deposit_3m",
                     "description": "Pre-built synthetic-pillar USD-OIS curve; no calibration steps required.",
@@ -78,6 +78,8 @@ def build_deposit() -> dict[str, Any]:
                         "allow_non_monotonic": False,
                         "min_forward_tenor": 1e-6,
                         "rate_calibration": None,
+                        "calibration_ois_cutoff_days": None,
+                        "fx_policy": None,
                     }
                 ],
             },

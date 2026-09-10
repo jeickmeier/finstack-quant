@@ -20,6 +20,7 @@ mod repo_cashflows;
 /// Repo-specific margining conventions and helper calculations.
 pub mod repo_margin;
 mod serde_validation;
+pub(crate) mod simm_curvature;
 /// SIMM risk-class and sensitivity container types.
 pub mod simm_types;
 mod thresholds;
@@ -52,12 +53,13 @@ pub use repo_cashflows::{
     generate_margin_cashflows, generate_margin_interest_cashflows, margin_calls_to_cashflows,
 };
 pub use repo_margin::{RepoMarginSpec, RepoMarginType};
+pub use simm_curvature::SimmCurvatureSensitivity;
 pub use simm_types::{
     commodity_bucket_id, ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
     SimmCreditSector, SimmRiskClass, SimmSensitivities, SimmSensitivitiesJson,
     SIMM_COMMODITY_BUCKET_COUNT, SIMM_TENORS,
 };
-pub use thresholds::{ImParameters, VmParameters};
+pub use thresholds::{ImCollateralResult, ImParameters, VmParameters};
 
 #[cfg(test)]
 mod tests {

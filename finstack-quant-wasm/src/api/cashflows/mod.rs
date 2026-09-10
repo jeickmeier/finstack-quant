@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 ///
 /// @param spec_json - JSON-encoded `CashflowScheduleBuildSpec`. Optional
 ///   `principal_exchange` is `"none"` or `"initial_and_final"` (default).
+///   `principal_events` entries require both economic `date` and cash `payment_date`.
 /// @param market_json - Optional JSON-encoded market context for floating-rate lookups.
 /// @returns JSON-encoded `CashFlowSchedule`.
 /// @throws If the spec or market JSON is malformed, or schedule construction fails.

@@ -11,7 +11,7 @@
 //! This module is the single source of truth; [`CDSOption::gamma`] is a
 //! thin pass-through to [`gamma`].
 
-use super::delta::{black_delta_ratio, delta_display_forward, price_strike_delta};
+use super::delta::{black_delta_ratio, price_strike_delta};
 use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::ForwardCdsContext;
 use crate::instruments::credit_derivatives::cds_option::pricer::{
     resolve_sigma, synthetic_underlying_cds,
@@ -89,7 +89,7 @@ fn spread_black_gamma(
     let disc = curves.get_discount(&option.discount_curve_id)?;
     let surv = curves.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), &cds, as_of, sigma)?;
-    let clean_forward = delta_display_forward(option, curves, &ctx, as_of)?;
+    let clean_forward = ctx.forward_par_spread;
     let up = black_delta_ratio(
         option.option_type,
         clean_forward + GAMMA_SPREAD_BUMP,

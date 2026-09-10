@@ -314,6 +314,7 @@ def build_sofr_future() -> dict[str, Any]:
                     "period_start": "2026-06-19",
                     "period_end": "2026-09-18",
                     "quoted_price": quoted_price,
+                    "rate_averaging": "term",
                     "day_count": "act_360",
                     "position": "long",
                     "contract_specs": {

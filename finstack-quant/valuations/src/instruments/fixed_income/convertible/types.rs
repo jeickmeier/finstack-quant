@@ -915,7 +915,13 @@ impl ConvertibleBond {
             .build()
     }
 
-    /// Calculate parity ratio of this convertible bond
+    /// Calculate policy-specific equity conversion value divided by notional.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context containing `underlying_equity_id` as the
+    ///   current share price in the bond's currency. Mandatory-variable terms
+    ///   determine share delivery from the lower and upper conversion prices.
     pub fn parity(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -931,10 +937,18 @@ impl ConvertibleBond {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         };
 
-        Ok(pricing::calculate_parity(self, spot))
+        pricing::calculate_parity(self, spot)
     }
 
-    /// Calculate conversion premium of this convertible bond
+    /// Calculate the decimal premium over policy-specific equity conversion value.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context containing the current underlying share price
+    ///   in the bond's currency; missing data and invalid conversion terms fail.
+    /// * `bond_price` - Finite nonnegative total bond value in notional-currency
+    ///   units, not percent of par. Returns `bond_price / conversion_value - 1`;
+    ///   a nonpositive or non-finite conversion value fails.
     pub fn conversion_premium(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -953,21 +967,32 @@ impl ConvertibleBond {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         };
 
-        // Use effective conversion ratio (includes anti-dilution adjustments)
-        let conversion_ratio = self.effective_conversion_ratio().ok_or_else(|| {
-            finstack_quant_core::Error::internal(
-                "convertible conversion premium requires effective conversion ratio",
-            )
-        })?;
-
-        Ok(pricing::calculate_conversion_premium(
-            bond_price,
-            spot,
-            conversion_ratio,
-        ))
+        let conversion_value = pricing::compute_conversion_value(self, spot)?;
+        if !bond_price.is_finite()
+            || bond_price < 0.0
+            || !conversion_value.is_finite()
+            || conversion_value <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "conversion premium requires a finite nonnegative bond price and positive conversion value".into(),
+            ));
+        }
+        Ok(bond_price / conversion_value - 1.0)
     }
 
-    /// Calculate Greeks for this convertible bond
+    /// Calculate Greeks by repricing the selected convertible lattice.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Discount and risky discount curves, equity price and
+    ///   volatility, plus forward curves and realized fixings for floating
+    ///   coupons. An instrument volatility override takes precedence; surface
+    ///   lookup otherwise uses the contractual conversion strike.
+    /// * `tree_type` - Optional binomial/trinomial grid and step count; `None`
+    ///   uses the canonical 200-step binomial tree for every repricing.
+    /// * `bump_size` - Optional finite positive spot-relative bump for delta and
+    ///   gamma; `None` uses 1%. Vega is per volatility point and rho per bp.
+    /// * `as_of` - Valuation date and origin of the ACT/365F equity model clock.
     pub fn greeks(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -1058,6 +1083,7 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
+            deps.add_discount_curve(credit_curve_id.clone());
             deps.add_credit_curve(credit_curve_id.clone());
         }
         if let Some(floating_coupon) = &self.floating_coupon {
@@ -1166,10 +1192,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
 
     fn raw_cashflow_schedule(
         &self,
-        _curves: &finstack_quant_core::market_data::context::MarketContext,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let schedule = pricing::build_convertible_schedule(self)?;
+        let schedule = pricing::build_convertible_schedule(self, curves)?;
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
@@ -1242,8 +1268,8 @@ mod tests {
     fn test_cashflow_provider_matches_convertible_schedule_builder() {
         let bond = ConvertibleBond::example().expect("example should build");
         let market = finstack_quant_core::market_data::context::MarketContext::new();
-        let expected =
-            super::pricing::build_convertible_schedule(&bond).expect("schedule should build");
+        let expected = super::pricing::build_convertible_schedule(&bond, &market)
+            .expect("schedule should build");
         let actual = bond
             .cashflow_schedule(&market, bond.issue_date)
             .expect("provider schedule should build");

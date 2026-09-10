@@ -6,11 +6,11 @@
     "description": "Synthetic CLO mezzanine structured credit base-case fixture. Two-step calibration: USD-SOFR-DISC bootstrapped from synthetic SOFR OIS quotes, SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. SOFR-1M auxiliary forward curve preserved in prior_market. Self-test contract: re-running calibration + waterfall pricing must reproduce the recorded values within solver tolerance.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs . Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan \u00a716). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 \u2014 reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923.",
+    "source_detail": "2026-09-09 pricing reference: the synthetic dirty quote is USD 10,952,985.036977235, constructed as sum(CF * DF * exp(-0.10 * t)) with Act365F t from 2026-04-30. The previous USD 5m quote implied 5,799.49bp, outside the supported spread range, and has been replaced rather than changing production limits. The reference test independently checks the 1,000bp spread and forward-difference CS01, while direct +/-1bp curve repricing checks DV01. Current outputs after input reconciliation and valuation-date-aware coverage projection are NPV USD 13,607,846.71744143, future expected loss USD 934,624.078306567, DV01 USD -246.7844843501225 per bp, and CS01 USD -2,271.8577877022326 per bp. Existing metric tolerances are unchanged. 2026-09-09 input reconciliation: BOND1 is explicitly assumed to default on 2026-04-01 with USD 8m defaulted par and a USD 1m unreceived recovery claim. The effective nine-month lag makes the claim due 2027-01-01, paid on the next eligible contractual payment date. Cumulative defaults are USD 8m and received recoveries are zero. The USD 7m historical loss is already reflected in current tranche balances: equity zero and senior USD 43m; it must not be written down again. The non-revolving senior note has no target balance. These are synthetic assumptions, not external benchmark observations. Earlier captures below predate this input reconciliation. Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs. Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan §16). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 — reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923. Input ownership updated 2026-09-09: the former 25% quote used 20m collateral as its denominator. The identical 5m USD dirty settlement target is now explicit in market_quotes. Expected values and tolerances are unchanged.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
-    "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-07-21",
+    "last_reviewed_by": "Devin",
+    "last_reviewed_on": "2026-09-09",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -477,6 +477,7 @@
               "industry": "Healthcare",
               "obligor_id": "OBLIGOR-2",
               "is_defaulted": true,
+              "default_date": "2026-04-01",
               "recovery_amount": {
                 "amount": "1000000",
                 "currency": "USD"
@@ -492,7 +493,7 @@
             }
           ],
           "cumulative_defaults": {
-            "amount": "0",
+            "amount": "8000000",
             "currency": "USD"
           },
           "cumulative_recoveries": {
@@ -510,8 +511,7 @@
               "max_price": 102.5,
               "min_yield": 0.04,
               "maintain_credit_quality": true,
-              "maintain_wal": false,
-              "apply_eligibility_criteria": true
+              "maintain_wal": false
             }
           },
           "collection_account": {
@@ -526,24 +526,7 @@
             "amount": "75000",
             "currency": "USD"
           },
-          "rep_lines": [
-            {
-              "id": "REP1",
-              "balance": {
-                "amount": "20000000",
-                "currency": "USD"
-              },
-              "rate": 0.055,
-              "spread_bp": 180.0,
-              "index_id": "SOFR-1M",
-              "maturity": "2031-01-01",
-              "seasoning_months": 12,
-              "day_count": "act_360",
-              "cpr": 0.08,
-              "cdr": 0.03,
-              "recovery_rate": 0.5
-            }
-          ],
+          "rep_lines": null,
           "cumulative_scheduled_amortization": {
             "amount": "0",
             "currency": "USD"
@@ -563,7 +546,7 @@
                 "currency": "USD"
               },
               "current_balance": {
-                "amount": "5000000",
+                "amount": "0",
                 "currency": "USD"
               },
               "target_balance": null,
@@ -584,22 +567,6 @@
                 "breach_date": null,
                 "consequence": "divert_cash_flow"
               },
-              "credit_enhancement": {
-                "subordination": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "overcollateralization": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "reserve_account": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "excess_spread": 0.0,
-                "cash_trap_active": false
-              },
               "frequency": {
                 "count": 3,
                 "unit": "months"
@@ -612,7 +579,6 @@
               "is_revolving": true,
               "can_reinvest": true,
               "maturity": "2034-01-01",
-              "expected_maturity": "2030-01-01",
               "payment_priority": 2,
               "attributes": {
                 "tags": [
@@ -635,13 +601,10 @@
                 "currency": "USD"
               },
               "current_balance": {
-                "amount": "45000000",
+                "amount": "43000000",
                 "currency": "USD"
               },
-              "target_balance": {
-                "amount": "30000000",
-                "currency": "USD"
-              },
+              "target_balance": null,
               "coupon": {
                 "floating": {
                   "index_id": "SOFR-3M",
@@ -662,22 +625,6 @@
               },
               "oc_trigger": null,
               "ic_trigger": null,
-              "credit_enhancement": {
-                "subordination": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "overcollateralization": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "reserve_account": {
-                  "amount": "0",
-                  "currency": "USD"
-                },
-                "excess_spread": 0.0,
-                "cash_trap_active": false
-              },
               "frequency": {
                 "count": 3,
                 "unit": "months"
@@ -690,7 +637,6 @@
               "is_revolving": false,
               "can_reinvest": false,
               "maturity": "2034-01-01",
-              "expected_maturity": null,
               "payment_priority": 1,
               "attributes": {
                 "tags": [
@@ -707,16 +653,12 @@
         },
         "closing_date": "2024-01-01",
         "first_payment_date": "2024-04-01",
-        "reinvestment_end_date": "2026-01-01",
         "maturity": "2034-01-01",
         "frequency": {
           "count": 1,
           "unit": "months"
         },
         "discount_curve_id": "USD-SOFR-DISC",
-        "metric_pricing_overrides": {
-          "quoted_price_pct": 25.0
-        },
         "attributes": {
           "tags": [
             "full"
@@ -744,25 +686,9 @@
           "recovery_lag": 10
         },
         "market_conditions": {
-          "refi_rate": 0.035,
-          "original_rate": 0.05,
-          "hpa": 0.02,
-          "unemployment": 0.05,
-          "seasonal_factor": 0.98,
-          "custom_factors": {
-            "stress": 1.2
-          }
+          "refi_rate": 0.035
         },
-        "credit_factors": {
-          "credit_score": 720,
-          "dti": 0.32,
-          "ltv": 0.85,
-          "delinquency_days": 15,
-          "unemployment_rate": 0.04,
-          "custom_factors": {
-            "fico_band": 700.0
-          }
-        },
+        "credit_factors": {},
         "deal_metadata": {
           "manager_id": "Manager-X",
           "servicer_id": "Servicer-Y",
@@ -779,23 +705,6 @@
           "recovery_rate": 0.42,
           "recovery_lag_months": 9,
           "reinvestment_price": 101.0
-        },
-        "default_assumptions": {
-          "base_cdr_annual": 0.03,
-          "base_recovery_rate": 0.45,
-          "base_cpr_annual": 0.09,
-          "psa_speed": 110.0,
-          "sda_speed": 1.2,
-          "abs_speed_monthly": 0.011,
-          "cpr_by_asset_type": {
-            "abs_auto": 0.2
-          },
-          "cdr_by_asset_type": {
-            "abs_auto": 0.03
-          },
-          "recovery_by_asset_type": {
-            "abs_auto": 0.5
-          }
         },
         "stochastic_prepay_spec": {
           "model": "factor_correlated",
@@ -870,17 +779,28 @@
           }
         ],
         "payment_calendar_id": "nyse",
-        "payment_business_day_convention": "modified_following"
+        "payment_business_day_convention": "modified_following",
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "quoted_dirty_price_currency": 10952985.036977235
+          }
+        }
       }
     }
   },
   "expected": {
-    "npv": 12504142.5835819,
-    "expected_loss": 725139.371099923,
-    "dv01": -158.220006350428,
-    "cs01": -819.516465414315
+    "npv": 13607846.71744143,
+    "expected_loss": 934624.078306567,
+    "dv01": -246.7844843501225,
+    "cs01": -2271.8577877022326,
+    "z_spread": 0.1
   },
   "tolerances": {
+    "z_spread": {
+      "abs": 1e-10,
+      "rel": 5e-09,
+      "tolerance_reason": "The synthetic dirty quote is constructed from projected cashflows using a 0.10 decimal continuously compounded spread on an Act365F clock; solving must recover that independently specified spread."
+    },
     "npv": {
       "abs": 1e-09,
       "rel": 5e-09,

@@ -18,21 +18,19 @@ pub struct DirtyPriceCalculator;
 
 impl MetricCalculator for DirtyPriceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // Use the base NPV that was already computed
-        let npv = context.base_value.amount();
-
-        // Get the original notional
-        // For structured credit, this is typically stored in the pool or tranche
-        let notional = get_original_notional(context)?;
-
-        if notional == 0.0 {
-            return Ok(0.0);
-        }
-
-        // Dirty price = (NPV / Notional) × 100
-        let dirty_price = (npv / notional) * 100.0;
-
-        Ok(dirty_price)
+        let quote = super::super::quote::SettlementQuote::from_context(context)?;
+        let flows = context.cashflows.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "structured-credit price requires projected cashflows".into(),
+            )
+        })?;
+        let deal = context
+            .instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>(
+            )?;
+        let curve = context
+            .curves
+            .get_discount(deal.discount_curve_id.as_str())?;
+        Ok(quote.model_dirty(flows, &curve)? / quote.notional * 100.0)
     }
 }
 

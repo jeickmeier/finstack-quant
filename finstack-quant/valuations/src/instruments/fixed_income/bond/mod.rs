@@ -795,9 +795,9 @@ mod tests {
     }
 
     #[test]
-    fn test_bond_builder_defaults_issue_date_from_maturity() {
+    fn test_bond_builder_requires_issue_date() {
         let maturity = date!(2030 - 06 - 15);
-        let bond = Bond::builder()
+        let error = Bond::builder()
             .id("NO_ISSUE".into())
             .notional(Money::from((1000_i64, Currency::USD)))
             .maturity(maturity)
@@ -809,13 +809,10 @@ mod tests {
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
-            .expect("should succeed with defaulted issue_date");
-
-        let expected_issue = maturity
-            .checked_sub(time::Duration::days(365))
-            .expect("subtraction should succeed");
-        assert_eq!(bond.issue_date, expected_issue);
-        assert!(bond.issue_date < bond.maturity);
+            .expect_err("issue_date is a required contractual input");
+        assert!(error
+            .to_string()
+            .contains("missing required field 'issue_date'"));
     }
 
     #[test]

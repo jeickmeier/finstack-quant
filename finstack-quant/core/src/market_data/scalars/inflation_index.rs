@@ -55,6 +55,8 @@
 //!     (Date::from_calendar_date(2023, Month::December, 31).expect("Valid date"), 299.0),
 //!     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 300.0),
 //!     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 302.0),
+//!     (Date::from_calendar_date(2024, Month::March, 31).expect("Valid date"), 303.8),
+//!     (Date::from_calendar_date(2024, Month::April, 30).expect("Valid date"), 304.1),
 //! ];
 //! let index = InflationIndex::new("US-CPI", observations, Currency::USD)
 //!     .expect("Index creation should succeed")
@@ -290,6 +292,7 @@ impl std::str::FromStr for InflationLag {
 ///     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 300.5),
 ///     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 302.1),
 ///     (Date::from_calendar_date(2024, Month::March, 31).expect("Valid date"), 303.8),
+///     (Date::from_calendar_date(2024, Month::April, 30).expect("Valid date"), 304.1),
 /// ];
 ///
 /// let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
@@ -427,10 +430,12 @@ impl InflationIndex {
 
     /// Get the index value on a settlement/reference date with all active conventions.
     ///
-    /// This first applies the configured publication lag, then evaluates the
-    /// configured step or linear interpolation, and finally applies the
-    /// effective month's seasonal factor. The date passed here is the contract
-    /// date, not a pre-lagged observation date.
+    /// With a months lag, each calendar month requires one observation, which
+    /// may be labelled at month start or month end. Step uses the lagged month;
+    /// linear interpolation uses `(day - 1) / days_in_contract_month` between
+    /// that month and the next. Seasonality applies to each monthly anchor.
+    /// With a days lag or no lag, lookup uses calendar-time interpolation.
+    /// The supplied date is the contract date before lagging.
     ///
     /// # Errors
     ///
@@ -440,6 +445,15 @@ impl InflationIndex {
     /// available observations). Seasonal multiplication itself does not add
     /// validation errors.
     pub fn value_on(&self, date: Date) -> Result<f64> {
+        if let InflationLag::Months(months) = self.lag {
+            let contract_date = match self.interpolation {
+                InflationInterpolation::Linear => date,
+                InflationInterpolation::Step => date
+                    .replace_day(1)
+                    .map_err(|_| crate::InputError::InvalidDateRange)?,
+            };
+            return self.ref_cpi_months_lag(contract_date, months.into());
+        }
         let effective_date = self.apply_lag(date)?;
         let base_value = self.series_interp.value_on(effective_date)?;
         let adjusted_value = self.apply_seasonality(base_value, effective_date)?;
@@ -455,8 +469,8 @@ impl InflationIndex {
     /// ```
     ///
     /// where `m` is the calendar month of `d`, `L = lag_months`, `D(m)` is the
-    /// number of days in month `m`, and `CPI(·)` are the first-of-month index
-    /// observations. Note the divisor is the length of the **settlement
+    /// number of days in month `m`, and `CPI(·)` are unique index
+    /// observations labelled anywhere within their reference month. Note the divisor is the length of the **settlement
     /// month**, not the distance between the lagged anchor observations; a
     /// generic calendar-time interpolation at `d − L months` gets both the
     /// weight and the day-clamping behaviour wrong at month ends.
@@ -469,8 +483,8 @@ impl InflationIndex {
     ///
     /// * `date` - Contract date whose day of month determines the daily weight.
     /// * `lag_months` - Calendar months between the contract month and the first
-    ///   CPI observation month (3 for US TIPS). Observations must exist on the
-    ///   first of their month; missing months are not interpolated. The first of
+    ///   CPI observation month (3 for US TIPS). Each required month must contain
+    ///   exactly one observation; missing months are not interpolated. The first of
     ///   the contract month needs only the first lagged observation.
     ///
     /// # Errors
@@ -481,12 +495,12 @@ impl InflationIndex {
         let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
             .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
         let anchor0 = first_of_month.add_months(-(lag_months as i32));
-        let cpi0 = self.apply_seasonality(self.series.value_on_exact(anchor0)?, anchor0)?;
+        let cpi0 = self.apply_seasonality(self.series.value_in_month(anchor0)?, anchor0)?;
         if date.day() == 1 {
             return Ok(cpi0);
         }
         let anchor1 = anchor0.add_months(1);
-        let cpi1 = self.apply_seasonality(self.series.value_on_exact(anchor1)?, anchor1)?;
+        let cpi1 = self.apply_seasonality(self.series.value_in_month(anchor1)?, anchor1)?;
 
         let days_in_month = f64::from(date.month().length(date.year()));
         let weight = (f64::from(date.day()) - 1.0) / days_in_month;
@@ -853,13 +867,12 @@ mod tests {
     fn test_with_lag() {
         let index = sample_cpi().with_lag(InflationLag::Months(1));
 
-        // Value on Apr 30 with 1-month lag should give Mar 31 value (102.0)
-        // However, with step interpolation (default), we get the previous value (101.0)
-        // since March 30 (Apr 30 - 1 month) is between Feb 28 and Mar 31
+        // April's one-month lag uses the March CPI observation, including a
+        // month-end-labelled series. Day clamping cannot select February.
         let value = index
             .value_on(make_date(2023, 4, 30))
             .expect("Value lookup should succeed in test");
-        assert_eq!(value, 101.0); // Feb value due to step interpolation
+        assert_eq!(value, 102.0);
     }
 
     #[test]

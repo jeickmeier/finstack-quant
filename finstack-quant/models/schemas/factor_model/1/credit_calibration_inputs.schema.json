@@ -213,7 +213,7 @@
         "format": "double",
         "type": "number"
       },
-      "description": "Optional caller-supplied idiosyncratic vol overrides.\n\nCaller-supplied values take precedence over history, peer-proxy, and\nglobal-default adder-vol estimates.",
+      "description": "Optional annualized idiosyncratic volatility overrides, in decimal\nspread per square-root year (`0.001` means 10 bp per square-root year).\n\nCaller-supplied values take precedence over history, peer-proxy, and\nglobal-default adder-vol estimates. Values must be finite and\nnon-negative; calibration converts them to the model's bp units.",
       "type": "object"
     },
     "issuer_tags": {

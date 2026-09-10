@@ -22,7 +22,6 @@ use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-use finstack_quant_valuations::instruments::fx::fx_barrier_option::{FxBarrierOption, Monitoring};
 use finstack_quant_valuations::instruments::fx::fx_digital_option::{
     DigitalPayoutType, FxDigitalOption,
 };
@@ -33,6 +32,7 @@ use finstack_quant_valuations::instruments::fx::fx_variance_swap::FxVarianceSwap
 use finstack_quant_valuations::instruments::fx::quanto_option::QuantoOption;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{Attributes, InstrumentPricingOverrides, OptionType};
+use finstack_quant_valuations::instruments::{FxBarrierOption, Monitoring};
 use std::hint::black_box;
 use std::sync::Arc;
 use time::Month;

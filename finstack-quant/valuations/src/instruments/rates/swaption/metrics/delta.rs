@@ -22,12 +22,14 @@
 //! bump-and-revalue (e.g. `Dv01`) where the A'(F) contribution matters.
 
 use crate::instruments::common_impl::parameters::OptionType;
-use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
+use crate::instruments::common_impl::vol_resolution::ResolvedVolatility;
+use crate::instruments::rates::swaption::Swaption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{
     bachelier_delta_call, bachelier_delta_put, black_delta_call, black_delta_put,
 };
+use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Minimum time to expiry (in years) for Black/Normal model delta.
 ///
@@ -70,47 +72,23 @@ impl MetricCalculator for DeltaCalculator {
             return Ok(intrinsic_delta * option.notional.amount() * inputs.annuity);
         }
 
-        // Black (lognormal) Greeks are undefined for non-positive forward or
-        // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
-        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
-        let use_normal = normal_by_model || normal_by_negative_rate;
-        let delta = if use_normal {
-            // When the Normal model is the configured vol model, `inputs.sigma`
-            // is already a normal vol. When the fallback is triggered purely by
-            // a non-positive forward/strike, `inputs.sigma` is a LOGNORMAL vol
-            // (from SABR or a lognormal surface) and must be converted before
-            // the Bachelier greek, otherwise the d-value is mis-scaled.
-            let normal_sigma = if normal_by_model {
-                inputs.sigma
-            } else {
-                super::resolved_normal_sigma(
-                    option,
-                    inputs.forward,
-                    strike,
-                    inputs.sigma,
-                    inputs.time_to_expiry,
-                )
-            };
-            match option.option_type {
-                OptionType::Call => bachelier_delta_call(
-                    inputs.forward,
-                    strike,
-                    normal_sigma,
-                    inputs.time_to_expiry,
-                ),
-                OptionType::Put => {
-                    bachelier_delta_put(inputs.forward, strike, normal_sigma, inputs.time_to_expiry)
-                }
+        let (forward, strike) = ResolvedVolatility {
+            sigma: inputs.sigma,
+            convention: inputs.volatility_convention,
+        }
+        .model_rates(inputs.forward, strike)?;
+        let delta = match (inputs.volatility_convention, option.option_type) {
+            (VolatilityConvention::Normal, OptionType::Call) => {
+                bachelier_delta_call(forward, strike, inputs.sigma, inputs.time_to_expiry)
             }
-        } else {
-            match option.option_type {
-                OptionType::Call => {
-                    black_delta_call(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry)
-                }
-                OptionType::Put => {
-                    black_delta_put(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry)
-                }
+            (VolatilityConvention::Normal, OptionType::Put) => {
+                bachelier_delta_put(forward, strike, inputs.sigma, inputs.time_to_expiry)
+            }
+            (_, OptionType::Call) => {
+                black_delta_call(forward, strike, inputs.sigma, inputs.time_to_expiry)
+            }
+            (_, OptionType::Put) => {
+                black_delta_put(forward, strike, inputs.sigma, inputs.time_to_expiry)
             }
         };
 

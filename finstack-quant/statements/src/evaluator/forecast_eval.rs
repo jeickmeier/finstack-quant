@@ -50,16 +50,29 @@ pub(crate) fn evaluate_forecast(
             node_spec.node_id
         )))?;
 
-    // Cache only this uninterrupted forecast segment. A later visible actual
-    // starts a new segment and must never seed forecasts for earlier periods.
-    let forecast_periods: Vec<PeriodId> = model
+    // Find the original run boundary even when leading forecast periods have
+    // explicit overrides. Overrides replace outputs; they do not reset the
+    // forecast's elapsed steps, seasonal phase or stochastic draw sequence.
+    let current_index = model
         .periods
         .iter()
-        .skip_while(|period| period.id < *period_id)
-        .take_while(|period| {
-            !period.is_actual || !node_spec.explicit_value_is_visible(period, visibility_cutoff)
-        })
-        .map(|period| period.id)
+        .position(|p| p.id == *period_id)
+        .ok_or_else(|| Error::forecast(format!("Unknown forecast period {period_id}")))?;
+    let preceding = &model.periods[..current_index];
+    let actual_anchor = preceding
+        .iter()
+        .rposition(|p| p.is_actual && node_spec.explicit_value_is_visible(p, visibility_cutoff));
+    let anchor = actual_anchor.or_else(|| preceding.iter().position(|p| {
+        node_spec.values.as_ref().is_some_and(|values| values.contains_key(&p.id))
+            && (!p.is_actual || node_spec.explicit_value_is_visible(p, visibility_cutoff))
+    })).ok_or_else(|| Error::forecast(format!(
+        "Cannot determine base value for forecast of node '{}': no preceding visible observation", node_spec.node_id
+    )))?;
+    let first_forecast = &model.periods[anchor + 1];
+    let forecast_periods: Vec<PeriodId> = model.periods[anchor + 1..]
+        .iter()
+        .take_while(|p| !p.is_actual || !node_spec.explicit_value_is_visible(p, visibility_cutoff))
+        .map(|p| p.id)
         .collect();
 
     if forecast_periods.is_empty() {
@@ -71,7 +84,13 @@ pub(crate) fn evaluate_forecast(
     }
 
     // Anchor strictly before the segment's first forecast period.
-    let base_value = determine_base_value(node_spec, period_id, model, context, visibility_cutoff)?;
+    let base_value = determine_base_value(
+        node_spec,
+        &first_forecast.id,
+        model,
+        context,
+        visibility_cutoff,
+    )?;
 
     let forecast_results = if let Some(offset) = seed_offset {
         let mut series = match mc_z_cache.as_mut() {

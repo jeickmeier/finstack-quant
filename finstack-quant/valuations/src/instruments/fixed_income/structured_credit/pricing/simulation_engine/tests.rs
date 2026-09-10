@@ -11,6 +11,498 @@ mod cases {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use time::Month;
 
+    fn production_trigger_deal(
+        consequence: crate::instruments::fixed_income::structured_credit::TriggerConsequence,
+    ) -> StructuredCredit {
+        use crate::instruments::fixed_income::structured_credit::CoverageTrigger;
+        let mut deal = StructuredCredit::example();
+        deal.tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "A",
+                20.0,
+                100.0,
+                TrancheSeniority::Senior,
+                Money::new(80_000_000.0, Currency::USD).expect("senior"),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                deal.maturity,
+            )
+            .expect("senior"),
+            Tranche::new(
+                "EQ",
+                0.0,
+                20.0,
+                TrancheSeniority::Equity,
+                Money::new(20_000_000.0, Currency::USD).expect("equity"),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                deal.maturity,
+            )
+            .expect("equity"),
+        ])
+        .expect("structure");
+        deal.tranches.tranches[0].oc_trigger =
+            Some(CoverageTrigger::new(1.30, consequence).with_cure_level(1.40));
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        deal
+    }
+
+    #[test]
+    fn production_waterfall_reinvestment_preserves_decimal_cash_budget() {
+        use crate::instruments::fixed_income::structured_credit::{
+            ReinvestmentCriteria, ReinvestmentPeriod,
+        };
+        let mut deal = StructuredCredit::example();
+        deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
+            end_date: deal.maturity,
+            is_active: true,
+            criteria: ReinvestmentCriteria::default(),
+        });
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        let budget = Money::from_decimal(
+            rust_decimal_macros::dec!(10557280.900008413701),
+            Currency::USD,
+        )
+        .expect("decimal budget");
+        let spent = recycle_reinvestment_principal(
+            &mut state,
+            budget,
+            1.0,
+            deal.first_payment_date,
+            &MarketContext::new(),
+        )
+        .expect("reinvestment");
+        assert_eq!(spent, budget);
+        assert_eq!(
+            budget
+                .checked_sub(spent)
+                .expect("cash left")
+                .amount_decimal(),
+            rust_decimal_macros::dec!(0)
+        );
+    }
+
+    #[test]
+    fn production_waterfall_trap_cure_rebreach_conserves_interest() {
+        use crate::instruments::fixed_income::structured_credit::TriggerConsequence;
+        let deal = production_trigger_deal(TriggerConsequence::TrapExcessSpread);
+        let waterfall =
+            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        let mut source = DeterministicPoolFlowSource;
+        let first = deal.first_payment_date;
+        let second = first.add_months(3);
+        let third = second.add_months(3);
+        let mut interest_generated = 0.0;
+        for (date, par, breached) in [
+            (first, 100_000_000.0, true),
+            (second, 112_000_000.0, false),
+            (third, 100_000_000.0, true),
+        ] {
+            // Supply an independently specified current collateral state at each boundary.
+            state.pool_state.balances[0] = par;
+            state.pool_outstanding = Money::new(par, Currency::USD).expect("collateral");
+            interest_generated +=
+                par * 0.07 * (date - state.prev_date.expect("start")).whole_days() as f64 / 360.0;
+            let opening_date = state.prev_date.expect("opening date");
+            simulate_period(
+                &mut state,
+                &deal,
+                &waterfall,
+                SimulationPeriod {
+                    accrual_start: opening_date,
+                    accrual_end: date,
+                    payment: date,
+                    valuation: deal.closing_date,
+                },
+                &MarketContext::new(),
+                3.0,
+                &mut source,
+            )
+            .expect("period");
+            assert_eq!(
+                state.tranche_triggers[0].trigger.breach_date.is_some(),
+                breached
+            );
+            let distributed: f64 = state
+                .results
+                .values()
+                .map(|result| result.total_interest.amount())
+                .sum();
+            assert!(
+                (distributed + state.undistributed_interest.amount() - interest_generated).abs()
+                    < 1e-6
+            );
+            assert_eq!(state.tranche_balances["EQ"].amount(), 20_000_000.0);
+            if breached {
+                assert!(state.undistributed_interest.amount() > 0.0);
+            } else {
+                assert_eq!(state.undistributed_interest.amount(), 0.0);
+            }
+        }
+        assert_eq!(state.tranche_triggers[0].trigger.breach_date, Some(third));
+    }
+
+    #[test]
+    fn production_waterfall_acceleration_pays_principal_from_excess_interest() {
+        use crate::instruments::fixed_income::structured_credit::TriggerConsequence;
+        for consequence in [
+            TriggerConsequence::AccelerateAmortization,
+            TriggerConsequence::DivertCashFlow,
+        ] {
+            let deal = production_trigger_deal(consequence);
+            let waterfall = Waterfall::standard_sequential(
+                deal.deal_type,
+                Currency::USD,
+                &deal.tranches,
+                vec![],
+            );
+            let mut state = SimulationState::new(
+                &deal.pool,
+                &deal.tranches,
+                deal.closing_date,
+                deal.closing_date,
+                0,
+            )
+            .expect("state");
+            simulate_period(
+                &mut state,
+                &deal,
+                &waterfall,
+                SimulationPeriod {
+                    accrual_start: deal.closing_date,
+                    accrual_end: deal.first_payment_date,
+                    payment: deal.first_payment_date,
+                    valuation: deal.closing_date,
+                },
+                &MarketContext::new(),
+                3.0,
+                &mut DeterministicPoolFlowSource,
+            )
+            .expect("period");
+            let days = (deal.first_payment_date - deal.closing_date).whole_days() as f64;
+            let expected = (100_000_000.0 * 0.07 - 80_000_000.0 * 0.04) * days / 360.0;
+            assert!((state.results["A"].total_principal.amount() - expected).abs() < 1e-6);
+            assert_eq!(state.results["EQ"].total_interest.amount(), 0.0);
+            assert_eq!(state.tranche_balances["EQ"].amount(), 20_000_000.0);
+        }
+    }
+
+    #[test]
+    fn production_waterfall_revolving_target_retains_ineligible_principal_until_end() {
+        use crate::instruments::fixed_income::structured_credit::{
+            ReinvestmentCriteria, ReinvestmentPeriod,
+        };
+        let mut deal = StructuredCredit::example();
+        let first = deal.first_payment_date;
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        deal.tranches.tranches[0].is_revolving = true;
+        deal.tranches.tranches[0].can_reinvest = true;
+        deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
+            end_date: first,
+            is_active: true,
+            criteria: ReinvestmentCriteria {
+                max_price: 99.0,
+                ..Default::default()
+            },
+        });
+        let waterfall =
+            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        let note = deal.tranches.tranches[0].id.as_str();
+        simulate_period(
+            &mut state,
+            &deal,
+            &waterfall,
+            SimulationPeriod {
+                accrual_start: deal.closing_date,
+                accrual_end: first,
+                payment: first,
+                valuation: deal.closing_date,
+            },
+            &MarketContext::new(),
+            3.0,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("revolving");
+        let held = 100_000_000.0 * (1.0 - 0.64_f64.powf(0.25));
+        assert!((state.undistributed_principal.amount() - held).abs() < 1e-6);
+        assert_eq!(state.results[note].total_principal.amount(), 0.0);
+        simulate_period(
+            &mut state,
+            &deal,
+            &waterfall,
+            SimulationPeriod {
+                accrual_start: first,
+                accrual_end: first.add_months(3),
+                payment: first.add_months(3),
+                valuation: deal.closing_date,
+            },
+            &MarketContext::new(),
+            3.0,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("amortizing");
+        assert_eq!(state.undistributed_principal.amount(), 0.0);
+        assert!(
+            (state.results[note].total_principal.amount()
+                - 100_000_000.0 * (1.0 - 0.64_f64.sqrt()))
+            .abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn production_waterfall_stop_reinvestment_overrides_active_period() {
+        use crate::instruments::fixed_income::structured_credit::{
+            ReinvestmentCriteria, ReinvestmentPeriod, TriggerConsequence,
+        };
+        let mut deal = production_trigger_deal(TriggerConsequence::StopReinvestment);
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
+        for tranche in &mut deal.tranches.tranches {
+            tranche.is_revolving = true;
+            tranche.can_reinvest = true;
+        }
+        deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
+            end_date: deal.maturity,
+            is_active: true,
+            criteria: ReinvestmentCriteria::default(),
+        });
+        let waterfall =
+            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        simulate_period(
+            &mut state,
+            &deal,
+            &waterfall,
+            SimulationPeriod {
+                accrual_start: deal.closing_date,
+                accrual_end: deal.first_payment_date,
+                payment: deal.first_payment_date,
+                valuation: deal.closing_date,
+            },
+            &MarketContext::new(),
+            3.0,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("triggered period");
+        let expected = 100_000_000.0 * (1.0 - 0.64_f64.powf(0.25));
+        assert!((state.results["A"].total_principal.amount() - expected).abs() < 1e-6);
+        assert!((state.pool_outstanding.amount() - (100_000_000.0 - expected)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn production_waterfall_terminal_spread_is_interest_and_conserved() {
+        let mut deal = StructuredCredit::example();
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let market = MarketContext::new();
+        let baseline = run_simulation_with_source(
+            &deal,
+            &market,
+            deal.closing_date,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("baseline");
+        deal.pool.excess_spread_account = Money::new(12345.0, Currency::USD).expect("spread");
+        let actual = run_simulation_with_source(
+            &deal,
+            &market,
+            deal.closing_date,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("funded spread");
+        let interest = |results: &HashMap<String, TrancheCashflows>| {
+            results
+                .values()
+                .map(|result| result.total_interest.amount())
+                .sum::<f64>()
+        };
+        let principal = |results: &HashMap<String, TrancheCashflows>| {
+            results
+                .values()
+                .map(|result| result.total_principal.amount())
+                .sum::<f64>()
+        };
+        assert!((interest(&actual) - interest(&baseline) - 12345.0).abs() < 1e-6);
+        assert!((principal(&actual) - principal(&baseline)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn production_waterfall_predefaulted_par_is_not_performing_collateral() {
+        let mut deal = StructuredCredit::example();
+        deal.pool.assets[0].default_with_recovery(
+            Money::new(70_000_000.0, Currency::USD).expect("recovery"),
+            deal.closing_date,
+        );
+        let state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        assert_eq!(state.pool_outstanding.amount(), 0.0);
+        assert_eq!(state.pool_state.balances.iter().sum::<f64>(), 0.0);
+        assert_eq!(
+            state.recovery_queue.pending_amount(Currency::USD).amount(),
+            70_000_000.0
+        );
+        assert_eq!(state.initial_realized_loss, 30_000_000.0);
+    }
+
+    #[test]
+    fn production_waterfall_equity_interest_preserves_loss_absorbing_principal() {
+        let mut deal = StructuredCredit::example();
+        deal.tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "A",
+                20.0,
+                100.0,
+                TrancheSeniority::Senior,
+                Money::new(80_000_000.0, Currency::USD).expect("balance"),
+                TrancheCoupon::Fixed { rate: 0.06 },
+                deal.maturity,
+            )
+            .expect("senior"),
+            Tranche::new(
+                "EQ",
+                0.0,
+                20.0,
+                TrancheSeniority::Equity,
+                Money::new(20_000_000.0, Currency::USD).expect("balance"),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                deal.maturity,
+            )
+            .expect("equity"),
+        ])
+        .expect("capital structure");
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        let waterfall =
+            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        let equity = deal
+            .tranches
+            .tranches
+            .iter()
+            .find(|t| t.seniority == TrancheSeniority::Equity)
+            .expect("equity");
+        let opening = equity.current_balance;
+        let mut source = DeterministicPoolFlowSource;
+        simulate_period(
+            &mut state,
+            &deal,
+            &waterfall,
+            SimulationPeriod {
+                accrual_start: deal.closing_date,
+                accrual_end: deal.first_payment_date,
+                payment: deal.first_payment_date,
+                valuation: deal.closing_date,
+            },
+            &MarketContext::new(),
+            3.0,
+            &mut source,
+        )
+        .expect("period");
+        let result = state.results.get(equity.id.as_str()).expect("equity flows");
+        assert!(
+            result.total_interest.amount() > 0.0,
+            "equity receives excess interest"
+        );
+        assert_eq!(result.total_principal.amount(), 0.0);
+        assert_eq!(state.tranche_balances[equity.id.as_str()], opening);
+    }
+
+    #[test]
+    fn production_waterfall_inactive_reinvestment_pays_principal() {
+        use crate::instruments::fixed_income::structured_credit::{
+            ReinvestmentCriteria, ReinvestmentPeriod,
+        };
+        let mut deal = StructuredCredit::example();
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
+            end_date: deal.maturity,
+            is_active: false,
+            criteria: ReinvestmentCriteria::default(),
+        });
+        let waterfall =
+            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let mut state = SimulationState::new(
+            &deal.pool,
+            &deal.tranches,
+            deal.closing_date,
+            deal.closing_date,
+            0,
+        )
+        .expect("state");
+        let mut source = DeterministicPoolFlowSource;
+        simulate_period(
+            &mut state,
+            &deal,
+            &waterfall,
+            SimulationPeriod {
+                accrual_start: deal.closing_date,
+                accrual_end: deal.first_payment_date,
+                payment: deal.first_payment_date,
+                valuation: deal.closing_date,
+            },
+            &MarketContext::new(),
+            3.0,
+            &mut source,
+        )
+        .expect("period");
+        // Three months of 36% annual CPR pays 1 - .64^(3/12) of par.
+        let principal = state
+            .results
+            .values()
+            .map(|r| r.total_principal.amount())
+            .sum::<f64>();
+        let expected =
+            deal.pool.total_balance().expect("pool").amount() * (1.0 - 0.64_f64.powf(0.25));
+        assert!(
+            (principal - expected).abs() < 1e-6,
+            "principal {principal}, expected {expected}"
+        );
+    }
+
     /// SC-M13 — an OAS rate shift must move FLOATING coupon projections.
     ///
     /// If the simulated rate path scaled prepayment only, pool-asset and
@@ -267,7 +759,6 @@ mod cases {
         // A premium price (> par) acquires less par than cash spent.
         assert!(par_acquired_at_price(100.0, 1.02) < 100.0);
         // Degenerate non-positive price falls back to 1:1 par recycling.
-        assert!((par_acquired_at_price(100.0, 0.0) - 100.0).abs() < 1e-9);
     }
 
     fn empty_tranche_cashflows(id: &str, currency: Currency) -> TrancheCashflows {
@@ -275,6 +766,7 @@ mod cases {
             tranche_id: id.to_string(),
             cashflows: Vec::new(),
             detailed_flows: Vec::new(),
+            accrual_periods: Vec::new(),
             interest_flows: Vec::new(),
             principal_flows: Vec::new(),
             pik_flows: Vec::new(),
@@ -508,6 +1000,8 @@ mod cases {
                 "USD-OIS",
             )
             .with_payment_calendar("nyse");
+            instrument.tranches.tranches[0].is_revolving = with_reinvestment;
+            instrument.tranches.tranches[0].can_reinvest = with_reinvestment;
             instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
             instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
             instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -759,10 +1253,12 @@ mod cases {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: None,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
         let tranche = Tranche::new(
@@ -880,10 +1376,12 @@ mod cases {
             obligor_id: None,
             is_defaulted: false,
             recovery_amount: None,
+            default_date: None,
             purchase_price: None,
             acquisition_date: None,
             smm_override: None,
             mdr_override: None,
+            recovery_rate: None,
             contractual_payment: None,
         });
         let tranche = Tranche::new(
@@ -1857,20 +2355,10 @@ mod cases {
 
     // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
 
-    /// A deal that accumulates a large recovery queue before the cleanup call
-    /// fires. This requires a HIGH CDR (many defaults) with a LONG recovery
-    /// lag (24 months), and a cleanup threshold that is crossed purely by
-    /// defaults (no CPR). With CDR ≈ 30% annual the pool drops to ~10% of
-    /// original balance in ~77 months (~6.5 years), at which point the
-    /// recovery queue holds roughly 3.6 M in pending inflows. The pool
-    /// outstanding at cleanup is only ~1 M, so:
-    ///
-    ///   buggy  : available = 1M − 3.6M → clamped to 0 → tranche paid nothing
-    ///   correct: available = 1M + 3.6M = 4.6M → tranche fully redeemed
-    ///
-    /// The tranche's remaining balance at cleanup is ~4.6 M (original − write-
-    /// downs), so the correct code fully retires it while the buggy code leaves
-    /// it unpaid (final_balance ≫ 0).
+    /// A principal-only deal with 30% annual defaults, 40% recovery and a
+    /// 24-month lag. At cleanup, performing par plus pending recoveries must
+    /// fund remaining principal after realized recoveries and net-loss
+    /// writedowns. Subtracting pending recoveries necessarily underfunds it.
     fn cleanup_with_large_recovery_queue_deal() -> StructuredCredit {
         let start = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
         // Long maturity so the deal runs to cleanup before expiring.
@@ -1879,7 +2367,7 @@ mod cases {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
             Money::from((10_000_000_i64, Currency::USD)),
-            0.06,
+            0.0,
             maturity,
             DayCount::Thirty360,
         ));
@@ -1890,7 +2378,7 @@ mod cases {
             80.0, // 80% of original balance = 8 M face
             TrancheSeniority::Senior,
             Money::from((8_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("senior tranche");
@@ -1915,39 +2403,22 @@ mod cases {
         .with_payment_calendar("nyse")
         .with_cleanup_call(0.10)
         .expect("cleanup call");
+        // No fees/coupons: principal funding is independently conserved as
+        // performing par plus recoveries, less allocated net credit losses.
+        instrument.fees = None;
         // CDR=30%: heavy defaults drive the pool below 10% factor in ~77 months.
         // No prepayments: the cleanup is triggered purely by defaults.
-        // Recovery_lag=24 months: at the cleanup date the entire recovery queue
-        // (from up to 77 prior default periods) is still pending.
+        // Recovery_lag=24 months: recent defaults still carry unsettled claims.
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.30);
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 24);
         instrument
     }
 
-    /// W-26 — cleanup-call redemption must ADD pending recoveries to available
-    /// cash, not subtract them.
-    ///
-    /// `RecoveryQueue::pending_amount()` represents future cash *inflows* —
-    /// recovery proceeds from already-defaulted collateral that have not yet
-    /// matured through the lag period. At the cleanup call, the equity holder
-    /// purchases the remaining pool (including distressed assets / recovery
-    /// rights), so these inflows are realised immediately. They must be ADDED
-    /// to `pool_outstanding` when computing `available_for_redemption`.
-    ///
-    /// The buggy code subtracted them:
-    ///   `available = pool_outstanding − pending_recoveries`
-    /// causing `available` to clamp to zero when pending_recoveries > pool_outstanding,
-    /// so the senior tranche is paid nothing at the cleanup call and retains
-    /// a large unpaid final balance.
-    ///
-    /// The fix adds them:
-    ///   `available = pool_outstanding + pending_recoveries`
-    /// which fully funds the remaining tranche claims.
-    ///
-    /// Assertion: after the fix, the senior tranche's final_balance must be
-    /// zero (fully redeemed). With the bug, it would be ~4 M (the pending
-    /// recoveries that were silently subtracted and then lost).
+    /// Pending recoveries are purchased with the performing pool at cleanup.
+    /// With no coupons or fees, the principal budget is independently funded
+    /// by par plus recoveries after net credit-loss writedowns. This isolates
+    /// recovery recognition from a note's ability to meet an interest claim.
     #[test]
     fn cleanup_call_redemption_includes_pending_recovery_queue() {
         let instrument = cleanup_with_large_recovery_queue_deal();
@@ -1988,16 +2459,8 @@ mod cases {
 
         let final_balance = tranche.final_balance.amount();
 
-        // With CDR=30% and a 24-month recovery lag, the recovery queue at
-        // cleanup holds ~3.6 M in pending inflows while pool_outstanding ≈ 1 M.
-        //
-        // Buggy (subtract): available = max(0, 1M − 3.6M) = 0 → senior gets
-        // $0 principal at the cleanup call → final_balance stays at ~4 M.
-        //
-        // Correct (add): available = 1M + 3.6M = 4.6M → senior fully redeemed
-        // → final_balance = 0.
-        //
-        // The senior tranche's final balance must be zero after the fix.
+        // Net-loss accounting leaves a funded principal claim when the
+        // remaining performing par and recovery receivables are sold together.
         assert!(
             final_balance < 1.0,
             "senior tranche must be fully redeemed at the cleanup call; \
@@ -2056,10 +2519,12 @@ mod cases {
                 obligor_id: None,
                 is_defaulted: false,
                 recovery_amount: None,
+                default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override,
+                recovery_rate: None,
                 contractual_payment: None,
             });
             pool

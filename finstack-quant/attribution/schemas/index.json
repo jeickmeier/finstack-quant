@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
-      "bytes": 1144421,
+      "bytes": 1141893,
       "kind": "input",
       "path": "schemas/attribution/1/attribution.schema.json",
       "summary": "One multi-period P&L attribution run: positions, markets and method.",
@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_result.schema.json",
-      "bytes": 74804,
+      "bytes": 74536,
       "kind": "output",
       "path": "schemas/attribution/1/attribution_result.schema.json",
       "summary": "Attributed P&L by effect and grouping, with policy stamps.",

@@ -12,7 +12,7 @@
 
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::rates::hw1f::forward_swap_rate::{
-    calculate_forward_swap_rate, resolve_reference_swap_convention, ForwardSwapRateInputs,
+    calculate_forward_swap_rate, ForwardSwapRateInputs,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -25,10 +25,9 @@ use finstack_quant_core::Result;
 /// Reference swap of a CMS fixing, with its leg conventions resolved.
 ///
 /// Resolution order for every leg field is explicit override >
-/// `swap_convention` > currency market convention (EUR, GBP, JPY) > USD
-/// market standard (semi-annual 30/360 fixed versus quarterly ACT/360
-/// floating). USD is deliberately absent from the currency step: the USD CMS
-/// underlying (fixed versus 3M) is not the same swap as
+/// `swap_convention` > currency market convention. The default USD CMS reference uses the
+/// registered USD-LIBOR-3M convention (semi-annual 30/360 fixed versus
+/// quarterly ACT/360 floating), distinct from
 /// [`IRSConvention::UsdSofr`] (annual/annual OIS).
 #[derive(Debug, Clone, Copy)]
 pub struct CmsReferenceSwap<'a> {
@@ -53,61 +52,84 @@ pub struct CmsReferenceSwap<'a> {
 }
 
 impl CmsReferenceSwap<'_> {
-    fn currency_swap_convention(&self) -> Option<IRSConvention> {
-        match self.currency {
-            Currency::EUR => Some(IRSConvention::EurEstr),
-            Currency::GBP => Some(IRSConvention::GbpSonia),
-            Currency::JPY => Some(IRSConvention::JpyTonar),
-            _ => None,
+    fn market_convention(
+        &self,
+    ) -> Result<&'static crate::market::conventions::RateIndexConventions> {
+        if let Some(convention) = self.swap_convention {
+            return convention.conventions();
         }
+        use crate::market::conventions::ConventionRegistry;
+        use finstack_quant_core::types::IndexId;
+        let id = match self.currency {
+            Currency::USD => "USD-LIBOR-3M",
+            Currency::EUR => "EUR-ESTR-OIS",
+            Currency::GBP => "GBP-SONIA-OIS",
+            Currency::JPY => "JPY-TONAR-OIS",
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{} requires an explicit reference-swap convention for {}",
+                    self.label, self.currency
+                )))
+            }
+        };
+        ConventionRegistry::try_global()?.require_rate_index(&IndexId::new(id))
     }
 
-    /// Resolved fixed-leg payment frequency (explicit > convention > currency > semi-annual).
-    pub fn resolved_fixed_frequency(&self) -> Tenor {
-        self.swap_fixed_frequency
-            .or_else(|| self.swap_convention.map(|c| c.fixed_frequency()))
-            .or_else(|| self.currency_swap_convention().map(|c| c.fixed_frequency()))
-            .unwrap_or_else(Tenor::semi_annual)
-    }
-
-    /// Resolved floating-leg payment frequency (explicit > convention > currency > quarterly).
-    pub fn resolved_float_frequency(&self) -> Tenor {
-        self.swap_float_frequency
-            .or_else(|| self.swap_convention.map(|c| c.float_frequency()))
-            .or_else(|| self.currency_swap_convention().map(|c| c.float_frequency()))
-            .unwrap_or_else(Tenor::quarterly)
-    }
-
-    /// Resolved fixed-leg day count (explicit > convention > currency > 30/360).
-    pub fn resolved_fixed_day_count(&self) -> DayCount {
-        self.swap_day_count
-            .or_else(|| self.swap_convention.map(|c| c.fixed_day_count()))
-            .or_else(|| self.currency_swap_convention().map(|c| c.fixed_day_count()))
-            .unwrap_or(DayCount::Thirty360)
-    }
-
-    /// Resolved floating-leg day count (explicit > convention > currency > ACT/360).
-    pub fn resolved_float_day_count(&self) -> DayCount {
-        self.swap_float_day_count
-            .or_else(|| self.swap_convention.map(|c| c.float_day_count()))
-            .or_else(|| self.currency_swap_convention().map(|c| c.float_day_count()))
-            .unwrap_or(DayCount::Act360)
-    }
-
-    /// Fixed-leg payments per year (see [`Tenor::payments_per_year`]).
-    pub fn payments_per_year(&self) -> f64 {
-        self.resolved_fixed_frequency().payments_per_year()
-    }
-
-    /// Reference-swap convention supplying the calendar, reset lag, business-day
-    /// rule and payment lag.
+    /// Resolve the fixed-leg payment frequency from an explicit override or the canonical registry.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when no override is set and the currency has
-    /// no market-standard convention.
-    pub fn convention(&self) -> Result<IRSConvention> {
-        resolve_reference_swap_convention(self.swap_convention, self.currency)
+    /// Returns an error for unsupported currencies or invalid registry entries.
+    pub fn resolved_fixed_frequency(&self) -> Result<Tenor> {
+        match self.swap_fixed_frequency {
+            Some(value) => Ok(value),
+            None => Ok(self.market_convention()?.default_fixed_leg_frequency),
+        }
+    }
+
+    /// Resolve the floating-leg payment frequency from an explicit override or the canonical registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported currencies or invalid registry entries.
+    pub fn resolved_float_frequency(&self) -> Result<Tenor> {
+        match self.swap_float_frequency {
+            Some(value) => Ok(value),
+            None => Ok(self.market_convention()?.default_payment_frequency),
+        }
+    }
+
+    /// Resolve the fixed-leg accrual day count from an explicit override or the canonical registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported currencies or invalid registry entries.
+    pub fn resolved_fixed_day_count(&self) -> Result<DayCount> {
+        match self.swap_day_count {
+            Some(value) => Ok(value),
+            None => Ok(self.market_convention()?.default_fixed_leg_day_count),
+        }
+    }
+
+    /// Resolve the floating-leg accrual day count from an explicit override or the canonical registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for unsupported currencies or invalid registry entries.
+    pub fn resolved_float_day_count(&self) -> Result<DayCount> {
+        match self.swap_float_day_count {
+            Some(value) => Ok(value),
+            None => Ok(self.market_convention()?.day_count),
+        }
+    }
+
+    /// Fixed-leg payments per year on the resolved reference-swap convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the fixed frequency cannot be resolved.
+    pub fn payments_per_year(&self) -> Result<f64> {
+        Ok(self.resolved_fixed_frequency()?.payments_per_year())
     }
 
     /// Effective date of the reference swap observed on `fixing_date`: the
@@ -122,20 +144,15 @@ impl CmsReferenceSwap<'_> {
     /// Returns a validation error when the convention cannot be resolved, has
     /// no reference calendar, or the calendar is not registered.
     pub fn reference_swap_start(&self, fixing_date: Date) -> Result<Date> {
-        let convention = self.convention()?;
-        let calendar_id = convention.calendar_id().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "{} convention has no reference calendar",
-                self.label
-            ))
-        })?;
-        let calendar = calendar_by_id(&calendar_id).ok_or_else(|| {
+        let convention = self.market_convention()?;
+        let calendar_id = &convention.market_calendar_id;
+        let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "{} reference calendar '{}' is not registered",
                 self.label, calendar_id
             ))
         })?;
-        fixing_date.add_business_days(convention.reset_lag_days(), calendar)
+        fixing_date.add_business_days(convention.market_settlement_days, calendar)
     }
 
     /// Forward par swap rate and market annuity of the reference swap
@@ -160,12 +177,8 @@ impl CmsReferenceSwap<'_> {
         start: Date,
         end: Date,
     ) -> Result<(f64, f64)> {
-        let convention = self.convention()?;
-        let calendar_id = convention.calendar_id().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "CMS reference-swap convention has no calendar".to_string(),
-            )
-        })?;
+        let convention = self.market_convention()?;
+        let calendar_id = &convention.market_calendar_id;
         calculate_forward_swap_rate(ForwardSwapRateInputs {
             market,
             discount_curve_id: self.discount_curve_id,
@@ -173,16 +186,16 @@ impl CmsReferenceSwap<'_> {
             as_of,
             start,
             end,
-            fixed_frequency: self.resolved_fixed_frequency(),
-            fixed_day_count: self.resolved_fixed_day_count(),
-            float_frequency: self.resolved_float_frequency(),
-            float_day_count: self.resolved_float_day_count(),
-            calendar_id: &calendar_id,
-            business_day_convention: convention.business_day_convention(),
+            fixed_frequency: self.resolved_fixed_frequency()?,
+            fixed_day_count: self.resolved_fixed_day_count()?,
+            float_frequency: self.resolved_float_frequency()?,
+            float_day_count: self.resolved_float_day_count()?,
+            calendar_id,
+            business_day_convention: convention.market_business_day_convention,
             stub: StubKind::ShortFront,
             end_of_month: start.end_of_month() == start && end.end_of_month() == end,
-            payment_lag_days: convention.payment_lag_days(),
-            enforce_forward_tenor: !convention.uses_daily_compounding(),
+            payment_lag_days: convention.default_payment_lag_days,
+            enforce_forward_tenor: convention.ois_compounding.is_none(),
         })
     }
 }
@@ -279,21 +292,30 @@ mod tests {
             forward_curve_id: &disc,
         };
         assert_eq!(
-            base.resolved_fixed_frequency(),
-            IRSConvention::EurEstr.fixed_frequency()
+            base.resolved_fixed_frequency().expect("registry"),
+            IRSConvention::EurEstr.fixed_frequency().expect("registry")
         );
         let explicit = CmsReferenceSwap {
             swap_fixed_frequency: Some(Tenor::quarterly()),
             ..base
         };
-        assert_eq!(explicit.resolved_fixed_frequency(), Tenor::quarterly());
+        assert_eq!(
+            explicit.resolved_fixed_frequency().expect("registry"),
+            Tenor::quarterly()
+        );
         let usd = CmsReferenceSwap {
             currency: Currency::USD,
             ..base
         };
-        assert_eq!(usd.resolved_fixed_frequency(), Tenor::semi_annual());
-        assert_eq!(usd.resolved_fixed_day_count(), DayCount::Thirty360);
-        assert_eq!(usd.payments_per_year(), 2.0);
+        assert_eq!(
+            usd.resolved_fixed_frequency().expect("registry"),
+            Tenor::semi_annual()
+        );
+        assert_eq!(
+            usd.resolved_fixed_day_count().expect("registry"),
+            DayCount::Thirty360
+        );
+        assert_eq!(usd.payments_per_year().expect("registry"), 2.0);
     }
 
     #[test]

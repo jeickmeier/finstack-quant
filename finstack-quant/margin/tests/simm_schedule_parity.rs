@@ -1,261 +1,201 @@
-//! SIMM embedded schedule parity test.
+//! Independent transcription of historical ISDA SIMM v2.6 tables.
 //!
-//! This suite pins a subset of the ISDA SIMM v2.6 risk weights, correlations,
-//! and concentration thresholds to their published values. Any accidental edit
-//! to `data/margin/simm.v1.json` or `registry/embedded.rs` that mutates these
-//! numbers will trip the test and force an explicit review.
-//!
-//! # Regulatory context
-//!
-//! ISDA publishes the SIMM methodology and schedules annually. The embedded
-//! copy in this crate is frozen at a specific version and must be re-verified
-//! against the ISDA source document on every schedule update.
-//!
-//! | Embedded version | ISDA source                                         | Frozen on   | Next review    |
-//! |------------------|-----------------------------------------------------|-------------|-----------------|
-//! | `SimmVersion::V2_6` | ISDA SIMM Methodology Version 2.6 (Dec 2023)     | 2024-01-15  | 2025-01 cycle  |
-//! | `SimmVersion::V2_5` | ISDA SIMM Methodology Version 2.5 (Dec 2022)     | 2023-01-15  | (historical)   |
-//!
-//! When adopting a new ISDA release:
-//!
-//! 1. Download the SIMM Methodology PDF from isda.org.
-//! 2. Add a new variant to [`finstack_quant_margin::SimmVersion`] if the schema
-//!    changed.
-//! 3. Add a new JSON entry to `data/margin/simm.v1.json` with all risk
-//!    weights, correlations, and thresholds from the ISDA tables.
-//! 4. Add a new `golden_values_for_*` function to this file with the
-//!    ISDA-sourced values for the new version.
-//! 5. Update the "Frozen on" and "Next review" rows above.
-//!
-//! # What this test catches
-//!
-//! - Accidental edits to the embedded JSON that change a risk weight.
-//! - Silent schedule drift introduced by a refactor of the registry loader.
-//! - Structural changes that drop, rename, or duplicate SIMM keys.
-//!
-//! # What this test does NOT catch
-//!
-//! - Legitimate ISDA schedule updates (by design — those require a reviewer
-//!   to bless the new numbers by updating BOTH this file and the JSON).
-//! - Formula-level bugs in the SIMM calculator itself (covered by the
-//!   calculator's unit tests).
+//! Source: https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf
+//! PDF SHA256 57e9d2e9e080e27abc92197923b019e40eb2fe60d9c82ce2a0f8238b7c4bf8e0.
+//! Reread 2026-09-09. Provenance: tests/fixtures/simm_v26_provenance.md.
+//! These replace incorrectly attributed self-captured values, not external
+//! Bloomberg/QuantLib vectors. Formula checks live in production_simm_csa_audit.
 
-use finstack_quant_margin::{SimmCalculator, SimmVersion};
-
-/// Golden SIMM v2.6 values sourced from the ISDA Methodology document.
-///
-/// Every entry MUST be backed by a specific page/table reference in the ISDA
-/// PDF. Add a reviewer comment when changing any value.
-struct SimmV26GoldenValues;
-
-impl SimmV26GoldenValues {
-    // ISDA SIMM v2.6 — Section E.1, Table 1: Interest Rate risk weights (bp)
-    fn ir_delta_weights() -> &'static [(&'static str, f64)] {
-        &[
-            ("2W", 109.0),
-            ("1M", 105.0),
-            ("3M", 80.0),
-            ("6M", 67.0),
-            ("1Y", 61.0),
-            ("2Y", 52.0),
-            ("3Y", 49.0),
-            ("5Y", 51.0),
-            ("10Y", 51.0),
-            ("15Y", 51.0),
-            ("20Y", 54.0),
-            ("30Y", 62.0),
-        ]
-    }
-
-    // ISDA SIMM v2.6 — Section E.3, Table 6: Credit Non-Qualifying delta weight
-    fn cnq_delta_weight() -> f64 {
-        500.0
-    }
-
-    // ISDA SIMM v2.6 — Section E.4, Table 9: Equity delta risk weight
-    fn equity_delta_weight() -> f64 {
-        32.0
-    }
-
-    // ISDA SIMM v2.6 — Section E.6, Table 14: FX delta weight
-    fn fx_delta_weight() -> f64 {
-        8.4
-    }
-
-    // ISDA SIMM v2.6 — Section E.6: FX delta intra-bucket correlation
-    fn fx_intra_bucket_correlation() -> f64 {
-        0.5
-    }
-
-    // ISDA SIMM v2.6 — Section E.2, Table 4: Inter-tenor IR correlations
-    // Spot-checks along the diagonal and off-diagonal to anchor the matrix.
-    fn ir_tenor_correlations() -> &'static [(&'static str, &'static str, f64)] {
-        &[
-            // Adjacent tenors — highest correlation
-            ("2W", "1M", 0.99),
-            ("10Y", "15Y", 0.98),
-            ("20Y", "30Y", 0.99),
-            // Mid-distance pairs
-            ("1Y", "5Y", 0.88),
-            ("2Y", "10Y", 0.88),
-            // Wide tenor gaps — lowest correlation
-            ("2W", "30Y", 0.51),
-            ("1M", "30Y", 0.54),
-            ("3M", "30Y", 0.59),
-        ]
-    }
-
-    // ISDA SIMM v2.6 — Margin Period of Risk (uncollateralized bilateral)
-    fn mpor_days() -> u32 {
-        10
-    }
-
-    // ISDA SIMM v2.6 — Section E.7: Concentration thresholds (USD)
-    fn concentration_ir_threshold() -> f64 {
-        230_000_000.0
-    }
-}
-
-/// Small epsilon for f64 equality — SIMM values are exact decimal quantities
-/// stored as f64, so direct equality would also work, but a tolerance guards
-/// against JSON parser rounding on non-binary-representable values.
-const EPS: f64 = 1e-9;
-
-fn close(a: f64, b: f64) -> bool {
-    (a - b).abs() <= EPS
-}
+use finstack_quant_margin::{SimmCalculator, SimmRiskClass, SimmVersion, SIMM_TENORS};
 
 #[test]
-fn simm_v2_6_ir_delta_weights_match_isda_schedule() {
-    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry loads");
-    for (tenor, expected) in SimmV26GoldenValues::ir_delta_weights() {
-        let actual = calc
-            .params
-            .ir_delta_weights
-            .get(*tenor)
-            .copied()
-            .unwrap_or_else(|| panic!("SIMM v2.6 missing IR delta weight for tenor '{tenor}'"));
-        assert!(
-            close(actual, *expected),
-            "SIMM v2.6 IR delta weight drift at tenor '{tenor}': expected {expected}, \
-             got {actual}. Update this test only if an ISDA schedule update has been reviewed."
-        );
-    }
-}
-
-#[test]
-fn simm_v2_6_non_bucketed_weights_match_isda_schedule() {
-    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry loads");
-
-    assert!(
-        close(
-            calc.params.cnq_delta_weight,
-            SimmV26GoldenValues::cnq_delta_weight()
+fn published_ir_weights_and_correlations() {
+    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry");
+    let p = &calc.params;
+    // D.1 tables 1-3, printed page 14.
+    for (table, expected) in [
+        (
+            &p.ir_delta_weights,
+            [109., 105., 90., 71., 66., 66., 64., 60., 60., 61., 61., 67.],
         ),
-        "SIMM v2.6 CNQ delta weight drift: expected {}, got {}",
-        SimmV26GoldenValues::cnq_delta_weight(),
-        calc.params.cnq_delta_weight
-    );
-    assert!(
-        close(
-            calc.params.equity_delta_weight,
-            SimmV26GoldenValues::equity_delta_weight()
+        (
+            &p.ir_delta_weights_low,
+            [15., 18., 9., 11., 13., 15., 19., 23., 23., 22., 22., 23.],
         ),
-        "SIMM v2.6 equity delta weight drift: expected {}, got {}",
-        SimmV26GoldenValues::equity_delta_weight(),
-        calc.params.equity_delta_weight
-    );
-    assert!(
-        close(
-            calc.params.fx_delta_weight,
-            SimmV26GoldenValues::fx_delta_weight()
+        (
+            &p.ir_delta_weights_high,
+            [
+                163., 109., 87., 89., 102., 96., 101., 97., 97., 102., 106., 101.,
+            ],
         ),
-        "SIMM v2.6 FX delta weight drift: expected {}, got {}",
-        SimmV26GoldenValues::fx_delta_weight(),
-        calc.params.fx_delta_weight
-    );
-    assert!(
-        close(
-            calc.params.fx_intra_bucket_correlation,
-            SimmV26GoldenValues::fx_intra_bucket_correlation()
-        ),
-        "SIMM v2.6 FX intra-bucket correlation drift: expected {}, got {}",
-        SimmV26GoldenValues::fx_intra_bucket_correlation(),
-        calc.params.fx_intra_bucket_correlation
-    );
-    assert_eq!(
-        calc.params.mpor_days,
-        SimmV26GoldenValues::mpor_days(),
-        "SIMM v2.6 MPOR drift: expected {}, got {}",
-        SimmV26GoldenValues::mpor_days(),
-        calc.params.mpor_days
-    );
-}
-
-#[test]
-fn simm_v2_6_ir_tenor_correlation_golden_samples() {
-    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry loads");
-
-    for (a, b, expected) in SimmV26GoldenValues::ir_tenor_correlations() {
-        // The registry stores the map keyed by an ordered `(String, String)`
-        // tenor pair. Try both orderings because the canonical form is not
-        // guaranteed by every loader version.
-        let key1 = (a.to_string(), b.to_string());
-        let key2 = (b.to_string(), a.to_string());
-        let actual = calc
-            .params
-            .ir_tenor_correlations
-            .get(&key1)
-            .or_else(|| calc.params.ir_tenor_correlations.get(&key2))
-            .copied()
-            .unwrap_or_else(|| panic!("SIMM v2.6 missing IR tenor correlation for ({a}, {b})"));
-        assert!(
-            close(actual, *expected),
-            "SIMM v2.6 IR tenor correlation drift at ({a}, {b}): expected {expected}, \
-             got {actual}. Update this test only if an ISDA schedule update has been reviewed."
-        );
-    }
-}
-
-#[test]
-fn simm_v2_6_ir_concentration_threshold_matches_isda() {
-    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry loads");
-    // The registry stores concentration thresholds keyed by risk class.
-    // This test specifically pins the IR threshold since it's the largest
-    // and most frequently misconfigured.
-    let thresholds = &calc.params.concentration_thresholds;
-    let found = thresholds.iter().find_map(|(k, v)| {
-        if format!("{k:?}").to_lowercase().contains("interest")
-            || format!("{k:?}").to_lowercase().contains("rate")
-        {
-            Some(*v)
-        } else {
-            None
+    ] {
+        assert_eq!(table.len(), 12);
+        for (tenor, weight) in SIMM_TENORS.iter().zip(expected) {
+            assert_eq!(table[*tenor], weight);
         }
-    });
-    let Some(actual) = found else {
-        panic!(
-            "SIMM v2.6 concentration_thresholds missing IR key (candidates: {:?})",
-            thresholds.keys().collect::<Vec<_>>()
+    }
+    // D.2 paragraph 36, printed pages 14-15, strict upper triangle in tenor order.
+    let rows: &[&[f64]] = &[
+        &[77., 67., 59., 48., 39., 34., 30., 25., 23., 21., 20.],
+        &[84., 74., 56., 43., 36., 31., 26., 21., 19., 19.],
+        &[88., 69., 55., 47., 40., 34., 27., 25., 25.],
+        &[86., 73., 65., 57., 49., 40., 38., 37.],
+        &[94., 87., 79., 68., 60., 57., 55.],
+        &[96., 91., 80., 74., 70., 69.],
+        &[97., 88., 81., 77., 76.],
+        &[95., 90., 86., 85.],
+        &[97., 94., 94.],
+        &[98., 97.],
+        &[99.],
+    ];
+    assert_eq!(p.ir_tenor_correlations.len(), 66);
+    for (i, row) in rows.iter().enumerate() {
+        for (offset, percent) in row.iter().enumerate() {
+            let a = SIMM_TENORS[i].to_owned();
+            let b = SIMM_TENORS[i + offset + 1].to_owned();
+            let actual = p
+                .ir_tenor_correlations
+                .get(&(a.clone(), b.clone()))
+                .or_else(|| p.ir_tenor_correlations.get(&(b, a)))
+                .expect("pair");
+            assert_eq!(*actual, percent / 100.0);
+        }
+    }
+    assert_eq!(p.ir_inter_currency_correlation, 0.32);
+    assert_eq!(p.ir_subcurve_correlation, 0.993);
+    assert_eq!(p.ir_historical_volatility_ratio, 0.47);
+    assert_eq!(p.ir_vega_weight, 0.23);
+}
+
+#[test]
+fn published_non_ir_weights_and_historical_ratios() {
+    let calc = SimmCalculator::default();
+    let p = &calc.params;
+    // E through I: selected supported residual classes and every commodity bucket.
+    assert_eq!(p.cnq_delta_weight, 1300.0);
+    assert_eq!(p.equity_delta_weight, 50.0);
+    assert_eq!(p.fx_delta_weight, 7.4);
+    assert_eq!(p.fx_high_delta_weight, 14.7);
+    assert_eq!(p.cq_vega_weight, 0.76);
+    assert_eq!(p.cnq_vega_weight, 0.76);
+    assert_eq!(p.equity_vega_weight, 0.45);
+    assert_eq!(p.fx_vega_weight, 0.48);
+    assert_eq!(p.commodity_vega_weight, 0.55);
+    assert_eq!(p.equity_historical_volatility_ratio, 0.60);
+    assert_eq!(p.fx_historical_volatility_ratio, 0.57);
+    assert_eq!(p.commodity_historical_volatility_ratio, 0.74);
+    assert_eq!(p.cq_same_issuer_correlation, 0.93);
+    assert_eq!(p.cq_intra_bucket_correlation, 0.46);
+    assert_eq!(p.credit_residual_correlation, 0.50);
+    assert_eq!(p.fx_intra_bucket_correlation, 0.50);
+    assert_eq!(p.fx_regular_high_correlation, 0.25);
+    assert_eq!(p.fx_high_high_correlation, -0.05);
+    let weights = [
+        48., 29., 33., 25., 35., 30., 60., 52., 68., 63., 21., 21., 15., 16., 13., 68., 17.,
+    ];
+    let correlations = [
+        83., 97., 93., 97., 98., 90., 98., 49., 80., 46., 58., 53., 62., 16., 18., 0., 38.,
+    ];
+    for i in 0..17 {
+        let key = (i + 1).to_string();
+        assert_eq!(p.commodity_bucket_weights[&key], weights[i]);
+        assert_eq!(
+            p.commodity_intra_bucket_correlations[&key],
+            correlations[i] / 100.0
         );
-    };
-    assert!(
-        close(actual, SimmV26GoldenValues::concentration_ir_threshold()),
-        "SIMM v2.6 IR concentration threshold drift: expected {}, got {actual}",
-        SimmV26GoldenValues::concentration_ir_threshold()
+    }
+}
+
+#[test]
+fn published_raw_concentration_thresholds() {
+    let calc = SimmCalculator::default();
+    let p = &calc.params;
+    // J, printed pages 26-28. Table units USD millions, per bp/% for delta.
+    for (key, delta, vega) in [
+        ("high", 30., 74.),
+        ("regular_well_traded", 330., 4900.),
+        ("regular_less_traded", 130., 520.),
+        ("low", 61., 970.),
+    ] {
+        assert_eq!(p.ir_delta_concentration_thresholds[key], delta * 1e6);
+        assert_eq!(p.ir_vega_concentration_thresholds[key], vega * 1e6);
+    }
+    for (key, threshold) in [("1", 3300.), ("2", 880.), ("3", 170.)] {
+        assert_eq!(p.fx_delta_concentration_thresholds[key], threshold * 1e6);
+    }
+    for (key, threshold) in [
+        ("1_1", 2800.),
+        ("1_2", 1400.),
+        ("1_3", 590.),
+        ("2_2", 520.),
+        ("2_3", 340.),
+        ("3_3", 210.),
+    ] {
+        assert_eq!(p.fx_vega_concentration_thresholds[key], threshold * 1e6);
+    }
+    let delta = [
+        310., 2100., 1700., 1700., 1700., 2800., 2800., 2700., 2700., 52., 530., 1300., 100., 100.,
+        100., 52., 4000.,
+    ];
+    let vega = [
+        390., 2900., 310., 310., 310., 6300., 6300., 1200., 1200., 120., 390., 1300., 590., 590.,
+        590., 69., 69.,
+    ];
+    for i in 0..17 {
+        let key = (i + 1).to_string();
+        assert_eq!(
+            p.commodity_delta_concentration_thresholds[&key],
+            delta[i] * 1e6
+        );
+        assert_eq!(
+            p.commodity_vega_concentration_thresholds[&key],
+            vega[i] * 1e6
+        );
+    }
+    for (class, delta, vega) in [
+        (SimmRiskClass::Equity, 0.37, 39.),
+        (SimmRiskClass::CreditNonQualifying, 0.50, 70.),
+    ] {
+        assert_eq!(p.concentration_thresholds[&class], delta * 1e6);
+        assert_eq!(p.vega_concentration_thresholds[&class], vega * 1e6);
+    }
+    assert_eq!(
+        p.vega_concentration_thresholds[&SimmRiskClass::CreditQualifying],
+        360e6
     );
 }
 
 #[test]
-fn simm_v2_6_ir_delta_weight_count_matches_isda_tenor_set() {
-    // ISDA SIMM v2.6 defines exactly 12 IR tenor buckets. Guard against
-    // accidental addition or removal of buckets that wouldn't be caught
-    // by the value-by-value test above (since missing-key also raises).
-    let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry loads");
-    assert_eq!(
-        calc.params.ir_delta_weights.len(),
-        12,
-        "SIMM v2.6 expects exactly 12 IR tenor buckets; registry has {}",
-        calc.params.ir_delta_weights.len()
-    );
+fn published_cross_risk_class_correlations() {
+    use SimmRiskClass::*;
+    let calc = SimmCalculator::default();
+    let p = &calc.params;
+    let classes = [
+        InterestRate,
+        CreditQualifying,
+        CreditNonQualifying,
+        Equity,
+        Commodity,
+        Fx,
+    ];
+    let rows: &[&[f64]] = &[
+        &[4., 4., 7., 37., 14.],
+        &[54., 70., 27., 37.],
+        &[46., 24., 15.],
+        &[35., 39.],
+        &[35.],
+    ];
+    for (i, row) in rows.iter().enumerate() {
+        for (j, percent) in row.iter().enumerate() {
+            let a = classes[i];
+            let b = classes[i + j + 1];
+            assert_eq!(
+                *p.risk_class_correlations
+                    .get(&(a, b))
+                    .or_else(|| p.risk_class_correlations.get(&(b, a)))
+                    .expect("pair"),
+                percent / 100.0
+            );
+        }
+    }
 }

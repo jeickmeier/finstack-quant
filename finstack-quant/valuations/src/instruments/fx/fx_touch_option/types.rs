@@ -511,19 +511,46 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             return Ok(Some(0.0));
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
-        let up = crate::metrics::bump_surface_vol_absolute(
+        if self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            == Some(0.0)
+        {
+            let bump = crate::metrics::bump_sizes::VOLATILITY;
+            let (up, market_up) = crate::metrics::bump_active_volatility(
+                self,
+                market,
+                self.vol_surface_id.as_str(),
+                bump,
+            )?;
+            return Ok(Some(
+                (up.value(&market_up, as_of)?.amount() - self.value(market, as_of)?.amount())
+                    / (bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL),
+            ));
+        }
+
+        let vol_bump = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+            .map_or(crate::metrics::bump_sizes::VOLATILITY, |volatility| {
+                crate::metrics::bump_sizes::VOLATILITY.min(volatility * 0.5)
+            });
+        let (up, market_up) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             vol_bump,
         )?;
-        let down = crate::metrics::bump_surface_vol_absolute(
+        let (down, market_down) = crate::metrics::bump_active_volatility(
+            self,
             market,
             self.vol_surface_id.as_str(),
             -vol_bump,
         )?;
-        let pv_up = self.value(&up, as_of)?.amount();
-        let pv_down = self.value(&down, as_of)?.amount();
+        let pv_up = up.value(&market_up, as_of)?.amount();
+        let pv_down = down.value(&market_down, as_of)?.amount();
         let width = 2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - pv_down) / width))
     }

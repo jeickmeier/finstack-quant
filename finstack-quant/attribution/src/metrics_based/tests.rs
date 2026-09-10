@@ -211,6 +211,7 @@ fn metrics_based_carry_without_horizon_stamp_rejects_multi_day_window() {
     let meta2 = finstack_quant_core::config::results_meta(&FinstackConfig::default());
     let mut measures_1d = IndexMap::new();
     measures_1d.insert(MetricId::CarryTotal, -5.0);
+    measures_1d.insert(MetricId::FundingCost, 0.0);
     let val_t0_1d = ValuationResult::stamped_with_meta(
         "TEST-CARRY-NO-HORIZON",
         as_of_t0,
@@ -291,6 +292,57 @@ fn metrics_based_carry_matching_horizon_stamp_uses_metrics_as_is() {
 
     assert!((attribution.carry.amount() + 12.0).abs() < 1e-9);
     let detail = attribution.carry_detail.expect("carry detail");
+    assert_eq!(detail.coupon_income.expect("coupon").total.amount(), 8.0);
+}
+
+#[test]
+fn production_carry_adds_back_funding_to_match_gross_total_pnl() {
+    let as_of_t0 = date!(2025 - 01 - 15);
+    let as_of_t1 = date!(2025 - 01 - 20); // 5-day window
+    let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
+
+    let instrument: Arc<dyn Instrument> = Arc::new(TestInstrument::new(
+        "TEST-CARRY-MATCHED-HORIZON",
+        Money::from((1000_i64, Currency::USD)),
+    ));
+
+    let mut measures_t0 = IndexMap::new();
+    measures_t0.insert(MetricId::CarryTotal, -15.0);
+    measures_t0.insert(MetricId::CouponIncome, 8.0);
+    measures_t0.insert(MetricId::PullToPar, -15.0);
+    measures_t0.insert(MetricId::RollDown, -5.0);
+    measures_t0.insert(MetricId::FundingCost, 3.0);
+    measures_t0.insert(MetricId::ThetaPeriodDays, 5.0);
+
+    let val_t0 = ValuationResult::stamped_with_meta(
+        "TEST-CARRY-MATCHED-HORIZON",
+        as_of_t0,
+        Money::from((1000_i64, Currency::USD)),
+        meta.clone(),
+    )
+    .with_measures(measures_t0);
+    let val_t1 = ValuationResult::stamped_with_meta(
+        "TEST-CARRY-MATCHED-HORIZON",
+        as_of_t1,
+        Money::from((988_i64, Currency::USD)),
+        meta,
+    );
+
+    let attribution = attribute_pnl_metrics_based(
+        &instrument,
+        &MarketContext::new(),
+        &MarketContext::new(),
+        &val_t0,
+        &val_t1,
+        as_of_t0,
+        as_of_t1,
+    )
+    .expect("matched-horizon carry should succeed");
+
+    assert!((attribution.carry.amount() + 12.0).abs() < 1e-9);
+    assert!(attribution.residual.amount().abs() < 1e-9);
+    let detail = attribution.carry_detail.expect("carry detail");
+    assert_eq!(detail.funding_cost.unwrap().amount(), 3.);
     assert_eq!(detail.coupon_income.expect("coupon").total.amount(), 8.0);
 }
 

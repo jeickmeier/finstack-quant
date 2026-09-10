@@ -173,7 +173,7 @@
     },
     "AgencyMbsPassthrough": {
       "additionalProperties": false,
-      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~14 days → payment on the 15th of M\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_model(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_model(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -310,7 +310,7 @@
       "type": "object"
     },
     "AgencyProgram": {
-      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively.",
+      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Their\npersisted values are exactly `GNMA_I` and `GNMA_II`, respectively.",
       "oneOf": [
         {
           "const": "FNMA",
@@ -324,7 +324,7 @@
         },
         {
           "const": "GNMA_I",
-          "description": "Ginnie Mae I - single-issuer pools with 14-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 14-day stated delay from month-end.",
+          "description": "Ginnie Mae I - single-issuer pools with 45-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 45-day stated delay from accrual start.",
           "type": "string"
         },
         {
@@ -351,7 +351,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional assumed pool for valuation.\nIf not provided, generic pool characteristics are assumed."
+          "description": "Optional assumed pool for valuation.\nIts current and original faces are scaled together to the trade's\npurchased current face. If absent, generic pool characteristics apply."
         },
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -381,10 +381,10 @@
         },
         "notional": {
           "$ref": "#/$defs/Money",
-          "description": "Trade notional (par amount)."
+          "description": "Current face amount purchased at settlement, in the trade currency."
         },
         "pool_factor": {
-          "description": "Expected pool factor for valuation.\nDefaults to 1.0 (newly issued) if not specified.",
+          "description": "Current/original face ratio in `(0, 1]` for the assumed delivered pool.\nDefaults to 1.0 for a generic pool. Original face is `notional / factor`;\nthe purchased current face remains `notional`. When an explicit pool is\nsupplied, its factor is used and any specified factor must agree.",
           "format": "double",
           "type": [
             "number",
@@ -880,7 +880,7 @@
           "description": "Reinvestment management\nReinvestment period configuration (if applicable)"
         },
         "rep_lines": {
-          "description": "Aggregated representative lines (optional optimization)\nIf present, pricing engine will use these instead of individual assets.",
+          "description": "Aggregated representative lines (optional optimization)\nMust be used with an empty `assets` vector; normalized into the same engine.",
           "items": {
             "$ref": "#/$defs/RepLine"
           },
@@ -2078,7 +2078,7 @@
     },
     "BarrierOption": {
       "additionalProperties": false,
-      "description": "Barrier option instrument.\n\nBarrier options are options with a barrier level that can knock in or out.\n\n# Barrier Monitoring\n\nReal-world barriers are typically monitored discretely (e.g., daily closes), not continuously.\nContinuous barrier formulas underestimate discrete barrier option values. The `use_gobet_miri`\nflag enables the Gobet-Miri discrete monitoring correction (β ≈ 0.5826), which adjusts the\neffective barrier level: `H_adj = H × exp(±0.5826 × σ × √Δt)`.\n\n**Recommendation**: Set `use_gobet_miri = true` (the default) for real-world pricing.\nOnly disable for continuous monitoring benchmarks or academic comparisons.\n\n# References\n\n- Broadie, Glasserman & Kou (1997), \"A Continuity Correction for Discrete Barrier Options\" `docs/REFERENCES.md#broadie-glasserman-kou-1997` `docs/REFERENCES.md#glasserman-2004-monte-carlo`\n- Gobet (2000), \"Weak Approximation of Killed Diffusion Using Euler Schemes\"",
+      "description": "Barrier option with a total trade rebate and explicit contractual monitoring.\nContinuous monitoring uses closed-form pricing by default. Discrete monitoring\nobserves only the supplied dates and uses Monte Carlo by default.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -2138,13 +2138,12 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-only pricing controls."
         },
-        "monitoring_frequency": {
-          "description": "Monitoring frequency for discrete barrier adjustment (years between observations).\n\nWhen set, the analytical pricer applies the Broadie-Glasserman correction\nto adjust the barrier level for discrete monitoring. Common values:\n- `1.0/252.0` — daily monitoring\n- `1.0/52.0` — weekly monitoring\n- `1.0/12.0` — monthly monitoring\n\nWhen `None`, the analytical pricer uses continuous monitoring formulas.\nNote: The MC pricer (`use_gobet_miri = true`) handles discrete monitoring\nindependently via per-step corrections.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "monitoring": {
+          "$ref": "#/$defs/Monitoring",
+          "default": {
+            "type": "continuous"
+          },
+          "description": "Contractual monitoring: continuous or an explicit, strictly increasing\nset of observation dates no later than expiry. Discrete pricing does not\ninterpolate hits between those dates."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -2170,7 +2169,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional rebate amount (paid if the barrier condition is met; see\n`rebate_timing` for when a knock-out rebate pays)"
+          "description": "Total contractual trade rebate in the payoff currency, independent of\nnotional. Knock-outs pay on a hit according to `rebate_timing`;\nknock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
           "$ref": "#/$defs/RebateTiming",
@@ -2193,11 +2192,6 @@
         "underlying_ticker": {
           "description": "Underlying asset ticker symbol",
           "type": "string"
-        },
-        "use_gobet_miri": {
-          "default": true,
-          "description": "Whether to use Gobet-Miri discrete barrier adjustment for Monte Carlo pricing.\n\nWhen `true` (recommended), applies the Broadie-Glasserman-Kou / Gobet-Miri correction\nto account for discrete barrier monitoring. This adjusts the effective barrier by\n`exp(±0.5826 × σ × √Δt)` where Δt is the time step.\n\n# Default Value\n\n**Defaults to `true`** for both builder and serde deserialization, as this\nreflects real-world discrete monitoring (daily closes). Set to `false` only\nfor continuous monitoring benchmarks or academic comparisons.\n\n# Production Recommendation\n\nAlways use `true` for production pricing of barrier options. Continuous\nbarrier formulas systematically underestimate discrete barrier option values.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "#/$defs/Id",
@@ -3715,7 +3709,7 @@
               "type": "null"
             }
           ],
-          "description": "Cash premium settlement date for Black time-to-expiry, when the screen\nquotes option time from premium settlement rather than valuation date."
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "cds_maturity": {
           "$ref": "#/$defs/DateWire",
@@ -3738,7 +3732,7 @@
               "type": "null"
             }
           ],
-          "description": "Exercise settlement date for Black time-to-expiry, when distinct from\nthe legal option expiration date."
+          "description": "Payment date of the exercise proceeds, defaulting to legal expiry.\nMust be on or after expiry and before CDS maturity. Discounting uses\nthis date; spread variance ends at legal expiry."
         },
         "exercise_style": {
           "$ref": "#/$defs/ExerciseStyle",
@@ -4274,10 +4268,10 @@
               "type": "null"
             }
           ],
-          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(price_pct_of_par, PV of remaining cashflows at reference_rate + spread)`\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
+          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(clean_floor, PV of remaining cashflows - accrued) + accrued`\n\nHere `clean_floor` is notional times `price_pct_of_par / 100`; the\nreference PV discounts remaining cashflows at the reference curve plus\nspread, and accrued interest is paid exactly once.\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
         },
         "price_pct_of_par": {
-          "description": "Redemption price as percentage of par amount.",
+          "description": "Clean redemption price as percentage of par amount (100 means par).\nAccrued coupon interest at exercise is added to determine the cash payment.",
           "format": "double",
           "type": "number"
         },
@@ -4495,7 +4489,7 @@
         "vol_type": {
           "$ref": "#/$defs/CapFloorVolType",
           "default": "auto",
-          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): treat the surface as a lognormal quote; Black-76\n  when forward and strike are positive, otherwise convert to an\n  equivalent normal vol and price with Bachelier. A normal-vol\n  surface must set `vol_type = Normal`.\n- `Lognormal`: Standard Black model, requires positive rates/strikes\n- `Normal`: Bachelier model, handles negative rates"
+          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): follow source convention and displacement metadata.\n- `Lognormal`: Black model, with the source displacement if present;\n  shifted forward and strike must both be positive.\n- `Normal`: Bachelier model using normal quotes in decimal rate units;\n  handles negative rates. Incompatible source conventions return errors."
         }
       },
       "required": [
@@ -4570,6 +4564,17 @@
         "kind": {
           "$ref": "#/$defs/CFKind",
           "description": "Category/kind of cash-flow."
+        },
+        "principal_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
         },
         "principal_delta": {
           "anyOf": [
@@ -4715,6 +4720,13 @@
             }
           ],
           "description": "Contractual maturity date, distinct from an adjusted final payment date."
+        },
+        "projected_fixings": {
+          "description": "Raw index observations used by projected floating coupons, before spread,\ngearing, caps and floors; retained for deterministic time-roll fixings.",
+          "items": {
+            "$ref": "#/$defs/ProjectedFixing"
+          },
+          "type": "array"
         },
         "representation": {
           "$ref": "#/$defs/CashflowRepresentation",
@@ -4929,7 +4941,7 @@
         },
         {
           "const": "isda_as",
-          "description": "Standard Asian convention (quarterly, Act/365F).",
+          "description": "Standard Asian convention (quarterly, Act/360).",
           "type": "string"
         },
         {
@@ -7986,41 +7998,6 @@
       ],
       "type": "object"
     },
-    "CreditEnhancement": {
-      "additionalProperties": false,
-      "description": "Credit-enhancement amounts and flags available to a tranche.",
-      "properties": {
-        "cash_trap_active": {
-          "description": "Whether residual cash is currently trapped or turboed into principal.",
-          "type": "boolean"
-        },
-        "excess_spread": {
-          "description": "Excess spread available to absorb losses, as an annual decimal rate.",
-          "format": "double",
-          "type": "number"
-        },
-        "overcollateralization": {
-          "$ref": "#/$defs/Money",
-          "description": "Collateral balance in excess of rated tranche balance."
-        },
-        "reserve_account": {
-          "$ref": "#/$defs/Money",
-          "description": "Cash reserve balance available as credit enhancement."
-        },
-        "subordination": {
-          "$ref": "#/$defs/Money",
-          "description": "Principal subordination supplied by junior tranches."
-        }
-      },
-      "required": [
-        "subordination",
-        "overcollateralization",
-        "reserve_account",
-        "excess_spread",
-        "cash_trap_active"
-      ],
-      "type": "object"
-    },
     "CreditFactorDetailOptions": {
       "additionalProperties": false,
       "description": "Options controlling the credit-factor detail emitted by attribution.\n\nDefaults: per-issuer adder breakdown OFF (large-portfolio payload control);\nper-bucket breakdown ON.",
@@ -8143,7 +8120,7 @@
     },
     "CreditFactors": {
       "additionalProperties": false,
-      "description": "Credit factors affecting default probability.",
+      "description": "Optional monetary inputs for CMBS debt-service coverage metrics.",
       "properties": {
         "annual_debt_service": {
           "anyOf": [
@@ -8166,59 +8143,8 @@
             }
           ],
           "description": "Annual net operating income for CMBS collateral, when provided."
-        },
-        "credit_score": {
-          "description": "Current FICO/credit score.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "custom_factors": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "description": "Additional custom factors.",
-          "type": "object"
-        },
-        "delinquency_days": {
-          "description": "Payment delinquency status (days).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "dti": {
-          "description": "Debt-to-income ratio.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "ltv": {
-          "description": "Loan-to-value ratio.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unemployment_rate": {
-          "description": "Unemployment rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
-      "required": [
-        "delinquency_days",
-        "custom_factors"
-      ],
       "type": "object"
     },
     "CreditHierarchicalConfig": {
@@ -10212,6 +10138,11 @@
       "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
       "oneOf": [
         {
+          "const": "one_one",
+          "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+          "type": "string"
+        },
+        {
           "const": "act_360",
           "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
           "type": "string"
@@ -10433,84 +10364,6 @@
       "description": "Exact decimal encoded only as a JSON string.",
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
-    },
-    "DefaultAssumptions": {
-      "additionalProperties": false,
-      "description": "Default assumptions for structured credit modeling",
-      "properties": {
-        "abs_speed_monthly": {
-          "description": "ABS monthly prepayment speed (for auto ABS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "base_cdr_annual": {
-          "description": "Base annual CDR (Constant Default Rate)",
-          "format": "double",
-          "type": "number"
-        },
-        "base_cpr_annual": {
-          "description": "Base annual CPR (Constant Prepayment Rate)",
-          "format": "double",
-          "type": "number"
-        },
-        "base_recovery_rate": {
-          "description": "Base recovery rate on defaults",
-          "format": "double",
-          "type": "number"
-        },
-        "cdr_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific annual CDRs",
-          "type": "object"
-        },
-        "cpr_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific annual CPRs",
-          "type": "object"
-        },
-        "psa_speed": {
-          "description": "PSA speed multiplier (for RMBS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "recovery_by_asset_type": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "default": {},
-          "description": "Asset-type specific recovery rates",
-          "type": "object"
-        },
-        "sda_speed": {
-          "description": "SDA speed multiplier (for RMBS)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "base_cdr_annual",
-        "base_recovery_rate",
-        "base_cpr_annual"
-      ],
-      "type": "object"
     },
     "DefaultCurve": {
       "description": "Default curve shape.",
@@ -11230,7 +11083,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional repo/financing curve identifier (carry-only).\n\nUsed exclusively for implied financing rate and roll specialness\ncalculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
+          "description": "Optional repo/financing curve identifier (carry-only).\n\nForward curve used by roll specialness to calculate the simple\nfinancing rate over the front/back settlement interval on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -11791,7 +11644,7 @@
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "default": "act_365f",
-          "description": "Day count convention"
+          "description": "Model year fraction for volatility, dividend carry and exercise times; defaults to ACT/365F. Discount factors retain the curve's own date convention."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
@@ -12213,14 +12066,14 @@
     },
     "ExcessSpreadSpec": {
       "additionalProperties": false,
-      "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. Any balance unused at deal end is released back to equity, unless a\ncumulative-loss trap trigger is breached.",
+      "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. At termination it pays deferred debt coupons; a breached loss trap\nthen applies remaining interest to debt principal before releasing the\nsurplus to the residual holder.",
       "properties": {
         "target_balance": {
           "$ref": "#/$defs/Money",
           "description": "Target funded balance of the spread account (currency units)."
         },
         "trap_loss_pct": {
-          "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which any remaining spread-account balance is\n*retained* in the deal at maturity rather than released to equity. When\n`None`, the unused balance is always released to equity.",
+          "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which terminal spread-account cash repays\ndebt principal after deferred coupons. Any surplus reaches the residual\nholder. `None` releases surplus after deferred coupons without this\ninterest-to-principal transfer.",
           "format": "double",
           "type": [
             "number",
@@ -15066,6 +14919,27 @@
           },
           "type": "array"
         },
+        "provider_quotes": {
+          "description": "Captured provider quotes, below explicit global and date/policy-pinned\nquotes in lookup priority. Market-context restoration uses these to\nrebuild a quote-only provider; arbitrary live provider behavior is not\nserialized. Required even when the provider has no snapshot quotes.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "$ref": "#/$defs/Currency"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
         "quotes": {
           "description": "Pair-global quotes as source, target, rate tuples.",
           "items": {
@@ -15091,6 +14965,7 @@
       "required": [
         "config",
         "quotes",
+        "provider_quotes",
         "pinned_quotes"
       ],
       "type": "object"
@@ -15860,7 +15735,7 @@
       "oneOf": [
         {
           "const": "usd_sofr",
-          "description": "USD SOFR OIS: Semi-annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
+          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
           "type": "string"
         },
         {
@@ -15880,7 +15755,7 @@
         },
         {
           "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Semi-annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
+          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
           "type": "string"
         }
       ]
@@ -16000,7 +15875,7 @@
         },
         "threshold": {
           "$ref": "#/$defs/Money",
-          "description": "IM threshold (aggregate group level).\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
+          "description": "Group-level IM threshold allocated to this CSA by the caller.\n\nBCBS-IOSCO permits €50M aggregate threshold at group level.\nMany large dealers operate with zero threshold by agreement."
         }
       },
       "required": [
@@ -16041,7 +15916,7 @@
           "type": "number"
         },
         "duration_id": {
-          "description": "Optional duration identifier for risk calculations",
+          "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.",
           "type": [
             "string",
             "null"
@@ -16148,6 +16023,17 @@
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
         },
+        "interpolation_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationInterpolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual monthly CPI interpolation, overriding index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+        },
         "lag_override": {
           "anyOf": [
             {
@@ -16248,7 +16134,7 @@
     },
     "InflationIndex": {
       "additionalProperties": false,
-      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
+      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
       "properties": {
         "currency": {
           "$ref": "#/$defs/Currency",
@@ -16492,7 +16378,7 @@
     },
     "InflationSwap": {
       "additionalProperties": false,
-      "description": "Zero-coupon Inflation Swap instrument.\n\nRepresents a zero-coupon inflation swap where one party pays a fixed real rate\nand the other receives the cumulative inflation over the swap's life. At maturity:\n\n```text\nInflation leg = Notional × [CPI(T_mat - Lag) / CPI(T_start - Lag) - 1]\nFixed leg     = Notional × [(1 + fixed_rate)^τ - 1]\n```\n\n# Market Conventions\n\n- **Lag**: Standard 3-month lag for US CPI, EUR HICP; 8-month for UK RPI\n- **Day Count**: Typically ACT/ACT for accrual, curve-specific for discounting\n- **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted\n\n# Validation\n\nCall [`validate()`](Self::validate) to check structural invariants before pricing.",
+      "description": "Zero-coupon Inflation Swap instrument.\n\nRepresents a zero-coupon inflation swap where one party pays a fixed real rate\nand the other receives the cumulative inflation over the swap's life. At maturity:\n\n```text\nInflation leg = Notional × [CPI(T_mat - Lag) / CPI(T_start - Lag) - 1]\nFixed leg     = Notional × [(1 + fixed_rate)^τ - 1]\n```\n\n# Market Conventions\n\n- **Lag**: Standard 3-month lag for US CPI/EUR HICP; 2-month for UK RPI\n- **Day Count**: Standard fixed legs compound annually with 1/1 accrual per period\n- **Business Day**: Payment dates adjusted per calendar; index observation typically unadjusted\n\n# Validation\n\nCall [`validate()`](Self::validate) to check structural invariants before pricing.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -16545,6 +16431,17 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+        },
+        "interpolation_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationInterpolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
         },
         "lag_override": {
           "anyOf": [
@@ -19262,55 +19159,14 @@
       "additionalProperties": false,
       "description": "Market conditions that affect prepayment behavior.",
       "properties": {
-        "custom_factors": {
-          "additionalProperties": {
-            "format": "double",
-            "type": "number"
-          },
-          "description": "Custom market factors.",
-          "type": "object"
-        },
-        "hpa": {
-          "description": "Home price appreciation (for mortgages).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "original_rate": {
-          "description": "Rate at origination for refinancing incentive calculation.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "refi_rate": {
-          "description": "Current refinancing rate.",
+          "description": "Finite annual decimal refinancing rate for Richard-Roll incentives; may be negative.",
           "format": "double",
           "type": "number"
-        },
-        "seasonal_factor": {
-          "description": "Seasonal adjustment factor.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unemployment": {
-          "description": "Unemployment rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
       "required": [
-        "refi_rate",
-        "custom_factors"
+        "refi_rate"
       ],
       "type": "object"
     },
@@ -20261,14 +20117,6 @@
             "null"
           ]
         },
-        "quoted_price_pct": {
-          "description": "Externally-quoted price as a percentage of original balance (100.0 = par).\n\nStructured-credit spread metrics require this external target to avoid\nthe circular objective `PV(curve + z) == PV(curve)`. They return an error\nwhen it is absent.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "theta_period": {
           "default": null,
           "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
@@ -20577,7 +20425,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Monitor continuously from `monitoring_start_date` through expiry.",
+          "description": "Monitor continuously through the contractual monitoring interval.",
           "properties": {
             "type": {
               "const": "continuous",
@@ -20615,7 +20463,7 @@
     },
     "Ndf": {
       "additionalProperties": false,
-      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (fixing_rate = None)\nForward rate is estimated via covered interest rate parity or fallback.\n\n## Post-Fixing (fixing_rate = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_contract - 1/F_fixing)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (fixing_rate = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (fixing_rate = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -20814,11 +20662,11 @@
       ]
     },
     "NdfQuoteConvention": {
-      "description": "Quote convention for NDF contract rates.\n\nNDFs can be quoted in two conventions depending on the market:\n\n# BasePerSettlement (default)\n\nRate is quoted as units of base currency per one unit of settlement currency.\nExample: USD/CNY = 7.25 means 7.25 CNY per 1 USD.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (1/F_contract - 1/F_fixing)\n```\n\nThis is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)\nwhere the restricted currency is the base and USD is the settlement currency.\n\n# SettlementPerBase\n\nRate is quoted as units of settlement currency per one unit of base currency.\nExample: CNY/USD = 0.138 means 0.138 USD per 1 CNY.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\n```\n\nThis is less common but may be used in some markets or for consistency with\nother FX instruments that quote in this direction.",
+      "description": "Quote convention for NDF contract rates.\n\nNDFs can be quoted in two conventions depending on the market:\n\n# BasePerSettlement (default)\n\nRate is quoted as units of base currency per one unit of settlement currency.\nExample: USD/CNY = 7.25 means 7.25 CNY per 1 USD.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\n```\n\nThis is the standard convention for most Asian NDF markets (CNY, KRW, INR, etc.)\nwhere the restricted currency is the base and USD is the settlement currency.\n\n# SettlementPerBase\n\nRate is quoted as units of settlement currency per one unit of base currency.\nExample: CNY/USD = 0.138 means 0.138 USD per 1 CNY.\n\nSettlement formula:\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\n```\n\nThis is less common but may be used in some markets or for consistency with\nother FX instruments that quote in this direction.",
       "oneOf": [
         {
           "const": "base_per_settlement",
-          "description": "Rate quoted as base currency per settlement currency (e.g., 7.25 CNY per USD).\nSettlement = Notional_base × (1/F_contract - 1/F_fixing)",
+          "description": "Rate quoted as base currency per settlement currency (e.g., 7.25 CNY per USD).\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)",
           "type": "string"
         },
         {
@@ -21779,22 +21627,22 @@
       "oneOf": [
         {
           "const": "fee",
-          "description": "Fee payment",
+          "description": "Fee payment funded from interest collections.",
           "type": "string"
         },
         {
           "const": "interest",
-          "description": "Interest payment",
+          "description": "Coupon payment funded from interest collections.",
           "type": "string"
         },
         {
           "const": "principal",
-          "description": "Principal payment",
+          "description": "Capital repayment funded from principal collections.",
           "type": "string"
         },
         {
           "const": "residual",
-          "description": "Residual/equity distribution",
+          "description": "Excess-interest distribution; does not retire equity principal.",
           "type": "string"
         }
       ]
@@ -22136,6 +21984,18 @@
           "$ref": "#/$defs/DayCount",
           "description": "Day-count convention used for coupon and accrual calculations."
         },
+        "default_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Economic default date for the outstanding recovery claim; required for defaulted assets."
+        },
         "id": {
           "$ref": "#/$defs/Id",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
@@ -22204,6 +22064,15 @@
             }
           ],
           "description": "Realized or modeled recovery amount when the asset is defaulted."
+        },
+        "recovery_rate": {
+          "default": null,
+          "description": "Per-asset recovery fraction in [0, 1]; overrides the deal recovery model.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "smm_override": {
           "default": null,
@@ -22321,6 +22190,10 @@
           "$ref": "#/$defs/DecimalWire",
           "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)"
         },
+        "standard_imm_dates": {
+          "description": "Whether to use the standard quarterly CDS roll grid (20 March,\nJune, September and December), including a final maturity stub.\nRequires quarterly `frequency` and `ShortFront` `stub`. Set false\nfor bespoke schedules generated from the supplied frequency/stub.",
+          "type": "boolean"
+        },
         "start": {
           "$ref": "#/$defs/DateWire",
           "description": "Start date of protection"
@@ -22332,6 +22205,7 @@
         }
       },
       "required": [
+        "standard_imm_dates",
         "start",
         "end",
         "frequency",
@@ -22508,6 +22382,33 @@
         "currency",
         "waterfall_spec",
         "events"
+      ],
+      "type": "object"
+    },
+    "ProjectedFixing": {
+      "additionalProperties": false,
+      "description": "One raw index observation needed by a projected floating coupon.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual index observation date, after fixing-calendar adjustments."
+        },
+        "series_id": {
+          "description": "Canonical market-series identifier, including the `FIXING:` prefix.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, or quote currency per base\ncurrency for an FX fixing series. The series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "series_id",
+        "date"
       ],
       "type": "object"
     },
@@ -22761,16 +22662,21 @@
       "additionalProperties": false,
       "description": "Quanto adjustment parameters for instruments where payoff currency differs from\nunderlying currency.",
       "properties": {
+        "asset_currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency in which the underlying asset is quoted and financed."
+        },
+        "asset_discount_curve_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Discount curve for financing the underlying in its asset currency."
+        },
         "correlation": {
           "$ref": "#/$defs/CorrelationWire",
-          "description": "Correlation between the underlying asset and the FX rate.\nMust be in [-1, 1]."
+          "description": "Correlation between the asset price and payoff-currency units per asset-currency unit.\nMust be in [-1, 1]."
         },
         "fx_spot_id": {
-          "description": "FX spot price identifier (for proper quanto vol lookup).\nFalls back to ATM approximation (1.0) if not provided.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/Id",
+          "description": "Required positive FX spot scalar in payoff-currency units per asset-currency unit.\nA monetary scalar must use the payoff currency. The FX surface is queried\nat the forward FX rate implied by the asset and payoff discount curves."
         },
         "fx_vol_surface_id": {
           "$ref": "#/$defs/Id",
@@ -22778,8 +22684,11 @@
         }
       },
       "required": [
+        "asset_currency",
+        "asset_discount_curve_id",
         "correlation",
-        "fx_vol_surface_id"
+        "fx_vol_surface_id",
+        "fx_spot_id"
       ],
       "type": "object"
     },
@@ -24226,16 +24135,12 @@
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
-        "apply_eligibility_criteria": {
-          "description": "Must satisfy eligibility criteria",
-          "type": "boolean"
-        },
         "maintain_credit_quality": {
-          "description": "Must maintain credit quality distribution",
+          "description": "Require the surviving credit-quality distribution; pro-rata replacement always preserves it.",
           "type": "boolean"
         },
         "maintain_wal": {
-          "description": "Must maintain weighted average life",
+          "description": "Require the surviving principal-payment profile; pro-rata replacement always preserves it.",
           "type": "boolean"
         },
         "max_price": {
@@ -24244,7 +24149,7 @@
           "type": "number"
         },
         "min_yield": {
-          "description": "Minimum yield requirement",
+          "description": "Minimum annual decimal current yield: replacement coupon divided by purchase-price fraction.",
           "format": "double",
           "type": "number"
         }
@@ -24253,8 +24158,7 @@
         "max_price",
         "min_yield",
         "maintain_credit_quality",
-        "maintain_wal",
-        "apply_eligibility_criteria"
+        "maintain_wal"
       ],
       "type": "object"
     },
@@ -24286,6 +24190,10 @@
       "additionalProperties": false,
       "description": "Representative line for aggregated pool modeling",
       "properties": {
+        "asset_type": {
+          "$ref": "#/$defs/AssetType",
+          "description": "Contractual asset classification; determines level-pay amortization."
+        },
         "balance": {
           "$ref": "#/$defs/Money",
           "description": "Aggregated balance"
@@ -24355,6 +24263,7 @@
       },
       "required": [
         "id",
+        "asset_type",
         "balance",
         "rate",
         "maturity",
@@ -26161,58 +26070,6 @@
           "$ref": "#/$defs/DealType",
           "description": "Deal classification (ABS/CLO/CMBS/RMBS)."
         },
-        "default_assumptions": {
-          "$ref": "#/$defs/DefaultAssumptions",
-          "default": {
-            "abs_speed_monthly": null,
-            "base_cdr_annual": 0.02,
-            "base_cpr_annual": 0.05,
-            "base_recovery_rate": 0.4,
-            "cdr_by_asset_type": {
-              "abs_auto": 0.02,
-              "auto": 0.02,
-              "card": 0.048,
-              "clo": 0.02,
-              "commercial": 0.02,
-              "consumer": 0.02,
-              "corporate": 0.02,
-              "credit_card": 0.048,
-              "mortgage": 0.002,
-              "rmbs": 0.002
-            },
-            "cpr_by_asset_type": {
-              "abs_auto": 0.18,
-              "auto": 0.18,
-              "card": 0.15,
-              "cc": 0.15,
-              "cmbs": 0.1,
-              "commercial": 0.1,
-              "cre": 0.1,
-              "credit_card": 0.15,
-              "mortgage": 0.06,
-              "rmbs": 0.06,
-              "student": 0.03,
-              "student_loan": 0.03
-            },
-            "psa_speed": null,
-            "recovery_by_asset_type": {
-              "abs_auto": 0.45,
-              "auto": 0.45,
-              "card": 0.05,
-              "clo": 0.4,
-              "collateral": 0.6,
-              "commercial": 0.4,
-              "consumer": 0.45,
-              "corporate": 0.4,
-              "credit_card": 0.05,
-              "mortgage": 0.6,
-              "rmbs": 0.6,
-              "unsecured": 0.05
-            },
-            "sda_speed": null
-          },
-          "description": "Default behavioral assumptions for the deal."
-        },
         "default_spec": {
           "$ref": "#/$defs/DefaultModelSpec",
           "default": {
@@ -26302,15 +26159,7 @@
           },
           "description": "Prepayment model specification."
         },
-        "recovery_spec": {
-          "$ref": "#/$defs/RecoveryModelSpec",
-          "default": {
-            "rate": 0.5,
-            "recovery_lag": 12
-          },
-          "description": "Recovery model specification."
-        },
-        "reinvestment_end_date": {
+        "quote_settlement_date": {
           "anyOf": [
             {
               "$ref": "#/$defs/DateWire"
@@ -26319,8 +26168,15 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "End of reinvestment period (if applicable)."
+          "description": "Buyer settlement date for clean/dirty price and spread metrics.\n`None` uses the valuation date. Cashflows payable on or before settlement\nbelong to the seller; model PV remains measured on the valuation date."
+        },
+        "recovery_spec": {
+          "$ref": "#/$defs/RecoveryModelSpec",
+          "default": {
+            "rate": 0.5,
+            "recovery_lag": 12
+          },
+          "description": "Recovery model specification."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -27371,10 +27227,6 @@
           "$ref": "#/$defs/TrancheCoupon",
           "description": "Interest specification"
         },
-        "credit_enhancement": {
-          "$ref": "#/$defs/CreditEnhancement",
-          "description": "Credit enhancement details"
-        },
         "current_balance": {
           "$ref": "#/$defs/Money",
           "description": "Current outstanding balance (after amortization and losses)"
@@ -27391,18 +27243,6 @@
           "description": "Detachment point as percentage (upper loss bound for this tranche)",
           "format": "double",
           "type": "number"
-        },
-        "expected_maturity": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/DateWire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Expected maturity date (may be earlier than legal maturity for CLOs)"
         },
         "frequency": {
           "$ref": "#/$defs/Tenor",
@@ -27492,7 +27332,6 @@
         "original_balance",
         "current_balance",
         "coupon",
-        "credit_enhancement",
         "frequency",
         "day_count",
         "deferred_interest",
@@ -27635,24 +27474,6 @@
           "const": "stop_reinvestment",
           "description": "Stop Reinvestment variant.",
           "type": "string"
-        },
-        {
-          "const": "reduce_manager_fee",
-          "description": "Reduce Manager Fee variant.",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Custom variant.",
-          "properties": {
-            "custom": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "custom"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -28908,6 +28729,14 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection and tagging"
         },
+        "base_cpi": {
+          "description": "Observed contractual reference CPI at start, with lag and interpolation\nalready applied. If absent, start CPI must resolve from market observations.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "business_day_convention": {
           "$ref": "#/$defs/BusinessDayConvention",
           "default": "modified_following",
@@ -28951,6 +28780,17 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+        },
+        "interpolation_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationInterpolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
         },
         "lag_override": {
           "anyOf": [

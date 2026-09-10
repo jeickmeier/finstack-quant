@@ -50,9 +50,6 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 ///     ``"callable_oas"``.
 /// var_config : dict | None
 ///     Historical VaR / expected-shortfall configuration override.
-/// quoted_price_pct : float | None
-///     External quoted price as a percentage of original balance (``100.0`` =
-///     par), required by structured-credit spread metrics.
 ///
 /// Raises
 /// ------
@@ -93,9 +90,9 @@ fn opt_serde_from_py<T: serde::de::DeserializeOwned + Send>(
 #[pymethods]
 impl PyMetricPricingOverrides {
     #[new]
-    #[pyo3(signature = (*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None, quoted_price_pct=None))]
+    #[pyo3(signature = (*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None))]
     #[pyo3(
-        text_signature = "(*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None, quoted_price_pct=None)"
+        text_signature = "(*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None)"
     )]
     // PyO3 binding: the argument list mirrors the Rust struct's public
     // fields as a keyword API, so it cannot be collapsed into a params struct
@@ -109,7 +106,6 @@ impl PyMetricPricingOverrides {
         breakeven_config: Option<&Bound<'_, PyAny>>,
         bond_risk_basis: Option<&str>,
         var_config: Option<&Bound<'_, PyAny>>,
-        quoted_price_pct: Option<f64>,
     ) -> PyResult<Self> {
         let inner = MetricPricingOverrides {
             bump_config: opt_serde_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
@@ -128,7 +124,6 @@ impl PyMetricPricingOverrides {
                 })
                 .transpose()?,
             var_config: opt_serde_from_py(py, var_config, "var_config")?,
-            quoted_price_pct,
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -182,12 +177,6 @@ impl PyMetricPricingOverrides {
             .transpose()
     }
 
-    /// Externally quoted price as a percentage of original balance, or ``None``.
-    #[getter]
-    fn quoted_price_pct(&self) -> Option<f64> {
-        self.inner.quoted_price_pct
-    }
-
     /// Deserialize overrides from canonical JSON.
     ///
     /// Parameters
@@ -238,7 +227,7 @@ impl PyMetricPricingOverrides {
                 .to_string()
         };
         Ok(format!(
-            "MetricPricingOverrides(bump_config={}, mc_seed_scenario={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, var_config={}, quoted_price_pct={})",
+            "MetricPricingOverrides(bump_config={}, mc_seed_scenario={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, var_config={})",
             bump,
             quoted(&self.inner.mc_seed_scenario),
             quoted(&self.inner.theta_period),
@@ -259,7 +248,6 @@ impl PyMetricPricingOverrides {
                     .transpose()
                     .map_err(display_to_py)?
             ),
-            super::convert::opt_repr(self.inner.quoted_price_pct),
         ))
     }
 }
@@ -524,13 +512,19 @@ pub(crate) fn market_history_json(
 /// metrics : list[str] | None
 ///     Metric identifiers to compute (e.g. ``["ytm", "dv01", "duration_mod"]``;
 ///     see ``list_standard_metrics()``). ``None`` or ``[]`` means valuation
-///     only.
+///     only. Mortgage OAS and CMO Z-spread require clean prices per 100 of
+///     current face and add settlement accrued interest. MBS ``dv01`` and
+///     ``bucketed_dv01`` include the same rate-dependent prepayments as
+///     ``duration_mod``. FI TRS ``duration_dv01`` requires ``duration_id`` and
+///     its finite signed duration scalar in years. Roll specialness is in
+///     basis points against ``repo_curve_id`` (a forward curve), or the
+///     discount curve when absent; implied financing is an ACT/360 decimal.
 /// pricing_options : MetricPricingOverrides | dict | str | None
 ///     Metric-time overrides merged into the instrument's ``pricing_overrides``
 ///     before pricing: ``theta_period`` (``"1D"``, ``"1W"``, ``"1M"``),
 ///     ``breakeven_config`` (``{"target": "z_spread", "mode": "linear"}``),
 ///     ``bump_config``, ``bond_risk_basis``, ``var_config``,
-///     ``quoted_price_pct``. ``None`` keeps the instrument's own overrides.
+///     ``None`` keeps the instrument's own overrides.
 /// market_history : MarketHistory | dict | str | None
 ///     Historical scenarios required by the ``hvar`` and
 ///     ``expected_shortfall`` metrics.
@@ -554,8 +548,10 @@ pub(crate) fn market_history_json(
 ///     validation for the requested model (e.g. a seasoned floating leg
 ///     without fixings).
 /// RuntimeError
-///     If the model or a metric solver fails numerically (calibration or
-///     convergence failure).
+///     If the model or a metric solver fails numerically, or instrument pricing
+///     wraps a failure with instrument/model context. This includes missing
+///     quanto inputs, asset-currency mismatches, and an analytical barrier model
+///     requested for discrete monitoring; the message retains the cause.
 ///
 /// Notes
 /// -----

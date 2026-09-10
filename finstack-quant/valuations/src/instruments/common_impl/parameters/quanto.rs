@@ -1,6 +1,7 @@
 //! Quanto adjustment specification for cross-currency instruments.
 
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::types::{CurveId, PriceId};
 
 /// Quanto adjustment parameters for instruments where payoff currency differs from
 /// underlying currency.
@@ -8,7 +9,11 @@ use finstack_quant_core::types::CurveId;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct QuantoSpec {
-    /// Correlation between the underlying asset and the FX rate.
+    /// Currency in which the underlying asset is quoted and financed.
+    pub asset_currency: Currency,
+    /// Discount curve for financing the underlying in its asset currency.
+    pub asset_discount_curve_id: CurveId,
+    /// Correlation between the asset price and payoff-currency units per asset-currency unit.
     /// Must be in [-1, 1].
     #[serde(
         serialize_with = "finstack_quant_core::wire::serialize_correlation",
@@ -21,10 +26,10 @@ pub struct QuantoSpec {
     pub correlation: f64,
     /// FX volatility surface ID (required for quanto vol lookup).
     pub fx_vol_surface_id: CurveId,
-    /// FX spot price identifier (for proper quanto vol lookup).
-    /// Falls back to ATM approximation (1.0) if not provided.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fx_spot_id: Option<String>,
+    /// Required positive FX spot scalar in payoff-currency units per asset-currency unit.
+    /// A monetary scalar must use the payoff currency. The FX surface is queried
+    /// at the forward FX rate implied by the asset and payoff discount curves.
+    pub fx_spot_id: PriceId,
 }
 
 impl QuantoSpec {
@@ -33,7 +38,10 @@ impl QuantoSpec {
     /// # Arguments
     /// * `correlation` - Correlation between the underlying asset and the FX
     ///   rate. Must be a finite value in `[-1.0, 1.0]`.
-    /// * `fx_vol_surface_id` - FX volatility surface identifier.
+    /// * `fx_vol_surface_id` - FX volatility surface identifier, quoted against payoff currency per asset currency.
+    /// * `asset_currency` - Currency of the underlying asset price and financing.
+    /// * `asset_discount_curve_id` - Asset-currency financing curve identifier.
+    /// * `fx_spot_id` - Required FX spot identifier, in payoff currency per asset currency.
     ///
     /// # Errors
     /// Returns an error if `correlation` is not finite or lies outside
@@ -43,21 +51,19 @@ impl QuantoSpec {
     pub fn new(
         correlation: f64,
         fx_vol_surface_id: impl Into<CurveId>,
+        asset_currency: Currency,
+        asset_discount_curve_id: impl Into<CurveId>,
+        fx_spot_id: impl Into<PriceId>,
     ) -> finstack_quant_core::Result<Self> {
         let spec = Self {
             correlation,
             fx_vol_surface_id: fx_vol_surface_id.into(),
-            fx_spot_id: None,
+            asset_currency,
+            asset_discount_curve_id: asset_discount_curve_id.into(),
+            fx_spot_id: fx_spot_id.into(),
         };
         spec.validate()?;
         Ok(spec)
-    }
-
-    /// Set the FX spot price identifier used for quanto vol lookup.
-    #[must_use]
-    pub fn with_fx_spot_id(mut self, fx_spot_id: impl Into<String>) -> Self {
-        self.fx_spot_id = Some(fx_spot_id.into());
-        self
     }
 
     /// Validate that the correlation is a finite value in `[-1.0, 1.0]`.
@@ -91,7 +97,7 @@ mod tests {
     fn new_rejects_correlation_above_one() {
         // Failure mode: correlation > 1 is documented as invalid ([-1, 1]) but
         // was previously unenforced at the constructor boundary.
-        let err = QuantoSpec::new(1.5, "FXVOL")
+        let err = QuantoSpec::new(1.5, "FXVOL", Currency::EUR, "EUR-OIS", "EURUSD")
             .expect_err("correlation 1.5 is outside [-1, 1] and must be rejected");
         let msg = err.to_string();
         assert!(
@@ -102,18 +108,20 @@ mod tests {
 
     #[test]
     fn new_rejects_correlation_below_minus_one_and_non_finite() {
-        assert!(QuantoSpec::new(-1.0001, "FXVOL").is_err());
-        assert!(QuantoSpec::new(f64::NAN, "FXVOL").is_err());
-        assert!(QuantoSpec::new(f64::INFINITY, "FXVOL").is_err());
+        assert!(QuantoSpec::new(-1.0001, "FXVOL", Currency::EUR, "EUR-OIS", "EURUSD").is_err());
+        assert!(QuantoSpec::new(f64::NAN, "FXVOL", Currency::EUR, "EUR-OIS", "EURUSD").is_err());
+        assert!(
+            QuantoSpec::new(f64::INFINITY, "FXVOL", Currency::EUR, "EUR-OIS", "EURUSD").is_err()
+        );
     }
 
     #[test]
     fn new_accepts_correlation_within_unit_interval() {
         for rho in [-1.0, -0.5, 0.0, 0.3, 1.0] {
-            let spec = QuantoSpec::new(rho, "FXVOL")
+            let spec = QuantoSpec::new(rho, "FXVOL", Currency::EUR, "EUR-OIS", "EURUSD")
                 .unwrap_or_else(|e| panic!("correlation {rho} should be accepted: {e}"));
             assert!((spec.correlation - rho).abs() < 1e-15);
-            assert!(spec.fx_spot_id.is_none());
+            assert_eq!(spec.fx_spot_id.as_str(), "EURUSD");
         }
     }
 
@@ -124,23 +132,19 @@ mod tests {
         let spec = QuantoSpec {
             correlation: 2.0,
             fx_vol_surface_id: CurveId::new("FXVOL"),
-            fx_spot_id: None,
+            asset_currency: Currency::EUR,
+            asset_discount_curve_id: CurveId::new("EUR-OIS"),
+            fx_spot_id: PriceId::new("EURUSD"),
         };
         assert!(spec.validate().is_err());
 
         let ok = QuantoSpec {
             correlation: 0.25,
             fx_vol_surface_id: CurveId::new("FXVOL"),
-            fx_spot_id: Some("FXSPOT".to_string()),
+            asset_currency: Currency::EUR,
+            asset_discount_curve_id: CurveId::new("EUR-OIS"),
+            fx_spot_id: PriceId::new("FXSPOT"),
         };
         assert!(ok.validate().is_ok());
-    }
-
-    #[test]
-    fn with_fx_spot_id_sets_optional_identifier() {
-        let spec = QuantoSpec::new(0.4, "FXVOL")
-            .expect("valid correlation")
-            .with_fx_spot_id("EURUSD-SPOT");
-        assert_eq!(spec.fx_spot_id.as_deref(), Some("EURUSD-SPOT"));
     }
 }

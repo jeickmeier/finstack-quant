@@ -251,7 +251,12 @@ pub fn bond_from_cashflows_json(
 /// @param model - Optional pricing-model identifier; omit for the instrument-native model.
 /// @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
 /// `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
-/// valuation-only result.
+/// valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices
+/// per 100 current face and include settlement accrued interest. MBS DV01,
+/// bucketed DV01 and duration share rate-dependent prepayment assumptions.
+/// FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
+/// Roll specialness is in basis points versus `repo_curve_id` (a forward curve),
+/// or the discount curve when omitted; implied financing is an ACT/360 decimal.
 /// @param pricing_options - Optional JSON metric-pricing overrides merged into
 /// the envelope before validation. Omit, `null`, or `undefined` to use the
 /// envelope as-is.

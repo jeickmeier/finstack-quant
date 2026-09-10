@@ -13,7 +13,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_margin::types::SimmSensitivitiesJson;
-use finstack_quant_margin::{ImMethodology, NettingSetId, SimmSensitivities};
+use finstack_quant_margin::{ImCollateralResult, ImMethodology, NettingSetId, SimmSensitivities};
 use std::collections::BTreeMap;
 
 use crate::types::PositionId;
@@ -29,6 +29,7 @@ fn amounts_close(lhs: f64, rhs: f64) -> bool {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct NettingSetMarginWire {
     netting_set_id: NettingSetId,
+    csa_id: Option<String>,
     as_of: Date,
     initial_margin: Money,
     variation_margin: Money,
@@ -44,6 +45,7 @@ impl From<&NettingSetMargin> for NettingSetMarginWire {
     fn from(m: &NettingSetMargin) -> Self {
         Self {
             netting_set_id: m.netting_set_id.clone(),
+            csa_id: m.csa_id.clone(),
             as_of: m.as_of,
             initial_margin: m.initial_margin,
             variation_margin: m.variation_margin,
@@ -65,6 +67,7 @@ impl From<NettingSetMarginWire> for NettingSetMargin {
     fn from(w: NettingSetMarginWire) -> Self {
         Self {
             netting_set_id: w.netting_set_id,
+            csa_id: w.csa_id,
             as_of: w.as_of,
             initial_margin: w.initial_margin,
             variation_margin: w.variation_margin,
@@ -117,6 +120,10 @@ struct PortfolioMarginResultWire {
     as_of: Date,
     base_currency: Currency,
     total_initial_margin: Money,
+    by_csa: BTreeMap<String, ImCollateralResult>,
+    total_required_im_collateral: Money,
+    total_im_transfer: Money,
+    total_segregated_im: Money,
     total_variation_margin: Money,
     total_margin: Money,
     netting_sets: Vec<NettingSetMarginWire>,
@@ -149,6 +156,14 @@ impl From<&PortfolioMarginResult> for PortfolioMarginResultWire {
             as_of: r.as_of,
             base_currency: r.base_currency,
             total_initial_margin: r.total_initial_margin,
+            by_csa: r
+                .by_csa
+                .iter()
+                .map(|(id, account)| (id.clone(), account.clone()))
+                .collect(),
+            total_required_im_collateral: r.total_required_im_collateral,
+            total_im_transfer: r.total_im_transfer,
+            total_segregated_im: r.total_segregated_im,
             total_variation_margin: r.total_variation_margin,
             total_margin: r.total_margin,
             netting_sets,
@@ -178,6 +193,10 @@ impl From<PortfolioMarginResultWire> for PortfolioMarginResult {
             as_of: w.as_of,
             base_currency: w.base_currency,
             total_initial_margin: w.total_initial_margin,
+            by_csa: w.by_csa.into_iter().collect(),
+            total_required_im_collateral: w.total_required_im_collateral,
+            total_im_transfer: w.total_im_transfer,
+            total_segregated_im: w.total_segregated_im,
             total_variation_margin: w.total_variation_margin,
             total_margin: w.total_margin,
             by_netting_set,
@@ -200,6 +219,12 @@ impl<'de> serde::Deserialize<'de> for PortfolioMarginResult {
         let base = wire.base_currency;
         for (label, money) in [
             ("total_initial_margin", wire.total_initial_margin),
+            (
+                "total_required_im_collateral",
+                wire.total_required_im_collateral,
+            ),
+            ("total_im_transfer", wire.total_im_transfer),
+            ("total_segregated_im", wire.total_segregated_im),
             ("total_variation_margin", wire.total_variation_margin),
             ("total_margin", wire.total_margin),
         ] {
@@ -208,6 +233,73 @@ impl<'de> serde::Deserialize<'de> for PortfolioMarginResult {
                     "minor 17: {label} currency {} does not match base currency {base}",
                     money.currency()
                 )));
+            }
+        }
+
+        for (id, account) in &wire.by_csa {
+            if !wire
+                .netting_sets
+                .iter()
+                .any(|ns| ns.csa_id.as_ref() == Some(id))
+            {
+                return Err(serde::de::Error::custom(
+                    "IM account has no corresponding CSA netting set",
+                ));
+            }
+            let currency = account.gross_initial_margin.currency();
+            for amount in [
+                account.gross_initial_margin,
+                account.required_collateral,
+                account.current_collateral,
+            ] {
+                if amount.currency() != currency
+                    || !amount.amount().is_finite()
+                    || amount.amount() < 0.0
+                {
+                    return Err(serde::de::Error::custom(
+                        "IM account balances must be nonnegative in one currency",
+                    ));
+                }
+            }
+            let difference =
+                account.required_collateral.amount() - account.current_collateral.amount();
+            if account.transfer.currency() != currency
+                || !account.transfer.amount().is_finite()
+                || (account.transfer.amount() != 0.0
+                    && !amounts_close(account.transfer.amount(), difference))
+                || account.required_collateral.amount() > account.gross_initial_margin.amount()
+            {
+                return Err(serde::de::Error::custom(
+                    "Invalid IM collateral transfer or target",
+                ));
+            }
+        }
+        // FX-dependent account totals cannot be rederived without the valuation
+        // snapshot. Where every account uses the reporting currency, verify them.
+        if wire
+            .by_csa
+            .values()
+            .all(|a| a.gross_initial_margin.currency() == base)
+        {
+            let required: f64 = wire
+                .by_csa
+                .values()
+                .map(|a| a.required_collateral.amount())
+                .sum();
+            let transfers: f64 = wire.by_csa.values().map(|a| a.transfer.amount()).sum();
+            let segregated: f64 = wire
+                .by_csa
+                .values()
+                .filter(|a| a.segregated)
+                .map(|a| a.required_collateral.amount())
+                .sum();
+            if !amounts_close(required, wire.total_required_im_collateral.amount())
+                || !amounts_close(transfers, wire.total_im_transfer.amount())
+                || !amounts_close(segregated, wire.total_segregated_im.amount())
+            {
+                return Err(serde::de::Error::custom(
+                    "Portfolio IM collateral totals do not equal CSA accounts",
+                ));
             }
         }
 

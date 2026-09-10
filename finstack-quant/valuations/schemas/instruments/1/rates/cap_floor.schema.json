@@ -136,7 +136,7 @@
         "vol_type": {
           "$ref": "#/$defs/CapFloorVolType",
           "default": "auto",
-          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): treat the surface as a lognormal quote; Black-76\n  when forward and strike are positive, otherwise convert to an\n  equivalent normal vol and price with Bachelier. A normal-vol\n  surface must set `vol_type = Normal`.\n- `Lognormal`: Standard Black model, requires positive rates/strikes\n- `Normal`: Bachelier model, handles negative rates"
+          "description": "Volatility type convention (lognormal/Black or normal/Bachelier).\n\n**Critical**: This must match the convention of your vol surface data.\nUsing lognormal vol with a normal surface (or vice versa) will produce\nincorrect prices.\n\n- `Auto` (default): follow source convention and displacement metadata.\n- `Lognormal`: Black model, with the source displacement if present;\n  shifted forward and strike must both be positive.\n- `Normal`: Bachelier model using normal quotes in decimal rate units;\n  handles negative rates. Incompatible source conventions return errors."
         }
       },
       "required": [

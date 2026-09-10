@@ -118,8 +118,9 @@ pub struct CDSOption {
     pub notional: Money,
     /// Settlement type
     pub settlement: SettlementType,
-    /// Cash premium settlement date for Black time-to-expiry, when the screen
-    /// quotes option time from premium settlement rather than valuation date.
+    /// Payment date of the option premium, returned by the settlement-date
+    /// accessor. This does not change variance time or front-end protection;
+    /// the option value excludes the separately agreed trade premium.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -128,8 +129,9 @@ pub struct CDSOption {
     )]
     #[builder(default)]
     pub cash_settlement_date: Option<Date>,
-    /// Exercise settlement date for Black time-to-expiry, when distinct from
-    /// the legal option expiration date.
+    /// Payment date of the exercise proceeds, defaulting to legal expiry.
+    /// Must be on or after expiry and before CDS maturity. Discounting uses
+    /// this date; spread variance ends at legal expiry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -298,6 +300,11 @@ impl CDSOption {
             }
         }
         if let Some(exercise_settlement) = self.exercise_settlement_date {
+            if exercise_settlement < self.expiry {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "exercise_settlement_date ({exercise_settlement}) must be on or after legal expiry ({})", self.expiry,
+                )));
+            }
             if exercise_settlement >= self.cds_maturity {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "exercise_settlement_date ({}) must be before CDS maturity ({})",
@@ -556,27 +563,11 @@ impl CDSOption {
         Ok(self)
     }
 
-    /// Bloomberg CDSO Black time-to-expiry: calendar days across the option
-    /// premium/exercise settlement window, divided by 365.
-    ///
-    /// Matches the convention published in *Pricing Credit Index Options*
-    /// (DOCS 2055833) §2.1 — the lognormal spread process is parameterised
-    /// in years and Bloomberg's reference implementation (and FinancePy's
-    /// open-source port) hard-codes the 365-day denominator. The day-count
-    /// rule that governs the underlying CDS premium-leg accrual (Act/360)
-    /// does not apply to option-pricing time-to-expiry — they are separate
-    /// quantities.
-    pub(crate) fn time_to_expiry(
-        &self,
-        as_of: finstack_quant_core::dates::Date,
-    ) -> finstack_quant_core::Result<f64> {
-        let start = self.effective_cash_settlement_date(as_of)?;
-        let end = self.exercise_settlement_date.unwrap_or(self.expiry);
-        if end <= start {
-            return Ok(0.0);
-        }
-        let days = (end - start).whole_days() as f64;
-        Ok(days / 365.0)
+    /// Actual/365F time from current valuation date to legal option expiry.
+    /// Premium and exercise settlement dates govern cash payments, not the
+    /// interval over which spread variance accumulates.
+    pub(crate) fn time_to_expiry(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        Ok(((self.expiry - as_of).whole_days() as f64 / 365.0).max(0.0))
     }
 
     /// Effective cash-settlement date for the option premium. Defaults to
@@ -884,5 +875,13 @@ mod tests {
             .expect_err("American CDS option must fail")
             .to_string()
             .contains("European"));
+    }
+
+    #[test]
+    fn production_cds_option_audit_exercise_payment_not_before_expiry() {
+        let mut option = CDSOption::example().expect("example");
+        option.exercise_settlement_date = Some(option.expiry - time::Duration::days(1));
+        let error = option.validate().expect_err("cannot pay before exercise");
+        assert!(error.to_string().contains("on or after legal expiry"));
     }
 }

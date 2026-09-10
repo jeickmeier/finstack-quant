@@ -67,17 +67,19 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |date, seasoning| {
+            |_, seasoning| {
                 request
                     .instrument
-                    .calculate_prepayment_rate(date, seasoning)
+                    .credit_model
+                    .prepayment_spec
+                    .smm(seasoning)
             },
         )?;
         let mdr = period_averaged_monthly_rate(
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |date, seasoning| request.instrument.calculate_default_rate(date, seasoning),
+            |_, seasoning| request.instrument.credit_model.default_spec.mdr(seasoning),
         )?;
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
@@ -174,17 +176,19 @@ impl PoolFlowSource for OasPathFlowSource {
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |date, seasoning| {
+            |_, seasoning| {
                 request
                     .instrument
-                    .calculate_prepayment_rate(date, seasoning)
+                    .credit_model
+                    .prepayment_spec
+                    .smm(seasoning)
             },
         )?;
         let base_mdr = period_averaged_monthly_rate(
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |date, seasoning| request.instrument.calculate_default_rate(date, seasoning),
+            |_, seasoning| request.instrument.credit_model.default_spec.mdr(seasoning),
         )?;
 
         let mut smm = base_smm;

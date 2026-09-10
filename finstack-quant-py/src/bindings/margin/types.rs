@@ -8,6 +8,52 @@ use finstack_quant_margin as fm;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+/// Gross IM, collateral target and signed transfer for one CSA IM account.
+#[pyclass(
+    name = "ImCollateralResult",
+    module = "finstack_quant.margin",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyImCollateralResult {
+    pub(super) inner: fm::ImCollateralResult,
+}
+
+#[pymethods]
+impl PyImCollateralResult {
+    /// Gross model IM before contractual terms. Amount is in major units of `currency`.
+    #[getter]
+    fn gross_initial_margin(&self) -> f64 {
+        self.inner.gross_initial_margin.amount()
+    }
+    /// Target collateral balance after the allocated CSA threshold. Amount is in major units of `currency`.
+    #[getter]
+    fn required_collateral(&self) -> f64 {
+        self.inner.required_collateral.amount()
+    }
+    /// Existing balance of this one-way IM account. Amount is in major units of `currency`.
+    #[getter]
+    fn current_collateral(&self) -> f64 {
+        self.inner.current_collateral.amount()
+    }
+    /// Signed MTA-filtered transfer: positive posts, negative returns excess. Amount is in major units of `currency`.
+    #[getter]
+    fn transfer(&self) -> f64 {
+        self.inner.transfer.amount()
+    }
+    /// ISO currency of all account amounts.
+    #[getter]
+    fn currency(&self) -> String {
+        self.inner.gross_initial_margin.currency().to_string()
+    }
+    /// Whether the required IM is segregated and unavailable to meet VM.
+    #[getter]
+    fn segregated(&self) -> bool {
+        self.inner.segregated
+    }
+}
+
 /// Initial margin calculation methodology.
 ///
 /// Immutable, hashable enum-style wrapper. Build one with a class factory
@@ -697,6 +743,25 @@ impl PyCsaSpec {
         Ok(Self { inner })
     }
 
+    /// Apply this CSA's IM threshold and MTA once to gross IM across its netting sets.
+    /// Both inputs are nonnegative major units of `base_currency`. Gross IM must
+    /// already reflect elected MPOR. Positive transfer posts; negative returns.
+    /// Raises `ValueError` for invalid amounts, invalid terms or absent IM terms.
+    fn apply_im_terms(
+        &self,
+        gross_initial_margin: f64,
+        current_collateral: f64,
+    ) -> PyResult<PyImCollateralResult> {
+        let gross = self.base_money(gross_initial_margin, "gross_initial_margin")?;
+        let current = self.base_money(current_collateral, "current_collateral")?;
+        Ok(PyImCollateralResult {
+            inner: self
+                .inner
+                .apply_im_terms(gross, current)
+                .map_err(core_to_py)?,
+        })
+    }
+
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
     /// Reconstruction goes through the same strict serde round-trip as
@@ -1170,6 +1235,7 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCollateralAssetClass>()?;
     m.add_class::<PyNettingSetId>()?;
     m.add_class::<PyCsaSpec>()?;
+    m.add_class::<PyImCollateralResult>()?;
     m.add_class::<PyEligibleCollateralSchedule>()?;
 
     // `CONSTANTS` mirrors `finstack_quant_margin::constants` plus the
@@ -1187,10 +1253,6 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     constants.set_item(
         "STANDARD_CDS_MATURITY_YEARS",
         fm::constants::STANDARD_CDS_MATURITY_YEARS,
-    )?;
-    constants.set_item(
-        "DEFAULT_BOND_INDEX_DURATION",
-        fm::constants::DEFAULT_BOND_INDEX_DURATION,
     )?;
     let tenor_buckets = PyDict::new(py);
     use fm::constants::tenor_buckets as tb;

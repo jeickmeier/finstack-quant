@@ -12,7 +12,8 @@
 //!
 //! The `−½β²σ²` term is the lognormal compensator: with `X ~ N(0, 1)` the
 //! shock `exp(−βσX − ½β²σ²)` has unit mean, so the simulated mean hazard
-//! equals λ₀ and `expected_mdr` matches the simulated average.
+//! equals λ₀. `expected_mdr` converts that mean hazard to a monthly rate;
+//! this is a mean-hazard approximation when the intensity is stochastic.
 //!
 //! where X(t) is an Ornstein-Uhlenbeck process:
 //! ```text
@@ -29,6 +30,8 @@
 //! sources `κ` from this spec's `mean_reversion`; κ = 0 holds one systematic
 //! draw across the horizon. Applying the exponential intensity to that OU
 //! factor realizes the model above.
+//! Seasoning adjustments require an explicitly configured seasoning model;
+//! this intensity process applies its base hazard from origination.
 //!
 //! # Sign Convention
 //!
@@ -110,7 +113,7 @@ impl IntensityProcessDefault {
 impl StochasticDefault for IntensityProcessDefault {
     fn conditional_mdr(
         &self,
-        seasoning: u32,
+        _seasoning: u32,
         factors: &[f64],
         _macro_factors: &MacroCreditFactors,
     ) -> f64 {
@@ -118,18 +121,8 @@ impl StochasticDefault for IntensityProcessDefault {
 
         let intensity = self.intensity(z);
 
-        // Apply seasoning ramp: linear over first 24 months, then flat at 1.0.
-        // Newly originated loans have lower default rates that ramp up as they season.
-        let ramp_months = 24_u32;
-        let seasoning_factor = if seasoning < ramp_months {
-            seasoning as f64 / ramp_months as f64
-        } else {
-            1.0
-        };
-        let adjusted_intensity = intensity * seasoning_factor;
-
         // Monthly survival probability
-        let monthly_intensity = adjusted_intensity / 12.0;
+        let monthly_intensity = intensity / 12.0;
         let survival_prob = (-monthly_intensity).exp();
 
         // MDR = 1 - survival
@@ -144,24 +137,31 @@ impl StochasticDefault for IntensityProcessDefault {
         "Intensity Process Default Model"
     }
 
-    fn expected_mdr(&self, seasoning: u32) -> f64 {
-        let ramp_months = 24_u32;
-        let seasoning_factor = if seasoning < ramp_months {
-            seasoning as f64 / ramp_months as f64
-        } else {
-            1.0
-        };
+    fn expected_mdr(&self, _seasoning: u32) -> f64 {
         // Same continuous-compounding conversion as `conditional_mdr`
         // (MDR = 1 − exp(−λ/12)); the shock is compensated to unit mean, so
-        // the expected hazard is the seasoning-adjusted base hazard.
-        let expected_hazard = self.base_hazard * seasoning_factor;
-        (1.0 - (-expected_hazard / 12.0).exp()).clamp(0.0, 1.0)
+        // the expected hazard equals the supplied base hazard.
+        (1.0 - (-self.base_hazard / 12.0).exp()).clamp(0.0, 1.0)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn production_credit_audit_intensity_has_no_implicit_seasoning() {
+        let model = IntensityProcessDefault::new(0.12, 0.0, 0.30);
+        let factors = MacroCreditFactors::default();
+        let expected = 1.0 - (-0.12_f64 / 12.0).exp();
+        for month in [0, 1, 12, 24, 60] {
+            assert!(
+                (model.conditional_mdr(month, &[0.0], &factors) - expected).abs() < 1e-14,
+                "base intensity must apply at month {month}"
+            );
+            assert!((model.expected_mdr(month) - expected).abs() < 1e-14);
+        }
+    }
 
     #[test]
     fn test_conditional_mdr_at_zero_factor() {
@@ -172,11 +172,9 @@ mod tests {
 
         // At Z=0 the compensated shock is exp(−½β²σ²), so the intensity is
         // base_hazard × exp(−½β²σ²) (the shock has unit MEAN, not unit mode).
-        // With seasoning ramp (24 months), factor at month 12 = 12/24 = 0.5.
         let beta_sigma = 0.5 * 0.30;
         let intensity = 0.02 * (-0.5_f64 * beta_sigma * beta_sigma).exp();
-        let seasoning_factor = 12.0 / 24.0;
-        let expected = 1.0 - (-intensity * seasoning_factor / 12.0_f64).exp();
+        let expected = 1.0 - (-intensity / 12.0_f64).exp();
         assert!(
             (mdr - expected).abs() < 1e-6,
             "MDR {} should equal expected {}",

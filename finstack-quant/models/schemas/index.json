@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_inputs.schema.json",
-      "bytes": 7863,
+      "bytes": 8041,
       "kind": "component",
       "path": "schemas/factor_model/1/credit_calibration_inputs.schema.json",
       "summary": "Observed spread panel feeding credit factor calibration.",

@@ -221,6 +221,13 @@ pub struct PrincipalEventSpec {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
+    /// Cash settlement date, independently adjusted from the economic event date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
     /// Outstanding balance delta. Positive increases outstanding, negative repays.
     pub delta: Money,
     /// Optional cash leg. When omitted, the cash leg equals `delta`.
@@ -358,7 +365,13 @@ impl CashflowScheduleBuildSpec {
             let _ = builder.fee(spec.clone());
         }
         for event in &self.principal_events {
-            let _ = builder.add_principal_event(event.date, event.delta, event.cash, event.kind);
+            let _ = builder.add_principal_event(
+                event.date,
+                event.payment_date,
+                event.delta,
+                event.cash,
+                event.kind,
+            );
         }
 
         builder.build(market)

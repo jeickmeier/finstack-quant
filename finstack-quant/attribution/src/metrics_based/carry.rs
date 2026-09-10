@@ -108,6 +108,12 @@ pub(super) fn apply(
             );
         }
 
+        // CarryTotal is net of financing; endpoint P&L is gross. Keep
+        // financing as a separately reported detail on every attribution path.
+        let funding = funding_cost.ok_or_else(|| finstack_quant_core::Error::Validation(
+            "gross carry attribution requires funding_cost alongside net carry_total (supply zero for an unfunded position)".into()
+        ))?;
+        attribution.carry = attribution.carry.checked_add(funding)?;
         attribution.carry_detail = Some(CarryDetail {
             total: attribution.carry,
             coupon_income: coupon_income.map(SourceLine::scalar),

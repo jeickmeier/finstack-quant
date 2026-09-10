@@ -5,7 +5,7 @@
 //! (June 2019), FNMA and FHLMC both issue UMBS with the same 55-day delay:
 //!
 //! - **FNMA / FHLMC (UMBS)**: 55-day stated delay — payment on the 25th of M+1
-//! - **GNMA I**: 14-day stated delay — single-issuer pools, payment on the 15th of M
+//! - **GNMA I**: 45-day stated delay — single-issuer pools, payment on the 15th of M+1
 //! - **GNMA II**: 50-day stated delay — multi-issuer pools, payment on the 20th of M+1
 //!
 //! These constants match [`AgencyProgram::payment_lag_days`] and the
@@ -37,7 +37,7 @@ use finstack_quant_core::Result;
 ///
 /// assert_eq!(payment_lag_days(AgencyProgram::Fnma), 55);
 /// assert_eq!(payment_lag_days(AgencyProgram::Fhlmc), 55);
-/// assert_eq!(payment_lag_days(AgencyProgram::GnmaI), 14);
+/// assert_eq!(payment_lag_days(AgencyProgram::GnmaI), 45);
 /// assert_eq!(payment_lag_days(AgencyProgram::GnmaII), 50);
 /// ```
 pub fn payment_lag_days(agency: AgencyProgram) -> u32 {
@@ -100,8 +100,8 @@ pub fn actual_payment_date(
 
 /// Generate payment schedule with delays for a series of accrual periods.
 ///
-/// The agency stated delay is measured from the accrual period start, so the
-/// input dates are accrual period starts.
+/// Uses the agency's following-month payment day and Federal Reserve holiday
+/// calendar, rather than adding an approximate stated delay.
 ///
 /// # Arguments
 ///
@@ -116,12 +116,11 @@ pub fn payment_schedule(
     accrual_starts: &[Date],
     agency: AgencyProgram,
 ) -> Result<Vec<(Date, Date)>> {
-    let delay = agency.payment_lag_days();
-
     accrual_starts
         .iter()
         .map(|&accrual_start| {
-            let payment = actual_payment_date(accrual_start, delay, false)?;
+            let payment =
+                agency.payment_date_for_period(accrual_start.year(), accrual_start.month())?;
             Ok((accrual_start, payment))
         })
         .collect()
@@ -153,7 +152,7 @@ mod tests {
     fn test_payment_lag_days() {
         assert_eq!(payment_lag_days(AgencyProgram::Fnma), 55);
         assert_eq!(payment_lag_days(AgencyProgram::Fhlmc), 55);
-        assert_eq!(payment_lag_days(AgencyProgram::GnmaI), 14);
+        assert_eq!(payment_lag_days(AgencyProgram::GnmaI), 45);
         assert_eq!(payment_lag_days(AgencyProgram::GnmaII), 50);
     }
 
@@ -194,11 +193,10 @@ mod tests {
 
         assert_eq!(schedule.len(), 3);
 
-        // First payment: the 55-day stated delay from the Jan 1 accrual start
-        // lands on Feb 25, 2024 — consistent with the FNMA "25th of M+1" rule.
+        // February 25, 2024 is Sunday: the FNMA payment follows on Monday.
         assert_eq!(schedule[0].0, accrual_starts[0]);
         assert_eq!(schedule[0].1.month(), Month::February);
-        assert_eq!(schedule[0].1.day(), 25);
+        assert_eq!(schedule[0].1.day(), 26);
     }
 
     #[test]

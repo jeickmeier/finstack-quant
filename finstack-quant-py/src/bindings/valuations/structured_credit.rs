@@ -74,7 +74,9 @@ fn extract_structured_credit(
 ///     Valuation date used for projection and discounting, either a date-like
 ///     object (``datetime.date``, ``pandas.Timestamp``) or an ISO 8601 string.
 /// target_pv : float
-///     Target present value in the tranche's currency. Values above model PV
+///     Positive dirty settlement value in the tranche's currency, including
+///     accrued interest once. The deal's ``quote_settlement_date`` defaults
+///     to valuation; payments on or before settlement belong to the seller. Values above model PV
 ///     produce a negative result; values below model PV produce a positive
 ///     result.
 ///
@@ -174,7 +176,9 @@ fn structured_credit_tranche_breakeven_cdr(
 /// tranche_id : str
 ///     Identifier of the tranche.
 /// market_price_pct : float
-///     Market price as a percentage of original balance (100.0 = par).
+///     Clean settlement price as a percentage of original balance (100.0 = par).
+///     Accrued interest is added once at the deal's ``quote_settlement_date``
+///     (valuation date when omitted).
 /// market : MarketContext
 ///     Market context supplying curves and fixings.
 /// as_of : datetime.date | str
@@ -241,8 +245,9 @@ fn structured_credit_tranche_oas(
 ///     Valuation date, either a date-like object (``datetime.date``,
 ///     ``pandas.Timestamp``) or an ISO 8601 string.
 /// market_price_pct : float, optional
-///     Market price as a percentage of original balance; when omitted the
-///     model price is used.
+///     Clean settlement price as a percentage of original balance. When omitted,
+///     the deal's market quote is used, or its model clean settlement price
+///     if no quote is supplied. PV remains measured at valuation.
 ///
 /// Returns
 /// -------

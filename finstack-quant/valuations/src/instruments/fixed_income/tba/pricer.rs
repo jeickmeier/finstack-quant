@@ -32,7 +32,9 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
             tba.id, factor
         )));
     }
-    let maturity = settlement_date.add_months(term_months as i32);
+    let issue_date = Date::from_calendar_date(settlement_date.year(), settlement_date.month(), 1)
+        .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+    let maturity = issue_date.add_months(term_months as i32);
 
     // Standard servicing and g-fee assumptions
     let servicing_fee = defaults.servicing_fee_rate;
@@ -63,7 +65,7 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
         .servicing_fee_rate(servicing_fee)
         .guarantee_fee_rate(guarantee_fee)
         .wam(term_months)
-        .issue_date(settlement_date)
+        .issue_date(issue_date)
         .maturity(maturity)
         .prepayment_model(PrepaymentModelSpec::psa(defaults.psa_multiplier))
         .discount_curve_id(tba.discount_curve_id.clone())
@@ -74,7 +76,47 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
 /// Resolve the assumed pool used as the canonical projected-collateral source.
 pub(crate) fn resolve_assumed_pool(tba: &AgencyTba, as_of: Date) -> Result<AgencyMbsPassthrough> {
     if let Some(ref pool) = tba.assumed_pool {
-        Ok(pool.as_ref().clone())
+        crate::instruments::Instrument::validate_invariants(pool.as_ref())?;
+        if tba
+            .pool_factor
+            .is_some_and(|factor| (factor - pool.current_factor).abs() > 1e-12)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "TBA pool_factor must agree with the explicitly supplied pool".into(),
+            ));
+        }
+        let mut resolved = pool.as_ref().clone();
+        let settlement = tba.get_settlement_date()?;
+        let accrual_start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+            .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+        if resolved.issue_date > settlement
+            || resolved
+                .last_paid_accrual_end
+                .is_some_and(|date| date >= accrual_start)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "TBA delivered pool state must precede the settlement month's accrual period"
+                    .into(),
+            ));
+        }
+        // Delivery transfers the settlement-month accrual onward. Prior-month
+        // P&I belongs to the seller even when its agency payment is still due.
+        resolved.last_paid_accrual_end = Some(accrual_start - time::Duration::days(1));
+        let scale = tba.notional.amount() / resolved.current_face.amount();
+        if !scale.is_finite()
+            || scale <= 0.0
+            || resolved.current_face.currency() != tba.notional.currency()
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "TBA assumed pool must have positive current face in the trade currency".into(),
+            ));
+        }
+        resolved.original_face = Money::new(
+            resolved.original_face.amount() * scale,
+            tba.notional.currency(),
+        )?;
+        resolved.current_face = tba.notional;
+        Ok(resolved)
     } else {
         create_assumed_pool(tba, as_of)
     }
@@ -97,7 +139,7 @@ pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) ->
     }
     let assumed_pool = resolve_assumed_pool(tba, as_of)?;
 
-    let pool_pv = price_mbs(&assumed_pool, market, as_of)?;
+    let pool_pv = price_mbs(&assumed_pool, market, settlement_date)?;
 
     // Before settlement, discount the contractual trade value back to the
     // valuation date. After settlement the forward is extinguished; any
@@ -105,15 +147,18 @@ pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) ->
     let discount_curve = market.get_discount(&tba.discount_curve_id)?;
     let df_to_settle = discount_curve.df_between_dates(as_of, settlement_date)?;
 
-    // Trade value at settlement = notional × trade_price / 100
-    let trade_value_at_settle = tba.notional.amount() * tba.trade_price / 100.0;
+    let trade_value_at_settle = tba.notional.amount() * tba.trade_price / 100.0
+        + crate::instruments::fixed_income::mbs_passthrough::pricer::settlement_accrued_interest(
+            &assumed_pool,
+            settlement_date,
+        )?;
 
     // PV of trade value
     let trade_pv = trade_value_at_settle * df_to_settle;
 
     // TBA value = Pool PV - Trade PV
     // Positive if pool is worth more than we're paying
-    let value = pool_pv.amount() - trade_pv;
+    let value = pool_pv.amount() * df_to_settle - trade_pv;
 
     Money::new(value, tba.notional.currency())
 }
@@ -231,5 +276,69 @@ mod tests {
         let pv = price_tba(&tba, &market, as_of).expect("should price");
 
         assert_eq!(pv.amount(), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    #[test]
+    fn tba_owns_settlement_month_and_pays_settlement_accrued() {
+        let mut tba = AgencyTba::example().expect("tba");
+        let as_of = date!(2026 - 03 - 01);
+        let settle = date!(2026 - 03 - 11);
+        tba.settlement_date = Some(settle);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (40.0, 1.0)])
+                .build()
+                .expect("curve"),
+        );
+        let pool = create_assumed_pool(&tba, as_of).expect("pool");
+        assert_eq!(
+            pool.issue_date, as_of,
+            "assumed pool starts on issue-month boundary"
+        );
+        let flows = generate_cashflows(&pool, as_of, None).expect("flows");
+        assert_eq!(flows[0].period_start, as_of);
+        let dirty = flows.iter().map(|cf| cf.total).sum::<f64>();
+        let expected =
+            dirty - tba.notional.amount() * (tba.trade_price / 100.0 + tba.coupon * 10.0 / 360.0);
+        let pv = price_tba(&tba, &market, as_of).expect("pv").amount();
+        assert!((pv - expected).abs() < 1e-7, "pv={pv}, expected={expected}");
+    }
+
+    #[test]
+    fn delivered_pool_excludes_sellers_prior_month_receivable() {
+        let mut tba = AgencyTba::example().expect("tba");
+        let settle = date!(2026 - 03 - 11);
+        tba.settlement_date = Some(settle);
+        let mut pool = create_assumed_pool(&tba, settle).expect("pool");
+        pool.issue_date = date!(2025 - 01 - 01);
+        tba.assumed_pool = Some(Box::new(pool));
+        let resolved = resolve_assumed_pool(&tba, settle).expect("pool");
+        let flows = generate_cashflows(&resolved, settle, Some(1)).expect("flows");
+        assert_eq!(flows[0].period_start, date!(2026 - 03 - 01));
+    }
+
+    #[test]
+    fn tba_assumed_pool_is_scaled_to_purchased_current_face() {
+        let mut tba = AgencyTba::example().expect("tba");
+        let as_of = date!(2026 - 03 - 01);
+        let mut pool = create_assumed_pool(&tba, as_of).expect("pool");
+        pool.original_face =
+            Money::new(tba.notional.amount() * 2.0 / 0.6, tba.notional.currency()).expect("money");
+        pool.current_face =
+            Money::new(tba.notional.amount() * 2.0, tba.notional.currency()).expect("money");
+        pool.current_factor = 0.6;
+        tba.assumed_pool = Some(Box::new(pool));
+        let resolved = resolve_assumed_pool(&tba, as_of).expect("resolve");
+        assert_eq!(resolved.current_face, tba.notional);
+        assert!((resolved.original_face.amount() * 0.6 - tba.notional.amount()).abs() < 1e-8);
     }
 }

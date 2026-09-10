@@ -3,7 +3,7 @@
 //! This module provides the integration between financial statement forecasts
 //! and the covenant engine, allowing for future compliance checking.
 
-use finstack_quant_core::dates::{Date, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_core::Result;
 use finstack_quant_covenants::{
@@ -14,20 +14,23 @@ use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde_json::json;
-use time::Month;
 
 /// Adapter to use Statements StatementResult as a ModelTimeSeries.
 ///
 /// This is primarily useful when integrating statement outputs with the
 /// covenant engine without re-shaping data into a separate time-series object.
 pub struct StatementsAdapter<'a> {
-    model: Option<&'a FinancialModelSpec>,
+    model: &'a FinancialModelSpec,
     results: &'a StatementResult,
 }
 
 impl<'a> StatementsAdapter<'a> {
-    /// Create a new adapter from results and optional model spec.
-    pub fn new(results: &'a StatementResult, model: Option<&'a FinancialModelSpec>) -> Self {
+    /// Create an adapter with the exact model calendar.
+    ///
+    /// # Arguments
+    /// * `results` - Evaluated metric observations keyed by model period.
+    /// * `model` - Source model providing actual calendar and fiscal boundaries.
+    pub fn new(results: &'a StatementResult, model: &'a FinancialModelSpec) -> Self {
         Self { model, results }
     }
 }
@@ -37,92 +40,27 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
         self.results.get(node_id, period)
     }
 
-    fn period_end_date(&self, period: &PeriodId) -> Date {
-        if let Some(model) = self.model {
-            for p in &model.periods {
-                if p.id == *period {
-                    // Periods use half-open [start, end) semantics —
-                    // return the last inclusive day, consistent with
-                    // approximate_period_end which returns calendar
-                    // month-end / year-end dates.
-                    return p.end - time::Duration::days(1);
-                }
-            }
-        }
-        approximate_period_end(period)
+    fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
+        self.model
+            .periods
+            .iter()
+            .find(|p| p.id == *period)
+            .and_then(|p| p.end.previous_day())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Missing or invalid model period {period}"
+                ))
+            })
     }
-}
-
-/// Approximate the end date of a period from its `PeriodId` when the model is
-/// not available. Handles all `PeriodKind` variants.
-fn approximate_period_end(period: &PeriodId) -> Date {
-    let (month, day) = match period.kind() {
-        PeriodKind::Monthly => {
-            let m = Month::try_from(period.index as u8).unwrap_or(Month::December);
-            let d = last_day_of_month(period.year, m);
-            (m, d)
-        }
-        PeriodKind::Quarterly => {
-            let m = match period.index {
-                1 => Month::March,
-                2 => Month::June,
-                3 => Month::September,
-                _ => Month::December,
-            };
-            let d = last_day_of_month(period.year, m);
-            (m, d)
-        }
-        PeriodKind::SemiAnnual => {
-            let m = if period.index == 1 {
-                Month::June
-            } else {
-                Month::December
-            };
-            let d = last_day_of_month(period.year, m);
-            (m, d)
-        }
-        PeriodKind::Annual => (Month::December, 31),
-        PeriodKind::Daily => {
-            // index is ordinal day 1..=366; convert back to (month, day)
-            let jan1 =
-                Date::from_calendar_date(period.year, Month::January, 1).unwrap_or(time::Date::MIN);
-            let date = jan1.saturating_add(time::Duration::days(period.index as i64 - 1));
-            (date.month(), date.day())
-        }
-        PeriodKind::Weekly => {
-            // index is ISO week 1..=53; approximate end as Sunday of that week
-            let jan4 =
-                Date::from_calendar_date(period.year, Month::January, 4).unwrap_or(time::Date::MIN);
-            let iso_week1_monday = jan4.saturating_sub(time::Duration::days(
-                jan4.weekday().number_days_from_monday() as i64,
-            ));
-            let week_end =
-                iso_week1_monday.saturating_add(time::Duration::days(period.index as i64 * 7 - 1));
-            return week_end;
-        }
-    };
-    Date::from_calendar_date(period.year, month, day).unwrap_or_else(|_| {
-        Date::from_calendar_date(period.year, Month::December, 31).unwrap_or(time::Date::MIN)
-    })
-}
-
-fn last_day_of_month(year: i32, month: Month) -> u8 {
-    match month {
-        Month::January
-        | Month::March
-        | Month::May
-        | Month::July
-        | Month::August
-        | Month::October
-        | Month::December => 31,
-        Month::April | Month::June | Month::September | Month::November => 30,
-        Month::February => {
-            if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
-                29
-            } else {
-                28
-            }
-        }
+    fn period_start_date(&self, period: &PeriodId) -> Result<Date> {
+        self.model
+            .periods
+            .iter()
+            .find(|p| p.id == *period)
+            .map(|p| p.start)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!("Missing model period {period}"))
+            })
     }
 }
 
@@ -162,7 +100,7 @@ pub fn forecast_covenant(
     periods: &[PeriodId],
     config: CovenantForecastConfig,
 ) -> Result<CovenantForecast> {
-    let adapter = StatementsAdapter::new(base_case, Some(model));
+    let adapter = StatementsAdapter::new(base_case, model);
     forecast_covenant_generic(covenant, &adapter, periods, config)
 }
 
@@ -172,7 +110,7 @@ pub fn forecast_covenant(
 ///
 /// * `results` - The forecast results (time-series of metrics)
 /// * `covenants` - The covenant engine containing covenant specifications
-/// * `model` - Optional financial model spec (for precise period dates)
+/// * `model` - Required source model containing exact calendar and fiscal period boundaries
 /// * `config` - Forecasting configuration
 ///
 /// # Returns
@@ -190,7 +128,7 @@ pub fn forecast_covenant(
 pub fn forecast_breaches(
     results: &StatementResult,
     covenants: &CovenantEngine,
-    model: Option<&FinancialModelSpec>,
+    model: &FinancialModelSpec,
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
     let mut periods: Vec<PeriodId> = results
@@ -261,91 +199,67 @@ pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, Tenor};
+    use finstack_quant_core::dates::{Date, Month, Tenor};
     use finstack_quant_covenants::CovenantType;
     use finstack_quant_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_quant_statements::evaluator::StatementResult;
     use indexmap::IndexMap;
-    use time::Month;
 
     #[test]
-    fn iso_week_end_preserves_calendar_year() {
-        let week = PeriodId::week(2020, 53).expect("valid ISO week");
-        assert_eq!(
-            approximate_period_end(&week),
-            time::macros::date!(2021 - 01 - 03)
+    fn fiscal_horizon_uses_model_boundaries() {
+        use finstack_quant_core::dates::Period;
+        use time::macros::date;
+        let id: PeriodId = "FY2025Q1".parse().unwrap();
+        let model = FinancialModelSpec::new(
+            "fiscal",
+            vec![Period {
+                id,
+                start: date!(2024 - 07 - 01),
+                end: date!(2024 - 10 - 01),
+                is_actual: false,
+            }],
         );
-    }
-
-    #[test]
-    fn approximate_period_end_quarterly() {
-        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&q1),
-            Date::from_calendar_date(2025, Month::March, 31).expect("valid date")
+        let results = StatementResult {
+            nodes: IndexMap::from([("leverage".into(), IndexMap::from([(id, 3.)]))]),
+            ..Default::default()
+        };
+        let spec = CovenantSpec::with_metric(
+            Covenant::new(
+                CovenantType::MaxDebtToEbitda { threshold: 4. },
+                Tenor::quarterly(),
+                "lev",
+            ),
+            "leverage",
         );
-        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&q2),
-            Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
-        );
-        let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&q3),
-            Date::from_calendar_date(2025, Month::September, 30).expect("valid date")
-        );
-        let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&q4),
-            Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
-        );
-    }
-
-    #[test]
-    fn approximate_period_end_monthly() {
-        let jan = PeriodId::month(2025, 1).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&jan),
-            Date::from_calendar_date(2025, Month::January, 31).expect("valid date")
-        );
-        let feb = PeriodId::month(2024, 2).expect("valid period fixture"); // leap year
-        assert_eq!(
-            approximate_period_end(&feb),
-            Date::from_calendar_date(2024, Month::February, 29).expect("valid date")
-        );
-        let feb_non_leap = PeriodId::month(2025, 2).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&feb_non_leap),
-            Date::from_calendar_date(2025, Month::February, 28).expect("valid date")
-        );
-        let jun = PeriodId::month(2025, 6).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&jun),
-            Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
-        );
-    }
-
-    #[test]
-    fn approximate_period_end_semi_annual() {
-        let h1 = PeriodId::half(2025, 1).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&h1),
-            Date::from_calendar_date(2025, Month::June, 30).expect("valid date")
-        );
-        let h2 = PeriodId::half(2025, 2).expect("valid period fixture");
-        assert_eq!(
-            approximate_period_end(&h2),
-            Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
-        );
-    }
-
-    #[test]
-    fn approximate_period_end_annual() {
-        let y = PeriodId::annual(2025);
-        assert_eq!(
-            approximate_period_end(&y),
-            Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
-        );
+        let config = CovenantForecastConfig {
+            stochastic: true,
+            volatility: Some(0.3),
+            ..Default::default()
+        };
+        let automatic = forecast_covenant(&spec, &model, &results, &[id], config.clone()).unwrap();
+        let explicit = forecast_covenant(
+            &spec,
+            &model,
+            &results,
+            &[id],
+            CovenantForecastConfig {
+                reference_date: Some(date!(2024 - 06 - 30)),
+                ..config
+            },
+        )
+        .unwrap();
+        assert!(automatic.breach_probability[0] > 0.);
+        assert_eq!(automatic.breach_probability, explicit.breach_probability);
+        assert_eq!(automatic.test_dates, vec![date!(2024 - 09 - 30)]);
+        let missing: PeriodId = "FY2025Q2".parse().unwrap();
+        assert!(forecast_covenant(
+            &spec,
+            &model,
+            &results,
+            &[missing],
+            CovenantForecastConfig::default()
+        )
+        .is_err());
     }
 
     #[test]
@@ -437,9 +351,17 @@ mod tests {
             ..StatementResult::default()
         };
 
-        assert!(
-            forecast_breaches(&results, &engine, None, CovenantForecastConfig::default()).is_err()
-        );
+        assert!(forecast_breaches(
+            &results,
+            &engine,
+            &finstack_quant_statements::builder::ModelBuilder::new("calendar")
+                .periods("2025Q1..Q2", None)
+                .unwrap()
+                .build()
+                .unwrap(),
+            CovenantForecastConfig::default()
+        )
+        .is_err());
     }
 
     #[test]
@@ -473,8 +395,17 @@ mod tests {
         };
 
         let config = CovenantForecastConfig::default();
-        let breaches =
-            forecast_breaches(&results, &engine, None, config).expect("Forecast should succeed");
+        let breaches = forecast_breaches(
+            &results,
+            &engine,
+            &finstack_quant_statements::builder::ModelBuilder::new("calendar")
+                .periods("2025Q1..Q2", None)
+                .unwrap()
+                .build()
+                .unwrap(),
+            config,
+        )
+        .expect("Forecast should succeed");
 
         assert_eq!(breaches.len(), 1);
         assert_eq!(breaches[0].covenant_id, "max_debt_ebitda");

@@ -12,7 +12,7 @@ mod vega;
 
 pub(crate) use bermudan_greeks::{
     BermudanDeltaCalculator, BermudanGammaCalculator, BermudanVegaCalculator,
-    ExerciseProbabilityCalculator, HwGreekParams,
+    ExerciseProbabilityCalculator,
 };
 pub(crate) use delta::DeltaCalculator;
 pub(crate) use gamma::GammaCalculator;
@@ -59,11 +59,6 @@ pub(crate) fn register_swaption_metrics(
 /// # Arguments
 ///
 /// * `registry` - The metric registry to register calculators with
-/// * `hw_params` - Calibrated Hull-White parameters for the Bermudan Greek calculators.
-///   These should be calibrated to co-terminal European swaption prices from
-///   the volatility surface. Using uncalibrated defaults can produce Bermudan
-///   premium errors of 10-30% of the early exercise value.
-///
 /// # Important
 ///
 /// `BermudanSwaption::value()` is not implemented (it requires a tree/LSMC pricer),
@@ -72,21 +67,17 @@ pub(crate) fn register_swaption_metrics(
 /// the explicit tree pricer are registered.
 pub(crate) fn register_bermudan_swaption_metrics(
     registry: &mut MetricRegistry,
-    hw_params: finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams,
 ) -> std::result::Result<(), crate::metrics::MetricRegistryError> {
     use crate::pricer::InstrumentType;
-    let hw = HwGreekParams::from_calibration(hw_params);
     crate::register_metrics! {
         registry: registry,
         instrument: InstrumentType::BermudanSwaption,
         metrics: [
             (Delta, BermudanDeltaCalculator {
                 bump_bp: bermudan_greeks::DEFAULT_RATE_BUMP_BP,
-                hw,
             }),
             (Gamma, BermudanGammaCalculator {
                 bump_bp: bermudan_greeks::DEFAULT_GAMMA_BUMP_BP,
-                hw,
             }),
             // Registered under `HwSigmaVega`, NOT `Vega`: this is a Hull-White
             // short-rate σ bump (a model-parameter vega) and lives on a
@@ -95,7 +86,6 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // incomparable units in cross-instrument aggregation.
             (HwSigmaVega, BermudanVegaCalculator {
                 bump_pct: bermudan_greeks::DEFAULT_VOL_BUMP_PCT,
-                hw,
             })
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
@@ -107,40 +97,10 @@ pub(crate) fn register_bermudan_swaption_metrics(
     // Register custom ExerciseProbability metric separately
     registry.register_metric(
         crate::metrics::MetricId::custom("exercise_probability"),
-        std::sync::Arc::new(ExerciseProbabilityCalculator { hw }),
+        std::sync::Arc::new(ExerciseProbabilityCalculator),
         &[InstrumentType::BermudanSwaption],
     )?;
     Ok(())
-}
-
-/// Convert a (possibly lognormal) volatility to a normal (Bachelier) vol for a
-/// swaption greek's negative-rate fallback.
-///
-/// The swaption Black greeks (`delta`, `gamma`, `vega`) fall back to the
-/// Bachelier model when the forward swap rate or strike is non-positive. In
-/// that case `inputs.sigma` resolved from SABR or a lognormal vol surface is a
-/// **lognormal** vol — feeding it straight into a Bachelier greek mis-scales
-/// the result by roughly a factor of the forward rate. This helper converts it
-/// via the standard lognormal→normal mapping, using any configured SABR shift
-/// so the conversion can operate on positive shifted rates.
-///
-/// (When the swaption's `vol_model` is itself `Normal`, `sigma` is already a
-/// normal vol and callers must NOT invoke this helper.)
-pub(super) fn resolved_normal_sigma(
-    option: &crate::instruments::rates::swaption::Swaption,
-    forward: f64,
-    strike: f64,
-    sigma: f64,
-    time_to_expiry: f64,
-) -> f64 {
-    let shift = option.sabr_params.as_ref().and_then(|p| p.shift);
-    crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
-        sigma,
-        forward,
-        strike,
-        time_to_expiry,
-        shift,
-    )
 }
 
 /// Swaption metrics configuration constants.

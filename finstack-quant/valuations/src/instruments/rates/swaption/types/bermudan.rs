@@ -366,39 +366,52 @@ impl BermudanSwaption {
         self.bermudan_schedule.effective_dates().last().copied()
     }
 
-    /// Calculate time to first exercise in years.
+    /// Calculate ACT/365F model time to the first exercise.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; elapsed first exercises return zero.
     pub fn time_to_first_exercise(&self, as_of: Date) -> Result<f64> {
         match self.first_exercise() {
             Some(first) => {
                 if as_of >= first {
                     return Ok(0.0);
                 }
-                self.get_day_count().year_fraction(
-                    as_of,
-                    first,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )
+                Ok(finstack_quant_models::rates::clock::model_time(
+                    as_of, first,
+                ))
             }
             None => Err(Error::Validation("No exercise dates".into())),
         }
     }
 
-    /// Calculate time to swap maturity in years.
+    /// Calculate the ACT/365F model horizon covering remaining contractual payments.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date defining model time zero; matured swaps return zero.
     pub fn time_to_maturity(&self, as_of: Date) -> Result<f64> {
         if as_of >= self.get_swap_end() {
             return Ok(0.0);
         }
-        self.get_day_count().year_fraction(
-            as_of,
-            self.get_swap_end(),
-            finstack_quant_core::dates::DayCountContext::default(),
-        )
+        let flows =
+            crate::instruments::rates::swaption::pricing::hw_cashflows::HwSwaptionCashflows::new(
+                &self.underlying_fixed_leg,
+                &self.underlying_float_leg,
+                as_of,
+                as_of,
+            )?;
+        Ok(flows.horizon())
     }
 
-    /// Get exercise dates as year fractions from valuation date.
+    /// Get future exercise dates as ACT/365F model times.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date defining model time zero; past exercises are excluded.
     pub fn exercise_times(&self, as_of: Date) -> Result<Vec<f64>> {
         self.bermudan_schedule
-            .exercise_times(as_of, self.get_day_count())
+            .exercise_times(as_of, finstack_quant_core::dates::DayCount::Act365F)
     }
 
     /// Build the underlying swap payment schedule.
@@ -473,11 +486,10 @@ impl BermudanSwaption {
     /// Convert payment dates to year fractions.
     pub fn payment_times(&self, as_of: Date) -> Result<Vec<f64>> {
         let (dates, _) = self.build_swap_schedule()?;
-        let ctx = finstack_quant_core::dates::DayCountContext::default();
-        dates
+        Ok(dates
             .iter()
-            .map(|&d| self.get_day_count().year_fraction(as_of, d, ctx))
-            .collect()
+            .map(|&d| finstack_quant_models::rates::clock::model_time(as_of, d))
+            .collect())
     }
 
     pub(crate) fn strike_f64(&self) -> Result<f64> {
@@ -620,123 +632,6 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
     }
 
     crate::impl_focused_pricing_overrides!();
-}
-
-/// Convert lognormal (Black) volatility to normal (Bachelier) volatility.
-///
-/// Uses the Brenner-Subrahmanyam (1988) / Hagan (2002) approximation with
-/// second-order correction. When a SABR shift is provided, the conversion
-/// operates on shifted rates (F + shift, K + shift), ensuring positivity
-/// even for negative-rate environments.
-///
-/// # Arguments
-///
-/// * `sigma_ln` - Lognormal (Black) volatility
-/// * `forward` - Forward swap rate
-/// * `strike` - Strike rate
-/// * `time_to_expiry` - Time to option expiry in years
-/// * `shift` - Optional SABR shift for negative rate handling
-///
-/// # Formula
-///
-/// For ATM (F = K):
-/// ```text
-/// σ_normal ≈ σ_lognormal × F_eff × [1 - σ²T/24]
-/// ```
-///
-/// For general F ≠ K:
-/// ```text
-/// σ_normal ≈ σ_lognormal × (F_eff - K_eff) / ln(F_eff/K_eff)
-///             × [1 - σ²T/24 × (1 - ln²(F_eff/K_eff)/12)]
-/// ```
-///
-/// where F_eff = F + shift, K_eff = K + shift when shift is provided.
-///
-/// # References
-///
-/// - Brenner, M. & Subrahmanyam, M.G. (1988). "A Simple Formula to Compute
-///   the Implied Standard Deviation"
-/// - Hagan, P. et al. (2002). "Managing Smile Risk" Wilmott Magazine `docs/REFERENCES.md#hagan-2002-sabr`
-/// - Jaeckel, P. (2017). "Let's Be Rational" for exact conversion
-pub(crate) fn lognormal_to_normal_vol(
-    sigma_ln: f64,
-    forward: f64,
-    strike: f64,
-    time_to_expiry: f64,
-    shift: Option<f64>,
-) -> f64 {
-    // Apply shift to ensure positive rates for the lognormal-to-normal mapping.
-    // Shifted SABR models define F_eff = F + shift, K_eff = K + shift where
-    // shift is chosen so that both are positive (e.g., shift = 3% for EUR).
-    let (f, k) = match shift {
-        Some(s) => (forward + s, strike + s),
-        None => (forward, strike),
-    };
-
-    let variance = sigma_ln * sigma_ln * time_to_expiry;
-
-    if f <= 0.0 || k <= 0.0 {
-        // Without shift, non-positive rates can't use the lognormal approximation.
-        // Fall back to linear approximation using the arithmetic mean of absolute
-        // values. This is crude and will produce unreliable normal vols -- callers
-        // should supply a SABR shift for negative-rate currencies instead.
-        //
-        // WARNING: This fallback is inherently unreliable. For negative-rate
-        // currencies (EUR, JPY, CHF), always configure `SabrParameters.shift`
-        // so that F + shift and K + shift are positive.
-        let effective_level = ((f.abs() + k.abs()) / 2.0).max(1e-6);
-        return sigma_ln * effective_level;
-    }
-
-    let log_fk = (f / k).ln();
-
-    // Moneyness-adjusted forward level
-    // For ATM: limit of (F-K)/ln(F/K) as K→F is F
-    // For non-ATM: this gives the "effective" forward for normal vol
-    let effective_forward = if log_fk.abs() < 1e-8 {
-        // Near ATM: use Taylor expansion to avoid 0/0
-        // (F-K)/ln(F/K) ≈ F × [1 - ln(F/K)/2 + ln(F/K)²/12 - ...]
-        f * (1.0 - log_fk / 2.0 + log_fk * log_fk / 12.0)
-    } else {
-        (f - k) / log_fk
-    };
-
-    // Second-order correction from Hagan (2002):
-    // The correction accounts for the difference in convexity between
-    // lognormal and normal models. For typical parameters this is ~0.1-1%.
-    //
-    // Correction = 1 - σ²T/24 × [1 - (1/12)(ln(F/K))²]
-    //
-    // For extreme parameters (σ²T > 12), the raw correction becomes negative.
-    // We floor at 0.5 to keep the result positive and bounded. This floor only
-    // activates for unrealistic combinations (e.g., 80% vol + 30Y tenor) where
-    // the second-order approximation itself has broken down anyway.
-    let moneyness_factor = 1.0 - log_fk * log_fk / 12.0;
-    let correction = if variance > 1e-10 {
-        let raw = 1.0 - (variance / 24.0) * moneyness_factor;
-        raw.max(0.5)
-    } else {
-        1.0
-    };
-
-    sigma_ln * effective_forward * correction
-}
-
-/// Numerical Jacobian of the normal-volatility conversion with respect to the
-/// original lognormal quote.
-pub(crate) fn lognormal_to_normal_vol_jacobian(
-    sigma_ln: f64,
-    forward: f64,
-    strike: f64,
-    time_to_expiry: f64,
-    shift: Option<f64>,
-) -> f64 {
-    let bump = (sigma_ln.abs() * 1.0e-5).max(1.0e-7);
-    let lower = (sigma_ln - bump).max(0.0);
-    let upper = sigma_ln + bump;
-    let normal_upper = lognormal_to_normal_vol(upper, forward, strike, time_to_expiry, shift);
-    let normal_lower = lognormal_to_normal_vol(lower, forward, strike, time_to_expiry, shift);
-    (normal_upper - normal_lower) / (upper - lower)
 }
 
 crate::impl_empty_cashflow_provider!(

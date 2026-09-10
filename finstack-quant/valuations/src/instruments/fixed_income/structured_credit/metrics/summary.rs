@@ -31,7 +31,7 @@ pub struct TrancheMetrics {
     pub currency: String,
     /// Present value of the tranche (currency units).
     pub pv: f64,
-    /// Model price as a percentage of original balance.
+    /// Model clean settlement price as a percentage of original balance.
     pub price_pct: f64,
     /// Weighted-average life (years).
     pub wal: f64,
@@ -42,7 +42,7 @@ pub struct TrancheMetrics {
     /// Credit-spread DV01 — currency change for a +1 bp z-spread shock. Negative
     /// for a long tranche (wider spreads reduce PV).
     pub cs01: f64,
-    /// Spread duration (years): `-CS01 / (PV · 1bp)`.
+    /// Spread duration (years): `-CS01 / (dirty settlement target · 1bp)`.
     pub spread_duration: f64,
     /// Modified (rate) duration of the projected cashflows (years).
     pub modified_duration: f64,
@@ -70,9 +70,10 @@ pub struct TrancheMetrics {
 ///   rate/index data needed for cashflow projection.
 /// * `as_of` - Valuation date used to determine projected cashflows and their
 ///   discounting horizon.
-/// * `market_price_pct` - quoted price (% of original balance) the z-spread and
+/// * `market_price_pct` - Clean settlement quote (% of original balance) the z-spread and
 ///   CS01 are solved against. When `None`, the tranche's own model price is used,
-///   giving a zero z-spread (a useful round-trip check) while CS01, duration and
+///   unless the deal supplies a clean/dirty quote override. The model target
+///   gives a zero z-spread while CS01, duration and
 ///   convexity remain meaningful sensitivities.
 ///
 /// # Errors
@@ -113,31 +114,38 @@ pub fn calculate_tranche_metrics(
         }
     }
     let pv_money = Money::new(pv, deal.pool.get_base_currency())?;
-    let price_pct = if original_balance > 0.0 {
-        pv / original_balance * 100.0
-    } else {
-        0.0
-    };
+    let quote =
+        super::quote::SettlementQuote::for_tranche(deal, as_of, original_balance, &cashflows)?;
+    let model_dirty = quote.model_dirty(&cashflows.cashflows, curve)?;
+    let price_pct = quote.clean_price(model_dirty);
 
     let wal = calculate_tranche_wal(&cashflows, as_of)?;
-    let modified_duration =
-        calculate_tranche_duration(&cashflows.cashflows, curve, as_of, pv_money)?;
-    let convexity = calculate_tranche_convexity(&cashflows.cashflows, curve, as_of)?;
+    let modified_duration = calculate_tranche_duration(
+        &cashflows.cashflows,
+        curve,
+        quote.settlement,
+        Money::new(model_dirty, pv_money.currency())?,
+    )?;
+    let convexity = calculate_tranche_convexity(&cashflows.cashflows, curve, quote.settlement)?;
 
     // Z-spread (and the CS01 measured at it) are solved against the supplied
     // market price, or the tranche's own model price when none is given.
-    let target_price_pct = market_price_pct.unwrap_or(price_pct);
-    let target_pv = Money::new(
-        target_price_pct / 100.0 * original_balance,
-        pv_money.currency(),
-    )?;
-    let z_spread_bp = calculate_tranche_z_spread(&cashflows.cashflows, curve, target_pv, as_of)?;
-    let cs01 = calculate_tranche_cs01(&cashflows.cashflows, curve, z_spread_bp * 1e-4, as_of)?;
-    let spread_duration = if pv != 0.0 {
-        -cs01 / (pv * ONE_BASIS_POINT)
-    } else {
-        0.0
+    let target_value = match market_price_pct {
+        Some(clean) => quote.clean_target(clean)?,
+        None => quote.external_target(deal)?.unwrap_or(model_dirty),
     };
+    let target_price_pct = quote.clean_price(target_value);
+    let target_pv = Money::new(target_value, pv_money.currency())?;
+    let z_spread_bp =
+        calculate_tranche_z_spread(&cashflows.cashflows, curve, target_pv, quote.settlement)?;
+    let cs01 = calculate_tranche_cs01(
+        &cashflows.cashflows,
+        curve,
+        z_spread_bp * 1e-4,
+        quote.settlement,
+    )?;
+    quote.dirty_target(target_value)?;
+    let spread_duration = -cs01 / (target_value * ONE_BASIS_POINT);
 
     Ok(TrancheMetrics {
         tranche_id: tranche_id.to_string(),

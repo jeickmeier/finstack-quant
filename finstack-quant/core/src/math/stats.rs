@@ -187,9 +187,9 @@ pub fn median_or_nan(xs: &[f64]) -> f64 {
 /// * `xs` - Observations whose order statistic is required. Values must be
 ///   finite; the slice is copied before sorting.
 /// * `q` - Quantile probability. Values outside the inclusive `0.0..=1.0`
-///   range are clamped to the nearest endpoint.
+///   range are clamped to the nearest endpoint; NaN returns `NaN`.
 pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
-    if xs.is_empty() {
+    if xs.is_empty() || q.is_nan() {
         return f64::NAN;
     }
     // Same non-finite policy as `quantile`: NaN/±inf entries have no
@@ -1399,6 +1399,20 @@ mod tests {
         assert_eq!(super::finite_min_or_nan(&values), -1.0);
         assert_eq!(super::finite_max_or_nan(&values), 5.0);
         assert_eq!(super::finite_count(&values), 3);
+    }
+
+    #[test]
+    fn quantile_linear_nan_probability_preserves_nan() {
+        for values in [&[][..], &[1.0][..], &[1.0, 2.0, 3.0][..]] {
+            assert!(super::quantile_linear_or_nan(values, f64::NAN).is_nan());
+        }
+        let values = [1.0, 2.0, 3.0];
+        for q in [f64::NEG_INFINITY, -1.0, 0.0] {
+            assert_eq!(super::quantile_linear_or_nan(&values, q), 1.0);
+        }
+        for q in [1.0, 2.0, f64::INFINITY] {
+            assert_eq!(super::quantile_linear_or_nan(&values, q), 3.0);
+        }
     }
 
     #[test]

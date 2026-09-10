@@ -151,9 +151,6 @@ impl VolSurfaceTarget {
         )?;
         let forward_fn = |t: f64| forward_inputs.forward(discount.as_ref(), t);
 
-        // The SABR calibrator owns tolerances for its vega-weighted SSE.
-        let sabr_calibrator = SabrCalibrator::new();
-
         let mut sabr_params_by_expiry: BTreeMap<OrderedF64, SabrParameters> = BTreeMap::new();
         let mut sabr_winning_starts = Vec::new();
         let mut sabr_winning_iterations = Vec::new();
@@ -185,6 +182,10 @@ impl VolSurfaceTarget {
                 });
             }
 
+            let min_quote = vols.iter().copied().fold(f64::INFINITY, f64::min);
+            let sabr_calibrator = SabrCalibrator::new()
+                .with_tolerance(config.vol_surface.validation_tolerance / min_quote)
+                .with_max_iterations(config.solver.max_iterations());
             let outcome = sabr_calibrator
                 .calibrate_auto_shift_with_diagnostics(f, &strikes, &vols, t, params.beta)
                 .map_err(|e| finstack_quant_core::Error::Calibration {

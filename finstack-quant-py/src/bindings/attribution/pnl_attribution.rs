@@ -321,7 +321,7 @@ impl PyPnlAttribution {
     }
 
     /// Carry decomposition detail as a serde-shaped dict, or ``None`` when not
-    /// populated. Keys mirror the Rust ``CarryDetail`` wire schema (``total``,
+    /// populated. Gross carry equals net CarryTotal plus FundingCost on the metrics path. Keys mirror the Rust ``CarryDetail`` wire schema (``total``,
     /// ``coupon_income``, ``pull_to_par``, ``roll_down``, ``funding_cost``).
     #[getter]
     fn carry_detail<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {

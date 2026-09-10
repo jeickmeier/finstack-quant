@@ -19,10 +19,12 @@
 //! this analytic calculator drops (frozen-annuity approximation). Use
 //! bump-and-revalue greeks where those terms matter.
 
-use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
+use crate::instruments::common_impl::vol_resolution::ResolvedVolatility;
+use crate::instruments::rates::swaption::Swaption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::{bachelier_gamma, black_gamma};
+use finstack_quant_models::volatility::VolatilityConvention;
 
 /// Minimum time to expiry (in years) for valid gamma calculation.
 ///
@@ -47,31 +49,16 @@ impl MetricCalculator for GammaCalculator {
             return Ok(0.0);
         }
 
-        // Black (lognormal) Greeks are undefined for non-positive forward or
-        // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
-        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
-        let use_normal = normal_by_model || normal_by_negative_rate;
-        let gamma = if use_normal {
-            // `inputs.sigma` is a normal vol only when the Normal model is
-            // configured; for the negative-rate fallback it is a lognormal vol
-            // and must be converted before the Bachelier gamma (which also
-            // divides by `sigma`, so a mis-scaled sigma corrupts the result
-            // twice).
-            let normal_sigma = if normal_by_model {
-                inputs.sigma
-            } else {
-                super::resolved_normal_sigma(
-                    option,
-                    inputs.forward,
-                    strike,
-                    inputs.sigma,
-                    inputs.time_to_expiry,
-                )
-            };
-            bachelier_gamma(inputs.forward, strike, normal_sigma, inputs.time_to_expiry)
-        } else {
-            black_gamma(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry)
+        let (forward, strike) = ResolvedVolatility {
+            sigma: inputs.sigma,
+            convention: inputs.volatility_convention,
+        }
+        .model_rates(inputs.forward, strike)?;
+        let gamma = match inputs.volatility_convention {
+            VolatilityConvention::Normal => {
+                bachelier_gamma(forward, strike, inputs.sigma, inputs.time_to_expiry)
+            }
+            _ => black_gamma(forward, strike, inputs.sigma, inputs.time_to_expiry),
         };
 
         // Scale by notional and annuity for cash gamma

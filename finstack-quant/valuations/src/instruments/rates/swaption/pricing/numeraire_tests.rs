@@ -48,9 +48,7 @@ use finstack_quant_models::monte_carlo::TimeGrid;
 
 use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm};
 use super::monte_carlo_lsmc::SwaptionLsmcPricer;
-use super::monte_carlo_payoff::{BermudanSwaptionPayoff, SwapSchedule};
-use super::swap_rate_utils::{ForwardSwapRate, HullWhiteBondPrice};
-use crate::instruments::common_impl::parameters::OptionType;
+use super::swap_rate_utils::HullWhiteBondPrice;
 use crate::instruments::rates::hw1f::hw1f_mc::build_event_aligned_grid;
 use crate::instruments::rates::hw1f::RateExoticMcConfig;
 
@@ -335,9 +333,19 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
 
 /// Exercise-aligned swap schedule used by both the LSMC engine and the
 /// reference: a co-terminal payer swap maturing at 5y with annual periods.
+#[derive(Clone)]
+struct SwapSchedule {
+    payment_dates: Vec<f64>,
+    accrual_fractions: Vec<f64>,
+    end_date: f64,
+}
+
 fn lsmc_swap_schedule() -> SwapSchedule {
-    SwapSchedule::new(1.0, 5.0, vec![1.0, 2.0, 3.0, 4.0, 5.0], vec![1.0; 5])
-        .expect("valid swap schedule")
+    SwapSchedule {
+        payment_dates: vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        accrual_fractions: vec![1.0; 5],
+        end_date: 5.0,
+    }
 }
 
 /// Hull-White 1F payer-swaption intrinsic at time `t`: `(S(t)-K)^+ A(t) N`,
@@ -352,7 +360,6 @@ fn hw1f_intrinsic(
     discount_fn: impl Fn(f64) -> f64 + Copy,
 ) -> (f64, f64) {
     let params = hw.params();
-    let swap_rate = ForwardSwapRate::compute(params, r_t, t, schedule, discount_fn);
     let mut annuity = 0.0;
     for (j, &payment_date) in schedule.payment_dates.iter().enumerate() {
         if payment_date > t {
@@ -360,6 +367,9 @@ fn hw1f_intrinsic(
                 * HullWhiteBondPrice::bond_price(params, r_t, t, payment_date, discount_fn);
         }
     }
+    let swap_rate = (1.0
+        - HullWhiteBondPrice::bond_price(params, r_t, t, schedule.end_date, discount_fn))
+        / annuity;
     (
         (swap_rate - strike).max(0.0) * annuity * notional,
         swap_rate,
@@ -607,18 +617,35 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
     // Probe the longer co-terminal Europeans: the pathwise-vs-deterministic
     // discounting gap grows with exercise time.
     for &ex_t in &[2.0, 3.0, 4.0] {
-        let payoff =
-            BermudanSwaptionPayoff::new(schedule.clone(), strike, OptionType::Call, notional);
         let (grid, exercise_idx) =
             build_event_aligned_grid(&[ex_t], schedule.end_date, 2).expect("grid");
         let engine = pricer
             .price_bermudan_with_grid(
-                &payoff,
+                |step, rate| {
+                    let t = grid.time(step);
+                    let (intrinsic, swap_rate) =
+                        hw1f_intrinsic(&hw, rate, t, &schedule, strike, notional, discount_fn);
+                    let annuity = schedule
+                        .payment_dates
+                        .iter()
+                        .zip(&schedule.accrual_fractions)
+                        .filter(|(pay, _)| **pay > t)
+                        .map(|(pay, tau)| {
+                            tau * HullWhiteBondPrice::bond_price(
+                                hw.params(),
+                                rate,
+                                t,
+                                *pay,
+                                discount_fn,
+                            )
+                        })
+                        .sum();
+                    Ok((swap_rate, annuity, intrinsic))
+                },
                 r0,
                 &grid,
                 &exercise_idx,
                 &basis,
-                discount_fn,
                 Currency::USD,
             )
             .expect("LSMC European pricing");
@@ -686,17 +713,35 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
     };
     let pricer = SwaptionLsmcPricer::with_config(config, hw.clone());
 
-    let payoff = BermudanSwaptionPayoff::new(schedule.clone(), strike, OptionType::Call, notional);
     let (grid, exercise_idx) =
         build_event_aligned_grid(&exercise_times, schedule.end_date, 2).expect("grid");
     let engine = pricer
         .price_bermudan_with_grid(
-            &payoff,
+            |step, rate| {
+                let t = grid.time(step);
+                let (intrinsic, swap_rate) =
+                    hw1f_intrinsic(&hw, rate, t, &schedule, strike, notional, discount_fn);
+                let annuity = schedule
+                    .payment_dates
+                    .iter()
+                    .zip(&schedule.accrual_fractions)
+                    .filter(|(pay, _)| **pay > t)
+                    .map(|(pay, tau)| {
+                        tau * HullWhiteBondPrice::bond_price(
+                            hw.params(),
+                            rate,
+                            t,
+                            *pay,
+                            discount_fn,
+                        )
+                    })
+                    .sum();
+                Ok((swap_rate, annuity, intrinsic))
+            },
             r0,
             &grid,
             &exercise_idx,
             &basis,
-            discount_fn,
             Currency::USD,
         )
         .expect("LSMC Bermudan pricing");

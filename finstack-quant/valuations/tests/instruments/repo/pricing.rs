@@ -344,16 +344,24 @@ fn test_pv_currency_matches_cash_currency() {
     let collateral = treasury_collateral();
 
     // EUR repo
-    let eur_repo = Repo::term(
-        "EUR_REPO",
-        Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-        collateral,
-        0.035,
-        date(2025, 1, 15),
-        date(2025, 4, 15),
-        "USD-OIS", // Using USD curve for test simplicity
-    )
-    .expect("Repo construction should succeed");
+    let eur_repo = Repo::builder()
+        .id("EXPLICIT-EUR".into())
+        .cash_amount(Money::new(1_000_000.0, Currency::EUR).expect("cash"))
+        .collateral(collateral)
+        .repo_rate(rust_decimal::Decimal::try_from(0.035).expect("rate"))
+        .start_date(date(2025, 1, 15))
+        .maturity(date(2025, 4, 15))
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .calendar_id_opt(Some("target2".into()))
+        .business_day_convention(
+            finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+        )
+        .haircut(0.02)
+        .repo_type(finstack_quant_valuations::instruments::rates::repo::RepoType::Term)
+        .triparty(false)
+        .discount_curve_id("USD-OIS".into())
+        .build()
+        .expect("explicit repo terms");
 
     let pv = eur_repo.value(&context, date(2025, 1, 10)).unwrap();
 

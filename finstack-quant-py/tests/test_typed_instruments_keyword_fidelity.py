@@ -73,6 +73,7 @@ def _single_rep_line() -> RepLine:
         datetime.date(2031, 1, 15),
         12,
         DayCount.ACT_360,
+        asset_type={"type": "first_lien_loan", "industry": None},
     )
 
 
@@ -271,6 +272,7 @@ def test_premium_and_protection_leg_spec_accept_keyword_arguments() -> None:
         stub="short_front",
         business_day_convention="modified_following",
         calendar_id=None,
+        standard_imm_dates=False,
     )
     protection = ProtectionLegSpec(
         credit_curve_id="ACME-CDS",
@@ -289,6 +291,7 @@ def test_rep_line_accepts_keyword_arguments() -> None:
         maturity=datetime.date(2031, 1, 15),
         seasoning_months=12,
         day_count=DayCount.ACT_360,
+        asset_type={"type": "first_lien_loan", "industry": None},
         spread_bp=None,
         index_id=None,
         cpr=0.10,
@@ -344,6 +347,7 @@ def test_structured_credit_builder_setters_accept_keyword_value() -> None:
         .build()
     )
     assert deal.id == "SC-KW"
+    assert deal.first_payment_date == datetime.date(2024, 2, 15)
 
 
 def test_structured_credit_new_abs_accepts_keyword_arguments() -> None:

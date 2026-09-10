@@ -34,7 +34,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-      "bytes": 16697,
+      "bytes": 17030,
       "kind": "component",
       "path": "schemas/common/1/day_count.schema.json",
       "summary": "Day-count convention.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-      "bytes": 31467,
+      "bytes": 31083,
       "kind": "component",
       "path": "schemas/common/1/metric_pricing_overrides.schema.json",
       "summary": "Metric-time pricing and finite-difference configuration.",
@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 906677,
+      "bytes": 904628,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -186,7 +186,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
-      "bytes": 43566,
+      "bytes": 44020,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
       "summary": "Standardised CDS index such as CDX or iTraxx.",
@@ -194,7 +194,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
-      "bytes": 15991,
+      "bytes": 16132,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_option.schema.json",
       "summary": "Payer or receiver option on a CDS or CDS index.",
@@ -210,7 +210,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
-      "bytes": 47934,
+      "bytes": 48388,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
       "summary": "Single-name CDS priced on the ISDA standard model.",
@@ -266,7 +266,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json",
-      "bytes": 11819,
+      "bytes": 11948,
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_option.schema.json",
       "summary": "European or American option on a single equity.",
@@ -282,7 +282,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 175544,
+      "bytes": 177854,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -306,7 +306,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
-      "bytes": 43824,
+      "bytes": 43848,
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
@@ -346,7 +346,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
-      "bytes": 11889,
+      "bytes": 11281,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/barrier_option.schema.json",
       "summary": "Knock-in or knock-out option on a monitored barrier.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 905644,
+      "bytes": 903595,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -362,7 +362,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
-      "bytes": 16284,
+      "bytes": 16957,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
       "summary": "Range accrual with issuer call rights.",
@@ -378,7 +378,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
-      "bytes": 11853,
+      "bytes": 12526,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/range_accrual.schema.json",
       "summary": "Coupon accruing only on days the index sits inside a range.",
@@ -402,7 +402,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
-      "bytes": 19791,
+      "bytes": 19797,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_cmo.schema.json",
       "summary": "Agency CMO tranche carved from a collateral pool.",
@@ -410,7 +410,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
-      "bytes": 12051,
+      "bytes": 12057,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_mbs_passthrough.schema.json",
       "summary": "Agency mortgage pass-through priced off a prepayment model.",
@@ -418,7 +418,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json",
-      "bytes": 18898,
+      "bytes": 19223,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/agency_tba.schema.json",
       "summary": "To-be-announced agency MBS forward trade.",
@@ -426,7 +426,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
-      "bytes": 86353,
+      "bytes": 88663,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond.schema.json",
       "summary": "Fixed- or floating-rate cash bond with a coupon schedule.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
-      "bytes": 98415,
+      "bytes": 100725,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
       "summary": "Exchange-traded bond future with a deliverable basket and CTD.",
@@ -442,7 +442,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
-      "bytes": 54393,
+      "bytes": 54674,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
@@ -450,7 +450,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
-      "bytes": 11863,
+      "bytes": 12017,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/dollar_roll.schema.json",
       "summary": "Simultaneous TBA sale and forward repurchase.",
@@ -474,7 +474,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 192417,
+      "bytes": 183944,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -490,7 +490,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
-      "bytes": 41100,
+      "bytes": 41275,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
       "summary": "Total-return swap on a fixed-income index versus a funding leg.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
-      "bytes": 14236,
+      "bytes": 14264,
       "kind": "input",
       "path": "schemas/instruments/1/fx/ndf.schema.json",
       "summary": "Non-deliverable forward cash-settled against a fixing.",
@@ -594,7 +594,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 992831,
+      "bytes": 989758,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -618,7 +618,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
-      "bytes": 25744,
+      "bytes": 25723,
       "kind": "input",
       "path": "schemas/instruments/1/rates/cap_floor.schema.json",
       "summary": "Strip of caplets or floorlets on a floating index.",
@@ -626,7 +626,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
-      "bytes": 10548,
+      "bytes": 10538,
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_option.schema.json",
       "summary": "Option on a constant-maturity swap rate.",
@@ -634,7 +634,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
-      "bytes": 11296,
+      "bytes": 11286,
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_spread_option.schema.json",
       "summary": "Option on the spread between two CMS rates.",
@@ -642,7 +642,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
-      "bytes": 15924,
+      "bytes": 15914,
       "kind": "input",
       "path": "schemas/instruments/1/rates/cms_swap.schema.json",
       "summary": "Swap paying a constant-maturity swap rate.",
@@ -666,7 +666,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
-      "bytes": 12698,
+      "bytes": 14358,
       "kind": "input",
       "path": "schemas/instruments/1/rates/inflation_cap_floor.schema.json",
       "summary": "Cap or floor on realised inflation.",
@@ -674,7 +674,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
-      "bytes": 9650,
+      "bytes": 11317,
       "kind": "input",
       "path": "schemas/instruments/1/rates/inflation_swap.schema.json",
       "summary": "Zero-coupon inflation swap on a price index.",
@@ -698,7 +698,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
-      "bytes": 53075,
+      "bytes": 53099,
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_swap.schema.json",
       "summary": "Vanilla fixed-versus-floating interest-rate swap.",
@@ -730,7 +730,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
-      "bytes": 8931,
+      "bytes": 10937,
       "kind": "input",
       "path": "schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
       "summary": "Year-on-year inflation swap.",

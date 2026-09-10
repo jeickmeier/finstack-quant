@@ -48,7 +48,7 @@
       ],
       "record": {
         "doc_clause": "isda_as",
-        "day_count": "act_365f",
+        "day_count": "act_360",
         "payment_frequency": "3M",
         "business_day_convention": "modified_following",
         "stub_convention": "short_front",
@@ -62,7 +62,7 @@
       ],
       "record": {
         "doc_clause": "isda_as",
-        "day_count": "act_365f",
+        "day_count": "act_360",
         "payment_frequency": "3M",
         "business_day_convention": "modified_following",
         "stub_convention": "short_front",
@@ -76,7 +76,7 @@
       ],
       "record": {
         "doc_clause": "isda_as",
-        "day_count": "act_365f",
+        "day_count": "act_360",
         "payment_frequency": "3M",
         "business_day_convention": "modified_following",
         "stub_convention": "short_front",
@@ -90,7 +90,7 @@
       ],
       "record": {
         "doc_clause": "isda_as",
-        "day_count": "act_365f",
+        "day_count": "act_360",
         "payment_frequency": "3M",
         "business_day_convention": "modified_following",
         "stub_convention": "short_front",
@@ -104,7 +104,7 @@
       ],
       "record": {
         "doc_clause": "isda_as",
-        "day_count": "act_365f",
+        "day_count": "act_360",
         "payment_frequency": "3M",
         "business_day_convention": "modified_following",
         "stub_convention": "short_front",

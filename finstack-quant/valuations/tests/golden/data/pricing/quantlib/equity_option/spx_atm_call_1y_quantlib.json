@@ -7,7 +7,6 @@
     "vega": 38.32995298410414
   },
   "instrument": {
-    "schema": "finstack_quant.instrument/1",
     "instrument": {
       "spec": {
         "attributes": {
@@ -32,7 +31,8 @@
         "vol_surface_id": "SPX-VOL-QL"
       },
       "type": "equity_option"
-    }
+    },
+    "schema": "finstack_quant.instrument/1"
   },
   "kind": "pricing",
   "market": {

@@ -425,6 +425,30 @@ impl ScalarTimeSeries {
             })),
         }
     }
+    /// Resolve the unique observation in a calendar month without interpolation.
+    pub(crate) fn value_in_month(&self, date: Date) -> Result<f64> {
+        let start = date
+            .replace_day(1)
+            .map_err(|_| crate::InputError::InvalidDateRange)?;
+        let end = date
+            .replace_day(date.month().length(date.year()))
+            .map_err(|_| crate::InputError::InvalidDateRange)?;
+        let dates = self.data.dates();
+        let first = dates.partition_point(|day| *day < to_days(start));
+        let after = dates.partition_point(|day| *day <= to_days(end));
+        match after - first {
+            1 => Ok(self.data.values()[first]),
+            0 => Err(crate::InputError::NotFound {
+                id: format!("series '{}' observation for {}", self.id, start),
+            }
+            .into()),
+            _ => Err(crate::Error::Validation(format!(
+                "series '{}' has multiple observations for month {}",
+                self.id, start
+            ))),
+        }
+    }
+
     /// Get observations as (Date, value) pairs.
     ///
     /// Returns all stored observations in chronological order.

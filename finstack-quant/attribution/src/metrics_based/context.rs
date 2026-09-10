@@ -51,7 +51,8 @@ impl<'a> AttributionInputs<'a> {
         let market_deps = instrument.market_dependencies()?;
 
         // Discount first, then forward; first occurrence wins so a curve that
-        // is both discount and projection is measured once.
+        // is both discount and projection is measured once. Credit-role curves
+        // are attributed only to credit, including risky discount curves.
         let mut rates_curve_ids: Vec<CurveId> = Vec::with_capacity(
             market_deps.curves.discount_curves.len() + market_deps.curves.forward_curves.len(),
         );
@@ -61,7 +62,7 @@ impl<'a> AttributionInputs<'a> {
             .iter()
             .chain(market_deps.curves.forward_curves.iter())
         {
-            if !rates_curve_ids.contains(id) {
+            if !market_deps.curves.credit_curves.contains(id) && !rates_curve_ids.contains(id) {
                 rates_curve_ids.push(id.clone());
             }
         }

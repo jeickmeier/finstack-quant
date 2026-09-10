@@ -30,6 +30,7 @@ from typing import Any
 import pandas as pd
 
 from finstack_quant.cashflows.aggregation import PeriodAggregation
+from finstack_quant.cashflows.fixings import ProjectedFixing
 from finstack_quant.cashflows.primitives import CashFlow, CFKind
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, Period, StubKind, Tenor
@@ -498,6 +499,7 @@ class CashFlowBuilder:
     def add_principal_event(
         self,
         date: datetime.date,
+        payment_date: datetime.date,
         delta: Money,
         kind: CFKind | str,
         cash: Money | None = None,
@@ -508,7 +510,9 @@ class CashFlowBuilder:
         Parameters
         ----------
         date : datetime.date
-            Event date.
+            Economic date from which principal changes interest accrual.
+        payment_date : datetime.date
+            Cash settlement date, independently adjusted from the economic date.
         delta : Money
             Outstanding delta; sign convention depends on *kind* (e.g.
             ``CFKind.NOTIONAL`` draws require ``delta >= 0``).
@@ -852,6 +856,7 @@ class CashFlowMeta:
         facility_limit: Money | None = None,
         issue_date: datetime.date | str | None = None,
         maturity_date: datetime.date | str | None = None,
+        projected_fixings: list[ProjectedFixing] | None = None,
     ) -> None:
         """
         Construct schedule metadata.
@@ -869,6 +874,10 @@ class CashFlowMeta:
             Instrument issue date.
         maturity_date : datetime.date or str, optional
             Contractual maturity date.
+        projected_fixings : list[ProjectedFixing], optional
+            Raw rate or FX observations from canonical coupon projection, before
+            spread/gearing/caps/floors; defaults to an empty list. Time rolls use
+            them to materialize crossed resets while preserving existing fixings.
 
         Raises
         ------
@@ -965,6 +974,22 @@ class CashFlowMeta:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
+    def projected_fixings(self) -> list[ProjectedFixing]:
+        """Return the raw observations retained for future market time rolls.
+
+        Returns
+        -------
+        list[ProjectedFixing]
+            Copy of required raw index/FX observations, including unavailable
+            projections recorded as ``None``. Existing market fixings take priority.
+
+        Notes
+        -----
+        This accessor does not raise and does not mutate the schedule.
         """
         ...
 
@@ -1386,7 +1411,7 @@ class CashFlowSchedule:
             (``datetime64``), ``reset_date`` (``datetime64``, ``NaT`` when
             absent), ``kind``, ``amount`` (float), ``currency``,
             ``accrual_factor``, ``rate`` (``NaN`` when absent), ``accrual``
-            (canonical metadata dict or None), ``principal_delta`` (canonical
+            (canonical metadata dict or None), ``principal_date`` (optional economic date), ``principal_delta`` (canonical
             money dict or None), and optionally
             ``outstanding``.
 
@@ -1531,7 +1556,7 @@ class CashFlowSchedule:
             native currency units), ``currency`` (ISO code), ``kind``
             (``CFKind`` label) and optional ``reset_date``,
             ``accrual_factor``, ``rate`` (``NaN`` / ``None`` = absent),
-            ``accrual`` and ``principal_delta`` (canonical JSON-compatible dicts
+            ``accrual`` and ``principal_date`` (optional economic date), ``principal_delta`` (canonical JSON-compatible dicts
             or None). Exported metadata is preserved when rebuilding.
         notional : Notional
             Representative notional stamped on the schedule.
@@ -3879,7 +3904,11 @@ class PrincipalEvent:
     >>> from finstack_quant.cashflows.primitives import CFKind
     >>> from finstack_quant.core.money import Money
     >>> event = PrincipalEvent(
-    ...     datetime.date(2025, 1, 15), Money(1_000_000.0, "USD"), Money(1_000_000.0, "USD"), CFKind.NOTIONAL
+    ...     datetime.date(2025, 1, 15),
+    ...     datetime.date(2025, 1, 15),
+    ...     Money(1_000_000.0, "USD"),
+    ...     Money(1_000_000.0, "USD"),
+    ...     CFKind.NOTIONAL,
     ... )
     >>> event.kind == CFKind.NOTIONAL
     True
@@ -3888,6 +3917,7 @@ class PrincipalEvent:
     def __init__(
         self,
         date: datetime.date,
+        payment_date: datetime.date,
         delta: Money,
         cash: Money,
         kind: CFKind | str,
@@ -3898,7 +3928,9 @@ class PrincipalEvent:
         Parameters
         ----------
         date : datetime.date
-            Event date.
+            Economic date from which principal changes interest accrual.
+        payment_date : datetime.date
+            Cash settlement date, independently adjusted from the economic date.
         delta : Money
             Outstanding delta (positive increases the balance, negative
             repays it).
@@ -3929,6 +3961,17 @@ class PrincipalEvent:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
+    def payment_date(self) -> datetime.date:
+        """Return the cash settlement date.
+
+        Returns
+        -------
+        datetime.date
+            Settlement date, independent of the economic event date. Access does not raise.
         """
         ...
 

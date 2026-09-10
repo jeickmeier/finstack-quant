@@ -183,6 +183,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
     };
 
     let mut flows = Vec::with_capacity(periods.len());
+    let mut projected_fixings = Vec::new();
     for period in periods {
         if period.payment_date <= as_of {
             continue;
@@ -218,9 +219,16 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                     compounding: &float.compounding,
                     fixing_calendar: cal,
                     compounded_spread: 0.0,
-                    need_observation_exposures: false,
+                    need_observation_exposures: true,
                 },
             )?;
+        projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
+            crate::cashflow::fixings::ProjectedFixing {
+                series_id: format!("FIXING:{}", float.forward_curve_id),
+                date: observation.observation_start,
+                value: Some(observation.projected_rate),
+            }
+        }));
         let compound_factor = projection.compound_factor;
         let accrual_year_fraction = projection.accrual_year_fraction;
 
@@ -252,7 +260,10 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         float.day_count,
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(irs.notional),
-            ..Default::default()
+            meta: crate::cashflow::builder::CashFlowMeta {
+                projected_fixings,
+                ..Default::default()
+            },
         },
     ))
 }

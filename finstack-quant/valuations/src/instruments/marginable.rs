@@ -16,8 +16,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_margin::constants::{
-    self, CALENDAR_DAYS_PER_YEAR, DEFAULT_BOND_INDEX_DURATION, DURATION_APPROXIMATION_FACTOR,
-    ONE_BP, STANDARD_CDS_MATURITY_YEARS,
+    self, CALENDAR_DAYS_PER_YEAR, DURATION_APPROXIMATION_FACTOR, ONE_BP,
+    STANDARD_CDS_MATURITY_YEARS,
 };
 use finstack_quant_margin::{
     ClearingStatus, Marginable, NettingSetId, OtcMarginSpec, RepoMarginSpec,
@@ -279,8 +279,8 @@ impl Marginable for InterestRateSwap {
             * ONE_BP;
 
         let sign = match self.side {
-            crate::instruments::rates::irs::PayReceive::Pay => -1.0,
-            crate::instruments::rates::irs::PayReceive::Receive => 1.0,
+            crate::instruments::rates::irs::PayReceive::Pay => 1.0,
+            crate::instruments::rates::irs::PayReceive::Receive => -1.0,
         };
 
         let buckets: &[(&str, f64, f64)] = &[
@@ -510,7 +510,7 @@ impl Marginable for EquityTotalReturnSwap {
         let mut sens = SimmSensitivities::new(currency);
 
         // For Equity TRS, main sensitivity is equity delta
-        // Delta = Notional (100% exposure to underlying)
+        // SIMM delta is P&L per 1% relative underlying move, not full notional.
         let delta = match self.side {
             TrsSide::ReceiveTotalReturn => self.notional.amount(),
             TrsSide::PayTotalReturn => -self.notional.amount(),
@@ -518,7 +518,7 @@ impl Marginable for EquityTotalReturnSwap {
 
         // Use the underlier as the equity identifier
         let underlier = &self.underlying.ticker;
-        sens.add_equity_delta(underlier, delta);
+        sens.add_equity_delta(underlier, delta * 0.01);
 
         Ok(sens)
     }
@@ -550,23 +550,7 @@ impl Marginable for FIIndexTotalReturnSwap {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
-        // Use duration from market data when available, otherwise fall back to default.
-        // This mirrors the logic in DurationDv01Calculator for consistency.
-        let duration = self
-            .underlying
-            .duration_id
-            .as_ref()
-            .map(|id| match market.get_price(id.as_str())? {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => Ok(*v),
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
-                    Err(finstack_quant_core::Error::Validation(format!(
-                        "duration_id '{}' must resolve to a unitless scalar",
-                        id
-                    )))
-                }
-            })
-            .transpose()?
-            .unwrap_or(DEFAULT_BOND_INDEX_DURATION);
+        let duration = self.index_duration(market)?;
 
         let dv01 = self.notional.amount().abs() * duration * ONE_BP;
 
@@ -721,8 +705,8 @@ mod tests {
             "Expected multi-tenor decomposition"
         );
         assert!(
-            sens.total_ir_delta() < 0.0,
-            "Pay fixed should be short rates"
+            sens.total_ir_delta() > 0.0,
+            "Pay fixed gains when floating rates rise"
         );
     }
 
@@ -771,9 +755,9 @@ mod tests {
 
         // The flat duration ≈ maturity proxy total (the OLD behavior) for a
         // ~10y swap: notional × 10 × 0.0001 (DURATION_APPROXIMATION_FACTOR) ×
-        // ONE_BP, signed negative for Pay-fixed. The repriced curve-aware DV01
+        // ONE_BP, signed positive for Pay-fixed. The repriced curve-aware DV01
         // genuinely differs from this crude proxy.
-        let proxy_total = -notional.amount().abs() * 10.0 * DURATION_APPROXIMATION_FACTOR * ONE_BP;
+        let proxy_total = notional.amount().abs() * 10.0 * DURATION_APPROXIMATION_FACTOR * ONE_BP;
         assert!(
             (repriced_total - proxy_total).abs() > 1e-6,
             "repriced DV01 ({repriced_total}) must differ from the duration proxy ({proxy_total})"

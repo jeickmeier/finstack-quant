@@ -300,7 +300,11 @@ fn par_cds_market() -> (finstack_quant_core::dates::Date, MarketContext) {
     )
 }
 
-fn apply_par_cds(market: &mut MarketContext, as_of: Date, spec: &ScenarioSpec) {
+fn apply_par_cds(
+    market: &mut MarketContext,
+    as_of: Date,
+    spec: &ScenarioSpec,
+) -> finstack_quant_scenarios::ApplicationReport {
     let mut model = FinancialModelSpec::new("test", vec![]);
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
@@ -311,16 +315,17 @@ fn apply_par_cds(market: &mut MarketContext, as_of: Date, spec: &ScenarioSpec) {
         calendar: None,
         as_of,
     };
-    engine.apply(spec, &mut ctx).expect("apply");
+    engine.apply(spec, &mut ctx).expect("apply")
 }
 
 #[test]
-fn solve_to_par_without_provider_is_a_hard_error() {
+fn first_order_par_spread_shift_scales_by_loss_given_default() {
     let (base_date, market) = par_cds_market();
     let original = market.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
+    let recovery = market.get_hazard("USD-CDS").unwrap().recovery_rate();
 
-    let mut shifted = market.clone();
-    apply_par_cds(
+    let mut shifted = market;
+    let report = apply_par_cds(
         &mut shifted,
         base_date,
         &ScenarioSpec {
@@ -338,7 +343,25 @@ fn solve_to_par_without_provider_is_a_hard_error() {
             hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         },
     );
-    let mut solved = market;
+    let shifted_h = shifted.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
+    let expected = original + 0.0025 / (1.0 - recovery);
+    assert!(
+        (shifted_h - expected).abs() < 1e-10,
+        "{shifted_h} vs {expected}"
+    );
+    assert!(report.warnings.iter().any(|warning| matches!(
+        warning,
+        finstack_quant_scenarios::Warning::HazardSpreadFirstOrder { curve_id, .. }
+            if curve_id == "USD-CDS"
+    )));
+}
+
+#[test]
+fn solve_to_par_without_provider_is_a_hard_error() {
+    use finstack_quant_core::market_data::context::MarketContextState;
+
+    let (base_date, mut solved) = par_cds_market();
+    let before = serde_json::to_value(MarketContextState::from(&solved)).unwrap();
     let mut model = FinancialModelSpec::new("test", vec![]);
     let mut ctx = ExecutionContext {
         market: &mut solved,
@@ -368,10 +391,10 @@ fn solve_to_par_without_provider_is_a_hard_error() {
         )
         .expect_err("solve-to-par requires an injected provider");
 
-    let shifted_h = shifted.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
-    assert!(
-        (shifted_h - (original + 0.0025)).abs() < 1e-10,
-        "first-order should add 25bp to the 5Y hazard: original={original} shifted={shifted_h}"
+    assert_eq!(ctx.as_of, base_date);
+    assert_eq!(
+        serde_json::to_value(MarketContextState::from(&*ctx.market)).unwrap(),
+        before
     );
     match error {
         finstack_quant_scenarios::Error::Core(finstack_quant_core::Error::Calibration {

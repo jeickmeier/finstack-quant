@@ -197,7 +197,11 @@ impl Check for RetainedEarningsReconciliation {
 
             let adjustments = sum_nodes(context.results, &self.other_adjustments, curr_pid);
 
-            let expected = re_prev + ni - dividends + adjustments;
+            let dividend_change = match self.dividends_sign_convention {
+                SignConventionPolicy::MagnitudePositive => -dividends,
+                SignConventionPolicy::InflowPositive => dividends,
+            };
+            let expected = re_prev + ni + dividend_change + adjustments;
             let diff = re_curr - expected;
             let reference = re_prev.abs().max(1.0);
             let tolerance = effective_tolerance(&context.config, self.tolerance, reference);

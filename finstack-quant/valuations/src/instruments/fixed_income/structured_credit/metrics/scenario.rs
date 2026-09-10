@@ -86,6 +86,7 @@ pub fn scenario_table(
     grid: &ScenarioGrid,
 ) -> Result<ScenarioTable> {
     deal.validate_for_pricing()?;
+    let deal = deal.resolved_for_pricing()?;
     let original_balance = deal
         .tranches
         .tranches
@@ -121,6 +122,15 @@ pub fn scenario_table(
         )));
     }
 
+    for (name, values) in [
+        ("CPR", &grid.cprs),
+        ("CDR", &grid.cdrs),
+        ("severity", &grid.severities),
+    ] {
+        for &value in values {
+            finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
+        }
+    }
     let mut cells = Vec::with_capacity(cell_count);
     for &cpr in &grid.cprs {
         for &cdr in &grid.cdrs {
@@ -133,7 +143,7 @@ pub fn scenario_table(
                     .recovery_lag
                     .unwrap_or(deal.credit_model.recovery_spec.recovery_lag);
                 scenario.credit_model.recovery_spec =
-                    RecoveryModelSpec::with_lag((1.0 - severity).clamp(0.0, 1.0), lag);
+                    RecoveryModelSpec::with_lag(1.0 - severity, lag);
 
                 let cashflows = scenario.get_tranche_cashflows(tranche_id, context, as_of)?;
                 let pv = scenario.value_tranche(tranche_id, context, as_of)?;

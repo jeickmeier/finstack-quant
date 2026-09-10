@@ -47,7 +47,7 @@
 //!   endpoint change.
 //! - Repricing methods isolate the date roll before market moves. Waterfall
 //!   orders must begin with [`AttributionFactor::Carry`]; metrics-based carry
-//!   uses `CarryTotal` or theta over the elapsed days.
+//!   uses `CarryTotal + FundingCost` or theta over the elapsed days.
 //! - Direct decomposition functions report in the instrument's native pricing
 //!   currency; [`pnl_bridge`] accepts an explicit target currency.
 //!   [`AttributionConfig::target_currency`] can translate aggregate fields and

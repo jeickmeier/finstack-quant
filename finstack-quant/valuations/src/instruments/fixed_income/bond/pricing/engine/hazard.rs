@@ -198,7 +198,10 @@ impl HazardBondEngine {
         // `outstanding_by_date` is the canonical after-event balance replay;
         // it includes historical and future amortization, PIK, draws, and
         // repayments in schedule order.
-        let outstanding_path = schedule.outstanding_by_date()?;
+        let outstanding_path =
+            crate::instruments::fixed_income::bond::pricing::principal::recovery_principal_path(
+                &schedule,
+            )?;
         let mut outstanding = schedule.get_notional().initial.amount();
         let mut balance_cursor = 0;
         while balance_cursor < outstanding_path.len() && outstanding_path[balance_cursor].0 <= as_of

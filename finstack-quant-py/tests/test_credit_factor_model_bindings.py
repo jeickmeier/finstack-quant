@@ -496,3 +496,12 @@ def test_factor_covariance_forecast_repr_is_informative() -> None:
     fcf = FactorCovarianceForecast(model)
     r = repr(fcf)
     assert "FactorCovarianceForecast" in r
+
+
+def test_idiosyncratic_override_is_decimal_spread_per_sqrt_year() -> None:
+    inputs = _fixture_inputs()
+    inputs["idiosyncratic_overrides"] = {"ISSUER-A": 0.001}
+    model = CreditCalibrator(_calibration_config()).calibrate(inputs)
+    row = model.to_dataframe().set_index("issuer_id").loc["ISSUER-A"]
+    assert row["adder_vol_annualized"] == pytest.approx(10.0)
+    assert row["adder_vol_source"] == "caller_supplied"

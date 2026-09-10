@@ -53,9 +53,9 @@ fn test_irs_convention_usd() {
     let conv = IRSConvention::UsdSofr;
 
     // Assert - USD SOFR OIS is the post-LIBOR standard
-    assert_eq!(conv.fixed_day_count(), DayCount::Thirty360);
-    assert_eq!(conv.float_day_count(), DayCount::Act360);
-    assert_eq!(conv.fixed_frequency(), Tenor::semi_annual());
+    assert_eq!(conv.fixed_day_count().expect("registry"), DayCount::Act360);
+    assert_eq!(conv.float_day_count().expect("registry"), DayCount::Act360);
+    assert_eq!(conv.fixed_frequency().expect("registry"), Tenor::annual());
     assert_eq!(conv.disc_curve_id(), "USD-SOFR");
 }
 
@@ -65,8 +65,8 @@ fn test_irs_convention_eur() {
     let conv = IRSConvention::EurEstr;
 
     // Assert - ESTR OIS uses annual payment frequency (not semi-annual like EURIBOR)
-    assert_eq!(conv.fixed_frequency(), Tenor::annual());
-    assert_eq!(conv.float_frequency(), Tenor::annual());
+    assert_eq!(conv.fixed_frequency().expect("registry"), Tenor::annual());
+    assert_eq!(conv.float_frequency().expect("registry"), Tenor::annual());
 }
 
 #[test]
@@ -75,6 +75,9 @@ fn test_irs_convention_eur_euribor() {
     let conv = IRSConvention::EurEuribor;
 
     // Assert - EURIBOR 6M uses semi-annual payment frequency
-    assert_eq!(conv.fixed_frequency(), Tenor::annual());
-    assert_eq!(conv.float_frequency(), Tenor::semi_annual());
+    assert_eq!(conv.fixed_frequency().expect("registry"), Tenor::annual());
+    assert_eq!(
+        conv.float_frequency().expect("registry"),
+        Tenor::semi_annual()
+    );
 }

@@ -1,0 +1,94 @@
+{
+  "description": "Input-only annual 1/1 USD inflation swap with fixed start CPI 300 and future reference CPI 330; flat zero discounting. Tests calculate both legs independently.",
+  "as_of": "2025-01-15",
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "inflation_swap",
+      "spec": {
+        "id": "USD-INFLATION-AUDIT",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "start_date": "2025-01-15",
+        "maturity": "2030-01-15",
+        "fixed_rate": "0.02",
+        "inflation_index_id": "US-CPI",
+        "discount_curve_id": "USD-OIS",
+        "day_count": "one_one",
+        "side": "pay",
+        "lag_override": {
+          "months": 3
+        },
+        "interpolation_override": "linear",
+        "base_cpi": 300,
+        "attributes": {}
+      }
+    }
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-15",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "inflation",
+        "id": "US-CPI",
+        "base_date": "2024-10-15",
+        "base_cpi": 300,
+        "day_count": "act_365f",
+        "indexation_lag_months": 3,
+        "knot_points": [
+          [
+            0,
+            300
+          ],
+          [
+            4,
+            330
+          ],
+          [
+            6,
+            330
+          ]
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_zero"
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

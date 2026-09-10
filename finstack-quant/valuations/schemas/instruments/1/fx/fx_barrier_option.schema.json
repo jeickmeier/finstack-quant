@@ -177,7 +177,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Monitor continuously from `monitoring_start_date` through expiry.",
+          "description": "Monitor continuously through the contractual monitoring interval.",
           "properties": {
             "type": {
               "const": "continuous",

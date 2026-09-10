@@ -346,15 +346,13 @@ fn example_07_swaption_vol_surface_builds_queryable_surface() {
     // a 5% rate environment is around 0.05; SABR will pin closely if non-flat,
     // approximately if flat (see 06_cdx_index_vol.json for the flat-grid issue).
     let vol = surface
-        .get_vol(1.0, 5.0, 0.05)
+        .get_normal_vol(1.0, 5.0, 0.05)
         .expect("vol query at 1y × 5y × ATM should succeed");
-    // The surface's output convention (lognormal-equivalent vs normal bp)
-    // depends on the SABR target's internal model — both are positive and
-    // bounded. Accepting either convention; tighten to a unit-specific bound
-    // once the convention is confirmed by a domain test.
+    // The input quotes and reconstructed cube both use decimal normal volatility.
+    assert!(surface.get_vol(1.0, 5.0, 0.05).is_err());
     assert!(
-        vol > 0.0 && vol < 5.0,
-        "swaption vol should be positive and < 500%, got {vol}"
+        vol > 0.0 && vol < 0.05,
+        "normal volatility must be below 500 bp, got {vol}"
     );
 }
 

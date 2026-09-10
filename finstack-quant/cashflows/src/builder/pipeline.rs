@@ -13,7 +13,7 @@ use rust_decimal::Decimal;
 use crate::builder::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
-    AmortizationParams, ResolvedFloatMarket,
+    AmortizationParams, FloatEmissionOutput, ResolvedFloatMarket,
 };
 use crate::builder::orchestrator::{AmortizationSetup, BuildState, PrincipalEvent};
 use crate::builder::{Notional, PrincipalExchange};
@@ -27,6 +27,8 @@ pub(super) struct BuildContext<'a> {
     /// business-day adjustment and payment lag. Equals the raw `maturity`
     /// when no coupon schedule exists.
     pub(super) redemption_date: Date,
+    /// Contractual accrual boundary at which final principal ceases accruing.
+    pub(super) redemption_effective_date: Date,
     /// Whether to emit the maturity balloon as `CFKind::Notional`.
     pub(super) principal_exchange: PrincipalExchange,
     pub(super) notional: &'a Notional,
@@ -68,7 +70,7 @@ impl<'a> DateProcessor<'a> {
         let pik_f = emit_fixed_coupons_on(
             d,
             self.ctx.fixed_schedules,
-            &state.outstanding_after,
+            &state.outstanding_history,
             state.outstanding,
             self.ctx.ccy,
             &mut state.flows,
@@ -76,14 +78,17 @@ impl<'a> DateProcessor<'a> {
         let pik_fl = emit_float_coupons_on(
             d,
             self.ctx.float_schedules,
-            &state.outstanding_after,
+            &state.outstanding_history,
             state.outstanding,
             self.ctx.ccy,
             ResolvedFloatMarket {
                 curves: self.resolved_curves,
                 fixings: self.resolved_fixings,
             },
-            &mut state.flows,
+            FloatEmissionOutput {
+                flows: &mut state.flows,
+                projected_fixings: &mut state.projected_fixings,
+            },
         )?;
         Ok(pik_f + pik_fl)
     }
@@ -102,14 +107,19 @@ impl<'a> DateProcessor<'a> {
             step_remaining_map: &self.amort_setup.step_remaining_map,
             custom_principal_map: &self.amort_setup.custom_principal_map,
         };
+        let first_flow = state.flows.len();
         emit_amortization_on(
             d,
             self.ctx.notional,
             &mut state.outstanding,
             &amort_params,
-            d == self.ctx.redemption_date,
+            self.amort_setup.amort_dates.iter().max() == Some(&d),
             &mut state.flows,
         )?;
+        for flow in &mut state.flows[first_flow..] {
+            flow.principal_date = Some(d);
+            flow.date = self.amort_setup.payment_dates.get(&d).copied().unwrap_or(d);
+        }
         Ok(())
     }
 
@@ -122,9 +132,6 @@ impl<'a> DateProcessor<'a> {
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
-        state
-            .outstanding_after
-            .insert(self.ctx.issue, state.outstanding);
         Ok(())
     }
 
@@ -160,14 +167,15 @@ impl<'a> DateProcessor<'a> {
                 };
                 state.flows.push(
                     CashFlow::new(
-                        d,
+                        ev.payment_date,
                         None,
                         Money::new(flow_amount, ev.cash.currency())?,
                         ev.kind,
                         0.0,
                         None,
                     )
-                    .with_principal_delta(ev.delta),
+                    .with_principal_delta(ev.delta)
+                    .with_principal_date(ev.date),
                 );
                 state.outstanding += f64_to_decimal(ev.delta.amount())?;
                 if state.outstanding < Decimal::ZERO {
@@ -183,25 +191,25 @@ impl<'a> DateProcessor<'a> {
 
     /// Handle maturity redemption: emit final principal repayment if outstanding > 0.
     ///
-    /// Triggers on `redemption_date` (adjusted maturity plus payment lag),
-    /// after same-day coupons, amortization, PIK capitalization, and fees, so
-    /// a lagged final PIK is included in the balloon. Outstanding is not
-    /// zeroed on the raw maturity when that date is earlier than the lagged
-    /// coupon.
+    /// Computes at the terminal accrual boundary after PIK capitalization.
+    /// Cash settles on the independently adjusted redemption payment date.
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
-        if d == self.ctx.redemption_date
+        if d == self.ctx.redemption_effective_date
             && self.ctx.principal_exchange == PrincipalExchange::InitialAndFinal
             && state.outstanding > Decimal::ZERO
         {
             let outstanding_f64 = finstack_quant_core::decimal::decimal_to_f64(state.outstanding)?;
-            state.flows.push(CashFlow::new(
-                d,
-                None,
-                Money::new(outstanding_f64, self.ctx.ccy)?,
-                CFKind::Notional,
-                0.0,
-                None,
-            ));
+            state.flows.push(
+                CashFlow::new(
+                    self.ctx.redemption_date,
+                    None,
+                    Money::new(outstanding_f64, self.ctx.ccy)?,
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_date(d),
+            );
             state.outstanding = Decimal::ZERO;
         }
         Ok(())
@@ -225,7 +233,6 @@ impl<'a> DateProcessor<'a> {
         self.process_principal_events(d, &mut state)?;
         self.handle_maturity(d, &mut state)?;
 
-        state.outstanding_after.insert(d, state.outstanding);
         debug_assert!(
             state
                 .outstanding_history

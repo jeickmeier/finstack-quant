@@ -97,6 +97,8 @@ pub mod primitives {
 
 /// Currency-preserving aggregation utilities for cashflows.
 pub mod aggregation;
+/// Raw index observations retained for realized-forward scenario rolls.
+pub mod fixings;
 
 /// Composable cashflow builder.
 pub mod builder;

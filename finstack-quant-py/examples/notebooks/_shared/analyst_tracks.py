@@ -432,7 +432,7 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
     payload = json.loads(deal.to_json())
     spec = payload["instrument"]["spec"]
     spec.update({
-        "first_payment_date": AS_OF.isoformat() if one_period else "2025-04-15",
+        "first_payment_date": "2025-04-15",
         "payment_calendar_id": "weekends_only",
         "payment_business_day_convention": "unadjusted",
         "fees": None,
@@ -445,7 +445,6 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
         "default_spec": {"cdr": 0.0, "curve": None},
         "recovery_spec": {"rate": 0.4, "recovery_lag": 0},
     })
-    spec["default_assumptions"].update({"base_cdr_annual": 0.0, "base_cpr_annual": 0.0, "base_recovery_rate": 0.4})
     return payload
 
 

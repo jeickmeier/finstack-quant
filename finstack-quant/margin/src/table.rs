@@ -24,6 +24,7 @@ struct SensitivityRow {
     risk_class: String,
     bucket: Option<String>,
     tenor: Option<String>,
+    expiry_tenor: Option<String>,
     issuer: Option<String>,
     kind: &'static str,
     amount: f64,
@@ -53,6 +54,7 @@ impl SensitivityRows {
             risk_class: risk_class.into(),
             bucket,
             tenor,
+            expiry_tenor: None,
             issuer,
             kind,
             amount,
@@ -79,7 +81,7 @@ impl SensitivityRows {
     }
 
     /// Sort the rows and build the six-column table.
-    fn into_table(mut self) -> Result<TableEnvelope> {
+    fn into_table(mut self, with_expiry: bool) -> Result<TableEnvelope> {
         self.rows.sort_by(|left, right| {
             (
                 &left.risk_class,
@@ -87,6 +89,7 @@ impl SensitivityRows {
                 &left.issuer,
                 &left.bucket,
                 &left.tenor,
+                &left.expiry_tenor,
             )
                 .cmp(&(
                     &right.risk_class,
@@ -94,12 +97,15 @@ impl SensitivityRows {
                     &right.issuer,
                     &right.bucket,
                     &right.tenor,
+                    &right.expiry_tenor,
                 ))
+                .then_with(|| left.amount.total_cmp(&right.amount))
         });
         let n = self.rows.len();
         let mut risk_class = Vec::with_capacity(n);
         let mut bucket = Vec::with_capacity(n);
         let mut tenor = Vec::with_capacity(n);
+        let mut expiry_tenor = Vec::with_capacity(n);
         let mut issuer = Vec::with_capacity(n);
         let mut kind = Vec::with_capacity(n);
         let mut amount = Vec::with_capacity(n);
@@ -107,11 +113,12 @@ impl SensitivityRows {
             risk_class.push(row.risk_class);
             bucket.push(row.bucket);
             tenor.push(row.tenor);
+            expiry_tenor.push(row.expiry_tenor);
             issuer.push(row.issuer);
             kind.push(row.kind.to_string());
             amount.push(row.amount);
         }
-        TableEnvelope::new(vec![
+        let mut columns = vec![
             TableColumn::new("risk_class", TableColumnData::String(risk_class))
                 .with_role(TableColumnRole::Dimension),
             TableColumn::new("bucket", TableColumnData::NullableString(bucket))
@@ -124,7 +131,17 @@ impl SensitivityRows {
                 .with_role(TableColumnRole::Dimension),
             TableColumn::new("amount", TableColumnData::Float64(amount))
                 .with_role(TableColumnRole::Measure),
-        ])
+        ];
+        if with_expiry {
+            columns.push(
+                TableColumn::new(
+                    "expiry_tenor",
+                    TableColumnData::NullableString(expiry_tenor),
+                )
+                .with_role(TableColumnRole::Dimension),
+            );
+        }
+        TableEnvelope::new(columns)
     }
 }
 
@@ -369,7 +386,7 @@ impl FrtbSensitivities {
             );
         }
 
-        rows.into_table()
+        rows.into_table(false)
     }
 }
 
@@ -513,18 +530,19 @@ impl SimmSensitivities {
                 *amount,
             );
         }
-        for (risk_class, amount) in &self.curvature {
-            rows.push(
-                serde_label(risk_class)?,
-                "curvature",
-                None,
-                None,
-                None,
-                *amount,
-            );
+        for input in &self.curvature {
+            rows.rows.push(SensitivityRow {
+                risk_class: serde_label(&input.risk_class)?,
+                kind: "curvature",
+                issuer: Some(input.factor.clone()),
+                bucket: Some(input.bucket.clone()),
+                tenor: input.risk_tenor.clone(),
+                expiry_tenor: Some(input.expiry_tenor.clone()),
+                amount: input.volatility_weighted_vega,
+            });
         }
 
-        rows.into_table()
+        rows.into_table(true)
     }
 }
 

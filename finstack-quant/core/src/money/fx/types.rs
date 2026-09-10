@@ -175,6 +175,11 @@ pub struct FxMatrixState {
     pub config: FxConfig,
     /// Pair-global quotes as source, target, rate tuples.
     pub quotes: Vec<(Currency, Currency, f64)>,
+    /// Captured provider quotes, below explicit global and date/policy-pinned
+    /// quotes in lookup priority. Market-context restoration uses these to
+    /// rebuild a quote-only provider; arbitrary live provider behavior is not
+    /// serialized. Required even when the provider has no snapshot quotes.
+    pub provider_quotes: Vec<(Currency, Currency, f64)>,
     /// Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.
     ///
     /// Required: a snapshot that omits it would silently re-derive those

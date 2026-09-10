@@ -157,7 +157,7 @@
       "oneOf": [
         {
           "const": "usd_sofr",
-          "description": "USD SOFR OIS: Semi-annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
+          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
           "type": "string"
         },
         {
@@ -177,7 +177,7 @@
         },
         {
           "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Semi-annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
+          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
           "type": "string"
         }
       ]

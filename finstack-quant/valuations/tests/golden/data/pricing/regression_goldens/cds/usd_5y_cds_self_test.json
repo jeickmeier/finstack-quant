@@ -361,7 +361,8 @@
           "calendar_id": "nyse",
           "day_count": "act_360",
           "spread_bp": "100.0",
-          "discount_curve_id": "USD-OIS"
+          "discount_curve_id": "USD-OIS",
+          "standard_imm_dates": true
         },
         "protection": {
           "credit_curve_id": "ACME-HZD",

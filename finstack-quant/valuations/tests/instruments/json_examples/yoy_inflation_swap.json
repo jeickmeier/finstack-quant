@@ -2,6 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "base_cpi": null,
       "business_day_convention": "modified_following",
       "calendar_id": null,
       "day_count": "act_365f",
@@ -13,6 +14,7 @@
       },
       "id": "YOYSWAP-USD-5Y",
       "inflation_index_id": "US-CPI",
+      "interpolation_override": null,
       "lag_override": {
         "months": 3
       },

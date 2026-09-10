@@ -23,7 +23,7 @@ use time::Month;
 /// # GNMA Programs
 ///
 /// Ginnie Mae has two distinct programs with different payment delay conventions:
-/// - **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.
+/// - **GNMA I**: Single-issuer pools with a 45-day stated delay. Payments on the 15th.
 /// - **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.
 ///
 /// Use `GnmaI` or `GnmaII` to select the appropriate convention. Their
@@ -36,10 +36,10 @@ pub enum AgencyProgram {
     Fnma,
     /// Freddie Mac (Federal Home Loan Mortgage Corporation)
     Fhlmc,
-    /// Ginnie Mae I - single-issuer pools with 14-day stated delay.
+    /// Ginnie Mae I - single-issuer pools with 45-day stated delay.
     ///
     /// GNMA I securities pay on the 15th of the month following the accrual
-    /// period, resulting in a 14-day stated delay from month-end.
+    /// period, resulting in a 45-day stated delay from accrual start.
     GnmaI,
     /// Ginnie Mae II - multi-issuer pools with 50-day stated delay.
     ///
@@ -68,12 +68,12 @@ impl AgencyProgram {
     /// | Program | Stated Delay | Payment Day | Payment Month |
     /// |---------|-------------|-------------|---------------|
     /// | FNMA/FHLMC (UMBS) | ~55 days | 25th | M+1 |
-    /// | GNMA I | ~14 days | 15th | M |
+    /// | GNMA I | ~45 days | 15th | M+1 |
     /// | GNMA II | ~50 days | 20th | M+1 |
     pub fn payment_lag_days(&self) -> u32 {
         match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => 55,
-            AgencyProgram::GnmaI => 14,
+            AgencyProgram::GnmaI => 45,
             AgencyProgram::GnmaII => 50,
         }
     }
@@ -86,11 +86,11 @@ impl AgencyProgram {
     /// | Program | Rule |
     /// |---------|------|
     /// | FNMA / FHLMC (UMBS) | 25th of the month following accrual |
-    /// | GNMA I | 15th of the accrual month |
+    /// | GNMA I | 15th of the month following accrual |
     /// | GNMA II | 20th of the month following accrual |
     ///
-    /// If the resulting day falls on a weekend, the caller should adjust
-    /// to the next business day separately.
+    /// Payments roll to the next business day on the `usny` Federal Reserve
+    /// calendar, including bank holidays.
     ///
     /// # Errors
     ///
@@ -101,8 +101,8 @@ impl AgencyProgram {
     /// # Arguments
     ///
     /// * `accrual_year` - Calendar year of the MBS accrual month (must be a valid `time` calendar year).
-    /// * `accrual_month` - Accrual month whose agency payment date is computed. GNMA I pays in
-    ///   this month; FNMA, FHLMC, and GNMA II pay in the following month.
+    /// * `accrual_month` - Accrual month whose following-month payment date is
+    ///   computed and adjusted on the Federal Reserve banking calendar.
     pub fn payment_date_for_period(&self, accrual_year: i32, accrual_month: Month) -> Result<Date> {
         let (pay_year, pay_month, pay_day) = match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => {
@@ -110,20 +110,25 @@ impl AgencyProgram {
                 (y, m, 25_u8)
             }
             AgencyProgram::GnmaI => {
-                // GNMA I pays on the 15th of the accrual month (not M+1)
-                (accrual_year, accrual_month, 15_u8)
+                let (y, m) = advance_month(accrual_year, accrual_month);
+                (y, m, 15_u8)
             }
             AgencyProgram::GnmaII => {
                 let (y, m) = advance_month(accrual_year, accrual_month);
                 (y, m, 20_u8)
             }
         };
-        Date::from_calendar_date(pay_year, pay_month, pay_day).map_err(|e| {
+        let payment = Date::from_calendar_date(pay_year, pay_month, pay_day).map_err(|e| {
             finstack_quant_core::Error::Validation(format!(
                 "invalid agency payment date {pay_year}-{:02}-{pay_day}: {e}",
                 pay_month as u8
             ))
-        })
+        })?;
+        finstack_quant_core::dates::adjust(
+            payment,
+            finstack_quant_core::dates::BusinessDayConvention::Following,
+            finstack_quant_core::dates::calendar_by_id_strict("usny")?,
+        )
     }
 
     /// Returns the canonical string representation.
@@ -217,7 +222,7 @@ pub enum PoolType {
 /// Agency MBS have standardized payment delays measured from the **start**
 /// of the accrual period (first day of the month) to the payment date:
 /// - FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1
-/// - GNMA I: ~14 days → payment on the 15th of M
+/// - GNMA I: ~45 days → payment on the 15th of M+1
 /// - GNMA II: ~50 days → payment on the 20th of M+1
 ///
 /// # Examples
@@ -531,21 +536,21 @@ mod tests {
                 "FNMA",
                 55,
                 false,
-                Date::from_calendar_date(2024, Month::February, 25).expect("valid date"),
+                Date::from_calendar_date(2024, Month::February, 26).expect("valid date"),
             ),
             (
                 AgencyProgram::Fhlmc,
                 "FHLMC",
                 55,
                 false,
-                Date::from_calendar_date(2024, Month::February, 25).expect("valid date"),
+                Date::from_calendar_date(2024, Month::February, 26).expect("valid date"),
             ),
             (
                 AgencyProgram::GnmaI,
                 "GNMA_I",
-                14,
+                45,
                 true,
-                Date::from_calendar_date(2024, Month::January, 15).expect("valid date"),
+                Date::from_calendar_date(2024, Month::February, 15).expect("valid date"),
             ),
             (
                 AgencyProgram::GnmaII,
@@ -715,5 +720,44 @@ mod tests {
         let mbs: AgencyMbsPassthrough = serde_json::from_value(value).expect("deserialize");
         assert_eq!(mbs.servicing_fee_rate, 0.0);
         assert_eq!(mbs.guarantee_fee_rate, 0.0);
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn agency_payments_follow_the_accrual_month_and_banking_calendar() {
+        assert_eq!(AgencyProgram::GnmaI.payment_lag_days(), 45);
+        assert_eq!(
+            AgencyProgram::GnmaI
+                .payment_date_for_period(2024, Month::January)
+                .expect("payment"),
+            date!(2024 - 02 - 15)
+        );
+        // February 15 is Sunday and February 16 is a Federal Reserve holiday.
+        assert_eq!(
+            AgencyProgram::GnmaI
+                .payment_date_for_period(2026, Month::January)
+                .expect("payment"),
+            date!(2026 - 02 - 17)
+        );
+        assert_eq!(
+            AgencyProgram::Fnma
+                .payment_date_for_period(2026, Month::March)
+                .expect("payment"),
+            date!(2026 - 04 - 27)
+        );
+    }
+
+    #[test]
+    fn agency_schedule_uses_calendar_payment_dates() {
+        let starts = [date!(2026 - 02 - 01), date!(2026 - 03 - 01)];
+        let schedule =
+            super::super::delay::payment_schedule(&starts, AgencyProgram::Fnma).expect("schedule");
+        assert_eq!(schedule[0].1, date!(2026 - 03 - 25));
+        assert_eq!(schedule[1].1, date!(2026 - 04 - 27));
     }
 }

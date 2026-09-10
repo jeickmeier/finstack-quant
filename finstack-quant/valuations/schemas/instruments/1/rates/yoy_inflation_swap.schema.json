@@ -1,5 +1,20 @@
 {
   "$defs": {
+    "InflationInterpolation": {
+      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
+          "type": "string"
+        }
+      ]
+    },
     "InflationLag": {
       "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
@@ -70,6 +85,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
+        "base_cpi": {
+          "description": "Observed contractual reference CPI at start, with lag and interpolation\nalready applied. If absent, start CPI must resolve from market observations.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
           "default": "modified_following",
@@ -113,6 +136,17 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+        },
+        "interpolation_override": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationInterpolation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
         },
         "lag_override": {
           "anyOf": [
@@ -192,6 +226,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "base_cpi": null,
           "business_day_convention": "modified_following",
           "calendar_id": null,
           "day_count": "act_365f",
@@ -203,6 +238,7 @@
           },
           "id": "YOYSWAP-USD-5Y",
           "inflation_index_id": "US-CPI",
+          "interpolation_override": null,
           "lag_override": {
             "months": 3
           },

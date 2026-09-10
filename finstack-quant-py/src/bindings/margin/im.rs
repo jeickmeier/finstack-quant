@@ -5,6 +5,7 @@
 
 use super::calculators::{money_from_amount, PyImResult};
 use super::frame::{opt_str, records, req_f64, req_str, split_pair};
+use super::im_curvature::PySimmCurvatureSensitivity;
 use super::types::{extract_asset_class, PyCollateralAssetClass, PyEligibleCollateralSchedule};
 use crate::bindings::date_utils::extract_date;
 use crate::bindings::module_utils::parse_currency;
@@ -41,7 +42,7 @@ fn parse_schedule_asset_class(asset_class: &str) -> PyResult<fm::ScheduleAssetCl
 /// Signed sensitivity amounts keyed by SIMM risk class and bucket, all in
 /// ``base_currency``. Rate and credit deltas are DV01/CS01-style amounts per
 /// 1bp move; vegas are currency amounts compatible with the SIMM vega
-/// weights; curvature is a single signed contribution per risk class. Tenor
+/// weights; curvature retains factor identity, risk tenor and option expiry. Tenor
 /// labels must be SIMM buckets (``CONSTANTS["SIMM_TENORS"]``) and commodity
 /// buckets one of the 17 ISDA buckets — ``validate()`` (run automatically by
 /// ``SimmCalculator.calculate_from_sensitivities``) rejects anything else so
@@ -129,7 +130,16 @@ impl PySimmSensitivities {
                 })
             };
             if kind == "curvature" {
-                sens.add_curvature(parse_risk_class(&risk_class)?, amount);
+                let input = fm::SimmCurvatureSensitivity {
+                    risk_class: parse_risk_class(&risk_class)?,
+                    bucket: need(&bucket, "bucket")?,
+                    factor: need(&issuer, "issuer")?,
+                    risk_tenor: tenor,
+                    expiry_tenor: need(&opt_str(&row, "expiry_tenor")?, "expiry_tenor")?,
+                    volatility_weighted_vega: amount,
+                };
+                input.validate().map_err(core_to_py)?;
+                sens.add_curvature(input);
                 continue;
             }
             match (risk_class.as_str(), kind.as_str()) {
@@ -290,28 +300,23 @@ impl PySimmSensitivities {
 
     /// Add a commodity delta: ``bucket`` is a SIMM commodity bucket id
     /// (``"1"``..``"17"``) or name (``"Crude"``, ``"Precious Metals"``);
-    /// ``amount`` is a signed currency sensitivity.
+    /// ``amount`` is signed currency P&L per 1% relative price increase.
     #[pyo3(signature = (bucket, amount))]
     fn add_commodity_delta(&mut self, bucket: &str, amount: f64) {
         self.inner.add_commodity_delta(bucket, amount);
     }
 
     /// Add a commodity vega for a SIMM commodity bucket: ``amount`` is a
-    /// signed currency vega.
+    /// signed sigma times dPV/dsigma before HVR, VRW and concentration.
     #[pyo3(signature = (bucket, amount))]
     fn add_commodity_vega(&mut self, bucket: &str, amount: f64) {
         self.inner.add_commodity_vega(bucket, amount);
     }
 
-    /// Add a curvature contribution (signed, in currency units, before the
-    /// SIMM curvature scale factor) for a SIMM risk class label such as
-    /// ``"interest_rate"`` or ``"equity"``. Raises ``ValueError`` for an
-    /// unknown label.
-    #[pyo3(signature = (risk_class, amount))]
-    fn add_curvature(&mut self, risk_class: &str, amount: f64) -> PyResult<()> {
-        self.inner
-            .add_curvature(parse_risk_class(risk_class)?, amount);
-        Ok(())
+    /// Preserve a validated expiry-resolved input until SF is applied before netting.
+    #[pyo3(signature = (sensitivity))]
+    fn add_curvature(&mut self, sensitivity: &PySimmCurvatureSensitivity) {
+        self.inner.add_curvature(sensitivity.inner.clone());
     }
 
     /// Add every bucket of ``other`` into this container (amounts sum), so
@@ -387,7 +392,7 @@ impl PySimmSensitivities {
     /// ``DataFrame``.
     ///
     /// Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-    /// ``amount``. One row per populated bucket; an empty container still
+    /// ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
     /// carries all six columns. Long format is used deliberately — a column
     /// per bucket would give a different schema for every portfolio, and it
     /// matches ``FrtbSensitivities.to_dataframe``.
@@ -401,7 +406,7 @@ impl PySimmSensitivities {
     /// ``issuer`` carries the name axis: a currency code for IR and FX delta,
     /// a ``"CCY1/CCY2"`` pair for FX vega, an issuer or index for credit, an
     /// underlier for equity. It is ``None`` for commodity (keyed by bucket
-    /// alone) and for curvature. ``bucket`` holds the SIMM credit sector for
+    /// alone); curvature uses issuer for factor identity. ``bucket`` holds the SIMM credit sector for
     /// bucketed credit deltas (e.g. ``"sovereign"``) and the commodity bucket
     /// label; it is ``None`` elsewhere. ``tenor`` is the SIMM tenor bucket
     /// (``"2W"``, ``"1M"``, ..., ``"30Y"``) where the risk class has one.
@@ -905,6 +910,7 @@ impl PyHaircutImCalculator {
 
 /// Register direct IM calculator bindings.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PySimmCurvatureSensitivity>()?;
     m.add_class::<PySimmSensitivities>()?;
     m.add_class::<PySimmCalculator>()?;
     m.add_class::<PyScheduleImCalculator>()?;

@@ -7,8 +7,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 
 use finstack_quant_margin::{
-    ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, SimmCalculator,
-    SimmSensitivities, VmCalculator,
+    ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, ScheduleAssetClass,
+    ScheduleImCalculator, SimmCalculator, SimmSensitivities, VmCalculator,
 };
 
 use crate::margin::netting_set::NettingSet;
@@ -83,6 +83,21 @@ impl PortfolioMarginAggregator {
             aggregator.add_position(position)?;
         }
 
+        let mut csa_owners = HashMap::default();
+        for ns in aggregator.netting_sets.values() {
+            if let Some(spec) = &ns.margin_spec {
+                if let Some((owner, existing)) =
+                    csa_owners.insert(spec.csa.id.clone(), (ns.id.counterparty_id(), &spec.csa))
+                {
+                    if owner != ns.id.counterparty_id() || existing != &spec.csa {
+                        return Err(Error::validation(format!(
+                            "CSA '{}' has conflicting terms or different counterparties",
+                            spec.csa.id
+                        )));
+                    }
+                }
+            }
+        }
         Ok(aggregator)
     }
 
@@ -100,6 +115,9 @@ impl PortfolioMarginAggregator {
         };
         let netting_set_id = marginable.netting_set_id();
         let margin_spec = marginable.margin_spec().cloned();
+        if let Some(spec) = &margin_spec {
+            spec.validate()?;
+        }
 
         if let Some(ns_id) = netting_set_id {
             let netting_set = self
@@ -138,6 +156,9 @@ impl PortfolioMarginAggregator {
     /// * `portfolio` - Portfolio used for mark-to-market lookups.
     /// * `market` - Market context required for VM and SIMM sensitivity extraction.
     /// * `as_of` - Valuation date for the margin run.
+    /// * `current_im_collateral` - One-way IM balances keyed by CSA ID in that
+    ///   CSA's currency. An absent entry means zero; unknown IDs are rejected.
+    ///   Excludes VM and the opposite party's segregated IM account.
     ///
     /// # Returns
     ///
@@ -153,6 +174,7 @@ impl PortfolioMarginAggregator {
         portfolio: &Portfolio,
         market: &MarketContext,
         as_of: Date,
+        current_im_collateral: &HashMap<String, Money>,
     ) -> Result<PortfolioMarginResult> {
         let mut result = PortfolioMarginResult::new(as_of, self.base_currency);
         for netting_set in self.netting_sets.values_mut() {
@@ -224,7 +246,76 @@ impl PortfolioMarginAggregator {
             .saturating_sub(result.total_positions)
             + result.degraded_positions.len();
 
+        self.apply_csa_im_terms(&mut result, current_im_collateral, market, as_of)?;
         Ok(result)
+    }
+
+    fn apply_csa_im_terms(
+        &self,
+        result: &mut PortfolioMarginResult,
+        current: &HashMap<String, Money>,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<()> {
+        let mut gross_by_csa = HashMap::default();
+        for ns in self.netting_sets.values() {
+            let Some(spec) = &ns.margin_spec else {
+                continue;
+            };
+            if spec.csa.im_params.is_none() {
+                continue;
+            }
+            let gross = result
+                .by_netting_set
+                .get(&ns.id)
+                .ok_or_else(|| Error::validation("Missing netting-set IM result"))?
+                .initial_margin;
+            let amount =
+                crate::fx::convert_to_base(gross, as_of, market, spec.csa.base_currency)?.amount();
+            let entry = gross_by_csa
+                .entry(spec.csa.id.clone())
+                .or_insert((&spec.csa, 0.0));
+            entry.1 += amount;
+        }
+        for id in current.keys() {
+            if !gross_by_csa.contains_key(id) {
+                return Err(Error::validation(format!(
+                    "Unknown IM collateral CSA '{id}'"
+                )));
+            }
+        }
+        for (id, (csa, gross)) in gross_by_csa {
+            let params = csa
+                .im_params
+                .as_ref()
+                .ok_or_else(|| Error::validation("Missing IM terms"))?;
+            let currency = csa.base_currency;
+            let account = params.apply_collateral_terms(
+                Money::new(gross, currency)?,
+                current
+                    .get(&id)
+                    .copied()
+                    .unwrap_or(Money::from((0_i64, currency))),
+            )?;
+            let required = self.convert_to_base(account.required_collateral, market, as_of)?;
+            let transfer = self.convert_to_base(account.transfer, market, as_of)?;
+            result.total_required_im_collateral = Money::new(
+                result.total_required_im_collateral.amount() + required,
+                self.base_currency,
+            )?;
+            result.total_im_transfer = Money::new(
+                result.total_im_transfer.amount() + transfer,
+                self.base_currency,
+            )?;
+            if account.segregated {
+                result.total_segregated_im = Money::new(
+                    result.total_segregated_im.amount() + required,
+                    self.base_currency,
+                )?;
+            }
+            result.by_csa.insert(id, account);
+        }
+        Ok(())
     }
 
     /// Calculate sensitivities for a single position.
@@ -235,6 +326,11 @@ impl PortfolioMarginAggregator {
         as_of: Date,
     ) -> Result<SimmSensitivities> {
         if let Some(marginable) = position.instrument.as_marginable() {
+            if let Some(spec) = marginable.margin_spec() {
+                if spec.im_methodology != ImMethodology::Simm || spec.csa.im_params.is_none() {
+                    return Ok(SimmSensitivities::new(self.base_currency));
+                }
+            }
             let sens = marginable
                 .simm_sensitivities(market, as_of)
                 .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
@@ -360,30 +456,43 @@ impl PortfolioMarginAggregator {
             netting_set,
             Money::new(total_mtm, self.base_currency)?,
             as_of,
+            market,
         )?;
 
-        let (im, im_methodology, simm_breakdown) = if netting_set.is_cleared() {
-            let im = self.calculate_clearing_im(
-                netting_set,
-                portfolio,
-                market,
-                as_of,
-                &mut degraded_positions,
-            )?;
-            (im, ImMethodology::ClearingHouse, None)
+        let method = netting_set
+            .margin_spec
+            .as_ref()
+            .map(|s| s.im_methodology)
+            .unwrap_or(if netting_set.is_cleared() {
+                ImMethodology::ClearingHouse
+            } else {
+                ImMethodology::Simm
+            });
+        let im_params = netting_set
+            .margin_spec
+            .as_ref()
+            .and_then(|s| s.csa.im_params.as_ref());
+        let no_im = netting_set.margin_spec.is_some() && im_params.is_none();
+        let (im, simm_breakdown) = if no_im {
+            (Money::from((0_i64, self.base_currency)), None)
         } else {
-            let (im, simm_breakdown) =
-                if let Some(ref sensitivities) = netting_set.aggregated_sensitivities {
-                    let (total, breakdown) = self
-                        .simm_calculator
-                        .calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
-                    let im = Money::new(total, self.base_currency)?;
-                    (im, Some((sensitivities.clone(), breakdown)))
-                } else {
-                    (Money::from((0_i64, self.base_currency)), None)
-                };
-            (im, ImMethodology::Simm, simm_breakdown)
+            match method {
+                ImMethodology::Simm => {
+                    if let Some(ref sensitivities) = netting_set.aggregated_sensitivities {
+                        let days = im_params.map(|p| p.mpor_days).unwrap_or(self.simm_calculator.mpor_days());
+                        let calculator = self.simm_calculator.clone().with_mpor(days);
+                        let (total, breakdown) = calculator.calculate_from_sensitivities_parts(sensitivities, self.base_currency)?;
+                        (Money::new(total, self.base_currency)?, Some((sensitivities.clone(), breakdown)))
+                    } else { (Money::from((0_i64, self.base_currency)), None) }
+                }
+                ImMethodology::Schedule => (self.calculate_schedule_im(netting_set, portfolio, market, as_of)?, None),
+                ImMethodology::ClearingHouse => (self.calculate_clearing_im(netting_set, portfolio, market, as_of, &mut degraded_positions)?, None),
+                other => return Err(Error::validation(format!(
+                    "Portfolio OTC margin does not support configured IM methodology {other:?}; supply its dedicated collateral/model engine"
+                ))),
+            }
         };
+        let im_methodology = method;
 
         let mut result = NettingSetMargin::new(
             netting_set.id.clone(),
@@ -394,6 +503,7 @@ impl PortfolioMarginAggregator {
             im_methodology,
         )?;
 
+        result.csa_id = netting_set.margin_spec.as_ref().map(|s| s.csa.id.clone());
         result.is_approximate = netting_set.is_cleared() || simm_breakdown.is_some();
 
         if let Some((sensitivities, breakdown)) = simm_breakdown {
@@ -401,6 +511,78 @@ impl PortfolioMarginAggregator {
         }
 
         Ok((result, degraded_positions))
+    }
+
+    fn calculate_schedule_im(
+        &self,
+        netting_set: &NettingSet,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<Money> {
+        use finstack_quant_valuations::pricer::InstrumentType;
+        let calculator = ScheduleImCalculator::bcbs_standard()?;
+        let mut inputs = Vec::new();
+        for id in &netting_set.positions {
+            let position = portfolio
+                .get_position(id.as_str())
+                .ok_or_else(|| Error::validation(format!("Missing schedule position '{id}'")))?;
+            let instrument = &position.instrument;
+            let marginable = instrument
+                .as_marginable()
+                .ok_or_else(|| Error::validation("Schedule position is not marginable"))?;
+            let exposure = marginable.im_exposure_base(market, as_of)?.ok_or_else(|| {
+                Error::validation(format!(
+                    "Schedule position '{id}' requires regulatory notional"
+                ))
+            })?;
+            let expiry = instrument.expiry().ok_or_else(|| {
+                Error::validation(format!(
+                    "Schedule position '{id}' requires contractual expiry"
+                ))
+            })?;
+            if expiry <= as_of {
+                continue;
+            }
+            let years = (expiry - as_of).whole_days() as f64 / 365.0;
+            let class = match instrument.key() {
+                InstrumentType::Irs | InstrumentType::FiIndexTotalReturnSwap => {
+                    ScheduleAssetClass::InterestRate
+                }
+                InstrumentType::Cds | InstrumentType::CdsIndex => ScheduleAssetClass::Credit,
+                InstrumentType::EquityTotalReturnSwap => ScheduleAssetClass::Equity,
+                other => {
+                    return Err(Error::validation(format!(
+                        "No approved schedule classification for {other:?}"
+                    )))
+                }
+            };
+            let notional = exposure.checked_mul_f64(position.scale_factor().abs())?;
+            let notional = Money::new(
+                self.convert_to_base(notional, market, as_of)?,
+                self.base_currency,
+            )?;
+            let mtm = self.get_position_mtm(position, market, as_of)?;
+            let mtm = Money::new(
+                self.convert_to_base(mtm, market, as_of)?,
+                self.base_currency,
+            )?;
+            inputs.push((mtm, notional, class, years));
+        }
+        let amount = calculator
+            .calculate_netting_set_with_ngr(&inputs, as_of)?
+            .map(|r| r.amount.amount())
+            .unwrap_or(0.0);
+        let days = netting_set
+            .margin_spec
+            .as_ref()
+            .and_then(|s| s.csa.im_params.as_ref())
+            .map(|p| p.mpor_days)
+            .unwrap_or(calculator.mpor_days);
+        Ok(Money::new(
+            amount * (f64::from(days) / f64::from(calculator.mpor_days)).sqrt(),
+            self.base_currency,
+        )?)
     }
 
     fn calculate_clearing_im(
@@ -435,9 +617,21 @@ impl PortfolioMarginAggregator {
                     // This conservative proxy grants no portfolio offsets. A short
                     // requires collateral just as a long does; signed sensitivity
                     // netting belongs to the SIMM path, not standalone IM amounts.
-                    let scaled_im = im_result
-                        .amount
-                        .checked_mul_f64(position.scale_factor().abs())?;
+                    let days = netting_set
+                        .margin_spec
+                        .as_ref()
+                        .and_then(|s| s.csa.im_params.as_ref())
+                        .map(|p| p.mpor_days)
+                        .unwrap_or(im_result.mpor_days);
+                    if im_result.mpor_days == 0 {
+                        return Err(Error::validation(
+                            "Clearing IM source MPOR must be positive",
+                        ));
+                    }
+                    let scaled_im = im_result.amount.checked_mul_f64(
+                        position.scale_factor().abs()
+                            * (f64::from(days) / f64::from(im_result.mpor_days)).sqrt(),
+                    )?;
                     let amount = if scaled_im.currency() == self.base_currency {
                         Ok(scaled_im.amount())
                     } else {
@@ -465,6 +659,7 @@ impl PortfolioMarginAggregator {
         netting_set: &NettingSet,
         gross_vm: Money,
         as_of: Date,
+        market: &MarketContext,
     ) -> Result<Money> {
         // No CSA on this netting set: nothing to net against. The caller
         // records the degradation so the unadjusted figure is not mistaken
@@ -473,11 +668,12 @@ impl PortfolioMarginAggregator {
             return Ok(Money::new(-gross_vm.amount(), self.base_currency)?);
         };
 
-        let current_collateral = Money::from((0_i64, self.base_currency));
+        let gross_vm = crate::fx::convert_to_base(gross_vm, as_of, market, spec.csa.base_currency)?;
+        let current_collateral = Money::from((0_i64, spec.csa.base_currency));
         let vm_result = VmCalculator::new(spec.csa.clone())
             .calculate(gross_vm, current_collateral, as_of)
             .map_err(|e| Error::validation(format!("M-13: CSA VM calculation failed: {e}")))?;
-        Ok(vm_result.net_margin())
+        crate::fx::convert_to_base(vm_result.net_margin(), as_of, market, self.base_currency)
     }
 
     /// Get MTM for a position in its native currency, scaled by position quantity.
@@ -581,6 +777,10 @@ mod tests {
             InstrumentType::Irs
         }
 
+        fn expiry(&self) -> Option<Date> {
+            Some(date!(2025 - 01 - 01))
+        }
+
         fn as_any(&self) -> &dyn Any {
             self
         }
@@ -656,6 +856,149 @@ mod tests {
         ) -> finstack_quant_core::Result<Option<Money>> {
             Ok(self.im_exposure_base)
         }
+    }
+
+    #[test]
+    fn production_csa_threshold_is_applied_once_with_mpor_and_separate_custody() {
+        let as_of = date!(2024 - 01 - 01);
+        for (mta, current, segregated, expected_transfer) in [
+            (1500.0, 13000.0, true, 0.0),
+            (1000.0, 13000.0, true, 1000.0),
+            (1000.0, 16000.0, false, -2000.0),
+        ] {
+            let mut spec = OtcMarginSpec::usd_bilateral().unwrap();
+            spec.csa.id = "shared-csa".into();
+            let params = spec.csa.im_params.as_mut().unwrap();
+            params.mpor_days = 40;
+            params.threshold = Money::new(10000.0, Currency::USD).unwrap();
+            params.mta = Money::new(mta, Currency::USD).unwrap();
+            params.segregated = segregated;
+            let mut builder = Portfolio::builder("two-netting-sets")
+                .base_currency(Currency::USD)
+                .as_of(as_of)
+                .entity(Entity::new(DUMMY_ENTITY_ID));
+            for n in ["a", "b"] {
+                let instrument = Arc::new(
+                    TestMarginableInstrument::new(
+                        n,
+                        NettingSetId::bilateral("BANK", n),
+                        100.0,
+                        Money::from((0_i64, Currency::USD)),
+                    )
+                    .with_margin_spec(spec.clone()),
+                );
+                builder = builder.position(
+                    Position::new(n, DUMMY_ENTITY_ID, n, instrument, 1.0, PositionUnit::Units)
+                        .unwrap(),
+                );
+            }
+            let portfolio = builder.build().unwrap();
+            let current = HashMap::from_iter([(
+                "shared-csa".to_owned(),
+                Money::new(current, Currency::USD).unwrap(),
+            )]);
+            let result = PortfolioMarginAggregator::from_portfolio(&portfolio)
+                .unwrap()
+                .calculate(&portfolio, &MarketContext::new(), as_of, &current)
+                .unwrap();
+            // USD 5Y RW=60, no concentration, sqrt(40/10)=2 on each NS.
+            assert_eq!(result.total_initial_margin.amount(), 24000.0);
+            assert_eq!(result.by_csa.len(), 1);
+            assert_eq!(result.total_required_im_collateral.amount(), 14000.0);
+            assert_eq!(result.total_im_transfer.amount(), expected_transfer);
+            assert_eq!(
+                result.total_segregated_im.amount(),
+                if segregated { 14000.0 } else { 0.0 }
+            );
+            let json = serde_json::to_string(&result).unwrap();
+            let restored: PortfolioMarginResult = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored.total_im_transfer, result.total_im_transfer);
+            assert_eq!(restored.by_csa, result.by_csa);
+        }
+    }
+
+    #[test]
+    fn production_schedule_dispatches_and_csa_methodology_conflicts_fail() {
+        let as_of = date!(2024 - 01 - 01);
+        let mut spec = OtcMarginSpec::bilateral_schedule(
+            finstack_quant_margin::CsaSpec::usd_regulatory().unwrap(),
+        );
+        spec.csa.im_params.as_mut().unwrap().methodology = ImMethodology::Schedule;
+        let instrument = Arc::new(
+            TestMarginableInstrument::new(
+                "schedule",
+                NettingSetId::bilateral("BANK", "CSA"),
+                1e12,
+                Money::from((100_i64, Currency::USD)),
+            )
+            .with_margin_spec(spec.clone())
+            .with_im_exposure_base(Money::from((1_000_000_i64, Currency::USD))),
+        );
+        let portfolio = Portfolio::builder("schedule")
+            .base_currency(Currency::USD)
+            .as_of(as_of)
+            .entity(Entity::new(DUMMY_ENTITY_ID))
+            .position(
+                Position::new(
+                    "p",
+                    DUMMY_ENTITY_ID,
+                    "schedule",
+                    instrument,
+                    1.0,
+                    PositionUnit::Units,
+                )
+                .unwrap(),
+            )
+            .build()
+            .unwrap();
+        let result = PortfolioMarginAggregator::from_portfolio(&portfolio)
+            .unwrap()
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            result
+                .by_netting_set
+                .values()
+                .next()
+                .unwrap()
+                .im_methodology,
+            ImMethodology::Schedule
+        );
+        // One-year IRS grid is 1%, NGR = 1. Huge irrelevant SIMM input has no effect.
+        assert_eq!(result.total_initial_margin.amount(), 10_000.0);
+        spec.im_methodology = ImMethodology::Simm;
+        let instrument = Arc::new(
+            TestMarginableInstrument::new(
+                "conflict",
+                NettingSetId::bilateral("BANK", "CSA"),
+                0.0,
+                Money::from((0_i64, Currency::USD)),
+            )
+            .with_margin_spec(spec),
+        );
+        let portfolio = Portfolio::builder("conflict")
+            .base_currency(Currency::USD)
+            .as_of(as_of)
+            .entity(Entity::new(DUMMY_ENTITY_ID))
+            .position(
+                Position::new(
+                    "p",
+                    DUMMY_ENTITY_ID,
+                    "conflict",
+                    instrument,
+                    1.0,
+                    PositionUnit::Units,
+                )
+                .unwrap(),
+            )
+            .build()
+            .unwrap();
+        assert!(PortfolioMarginAggregator::from_portfolio(&portfolio).is_err());
     }
 
     #[test]
@@ -753,10 +1096,20 @@ mod tests {
             PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let first = aggregator
-            .calculate(&portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
             .expect("first margin run should succeed");
         let second = aggregator
-            .calculate(&portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
             .expect("second margin run should succeed");
 
         assert_eq!(first.by_netting_set.len(), 1);
@@ -800,7 +1153,12 @@ mod tests {
             PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
-            .calculate(&portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
             .expect("minor 18: portfolio-level margin should degrade the bad position");
         assert!(
             result
@@ -852,7 +1210,12 @@ mod tests {
             PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
-            .calculate(&portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
             .expect("M-13: CSA VM terms should calculate");
 
         assert_eq!(
@@ -899,7 +1262,12 @@ mod tests {
             PortfolioMarginAggregator::from_portfolio(&portfolio).expect("consistent margin terms");
 
         let result = aggregator
-            .calculate(&portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &portfolio,
+                &MarketContext::new(),
+                as_of,
+                &finstack_quant_core::HashMap::default(),
+            )
             .expect("M-10: cleared IM should calculate from CCP exposure base");
         let netting_set = result
             .by_netting_set
@@ -950,7 +1318,12 @@ mod tests {
             .expect("consistent margin terms");
 
         let result = aggregator
-            .calculate(&empty_portfolio, &MarketContext::new(), as_of)
+            .calculate(
+                &empty_portfolio,
+                &MarketContext::new(),
+                as_of,
+                &HashMap::default(),
+            )
             .expect("MO-15: stale registration should degrade, not fail portfolio margin");
 
         assert_eq!(

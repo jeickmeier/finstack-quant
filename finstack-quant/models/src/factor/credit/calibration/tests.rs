@@ -420,6 +420,13 @@ mod calibration_pipeline {
     }
 
     fn calibrate(case: PipelineCase) -> finstack_quant_core::Result<CreditFactorModel> {
+        calibrate_with_override(case, None)
+    }
+
+    fn calibrate_with_override(
+        case: PipelineCase,
+        override_vol: Option<f64>,
+    ) -> finstack_quant_core::Result<CreditFactorModel> {
         let dates = monthly_dates(case.n_dates);
         let mut tags = BTreeMap::new();
         let mut spreads = BTreeMap::new();
@@ -460,7 +467,9 @@ mod calibration_pipeline {
             },
             as_of: dates[case.as_of_idx],
             as_of_spreads,
-            idiosyncratic_overrides: BTreeMap::new(),
+            idiosyncratic_overrides: override_vol
+                .map(|vol| BTreeMap::from([(IssuerId::new("A"), vol)]))
+                .unwrap_or_default(),
             spread_durations: BTreeMap::new(),
         })
     }
@@ -469,6 +478,35 @@ mod calibration_pipeline {
         (0..n)
             .map(|i| base + amp * ((i as f64) * frequency).sin())
             .collect()
+    }
+
+    #[test]
+    fn production_credit_audit_override_uses_decimal_spread_volatility() {
+        use crate::factor::credit::hierarchy::AdderVolSource;
+
+        let series = wavy(24, 0.01, 0.001, 0.7);
+        let model = calibrate_with_override(
+            PipelineCase {
+                policy: IssuerBetaPolicy::GloballyOff,
+                thresholds: vec![1, 1],
+                n_dates: 24,
+                issuers: vec![("A", "TECH", series.clone())],
+                generic: series,
+                as_of_idx: 23,
+            },
+            Some(0.001),
+        )
+        .expect("calibration");
+        let row = &model.issuer_betas[0];
+        assert!(
+            (row.adder_vol_annualized - 10.0).abs() < 1e-12,
+            "0.001 decimal spread per sqrt(year) is 10 bp per sqrt(year), got {}",
+            row.adder_vol_annualized
+        );
+        assert!(matches!(
+            row.adder_vol_source,
+            AdderVolSource::CallerSupplied
+        ));
     }
 
     /// Fold-up must gate on the full bucket membership. Under the default

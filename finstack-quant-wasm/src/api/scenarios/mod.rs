@@ -208,7 +208,8 @@ pub fn build_template_component(template_id: &str, component_id: &str) -> Result
 /// @param resolution_mode - Optional hierarchy conflict policy:
 ///   `"most_specific_wins"` (default) or `"cumulative"`.
 /// @param hazard_bump_mode - Optional ParCDS delivery:
-///   `"solve_to_par"` (default) or `"first_order_shift"`.
+///   `"solve_to_par"` (default) rebootstraps par quotes; `"first_order_shift"` applies
+///   delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
 #[wasm_bindgen(js_name = buildScenarioSpec)]
 pub fn build_scenario_spec(
     id: &str,

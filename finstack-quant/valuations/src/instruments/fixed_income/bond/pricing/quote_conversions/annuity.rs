@@ -105,7 +105,9 @@ pub fn periods_per_year(
 /// * `frequency` - Optional coupon frequency required by conventions such as
 ///   ACT/ACT (ICMA); `None` is valid for conventions without it.
 /// * `schedule` - Ordered coupon boundary/payment dates; adjacent pairs form
-///   accrual periods and the first date anchors the leg.
+///   accrual periods and the first date anchors the leg. For ICMA, the first
+///   coupon anchors one quasi-coupon grid for the entire leg, preserving EOM
+///   rolls and both front and back stubs.
 ///
 /// # Returns
 ///
@@ -126,6 +128,14 @@ pub fn fixed_leg_annuity(
 
     let dc_ctx = DayCountContext {
         frequency,
+        coupon_period: frequency.and_then(|frequency| {
+            super::icma_reference_period(
+                day_count,
+                frequency,
+                schedule.iter().copied(),
+                schedule[0],
+            )
+        }),
         ..DayCountContext::default()
     };
     let mut ann = 0.0;

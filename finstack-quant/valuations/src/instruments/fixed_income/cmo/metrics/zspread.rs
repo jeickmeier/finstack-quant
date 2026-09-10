@@ -35,7 +35,17 @@ pub(crate) fn calculate_tranche_zspread(
         ))
     })?;
 
-    let market_price = market_price_pct / 100.0 * tranche.current_face.amount();
+    let month_start = Date::from_calendar_date(as_of.year(), as_of.month(), 1)
+        .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+    let accrual_start = month_start.max(cmo.issue_date);
+    let accrued = tranche.current_face.amount()
+        * tranche.coupon
+        * DayCount::Thirty360.year_fraction(
+            accrual_start.min(as_of),
+            as_of,
+            DayCountContext::default(),
+        )?;
+    let market_price = market_price_pct / 100.0 * tranche.current_face.amount() + accrued;
 
     // Cache cashflows outside the solver loop — they don't depend on spread.
     let tranche_cfs = generate_tranche_cashflows(cmo, as_of, None)?;
@@ -169,5 +179,32 @@ mod tests {
         let zspread = calculate_tranche_zspread(&cmo, price_pct, &market, as_of).expect("zspread");
 
         assert!(zspread.abs() < 0.01);
+    }
+}
+
+#[cfg(test)]
+mod production_mortgage_audit {
+    use super::*;
+    use crate::instruments::fixed_income::cmo::pricer::price_cmo;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    #[test]
+    fn cmo_clean_quote_has_zero_spread_at_clean_model_value() {
+        let cmo = AgencyCmo::example().expect("cmo");
+        let as_of = date!(2024 - 01 - 15);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (40.0, 1.0)])
+                .build()
+                .expect("curve"),
+        );
+        let tranche = cmo.reference_tranche().expect("tranche");
+        let dirty = price_cmo(&cmo, &market, as_of).expect("price").amount();
+        let accrued = tranche.current_face.amount() * tranche.coupon * 14.0 / 360.0;
+        let clean = (dirty - accrued) / tranche.current_face.amount() * 100.0;
+        let spread = calculate_tranche_zspread(&cmo, clean, &market, as_of).expect("spread");
+        assert!(spread.abs() < 1e-9, "spread {spread}");
     }
 }

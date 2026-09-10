@@ -402,6 +402,11 @@ pub struct BasisSwapLeg {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PremiumLegSpec {
+    /// Whether to use the standard quarterly CDS roll grid (20 March,
+    /// June, September and December), including a final maturity stub.
+    /// Requires quarterly `frequency` and `ShortFront` `stub`. Set false
+    /// for bespoke schedules generated from the supplied frequency/stub.
+    pub standard_imm_dates: bool,
     /// Start date of protection
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(

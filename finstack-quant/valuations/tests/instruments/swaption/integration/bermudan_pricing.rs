@@ -81,7 +81,9 @@ fn test_tree_valuator_rejects_mixed_curve_bermudan() {
         HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
         50,
         &curve,
+        as_of,
         ttm,
+        &swaption.exercise_times(as_of).expect("exercise times"),
     )
     .expect("Calibration should succeed");
 
@@ -111,7 +113,9 @@ fn test_bermudan_price_positive() {
         HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
         50,
         &curve,
+        as_of,
         ttm,
+        &swaption.exercise_times(as_of).expect("exercise times"),
     )
     .expect("Calibration should succeed");
 
@@ -146,7 +150,9 @@ fn test_bermudan_payer_vs_receiver() {
         HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
         50,
         &curve,
+        as_of,
         ttm,
+        &payer.exercise_times(as_of).expect("exercise times"),
     )
     .expect("Calibration should succeed");
 
@@ -189,7 +195,9 @@ fn test_bermudan_strike_sensitivity() {
         HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
         50,
         &curve,
+        as_of,
         ttm,
+        &low_strike.exercise_times(as_of).expect("exercise times"),
     )
     .expect("Calibration should succeed");
 
@@ -243,7 +251,11 @@ fn test_bermudan_more_exercise_dates_higher_value() {
         HullWhiteCalibrationParams::new(0.03, 0.01).expect("valid HW params"),
         50,
         &curve,
+        as_of,
         ttm,
+        &early_swaption
+            .exercise_times(as_of)
+            .expect("exercise times"),
     )
     .expect("Calibration should succeed");
 

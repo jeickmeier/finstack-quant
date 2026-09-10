@@ -131,7 +131,30 @@ fn execute_waterfall_core(
     explain: ExplainOpts,
     mut workspace: Option<&mut WaterfallWorkspace>,
 ) -> Result<WaterfallDistribution> {
-    let mut remaining = context.available_cash;
+    let mut tiers: Vec<_> = waterfall.tiers.iter().collect();
+    tiers.sort_by_key(|tier| tier.priority);
+    for pair in tiers.windows(2) {
+        if pair[0].priority == pair[1].priority {
+            return Err(CoreError::Validation(format!(
+                "waterfall tiers '{}' and '{}' have duplicate priority {}",
+                pair[0].id, pair[1].id, pair[0].priority
+            )));
+        }
+    }
+    let mut interest_remaining = context.interest_collections;
+    let mut principal_remaining = context.principal_collections;
+    let classified_cash = interest_remaining.checked_add(principal_remaining)?;
+    if interest_remaining.amount() < 0.0
+        || principal_remaining.amount() < 0.0
+        || (classified_cash.amount() - context.available_cash.amount()).abs()
+            > (context.available_cash.amount().abs() * f64::EPSILON * 8.0).max(1e-8)
+        || classified_cash.currency() != waterfall.base_currency
+    {
+        return Err(CoreError::Validation(format!(
+            "waterfall available cash must equal nonnegative interest plus principal in its base currency: available={}, interest={}, principal={}",
+            context.available_cash.amount(), interest_remaining.amount(), principal_remaining.amount()
+        )));
+    }
     let mut total_diverted = Money::from((0_i64, waterfall.base_currency));
     let mut had_diversions = false;
     let mut diversion_reason = None;
@@ -199,6 +222,7 @@ fn execute_waterfall_core(
         pool,
         context.payment_date,
         context.period_start,
+        context.valuation_date,
         context.principal_collections,
         context.interest_collections,
         context.pool_balance,
@@ -273,9 +297,14 @@ fn execute_waterfall_core(
     // so regular and diverted tiers cannot retire the same notional twice.
     let mut principal_paid_in_period: HashMap<String, Money> = HashMap::default();
 
-    for tier in &waterfall.tiers {
+    for tier in tiers {
+        let remaining = if tier.payment_type == PaymentType::Principal {
+            principal_remaining
+        } else {
+            interest_remaining
+        };
         let (target_recipients, tier_diverted): (&[Recipient], bool) =
-            if tier.divertible && diversion_active {
+            if tier.divertible && diversion_active && cure_remaining.amount() > 0.0 {
                 // Cure pays the earliest principal tier in its configured
                 // recipient order (it may sit later than this divertible
                 // interest tier). Early principal is booked in
@@ -363,7 +392,11 @@ fn execute_waterfall_core(
         }
 
         tier_allocations.push((tier.id.clone(), tier_cash));
-        remaining = remaining.checked_sub(tier_cash)?;
+        if tier.payment_type == PaymentType::Principal {
+            principal_remaining = principal_remaining.checked_sub(tier_cash)?;
+        } else {
+            interest_remaining = interest_remaining.checked_sub(tier_cash)?;
+        }
     }
 
     let coverage_tests_public: Vec<(String, f64, bool)> = coverage_test_results
@@ -405,7 +438,9 @@ fn execute_waterfall_core(
         payment_records: allocation_output.payment_records.clone(),
         coverage_tests: coverage_tests_public.clone(),
         diverted_cash: total_diverted,
-        remaining_cash: remaining,
+        remaining_cash: interest_remaining.checked_add(principal_remaining)?,
+        remaining_interest: interest_remaining,
+        remaining_principal: principal_remaining,
         had_diversions,
         diversion_reason,
         diverted_amounts,
@@ -578,7 +613,7 @@ fn allocate_sequential(
         // SC-M28: record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
-        if is_principal_payment(&recipient.calculation) {
+        if is_principal_payment(&recipient.calculation, tier.payment_type) {
             match output
                 .principal_distributions
                 .entry(recipient.recipient_type.clone())
@@ -749,7 +784,7 @@ fn allocate_pro_rata(
         // SC-M28: record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
-        if is_principal_payment(&recipient.calculation) {
+        if is_principal_payment(&recipient.calculation, tier.payment_type) {
             match output
                 .principal_distributions
                 .entry(recipient.recipient_type.clone())
@@ -945,13 +980,11 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 /// and its principal, so `distributions` aggregates them; without this the
 /// engine had to guess the split by assuming interest is satisfied first.
 ///
-/// `ResidualCash` counts as principal: it is the equity/residual distribution,
-/// which the engine books against notional rather than as a coupon.
-fn is_principal_payment(calculation: &PaymentCalculation) -> bool {
-    matches!(
-        calculation,
-        PaymentCalculation::TranchePrincipal { .. } | PaymentCalculation::ResidualCash
-    )
+/// Residual cash retains its source: only a principal tier repays capital.
+fn is_principal_payment(calculation: &PaymentCalculation, payment_type: PaymentType) -> bool {
+    matches!(calculation, PaymentCalculation::TranchePrincipal { .. })
+        || (matches!(calculation, PaymentCalculation::ResidualCash)
+            && payment_type == PaymentType::Principal)
 }
 
 /// Contractual coupon for the period with the simulated rate-path shift applied.
@@ -1051,9 +1084,8 @@ pub(crate) struct SeniorFeeInputs<'a> {
 /// Senior fees accruing this period, i.e. the fee tiers that rank ahead of
 /// every note.
 ///
-/// `take_while` deliberately stops at the first non-Fee tier: only fees that
-/// sit ABOVE the notes are senior claims. A junior fee tier placed below the
-/// notes is not a senior claim and must not be counted here.
+/// Priority determines seniority even when deserialized tiers arrive out of order.
+/// Only fees ranking ahead of the first non-fee tier enter the senior claim.
 ///
 /// This is the single source of truth for "what the fee tier will take",
 /// shared by three call sites that must agree:
@@ -1073,11 +1105,20 @@ pub(crate) fn senior_fee_accrual(
 ) -> Result<Money> {
     let empty_in_period: HashMap<String, Money> = HashMap::default();
     let mut total = Money::from((0_i64, waterfall.base_currency));
-    for tier in waterfall
+    let first_note_priority = waterfall
         .tiers
         .iter()
-        .take_while(|t| t.payment_type == PaymentType::Fee)
-    {
+        .filter(|tier| tier.payment_type != PaymentType::Fee)
+        .map(|tier| tier.priority)
+        .min()
+        .unwrap_or(usize::MAX);
+    let mut fees: Vec<_> = waterfall
+        .tiers
+        .iter()
+        .filter(|tier| tier.payment_type == PaymentType::Fee && tier.priority < first_note_priority)
+        .collect();
+    fees.sort_by_key(|tier| tier.priority);
+    for tier in fees {
         for recipient in &tier.recipients {
             let amount = calculate_payment_amount(
                 waterfall.base_currency,
@@ -1104,12 +1145,13 @@ pub(crate) fn senior_fee_accrual(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn evaluate_coverage_tests(
+pub(super) fn evaluate_coverage_tests(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
     pool: &AssetPool,
     as_of: Date,
     period_start: Date,
+    valuation_date: Date,
     principal_collections: Money,
     interest_collections: Money,
     current_pool_balance: Money,
@@ -1150,6 +1192,7 @@ fn evaluate_coverage_tests(
                 tranches,
                 tranche_id: &trigger.tranche_id,
                 as_of,
+                valuation_date,
                 period_start: Some(period_start),
                 cash_balance: principal_collections,
                 interest_collections,
@@ -1183,6 +1226,7 @@ fn evaluate_coverage_tests(
                 tranches,
                 tranche_id: &trigger.tranche_id,
                 as_of,
+                valuation_date,
                 period_start: Some(period_start),
                 cash_balance: principal_collections,
                 interest_collections,
@@ -1216,10 +1260,10 @@ fn evaluate_coverage_tests(
 
 /// Internal coverage test result with cure amount.
 #[derive(Debug, Clone)]
-struct CoverageTestResult {
-    test_id: String,
-    current_ratio: f64,
-    is_passing: bool,
+pub(super) struct CoverageTestResult {
+    pub(super) test_id: String,
+    pub(super) current_ratio: f64,
+    pub(super) is_passing: bool,
     /// Amount needed to cure the breach (divert to senior principal).
     cure_amount: Option<Money>,
 }
@@ -1524,10 +1568,12 @@ mod ic_diversion_tests {
                 obligor_id: Some("OBLIGOR_0".into()),
                 is_defaulted: false,
                 recovery_amount: None,
+                default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                recovery_rate: None,
                 contractual_payment: None,
             });
         }
@@ -1753,10 +1799,12 @@ mod ic_diversion_tests {
                 obligor_id: Some("OBLIGOR_0".into()),
                 is_defaulted: false,
                 recovery_amount: None,
+                default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                recovery_rate: None,
                 contractual_payment: None,
             });
         }
@@ -1937,10 +1985,12 @@ mod ic_diversion_tests {
                 obligor_id: Some("OBLIGOR_0".into()),
                 is_defaulted: false,
                 recovery_amount: None,
+                default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                recovery_rate: None,
                 contractual_payment: None,
             });
         }
@@ -2419,8 +2469,8 @@ mod water_fill_tests {
             &AssetPool::new("POOL", DealType::Clo, ccy),
             WaterfallContext {
                 available_cash: Money::from((300_000_i64, ccy)),
-                interest_collections: Money::from((300_000_i64, ccy)),
-                principal_collections: Money::from((0_i64, ccy)),
+                interest_collections: Money::from((13_000_i64, ccy)),
+                principal_collections: Money::from((287_000_i64, ccy)),
                 payment_date,
                 period_start,
                 valuation_date: period_start,

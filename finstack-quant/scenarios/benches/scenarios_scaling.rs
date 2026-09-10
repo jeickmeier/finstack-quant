@@ -3,6 +3,7 @@
 //! Complements `scenarios.rs` (absolute cost at one size) by measuring how cost
 //! grows with operation count, curve count, and book size. Read ns-per-element
 //! across sizes: flat is linear; rising means a super-linear term is back.
+//! The credit replay case also measures exact historical quote recalibration.
 
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -100,6 +101,46 @@ fn scaling_hierarchy_par_cds(c: &mut Criterion) {
     group.finish();
 }
 
+fn historical_credit_quote_replay(c: &mut Criterion) {
+    use finstack_quant_calibration::{
+        api::{engine, schema::CalibrationEnvelope},
+        recalibration::CachedRecalibrationProvider,
+    };
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_valuations::metrics::risk::{
+        MarketScenario, RiskFactorShift, RiskFactorType,
+    };
+
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .expect("calibration inputs");
+    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let market = MarketContext::try_from(calibrated.result.final_market).expect("market");
+    let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");
+    let recipe = hazard.hazard_calibration().expect("replay recipe");
+    let scenario = MarketScenario::new(
+        hazard.base_date(),
+        vec![RiskFactorShift {
+            factor: RiskFactorType::CreditSpread {
+                curve_id: "ISSUER-A-CDS".into(),
+                tenor_years: recipe.spread_risk_inputs[0].pillar_time,
+            },
+            shift: 0.001,
+        }],
+    );
+    let provider = CachedRecalibrationProvider::new();
+    c.bench_function("historical_credit_quote_replay_10bp", |b| {
+        b.iter(|| {
+            black_box(
+                scenario
+                    .apply(black_box(&market), Some(&provider))
+                    .expect("exact quote replay"),
+            )
+        });
+    });
+}
+
 fn scaling_instrument_spread(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_instrument_spread");
     let market = lean_market();
@@ -166,6 +207,7 @@ criterion_group!(
     scaling_same_curve_ops,
     scaling_hierarchy_curves,
     scaling_hierarchy_par_cds,
+    historical_credit_quote_replay,
     scaling_instrument_spread,
     scaling_time_roll_instruments,
     scaling_compose,

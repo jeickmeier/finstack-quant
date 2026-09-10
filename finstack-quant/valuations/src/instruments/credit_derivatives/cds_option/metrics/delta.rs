@@ -14,7 +14,6 @@
 //! [`CDSOption::delta`] is a thin pass-through to [`delta`].
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::credit_derivatives::cds::pricing::CDSPricer;
 use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::{
     self, ForwardCdsContext,
 };
@@ -95,7 +94,7 @@ fn spread_black_delta(
     let disc = curves.get_discount(&option.discount_curve_id)?;
     let surv = curves.get_hazard(&option.credit_curve_id)?;
     let ctx = ForwardCdsContext::build(option, disc.as_ref(), surv.as_ref(), &cds, as_of, sigma)?;
-    let clean_forward = delta_display_forward(option, curves, &ctx, as_of)?;
+    let clean_forward = ctx.forward_par_spread;
     Ok(black_delta_ratio(
         option.option_type,
         clean_forward,
@@ -159,34 +158,6 @@ pub(super) fn price_strike_delta(
         )));
     }
     Ok(option_cs01 / underlying_spread_dv01)
-}
-
-pub(super) fn delta_display_forward(
-    option: &CDSOption,
-    curves: &MarketContext,
-    ctx: &ForwardCdsContext,
-    as_of: finstack_quant_core::dates::Date,
-) -> Result<f64> {
-    let cds = synthetic_underlying_cds(option, as_of)?;
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let surv = curves.get_hazard(&option.credit_curve_id)?;
-    // Bloomberg CDSO Default_Leg(0, T_mat): the synthetic CDS carries the
-    // `BloombergCdswClean` convention, so protection integrates from the
-    // valuation date itself (step-in 0).
-    let spot_protection_pv = CDSPricer::new()
-        .pv_protection_leg(&cds, disc.as_ref(), surv.as_ref(), as_of)?
-        .amount();
-    let denom = ctx.df_to_expiry
-        * ctx.survival_to_expiry
-        * ctx.bootstrapped_l_at_expiry
-        * cds.notional.amount();
-    if denom <= 1e-12 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "degenerate CDS option delta display-forward denominator: id={}, denom={denom:.6e}",
-            option.id,
-        )));
-    }
-    Ok(spot_protection_pv / denom)
 }
 
 pub(super) fn black_delta_ratio(

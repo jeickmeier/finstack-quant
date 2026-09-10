@@ -762,7 +762,7 @@ class TestCashFlowBuilder:
         # `kind` has no default in Rust (builder/principal.rs) or in the JSON
         # spec (PrincipalEventSpec in json.rs); the binding must not invent one.
         with pytest.raises(TypeError):
-            builder.add_principal_event(dt.date(2025, 6, 15), Money(-100_000.0, "USD"))
+            builder.add_principal_event(dt.date(2025, 6, 15), dt.date(2025, 6, 15), Money(-100_000.0, "USD"))
 
     def test_add_principal_event_repayment_with_explicit_kind(self) -> None:
         from finstack_quant.cashflows.builder import CashFlowSchedule
@@ -772,7 +772,9 @@ class TestCashFlowBuilder:
             CashFlowSchedule
             .builder()
             .principal(Money(1_000_000.0, "USD"), dt.date(2025, 1, 15), dt.date(2026, 1, 15))
-            .add_principal_event(dt.date(2025, 6, 15), Money(-100_000.0, "USD"), CFKind.AMORTIZATION)
+            .add_principal_event(
+                dt.date(2025, 6, 15), dt.date(2025, 6, 15), Money(-100_000.0, "USD"), CFKind.AMORTIZATION
+            )
             .build(None)
         )
         flows = schedule.get_flows()
@@ -859,6 +861,7 @@ class TestCashFlowSchedule:
             "rate",
             "accrual",
             "principal_delta",
+            "principal_date",
         ]
         assert str(df["date"].dtype).startswith("datetime64")
         assert "outstanding" in schedule.to_dataframe(outstanding=True).columns
@@ -1338,6 +1341,7 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
         "principal_events": [
             {
                 "date": "2025-02-01",
+                "payment_date": "2025-02-03",
                 "kind": "notional",
                 "delta": {"amount": "100", "currency": "USD"},
                 "cash": {"amount": "98", "currency": "USD"},
@@ -1363,3 +1367,8 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     draw = CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL).with_principal_delta(Money(100, "USD"))
     draw.validate()
     assert CashFlow.from_json(draw.to_json()).principal_delta.amount == 100
+    delayed = draw.with_principal_date("2025-01-31")
+    assert delayed.date == dt.date(2025, 2, 1)
+    assert delayed.principal_date == dt.date(2025, 1, 31)
+    assert delayed.get_balance_date() == dt.date(2025, 1, 31)
+    assert CashFlow.from_json(delayed.to_json()).principal_date == dt.date(2025, 1, 31)

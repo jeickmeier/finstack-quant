@@ -62,12 +62,12 @@ pub enum FeeSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum FeeAccrualBasis {
-    /// Use the outstanding balance at the period's accrual start, matching the
-    /// coupon convention (same-date amortization/PIK on the payment date does
-    /// not affect the fee base).
+    /// Use the outstanding balance at the period's accrual start, after
+    /// all principal movements effective on that day.
     #[default]
     PointInTime,
-    /// Time-weighted average outstanding over the accrual period.
+    /// Accrue separately on each constant-balance interval using the fee's
+    /// contractual day count; principal changes apply from their effective date.
     TimeWeightedAverage,
 }
 

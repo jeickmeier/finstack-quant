@@ -84,7 +84,8 @@ fn bench_taylor_var(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &history, |b, history| {
             b.iter(|| {
                 black_box(
-                    calculate_var(black_box(&[&bond]), &market, history, base, &config).unwrap(),
+                    calculate_var(black_box(&[&bond]), &market, history, base, &config, None)
+                        .unwrap(),
                 )
             });
         });

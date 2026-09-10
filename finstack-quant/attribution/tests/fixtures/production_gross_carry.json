@@ -1,0 +1,150 @@
+{
+  "description": "Input-only funded bond: no payments in the one-day window and unchanged curves, so gross carry equals endpoint P&L; funding is an additional detail. USD OIS 5%, repo 3%, exponential discount factors.",
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "bond",
+      "spec": {
+        "id": "CARRY",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "issue_date": "2024-01-15",
+        "maturity": "2030-01-15",
+        "cashflow_spec": {
+          "fixed": {
+            "coupon_type": "cash",
+            "rate": "0.05",
+            "frequency": {
+              "count": 6,
+              "unit": "months"
+            },
+            "day_count": "30_360",
+            "business_day_convention": "modified_following",
+            "calendar_id": "usny",
+            "stub": "short_front",
+            "end_of_month": false,
+            "payment_lag_days": 0
+          }
+        },
+        "discount_curve_id": "USD-OIS",
+        "credit_curve_id": null,
+        "call_put": null,
+        "attributes": {},
+        "settlement_days": 1,
+        "ex_coupon_days": 0,
+        "ex_coupon_calendar_id": "usny",
+        "funding_curve_id": "USD-REPO"
+      }
+    }
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-06-17",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            0.5,
+            0.9753099120283326
+          ],
+          [
+            1,
+            0.951229424500714
+          ],
+          [
+            2,
+            0.9048374180359595
+          ],
+          [
+            5,
+            0.7788007830714049
+          ],
+          [
+            10,
+            0.6065306597126334
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 0.000001,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "discount",
+        "id": "USD-REPO",
+        "base": "2025-06-17",
+        "day_count": "act_365f",
+        "knot_points": [
+          [
+            0,
+            1
+          ],
+          [
+            0.5,
+            0.9851119396030626
+          ],
+          [
+            1,
+            0.9704455335485082
+          ],
+          [
+            2,
+            0.9417645335842487
+          ],
+          [
+            5,
+            0.8607079764250578
+          ],
+          [
+            10,
+            0.7408182206817179
+          ]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 0.000001,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {
+      "AAPL": {
+        "unitless": 1
+      },
+      "AAPL-VOL": {
+        "unitless": 0.2
+      },
+      "AAPL-DIVYIELD": {
+        "unitless": 0
+      }
+    },
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  },
+  "as_of_t0": "2025-06-17",
+  "as_of_t1": "2025-06-18"
+}

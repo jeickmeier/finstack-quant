@@ -193,7 +193,8 @@ pub struct IndexUnderlyingParams {
     pub base_currency: Currency,
     /// Optional yield curve/scalar identifier for carry calculation
     pub yield_id: Option<String>,
-    /// Optional duration identifier for risk calculations
+    /// Market scalar identifier for signed index duration in years. Required when
+    /// requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
     pub duration_id: Option<String>,
     /// Contract size (index units per contract, defaults to 1.0)
     pub contract_size: f64,

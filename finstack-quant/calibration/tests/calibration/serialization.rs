@@ -196,7 +196,6 @@ fn step_params_v2_roundtrip_for_all_variants() {
         fixed_day_count: None,
         swap_index: Some("USD-SOFR-3M".into()),
         vol_tolerance: None,
-        sabr_tolerance: None,
         sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
         allow_sabr_missing_bucket_fallback: false,
     });
@@ -278,13 +277,14 @@ fn envelope_unknown_field_is_rejected() {
 
 #[test]
 fn test_hull_white_step_params_serde() {
-    let json = r#"{"kind":"hull_white","id":"hw","quote_set":"swaptions","curve_id":"USD-OIS","currency":"USD","base_date":"2024-01-02"}"#;
+    let json = r#"{"kind":"hull_white","fit_tolerance":0.0001,"id":"hw","quote_set":"swaptions","curve_id":"USD-OIS","currency":"USD","base_date":"2024-01-02"}"#;
     let step: CalibrationStep = serde_json::from_str(json).expect("should deserialize");
     assert!(matches!(step.params, StepParams::HullWhite(_)));
 
     // Also test roundtrip through Rust struct construction
     let base_date = Date::from_calendar_date(2024, Month::January, 2).unwrap();
     let hw = StepParams::HullWhite(HullWhiteStepParams {
+        fit_tolerance: 1e-6,
         curve_id: "USD-OIS".into(),
         currency: Currency::USD,
         base_date,

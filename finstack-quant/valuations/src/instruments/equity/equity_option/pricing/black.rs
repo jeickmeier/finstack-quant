@@ -9,7 +9,7 @@ use crate::instruments::common_impl::parameters::{OptionMarketParams, OptionType
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::{ExerciseStyle, SettlementType};
 use crate::pricer::expect_inst;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -61,7 +61,8 @@ pub(crate) fn compute_pv(
             let exercise_times: Vec<f64> = schedule
                 .iter()
                 .filter_map(|date| {
-                    let year_fraction = DayCount::Act365F
+                    let year_fraction = inst
+                        .day_count
                         .year_fraction(as_of, *date, Default::default())
                         .ok()?;
                     (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
@@ -107,7 +108,7 @@ pub struct EquityOptionGreeks {
 ///
 /// Uses proper day count handling:
 /// - Rate lookups use the discount curve's day count
-/// - Vol time uses ACT/365F (equity market standard)
+/// - Vol time uses the configured model day count (ACT/365F by default)
 pub(crate) fn compute_greeks(
     inst: &EquityOption,
     curves: &MarketContext,
@@ -140,7 +141,7 @@ pub(crate) fn compute_greeks(
                     } else {
                         0.0
                     };
-                    let t = year_fraction(DayCount::Act365F, as_of, exercise.settlement_date)?;
+                    let t = year_fraction(inst.day_count, as_of, exercise.settlement_date)?;
                     (-q * t).exp()
                 };
                 let direction = match inst.option_type {
@@ -274,7 +275,8 @@ pub(crate) fn compute_greeks(
             let exercise_times: Vec<f64> = schedule
                 .iter()
                 .filter_map(|date| {
-                    let year_fraction = DayCount::Act365F
+                    let year_fraction = inst
+                        .day_count
                         .year_fraction(as_of, *date, Default::default())
                         .ok()?;
                     (year_fraction > 0.0 && year_fraction <= params.time_to_expiry)
@@ -328,32 +330,17 @@ fn tree_finite_difference_greeks(
 
     let delta_unit = (price_up - price_dn) / (2.0 * h_s);
 
-    // Gamma: a 1%-of-spot bump is too small. The central second difference
-    // `(p_up − 2·base + p_dn) / h²` has noise of order `ε_tree / h²`, which a
-    // 1% bump leaves noise-dominated — gamma is then noisy and biased,
-    // especially for short-dated options where the tree's discrete spot grid
-    // makes `P(S)` locally piecewise-flat.
-    //
-    // Use a wider, better-conditioned gamma bump sized to the option's natural
-    // spot scale `σ·√t` (the width of the region where gamma actually lives),
-    // with a 2%-of-spot floor so the bump never collapses for short-dated /
-    // low-vol options. This trades a small, bounded discretisation bias for a
-    // large reduction in second-difference noise. A separate, dedicated
-    // re-pricing pair is used so the delta bump stays small for accuracy.
+    // LR adapts its lattice to spot and strike. A bounded 2%-5% spot
+    // stencil resolves curvature without spanning most of the payoff domain
+    // at high volatility. Both spot evaluations remain strictly positive.
     let gamma_unit = {
-        let vol_t = params.volatility * params.time_to_expiry.max(0.0).sqrt();
-        let h_g = params.spot * vol_t.max(0.02);
-        let mut p_g_up = params.clone();
-        p_g_up.spot += h_g;
-        let price_g_up = price_fn(&p_g_up)?;
-        let mut p_g_dn = params.clone();
-        p_g_dn.spot = (p_g_dn.spot - h_g).max(1e-8);
-        let price_g_dn = price_fn(&p_g_dn)?;
-        let h_dn = params.spot - p_g_dn.spot;
-        // Non-uniform three-point second derivative. When the down bump is
-        // clamped, a symmetric stencil would leak the first derivative into
-        // gamma and can dominate the result.
-        2.0 * ((price_g_up - base_price) / h_g - (base_price - price_g_dn) / h_dn) / (h_g + h_dn)
+        let vol_t = params.volatility * params.time_to_expiry.sqrt();
+        let h_g = params.spot * (0.1 * vol_t).clamp(0.02, 0.05);
+        let mut up = params.clone();
+        let mut down = params.clone();
+        up.spot += h_g;
+        down.spot -= h_g;
+        (price_fn(&up)? - 2.0 * base_price + price_fn(&down)?) / (h_g * h_g)
     };
 
     // Vega (1% vol bump)

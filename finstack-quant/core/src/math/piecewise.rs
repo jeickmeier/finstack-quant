@@ -136,8 +136,8 @@ impl PiecewiseConstantCurve {
                 sigma_sq * (right - left)
             } else {
                 sigma_sq
-                    * ((-2.0 * kappa * (anchor - right)).exp()
-                        - (-2.0 * kappa * (anchor - left)).exp())
+                    * (-2.0 * kappa * (anchor - right)).exp()
+                    * -(-2.0 * kappa * (right - left)).exp_m1()
                     / (2.0 * kappa)
             };
             total += contribution;
@@ -163,5 +163,17 @@ mod tests {
         let first = 0.01_f64.powi(2) * ((-0.10_f64).exp() - (-0.20_f64).exp()) / 0.10;
         let second = 0.02_f64.powi(2) * (1.0 - (-0.10_f64).exp()) / 0.10;
         assert!((integral - (first + second)).abs() < 1.0e-14);
+    }
+
+    #[test]
+    fn weighted_variance_retains_accuracy_near_zero_mean_reversion() {
+        let curve =
+            PiecewiseConstantCurve::new(vec![0.0, 1.0], vec![0.01, 0.025]).expect("schedule");
+        let value = curve
+            .integrate_squared_exp_weight(1e-12, 2.0, 0.0, 2.0)
+            .expect("integral");
+        // At zero mean reversion each one-year interval contributes sigma^2;
+        // the exact 1e-12 correction is less than 4e-15 in absolute variance.
+        assert!((value - (0.01_f64.powi(2) + 0.025_f64.powi(2))).abs() < 4e-15);
     }
 }

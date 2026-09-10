@@ -273,6 +273,7 @@ mod tests {
             tranche_id: "A".to_string(),
             cashflows: principal_flows.clone(),
             detailed_flows: Vec::new(),
+            accrual_periods: Vec::new(),
             interest_flows: Vec::new(),
             principal_flows: principal_flows.clone(),
             pik_flows: Vec::new(),

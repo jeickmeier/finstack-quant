@@ -112,8 +112,15 @@ fn bench_bermudan_hw_tree(c: &mut Criterion) {
     let hw_params = HullWhiteCalibrationParams::default();
     let ttm = swaption.time_to_maturity(as_of).expect("ttm");
     let disc = market.get_discount("USD-OIS").expect("USD-OIS");
-    let cached = PreparedHullWhiteModel::prepare(hw_params, 100, disc.as_ref(), ttm)
-        .expect("pre-calibrated HW tree");
+    let cached = PreparedHullWhiteModel::prepare(
+        hw_params,
+        100,
+        disc.as_ref(),
+        as_of,
+        ttm,
+        &swaption.exercise_times(as_of).expect("exercise times"),
+    )
+    .expect("pre-calibrated HW tree");
 
     let calibrate_each = BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
         tree_steps: 100,

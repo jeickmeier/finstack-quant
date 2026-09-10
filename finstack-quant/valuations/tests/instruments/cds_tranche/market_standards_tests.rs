@@ -335,31 +335,17 @@ fn test_mezzanine_tranche_parameters() {
 // ==================== Gaussian Copula Methodology Tests ====================
 
 #[test]
-fn test_gaussian_copula_quadrature_orders() {
-    // Market Standard: Gauss-Hermite quadrature with 5, 7, or 10 points
-    // Reference: Hull & White (2004), numerical methods for copula integration
-
-    let valid_orders = [5, 7, 10];
-
-    for &order in &valid_orders {
-        let mut config =
-            finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default(
-            );
-        config.quadrature_order = order;
-
-        assert_eq!(config.quadrature_order, order);
+fn test_adaptive_integration_config() {
+    use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
+        CDSTranchePricer, CDSTranchePricerConfig,
+    };
+    for tolerance in [1e-6, 1e-8, 1e-10, 1e-12] {
+        let config = CDSTranchePricerConfig::default().with_integration_tolerance(tolerance);
+        CDSTranchePricer::with_params(config).expect("supported global integration budget");
     }
-}
-
-#[test]
-fn test_default_quadrature_order() {
-    // Market Standard: 20-point Gauss-Hermite per QuantLib/Bloomberg convention
-
-    let config =
-        finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default();
     assert_eq!(
-        config.quadrature_order, 20,
-        "Default quadrature order should be 20 (industry standard: 20-50 points)"
+        CDSTranchePricerConfig::default().integration_tolerance,
+        1e-10
     );
 }
 

@@ -16,7 +16,7 @@
         "business_day_convention": "modified_following",
         "base_calendar_id": "target2",
         "quote_calendar_id": "usny",
-        "notional_exchange": {"mtm_resetting": {"resetting_side": "leg1"}}
+        "notional_exchange": {"mtm_resetting": {"resetting_side": "leg2"}}
       }
     }
   ]

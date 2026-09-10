@@ -102,16 +102,21 @@
       "additionalProperties": false,
       "description": "Quanto adjustment parameters for instruments where payoff currency differs from\nunderlying currency.",
       "properties": {
+        "asset_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which the underlying asset is quoted and financed."
+        },
+        "asset_discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve for financing the underlying in its asset currency."
+        },
         "correlation": {
           "$ref": "#/$defs/CorrelationWire",
-          "description": "Correlation between the underlying asset and the FX rate.\nMust be in [-1, 1]."
+          "description": "Correlation between the asset price and payoff-currency units per asset-currency unit.\nMust be in [-1, 1]."
         },
         "fx_spot_id": {
-          "description": "FX spot price identifier (for proper quanto vol lookup).\nFalls back to ATM approximation (1.0) if not provided.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Required positive FX spot scalar in payoff-currency units per asset-currency unit.\nA monetary scalar must use the payoff currency. The FX surface is queried\nat the forward FX rate implied by the asset and payoff discount curves."
         },
         "fx_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -119,8 +124,11 @@
         }
       },
       "required": [
+        "asset_currency",
+        "asset_discount_curve_id",
         "correlation",
-        "fx_vol_surface_id"
+        "fx_vol_surface_id",
+        "fx_spot_id"
       ],
       "type": "object"
     },

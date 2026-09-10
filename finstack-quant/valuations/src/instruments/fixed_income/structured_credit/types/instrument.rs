@@ -62,9 +62,8 @@ impl Instrument for StructuredCredit {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
 
-        // Representative lines are descriptive aggregates; pricing reads the assets directly.
-        for index_id in self
-            .pool
+        let pool = self.pool.normalized(self.closing_date)?;
+        for index_id in pool
             .assets
             .iter()
             .filter_map(|asset| asset.index_id.as_deref())
@@ -82,6 +81,7 @@ impl Instrument for StructuredCredit {
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.resolved_for_pricing()?;
         if let Some(threshold) = self.cleanup_call_pct {
             if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -114,19 +114,28 @@ impl Instrument for StructuredCredit {
         as_of: Date,
     ) {
         context.discount_curve_id = Some(self.discount_curve_id.to_owned());
-        context.notional = self.pool.total_balance().ok();
-        // Preserve classified rows for metrics such as WAL while deriving the
-        // cash-only compatibility view from the same canonical schedule.
-        if let Ok(schedule) = self.cashflow_schedule(market, as_of) {
+        context.notional = Some(self.tranches.total_size);
+        if let Ok(results) =
+            crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+                self, market, as_of,
+            )
+        {
+            let mut flows = Vec::new();
+            let mut accruals = Vec::new();
+            for result in results.into_values() {
+                flows.extend(result.detailed_flows);
+                accruals.extend(result.accrual_periods);
+            }
+            flows.sort_by_key(|flow| flow.date);
             context.cashflows = Some(
-                schedule
-                    .get_flows()
+                flows
                     .iter()
                     .filter(|flow| crate::cashflow::primitives::is_cash_settlement_kind(flow.kind))
                     .map(|flow| (flow.date, flow.amount))
                     .collect(),
             );
-            context.tagged_cashflows = Some(schedule.into_flows());
+            context.tagged_cashflows = Some(flows);
+            context.structured_credit_accruals = Some(accruals);
         }
     }
 
@@ -135,10 +144,11 @@ impl Instrument for StructuredCredit {
     }
 
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {
+        let effective = self.effective_credit_model();
         ModelParamsSnapshot::StructuredCredit {
-            prepayment_spec: self.credit_model.prepayment_spec.clone(),
-            default_spec: self.credit_model.default_spec.clone(),
-            recovery_spec: self.credit_model.recovery_spec.clone(),
+            prepayment_spec: effective.prepayment_spec,
+            default_spec: effective.default_spec,
+            recovery_spec: effective.recovery_spec,
         }
     }
 
@@ -152,7 +162,7 @@ impl Instrument for StructuredCredit {
                 default_spec,
                 recovery_spec,
             } => {
-                let mut modified = self.clone();
+                let mut modified = self.resolved_for_pricing()?;
                 modified.credit_model.prepayment_spec = prepayment_spec.clone();
                 modified.credit_model.default_spec = default_spec.clone();
                 modified.credit_model.recovery_spec = recovery_spec.clone();

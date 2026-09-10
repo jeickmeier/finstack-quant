@@ -175,9 +175,17 @@ Only `id`, `margin_spec`, `netting_set_id`, `simm_sensitivities`, and
 - VM/IM thresholds, MTAs, independent amounts, and all calculator results are
   `Money`. Currency mismatches error rather than converting.
 - `Marginable::simm_sensitivities` expects currency-denominated risk measures
-  (DV01/CS01-style dollar sensitivities), not raw quote moves. The supported
+  per 1bp rate/credit move or per 1% relative equity/FX/commodity price move.
+  Vegas are `sigma * dPV/dsigma`, before VRW, HVR and concentration; non-IR
+  sigma follows paragraph 10(b). Concentration uses raw sensitivities, in the
+  units of the official USD-million threshold tables. The supported
   v2.6 calculation is an indicative USD-only approximation: product-class,
-  subcurve, and some non-IR factor dimensions are incomplete. Results carry
+  subcurve delta/vega, equity classification, non-qualifying credit classification,
+  commodity within-bucket factor detail and IR vega underlying-maturity dimensions
+  remain incomplete. Unclassified equity and non-qualifying credit use the
+  published residual parameters. Curvature uses `SimmCurvatureSensitivity` to
+  retain risk tenor, factor and option expiry, applying expiry scaling before
+  netting. Curvature no longer accepts a scalar per class. Results carry
   `approximation = true`; this is not a current regulatory SIMM implementation.
 - **FRTB risk weights reproduce the Basel tables as published, so the expected
   sensitivity scale varies by risk class**: GIRR/CSR/equity/commodity/FX delta
@@ -188,6 +196,13 @@ Only `id`, `margin_spec`, `netting_set_id`, `simm_sensitivities`, and
 - Schedule IM, the cleared-IM proxy, and haircut IM invoked through the
   `ImCalculator` trait require `Marginable::im_exposure_base`. They fail closed
   rather than falling back to MtM as a pseudo-notional.
+- `CsaSpec::apply_im_terms` applies the CSA's allocated threshold and MTA once
+  to summed gross IM already calculated for the elected MPOR. It returns
+  `ImCollateralResult` with gross model IM, target collateral, current balance,
+  signed transfer and segregation. Positive transfers post additional IM;
+  negative transfers return excess. MTA equality triggers a transfer. IM and VM
+  remain separate; segregated IM cannot be reused to meet VM. The caller allocates
+  any group-wide threshold across CSAs.
 - XVA adjustments are positive when they cost the desk and compose as
   `total_xva = CVA − DVA + FVA + MVA`. Exposure times are nonnegative, strictly increasing year fractions and
   may include zero. Exposure is held constant before the first supplied point

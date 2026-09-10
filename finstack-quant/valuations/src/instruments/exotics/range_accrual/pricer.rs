@@ -11,10 +11,11 @@
 //!
 //! Both methods support:
 //! - Absolute or relative bounds (via `BoundsType`)
-//! - Quanto drift adjustment (requires `quanto_correlation` and `fx_vol_surface_id`)
+//! - Quanto asset financing and drift adjustment from the nested `QuantoSpec`
 //! - Historical fixings for mid-life valuations (via `past_fixings_in_range`)
 
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use crate::instruments::exotics::range_accrual::monte_carlo::RangeAccrualPayoff;
 use crate::instruments::exotics::range_accrual::types::RangeAccrual;
 use crate::pricer::{
@@ -30,33 +31,82 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 
-/// Resolve the FX spot required for a quanto range-accrual payoff.
-///
-/// When `quanto.fx_spot_id` is configured, the spot **must** resolve from the
-/// market context. Silently substituting `1.0` — as the prior implementation
-/// did — masks missing market data and materially mis-prices the quanto
-/// adjustment term (which scales multiplicatively with `fx_spot`). Callers
-/// that truly want an ATM approximation should set `fx_spot_id = None`
-/// explicitly.
-fn get_fx_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
-    let fx_spot_id = inst.quanto.as_ref().and_then(|q| q.fx_spot_id.as_deref());
-
-    match fx_spot_id {
-        None => Ok(1.0),
-        Some(id) => {
-            let ms = curves.get_price(id).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "range-accrual quanto fx_spot_id '{id}' not found in market context: {e}. \
-                     Provide the FX spot scalar or drop the fx_spot_id to use the ATM \
-                     approximation explicitly."
-                ))
-            })?;
-            Ok(match ms {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-            })
+/// Resolve the asset spot in its financing currency.
+fn asset_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
+    let scalar = curves.get_price(&inst.spot_id)?;
+    let expected = inst
+        .quanto
+        .as_ref()
+        .map_or(inst.notional.currency(), |q| q.asset_currency);
+    let spot = match scalar {
+        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+            if money.currency() != expected {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected,
+                    actual: money.currency(),
+                });
+            }
+            money.amount()
         }
-    }
+    };
+    crate::instruments::common_impl::validation::validate_f64_positive(
+        spot,
+        "RangeAccrual asset spot",
+    )?;
+    Ok(spot)
+}
+
+/// Expected asset growth under the payoff-currency measure at one observation.
+fn asset_growth(
+    inst: &RangeAccrual,
+    curves: &MarketContext,
+    as_of: Date,
+    date: Date,
+    sigma: f64,
+) -> Result<f64> {
+    let t = inst
+        .day_count
+        .year_fraction(as_of, date, DayCountContext::default())?;
+    let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        curves,
+        inst.div_yield_id.as_ref(),
+    )?;
+    let payoff_df = curves
+        .get_discount(inst.discount_curve_id.as_str())?
+        .df_between_dates(as_of, date)?;
+    let Some(quanto) = &inst.quanto else {
+        return Ok((-q * t).exp() / payoff_df);
+    };
+    quanto.validate()?;
+    let asset_df = curves
+        .get_discount(quanto.asset_discount_curve_id.as_str())?
+        .df_between_dates(as_of, date)?;
+    let fx_spot = match curves.get_price(quanto.fx_spot_id.as_str())? {
+        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
+        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+            if money.currency() != inst.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: inst.notional.currency(),
+                    actual: money.currency(),
+                });
+            }
+            money.amount()
+        }
+    };
+    crate::instruments::common_impl::validation::validate_f64_positive(
+        fx_spot,
+        "RangeAccrual quanto FX spot",
+    )?;
+    let fx_forward = fx_spot * asset_df / payoff_df;
+    let sigma_fx = resolve_sigma_at(
+        &Default::default(),
+        curves,
+        quanto.fx_vol_surface_id.as_str(),
+        t,
+        fx_forward,
+    )?;
+    Ok((-(q + quanto.correlation * sigma * sigma_fx) * t).exp() / asset_df)
 }
 
 /// Range accrual Monte Carlo pricer.
@@ -64,7 +114,7 @@ fn get_fx_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
 /// # Flat-volatility limitation (audit item 9)
 ///
 /// This pricer simulates the underlying with a **single, constant** GBM
-/// volatility — `σ = finstack_quant_models::volatility::get_surface_vol_clamped(&vol_surface, T, S₀)`, the ATM vol at the
+/// volatility — the active unshifted Black quote at the initial spot and
 /// final maturity. Geometric Brownian motion is a constant-volatility process,
 /// so the Monte Carlo path-set cannot represent a volatility **skew** or
 /// **term structure**. On a non-flat surface this MC therefore diverges from
@@ -163,11 +213,7 @@ impl RangeAccrualMcPricer {
             return compute_known_value(inst, curves, as_of, final_date);
         }
 
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        let initial_spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
+        let initial_spot = asset_spot(inst, curves)?;
 
         // Compute effective bounds based on BoundsType
         let effective_lower = inst.effective_lower_bound(initial_spot);
@@ -185,38 +231,24 @@ impl RangeAccrualMcPricer {
             "range-accrual Monte Carlo drift",
         )?;
 
-        let mut q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
-            curves,
-            inst.div_yield_id.as_ref(),
-        )?;
-
-        let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
         // FLAT-VOL APPROXIMATION (audit item 9 — see the struct-level doc):
         // GBM is a constant-volatility process, so the whole simulation uses a
         // single ATM vol. This deliberately does NOT capture volatility skew or
         // term structure; on a non-flat surface this MC diverges from the
         // static-replication pricer (which samples per-observation and
         // per-strike). Use `ModelKey::StaticReplication` for non-flat surfaces.
-        let sigma = finstack_quant_models::volatility::get_surface_vol_clamped(
-            &vol_surface,
+        let sigma = resolve_sigma_at(
+            &inst.instrument_pricing_overrides.market_quotes,
+            curves,
+            inst.vol_surface_id.as_str(),
             t,
             initial_spot,
-        );
+        )?;
 
-        // Quanto Adjustment using FX spot for vol lookup
-        if let Some(quanto) = &inst.quanto {
-            let fx_vol_surface = curves.get_surface(quanto.fx_vol_surface_id.as_str())?;
-            let fx_spot = get_fx_spot(inst, curves)?;
-            let sigma_fx = finstack_quant_models::volatility::get_surface_vol_clamped(
-                &fx_vol_surface,
-                t,
-                fx_spot,
-            );
-
-            // Drift adjustment: q_param = q_real + rho * sigma_S * sigma_FX
-            q += quanto.correlation * sigma * sigma_fx;
-        }
-
+        // Keep discounting in payoff currency while financing the asset in its
+        // own currency. The same horizon growth drives analytical probabilities.
+        let growth = asset_growth(inst, curves, as_of, final_date, sigma)?;
+        let q = r - growth.ln() / t;
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
 
@@ -374,7 +406,7 @@ pub(crate) fn compute_pv(
 ///
 /// This method:
 /// - Uses effective bounds based on `BoundsType` (absolute or relative to initial spot)
-/// - Applies quanto drift adjustment using FX spot for vol lookup when available
+/// - Projects in asset currency with quanto drift and discounts in payoff currency
 /// - Includes historical fixings in the accrual calculation for mid-life valuations
 pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) -> Result<Money> {
     use finstack_quant_core::math::special_functions::norm_cdf;
@@ -406,11 +438,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         return compute_known_value(inst, curves, as_of, final_date);
     }
 
-    let spot_scalar = curves.get_price(&inst.spot_id)?;
-    let initial_spot = match spot_scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-    };
+    let initial_spot = asset_spot(inst, curves)?;
 
     // Compute effective bounds based on BoundsType
     let effective_lower = inst.effective_lower_bound(initial_spot);
@@ -418,16 +446,6 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
 
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
-
-    let q_yield = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
-        curves,
-        inst.div_yield_id.as_ref(),
-    )?;
-
-    let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
-
-    // Get FX spot for quanto vol lookup (uses actual spot if available, else 1.0)
-    let fx_spot = get_fx_spot(inst, curves)?;
 
     // Count observations and track past/future split
     let n_total_obs = inst.observation_dates.len();
@@ -450,31 +468,14 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         }
 
         future_obs_count += 1;
-        let df_obs = disc_curve.df_between_dates(as_of, date)?;
-
-        // Quanto drift adjustment specific to this horizon
-        let mut drift_adj = 0.0;
-        if let Some(quanto) = &inst.quanto {
-            let fx_vol_surface = curves.get_surface(quanto.fx_vol_surface_id.as_str())?;
-            // Vol of Asset (S) for drift adj: use ATM at current spot
-            let sig_s = finstack_quant_models::volatility::get_surface_vol_clamped(
-                &vol_surface,
-                t_obs,
-                initial_spot,
-            );
-            // Vol of FX for drift adj: use ATM at FX spot
-            let sig_fx = finstack_quant_models::volatility::get_surface_vol_clamped(
-                &fx_vol_surface,
-                t_obs,
-                fx_spot,
-            );
-            drift_adj = quanto.correlation * sig_s * sig_fx;
-        }
-
-        // Exact curve carry on the model/volatility clock. Writing the forward
-        // as S/DF avoids annualizing a curve-native zero rate on `t_obs` when
-        // the curve and instrument day counts differ.
-        let forward = initial_spot / df_obs * (-(q_yield + drift_adj) * t_obs).exp();
+        let sigma = resolve_sigma_at(
+            &inst.instrument_pricing_overrides.market_quotes,
+            curves,
+            inst.vol_surface_id.as_str(),
+            t_obs,
+            initial_spot,
+        )?;
+        let forward = initial_spot * asset_growth(inst, curves, as_of, date, sigma)?;
 
         // Digital Call Probability P(S_t > K) via finite-width call spread.
         //
@@ -496,15 +497,20 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         const DIGITAL_SPREAD_FLOOR: f64 = 1e-6; // prevent negative strikes
 
         // Undiscounted Black-76 call price: F·N(d1) - K·N(d2)
-        let black_call = |k: f64| -> f64 {
-            let vol =
-                finstack_quant_models::volatility::get_surface_vol_clamped(&vol_surface, t_obs, k);
+        let black_call = |k: f64| -> Result<f64> {
+            let vol = resolve_sigma_at(
+                &inst.instrument_pricing_overrides.market_quotes,
+                curves,
+                inst.vol_surface_id.as_str(),
+                t_obs,
+                k,
+            )?;
             let std_dev = vol * t_obs.sqrt();
             if std_dev < 1e-6 {
-                return (forward - k).max(0.0);
+                return Ok((forward - k).max(0.0));
             }
             let (d1, d2) = d1_d2_black76(forward, k, vol, t_obs);
-            forward * norm_cdf(d1) - k * norm_cdf(d2)
+            Ok(forward * norm_cdf(d1) - k * norm_cdf(d2))
         };
 
         // Digital call probability using finite-width call spread.
@@ -519,7 +525,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
                 // Degenerate: fall back to a binary step on the forward
                 return Ok(if forward > strike { 1.0 } else { 0.0 });
             }
-            let prob = (black_call(k_lo) - black_call(k_hi)) / spread;
+            let prob = (black_call(k_lo)? - black_call(k_hi)?) / spread;
             Ok(prob.clamp(0.0, 1.0))
         };
 
