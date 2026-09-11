@@ -4,7 +4,8 @@
 //! each position is repriced under T0 and T1 markets (or more, depending on
 //! method), then factor contributions are FX-converted and aggregated.
 //!
-//! This bench uses realistic day-over-day markets (+10bp parallel shift) so
+//! This bench uses synthetic day-over-day markets (forward rates +10bp,
+//! discount factors -0.001 and selected FX moves) so
 //! every code path — repricing, waterfall decomposition, FX translation, and
 //! neumaier aggregation — is exercised.
 //!

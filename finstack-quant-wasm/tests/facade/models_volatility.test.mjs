@@ -64,13 +64,20 @@ test('models.volatility evaluates core data artifacts', () => {
 
 test('normal SABR beta zero uses arithmetic moneyness across zero', () => {
   const { SabrParameters, SabrModel } = facade.models.volatility;
-  const alpha = 0.008, nu = 0.7, rho = -0.35, expiry = 2;
+  const alpha = 0.008,
+    nu = 0.7,
+    rho = -0.35,
+    expiry = 2;
   const params = new SabrParameters(alpha, 0, nu, rho);
   const model = new SabrModel(params);
-  for (const [forward, strike] of [[-0.01, -0.006], [-0.002, 0.002], [0.01, 0.014]]) {
-    const z = nu * (forward - strike) / alpha;
+  for (const [forward, strike] of [
+    [-0.01, -0.006],
+    [-0.002, 0.002],
+    [0.01, 0.014],
+  ]) {
+    const z = (nu * (forward - strike)) / alpha;
     const chi = Math.log((Math.sqrt(1 - 2 * rho * z + z * z) + z - rho) / (1 - rho));
-    const expected = alpha * z / chi * (1 + (2 - 3 * rho * rho) * nu * nu * expiry / 24);
+    const expected = ((alpha * z) / chi) * (1 + ((2 - 3 * rho * rho) * nu * nu * expiry) / 24);
     assert.ok(Math.abs(model.impliedVol(forward, strike, expiry) - expected) < 1e-14);
   }
   model.free();
@@ -79,8 +86,17 @@ test('normal SABR beta zero uses arithmetic moneyness across zero', () => {
 
 test('SABR calibration rejects a poor final quote fit', () => {
   const calibrator = new facade.models.volatility.SabrCalibrator();
-  assert.throws(() => calibrator.calibrate(100, new Float64Array([90, 95, 100, 105, 110]),
-    new Float64Array([0.22, 0.20, 0.19, 0.195, 0.21]), 1, 0.5), /no acceptable/);
+  assert.throws(
+    () =>
+      calibrator.calibrate(
+        100,
+        new Float64Array([90, 95, 100, 105, 110]),
+        new Float64Array([0.22, 0.2, 0.19, 0.195, 0.21]),
+        1,
+        0.5
+      ),
+    /no acceptable/
+  );
   calibrator.free();
 });
 
@@ -89,7 +105,13 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
   const checked = facade.models.volatility.getCubeVol(low, 1, 5, 0.02);
   const clamped = facade.models.volatility.getCubeVolClamped(low, 1, 5, 0.02);
   assert.ok(Math.abs(clamped - checked) < 1e-14);
-  const invalid = new facade.core.VolCube('INVALID', [1], [5], [0.008, 0.5, 0, 0.3, Number.NaN], [-0.01]);
+  const invalid = new facade.core.VolCube(
+    'INVALID',
+    [1],
+    [5],
+    [0.008, 0.5, 0, 0.3, Number.NaN],
+    [-0.01]
+  );
   assert.ok(Number.isNaN(facade.models.volatility.getCubeVolClamped(invalid, 1, 5, -0.01)));
   low.free();
   invalid.free();

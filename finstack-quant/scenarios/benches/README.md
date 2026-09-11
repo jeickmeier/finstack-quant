@@ -49,7 +49,7 @@ save and diff a `main` baseline, failing above a 10% median regression.
 | `scaling_same_curve_ops` | 1 / 8 / 24 / 48 sequential discount bumps on one curve | Sequential flush-before-next-op |
 | `scaling_hierarchy_curves` | 16 / 64 / 128 curves under one `HierarchyCurveParallelBp` | Expansion + N synthetic discount rebuilds |
 | `scaling_hierarchy_par_cds` | 2 / 4 / 8 hazard curves under one ParCDS hierarchy shock | Expansion + N explicit first-order hazard shifts |
-| `historical_credit_quote_replay_10bp` | One calibrated credit curve, 10bp pillar spread shock | Exact quote replay through the cached recalibration provider; initial calibration is outside timing |
+| `historical_credit_quote_replay_10bp` | One calibrated credit curve, 10bp pillar spread shock | Separate cached-result and fresh-provider cases; initial market calibration is outside timing, while a fresh provider forces each shock to recalibrate |
 | `scaling_instrument_spread` | 50 / 200 / 500 bonds | Instrument-spread dispatch |
 | `scaling_time_roll_instruments` | 10 / 40 / 80 bonds | Time-roll carry (Rayon above 64) |
 | `scaling_compose` | 10 / 50 / 200 specs | `compose` |

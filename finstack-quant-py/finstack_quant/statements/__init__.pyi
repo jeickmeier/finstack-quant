@@ -1920,9 +1920,12 @@ class ModelBuilder:
         ----------
         key:
             Namespaced model-metadata key used to identify the supplied JSON
-            value in serialized model output.
+            value in serialized model output. ``currency`` selects the model's
+            reporting currency.
         value:
-            JSON-serialized metadata value.
+            JSON-serializable metadata value. For ``currency``, supply a supported
+            three-letter currency-code string such as ``"USD"``; ``build()``
+            raises ``ValueError`` for malformed currency metadata.
 
         Returns
         -------

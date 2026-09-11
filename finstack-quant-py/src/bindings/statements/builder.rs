@@ -903,6 +903,9 @@ impl PyModelBuilder {
     ///     Any JSON-serializable value: ``"USD"``, ``42``, ``{"source":
     ///     "erp"}``, a list. A string that parses as JSON is stored as that
     ///     JSON value; any other string is stored verbatim.
+    ///     For ``key="currency"``, supply a supported three-letter currency-code
+    ///     string such as ``"USD"``; ``build()`` raises ``ValueError`` for malformed
+    ///     currency metadata.
     ///
     /// Returns
     /// -------

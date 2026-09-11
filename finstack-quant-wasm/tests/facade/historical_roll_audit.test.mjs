@@ -39,7 +39,11 @@ test('first-order credit spread shocks use recovery conversion and disclose appr
 test('time roll preserves the raw crossed fixing and supports repeated rolls', () => {
   const f = fixture('production_quanto_range');
   f.market.curves = f.market.curves.filter((curve) => curve.id === 'USD-OIS');
-  f.market.curves[0].knot_points = [[0, 1], [1, 1], [10, 1]];
+  f.market.curves[0].knot_points = [
+    [0, 1],
+    [1, 1],
+    [10, 1],
+  ];
   const bond = valuations.instruments.Bond.floating(
     'ROLL-FRN',
     new core.Money(1000000, new core.Currency('USD')),
@@ -107,61 +111,127 @@ test('overnight time roll records daily raw observations across a weekend', () =
   const option = f.instrument.instrument.spec;
   const fixed = { ...option.underlying_fixed_leg, start: '2025-01-02', end: '2026-01-02' };
   const floating = { ...option.underlying_float_leg, start: fixed.start, end: fixed.end };
-  f.market.curves[0].knot_points = [[0, 1], [1, Math.exp(-0.04)], [2, Math.exp(-0.08)]];
+  f.market.curves[0].knot_points = [
+    [0, 1],
+    [1, Math.exp(-0.04)],
+    [2, Math.exp(-0.08)],
+  ];
   const instrument = {
     schema: 'finstack_quant.instrument/1',
     instrument: {
       type: 'interest_rate_swap',
-      spec: { id: 'ROLL-OIS', notional: option.notional, side: 'pay', fixed, float: floating, attributes: {} },
+      spec: {
+        id: 'ROLL-OIS',
+        notional: option.notional,
+        side: 'pay',
+        fixed,
+        float: floating,
+        attributes: {},
+      },
     },
   };
-  const scenario = { id: 'overnight-roll', operations: [
-    { kind: 'time_roll_forward', period: '5D', apply_shocks: false, roll_mode: 'calendar_days' },
-  ] };
-  const result = scenarios.applyScenarioToMarket(JSON.stringify(scenario), JSON.stringify(f.market), f.as_of, JSON.stringify([instrument]));
+  const scenario = {
+    id: 'overnight-roll',
+    operations: [
+      { kind: 'time_roll_forward', period: '5D', apply_shocks: false, roll_mode: 'calendar_days' },
+    ],
+  };
+  const result = scenarios.applyScenarioToMarket(
+    JSON.stringify(scenario),
+    JSON.stringify(f.market),
+    f.as_of,
+    JSON.stringify([instrument])
+  );
   assert.deepEqual(result.time_roll.failed_instruments, []);
-  const observations = result.market.series.find((series) => series.id === 'FIXING:USD-OIS').observations;
+  const observations = result.market.series.find(
+    (series) => series.id === 'FIXING:USD-OIS'
+  ).observations;
   const friday = observations.find(([date]) => date === '2025-01-03')[1];
-  const expected = Math.expm1(0.04 * 3 / 365) / (3 / 365);
+  const expected = Math.expm1((0.04 * 3) / 365) / (3 / 365);
   assert.ok(Math.abs(friday - expected) < 1e-11, `${friday} versus ${expected}`);
   assert.ok(friday < 0.041, 'the 100bp coupon spread must not enter daily fixings');
-  assert.deepEqual(observations.map(([date]) => date), ['2025-01-02', '2025-01-03', '2025-01-06']);
+  assert.deepEqual(
+    observations.map(([date]) => date),
+    ['2025-01-02', '2025-01-03', '2025-01-06']
+  );
 });
 
 function swapExample(name) {
-  return JSON.parse(readFileSync(new URL(`../../../finstack-quant/valuations/tests/instruments/json_examples/${name}.json`, import.meta.url)));
+  return JSON.parse(
+    readFileSync(
+      new URL(
+        `../../../finstack-quant/valuations/tests/instruments/json_examples/${name}.json`,
+        import.meta.url
+      )
+    )
+  );
 }
 
 function flatRollMarket() {
   const f = fixture('production_quanto_range');
   f.market.curves = f.market.curves.filter((curve) => curve.id === 'USD-OIS');
-  f.market.curves[0].knot_points = [[0, 1], [1, 1], [10, 1]];
+  f.market.curves[0].knot_points = [
+    [0, 1],
+    [1, 1],
+    [10, 1],
+  ];
   return f;
 }
 
 function addForward(market, id, rate) {
-  market.curves.push({ type: 'forward', id, base: '2025-01-02', reset_lag: 0,
-    day_count: 'act_360', tenor: 0.25, knot_points: [[0, rate], [1, rate], [10, rate]],
-    projection_grid: null, interp_style: 'linear', extrapolation: 'flat_forward',
-    rate_calibration: null, fx_policy: null });
+  market.curves.push({
+    type: 'forward',
+    id,
+    base: '2025-01-02',
+    reset_lag: 0,
+    day_count: 'act_360',
+    tenor: 0.25,
+    knot_points: [
+      [0, rate],
+      [1, rate],
+      [10, rate],
+    ],
+    projection_grid: null,
+    interp_style: 'linear',
+    extrapolation: 'flat_forward',
+    rate_calibration: null,
+    fx_policy: null,
+  });
 }
 
 test('basis swap rolls both raw overnight indices without spread contamination', () => {
   const f = flatRollMarket();
   const instrument = swapExample('basis_swap');
   const spec = instrument.instrument.spec;
-  for (const [leg, rate] of [[spec.primary_leg, 0.03], [spec.reference_leg, 0.04]]) {
-    leg.start = '2025-01-03'; leg.end = '2026-01-03';
+  for (const [leg, rate] of [
+    [spec.primary_leg, 0.03],
+    [spec.reference_leg, 0.04],
+  ]) {
+    leg.start = '2025-01-03';
+    leg.end = '2026-01-03';
     leg.compounding = { compounded_in_arrears: { lookback_days: 0 } };
     addForward(f.market, leg.forward_curve_id, rate);
   }
-  const scenario = { id: 'basis-roll', operations: [
-    { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
-  ] };
-  const result = scenarios.applyScenarioToMarket(JSON.stringify(scenario), JSON.stringify(f.market), f.as_of, JSON.stringify([instrument]));
+  const scenario = {
+    id: 'basis-roll',
+    operations: [
+      { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
+    ],
+  };
+  const result = scenarios.applyScenarioToMarket(
+    JSON.stringify(scenario),
+    JSON.stringify(f.market),
+    f.as_of,
+    JSON.stringify([instrument])
+  );
   assert.deepEqual(result.time_roll.failed_instruments, []);
-  for (const [leg, rate] of [[spec.primary_leg, 0.03], [spec.reference_leg, 0.04]]) {
-    const observations = result.market.series.find((series) => series.id === `FIXING:${leg.forward_curve_id}`).observations;
+  for (const [leg, rate] of [
+    [spec.primary_leg, 0.03],
+    [spec.reference_leg, 0.04],
+  ]) {
+    const observations = result.market.series.find(
+      (series) => series.id === `FIXING:${leg.forward_curve_id}`
+    ).observations;
     assert.ok(observations.length >= 1);
     for (const [, value] of observations) assert.ok(Math.abs(value - rate) < 1e-10);
   }
@@ -170,13 +240,29 @@ test('basis swap rolls both raw overnight indices without spread contamination',
 test('crossed fixing projection reports a missing dependency before rolling the market', () => {
   const f = flatRollMarket();
   const instrument = swapExample('basis_swap');
-  for (const leg of [instrument.instrument.spec.primary_leg, instrument.instrument.spec.reference_leg]) {
-    leg.start = '2025-01-03'; leg.end = '2026-01-03';
+  for (const leg of [
+    instrument.instrument.spec.primary_leg,
+    instrument.instrument.spec.reference_leg,
+  ]) {
+    leg.start = '2025-01-03';
+    leg.end = '2026-01-03';
   }
   const before = JSON.stringify(f.market);
-  const scenario = { id: 'missing-projection', operations: [
-    { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
-  ] };
-  assert.throws(() => scenarios.applyScenarioToMarket(JSON.stringify(scenario), before, f.as_of, JSON.stringify([instrument])), /pre-roll fixing projection|missing pre-roll projection/i);
+  const scenario = {
+    id: 'missing-projection',
+    operations: [
+      { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
+    ],
+  };
+  assert.throws(
+    () =>
+      scenarios.applyScenarioToMarket(
+        JSON.stringify(scenario),
+        before,
+        f.as_of,
+        JSON.stringify([instrument])
+      ),
+    /pre-roll fixing projection|missing pre-roll projection/i
+  );
   assert.equal(JSON.stringify(f.market), before);
 });

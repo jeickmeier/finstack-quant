@@ -130,12 +130,22 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
         }],
     );
     let provider = CachedRecalibrationProvider::new();
-    c.bench_function("historical_credit_quote_replay_10bp", |b| {
+    c.bench_function("historical_credit_quote_replay_10bp/cached_result", |b| {
         b.iter(|| {
             black_box(
                 scenario
                     .apply(black_box(&market), Some(&provider))
                     .expect("exact quote replay"),
+            )
+        });
+    });
+    c.bench_function("historical_credit_quote_replay_10bp/fresh_provider", |b| {
+        b.iter(|| {
+            let provider = CachedRecalibrationProvider::new();
+            black_box(
+                scenario
+                    .apply(black_box(&market), Some(&provider))
+                    .expect("uncached exact quote replay"),
             )
         });
     });

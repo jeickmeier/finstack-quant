@@ -11,9 +11,11 @@
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
+use finstack_quant_core::market_data::scalars::{
+    InflationIndex, InflationInterpolation, InflationLag, MarketScalar, ScalarTimeSeries,
+};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
@@ -141,7 +143,7 @@ pub fn create_market_context() -> MarketContext {
     build_market_context(base_date(), 0.0)
 }
 
-/// T1 market context (valuation date = 2025-01-02, rates +10bp vs T0).
+/// T1 synthetic market: forward rates +10bp, discount factors -0.001 and selected FX moves.
 ///
 /// Used by attribution benchmarks to simulate a realistic day-over-day move.
 pub fn create_t1_market_context() -> MarketContext {
@@ -256,6 +258,18 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .interp(InterpStyle::Linear)
         .build()
         .unwrap();
+    // Synthetic published monthly CPI for lagged start/current references.
+    // Historical observations are separate from the forward projection curve.
+    let cpi_history = InflationIndex::new(
+        "USD-CPI",
+        (-3..=0)
+            .map(|months| (base.add_months(months), 100.0))
+            .collect(),
+        Currency::USD,
+    )
+    .unwrap()
+    .with_lag(InflationLag::None)
+    .with_interpolation(InflationInterpolation::Linear);
 
     let base_corr = BaseCorrelationCurve::builder("CDX-CORR")
         .knots(corr_knots)
@@ -377,6 +391,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert(jpy_alias)
         .insert(hazard)
         .insert(inflation)
+        .insert_inflation_index("USD-CPI", cpi_history)
         .insert(base_corr)
         .insert_surface(equity_vol)
         .insert_surface(swaption_vol)
@@ -962,6 +977,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .maturity(maturity_5y())
             .fixed_rate(rust_decimal::Decimal::try_from(0.02).expect("valid literal"))
             .inflation_index_id("USD-CPI".into())
+            .lag_override(InflationLag::Months(3))
+            .interpolation_override(InflationInterpolation::Step)
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)

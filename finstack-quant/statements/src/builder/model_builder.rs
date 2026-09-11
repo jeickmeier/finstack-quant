@@ -730,8 +730,10 @@ impl ModelBuilder<Ready> {
     /// Add metadata to the model.
     ///
     /// # Arguments
-    /// * `key` - Metadata key
-    /// * `value` - Arbitrary JSON payload
+    /// * `key` - Metadata key; `currency` selects the model's reporting currency.
+    /// * `value` - JSON payload stored under the key. For `currency`, supply a
+    ///   supported three-letter currency-code string such as `"USD"`; malformed
+    ///   currency metadata is rejected by [`build`](Self::build).
     ///
     /// # Example
     ///
@@ -740,9 +742,9 @@ impl ModelBuilder<Ready> {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let model = ModelBuilder::new("demo")
     ///     .periods("2025Q1..Q2", None)?
-    ///     .with_meta("currency", serde_json::json!({ "code": "USD" }))
+    ///     .with_meta("currency", serde_json::json!("USD"))
     ///     .build()?;
-    /// assert_eq!(model.meta["currency"]["code"], "USD");
+    /// assert_eq!(model.meta["currency"], "USD");
     /// # Ok(())
     /// # }
     /// ```

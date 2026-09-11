@@ -274,6 +274,17 @@ run = [
   "cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast",
 ]
 
+[tasks.rust-doc-crate]
+description = "Build one crate's docs, enforce input docs, and run its doctests"
+usage = 'arg "<package>" help="Rust package to validate"'
+run = '''
+set -eu
+pkg="${usage_package?}"
+RUSTDOCFLAGS='-D warnings' cargo doc -p "$pkg" --no-deps
+uv run --no-sync python scripts/check_public_api_input_docs.py --package "$pkg"
+cargo test -p "$pkg" --doc --no-fail-fast
+'''
+
 [tasks.rust-test-slow]
 description = "Run Rust tests including ignored/slow ones"
 run = [

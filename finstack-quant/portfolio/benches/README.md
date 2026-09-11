@@ -47,7 +47,10 @@ fails above a 10% median regression.
 
 ## Default matrix and opt-in extensions
 
-The default matrix keeps the large workflows bounded:
+The default matrix keeps the large workflows bounded. The shared market supplies
+synthetic published CPI history separately from its projection curve. Its TIPS
+use an unlagged, linearly interpolated index; inflation swaps elect their own
+three-month lag and step interpolation.
 
 - `portfolio_valuation` PV scaling: 63 / 64 / 250 / 3,000 positions. The 63/64
   pair straddles `POSITION_PARALLEL_MIN_POSITIONS = 64`, the Rayon cut-over in

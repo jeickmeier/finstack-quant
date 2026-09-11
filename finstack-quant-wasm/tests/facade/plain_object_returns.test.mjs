@@ -151,6 +151,9 @@ test('calibrateAutoShift fits a negative-rate smile with a shift', () => {
   assert.equal(fitted.shift, 0.02);
   const repriced = new wasm.SabrSmile(fitted, forward, t).generateSmile(strikes);
   for (let i = 0; i < vols.length; ++i) {
-    assert.ok(Math.abs(repriced[i] - vols[i]) < 1e-6, 'fitted quotes preserve the selected convention');
+    assert.ok(
+      Math.abs(repriced[i] - vols[i]) < 1e-6,
+      'fitted quotes preserve the selected convention'
+    );
   }
 });

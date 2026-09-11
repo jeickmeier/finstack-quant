@@ -49,6 +49,47 @@
           "evidence": "The replay-backed flat deal-spread proxy produces 4721.57548128 versus Bloomberg 4680.88."
         }
       ]
+    },
+    {
+      "path": "pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json",
+      "description": "Known difference: CDX IG 46 Bloomberg CDSO methodology reconciliation deferred by user on 2026-09-10",
+      "metrics": [
+        {
+          "metric": "npv",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 112047.41325164 versus preserved target 118781.76; unchanged tolerance USD 6. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "par_spread",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 55.05589752 versus preserved target 55.2848; unchanged tolerance 0.07 bp. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "delta",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 0.51100454 versus preserved target 0.507; unchanged tolerance 0.001. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "gamma",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 0.54177801 versus preserved target 0.547; unchanged tolerance 0.005. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "vega",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 3351.02741090 versus preserved target 3411.78; unchanged tolerance USD 25 or 1%. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "dv01",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack -109.05137160 versus preserved target -112.536042572938; unchanged tolerance USD 0.5. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        },
+        {
+          "metric": "cs01",
+          "reason": "Known difference accepted for this remediation closeout; Bloomberg market-side and payoff/annuity conventions remain unresolved. Source expectations and tolerances are preserved.",
+          "evidence": "Reconciliation measurement: Finstack 23362.72591100 versus preserved target 25352.02; unchanged tolerance USD 650. See docs/audits/2026-09-09-cdso-reconciliation.md."
+        }
+      ]
     }
   ]
 }
