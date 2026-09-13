@@ -15,7 +15,7 @@ then supplies a concrete `VolSource` to pricing code.
 Consumed by [`models::closed_form`](../closed_form/) and
 [`models::trees`](../trees/) (both use `black::d1_d2`), by
 `calibration::hull_white` (`normal::bachelier_price`), by
-`calibration::targets::vol` (`SABRCalibrator::calibrate_auto_shift`, the
+`calibration::targets::vol` (`SabrCalibrator::calibrate`, the
 SABR slice fitter behind `VolSurfaceModel::Sabr`), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
@@ -157,10 +157,10 @@ Levenberg-Marquardt on normalized vega-weighted squared relative quote errors ov
 | `new()` | tolerance 1e-4, max 2000 iterations |
 | `high_precision()` | tolerance 1e-8, max 200 iterations (Bloomberg VCUB territory) |
 | `with_tolerance` / `with_max_iterations` | Fluent overrides |
-| `calibrate(F, &strikes, &vols, T, β)` | LM with finite-difference Jacobian |
-| `calibrate_shifted(...)` | Explicit displacement |
-| `calibrate_auto_shift(...)` | Displacement chosen automatically when the forward or a strike is negative |
-| `calibrate_with_atm_pinning(...)` | Solves α analytically for an exact ATM match, then fits ν and ρ only |
+| `with_shift(SabrShift)` | `None`, `Fixed(s)` for an explicit displacement, or `Auto` to pick a standardized shift when the forward or a strike is negative |
+| `with_atm_pinning(bool)` | Solves α analytically for an exact ATM match, then fits ν and ρ only |
+| `calibrate(F, &strikes, &vols, T, β)` | LM with finite-difference Jacobian under the configured shift/pinning settings |
+| `calibrate_with_diagnostics(...)` | Same fit, returning `SabrCalibrationOutcome` with solver statistics |
 
 The solve uses log(alpha), ensuring positive alpha without a quote-scale-dependent
 upper or lower bound. Nu is bounded to [0.001, 2.0] and rho to [-0.99, 0.99].
@@ -297,9 +297,10 @@ SABR is the only part of this module reachable from the host languages, and the
 class names use the lower-cased acronym on both sides:
 
 **Python** — `finstack_quant.valuations`: `SabrParameters`, `SabrModel`,
-`SabrSmile`, `SabrCalibrator`. `SabrCalibrator` exposes `calibrate` and
-`calibrate_auto_shift`, each taking `(forward, strikes, market_vols, t, beta)`
-with `beta` required, plus `high_precision()` and `with_tolerance()`.
+`SabrSmile`, `SabrCalibrator`. `SabrCalibrator` exposes `calibrate`, taking
+`(forward, strikes, market_vols, t, beta)` with `beta` required, plus
+`high_precision()`, `with_tolerance()`, `with_shift(None | float | "auto")`
+and `with_atm_pinning(bool)`.
 
 **WASM** — `valuations` namespace: `SabrParameters`, `SabrModel`, `SabrSmile`,
 `SabrCalibrator`.

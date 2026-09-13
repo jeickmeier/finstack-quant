@@ -9,7 +9,7 @@ use crate::api::core::market_data::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::sabr::{
-    SabrCalibrator, SabrModel, SabrParameters, SabrSmile,
+    SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
 };
 use wasm_bindgen::prelude::*;
 
@@ -343,36 +343,47 @@ impl JsSabrCalibrator {
             .map_err(to_js_err)
     }
 
-    /// Calibrate with automatic shift selection for negative-rate smiles.
-    ///
-    /// When the forward or any strike is negative, a shifted-SABR fit is
-    /// performed with an automatically chosen shift; otherwise this behaves
-    /// like `calibrate`.
-    /// @param forward - Forward price or rate in the same quote convention as the strike.
-    /// @param strikes - Option strikes aligned one-for-one with market_vols.
-    /// @param market_vols - Market-implied annualized volatilities aligned one-for-one with strikes.
-    /// @param t - Time from the curve base date in years.
-    /// @param beta - SABR CEV elasticity parameter held fixed during calibration.
+    /// Return a copy of this calibrator with an overridden displacement
+    /// policy, preserving all other settings.
+    /// @param shift - `null`/`undefined` fits the quotes as-is; a number is a
+    /// fixed additive shift in the forward's units (decimal rate or price);
+    /// `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp
+    /// of headroom above the most negative forward or strike, or none when
+    /// every input is non-negative. The shift used is stored on the fitted
+    /// `SabrParameters`.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if the strike and volatility lengths
-    /// differ, the quote arrays are empty, the required shift exceeds the
-    /// supported standardized ladder, the SABR inputs or fitted parameters are
-    /// invalid, or the calibration solver does not converge.
-    #[wasm_bindgen(js_name = calibrateAutoShift)]
-    pub fn calibrate_auto_shift(
-        &self,
-        forward: f64,
-        strikes: Vec<f64>,
-        market_vols: Vec<f64>,
-        t: f64,
-        beta: f64,
-    ) -> Result<JsSabrParameters, JsValue> {
-        self.inner
-            .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| JsSabrParameters { inner })
-            .map_err(to_js_err)
+    /// Throws a JavaScript exception if `shift` is neither `null`, a number,
+    /// nor the string `"auto"`.
+    #[wasm_bindgen(js_name = withShift)]
+    pub fn with_shift(&self, shift: JsValue) -> Result<JsSabrCalibrator, JsValue> {
+        let shift = if shift.is_null() || shift.is_undefined() {
+            SabrShift::None
+        } else if let Some(value) = shift.as_f64() {
+            SabrShift::Fixed(value)
+        } else if shift.as_string().as_deref() == Some("auto") {
+            SabrShift::Auto
+        } else {
+            return Err(JsValue::from_str(
+                "shift must be null, a number, or the string \"auto\"",
+            ));
+        };
+        Ok(Self {
+            inner: self.inner.clone().with_shift(shift),
+        })
+    }
+
+    /// Return a copy of this calibrator with exact ATM pinning enabled or
+    /// disabled, preserving all other settings.
+    /// @param atm_pinning - When `true`, alpha is solved analytically so the
+    /// model reproduces the ATM volatility interpolated from the quotes
+    /// exactly, and only nu and rho are fitted to the smile.
+    #[wasm_bindgen(js_name = withAtmPinning)]
+    pub fn with_atm_pinning(&self, atm_pinning: bool) -> JsSabrCalibrator {
+        Self {
+            inner: self.inner.clone().with_atm_pinning(atm_pinning),
+        }
     }
 }
 
@@ -656,7 +667,7 @@ mod tests {
     }
 
     #[test]
-    fn sabr_calibrate_auto_shift_fits_negative_rate_smile() {
+    fn sabr_auto_shift_fits_negative_rate_smile() {
         let p = JsSabrParameters::new(0.05, 0.5, 0.4, -0.1, Some(0.03)).expect("params");
         let forward = -0.005;
         let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
@@ -664,8 +675,10 @@ mod tests {
         let vols = smile.generate_smile(strikes.clone()).expect("smile");
 
         let fitted = JsSabrCalibrator::new()
-            .calibrate_auto_shift(forward, strikes, vols.into_vec(), 1.0, 0.5)
-            .expect("calibrate_auto_shift");
+            .with_shift(JsValue::from_str("auto"))
+            .expect("auto shift policy")
+            .calibrate(forward, strikes, vols.into_vec(), 1.0, 0.5)
+            .expect("auto-shift calibrate");
         let shift = fitted
             .shift()
             .expect("negative-rate fit must carry a shift");

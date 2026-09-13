@@ -157,28 +157,44 @@ def test_sabr_calibrate_requires_explicit_beta() -> None:
         SabrCalibrator().calibrate(100.0, [90.0, 100.0, 110.0], [0.2, 0.19, 0.2], 1.0)
 
 
-def test_sabr_calibrate_auto_shift_positive_rates_matches_calibrate() -> None:
+def test_sabr_auto_shift_positive_rates_matches_calibrate() -> None:
     params = SabrParameters(0.05, 0.5, 0.4, -0.1)
     smile = SabrSmile(params, 0.03, 1.0)
     strikes = [0.01, 0.02, 0.03, 0.04, 0.05]
     vols = smile.generate_smile(strikes)
-    fitted = SabrCalibrator().calibrate_auto_shift(0.03, strikes, vols, 1.0, 0.5)
+    fitted = SabrCalibrator().with_shift("auto").calibrate(0.03, strikes, vols, 1.0, 0.5)
     assert fitted.shift is None
     assert fitted.alpha > 0.0
 
 
-def test_sabr_calibrate_auto_shift_negative_rates_uses_shift() -> None:
+def test_sabr_auto_shift_negative_rates_uses_shift() -> None:
     params = SabrParameters(0.05, 0.5, 0.4, -0.1, shift=0.02)
     forward = -0.005
     strikes = [-0.015, -0.01, -0.005, 0.0, 0.005]
     smile = SabrSmile(params, forward, 1.0)
     vols = smile.generate_smile(strikes)
-    fitted = SabrCalibrator().calibrate_auto_shift(forward, strikes, vols, 1.0, 0.5)
+    fitted = SabrCalibrator().with_shift("auto").calibrate(forward, strikes, vols, 1.0, 0.5)
     assert fitted.shift is not None
     assert fitted.shift == 0.02
     repriced = SabrSmile(fitted, forward, 1.0).generate_smile(strikes)
     assert all(abs(actual - quote) / quote <= 1e-4 for actual, quote in zip(repriced, vols, strict=True))
     assert fitted.is_shifted()
+
+
+def test_sabr_fixed_shift_and_atm_pinning() -> None:
+    params = SabrParameters(0.05, 0.5, 0.4, -0.1, shift=0.03)
+    forward = -0.005
+    strikes = [-0.015, -0.01, -0.005, 0.0, 0.005]
+    vols = SabrSmile(params, forward, 1.0).generate_smile(strikes)
+    calibrator = SabrCalibrator().with_shift(0.03).with_atm_pinning(True)
+    assert "shift=0.03" in repr(calibrator)
+    assert "atm_pinning=True" in repr(calibrator)
+    fitted = calibrator.calibrate(forward, strikes, vols, 1.0, 0.5)
+    assert fitted.shift == 0.03
+    repriced = SabrSmile(fitted, forward, 1.0).generate_smile(strikes)
+    assert abs(repriced[2] - vols[2]) / vols[2] <= 1e-4
+    with pytest.raises(ValueError, match="auto"):
+        SabrCalibrator().with_shift("later")
 
 
 # B5 — Closed-form exotics

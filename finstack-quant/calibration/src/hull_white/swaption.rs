@@ -73,7 +73,7 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 /// swap. For OIS swaptions the daily compounding inside each accrual period
 /// is approximated by a single forward rate.
 pub fn calibrate_hull_white_to_swaptions(
-    df: &dyn Fn(f64) -> f64,
+    df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[SwaptionQuote],
     frequency: SwapFrequency,
     schedules: Option<&[SwaptionSchedule]>,
@@ -263,7 +263,7 @@ pub fn calibrate_hull_white_to_swaptions(
 /// pathological discount inputs producing a price a swaption cannot have.
 /// Fit quality is judged from the final implied-quote report residuals.
 fn validate_model_price_sanity(
-    df: &dyn Fn(f64) -> f64,
+    df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[SwaptionQuote],
     prepared: &[PreparedSwaption],
     ppy: usize,
@@ -320,7 +320,7 @@ fn swaption_atm_vega(annuity: f64, fwd_rate: f64, expiry: f64, vol: f64, is_norm
 /// `Option<SwaptionSchedule>`.
 #[cfg(test)]
 pub(crate) fn compute_swap_annuity_and_rate(
-    df: &dyn Fn(f64) -> f64,
+    df: &(dyn Fn(f64) -> f64 + Sync),
     t0: f64,
     tenor: f64,
     periods_per_year: usize,
@@ -329,7 +329,7 @@ pub(crate) fn compute_swap_annuity_and_rate(
 }
 
 pub(super) fn compute_swap_annuity_and_rate_inner(
-    df: &dyn Fn(f64) -> f64,
+    df: &(dyn Fn(f64) -> f64 + Sync),
     t0: f64,
     tenor: f64,
     periods_per_year: usize,
@@ -477,7 +477,7 @@ pub(super) fn compute_swaption_market_price(
 pub(crate) fn hw1f_swaption_price(
     kappa: f64,
     sigma: f64,
-    df: &dyn Fn(f64) -> f64,
+    df: &(dyn Fn(f64) -> f64 + Sync),
     t0: f64,
     tenor: f64,
     swap_rate: f64,
@@ -498,7 +498,7 @@ pub(crate) fn hw1f_swaption_price(
 pub(super) struct Hw1fSwaptionPriceInput<'a> {
     pub(super) kappa: f64,
     pub(super) sigma: f64,
-    pub(super) df: &'a dyn Fn(f64) -> f64,
+    pub(super) df: &'a (dyn Fn(f64) -> f64 + Sync),
     pub(super) t0: f64,
     pub(super) tenor: f64,
     pub(super) swap_rate: f64,

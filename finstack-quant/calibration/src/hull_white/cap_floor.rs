@@ -27,8 +27,8 @@ use super::*;
 /// * `config` - Frequency plus fixed-mean-reversion or initial-parameter
 ///   settings. A one-quote calibration requires `config.fixed_kappa`.
 pub fn calibrate_hull_white_to_cap_floors(
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],
     config: CapFloorCalibrationConfig,
 ) -> finstack_quant_core::Result<(HullWhiteCalibrationParams, CalibrationReport)> {
@@ -306,7 +306,7 @@ struct MoneynessSummary {
 
 fn cap_floor_moneyness_summary(
     quotes: &[CapFloorQuote],
-    forward_df: &dyn Fn(f64) -> f64,
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     frequency: SwapFrequency,
 ) -> MoneynessSummary {
     let mut max_dist = 0.0_f64;
@@ -382,8 +382,8 @@ pub(super) fn validate_cap_floor_quote(
 /// over the plausible normal-vol range converges to the unique least-squares optimum.
 pub(super) fn solve_cap_floor_sigma_for_fixed_kappa(
     kappa: f64,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],
     market_prices: &[f64],
     frequency: SwapFrequency,
@@ -516,8 +516,8 @@ impl PiecewiseSigmaCalibrationConfig {
 /// * `config` - Fixed mean-reversion, sigma search bounds, and coupon
 ///   frequency used while sequentially solving the volatility schedule.
 pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],
     config: PiecewiseSigmaCalibrationConfig,
 ) -> finstack_quant_core::Result<(HullWhiteParams, CalibrationReport)> {

@@ -29,7 +29,7 @@ only through the instrument pricers.
 | [`binomial_tree.rs`](binomial_tree.rs) | `BinomialTree` (CRR, Leisen-Reimer) plus American/European/Bermudan entry points |
 | [`short_rate_tree/`](short_rate_tree/) | `ShortRateTree`: Ho-Lee, Black-Derman-Toy, Black-Karasinski |
 | [`hull_white_tree.rs`](hull_white_tree.rs) | `HullWhiteTree`: 1-factor trinomial in auxiliary x-space |
-| [`two_factor_rates_credit.rs`](two_factor_rates_credit.rs) | `RatesCreditTree`: correlated rate + hazard 2D lattice |
+| [`two_factor_rates_credit/`](two_factor_rates_credit/) | `RatesCreditTree`: correlated rate + hazard 2D lattice (`calibration.rs`, `sampling.rs`, `pricing.rs`) |
 
 The shared `price_recombining_tree` engine is binomial. Trinomial lattices
 (the Black-Karasinski short-rate lattice, `HullWhiteTree`, and the

@@ -66,7 +66,7 @@ pub use trees::{
 pub use types::{ExerciseStyle, OptionMarketParams, OptionType};
 pub use volatility::{
     d1, d1_black76, d1_d2_black76, d2_black76, vega_weight, SabrCalibrator, SabrModel,
-    SabrParameters, SabrSmile,
+    SabrParameters, SabrShift, SabrSmile,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.

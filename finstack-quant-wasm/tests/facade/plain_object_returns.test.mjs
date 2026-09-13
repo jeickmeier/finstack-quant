@@ -108,7 +108,7 @@ test('FxOption price and greeks return plain objects', () => {
   }
 });
 
-test('SabrCalibrator surface: withTolerance, calibrate, calibrateAutoShift, params', () => {
+test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () => {
   const forward = 0.03;
   const strikes = [0.01, 0.02, 0.03, 0.04, 0.05];
   const t = 1.0;
@@ -123,7 +123,7 @@ test('SabrCalibrator surface: withTolerance, calibrate, calibrateAutoShift, para
   assert.equal(fitted.beta, beta);
   assert.ok(fitted.alpha > 0);
 
-  const auto = calibrator.calibrateAutoShift(forward, strikes, vols, t, beta);
+  const auto = calibrator.withShift('auto').calibrate(forward, strikes, vols, t, beta);
   assert.equal(auto.beta, beta);
   assert.equal(auto.shift, undefined, 'positive-rate smile needs no shift');
 
@@ -133,7 +133,7 @@ test('SabrCalibrator surface: withTolerance, calibrate, calibrateAutoShift, para
   assert.equal(typeof params.alpha, 'number');
 });
 
-test('calibrateAutoShift fits a negative-rate smile with a shift', () => {
+test('withShift("auto") fits a negative-rate smile with a shift', () => {
   const forward = -0.005;
   const strikes = [-0.015, -0.01, -0.005, 0.0, 0.005];
   const t = 1.0;
@@ -144,7 +144,9 @@ test('calibrateAutoShift fits a negative-rate smile with a shift', () => {
   const smile = new wasm.SabrSmile(shifted, forward, t);
   const vols = smile.generateSmile(strikes);
 
-  const fitted = new wasm.SabrCalibrator().calibrateAutoShift(forward, strikes, vols, t, beta);
+  const fitted = new wasm.SabrCalibrator()
+    .withShift('auto')
+    .calibrate(forward, strikes, vols, t, beta);
   assert.equal(typeof fitted.shift, 'number', 'negative-rate fit must carry a shift');
   assert.ok(fitted.shift > 0);
   assert.ok(fitted.isShifted());

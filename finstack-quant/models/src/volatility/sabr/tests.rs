@@ -241,7 +241,8 @@ fn test_sabr_auto_shift_calibration() {
 
     let calibrator = SabrCalibrator::new().with_tolerance(1e-6);
     let params = calibrator
-        .calibrate_auto_shift(forward, &strikes, &market_vols, time_to_expiry, beta)
+        .with_shift(SabrShift::Auto)
+        .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
         .expect("Volatility calculation should succeed in test");
 
     assert!(params.is_shifted());
@@ -921,7 +922,7 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
     assert!((solved_atm - target_atm).abs() < 1e-10);
 }
 
-/// `calibrate_with_atm_pinning` must pin to the volatility *interpolated to the
+/// ATM pinning (`with_atm_pinning(true)`) must pin to the volatility *interpolated to the
 /// forward*, not to the market quote at whatever strike happens to be nearest.
 ///
 /// Failure mode under test: the old `find_atm_vol` returned `vols[i]` for the
@@ -958,7 +959,8 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
     let calibrated = SabrCalibrator::new()
         .with_tolerance(1e-10)
         .with_max_iterations(200)
-        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, beta)
+        .with_atm_pinning(true)
+        .calibrate(forward, &strikes, &market_vols, expiry, beta)
         .expect("ATM-pinned calibration should succeed");
     let prepared_model = SabrModel::new(calibrated);
 
@@ -1008,7 +1010,8 @@ fn test_sabr_beta_zero_calibrates_negative_cross_zero_forward() {
     let calibrated = SabrCalibrator::new()
         .with_tolerance(1e-10)
         .with_max_iterations(500)
-        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.0)
+        .with_atm_pinning(true)
+        .calibrate(forward, &strikes, &market_vols, expiry, 0.0)
         .expect("β=0 negative-forward calibration should succeed");
     let prepared_model = SabrModel::new(calibrated);
 
@@ -1283,7 +1286,8 @@ fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
     let calibrated = SabrCalibrator::new()
         .with_tolerance(1e-10)
         .with_max_iterations(300)
-        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.0)
+        .with_atm_pinning(true)
+        .calibrate(forward, &strikes, &market_vols, expiry, 0.0)
         .expect("normal-convention calibration should succeed");
 
     // The optimizer must have moved off the initial guess.

@@ -86,7 +86,21 @@
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
+#![deny(clippy::unreachable)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+    )
+)]
+#![doc(test(attr(allow(clippy::expect_used))))]
 
 /// Plan-driven calibration API (schema + execution engine).
 pub mod api;
@@ -126,10 +140,8 @@ pub mod recalibration;
 pub(crate) mod constants;
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
 mod hazard_curve_tests;
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
 mod repricing_tests;
 #[cfg(test)]
 mod test_support;

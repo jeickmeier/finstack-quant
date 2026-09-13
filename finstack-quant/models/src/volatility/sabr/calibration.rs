@@ -182,10 +182,10 @@ fn initial_alpha_guess(atm_vol: f64, forward: f64, beta: f64) -> f64 {
 /// standardized shifts (e.g. 1% for EUR/CHF swaptions, 2%/3% for deeply
 /// negative short rates) rather than an ad-hoc data-dependent value, so the
 /// same surface re-calibrated on a slightly different day does not silently
-/// change convention. `calibrate_auto_shift` rounds the required minimum
+/// change convention. [`SabrShift::Auto`] rounds the required minimum
 /// shift (`−min_rate + 10bp` headroom) *up* to the next rung. Callers that
 /// need an exact per-currency convention should pass an explicit shift to
-/// [`SabrCalibrator::calibrate_shifted`].
+/// [`SabrShift::Fixed`].
 const STANDARD_SHIFTS: [f64; 5] = [0.005, 0.01, 0.02, 0.03, 0.04];
 
 /// Round the minimum required shift up to the standardized ladder.
@@ -201,7 +201,7 @@ fn standard_shift(min_rate: f64) -> Result<f64> {
         .ok_or_else(|| {
             Error::Validation(format!(
                 "SABR auto-shift: minimum rate {min_rate:.6} requires a shift larger than the \
-                 maximum standardized shift of 4%; pass an explicit shift via calibrate_shifted"
+                 maximum standardized shift of 4%; pass an explicit shift via SabrShift::Fixed"
             ))
         })
 }
@@ -222,6 +222,29 @@ pub struct SabrCalibrator {
     tolerance: f64,
     /// Maximum iterations for the optimizer.
     max_iterations: usize,
+    /// Displacement policy applied to the forward and strikes before fitting.
+    shift: SabrShift,
+    /// Whether alpha is solved analytically for an exact ATM match.
+    atm_pinning: bool,
+}
+
+/// Displacement applied to the forward and strikes before a SABR fit.
+///
+/// Shifted SABR models `F + s` instead of `F`, which keeps the CEV backbone
+/// well-defined when the forward or a strike is negative (EUR/CHF/JPY rates).
+/// The chosen shift is stored on the calibrated [`SabrParameters`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SabrShift {
+    /// No displacement. Inputs are fitted as quoted; negative forwards or
+    /// strikes are only meaningful for normal SABR (β = 0).
+    None,
+    /// Fixed additive displacement in the units of the forward (decimal rate
+    /// or price). The shifted forward and strikes must be strictly positive.
+    Fixed(f64),
+    /// Use the smallest standardized shift (1%, 2%, 3%, 4%) that leaves at
+    /// least 10bp of headroom above the most negative forward or strike, or
+    /// no shift when every input is non-negative.
+    Auto,
 }
 
 /// Calibrated SABR parameters and deterministic solver diagnostics.
@@ -447,6 +470,8 @@ impl SabrCalibrator {
         Self {
             tolerance: 1e-4,
             max_iterations: 2000,
+            shift: SabrShift::None,
+            atm_pinning: false,
         }
     }
 
@@ -455,7 +480,34 @@ impl SabrCalibrator {
         Self {
             tolerance: 1e-8,
             max_iterations: 200,
+            shift: SabrShift::None,
+            atm_pinning: false,
         }
+    }
+
+    /// Set the displacement policy applied before fitting.
+    ///
+    /// # Arguments
+    ///
+    /// * `shift` - [`SabrShift::None`] for strictly positive inputs,
+    ///   [`SabrShift::Fixed`] for an explicit additive displacement in the
+    ///   forward's units, or [`SabrShift::Auto`] to pick a standardized shift
+    ///   only when the forward or a strike is negative.
+    pub fn with_shift(mut self, shift: SabrShift) -> Self {
+        self.shift = shift;
+        self
+    }
+
+    /// Enable or disable exact ATM pinning.
+    ///
+    /// # Arguments
+    ///
+    /// * `atm_pinning` - When `true`, alpha is solved analytically so the
+    ///   model reproduces the ATM volatility interpolated from the quotes
+    ///   exactly, and only nu and rho are fitted to the smile.
+    pub fn with_atm_pinning(mut self, atm_pinning: bool) -> Self {
+        self.atm_pinning = atm_pinning;
+        self
     }
 
     /// Set the maximum accepted relative error of every final volatility quote.
@@ -488,136 +540,22 @@ impl SabrCalibrator {
         self.max_iterations
     }
 
-    /// Calibrate SABR parameters with automatic negative rate detection
-    pub fn calibrate_auto_shift(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-    ) -> Result<SabrParameters> {
-        Ok(self
-            .calibrate_auto_shift_with_diagnostics(
-                forward,
-                strikes,
-                market_vols,
-                time_to_expiry,
-                beta,
-            )?
-            .parameters)
+    /// Displacement policy applied before fitting.
+    pub fn shift(&self) -> SabrShift {
+        self.shift
     }
 
-    /// Calibrate with an automatically selected shift and return solver diagnostics.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Unshifted forward price or decimal rate.
-    /// * `strikes` - Unshifted strikes in the same units as `forward`.
-    /// * `market_vols` - Implied volatilities aligned with `strikes`.
-    /// * `time_to_expiry` - Time to expiry in years.
-    /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
-    pub fn calibrate_auto_shift_with_diagnostics(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-    ) -> Result<SabrCalibrationOutcome> {
-        let min_strike = strikes
-            .iter()
-            .min_by(|a, b| a.total_cmp(b))
-            .ok_or_else(|| Error::Validation("Strikes should not be empty".to_string()))?;
-        let min_rate = forward.min(*min_strike);
-        if min_rate < 0.0 {
-            let shift = standard_shift(min_rate)?;
-            self.calibrate_shifted_with_diagnostics(
-                forward,
-                strikes,
-                market_vols,
-                time_to_expiry,
-                beta,
-                shift,
-            )
-        } else {
-            self.calibrate_with_diagnostics(forward, strikes, market_vols, time_to_expiry, beta)
-        }
+    /// Whether alpha is pinned to the interpolated ATM volatility.
+    pub fn atm_pinning(&self) -> bool {
+        self.atm_pinning
     }
 
-    /// Calibrate shifted SABR parameters for negative rate environments
-    pub fn calibrate_shifted(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-        shift: f64,
-    ) -> Result<SabrParameters> {
-        Ok(self
-            .calibrate_shifted_with_diagnostics(
-                forward,
-                strikes,
-                market_vols,
-                time_to_expiry,
-                beta,
-                shift,
-            )?
-            .parameters)
-    }
-
-    /// Calibrate shifted SABR and return solver diagnostics.
+    /// Calibrate SABR parameters to market implied volatilities.
     ///
-    /// # Arguments
-    ///
-    /// * `forward` - Unshifted forward price or decimal rate.
-    /// * `strikes` - Unshifted strikes in the same units as `forward`.
-    /// * `market_vols` - Implied volatilities aligned with `strikes`.
-    /// * `time_to_expiry` - Time to expiry in years.
-    /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
-    /// * `shift` - Additive shift applied to the forward and strikes.
-    pub fn calibrate_shifted_with_diagnostics(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-        shift: f64,
-    ) -> Result<SabrCalibrationOutcome> {
-        if strikes.len() != market_vols.len() {
-            return Err(Error::Validation(format!(
-                "SABR calibration: strikes length ({}) must match market_vols length ({})",
-                strikes.len(),
-                market_vols.len()
-            )));
-        }
-        let shifted_forward = forward + shift;
-        let shifted_strikes: Vec<f64> = strikes.iter().map(|&strike| strike + shift).collect();
-        if shifted_forward <= 0.0 || shifted_strikes.iter().any(|&strike| strike <= 0.0) {
-            return Err(Error::Validation(format!(
-                "Shifted SABR calibration: shift={shift:.6} is insufficient"
-            )));
-        }
-        let mut outcome = self.calibrate_with_diagnostics(
-            shifted_forward,
-            &shifted_strikes,
-            market_vols,
-            time_to_expiry,
-            beta,
-        )?;
-        outcome.parameters = SabrParameters::new_with_shift(
-            outcome.parameters.alpha,
-            beta,
-            outcome.parameters.nu,
-            outcome.parameters.rho,
-            shift,
-        )?;
-        Ok(outcome)
-    }
-
-    /// Calibrate SABR parameters to market implied volatilities using multi-dimensional solver.
+    /// Applies the configured [`SabrShift`] and ATM-pinning settings, then runs
+    /// the multi-start Levenberg-Marquardt fit and returns the parameters only.
+    /// Use [`calibrate_with_diagnostics`](Self::calibrate_with_diagnostics)
+    /// for solver statistics.
     ///
     /// # Vol quoting convention
     ///
@@ -626,25 +564,44 @@ impl SabrCalibrator {
     /// `SabrVolType`): pass **normal (Bachelier)** quotes when calibrating
     /// with β≈0 and **lognormal (Black)** quotes for β>0. Mixing conventions
     /// silently mis-calibrates.
+    ///
+    /// # Arguments
+    ///
+    /// * `forward` - Unshifted forward price or decimal rate.
+    /// * `strikes` - Unshifted strikes in the same units as `forward`; at
+    ///   least three, aligned with `market_vols`.
+    /// * `market_vols` - Implied volatilities aligned with `strikes`.
+    /// * `time_to_expiry` - Time to expiry in years.
+    /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when fewer than three aligned quotes are
+    /// supplied, the (shifted) forward or a strike is non-positive, an
+    /// automatic shift would exceed 4%, the calibrator settings are invalid,
+    /// or no start reproduces every quote within `tolerance`.
     pub fn calibrate(
         &self,
         forward: f64,
         strikes: &[f64],
         market_vols: &[f64],
         time_to_expiry: f64,
-        beta: f64, // Beta is usually fixed
+        beta: f64,
     ) -> Result<SabrParameters> {
         Ok(self
             .calibrate_with_diagnostics(forward, strikes, market_vols, time_to_expiry, beta)?
             .parameters)
     }
 
-    /// Calibrate unshifted SABR and return solver diagnostics.
+    /// Calibrate SABR and return the parameters with solver diagnostics.
+    ///
+    /// Same inputs, conventions, and errors as [`calibrate`](Self::calibrate).
     ///
     /// # Arguments
     ///
-    /// * `forward` - Forward price or decimal rate.
-    /// * `strikes` - Strikes in the same units as `forward`.
+    /// * `forward` - Unshifted forward price or decimal rate.
+    /// * `strikes` - Unshifted strikes in the same units as `forward`; at
+    ///   least three, aligned with `market_vols`.
     /// * `market_vols` - Implied volatilities aligned with `strikes`.
     /// * `time_to_expiry` - Time to expiry in years.
     /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
@@ -663,6 +620,83 @@ impl SabrCalibrator {
                 market_vols.len()
             )));
         }
+        let shift = self.resolve_shift(forward, strikes)?;
+        if shift == 0.0 {
+            return self.fit(forward, strikes, market_vols, time_to_expiry, beta);
+        }
+        let shifted_forward = forward + shift;
+        let shifted_strikes: Vec<f64> = strikes.iter().map(|&strike| strike + shift).collect();
+        if shifted_forward <= 0.0 || shifted_strikes.iter().any(|&strike| strike <= 0.0) {
+            return Err(Error::Validation(format!(
+                "Shifted SABR calibration: shift={shift:.6} is insufficient"
+            )));
+        }
+        let mut outcome = self.fit(
+            shifted_forward,
+            &shifted_strikes,
+            market_vols,
+            time_to_expiry,
+            beta,
+        )?;
+        outcome.parameters = SabrParameters::new_with_shift(
+            outcome.parameters.alpha,
+            beta,
+            outcome.parameters.nu,
+            outcome.parameters.rho,
+            shift,
+        )?;
+        Ok(outcome)
+    }
+
+    /// Resolve the configured [`SabrShift`] to a concrete displacement.
+    fn resolve_shift(&self, forward: f64, strikes: &[f64]) -> Result<f64> {
+        match self.shift {
+            SabrShift::None => Ok(0.0),
+            SabrShift::Fixed(shift) if shift.is_finite() => Ok(shift),
+            SabrShift::Fixed(shift) => Err(Error::Validation(format!(
+                "SABR calibration: fixed shift must be finite, got {shift}"
+            ))),
+            SabrShift::Auto => {
+                let min_strike = strikes
+                    .iter()
+                    .copied()
+                    .min_by(f64::total_cmp)
+                    .ok_or_else(|| Error::Validation("Strikes should not be empty".to_string()))?;
+                let min_rate = forward.min(min_strike);
+                if min_rate < 0.0 {
+                    standard_shift(min_rate)
+                } else {
+                    Ok(0.0)
+                }
+            }
+        }
+    }
+
+    /// Dispatch to the free or ATM-pinned fit on already-shifted inputs.
+    fn fit(
+        &self,
+        forward: f64,
+        strikes: &[f64],
+        market_vols: &[f64],
+        time_to_expiry: f64,
+        beta: f64,
+    ) -> Result<SabrCalibrationOutcome> {
+        if self.atm_pinning {
+            self.fit_atm_pinned(forward, strikes, market_vols, time_to_expiry, beta)
+        } else {
+            self.fit_free(forward, strikes, market_vols, time_to_expiry, beta)
+        }
+    }
+
+    /// Fit alpha, nu, and rho freely (no ATM pinning) on positive inputs.
+    fn fit_free(
+        &self,
+        forward: f64,
+        strikes: &[f64],
+        market_vols: &[f64],
+        time_to_expiry: f64,
+        beta: f64,
+    ) -> Result<SabrCalibrationOutcome> {
         let weights =
             normalized_quote_weights(forward, strikes, market_vols, time_to_expiry, beta)?;
         self.validate_settings()?;
@@ -808,49 +842,11 @@ impl SabrCalibrator {
         Ok(first.1)
     }
 
-    /// Calibrate SABR with ATM volatility pinning.
+    /// Fit nu and rho with alpha solved analytically for an exact ATM match.
     ///
-    /// Solves for alpha analytically so the model matches ATM vol exactly, then
-    /// fits only nu and rho to the smile.
-    ///
-    /// # Arguments
-    /// * `forward` - Forward rate
-    /// * `strikes` - Vector of strikes (should include ATM)
-    /// * `market_vols` - Market implied volatilities corresponding to strikes
-    /// * `time_to_expiry` - Time to expiry in years
-    /// * `beta` - SABR beta parameter (typically fixed)
-    ///
-    /// # Returns
-    /// Calibrated SABR parameters with exact ATM match
-    pub fn calibrate_with_atm_pinning(
-        &self,
-        forward: f64,
-        strikes: &[f64],
-        market_vols: &[f64],
-        time_to_expiry: f64,
-        beta: f64,
-    ) -> Result<SabrParameters> {
-        Ok(self
-            .calibrate_with_atm_pinning_diagnostics(
-                forward,
-                strikes,
-                market_vols,
-                time_to_expiry,
-                beta,
-            )?
-            .parameters)
-    }
-
-    /// Calibrate with exact ATM pinning and return solver diagnostics.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward` - Forward price or decimal rate.
-    /// * `strikes` - Strikes in the same units as `forward`, including ATM.
-    /// * `market_vols` - Implied volatilities aligned with `strikes`.
-    /// * `time_to_expiry` - Time to expiry in years.
-    /// * `beta` - Fixed SABR elasticity parameter in `[0, 1]`.
-    pub fn calibrate_with_atm_pinning_diagnostics(
+    /// The ATM target is the volatility interpolated (linearly in variance)
+    /// to the forward from the quoted smile; see [`Self::find_atm_vol`].
+    fn fit_atm_pinned(
         &self,
         forward: f64,
         strikes: &[f64],
@@ -858,13 +854,6 @@ impl SabrCalibrator {
         time_to_expiry: f64,
         beta: f64,
     ) -> Result<SabrCalibrationOutcome> {
-        if strikes.len() != market_vols.len() || strikes.len() < 3 {
-            return Err(Error::Validation(format!(
-                "ATM-pinned SABR calibration requires at least three aligned quotes; strikes={}, vols={}",
-                strikes.len(),
-                market_vols.len()
-            )));
-        }
         let weights =
             normalized_quote_weights(forward, strikes, market_vols, time_to_expiry, beta)?;
         self.validate_settings()?;
@@ -1069,7 +1058,8 @@ mod acceptance_tests {
         // Interpolation supplies an approximate ATM target, so pinning it perturbs
         // the original exact smile. Require explicit acceptance of that quote error.
         assert!(SabrCalibrator::new()
-            .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.5)
+            .with_atm_pinning(true)
+            .calibrate(forward, &strikes, &market_vols, expiry, 0.5)
             .is_err());
         let calibrated_atm = SabrCalibrator::new()
             .find_atm_vol(forward, &strikes, &market_vols)
@@ -1220,13 +1210,9 @@ mod acceptance_tests {
         };
         let calibrate_pinned = || {
             calibrator
-                .calibrate_with_atm_pinning_diagnostics(
-                    forward,
-                    &strikes,
-                    &market_vols,
-                    time_to_expiry,
-                    beta,
-                )
+                .clone()
+                .with_atm_pinning(true)
+                .calibrate_with_diagnostics(forward, &strikes, &market_vols, time_to_expiry, beta)
                 .expect("ATM-pinned calibration")
         };
         let free_first = calibrate_free();
@@ -1332,7 +1318,8 @@ mod acceptance_tests {
             .with_tolerance(1.0e-12)
             .with_max_iterations(1);
         let error = calibrator
-            .calibrate_with_atm_pinning(
+            .with_atm_pinning(true)
+            .calibrate(
                 0.03,
                 &[0.02, 0.025, 0.03, 0.035, 0.04],
                 &[0.02, 0.015, 0.01, 0.015, 0.02],

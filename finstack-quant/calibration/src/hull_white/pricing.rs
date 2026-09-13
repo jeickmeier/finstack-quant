@@ -2,8 +2,8 @@ use super::*;
 
 /// Price a full cap/floor with a flat normal volatility quote.
 pub(crate) fn bachelier_cap_floor_price(
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     maturity: f64,
     strike: f64,
     normal_vol: f64,
@@ -23,8 +23,8 @@ pub(crate) fn bachelier_cap_floor_price(
 }
 
 pub(super) fn cap_floor_bachelier_vega(
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     maturity: f64,
     strike: f64,
     normal_vol: f64,
@@ -84,8 +84,8 @@ impl CapFloorPriceSpec {
 pub(crate) fn hw1f_cap_floor_price(
     kappa: f64,
     sigma: f64,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     spec: CapFloorPriceSpec,
 ) -> f64 {
     let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency).collect();
@@ -102,8 +102,8 @@ pub(crate) fn hw1f_cap_floor_price(
 /// Price a full cap/floor under a scheduled HW1F short-rate volatility.
 pub(crate) fn hw1f_cap_floor_price_with_model(
     params: &HullWhiteParams,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     spec: CapFloorPriceSpec,
 ) -> finstack_quant_core::Result<f64> {
     let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency)
@@ -124,8 +124,8 @@ pub(crate) fn hw1f_cap_floor_price_with_model(
 pub(crate) fn hw1f_cap_floor_implied_normal_vol(
     kappa: f64,
     sigma: f64,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     spec: CapFloorPriceSpec,
 ) -> finstack_quant_core::Result<f64> {
     let target = hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec);
@@ -134,8 +134,8 @@ pub(crate) fn hw1f_cap_floor_implied_normal_vol(
 
 pub(super) fn cap_floor_implied_normal_vol(
     target: f64,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
     spec: CapFloorPriceSpec,
 ) -> finstack_quant_core::Result<f64> {
     if !target.is_finite() || target < 0.0 {
@@ -192,7 +192,7 @@ pub(super) fn cap_floor_periods(
 /// `solve_cap_floor_sigma_for_fixed_kappa`) rely on the non-finite-price
 /// check to detect broken curves, and `f64::max` would silently absorb a NaN
 /// (`NaN.max(1e-12) == 1e-12`), defeating that error contract.
-pub(super) fn forward_rate_from_df(df: &dyn Fn(f64) -> f64, start: f64, end: f64) -> f64 {
+pub(super) fn forward_rate_from_df(df: &(dyn Fn(f64) -> f64 + Sync), start: f64, end: f64) -> f64 {
     let accrual = (end - start).max(1e-12);
     let p_start = df(start);
     let p_end = df(end);

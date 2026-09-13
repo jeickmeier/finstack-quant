@@ -14,7 +14,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::Result;
-use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters};
+use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters, SabrShift};
 use std::collections::BTreeMap;
 
 use crate::constants::OrderedF64;
@@ -187,7 +187,8 @@ impl VolSurfaceTarget {
                 .with_tolerance(config.vol_surface.validation_tolerance / min_quote)
                 .with_max_iterations(config.solver.max_iterations());
             let outcome = sabr_calibrator
-                .calibrate_auto_shift_with_diagnostics(f, &strikes, &vols, t, params.beta)
+                .with_shift(SabrShift::Auto)
+                .calibrate_with_diagnostics(f, &strikes, &vols, t, params.beta)
                 .map_err(|e| finstack_quant_core::Error::Calibration {
                     message: format!("SABR calibration failed at t={t:.6}: {e}"),
                     category: "vol_surface".to_string(),

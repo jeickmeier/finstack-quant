@@ -61,10 +61,4 @@ pub trait ExternalImSource: Send + Sync {
     fn external_mpor_days(&self) -> Option<u32> {
         None
     }
-
-    /// Optional label (model/methodology) surfaced in the IM result
-    /// breakdown map.
-    fn external_model_name(&self) -> Option<String> {
-        None
-    }
 }

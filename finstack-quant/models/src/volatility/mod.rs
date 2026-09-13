@@ -87,7 +87,8 @@ pub use finstack_quant_core::math::{norm_cdf, norm_pdf};
 pub use implied::{implied_vol_bachelier, implied_vol_black};
 pub use normal::{bachelier_price, d_bachelier};
 pub use sabr::{
-    vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrSmile,
+    vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
+    SabrSmile,
 };
 pub use sabr_derivatives::{SabrCalibrationDerivatives, SabrMarketData};
 pub use source::{

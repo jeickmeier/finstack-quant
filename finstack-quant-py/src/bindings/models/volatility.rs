@@ -31,10 +31,11 @@ use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::sabr::{
-    SabrCalibrator, SabrModel, SabrParameters, SabrSmile,
+    SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
 };
 use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi, SviParams};
 use finstack_quant_models::volatility::VolatilityConvention;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -512,51 +513,86 @@ impl PySabrCalibrator {
         .map_err(core_to_py)
     }
 
-    /// Calibrate with automatic shift selection for negative-rate smiles.
-    ///
-    /// When the forward or any strike is negative, a shifted-SABR fit is
-    /// performed with an automatically chosen shift; otherwise this behaves
-    /// like :meth:`calibrate`.
+    /// Override the displacement policy applied before fitting.
     ///
     /// Parameters
     /// ----------
-    /// forward : float
-    ///     Forward price / rate (may be negative).
-    /// strikes : list[float]
-    ///     Strikes at which market vols are quoted (may be negative).
-    /// market_vols : list[float]
-    ///     Observed Black implied volatilities at each strike.
-    /// t : float
-    ///     Time to expiry in years.
-    /// beta : float
-    ///     Fixed CEV exponent.
+    /// shift : float | str | None
+    ///     ``None`` fits the quotes as-is; a float is a fixed additive shift in
+    ///     the forward's units (decimal rate or price); ``"auto"`` picks the
+    ///     smallest standardized shift (1-4%) that leaves 10bp of headroom
+    ///     above the most negative forward or strike, or none when every
+    ///     input is non-negative. The shift used is stored on the fitted
+    ///     :class:`SabrParameters`.
     ///
     /// Returns
     /// -------
-    /// SabrParameters
-    ///     Calibrated parameters; ``shift`` is set when a shifted fit was used.
-    fn calibrate_auto_shift(
-        &self,
-        py: Python<'_>,
-        forward: f64,
-        strikes: Vec<f64>,
-        market_vols: Vec<f64>,
-        t: f64,
-        beta: f64,
-    ) -> PyResult<PySabrParameters> {
-        py.detach(|| {
-            self.inner
-                .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
+    /// SabrCalibrator
+    ///     Copy of this calibrator with the shift policy replaced.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"``.
+    #[pyo3(signature = (shift))]
+    fn with_shift(&self, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let shift = if shift.is_none() {
+            SabrShift::None
+        } else if let Ok(text) = shift.extract::<String>() {
+            if text == "auto" {
+                SabrShift::Auto
+            } else {
+                return Err(PyValueError::new_err(format!(
+                    "shift must be None, a float, or \"auto\"; got {text:?}"
+                )));
+            }
+        } else if let Ok(value) = shift.extract::<f64>() {
+            SabrShift::Fixed(value)
+        } else {
+            return Err(PyValueError::new_err(
+                "shift must be None, a float, or \"auto\"",
+            ));
+        };
+        Ok(Self {
+            inner: self.inner.clone().with_shift(shift),
         })
-        .map(|inner| PySabrParameters { inner })
-        .map_err(core_to_py)
+    }
+
+    /// Enable or disable exact ATM pinning.
+    ///
+    /// Parameters
+    /// ----------
+    /// atm_pinning : bool
+    ///     When ``True``, ``alpha`` is solved analytically so the model
+    ///     reproduces the ATM volatility interpolated from the quotes
+    ///     exactly, and only ``nu`` and ``rho`` are fitted to the smile.
+    ///
+    /// Returns
+    /// -------
+    /// SabrCalibrator
+    ///     Copy of this calibrator with the pinning flag replaced. Does not raise.
+    fn with_atm_pinning(&self, atm_pinning: bool) -> Self {
+        Self {
+            inner: self.inner.clone().with_atm_pinning(atm_pinning),
+        }
     }
 
     fn __repr__(&self) -> String {
+        let shift = match self.inner.shift() {
+            SabrShift::None => "None".to_string(),
+            SabrShift::Fixed(value) => value.to_string(),
+            SabrShift::Auto => "'auto'".to_string(),
+        };
         format!(
-            "SabrCalibrator(tolerance={}, max_iterations={})",
+            "SabrCalibrator(tolerance={}, max_iterations={}, shift={}, atm_pinning={})",
             self.inner.tolerance(),
-            self.inner.max_iterations()
+            self.inner.max_iterations(),
+            shift,
+            if self.inner.atm_pinning() {
+                "True"
+            } else {
+                "False"
+            }
         )
     }
 }

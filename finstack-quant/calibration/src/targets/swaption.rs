@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::surfaces::VolQuoteType;
 use finstack_quant_core::Result;
-use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters};
+use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters, SabrShift};
 use finstack_quant_valuations::instruments::rates::swaption::contractual_swap_tenor_years;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::collections::BTreeMap;
@@ -235,15 +235,11 @@ impl SwaptionVolTarget {
 
             let res = match params.vol_convention {
                 SwaptionVolConvention::Normal => sabr_calibrator
-                    .calibrate_with_atm_pinning_diagnostics(fwd_rate, &strikes, &vols, t_exp, 0.0),
+                    .with_atm_pinning(true)
+                    .calibrate_with_diagnostics(fwd_rate, &strikes, &vols, t_exp, 0.0),
                 SwaptionVolConvention::Lognormal => sabr_calibrator
-                    .calibrate_auto_shift_with_diagnostics(
-                        fwd_rate,
-                        &strikes,
-                        &vols,
-                        t_exp,
-                        params.sabr_beta,
-                    ),
+                    .with_shift(SabrShift::Auto)
+                    .calibrate_with_diagnostics(fwd_rate, &strikes, &vols, t_exp, params.sabr_beta),
                 SwaptionVolConvention::ShiftedLognormal { shift } => {
                     if !shift.is_finite() || shift <= 0.0 {
                         Err(finstack_quant_core::Error::Validation(format!(
@@ -251,14 +247,15 @@ impl SwaptionVolTarget {
                             shift
                         )))
                     } else {
-                        sabr_calibrator.calibrate_shifted_with_diagnostics(
-                            fwd_rate,
-                            &strikes,
-                            &vols,
-                            t_exp,
-                            params.sabr_beta,
-                            shift,
-                        )
+                        sabr_calibrator
+                            .with_shift(SabrShift::Fixed(shift))
+                            .calibrate_with_diagnostics(
+                                fwd_rate,
+                                &strikes,
+                                &vols,
+                                t_exp,
+                                params.sabr_beta,
+                            )
                     }
                 }
             };

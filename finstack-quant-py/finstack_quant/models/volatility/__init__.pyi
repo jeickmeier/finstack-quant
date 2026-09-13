@@ -683,42 +683,59 @@ class SabrCalibrator:
         """
         ...
 
-    def calibrate_auto_shift(
-        self,
-        forward: float,
-        strikes: list[float],
-        market_vols: list[float],
-        t: float,
-        beta: float,
-    ) -> SabrParameters:
+    def with_shift(self, shift: float | str | None) -> SabrCalibrator:
         """
-        Calibrate with automatic shift selection for negative-rate smiles.
+        Return a copy with an overridden displacement policy.
 
         Parameters
         ----------
-        forward : float
-            Forward at expiry.
-        strikes : list[float]
-            Strike grid aligned with ``market_vols``.
-        market_vols : list[float]
-            Positive finite market vols: decimal rate per square-root year for beta=0,
-            dimensionless annual Black volatility otherwise.
-        t : float
-            Expiry in years.
-        beta : float
-            Fixed SABR beta in ``[0, 1]``.
+        shift : float | str | None
+            ``None`` fits the quotes as-is; a float is a fixed additive shift in
+            the forward's units (decimal rate or price); ``"auto"`` picks the
+            smallest standardized shift (1-4%) that leaves 10bp of headroom above
+            the most negative forward or strike, or none when every input is
+            non-negative. The shift used is stored on the fitted
+            :class:`SabrParameters`.
 
         Returns
         -------
-        SabrParameters
-            Calibrated :class:`SabrParameters` with auto-selected shift.
+        SabrCalibrator
+            New calibrator instance sharing other settings.
 
         Raises
         ------
         ValueError
-            If inputs or settings are invalid.
-        RuntimeError
-            If no fitted candidate satisfies the per-quote error budget.
+            If ``shift`` is neither ``None``, a float, nor ``"auto"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import SabrCalibrator
+        >>> "shift='auto'" in repr(SabrCalibrator().with_shift("auto"))
+        True
+        """
+        ...
+
+    def with_atm_pinning(self, atm_pinning: bool) -> SabrCalibrator:
+        """
+        Return a copy with exact ATM pinning enabled or disabled.
+
+        Parameters
+        ----------
+        atm_pinning : bool
+            When ``True``, ``alpha`` is solved analytically so the model
+            reproduces the ATM volatility interpolated from the quotes exactly,
+            and only ``nu`` and ``rho`` are fitted to the smile.
+
+        Returns
+        -------
+        SabrCalibrator
+            New calibrator instance sharing other settings. Does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.volatility import SabrCalibrator
+        >>> "atm_pinning=True" in repr(SabrCalibrator().with_atm_pinning(True))
+        True
         """
         ...
 

@@ -152,20 +152,50 @@ impl GlobalFitOptimizer {
     where
         T: GlobalSolveTarget,
     {
-        Self::optimize_with_multi_start(target, quotes, config, success_tolerance, None)
+        Self::optimize_impl(
+            target,
+            quotes,
+            config,
+            success_tolerance,
+            None,
+            no_restarts::<T>,
+        )
     }
 
     /// Execute a simultaneous weighted least-squares fit with optional multi-start.
     ///
     /// When `multi_start` is `Some`, the optimizer runs `num_restarts` additional solves
-    /// from deterministically-perturbed starting points. The best result (lowest weighted
-    /// residual norm) is returned.
+    /// from deterministically-perturbed starting points. On native targets the restarts
+    /// run in parallel; results are folded in restart order, so the winner is identical
+    /// to a serial run. The best result (lowest weighted residual norm) is returned.
     pub(crate) fn optimize_with_multi_start<T>(
         target: &T,
         quotes: &[T::Quote],
         config: &CalibrationConfig,
         success_tolerance: f64,
         multi_start: Option<&MultiStartConfig>,
+    ) -> Result<(T::Curve, CalibrationReport)>
+    where
+        T: GlobalSolveTarget + Sync,
+        T::Quote: Sync,
+    {
+        Self::optimize_impl(
+            target,
+            quotes,
+            config,
+            success_tolerance,
+            multi_start,
+            parallel_restarts::<T>,
+        )
+    }
+
+    fn optimize_impl<T>(
+        target: &T,
+        quotes: &[T::Quote],
+        config: &CalibrationConfig,
+        success_tolerance: f64,
+        multi_start: Option<&MultiStartConfig>,
+        run_restarts: RestartRunner<T>,
     ) -> Result<(T::Curve, CalibrationReport)>
     where
         T: GlobalSolveTarget,
@@ -218,16 +248,17 @@ impl GlobalFitOptimizer {
         // user can see whether the answer came from the originally-supplied initial
         // guess or required a perturbation to escape a bad region.
         let mut winning_start: Option<usize> = None;
-        let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(
+        let inputs = SolveInputs {
             target,
-            &active_quotes,
-            &times,
-            &initials,
-            &weight_scales,
-            &lb,
-            &ub,
+            active_quotes: &active_quotes,
+            times: &times,
+            weight_scales: &weight_scales,
+            lb: &lb,
+            ub: &ub,
             config,
-        ) {
+        };
+        let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(&inputs, &initials)
+        {
             Ok(v) => Some(v),
             Err(err) => {
                 tracing::warn!(
@@ -249,25 +280,11 @@ impl GlobalFitOptimizer {
                 );
             }
 
-            for restart_idx in 0..ms.num_restarts {
-                let perturbed = perturb_initial_guess(
-                    &initials,
-                    ms.perturbation_scale,
-                    restart_idx,
-                    lb.as_deref(),
-                    ub.as_deref(),
-                );
-
-                match run_single_solve(
-                    target,
-                    &active_quotes,
-                    &times,
-                    &perturbed,
-                    &weight_scales,
-                    &lb,
-                    &ub,
-                    config,
-                ) {
+            // Restarts are independent solves; fold them in index order so the
+            // first strictly-better restart wins exactly as it would serially.
+            let restart_results = run_restarts(&inputs, &initials, ms);
+            for (restart_idx, outcome) in restart_results.into_iter().enumerate() {
+                match outcome {
                     Ok((result, wl2)) => {
                         let improved = best.as_ref().is_none_or(|(_, prev)| wl2 < *prev);
                         if improved {
@@ -480,22 +497,88 @@ type SingleSolveResult = (
     usize,
 );
 
+/// Inputs shared by the primary solve and every multi-start restart of one fit.
+#[derive(Clone, Copy)]
+struct SolveInputs<'a, T: GlobalSolveTarget> {
+    target: &'a T,
+    active_quotes: &'a [T::Quote],
+    times: &'a [f64],
+    weight_scales: &'a [f64],
+    lb: &'a Option<Vec<f64>>,
+    ub: &'a Option<Vec<f64>>,
+    config: &'a CalibrationConfig,
+}
+
+/// Runs the multi-start restarts for one fit and returns one outcome per restart,
+/// in restart-index order.
+type RestartRunner<T> =
+    fn(&SolveInputs<'_, T>, &[f64], &MultiStartConfig) -> Vec<Result<(SingleSolveResult, f64)>>;
+
+/// Restart runner for [`GlobalFitOptimizer::optimize`], which never restarts.
+fn no_restarts<T: GlobalSolveTarget>(
+    _inputs: &SolveInputs<'_, T>,
+    _initials: &[f64],
+    _multi_start: &MultiStartConfig,
+) -> Vec<Result<(SingleSolveResult, f64)>> {
+    Vec::new()
+}
+
+/// Run every restart from its Halton-perturbed start. Restarts are independent
+/// LM solves, so they run on the rayon pool on native targets; the output order
+/// is the restart index regardless of scheduling.
+fn parallel_restarts<T>(
+    inputs: &SolveInputs<'_, T>,
+    initials: &[f64],
+    multi_start: &MultiStartConfig,
+) -> Vec<Result<(SingleSolveResult, f64)>>
+where
+    T: GlobalSolveTarget + Sync,
+    T::Quote: Sync,
+{
+    let solve_from = |restart_idx: usize| {
+        let perturbed = perturb_initial_guess(
+            initials,
+            multi_start.perturbation_scale,
+            restart_idx,
+            inputs.lb.as_deref(),
+            inputs.ub.as_deref(),
+        );
+        run_single_solve(inputs, &perturbed)
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use rayon::prelude::*;
+        (0..multi_start.num_restarts)
+            .into_par_iter()
+            .map(solve_from)
+            .collect()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        (0..multi_start.num_restarts).map(solve_from).collect()
+    }
+}
+
 /// Run one LM solve and return parameters, statistics, evaluation diagnostics,
 /// clamp count, and the final weighted L2 residual norm.
-#[allow(clippy::too_many_arguments)]
 fn run_single_solve<T>(
-    target: &T,
-    active_quotes: &[T::Quote],
-    times: &[f64],
+    inputs: &SolveInputs<'_, T>,
     initials: &[f64],
-    weight_scales: &[f64],
-    lb: &Option<Vec<f64>>,
-    ub: &Option<Vec<f64>>,
-    config: &CalibrationConfig,
 ) -> Result<(SingleSolveResult, f64)>
 where
     T: GlobalSolveTarget,
 {
+    let SolveInputs {
+        target,
+        active_quotes,
+        times,
+        weight_scales,
+        lb,
+        ub,
+        config,
+    } = *inputs;
     let n_residuals = active_quotes.len();
 
     let use_efficient = match config.calibration_method {
@@ -511,12 +594,10 @@ where
     let eval_counter: Cell<usize> = Cell::new(0);
 
     // Reuse a local buffer across LM residual evaluations when bounds
-    // clamping is active. SEQUENTIAL-ONLY: this `RefCell` assumes the
-    // residual closure is called from a single thread. The framework
-    // currently runs LM solves and multi-start restarts serially. If a
-    // future change parallelises restarts via `rayon::par_iter()` or moves
-    // the closure across threads, switch to `Mutex<Vec<f64>>` (or a
-    // per-thread local) — `RefCell` will panic on concurrent borrow_mut.
+    // clamping is active. This `RefCell` is local to one solve: multi-start
+    // restarts run in parallel, but each restart owns its own buffer and the
+    // LM solver calls the residual closure from a single thread. Do not hoist
+    // it out of this function without switching to `Mutex<Vec<f64>>`.
     let clamp_buffer: RefCell<Vec<f64>> = RefCell::new(Vec::with_capacity(initials.len()));
 
     let residuals_func = |params: &[f64], resid: &mut [f64]| {

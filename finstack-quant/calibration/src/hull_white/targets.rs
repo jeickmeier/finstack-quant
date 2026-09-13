@@ -155,7 +155,7 @@ pub(super) struct PreparedSwaption {
 /// allocation per residual call; the pre-computed market data avoids re-
 /// pricing from quotes inside the LM hot loop.
 pub(super) struct HullWhiteSwaptionTarget<'a> {
-    pub(super) df: &'a dyn Fn(f64) -> f64,
+    pub(super) df: &'a (dyn Fn(f64) -> f64 + Sync),
     pub(super) ppy: usize,
     pub(super) initial_x0: [f64; 2],
     pub(super) prepared: Vec<PreparedSwaption>,
@@ -279,8 +279,8 @@ pub(super) struct PreparedCapFloor {
 /// 1D Brent solver because a single scalar root-find does not benefit
 /// from the LM machinery.
 pub(super) struct HullWhiteCapFloorTarget<'a> {
-    pub(super) discount_df: &'a dyn Fn(f64) -> f64,
-    pub(super) forward_df: &'a dyn Fn(f64) -> f64,
+    pub(super) discount_df: &'a (dyn Fn(f64) -> f64 + Sync),
+    pub(super) forward_df: &'a (dyn Fn(f64) -> f64 + Sync),
     pub(super) frequency: SwapFrequency,
     pub(super) initial_x0: [f64; 2],
     pub(super) prepared: Vec<PreparedCapFloor>,

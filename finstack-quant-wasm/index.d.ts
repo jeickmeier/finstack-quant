@@ -6491,26 +6491,20 @@ export interface SabrCalibrator extends WasmOwned {
     beta: number
   ): SabrParameters;
   /**
-   * Calibrate with automatic shift selection for negative-rate smiles.
-   *
-   * When the forward or any strike is negative, a shifted-SABR fit is
-   * performed with an automatically chosen shift; otherwise this behaves
-   * like `calibrate`.
-   * @returns A `SabrParameters` handle.
-   * @param forward - Forward price or rate in the same quote convention as the strike.
-   * @param strikes - Option strikes aligned one-for-one with market_vols.
-   * @param marketVols - Market-implied annualized volatilities aligned one-for-one with strikes.
-   * @param t - Time from the curve base date in years.
-   * @param beta - SABR CEV elasticity parameter held fixed during calibration.
-   * @throws Error - Throws a JavaScript exception if the strike and volatility lengths differ, the quote arrays are empty, the required shift exceeds the supported standardized ladder, the SABR inputs or fitted parameters are invalid, or the calibration solver does not converge.
+   * Return a copy of this calibrator with an overridden displacement policy,
+   * preserving all other settings.
+   * @returns A `SabrCalibrator` handle.
+   * @param shift - `null`/`undefined` fits the quotes as-is; a number is a fixed additive shift in the forward's units (decimal rate or price); `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp of headroom above the most negative forward or strike, or none when every input is non-negative. The shift used is stored on the fitted `SabrParameters`.
+   * @throws Error - Throws a JavaScript exception if `shift` is neither `null`, a number, nor the string `"auto"`.
    */
-  calibrateAutoShift(
-    forward: number,
-    strikes: number[],
-    marketVols: number[],
-    t: number,
-    beta: number
-  ): SabrParameters;
+  withShift(shift: number | "auto" | null | undefined): SabrCalibrator;
+  /**
+   * Return a copy of this calibrator with exact ATM pinning enabled or
+   * disabled, preserving all other settings.
+   * @returns A `SabrCalibrator` handle.
+   * @param atmPinning - When `true`, alpha is solved analytically so the model reproduces the ATM volatility interpolated from the quotes exactly, and only nu and rho are fitted to the smile.
+   */
+  withAtmPinning(atmPinning: boolean): SabrCalibrator;
 }
 
 /**
