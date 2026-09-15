@@ -1,6 +1,15 @@
 {
   "source": "SciPy 1.18.1 binomial CDF; QUADPACK and composite GL32",
   "gaussian_tail_mass_bound": 1.5239706048321186e-23,
+  "large_homogeneous_pool": {
+    "note": "Production path when n > SMALL_POOL_THRESHOLD (64): E[min(LGD * p(Z), K)] with p(Z)=Φ((Φ^{-1}(PD)-√ρ Z)/√(1-ρ)). Independent composite trapezoid on Z∈[-10,10] with the same ±10σ CDF clip as the pricer. The binomial cases below do not describe this path.",
+    "n": 125,
+    "pd": 0.01,
+    "correlation": 0.3,
+    "cap": 0.03,
+    "recovery": 0.4,
+    "expected_loss": 0.005004075735956014
+  },
   "cases": [
     {
       "n": 125,

@@ -1,5 +1,5 @@
 {
-  "description": "Input-only finite Gaussian pool: 125 names, 1% one-year PD, 40% recovery, 30% correlation; portfolio notional 1,000,000 USD. Expected loss is supplied independently by production_tranche_loss_reference.json.",
+  "description": "Input-only 125-name Gaussian pool (CDX-sized): 1% one-year PD, 40% recovery, 30% correlation; portfolio notional 1,000,000 USD. n > SMALL_POOL_THRESHOLD (64) uses the large-homogeneous-pool closed form; expected loss is the LHP pin in production_tranche_loss_reference.json.",
   "as_of": "2025-01-01",
   "instrument": {
     "instrument": {

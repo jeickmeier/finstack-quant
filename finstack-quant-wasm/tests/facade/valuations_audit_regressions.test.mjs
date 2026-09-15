@@ -451,7 +451,7 @@ test('TBA delivery excludes prior receivables and adjusts the agency payment dat
   assert.ok(Math.abs(Number(result.value.amount) - expected) < 1e-9);
 });
 
-test('finite credit-pool loss meets the independent integration reference', () => {
+test('large homogeneous credit-pool loss meets the independent LHP reference', () => {
   const f = JSON.parse(
     readFileSync(
       new URL(
@@ -476,7 +476,8 @@ test('finite credit-pool loss meets the independent integration reference', () =
     ['expected_loss']
   );
   assert.ok(
-    Math.abs(result.measures.expected_loss - 1e6 * reference.cases[0].expected_loss) < 2e-4
+    Math.abs(result.measures.expected_loss - 1e6 * reference.large_homogeneous_pool.expected_loss) <
+      2e-4
   );
 });
 

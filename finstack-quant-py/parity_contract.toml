@@ -409,6 +409,7 @@ public = [
 ]
 
 [crates.cashflows.module_symbols.fixings]
+python_package = "finstack_quant.cashflows.fixings"
 public = ["ProjectedFixing", "materialize_fixings"]
 
 [crates.cashflows.module_symbols.accrual]
@@ -451,6 +452,7 @@ python_only = [
     "accrual",
     "aggregation",
     "builder",
+    "fixings",
     "primitives",
     "schema",
 ]

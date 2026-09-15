@@ -454,7 +454,9 @@ def test_credit_tranche_loss_and_complete_issuer_coverage() -> None:
     result = price_instrument(
         json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "hazard_rate", ["expected_loss"]
     )
-    assert result.get_metric("expected_loss") == pytest.approx(1e6 * reference["cases"][0]["expected_loss"], abs=2e-4)
+    assert result.get_metric("expected_loss") == pytest.approx(
+        1e6 * reference["large_homogeneous_pool"]["expected_loss"], abs=2e-4
+    )
     f["market"]["credit_indices"][0]["num_constituents"] = 2
     f["market"]["credit_indices"][0]["issuer_credit_curve_ids"] = {"A": "HZ"}
     with pytest.raises(ValueError, match=r"complete coverage|num_constituents"):

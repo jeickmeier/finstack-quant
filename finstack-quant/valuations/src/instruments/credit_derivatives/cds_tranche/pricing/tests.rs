@@ -2745,6 +2745,51 @@ mod production_credit_audit {
     }
 
     #[test]
+    fn large_pool_loss_matches_independent_lhp_reference() {
+        let reference: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/production_tranche_loss_reference.json"
+        ))
+        .expect("reference");
+        let pin = &reference["large_homogeneous_pool"];
+        let n = pin["n"].as_u64().expect("N") as u16;
+        assert!(
+            usize::from(n) > credit::SMALL_POOL_THRESHOLD,
+            "LHP pin must describe a pool larger than SMALL_POOL_THRESHOLD"
+        );
+        let pd = pin["pd"].as_f64().expect("PD");
+        let rho = pin["correlation"].as_f64().expect("rho");
+        let cap = pin["cap"].as_f64().expect("cap");
+        let expected = pin["expected_loss"].as_f64().expect("EL");
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let hazard = HazardCurve::builder("HZ")
+            .base_date(base)
+            .recovery_rate(0.4)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(1.0, -(1.0 - pd).ln())])
+            .build()
+            .expect("hazard");
+        let correlation = BaseCorrelationCurve::builder("BC")
+            .knots([(3.0, rho), (100.0, rho)])
+            .build()
+            .expect("correlation");
+        let index = CreditIndexData::builder()
+            .num_constituents(n)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::new(hazard))
+            .base_correlation_curve(Arc::new(correlation))
+            .build()
+            .expect("index");
+        let actual = CDSTranchePricer::new()
+            .calculate_equity_tranche_loss(cap * 100.0, rho, &index, maturity)
+            .expect("loss");
+        assert!(
+            (actual - expected).abs() < 2e-10,
+            "LHP N={n}, PD={pd}, rho={rho}, cap={cap}: {actual:.15} vs {expected:.15}"
+        );
+    }
+
+    #[test]
     fn dispersed_pool_honors_constant_recovery_override() {
         let market = sample_market_context_with_issuers(3);
         let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
