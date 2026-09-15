@@ -358,20 +358,15 @@ impl JsSabrCalibrator {
     /// nor the string `"auto"`.
     #[wasm_bindgen(js_name = withShift)]
     pub fn with_shift(&self, shift: JsValue) -> Result<JsSabrCalibrator, JsValue> {
-        let shift = if shift.is_null() || shift.is_undefined() {
-            SabrShift::None
-        } else if let Some(value) = shift.as_f64() {
-            SabrShift::Fixed(value)
-        } else if shift.as_string().as_deref() == Some("auto") {
-            SabrShift::Auto
-        } else {
-            return Err(JsValue::from_str(
-                "shift must be null, a number, or the string \"auto\"",
-            ));
-        };
-        Ok(Self {
-            inner: self.inner.clone().with_shift(shift),
+        parse_sabr_shift(
+            shift.is_null() || shift.is_undefined(),
+            shift.as_f64(),
+            shift.as_string().as_deref(),
+        )
+        .map(|policy| Self {
+            inner: self.inner.clone().with_shift(policy),
         })
+        .map_err(|e| JsValue::from_str(&e))
     }
 
     /// Return a copy of this calibrator with exact ATM pinning enabled or
@@ -390,6 +385,26 @@ impl JsSabrCalibrator {
 impl Default for JsSabrCalibrator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Decode the JS `withShift` union without constructing a `JsValue`.
+///
+/// Native tests cannot call `JsValue::from_str`: wasm-bindgen's string
+/// constructor is a `nounwind` stub off `wasm32` and aborts the process.
+fn parse_sabr_shift(
+    is_null_or_undefined: bool,
+    number: Option<f64>,
+    text: Option<&str>,
+) -> Result<SabrShift, String> {
+    if is_null_or_undefined {
+        Ok(SabrShift::None)
+    } else if let Some(value) = number {
+        Ok(SabrShift::Fixed(value))
+    } else if text == Some("auto") {
+        Ok(SabrShift::Auto)
+    } else {
+        Err("shift must be null, a number, or the string \"auto\"".to_string())
     }
 }
 
@@ -667,22 +682,46 @@ mod tests {
     }
 
     #[test]
+    fn parse_sabr_shift_accepts_null_number_and_auto() {
+        assert_eq!(
+            parse_sabr_shift(true, None, None).expect("null"),
+            SabrShift::None
+        );
+        assert_eq!(
+            parse_sabr_shift(false, Some(0.03), None).expect("fixed"),
+            SabrShift::Fixed(0.03)
+        );
+        assert_eq!(
+            parse_sabr_shift(false, None, Some("auto")).expect("auto"),
+            SabrShift::Auto
+        );
+        assert!(parse_sabr_shift(false, None, Some("later")).is_err());
+    }
+
+    #[test]
     fn sabr_auto_shift_fits_negative_rate_smile() {
-        let p = JsSabrParameters::new(0.05, 0.5, 0.4, -0.1, Some(0.03)).expect("params");
+        // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
+        // error: both abort off wasm32. Drive the same `"auto"` policy through
+        // the native-testable parser and the domain calibrator. Synthetic
+        // quotes use the documented 2% ladder rung (`-min(strike)+10bp = 1.6%`
+        // rounds up to 2%), matching the JS facade and Python bindings.
+        let policy = parse_sabr_shift(false, None, Some("auto")).expect("auto shift policy");
+        let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
         let forward = -0.005;
         let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
-        let smile = JsSabrSmile::new(&p, forward, 1.0);
-        let vols = smile.generate_smile(strikes.clone()).expect("smile");
+        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
+            .generate_smile(&strikes)
+            .expect("smile");
 
-        let fitted = JsSabrCalibrator::new()
-            .with_shift(JsValue::from_str("auto"))
-            .expect("auto shift policy")
-            .calibrate(forward, strikes, vols.into_vec(), 1.0, 0.5)
+        let fitted = SabrCalibrator::new()
+            .with_shift(policy)
+            .calibrate(forward, &strikes, &vols, 1.0, 0.5)
             .expect("auto-shift calibrate");
         let shift = fitted
             .shift()
             .expect("negative-rate fit must carry a shift");
         assert!(shift > 0.0);
         assert!(fitted.is_shifted());
+        assert!((shift - 0.02).abs() < 1e-12);
     }
 }
