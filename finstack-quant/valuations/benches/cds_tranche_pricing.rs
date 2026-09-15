@@ -21,7 +21,7 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTrancheParams;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranche, TrancheSide,
+    CDSTranche, CDSTranchePricer, CDSTranchePricerConfig, TrancheSide,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -315,6 +315,28 @@ fn bench_cds_tranche_all_metrics(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_cds_tranche_student_t_npv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cds_tranche_student_t_npv");
+    let market = create_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let tranche = create_tranche(3.0, 7.0, 5);
+    let pricer = CDSTranchePricer::with_params(
+        CDSTranchePricerConfig::default()
+            .with_student_t_copula(6.0)
+            .unwrap(),
+    )
+    .unwrap();
+
+    group.bench_function("junior_mezz_3_7_df6", |b| {
+        b.iter(|| {
+            pricer
+                .price_tranche(black_box(&tranche), black_box(&market), black_box(as_of))
+                .unwrap()
+        });
+    });
+    group.finish();
+}
+
 fn bench_cds_tranche_heterogeneous(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_tranche_heterogeneous");
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -344,6 +366,7 @@ criterion_group!(
     bench_cds_tranche_jump_to_default,
     bench_cds_tranche_par_spread,
     bench_cds_tranche_all_metrics,
+    bench_cds_tranche_student_t_npv,
     bench_cds_tranche_heterogeneous
 );
 criterion_main!(benches);

@@ -5,7 +5,7 @@ use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::correlation::recovery::RecoveryModel;
+use finstack_quant_models::correlation::recovery::{RecoveryModel, RecoverySpec};
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 struct ElInvariants {
@@ -168,14 +168,16 @@ impl CDSTranchePricer {
         if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
             return Ok((0.0, 0.0));
         }
-        let el_to_attach = self.calculate_equity_tranche_loss(
+        let (el_to_attach, rec_to_attach_cap) = self.calculate_equity_tranche_capped_pair(
             inv.eff_attach * 100.0,
+            (1.0 - inv.eff_attach) * 100.0,
             inv.corr_attach,
             index_data,
             date,
         )?;
-        let el_to_detach = self.calculate_equity_tranche_loss(
+        let (el_to_detach, rec_to_detach_cap) = self.calculate_equity_tranche_capped_pair(
             inv.eff_detach * 100.0,
+            (1.0 - inv.eff_detach) * 100.0,
             inv.corr_detach,
             index_data,
             date,
@@ -206,18 +208,6 @@ impl CDSTranchePricer {
         // (1−D) cap with ρ(D). Any small negative residual from that
         // correlation mismatch is benign and clamped to zero (the recovery
         // leg has no arbitrage-validation contract).
-        let rec_to_attach_cap = self.calculate_equity_tranche_recovery(
-            (1.0 - inv.eff_attach) * 100.0,
-            inv.corr_attach,
-            index_data,
-            date,
-        )?;
-        let rec_to_detach_cap = self.calculate_equity_tranche_recovery(
-            (1.0 - inv.eff_detach) * 100.0,
-            inv.corr_detach,
-            index_data,
-            date,
-        )?;
         let current_portfolio_wd_fraction = (rec_to_attach_cap - rec_to_detach_cap).max(0.0);
         let tranche_wd_fraction =
             (current_portfolio_wd_fraction * inv.pool_factor) / inv.orig_width;
@@ -424,7 +414,7 @@ impl CDSTranchePricer {
             let t = self.years_from_base(index_data, maturity)?;
             self.homogeneous_capped_expectation(
                 cap_pct / 100.0,
-                index_data.num_constituents as usize,
+                usize::from(index_data.num_constituents),
                 self.get_default_probability(index_data, t)?,
                 index_data.recovery_rate,
                 self.smooth_correlation_boundary(correlation),
@@ -481,6 +471,75 @@ impl CDSTranchePricer {
                 cap,
                 conditional_p(factors),
                 scale * exposure_at(factors),
+            )
+        })
+    }
+
+    /// Loss and recovery capped expectations at one correlation.
+    ///
+    /// Constant-recovery homogeneous pools share one conditional default
+    /// distribution. Stochastic recovery or issuer-curve paths keep two
+    /// independent integrals.
+    fn calculate_equity_tranche_capped_pair(
+        &self,
+        loss_cap_pct: f64,
+        recovery_cap_pct: f64,
+        correlation: f64,
+        index_data: &CreditIndexData,
+        date: Date,
+    ) -> Result<(f64, f64)> {
+        let stochastic = matches!(
+            self.params.recovery_spec,
+            Some(RecoverySpec::MarketCorrelated { .. })
+        );
+        if stochastic || (self.params.use_issuer_curves && index_data.has_issuer_curves()) {
+            return Ok((
+                self.calculate_equity_tranche_loss(loss_cap_pct, correlation, index_data, date)?,
+                self.calculate_equity_tranche_recovery(
+                    recovery_cap_pct,
+                    correlation,
+                    index_data,
+                    date,
+                )?,
+            ));
+        }
+        let t = self.years_from_base(index_data, date)?;
+        self.homogeneous_capped_pair(
+            loss_cap_pct / 100.0,
+            recovery_cap_pct / 100.0,
+            usize::from(index_data.num_constituents),
+            self.get_default_probability(index_data, t)?,
+            index_data.recovery_rate,
+            self.smooth_correlation_boundary(correlation),
+        )
+    }
+
+    /// Shared constant-recovery homogeneous engine for a loss/recovery pair.
+    fn homogeneous_capped_pair(
+        &self,
+        loss_cap: f64,
+        recovery_cap: f64,
+        count: usize,
+        default_prob: f64,
+        base_recovery: f64,
+        correlation: f64,
+    ) -> Result<(f64, f64)> {
+        let threshold = self.default_threshold_for_copula(default_prob);
+        let conditional_p = |factors: &[f64]| {
+            if self.params.copula_spec.is_gaussian() {
+                self.conditional_default_probability_enhanced(threshold, correlation, factors[0])
+            } else {
+                self.conditional_default_prob_copula(self.copula(), threshold, factors, correlation)
+            }
+        };
+        self.integrate_factors_pair(&|factors| {
+            self.conditional_equity_tranche_pair(
+                count,
+                loss_cap,
+                recovery_cap,
+                conditional_p(factors),
+                1.0 - base_recovery,
+                base_recovery,
             )
         })
     }

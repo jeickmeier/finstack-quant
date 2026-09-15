@@ -720,53 +720,13 @@ mod tests {
             .insert_credit_index("CDX.NA.IG", credit_index)
     }
 
-    fn build_student_t_quote(
-        base_date: finstack_quant_core::dates::Date,
-        df: f64,
-        correlation: f64,
-    ) -> CdsTrancheQuote {
-        let market = build_student_t_market(base_date, correlation);
+    /// Synthetic 5Y [3,7] CDX mezzanine upfront at ν = 6, ρ = 0.3 under the
+    /// default Student-t pricer (product Gauss + LHP). The step recovers ν
+    /// near 6 without manufacturing the quote from a live price.
+    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.216_304_990_700;
+
+    fn build_student_t_quote(upfront_pct: f64) -> CdsTrancheQuote {
         let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity");
-        let template = CdsTrancheQuote {
-            id: QuoteId::new("TRANCHE-1"),
-            index: "CDX.NA.IG".to_string(),
-            series: 42,
-            attachment: 0.03,
-            detachment: 0.07,
-            maturity,
-            upfront_pct: 0.0,
-            running_spread_bp: 500.0,
-            convention: CdsConventionKey {
-                currency: Currency::USD,
-                doc_clause: CdsDocClause::IsdaNa,
-            },
-        };
-        let mut curve_ids = finstack_quant_core::HashMap::default();
-        curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
-        curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
-        let build_context = crate::build::BuildCtx::new(base_date, 1.0 / (0.07 - 0.03), curve_ids);
-        let instrument = crate::build::cds_tranche::build_cds_tranche_instrument(
-            &template,
-            &build_context,
-            &crate::build::cds_tranche::CDSTrancheBuildOverrides::default(),
-        )
-        .expect("shared tranche builder");
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CDSTranche>()
-            .expect("CDSTranche");
-
-        let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default()
-                .with_student_t_copula(df)
-                .expect("valid calibration fixture Student-t df"),
-        )
-        .expect("valid tranche pricer config");
-        let upfront_pct = pricer
-            .calculate_upfront(tranche, &market, base_date)
-            .expect("upfront")
-            / tranche.notional.amount();
-
         CdsTrancheQuote {
             id: QuoteId::new("TRANCHE-1"),
             index: "CDX.NA.IG".to_string(),
@@ -818,7 +778,7 @@ mod tests {
             correlation: 0.3,
         });
         let quotes = vec![MarketQuote::CdsTranche(build_student_t_quote(
-            base_date, 6.0, 0.3,
+            STUDENT_T_FIXTURE_UPFRONT_PCT,
         ))];
         let context = build_student_t_market(base_date, 0.25);
 
@@ -837,6 +797,41 @@ mod tests {
         assert!(
             (calibrated_df - 6.0).abs() < 0.5,
             "expected calibrated df near 6.0, got {calibrated_df}"
+        );
+    }
+
+    #[test]
+    fn student_t_fixture_upfront_matches_default_pricer() {
+        let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("valid date");
+        let market = build_student_t_market(base_date, 0.3);
+        let quote = build_student_t_quote(0.0);
+        let mut curve_ids = finstack_quant_core::HashMap::default();
+        curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
+        curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
+        let build_context = crate::build::BuildCtx::new(base_date, 1.0 / (0.07 - 0.03), curve_ids);
+        let instrument = crate::build::cds_tranche::build_cds_tranche_instrument(
+            &quote,
+            &build_context,
+            &crate::build::cds_tranche::CDSTrancheBuildOverrides::default(),
+        )
+        .expect("shared tranche builder");
+        let tranche = instrument
+            .as_any()
+            .downcast_ref::<CDSTranche>()
+            .expect("CDSTranche");
+        let pricer = CDSTranchePricer::with_params(
+            CDSTranchePricerConfig::default()
+                .with_student_t_copula(6.0)
+                .expect("valid fixture df"),
+        )
+        .expect("valid pricer");
+        let live = pricer
+            .calculate_upfront(tranche, &market, base_date)
+            .expect("upfront")
+            / tranche.notional.amount();
+        assert!(
+            (live - STUDENT_T_FIXTURE_UPFRONT_PCT).abs() < 1e-6,
+            "update STUDENT_T_FIXTURE_UPFRONT_PCT to {live:.12}"
         );
     }
 

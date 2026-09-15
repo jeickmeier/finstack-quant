@@ -449,6 +449,42 @@ impl Copula for StudentTCopula {
         result
     }
 
+    fn try_integrate_pair(
+        &self,
+        f: &super::FactorPairIntegrand<'_>,
+    ) -> finstack_quant_core::Result<(f64, f64)> {
+        let error = std::cell::RefCell::new(None);
+        let sqrt_2 = std::f64::consts::SQRT_2;
+        let inv_sqrt_pi = 1.0 / std::f64::consts::PI.sqrt();
+        let mut first = 0.0;
+        let mut second = 0.0;
+        for &(w_val, w_weight) in &self.gamma_quadrature {
+            let mut inner_first = 0.0;
+            let mut inner_second = 0.0;
+            for (i, &z) in self.inner_quadrature.points.iter().enumerate() {
+                if error.borrow().is_some() {
+                    break;
+                }
+                match f(&[sqrt_2 * z, w_val]) {
+                    Ok((a, b)) => {
+                        let weight = self.inner_quadrature.weights[i];
+                        inner_first += weight * a;
+                        inner_second += weight * b;
+                    }
+                    Err(err) => {
+                        *error.borrow_mut() = Some(err);
+                    }
+                }
+            }
+            first += w_weight * inner_first * inv_sqrt_pi;
+            second += w_weight * inner_second * inv_sqrt_pi;
+        }
+        match error.into_inner() {
+            Some(err) => Err(err),
+            None => Ok((first, second)),
+        }
+    }
+
     fn sample_mixing(&self, u01: f64) -> f64 {
         // Variance-mixture representation of the multivariate t-copula:
         // every name shares W = χ²(ν)/ν. Inverse-CDF sampling from a single

@@ -5,7 +5,7 @@ use super::config::{
 };
 use super::registry::JumpToDefaultResult;
 use crate::cashflow::primitives::CFKind;
-use crate::constants::BASIS_POINTS_PER_UNIT;
+use crate::constants::{credit, BASIS_POINTS_PER_UNIT};
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_core::dates::{next_cds_date, Date};
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
@@ -67,6 +67,15 @@ impl CDSTranchePricer {
         conditional_default_prob: f64,
         exposure: f64,
     ) -> Result<f64> {
+        if !conditional_default_prob.is_finite() {
+            return Err(Error::Validation(
+                "conditional default probability must be finite".to_owned(),
+            ));
+        }
+        if num_constituents > credit::SMALL_POOL_THRESHOLD {
+            return Ok((conditional_default_prob * exposure).min(cap_notional));
+        }
+
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
         // Evaluate the whole conditional binomial PMF once (O(n)) instead of
@@ -98,6 +107,50 @@ impl CDSTranchePricer {
             }
 
             Ok(expected)
+        })
+    }
+
+    /// Loss and recovery capped expectations from one conditional default
+    /// distribution.
+    pub(super) fn conditional_equity_tranche_pair(
+        &self,
+        num_constituents: usize,
+        loss_cap: f64,
+        recovery_cap: f64,
+        conditional_default_prob: f64,
+        loss_exposure: f64,
+        recovery_exposure: f64,
+    ) -> Result<(f64, f64)> {
+        if !conditional_default_prob.is_finite() {
+            return Err(Error::Validation(
+                "conditional default probability must be finite".to_owned(),
+            ));
+        }
+        if num_constituents > credit::SMALL_POOL_THRESHOLD {
+            return Ok((
+                (conditional_default_prob * loss_exposure).min(loss_cap),
+                (conditional_default_prob * recovery_exposure).min(recovery_cap),
+            ));
+        }
+
+        let individual_notional = 1.0 / num_constituents as f64;
+        thread_local! {
+            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
+                const { std::cell::RefCell::new(Vec::new()) };
+        }
+
+        PMF_SCRATCH.with(|cell| {
+            let mut pmf = cell.borrow_mut();
+            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
+
+            let mut loss = 0.0;
+            let mut recovery = 0.0;
+            for (k, &prob_k_defaults) in pmf.iter().enumerate() {
+                let defaulted = k as f64 * individual_notional;
+                loss += prob_k_defaults * (defaulted * loss_exposure).min(loss_cap);
+                recovery += prob_k_defaults * (defaulted * recovery_exposure).min(recovery_cap);
+            }
+            Ok((loss, recovery))
         })
     }
 
@@ -949,6 +1002,23 @@ mod tests {
         assert!(
             (total - 1.0).abs() < 1e-9,
             "binomial pmf over 0..=125 must sum to 1, got {total}"
+        );
+    }
+
+    #[test]
+    fn large_homogeneous_pool_uses_lhp() {
+        let pricer = CDSTranchePricer::new();
+        let lhp = pricer
+            .conditional_equity_tranche_capped(125, 0.08, 0.20, 0.60)
+            .expect("LHP");
+        assert!((lhp - 0.08_f64).abs() < 1e-15);
+
+        let binomial = pricer
+            .conditional_equity_tranche_capped(10, 0.08, 0.20, 0.60)
+            .expect("binomial");
+        assert!(
+            (binomial - lhp).abs() > 1e-6,
+            "finite-n binomial must differ from LHP: binomial={binomial}, lhp={lhp}"
         );
     }
 

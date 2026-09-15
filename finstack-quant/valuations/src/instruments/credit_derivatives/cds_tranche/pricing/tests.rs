@@ -3,6 +3,7 @@
 use super::config::{DiscountAt, DEFAULT_INTEGRATION_TOLERANCE};
 use super::*;
 use crate::cashflow::primitives::CFKind;
+use crate::constants::credit;
 use crate::instruments::credit_derivatives::cds_tranche::parameters::CDSTrancheParams;
 use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSide};
 use finstack_quant_core::currency::Currency;
@@ -2680,6 +2681,10 @@ fn test_stochastic_recovery_full_pool_el_matches_index() {
 mod production_credit_audit {
     use super::*;
 
+    /// SciPy binomial-CDF pins apply only to homogeneous pools that still use
+    /// the finite-n PMF (`n ≤ credit::SMALL_POOL_THRESHOLD`). Larger
+    /// homogeneous pools use the large-homogeneous-pool closed form, which
+    /// this fixture does not describe.
     #[test]
     fn finite_pool_loss_matches_independent_adaptive_reference() {
         let reference: serde_json::Value = serde_json::from_str(include_str!(
@@ -2695,7 +2700,12 @@ mod production_credit_audit {
             ..Default::default()
         })
         .expect("pricer");
+        let mut compared = 0_usize;
         for row in reference["cases"].as_array().expect("cases") {
+            let n = row["n"].as_u64().expect("N") as u16;
+            if usize::from(n) > credit::SMALL_POOL_THRESHOLD {
+                continue;
+            }
             let pd = row["pd"].as_f64().expect("PD");
             let rho = row["correlation"].as_f64().expect("rho");
             let cap = row["cap"].as_f64().expect("cap");
@@ -2712,7 +2722,7 @@ mod production_credit_audit {
                 .build()
                 .expect("correlation");
             let index = CreditIndexData::builder()
-                .num_constituents(row["n"].as_u64().expect("N") as u16)
+                .num_constituents(n)
                 .recovery_rate(0.4)
                 .index_credit_curve(Arc::new(hazard))
                 .base_correlation_curve(Arc::new(correlation))
@@ -2726,7 +2736,12 @@ mod production_credit_audit {
                 "N={}, PD={pd}, rho={rho}, cap={cap}: {actual:.15} vs {expected:.15}",
                 index.num_constituents
             );
+            compared += 1;
         }
+        assert!(
+            compared > 0,
+            "fixture must include at least one finite-n binomial case"
+        );
     }
 
     #[test]

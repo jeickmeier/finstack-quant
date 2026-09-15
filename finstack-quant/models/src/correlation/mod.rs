@@ -51,8 +51,8 @@ pub mod portfolio_loss;
 pub mod recovery;
 
 pub use copula::{
-    Copula, CopulaSpec, GaussianCopula, MultiFactorCopula, RandomFactorLoadingCopula,
-    StudentTCopula,
+    Copula, CopulaSpec, FactorPairIntegrand, GaussianCopula, MultiFactorCopula,
+    RandomFactorLoadingCopula, StudentTCopula,
 };
 pub use error::{Error, Result};
 pub use finstack_quant_analytics::correlation::{

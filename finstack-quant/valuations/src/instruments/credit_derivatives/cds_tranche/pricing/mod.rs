@@ -34,12 +34,16 @@
 //!
 //! ## Adaptive Integration
 //!
-//! Conditioning factors use partitioned adaptive Simpson integration. Normal
-//! tails outside [-10,10] have probability below 1.524e-23. Student-t mixing
-//! tails use explicit quantile bounds. The configured absolute integration
-//! tolerance is allocated across intervals, factors and tails; exhausted
-//! refinement produces an error. Conditional convolution grid error and the
-//! large-pool normal approximation remain separate approximation boundaries.
+//! Gaussian, RFL, and multi-factor conditioning use partitioned adaptive
+//! Simpson. Normal tails outside [-10,10] have probability below 1.524e-23.
+//! Student-t uses the copula's product Gauss–Laguerre × Gauss–Hermite rule
+//! by default; nested adaptive Simpson over the mixing variable is opt-in
+//! via `CDSTranchePricerConfig::with_adaptive_student_t_integration`.
+//! When adaptive Student-t is enabled, mixing tails use explicit quantile
+//! bounds and the configured absolute integration tolerance is allocated
+//! across intervals, factors and tails; exhausted refinement produces an
+//! error. Conditional convolution grid error and the large-pool
+//! approximation remain separate approximation boundaries.
 //! Base-correlation differences may clamp only noise inside the combined
 //! integration budget; materially negative tranche losses return an error.
 //!
@@ -47,7 +51,9 @@
 //!
 //! * Supports both homogeneous and heterogeneous portfolios: per-issuer credit
 //!   curves, recovery rates, and weights via `CreditIndexData::issuer_credit_curves`
-//! * Automatically detects uniform portfolios and uses the faster binomial path
+//! * Automatically detects uniform portfolios and uses the faster binomial
+//!   path, or the large-homogeneous-pool closed form above
+//!   `credit::SMALL_POOL_THRESHOLD` names
 //! * Falls back to heterogeneous exact convolution (pools ≤ 64 names) or the
 //!   moment-matched normal approximation for large diversified portfolios
 //!

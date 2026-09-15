@@ -33,6 +33,9 @@ use finstack_quant_core::math::GaussHermiteQuadrature;
 
 use crate::correlation::{Error, Result};
 
+/// Fallible two-valued integrand over a copula factor realization.
+pub type FactorPairIntegrand<'a> = dyn Fn(&[f64]) -> finstack_quant_core::Result<(f64, f64)> + 'a;
+
 /// Copula model for portfolio default correlation.
 ///
 /// Implementations provide the conditional default probability P(τᵢ ≤ t | M)
@@ -163,6 +166,36 @@ pub trait Copula: Send + Sync {
             Some(err) => Err(err),
             None => Ok(value),
         }
+    }
+
+    /// Integrate a two-valued fallible integrand over the copula factors.
+    ///
+    /// The default implementation performs two independent
+    /// [`Self::try_integrate_fn`] passes. Copulas whose quadrature is a
+    /// product rule should override this to accumulate both components in
+    /// one node sweep.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Fallible integrand receiving the copula's factor vector and
+    ///   returning a `(first, second)` pair in the same units as a scalar
+    ///   [`Self::integrate_fn`] integrand.
+    ///
+    /// # Returns
+    ///
+    /// The factor-space expectation of each component when every evaluation
+    /// succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error produced by `f`.
+    fn try_integrate_pair(
+        &self,
+        f: &FactorPairIntegrand<'_>,
+    ) -> finstack_quant_core::Result<(f64, f64)> {
+        let first = self.try_integrate_fn(&|factors| f(factors).map(|pair| pair.0))?;
+        let second = self.try_integrate_fn(&|factors| f(factors).map(|pair| pair.1))?;
+        Ok((first, second))
     }
 
     /// Per-name latent variable `Aᵢ` for a finite-pool Monte Carlo draw.

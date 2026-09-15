@@ -4,7 +4,7 @@ use super::config::CDSTranchePricer;
 use finstack_quant_core::math::integration::adaptive_simpson;
 use finstack_quant_core::math::{chi_squared_quantile, ln_gamma, norm_pdf};
 use finstack_quant_core::{Error, Result};
-use finstack_quant_models::correlation::copula::CopulaSpec;
+use finstack_quant_models::correlation::copula::{CopulaSpec, FactorPairIntegrand};
 use std::cell::RefCell;
 
 /// The omitted two-sided normal mass is below 1.524e-23. Every capped pool
@@ -85,6 +85,9 @@ impl CDSTranchePricer {
         let depth = self.params.integration_max_depth;
         match self.params.copula_spec {
             CopulaSpec::Gaussian => integrate_normal(&|z| f(&[z]), tolerance * 0.5, depth),
+            CopulaSpec::StudentT { .. } if !self.params.adaptive_student_t_integration => {
+                self.copula().try_integrate_fn(f)
+            }
             CopulaSpec::StudentT { degrees_of_freedom } => {
                 // Shared W ~ Gamma(nu/2, nu/2). Integrate log(W), preserving
                 // conditional independence given both Z and W. Explicit
@@ -119,6 +122,23 @@ impl CDSTranchePricer {
                 tolerance / 8.0,
                 depth,
             ),
+        }
+    }
+
+    /// Integrate a two-valued bounded expectation over the copula factors.
+    ///
+    /// Student-t product-Gauss pricing accumulates both components in one
+    /// node sweep. Adaptive and Gaussian paths evaluate each component
+    /// separately.
+    pub(super) fn integrate_factors_pair(&self, f: &FactorPairIntegrand<'_>) -> Result<(f64, f64)> {
+        match self.params.copula_spec {
+            CopulaSpec::StudentT { .. } if !self.params.adaptive_student_t_integration => {
+                self.copula().try_integrate_pair(f)
+            }
+            _ => Ok((
+                self.integrate_factors(&|factors| f(factors).map(|pair| pair.0))?,
+                self.integrate_factors(&|factors| f(factors).map(|pair| pair.1))?,
+            )),
         }
     }
 }
@@ -162,5 +182,62 @@ mod tests {
             let mass = pricer.integrate_factors(&|_| Ok(1.0)).expect("mass");
             assert!((mass - 1.0).abs() < 1e-8, "{spec:?}: mass={mass}");
         }
+    }
+
+    #[test]
+    fn student_t_default_uses_product_gauss_node_count() {
+        let pricer = CDSTranchePricer::with_params(
+            CDSTranchePricerConfig::default()
+                .with_student_t_copula(6.0)
+                .expect("valid df"),
+        )
+        .expect("config");
+        let evals = std::cell::Cell::new(0usize);
+        let mass = pricer
+            .integrate_factors(&|_| {
+                evals.set(evals.get() + 1);
+                Ok(1.0)
+            })
+            .expect("mass");
+        assert!((mass - 1.0).abs() < 1e-8, "mass={mass}");
+        let n = evals.get();
+        assert!(
+            (100..=400).contains(&n),
+            "Student-t product Gauss should evaluate at most 20×20 nodes, got {n}"
+        );
+    }
+
+    #[test]
+    fn student_t_product_gauss_ignores_adaptive_depth() {
+        let pricer = CDSTranchePricer::with_params(CDSTranchePricerConfig {
+            copula_spec: CopulaSpec::student_t(6.0).expect("valid df"),
+            integration_max_depth: 0,
+            ..Default::default()
+        })
+        .expect("config");
+        let mass = pricer.integrate_factors(&|_| Ok(1.0)).expect("mass");
+        assert!((mass - 1.0).abs() < 1e-8, "mass={mass}");
+    }
+
+    #[test]
+    fn student_t_pair_matches_two_scalar_integrals() {
+        let pricer = CDSTranchePricer::with_params(
+            CDSTranchePricerConfig::default()
+                .with_student_t_copula(6.0)
+                .expect("valid df"),
+        )
+        .expect("config");
+        let (first, second) = pricer
+            .integrate_factors_pair(&|factors| {
+                let z = factors[0];
+                Ok((z * z, 1.0))
+            })
+            .expect("pair");
+        let scalar_first = pricer
+            .integrate_factors(&|factors| Ok(factors[0] * factors[0]))
+            .expect("first");
+        let scalar_second = pricer.integrate_factors(&|_| Ok(1.0)).expect("second");
+        assert!((first - scalar_first).abs() < 1e-12);
+        assert!((second - scalar_second).abs() < 1e-12);
     }
 }

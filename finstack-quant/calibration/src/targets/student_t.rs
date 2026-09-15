@@ -33,7 +33,7 @@ use crate::build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOve
 use crate::build::BuildCtx;
 use crate::config::CalibrationConfig;
 use crate::quotes::market_quote::MarketQuote;
-use crate::solver::helpers::bracket_solve_1d_with_diagnostics;
+use crate::solver::helpers::bracket_solve_1d_nearest_first_with_diagnostics;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -215,18 +215,22 @@ impl StudentTTarget {
     ) -> Result<(MarketContext, f64, CalibrationReport)> {
         let (df_lo, df_hi) = self.params.df_bounds;
         let initial_df = self.params.initial_df;
-        let tolerance = self.config.solver.tolerance();
         let max_iters = self.config.solver.max_iterations();
 
         // Separate the root x-tolerance from quadrature-limited residual accuracy.
         const STUDENT_T_UPFRONT_TOLERANCE: f64 = 1e-3;
-        let acceptance_tolerance = tolerance.max(STUDENT_T_UPFRONT_TOLERANCE);
+        let acceptance_tolerance = self
+            .config
+            .solver
+            .tolerance()
+            .max(STUDENT_T_UPFRONT_TOLERANCE);
 
-        let objective = |df: f64| -> f64 {
+        let template = CDSTranchePricerConfig::default();
+        let price_residual = |df: f64| -> f64 {
             if df <= 2.0 || !df.is_finite() {
                 return f64::INFINITY;
             }
-            let Ok(config) = CDSTranchePricerConfig::default().with_student_t_copula(df) else {
+            let Ok(config) = template.clone().with_student_t_copula(df) else {
                 return f64::INFINITY;
             };
             let Ok(pricer) = CDSTranchePricer::with_params(config) else {
@@ -238,63 +242,76 @@ impl StudentTTarget {
             }
         };
 
-        // Generate scan points for bracketing.
-        let scan = self.build_scan_grid(df_lo, df_hi, initial_df);
-
-        let (root, diagnostics) =
-            bracket_solve_1d_with_diagnostics(&objective, initial_df, &scan, tolerance, max_iters)?;
-
-        // Determine result.
-        //
-        // On non-convergence we return `Err` rather than `Ok` with an
-        // uncalibrated fallback `df`: the previous behaviour stored the
-        // fallback in the context and direct callers (those not routed through
-        // the engine's `fail_on_bad_fit` check) silently received a bad
-        // parameter. Returning `Err` makes the failure impossible to ignore —
-        // it propagates through `StudentTTarget::solve` and the `?` in
-        // `step_runtime.rs`.
-        let (calibrated_df, success, reason) = match root {
-            Some(df) if df.is_finite() && df > 2.0 => {
-                let residual = objective(df);
-                if residual.abs() <= acceptance_tolerance {
-                    (
-                        df,
-                        true,
-                        format!("Student-t df calibration converged: df={:.4}", df),
-                    )
-                } else {
+        let residual0 = price_residual(initial_df);
+        let (calibrated_df, eval_count, residual) = if residual0.is_finite()
+            && residual0.abs() <= acceptance_tolerance
+        {
+            (initial_df, 1usize, residual0)
+        } else {
+            let scan = self.build_scan_grid(df_lo, df_hi, initial_df);
+            let (root, diagnostics) = bracket_solve_1d_nearest_first_with_diagnostics(
+                &price_residual,
+                initial_df,
+                &scan,
+                acceptance_tolerance,
+                max_iters,
+            )?;
+            match root {
+                Some(df) if df.is_finite() && df > 2.0 => {
+                    let residual = diagnostics
+                        .best_value
+                        .filter(|_| {
+                            diagnostics
+                                .best_point
+                                .is_some_and(|point| (point - df).abs() < 1e-12)
+                        })
+                        .unwrap_or_else(|| price_residual(df));
+                    if residual.abs() <= acceptance_tolerance {
+                        (df, diagnostics.eval_count, residual)
+                    } else {
+                        return Err(finstack_quant_core::Error::Calibration {
+                            message: format!(
+                                "Student-t df calibration failed: best df={:.4} but residual {:.2e} exceeds tolerance {:.2e}",
+                                df, residual.abs(), acceptance_tolerance
+                            ),
+                            category: "student_t_df".to_string(),
+                        });
+                    }
+                }
+                _ => {
+                    let fallback_df = diagnostics.best_point.unwrap_or(initial_df);
                     return Err(finstack_quant_core::Error::Calibration {
                         message: format!(
-                            "Student-t df calibration failed: best df={:.4} but residual {:.2e} exceeds tolerance {:.2e}",
-                            df, residual.abs(), acceptance_tolerance
+                            "Student-t df calibration failed to converge (bracket_found={}, best df={:.4})",
+                            diagnostics.bracket_found, fallback_df
                         ),
                         category: "student_t_df".to_string(),
                     });
                 }
             }
-            _ => {
-                let fallback_df = diagnostics.best_point.unwrap_or(initial_df);
-                return Err(finstack_quant_core::Error::Calibration {
-                    message: format!(
-                        "Student-t df calibration failed to converge (bracket_found={}, best df={:.4})",
-                        diagnostics.bracket_found, fallback_df
-                    ),
-                    category: "student_t_df".to_string(),
-                });
-            }
         };
 
-        // Clamp to bounds.
-        let calibrated_df = calibrated_df.clamp(df_lo, df_hi);
+        let unclamped_df = calibrated_df;
+        let calibrated_df = unclamped_df.clamp(df_lo, df_hi);
+        let final_residual = if (calibrated_df - unclamped_df).abs() < 1e-12 {
+            residual
+        } else {
+            price_residual(calibrated_df)
+        };
+
+        let success = true;
+        let reason = format!(
+            "Student-t df calibration converged: df={:.4}",
+            calibrated_df
+        );
 
         let mut residuals = BTreeMap::new();
-        let final_residual = objective(calibrated_df);
         residuals.insert(
             format!("{}_df", self.params.tranche_instrument_id),
             final_residual,
         );
 
-        let report = CalibrationReport::new(residuals, diagnostics.eval_count, success, &reason)
+        let report = CalibrationReport::new(residuals, eval_count, success, &reason)
             .with_metadata("calibration_type", "student_t_df")
             .with_metadata("tranche_instrument_id", &self.params.tranche_instrument_id)
             .with_metadata("calibrated_df", format!("{:.6}", calibrated_df))

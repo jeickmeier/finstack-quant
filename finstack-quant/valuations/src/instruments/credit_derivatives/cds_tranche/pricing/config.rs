@@ -125,11 +125,22 @@ pub struct CDSTranchePricerConfig {
     /// Absolute numerical integration budget in portfolio-notional fractions
     /// (default `1e-10`). Must lie in `[1e-12, 1e-4]`. Tail truncation and
     /// nested-factor quadrature each consume a share of this budget.
+    ///
+    /// Student-t pricing uses the copula's product Gauss rule by default and
+    /// ignores this budget unless
+    /// [`Self::adaptive_student_t_integration`] is enabled.
     pub integration_tolerance: f64,
     /// Maximum adaptive subdivisions per conditioning interval (default 20).
     /// Zero permits only the initial refinement check. The summed absolute
     /// quadrature error must meet the total budget, or pricing fails.
+    ///
+    /// Student-t product-Gauss pricing ignores this depth.
     pub integration_max_depth: usize,
+    /// When `true`, Student-t factor integrals use nested adaptive Simpson
+    /// subject to [`Self::integration_tolerance`]. When `false` (default),
+    /// Student-t uses the copula's fixed product Gauss–Laguerre ×
+    /// Gauss–Hermite rule.
+    pub adaptive_student_t_integration: bool,
     /// Whether to use issuer-specific curves if available
     pub use_issuer_curves: bool,
     /// Minimum correlation value for numerical stability
@@ -179,6 +190,7 @@ impl Default for CDSTranchePricerConfig {
             // Numerical integration
             integration_tolerance: DEFAULT_INTEGRATION_TOLERANCE,
             integration_max_depth: 20,
+            adaptive_student_t_integration: false,
             use_issuer_curves: true,
             min_correlation: DEFAULT_MIN_CORRELATION,
             max_correlation: DEFAULT_MAX_CORRELATION,
@@ -216,9 +228,8 @@ impl CDSTranchePricerConfig {
     pub fn validate(&self) -> CoreResult<()> {
         match &self.copula_spec {
             CopulaSpec::Gaussian | CopulaSpec::MultiFactor => {}
-            CopulaSpec::StudentT { .. } => {
-                self.copula_spec
-                    .build()
+            CopulaSpec::StudentT { degrees_of_freedom } => {
+                CopulaSpec::student_t(*degrees_of_freedom)
                     .map_err(|error| CoreError::Validation(error.to_string()))?;
             }
             CopulaSpec::RandomFactorLoading { loading_volatility } => {
@@ -361,9 +372,29 @@ impl CDSTranchePricerConfig {
     ///
     /// * `tolerance` - Absolute error budget in portfolio-notional fractions,
     ///   between `1e-12` and `1e-4`. Validated when constructing the pricer.
+    ///   Student-t product-Gauss pricing ignores this budget unless
+    ///   [`Self::with_adaptive_student_t_integration`] is enabled.
     #[must_use]
     pub fn with_integration_tolerance(mut self, tolerance: f64) -> Self {
         self.integration_tolerance = tolerance;
+        self
+    }
+
+    /// Choose nested adaptive Simpson for Student-t factor integrals.
+    ///
+    /// The default Student-t path uses the copula's product Gauss rule.
+    /// Enable this only when a caller must meet
+    /// [`Self::integration_tolerance`] rather than the fixed quadrature
+    /// accuracy.
+    ///
+    /// # Arguments
+    ///
+    /// * `enabled` - `true` to use nested adaptive Simpson over the Student-t
+    ///   mixing variable and systematic factor; `false` (default) to use
+    ///   product Gauss–Laguerre × Gauss–Hermite quadrature.
+    #[must_use]
+    pub fn with_adaptive_student_t_integration(mut self, enabled: bool) -> Self {
+        self.adaptive_student_t_integration = enabled;
         self
     }
 }
@@ -412,8 +443,10 @@ pub enum HeteroMethod {
 /// and optional stochastic recovery for market-standard tranche pricing.
 ///
 /// The copula instance is constructed lazily and cached for the pricer's
-/// lifetime. Expected losses use adaptive integration over every conditioning
-/// factor with explicit tail and convergence budgets.
+/// lifetime. Gaussian, RFL, and multi-factor expected losses use adaptive
+/// integration over every conditioning factor with explicit tail and
+/// convergence budgets. Student-t uses the copula's product Gauss rule
+/// unless adaptive integration is enabled.
 ///
 /// Configuration is validated by [`CDSTranchePricer::with_params`] and remains
 /// immutable for the pricer's lifetime. The cached copula
