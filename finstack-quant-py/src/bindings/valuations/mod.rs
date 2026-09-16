@@ -18,6 +18,7 @@ pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
 mod typed_legs;
 pub(crate) mod typed_rates;
+pub(crate) mod typed_revolving_credit;
 pub(crate) mod typed_structured_credit;
 
 use crate::bindings::pandas_utils::{
@@ -661,6 +662,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_equity::register(py, &m)?;
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
+    typed_revolving_credit::register(py, &m)?;
     pricing::register(py, &m)?;
     structured_credit::register(&m)?;
     let mut exports = vec![
@@ -718,6 +720,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_equity::EXPORTS);
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);
+    exports.extend_from_slice(typed_revolving_credit::EXPORTS);
     exports.extend_from_slice(pricing::EXPORTS);
     exports.sort_unstable();
     exports.dedup();

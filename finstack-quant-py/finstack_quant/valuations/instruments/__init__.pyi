@@ -23,6 +23,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
+from finstack_quant.cashflows.builder import CashFlowSchedule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import MarketContext
@@ -15883,6 +15884,127 @@ class AssetPool:
             If ``value`` does not match the ``PoolAsset`` list shape.
         """
         ...
+    def with_instruments(
+        self,
+        bonds: list[Bond] | None = None,
+        term_loans: list[TermLoan] | None = None,
+        revolvers: list[RevolvingCredit] | None = None,
+        call_exercise: str | dict[str, Any] | None = None,
+        put_exercise: str | dict[str, Any] | None = None,
+        overrides: list[dict[str, Any]] | None = None,
+    ) -> AssetPool:
+        """
+        Attach real instruments as the collateral, returning a new pool.
+
+        The pool then holds ``Bond``, ``TermLoan`` and ``RevolvingCredit``
+        instruments instead of asset rows or representative lines; each
+        instrument's own cashflow schedule drives the deal, defaults come from
+        the instrument's credit curve when present, and collateral draws are
+        funded from the reserve account (see :meth:`with_reserve`).
+
+        Parameters
+        ----------
+        bonds : list[Bond], optional
+            Bonds in any form (fixed, floating, step-up, amortizing, callable).
+        term_loans : list[TermLoan], optional
+            Term loans, including delayed-draw facilities.
+        revolvers : list[RevolvingCredit], optional
+            Revolving facilities; stochastic ones simulate draws on the paths.
+        call_exercise : str | dict[str, Any], optional
+            Default issuer-call policy: ``"contractual"`` (never, the default),
+            ``"first_call"``, ``"worst"`` (yield-to-worst, needs a quoted clean
+            price) or ``{"policy": "refinancing_incentive", "threshold_bp": 50.0}``.
+        put_exercise : str | dict[str, Any], optional
+            Default holder-put policy: ``"never"`` (default) or ``"first_put"``.
+        overrides : list[dict[str, Any]], optional
+            Per-instrument overrides ``{"id": ..., "call": {...}, "put": {...}}``.
+
+        Returns
+        -------
+        AssetPool
+            A new pool with ``instruments`` set (the original is unchanged).
+
+        Raises
+        ------
+        ValueError
+            If a policy or override does not match its serde shape.
+        TypeError
+            If a list element is not the expected typed instrument.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.currency import Currency
+        >>> from finstack_quant.valuations.instruments import AssetPool, Bond, RevolvingCredit
+        >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_instruments(
+        ...     bonds=[Bond.example()],
+        ...     revolvers=[RevolvingCredit.example()],
+        ...     call_exercise="first_call",
+        ... )
+        >>> sorted(pool.instruments)
+        ['bonds', 'call_exercise', 'overrides', 'put_exercise', 'revolvers', 'term_loans']
+        """
+        ...
+    def with_reserve(
+        self,
+        reserve_account: Money | float,
+        reserve_account_rate: float = 0.0,
+        reserve_target: Money | float | None = None,
+        reserve_interest_destination: str | dict[str, Any] | None = None,
+        currency: str | None = None,
+    ) -> AssetPool:
+        """
+        Configure the reserve account, returning a new pool.
+
+        The reserve funds collateral draws (revolver utilization increases,
+        delayed draws and loan-equivalent draws at default), is replenished by
+        revolver repayments up to ``reserve_target``, and earns
+        ``reserve_account_rate`` routed per ``reserve_interest_destination``.
+
+        Parameters
+        ----------
+        reserve_account : Money | float
+            Opening reserve balance; a bare number needs ``currency``.
+        reserve_account_rate : float, default 0.0
+            Annual interest rate earned by the reserve, as a decimal (simple
+            ACT/360 on the opening balance each period).
+        reserve_target : Money | float, optional
+            Balance revolver repayments replenish toward; ``None`` disables
+            replenishment.
+        reserve_interest_destination : str | dict[str, Any], optional
+            ``"waterfall"`` (default, interest proceeds), ``"retain"``
+            (capitalized into the reserve) or
+            ``{"kind": "tranche", "tranche_id": "EQ"}`` (paid directly to that
+            tranche).
+        currency : str, optional
+            ISO-4217 code applied when a bare number is passed.
+
+        Returns
+        -------
+        AssetPool
+            A new pool with the reserve configured (the original is unchanged).
+
+        Raises
+        ------
+        ValueError
+            If an amount is not finite, a bare number has no currency, or the
+            destination does not match its serde shape.
+        TypeError
+            If an amount is neither ``Money`` nor a number.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.currency import Currency
+        >>> from finstack_quant.core.money import Money
+        >>> from finstack_quant.valuations.instruments import AssetPool
+        >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reserve(
+        ...     Money(5_000_000.0, Currency("USD")),
+        ...     reserve_account_rate=0.03,
+        ...     reserve_interest_destination={"kind": "tranche", "tranche_id": "EQ"},
+        ... )
+        >>> (pool.reserve_account_rate, pool.reserve_interest_destination["kind"])
+        (0.03, 'tranche')
+        """
+        ...
 
     @staticmethod
     def from_json(json: str) -> AssetPool:
@@ -16155,6 +16277,75 @@ class AssetPool:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reserve_account_rate(self) -> float:
+        """
+        Annual interest rate earned by the reserve account, as a decimal.
+
+        Returns
+        -------
+        float
+            The reserve rate (``0.0`` when the reserve earns nothing).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reserve_target(self) -> Money | None:
+        """
+        Reserve balance revolver repayments replenish toward, or ``None``.
+
+        Returns
+        -------
+        Money | None
+            The target balance, or ``None`` when replenishment is disabled.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reserve_interest_destination(self) -> dict[str, Any]:
+        """
+        Destination of the reserve interest as its serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"kind": "waterfall"}``, ``{"kind": "retain"}`` or
+            ``{"kind": "tranche", "tranche_id": ...}``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def instruments(self) -> dict[str, Any] | None:
+        """
+        Instrument collateral as its serde ``dict``, or ``None``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``bonds``, ``term_loans``, ``revolvers``, ``call_exercise``,
+            ``put_exercise`` and ``overrides``; ``None`` when the pool is
+            modelled with asset rows or representative lines.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
         """
         ...
 
@@ -17662,6 +17853,82 @@ class StructuredCredit:
             If canonical serialization fails.
         """
         ...
+    def price_stochastic(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+        num_paths: int | None = None,
+        antithetic: bool = True,
+    ) -> StochasticPricingResult:
+        """
+        Price the deal with the scenario-waterfall Monte Carlo engine.
+
+        Every path runs the full period loop and waterfall on simulated
+        prepayment, default and recovery paths (and, for pools of real
+        instruments, per-name defaults and simulated revolver draws).
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context with the deal's discount curve and every curve the
+            collateral references.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date (ISO 8601 strings accepted).
+        num_paths : int, optional
+            Number of Monte Carlo paths; defaults to the deal's configured
+            ``mc_paths`` override or 10,000.
+        antithetic : bool, default True
+            Use antithetic variates (pairs share random numbers).
+
+        Returns
+        -------
+        StochasticPricingResult
+            Deal and tranche present values, loss statistics, Monte Carlo
+            error, draw diagnostics and the draw option cost.
+
+        Raises
+        ------
+        ValueError
+            If the deal fails validation or ``num_paths`` is zero.
+        KeyError
+            If a required curve is missing from ``market``.
+        RuntimeError
+            If the simulation fails.
+        """
+        ...
+    def run_simulation_with_diagnostics(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    ) -> SimulationDiagnostics:
+        """
+        Run the deterministic simulation and return the deal-level accounting.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context with the deal's discount curve and every curve the
+            collateral references.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date (ISO 8601 strings accepted).
+
+        Returns
+        -------
+        SimulationDiagnostics
+            Reserve balance and interest per period, draw funding by source
+            and unfunded draws.
+
+        Raises
+        ------
+        ValueError
+            If the deal fails validation or (for instrument collateral) the
+            contractual draw calendar cannot be funded.
+        KeyError
+            If a required curve is missing from ``market``.
+        RuntimeError
+            If the simulation fails.
+        """
+        ...
 
 class StructuredCreditBuilder:
     """
@@ -18213,6 +18480,7 @@ def price_instrument(
     | ConvertibleBond
     | EquityOption
     | StructuredCredit
+    | RevolvingCredit
     | CompositeInstrument,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
@@ -18346,6 +18614,7 @@ def instrument_cashflows_json(
     | ConvertibleBond
     | EquityOption
     | StructuredCredit
+    | RevolvingCredit
     | CompositeInstrument,
     market: MarketContext | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
@@ -18481,7 +18750,7 @@ def list_standard_metrics() -> list[str]:
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
     >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (218, True, True)
+    (219, True, True)
     """
     ...
 
@@ -18506,6 +18775,2016 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     (True, True)
     """
     ...
+
+class RevolvingCredit:
+    """
+    Typed wrapper for the canonical Rust ``RevolvingCredit`` instrument.
+
+    Construct via :meth:`RevolvingCredit.builder`, the
+    :meth:`RevolvingCredit.example` preset or :meth:`RevolvingCredit.from_json`.
+    Every public Rust field is readable as a property; :meth:`price` /
+    :meth:`metric` run the same pricer as :func:`price_instrument`. Stochastic
+    facilities (a ``draw_repay_spec`` of kind ``"stochastic"``) additionally
+    expose :meth:`price_with_paths` and their path-averaged
+    :meth:`expected_cashflows`. Instances are accepted directly by
+    :func:`price_instrument` and :meth:`AssetPool.with_instruments`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import RevolvingCredit
+    >>> facility = RevolvingCredit.example()
+    >>> (facility.id, facility.is_stochastic)
+    ('RCF-USD-3Y', False)
+    """
+
+    @staticmethod
+    def builder() -> RevolvingCreditBuilder:
+        """
+        Create a fluent builder (mirrors Rust ``RevolvingCredit::builder()``).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            A builder with fluent, consuming setter methods.
+
+        Notes
+        -----
+        This factory does not raise; it returns an empty builder.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import RevolvingCredit
+        >>> builder = RevolvingCredit.builder()
+        >>> builder.id("RCF-1") is builder
+        True
+        """
+        ...
+    @staticmethod
+    def example() -> RevolvingCredit:
+        """
+        Canonical example: USD 50M three-year SOFR + 250bp facility with USD 10M drawn and a scheduled draw and repayment (mirrors Rust ``RevolvingCredit::example``).
+
+        Returns
+        -------
+        RevolvingCredit
+            The example facility.
+
+        Raises
+        ------
+        ValueError
+            If construction fails (should not occur).
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import RevolvingCredit
+        >>> RevolvingCredit.example().id
+        'RCF-USD-3Y'
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> RevolvingCredit:
+        """
+        Deserialize a validated facility from its canonical v1 envelope.
+
+        Parameters
+        ----------
+        json : str
+            A ``finstack_quant.instrument/1`` envelope containing an exact
+            ``"revolving_credit"`` payload. The UTF-8 input must not exceed
+            16 MiB. Bare payloads and cross-type coercion are rejected.
+
+        Returns
+        -------
+        RevolvingCredit
+            The validated facility represented by the payload.
+
+        Raises
+        ------
+        ValueError
+            If the input exceeds 16 MiB, is malformed, has an unsupported
+            envelope schema, carries a type other than ``"revolving_credit"``,
+            or fails facility validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import RevolvingCredit
+        >>> facility = RevolvingCredit.example()
+        >>> RevolvingCredit.from_json(facility.to_json()).id == facility.id
+        True
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
+
+        Returns
+        -------
+        str
+            Envelope accepted by :func:`price_instrument` and :meth:`from_json`.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Serde form of the facility as a Python ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            Canonical serde shape of the Rust ``RevolvingCredit``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(RevolvingCredit.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+    def price(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+        model: str = "default",
+        metrics: list[str] | None = None,
+        pricing_options: dict[str, object] | str | None = None,
+        market_history: str | None = None,
+    ) -> ValuationResult:
+        """
+        Price this facility and return a :class:`~finstack_quant.valuations.ValuationResult`.
+
+        Same pipeline and keyword surface as :func:`price_instrument`; a
+        stochastic ``draw_repay_spec`` prices by Monte Carlo, a deterministic
+        one on its contractual schedule.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or its JSON string.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date (ISO 8601 strings accepted).
+        model : str, default "default"
+            Model key.
+        metrics : list[str], optional
+            Metric identifiers to compute (for example ``"dv01"`` or
+            ``"draw_option_cost"``).
+        pricing_options : dict[str, object] | str, optional
+            ``MetricPricingOverrides`` merged into the instrument's own overrides.
+        market_history : str, optional
+            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+            ``expected_shortfall``.
+
+        Returns
+        -------
+        ValuationResult
+            Typed valuation envelope with price, currency and metrics.
+
+        Raises
+        ------
+        ValueError
+            If an input cannot be interpreted or the instrument fails validation.
+        KeyError
+            If a required curve or metric is missing from ``market``.
+        RuntimeError
+            If pricing or a metric computation fails.
+        """
+        ...
+    def metric(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+        metric_id: str,
+        model: str = "default",
+    ) -> float:
+        """
+        Compute one scalar metric for this facility (e.g. ``"dv01"`` or ``"draw_option_cost"``).
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or its JSON string.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date.
+        metric_id : str
+            Registered metric identifier.
+        model : str, default "default"
+            Model key.
+
+        Returns
+        -------
+        float
+            The metric value.
+
+        Raises
+        ------
+        ValueError
+            If ``metric_id`` is unknown or an input cannot be interpreted.
+        KeyError
+            If a required curve is missing from ``market``.
+        RuntimeError
+            If the metric computation fails.
+        """
+        ...
+    def price_with_paths(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    ) -> EnhancedMonteCarloResult:
+        """
+        Run the stochastic Monte Carlo valuation and keep every path.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context with the discount curve, the index forward curve and
+            fixings for floating facilities, and the hazard curve for
+            market-anchored spread processes.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date; the simulation starts here with the current drawn
+            amount.
+
+        Returns
+        -------
+        EnhancedMonteCarloResult
+            Present value and draw option cost estimates plus every path.
+
+        Raises
+        ------
+        ValueError
+            If the facility has a deterministic ``draw_repay_spec`` or fails
+            validation.
+        KeyError
+            If a required curve is missing from ``market``.
+        RuntimeError
+            If the simulation fails.
+        """
+        ...
+    def expected_cashflows(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    ) -> CashFlowSchedule:
+        """
+        Cashflow schedule of the facility: contractual for a deterministic ``draw_repay_spec``, path-averaged for a stochastic one.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context with the curves the schedule projects from.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date; flows are projected from this date.
+
+        Returns
+        -------
+        CashFlowSchedule
+            Dated interest, fee and principal flows from the lender's
+            perspective (draws negative, repayments positive).
+
+        Raises
+        ------
+        ValueError
+            If the facility fails validation or the schedule cannot be built.
+        KeyError
+            If a required curve is missing from ``market``.
+        """
+        ...
+    def market_dependencies(self) -> dict[str, Any]:
+        """
+        Market-data dependencies (curves, fixings) as a dict.
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust ``MarketDependencies``.
+
+        Raises
+        ------
+        ValueError
+            If the instrument cannot enumerate its dependencies.
+        """
+        ...
+    @property
+    def id(self) -> str:
+        """
+        Instrument identifier.
+
+        Returns
+        -------
+        str
+            Stable identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def commitment_amount(self) -> Money:
+        """
+        Total committed amount.
+
+        Returns
+        -------
+        Money
+            Currency-tagged commitment.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def drawn_amount(self) -> Money:
+        """
+        Drawn amount at the commitment date (deterministic schedules) or at the valuation anchor (stochastic facilities).
+
+        Returns
+        -------
+        Money
+            Currency-tagged drawn balance.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def commitment_date(self) -> datetime.date:
+        """
+        Date the facility becomes available.
+
+        Returns
+        -------
+        datetime.date
+            The commitment date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def maturity(self) -> datetime.date:
+        """
+        Expiry of the commitment.
+
+        Returns
+        -------
+        datetime.date
+            The maturity date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def base_rate_spec(self) -> dict[str, Any]:
+        """
+        Base-rate specification as its serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"fixed": {"rate": r}}`` or ``{"floating": {...}}``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
+    def day_count(self) -> DayCount:
+        """
+        Interest accrual day count.
+
+        Returns
+        -------
+        DayCount
+            The accrual convention.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def frequency(self) -> Tenor:
+        """
+        Payment frequency for interest and fees.
+
+        Returns
+        -------
+        Tenor
+            The payment tenor.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def fees(self) -> dict[str, Any]:
+        """
+        Fee structure as its serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers`` and
+            ``facility_fee_bp``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
+    def draw_repay_spec(self) -> dict[str, Any]:
+        """
+        Draw/repay specification as its serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``{"deterministic": [...]}`` or ``{"stochastic": {...}}``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
+    def is_stochastic(self) -> bool:
+        """
+        Whether utilization is simulated (stochastic ``draw_repay_spec``).
+
+        Returns
+        -------
+        bool
+            ``True`` for a stochastic facility.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def discount_curve_id(self) -> str:
+        """
+        Discount curve identifier.
+
+        Returns
+        -------
+        str
+            The curve id.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def credit_curve_id(self) -> str | None:
+        """
+        Credit (hazard) curve identifier, or ``None``.
+
+        Returns
+        -------
+        str | None
+            The curve id when the facility carries credit risk.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def recovery_rate(self) -> float:
+        """
+        Recovery rate on default, as a decimal in ``[0, 1]``.
+
+        Returns
+        -------
+        float
+            The recovery fraction.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def leq(self) -> float:
+        """
+        Loan-equivalent exposure: fraction of the undrawn commitment drawn at default, as a decimal in ``[0, 1]``.
+
+        Returns
+        -------
+        float
+            The loan-equivalent exposure.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def stub(self) -> StubKind:
+        """
+        Stub rule for schedule generation.
+
+        Returns
+        -------
+        StubKind
+            The stub kind.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def attributes(self) -> Attributes:
+        """
+        Scenario-selection attributes.
+
+        Returns
+        -------
+        Attributes
+            The attribute map.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def default_model(self) -> str:
+        """
+        Default pricing model key from the ``Instrument`` trait.
+
+        Returns
+        -------
+        str
+            The model key.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expiry(self) -> datetime.date | None:
+        """
+        Expiry date exposed by the ``Instrument`` trait, or ``None``.
+
+        Returns
+        -------
+        datetime.date | None
+            The expiry date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class RevolvingCreditBuilder:
+    """
+    Fluent builder for :class:`RevolvingCredit`; wraps the Rust
+    ``FinancialBuilder`` output one setter for one setter.
+
+    Builders are consumed by ``build()``; create a new builder per facility.
+    Required fields: ``id``, ``commitment_amount``, ``drawn_amount``,
+    ``commitment_date``, ``maturity``, ``base_rate_spec``, ``day_count``,
+    ``frequency``, ``fees`` (or :meth:`fees_flat`), ``draw_repay_spec``,
+    ``discount_curve_id`` and ``recovery_rate``. Nested specs accept a
+    ``dict`` or JSON ``str`` in the Rust serde shape.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.valuations.instruments import RevolvingCredit
+    >>> facility = (
+    ...     RevolvingCredit
+    ...     .builder()
+    ...     .id("RCF-1")
+    ...     .commitment_amount(Money(50_000_000.0, Currency("USD")))
+    ...     .drawn_amount(Money(10_000_000.0, Currency("USD")))
+    ...     .commitment_date(datetime.date(2024, 1, 15))
+    ...     .maturity(datetime.date(2027, 1, 15))
+    ...     .base_rate_spec(0.06)
+    ...     .day_count("act_360")
+    ...     .frequency("3M")
+    ...     .fees_flat(25.0, 10.0, 5.0)
+    ...     .draw_repay_spec({"deterministic": []})
+    ...     .discount_curve_id("USD-OIS")
+    ...     .recovery_rate(0.4)
+    ...     .build()
+    ... )
+    >>> facility.is_stochastic
+    False
+    """
+
+    def id(self, value: str) -> RevolvingCreditBuilder:
+        """
+        Set the instrument identifier.
+
+        Parameters
+        ----------
+        value : str
+            Unique identifier for the facility.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+    def commitment_amount(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+        """
+        Set the total commitment.
+
+        Parameters
+        ----------
+        value : Money | float
+            Commitment; a bare number needs ``currency``.
+        currency : str, optional
+            ISO-4217 code applied when ``value`` is a bare number.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the amount is not finite, a bare number has no currency, or the
+            builder was already consumed.
+        TypeError
+            If ``value`` is neither ``Money`` nor a number.
+        """
+        ...
+    def drawn_amount(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+        """
+        Set the drawn amount at the commitment date (or the valuation anchor for stochastic facilities).
+
+        Parameters
+        ----------
+        value : Money | float
+            Drawn balance; a bare number needs ``currency``.
+        currency : str, optional
+            ISO-4217 code applied when ``value`` is a bare number.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the amount is not finite, a bare number has no currency, or the
+            builder was already consumed.
+        TypeError
+            If ``value`` is neither ``Money`` nor a number.
+        """
+        ...
+    def commitment_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:
+        """
+        Set the date the facility becomes available.
+
+        Parameters
+        ----------
+        value : datetime.date | datetime.datetime | pd.Timestamp | str
+            Commitment date (ISO 8601 strings accepted).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date or the builder was already consumed.
+        """
+        ...
+    def maturity(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:
+        """
+        Set the expiry of the commitment.
+
+        Parameters
+        ----------
+        value : datetime.date | datetime.datetime | pd.Timestamp | str
+            Maturity date (ISO 8601 strings accepted).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date or the builder was already consumed.
+        """
+        ...
+    def base_rate_spec(self, value: float | dict[str, Any] | str) -> RevolvingCreditBuilder:
+        """
+        Set the base rate.
+
+        Parameters
+        ----------
+        value : float | dict[str, Any] | str
+            A bare decimal builds a fixed rate (``0.06`` = 6%); a ``dict`` or
+            JSON ``str`` in the ``BaseRateSpec`` serde shape
+            (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
+            ``FloatingRateSpec``) is used verbatim.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the spec does not match the serde shape or the builder was
+            already consumed.
+        """
+        ...
+    def day_count(self, value: DayCount | str) -> RevolvingCreditBuilder:
+        """
+        Set the interest accrual day count.
+
+        Parameters
+        ----------
+        value : DayCount | str
+            Day count object or serde name (``"act_360"``, ``"act_365f"``,
+            ``"30_360"``, ...).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the name is unknown or the builder was already consumed.
+        TypeError
+            If ``value`` is neither ``DayCount`` nor ``str``.
+        """
+        ...
+    def frequency(self, value: Tenor | str) -> RevolvingCreditBuilder:
+        """
+        Set the payment frequency for interest and fees.
+
+        Parameters
+        ----------
+        value : Tenor | str
+            Tenor object or string such as ``"3M"``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the tenor cannot be parsed or the builder was already consumed.
+        TypeError
+            If ``value`` is neither ``Tenor`` nor ``str``.
+        """
+        ...
+    def fees(self, value: dict[str, Any] | str) -> RevolvingCreditBuilder:
+        """
+        Set the fee structure from its serde shape.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str
+            ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
+            (``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers``,
+            ``facility_fee_bp``).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the spec does not match the serde shape or the builder was
+            already consumed.
+        """
+        ...
+    def fees_flat(
+        self, commitment_fee_bp: float, usage_fee_bp: float, facility_fee_bp: float
+    ) -> RevolvingCreditBuilder:
+        """
+        Set flat (non-tiered) fees in basis points (mirrors Rust ``RevolvingCreditFees::flat``).
+
+        Parameters
+        ----------
+        commitment_fee_bp : float
+            Annual commitment fee on the undrawn amount, in basis points;
+            values ``<= 0`` produce no commitment fee.
+        usage_fee_bp : float
+            Annual usage fee on the drawn amount, in basis points.
+        facility_fee_bp : float
+            Annual facility fee on the total commitment, in basis points.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If a rate is not finite or the builder was already consumed.
+        """
+        ...
+    def draw_repay_spec(self, value: dict[str, Any] | str) -> RevolvingCreditBuilder:
+        """
+        Set the draw/repay specification from its serde shape.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str
+            ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
+            ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
+            or ``{"stochastic": {"utilization_process": {...}, "num_paths": ..., ...}}``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the spec does not match the serde shape or the builder was
+            already consumed.
+        """
+        ...
+    def discount_curve_id(self, value: str) -> RevolvingCreditBuilder:
+        """
+        Set the discount curve identifier.
+
+        Parameters
+        ----------
+        value : str
+            Discount curve id in the market context.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def credit_curve_id(self, value: str | None) -> RevolvingCreditBuilder:
+        """
+        Set (or clear) the credit curve identifier.
+
+        Parameters
+        ----------
+        value : str | None
+            Hazard curve id used for survival weighting; ``None`` prices
+            without credit risk. A stochastic facility with a credit curve must
+            use a market-anchored spread process on the same curve.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def recovery_rate(self, value: float) -> RevolvingCreditBuilder:
+        """
+        Set the recovery rate on default.
+
+        Parameters
+        ----------
+        value : float
+            Recovery fraction as a decimal in ``[0, 1]``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def leq(self, value: float) -> RevolvingCreditBuilder:
+        """
+        Set the loan-equivalent exposure drawn at default.
+
+        Parameters
+        ----------
+        value : float
+            Fraction of the undrawn commitment assumed drawn at default, as a
+            decimal in ``[0, 1]`` (default ``0.0``).
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def stub(self, value: StubKind | str) -> RevolvingCreditBuilder:
+        """
+        Set the stub rule for schedule generation.
+
+        Parameters
+        ----------
+        value : StubKind | str
+            Stub kind object or serde name (``"short_front"``, ``"short_back"``,
+            ``"long_front"``, ``"long_back"``, ``"none"``); default
+            ``"short_front"``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the name is unknown or the builder was already consumed.
+        TypeError
+            If ``value`` is neither ``StubKind`` nor ``str``.
+        """
+        ...
+    def attributes(self, value: Attributes | dict[str, str] | None) -> RevolvingCreditBuilder:
+        """
+        Set scenario-selection attributes.
+
+        Parameters
+        ----------
+        value : Attributes | dict[str, str] | None
+            Attribute map; ``None`` clears it.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        TypeError
+            If ``value`` is neither ``Attributes`` nor a ``dict``.
+        """
+        ...
+    def build(self) -> RevolvingCredit:
+        """
+        Consume the builder and validate the facility.
+
+        Returns
+        -------
+        RevolvingCredit
+            The validated facility.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed, a required field is missing
+            (the message names the field), or the facility fails validation.
+        """
+        ...
+
+class EnhancedMonteCarloResult:
+    """
+    Monte Carlo result of a stochastic revolving credit facility with every
+    simulated path retained (:meth:`RevolvingCredit.price_with_paths`'s return
+    value).
+
+    The present value and the draw option cost are antithetic-aware estimates
+    (mean, standard error, 95% interval); :attr:`path_pvs` and
+    :attr:`path_draw_option_costs` carry the per-path values in path order and
+    :meth:`to_dataframe` tabulates them.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> import json
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.valuations.instruments import RevolvingCredit
+    >>> envelope = json.loads(RevolvingCredit.example().to_json())
+    >>> spec = envelope["instrument"]["spec"]
+    >>> spec["base_rate_spec"] = {"fixed": {"rate": 0.06}}
+    >>> spec["draw_repay_spec"] = {
+    ...     "stochastic": {
+    ...         "utilization_process": {"mean_reverting": {"target_rate": 0.6, "speed": 1.0, "volatility": 0.25}},
+    ...         "num_paths": 16,
+    ...         "seed": 42,
+    ...         "mc_config": {
+    ...             "recovery_rate": spec["recovery_rate"],
+    ...             "credit_spread_process": {"constant": 0.025},
+    ...         },
+    ...     }
+    ... }
+    >>> facility = RevolvingCredit.from_json(json.dumps(envelope))
+    >>> as_of = datetime.date(2024, 1, 15)
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    >>> result = facility.price_with_paths(market, as_of)
+    >>> (result.num_simulated_paths, len(result.path_pvs), result.pv.currency.code)
+    (16, 16, 'USD')
+    >>> list(result.to_dataframe().columns)
+    ['path', 'pv', 'draw_option_cost']
+    """
+
+    @staticmethod
+    def from_json(json: str) -> EnhancedMonteCarloResult:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``EnhancedMonteCarloResult`` (the exact shape
+            ``to_json`` writes, including every path's cashflow schedule).
+
+        Returns
+        -------
+        EnhancedMonteCarloResult
+            The decoded result.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not valid JSON for the result shape.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import EnhancedMonteCarloResult
+        >>> try:
+        ...     EnhancedMonteCarloResult.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            JSON-encoded result, including every path's cashflow schedule and
+            factor paths.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust result.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(EnhancedMonteCarloResult.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        One row per simulated path as a pandas ``DataFrame``.
+
+        Columns: ``path`` (index in path order), ``pv`` and
+        ``draw_option_cost`` (facility currency units).
+
+        Returns
+        -------
+        pd.DataFrame
+            The per-path distribution of present value and draw option cost.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def pv(self) -> Money:
+        """
+        Mean present value across paths (facility currency).
+
+        Returns
+        -------
+        Money
+            Currency-tagged mean present value.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pv_std_error(self) -> float:
+        """
+        Standard error of the mean present value, in currency units.
+
+        Returns
+        -------
+        float
+            The standard error.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pv_ci_95(self) -> tuple[Money, Money]:
+        """
+        95% confidence interval of the mean present value.
+
+        Returns
+        -------
+        tuple[Money, Money]
+            Lower and upper bounds.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def num_paths(self) -> int:
+        """
+        Number of independent path estimators (antithetic pairs count once).
+
+        Returns
+        -------
+        int
+            The estimator count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def num_simulated_paths(self) -> int:
+        """
+        Number of simulated paths, including both members of antithetic pairs.
+
+        Returns
+        -------
+        int
+            The simulated path count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draw_option_cost(self) -> Money:
+        """
+        Mean draw option cost across paths (facility currency): the value to the lender of the simulated draws having been made at the contractual margin instead of each path's fair spread; negative when spreads widen after draws.
+
+        Returns
+        -------
+        Money
+            Currency-tagged mean draw option cost.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draw_option_cost_std_error(self) -> float:
+        """
+        Standard error of the mean draw option cost, in currency units.
+
+        Returns
+        -------
+        float
+            The standard error.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draw_option_cost_ci_95(self) -> tuple[Money, Money]:
+        """
+        95% confidence interval of the mean draw option cost.
+
+        Returns
+        -------
+        tuple[Money, Money]
+            Lower and upper bounds.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def path_pvs(self) -> list[float]:
+        """
+        Present value of every simulated path, in path order.
+
+        Returns
+        -------
+        list[float]
+            Per-path present values in currency units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+    @property
+    def path_draw_option_costs(self) -> list[float]:
+        """
+        Draw option cost of every simulated path, in path order.
+
+        Returns
+        -------
+        list[float]
+            Per-path draw option costs in currency units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+    @property
+    def utilization_paths(self) -> list[list[float]]:
+        """
+        Simulated utilization trajectories, one list per path, aligned with :attr:`observation_dates`.
+
+        Returns
+        -------
+        list[list[float]]
+            Utilization fractions in ``[0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+    @property
+    def credit_spread_paths(self) -> list[list[float]]:
+        """
+        Simulated credit-spread trajectories (decimal), one list per path, aligned with :attr:`observation_dates`.
+
+        Returns
+        -------
+        list[list[float]]
+            Spread levels as decimals.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+    @property
+    def observation_dates(self) -> list[str]:
+        """
+        Observation dates of the factor trajectories (ISO 8601 strings).
+
+        Returns
+        -------
+        list[str]
+            The observation grid.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+
+class StochasticPricingResult:
+    """
+    Stochastic (scenario-waterfall) pricing result of a structured-credit deal
+    (:meth:`StructuredCredit.price_stochastic`'s return value).
+
+    Deal-level present value, loss statistics and Monte Carlo error sit next
+    to one ``TranchePricingResult`` per tranche (as dicts). Pools of real
+    instruments add the reserve-funding diagnostics
+    (:attr:`unfunded_draw_path_fraction`, :attr:`expected_collateral_draws`)
+    and the draw option cost with its per-path distribution.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> import json
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.dates import DayCount
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.valuations.instruments import (
+    ...     AssetPool,
+    ...     RepLine,
+    ...     StructuredCredit,
+    ...     Tranche,
+    ...     TrancheStructure,
+    ... )
+    >>> as_of, maturity = datetime.date(2024, 1, 15), datetime.date(2031, 1, 15)
+    >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
+    ...     RepLine(
+    ...         "LINE-1",
+    ...         Money(80_000_000.0, Currency("USD")),
+    ...         0.07,
+    ...         maturity,
+    ...         12,
+    ...         DayCount.ACT_360,
+    ...         asset_type={"type": "first_lien_loan", "industry": None},
+    ...     )
+    ... ])
+    >>> note = (
+    ...     Tranche
+    ...     .builder()
+    ...     .id("A")
+    ...     .attachment_point(0.0)
+    ...     .detachment_point(100.0)
+    ...     .seniority("senior")
+    ...     .original_balance(Money(80_000_000.0, Currency("USD")))
+    ...     .coupon_fixed(0.05)
+    ...     .maturity(maturity)
+    ...     .build()
+    ... )
+    >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    >>> envelope = json.loads(deal.to_json())
+    >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
+    >>> deal = StructuredCredit.from_json(json.dumps(envelope))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> result = deal.price_stochastic(market, as_of, num_paths=8)
+    >>> (result.num_paths, [t["tranche_id"] for t in result.tranche_results])
+    (8, ['A'])
+    >>> result.unfunded_draw_path_fraction
+    0.0
+    """
+
+    @staticmethod
+    def from_json(json: str) -> StochasticPricingResult:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``StochasticPricingResult`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        StochasticPricingResult
+            The decoded result.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not valid JSON for the result shape.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import StochasticPricingResult
+        >>> try:
+        ...     StochasticPricingResult.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            JSON-encoded result.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust result.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(StochasticPricingResult.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        One row per tranche as a pandas ``DataFrame``.
+
+        Columns: ``tranche_id``, ``seniority``, ``npv``, ``expected_loss``,
+        ``unexpected_loss``, ``expected_shortfall`` (currency units),
+        ``attachment``, ``detachment`` (decimal), ``average_life`` (years),
+        ``credit_duration`` and ``draw_option_cost`` (currency units).
+
+        Returns
+        -------
+        pd.DataFrame
+            The tranche summary.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    def draw_option_cost_dataframe(self) -> pd.DataFrame:
+        """
+        The per-path draw option cost distribution as a pandas ``DataFrame``.
+
+        Columns: ``path`` (index in path order) and ``draw_option_cost``
+        (currency units). Empty for pools without stochastic revolvers.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per path.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def npv(self) -> Money:
+        """
+        Mean deal present value across paths (pool currency).
+
+        Returns
+        -------
+        Money
+            Currency-tagged present value.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def dirty_price(self) -> float:
+        """
+        Dirty price as a percentage of the pool notional.
+
+        Returns
+        -------
+        float
+            The dirty price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expected_loss(self) -> Money:
+        """
+        Expected (mean) loss across paths.
+
+        Returns
+        -------
+        Money
+            Currency-tagged expected loss.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def unexpected_loss(self) -> Money:
+        """
+        Unexpected loss (standard deviation of the path losses).
+
+        Returns
+        -------
+        Money
+            Currency-tagged unexpected loss.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expected_shortfall(self) -> Money:
+        """
+        Expected shortfall of the path losses at :attr:`es_confidence`.
+
+        Returns
+        -------
+        Money
+            Currency-tagged expected shortfall.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def es_confidence(self) -> float:
+        """
+        Confidence level of :attr:`expected_shortfall` (decimal).
+
+        Returns
+        -------
+        float
+            The confidence level.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pv_std_error(self) -> float:
+        """
+        Standard error of the mean present value, in currency units.
+
+        Returns
+        -------
+        float
+            The standard error.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pv_confidence_interval(self) -> tuple[float, float]:
+        """
+        95% confidence interval of the mean present value, in currency units.
+
+        Returns
+        -------
+        tuple[float, float]
+            Lower and upper bounds.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def num_paths(self) -> int:
+        """
+        Number of scenario paths.
+
+        Returns
+        -------
+        int
+            The path count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pricing_mode(self) -> dict[str, Any]:
+        """
+        Pricing mode used, as its serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            The ``PricingMode`` serde shape.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
+    def unfunded_draw_path_fraction(self) -> float:
+        """
+        Fraction of paths on which a collateral draw could not be funded from the reserve account and that period's principal collections.
+
+        Returns
+        -------
+        float
+            A fraction in ``[0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expected_collateral_draws(self) -> Money:
+        """
+        Mean over paths of the collateral draws funded through the reserve account and principal collections.
+
+        Returns
+        -------
+        Money
+            Currency-tagged mean draws.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draw_option_cost(self) -> Money:
+        """
+        Mean draw option cost across paths: the value to the deal of its revolvers' draws having been made at the contractual margin instead of each path's fair spread (negative when spreads widen).
+
+        Returns
+        -------
+        Money
+            Currency-tagged mean draw option cost.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draw_option_cost_paths(self) -> list[float]:
+        """
+        Per-path draw option cost in path order (empty for pools without stochastic revolvers).
+
+        Returns
+        -------
+        list[float]
+            Per-path costs in currency units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored values.
+        """
+        ...
+    @property
+    def tranche_results(self) -> list[dict[str, Any]]:
+        """
+        Tranche-level results as a list of dicts (``TranchePricingResult`` serde shape, in capital-structure order).
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per tranche.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+class SimulationDiagnostics:
+    """
+    Reserve-account and draw-funding accounting of one deterministic
+    simulation (:meth:`StructuredCredit.run_simulation_with_diagnostics`'s
+    return value).
+
+    Examples
+    --------
+    >>> import datetime
+    >>> import json
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.dates import DayCount
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.valuations.instruments import (
+    ...     AssetPool,
+    ...     RepLine,
+    ...     StructuredCredit,
+    ...     Tranche,
+    ...     TrancheStructure,
+    ... )
+    >>> as_of, maturity = datetime.date(2024, 1, 15), datetime.date(2031, 1, 15)
+    >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
+    ...     RepLine(
+    ...         "LINE-1",
+    ...         Money(80_000_000.0, Currency("USD")),
+    ...         0.07,
+    ...         maturity,
+    ...         12,
+    ...         DayCount.ACT_360,
+    ...         asset_type={"type": "first_lien_loan", "industry": None},
+    ...     )
+    ... ])
+    >>> note = (
+    ...     Tranche
+    ...     .builder()
+    ...     .id("A")
+    ...     .attachment_point(0.0)
+    ...     .detachment_point(100.0)
+    ...     .seniority("senior")
+    ...     .original_balance(Money(80_000_000.0, Currency("USD")))
+    ...     .coupon_fixed(0.05)
+    ...     .maturity(maturity)
+    ...     .build()
+    ... )
+    >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
+    >>> envelope = json.loads(deal.to_json())
+    >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
+    >>> deal = StructuredCredit.from_json(json.dumps(envelope))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)
+    >>> diagnostics.unfunded_draws.amount
+    0.0
+    >>> list(diagnostics.to_dataframe().columns)
+    ['date', 'reserve_balance', 'reserve_interest']
+    """
+
+    @staticmethod
+    def from_json(json: str) -> SimulationDiagnostics:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``SimulationDiagnostics`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        SimulationDiagnostics
+            The decoded diagnostics.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is not valid JSON for the diagnostics shape.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import SimulationDiagnostics
+        >>> try:
+        ...     SimulationDiagnostics.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            JSON-encoded diagnostics.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust diagnostics.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(SimulationDiagnostics.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        One row per simulated period as a pandas ``DataFrame``.
+
+        Columns: ``date`` (ISO 8601 string), ``reserve_balance`` (end-of-period
+        balance) and ``reserve_interest`` (interest earned in the period), both
+        in currency units.
+
+        Returns
+        -------
+        pd.DataFrame
+            The reserve path.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def reserve_balance_path(self) -> list[tuple[datetime.date, Money]]:
+        """
+        Reserve-account balance at the end of each simulated period.
+
+        Returns
+        -------
+        list[tuple[datetime.date, Money]]
+            ``(date, balance)`` pairs in period order.
+
+        Raises
+        ------
+        ValueError
+            If a date cannot be converted.
+        """
+        ...
+    @property
+    def reserve_interest_paid(self) -> list[tuple[datetime.date, Money]]:
+        """
+        Reserve interest earned each period, before routing.
+
+        Returns
+        -------
+        list[tuple[datetime.date, Money]]
+            ``(date, interest)`` pairs in period order.
+
+        Raises
+        ------
+        ValueError
+            If a date cannot be converted.
+        """
+        ...
+    @property
+    def draws_from_reserve(self) -> Money:
+        """
+        Collateral draws funded from the reserve account over the simulation.
+
+        Returns
+        -------
+        Money
+            Currency-tagged amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def draws_from_principal(self) -> Money:
+        """
+        Collateral draws funded from principal collections over the simulation.
+
+        Returns
+        -------
+        Money
+            Currency-tagged amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def unfunded_draws(self) -> Money:
+        """
+        Collateral draws that could not be funded over the simulation.
+
+        Returns
+        -------
+        Money
+            Currency-tagged amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def reserve_replenished(self) -> Money:
+        """
+        Revolver repayments diverted to replenish the reserve over the simulation.
+
+        Returns
+        -------
+        Money
+            Currency-tagged amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
 
 class OasResult:
     """

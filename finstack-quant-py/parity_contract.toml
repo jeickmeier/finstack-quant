@@ -1126,6 +1126,7 @@ public = [
     "ConvertibleBondBuilder",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
+    "EnhancedMonteCarloResult",
     "EquityOption",
     "EquityOptionBuilder",
     "FixedLegSpec",
@@ -1147,7 +1148,11 @@ public = [
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
+    "RevolvingCredit",
+    "RevolvingCreditBuilder",
     "ScenarioTable",
+    "SimulationDiagnostics",
+    "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",
     "Swaption",
@@ -3120,6 +3125,7 @@ callable_range_accrual_accrued = "callableRangeAccrualAccrued"
 [wasm_valuations_subset.python_path_js_map]
 "instruments.Bond" = "Bond"
 "instruments.TermLoan" = "TermLoan"
+"instruments.RevolvingCredit" = "RevolvingCredit"
 "instruments.bond_from_cashflows_json" = "bondFromCashflowsJson"
 "instruments.instrument_cashflows_json" = "instrumentCashflowsJson"
 "instruments.FxForward" = "FxForward"
@@ -3186,6 +3192,7 @@ fx = [
 ]
 instruments = [
     "Bond",
+    "RevolvingCredit",
     "TermLoan",
     "bondFromCashflowsJson",
     "instrumentCashflowsJson",
@@ -3298,6 +3305,7 @@ instruments = [
     "ConvertibleBondBuilder",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
+    "EnhancedMonteCarloResult",
     "EquityOption",
     "EquityOptionBuilder",
     "FixedLegSpec",
@@ -3317,7 +3325,10 @@ instruments = [
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
+    "RevolvingCreditBuilder",
     "ScenarioTable",
+    "SimulationDiagnostics",
+    "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",
     "Swaption",
@@ -3333,12 +3344,13 @@ instruments = [
 
 # Method-level accounting for the shared typed instrument classes (mirrors
 # the [wasm_portfolio_subset.class_methods] precedent). WASM method names
-# are camelCase as emitted by wasm-bindgen. Bond/TermLoan are JSON-first
-# on both hosts; WASM has no typed `price` method (call `priceInstrument`
-# with `toJson()`).
+# are camelCase as emitted by wasm-bindgen. Bond/TermLoan/RevolvingCredit are
+# JSON-first on both hosts; WASM has no typed `price` method (call
+# `priceInstrument` with `toJson()`).
 [wasm_valuations_subset.class_methods]
 Bond = ["fixed", "floating", "fromJson", "toJson", "id"]
 TermLoan = ["fromJson", "example", "toJson", "id"]
+RevolvingCredit = ["fromJson", "example", "toJson", "id"]
 FxForward = ["fromJson", "toJson", "id", "price"]
 FxOption = [
     "fromJson",
@@ -3366,6 +3378,10 @@ FxOption = [
 "TermLoan.example" = "TermLoan.example"
 "TermLoan.to_json" = "TermLoan.toJson"
 "TermLoan.id" = "TermLoan.id"
+"RevolvingCredit.from_json" = "RevolvingCredit.fromJson"
+"RevolvingCredit.example" = "RevolvingCredit.example"
+"RevolvingCredit.to_json" = "RevolvingCredit.toJson"
+"RevolvingCredit.id" = "RevolvingCredit.id"
 "FxForward.from_json" = "FxForward.fromJson"
 "FxForward.to_json" = "FxForward.toJson"
 "FxForward.id" = "FxForward.id"

@@ -30,6 +30,7 @@ from tests.tests_typed_helpers import (
 )
 
 ALL_TYPED = [
+    ("RevolvingCredit", instruments.RevolvingCredit.example),
     ("InterestRateSwap", build_irs),
     ("Swaption", build_swaption),
     ("CapFloor", build_capfloor),

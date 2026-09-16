@@ -2,20 +2,21 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::extract::extract_market;
 use crate::bindings::valuations::convert::{bool_repr, enum_to_py_string};
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    CreditFactors, DealFees, DealType, MarketConditions, Metadata, Overrides, StructuredCredit,
-    WaterfallRules,
+    run_simulation_with_diagnostics, CreditFactors, DealFees, DealType, MarketConditions, Metadata,
+    Overrides, PricingMode, StructuredCredit, WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::instruments::{
     enum_from_str, parse_typed_instrument_json, serialize_typed_instrument_json,
 };
-use super::{PyAssetPool, PyTrancheStructure};
+use super::{PyAssetPool, PySimulationDiagnostics, PyStochasticPricingResult, PyTrancheStructure};
 
 type StructuredCreditBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
@@ -292,6 +293,111 @@ impl PyStructuredCredit {
                 "expected instrument type \"structured_credit\", got a different instrument type",
             )),
         }
+    }
+
+    /// Price the deal with the scenario-waterfall Monte Carlo engine.
+    ///
+    /// Every path runs the full period loop and waterfall on simulated
+    /// prepayment, default and recovery paths (and, for pools of real
+    /// instruments, per-name defaults and simulated revolver draws).
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     Market context with the deal's discount curve and every curve
+    ///     the collateral references.
+    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+    ///     Valuation date.
+    /// num_paths : int, optional
+    ///     Number of Monte Carlo paths; defaults to the deal's configured
+    ///     ``mc_paths`` override or 10,000.
+    /// antithetic : bool, default True
+    ///     Use antithetic variates (pairs share random numbers).
+    ///
+    /// Returns
+    /// -------
+    /// StochasticPricingResult
+    ///     Deal and tranche present values, loss statistics, Monte Carlo
+    ///     error, draw diagnostics and the draw option cost.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the deal fails validation or ``num_paths`` is zero.
+    /// KeyError
+    ///     If a required curve is missing from ``market``.
+    /// RuntimeError
+    ///     If the simulation fails.
+    #[pyo3(signature = (market, as_of, num_paths=None, antithetic=true))]
+    #[pyo3(text_signature = "($self, market, as_of, num_paths=None, antithetic=True)")]
+    fn price_stochastic(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &Bound<'_, PyAny>,
+        num_paths: Option<usize>,
+        antithetic: bool,
+    ) -> PyResult<PyStochasticPricingResult> {
+        let market = extract_market(py, market)?;
+        let as_of = extract_date(as_of)?;
+        let deal = self.inner.clone();
+        let num_paths = num_paths.unwrap_or_else(|| {
+            deal.instrument_pricing_overrides
+                .model_config
+                .mc_paths
+                .unwrap_or(10_000)
+        });
+        let mode = PricingMode::MonteCarlo {
+            num_paths,
+            antithetic,
+        };
+        let inner = py
+            .detach(move || deal.price_stochastic_with_mode(&market, as_of, mode))
+            .map_err(core_to_py)?;
+        Ok(PyStochasticPricingResult { inner })
+    }
+
+    /// Run the deterministic simulation and return the deal-level accounting.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     Market context with the deal's discount curve and every curve
+    ///     the collateral references.
+    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+    ///     Valuation date.
+    ///
+    /// Returns
+    /// -------
+    /// SimulationDiagnostics
+    ///     Reserve balance and interest per period, draw funding by source
+    ///     and unfunded draws.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the deal fails validation or (for instrument collateral) the
+    ///     contractual draw calendar cannot be funded.
+    /// KeyError
+    ///     If a required curve is missing from ``market``.
+    /// RuntimeError
+    ///     If the simulation fails.
+    #[pyo3(text_signature = "($self, market, as_of)")]
+    fn run_simulation_with_diagnostics(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &Bound<'_, PyAny>,
+    ) -> PyResult<PySimulationDiagnostics> {
+        let market = extract_market(py, market)?;
+        let as_of = extract_date(as_of)?;
+        let deal = self.inner.clone();
+        let run = py
+            .detach(move || run_simulation_with_diagnostics(&deal, &market, as_of))
+            .map_err(core_to_py)?;
+        Ok(PySimulationDiagnostics {
+            inner: run.diagnostics,
+        })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.

@@ -1,13 +1,40 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::valuations::convert::{currency_from_py, enum_to_py_string, money_to_py};
+use crate::bindings::valuations::convert::{
+    currency_from_py, enum_to_py_string, money_from_py, money_to_py,
+};
+use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
+use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
+use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset,
+    AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
+    PoolAsset, PutExercisePolicy, ReserveInterestDestination,
 };
 
 use super::super::instruments::enum_from_str;
 use super::PyRepLine;
+
+/// Parse an internally tagged policy/destination enum from a bare variant
+/// name (``"first_call"``), a ``dict`` in the serde shape, or a JSON ``str``.
+fn tagged_enum_from_py<T: serde::de::DeserializeOwned + Send>(
+    py: Python<'_>,
+    value: &Bound<'_, PyAny>,
+    tag: &str,
+    label: &str,
+) -> PyResult<T> {
+    if let Ok(text) = value.extract::<String>() {
+        let trimmed = text.trim();
+        let json = if trimmed.starts_with('{') {
+            trimmed.to_string()
+        } else {
+            serde_json::json!({ tag: trimmed }).to_string()
+        };
+        return serde_json::from_str(&json)
+            .map_err(|err| serde_json_to_py(err, &format!("invalid {label}")));
+    }
+    crate::bindings::module_utils::py_to_serde(py, value, label)
+}
 
 /// Typed wrapper for the Rust `AssetPool` (structured-credit collateral pool).
 #[pyclass(
@@ -131,6 +158,181 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
+    /// Attach real instruments as the collateral, returning a new pool.
+    ///
+    /// The pool then holds ``Bond``, ``TermLoan`` and ``RevolvingCredit``
+    /// instruments instead of asset rows or representative lines; each
+    /// instrument's own cashflow schedule drives the deal, defaults come from
+    /// the instrument's credit curve when present, and collateral draws are
+    /// funded from the reserve account (see :meth:`with_reserve`).
+    ///
+    /// Parameters
+    /// ----------
+    /// bonds : list[Bond], optional
+    ///     Bonds in any form (fixed, floating, step-up, amortizing, callable).
+    /// term_loans : list[TermLoan], optional
+    ///     Term loans, including delayed-draw facilities.
+    /// revolvers : list[RevolvingCredit], optional
+    ///     Revolving facilities; stochastic ones simulate draws on the paths.
+    /// call_exercise : str | dict, optional
+    ///     Default issuer-call policy: ``"contractual"`` (never, the
+    ///     default), ``"first_call"``, ``"worst"`` (yield-to-worst, needs a
+    ///     quoted clean price) or ``{"policy": "refinancing_incentive",
+    ///     "threshold_bp": 50.0}``.
+    /// put_exercise : str, optional
+    ///     Default holder-put policy: ``"never"`` (default) or ``"first_put"``.
+    /// overrides : list[dict], optional
+    ///     Per-instrument overrides ``{"id": ..., "call": {...}, "put": {...}}``.
+    ///
+    /// Returns
+    /// -------
+    /// AssetPool
+    ///     A new pool with ``instruments`` set (the original is unchanged).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a policy or override does not match its serde shape.
+    /// TypeError
+    ///     If a list element is not the expected typed instrument.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.core.currency import Currency
+    /// >>> from finstack_quant.valuations.instruments import AssetPool, Bond, RevolvingCredit
+    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_instruments(
+    /// ...     bonds=[Bond.example()], revolvers=[RevolvingCredit.example()],
+    /// ...     call_exercise="first_call",
+    /// ... )
+    /// >>> sorted(pool.instruments)
+    /// ['bonds', 'call_exercise', 'overrides', 'put_exercise', 'revolvers', 'term_loans']
+    #[pyo3(signature = (bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None))]
+    #[pyo3(
+        text_signature = "($self, bonds=None, term_loans=None, revolvers=None, call_exercise=None, put_exercise=None, overrides=None)"
+    )]
+    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
+    #[allow(clippy::too_many_arguments)]
+    fn with_instruments(
+        &self,
+        py: Python<'_>,
+        bonds: Option<Vec<PyRef<'_, PyBond>>>,
+        term_loans: Option<Vec<PyRef<'_, PyTermLoan>>>,
+        revolvers: Option<Vec<PyRef<'_, PyRevolvingCredit>>>,
+        call_exercise: Option<&Bound<'_, PyAny>>,
+        put_exercise: Option<&Bound<'_, PyAny>>,
+        overrides: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let call_exercise: CallExercisePolicy = match call_exercise {
+            Some(value) => tagged_enum_from_py(py, value, "policy", "call_exercise")?,
+            None => CallExercisePolicy::default(),
+        };
+        let put_exercise: PutExercisePolicy = match put_exercise {
+            Some(value) => tagged_enum_from_py(py, value, "policy", "put_exercise")?,
+            None => PutExercisePolicy::default(),
+        };
+        let overrides: Vec<InstrumentExerciseOverride> = match overrides {
+            Some(value) => crate::bindings::module_utils::py_to_serde(py, value, "overrides")?,
+            None => Vec::new(),
+        };
+        let collateral = InstrumentCollateral {
+            bonds: bonds
+                .unwrap_or_default()
+                .iter()
+                .map(|bond| bond.inner.clone())
+                .collect(),
+            term_loans: term_loans
+                .unwrap_or_default()
+                .iter()
+                .map(|loan| loan.inner.clone())
+                .collect(),
+            revolvers: revolvers
+                .unwrap_or_default()
+                .iter()
+                .map(|facility| facility.inner.clone())
+                .collect(),
+            call_exercise,
+            put_exercise,
+            overrides,
+        };
+        let mut inner = self.inner.clone();
+        inner.instruments = Some(collateral);
+        Ok(Self { inner })
+    }
+
+    /// Configure the reserve account, returning a new pool.
+    ///
+    /// The reserve funds collateral draws (revolver utilization increases,
+    /// delayed draws and loan-equivalent draws at default), is replenished by
+    /// revolver repayments up to ``reserve_target``, and earns
+    /// ``reserve_account_rate`` routed per ``reserve_interest_destination``.
+    ///
+    /// Parameters
+    /// ----------
+    /// reserve_account : Money | float
+    ///     Opening reserve balance; a bare number needs ``currency``.
+    /// reserve_account_rate : float, default 0.0
+    ///     Annual interest rate earned by the reserve, as a decimal
+    ///     (simple ACT/360 on the opening balance each period).
+    /// reserve_target : Money | float, optional
+    ///     Balance revolver repayments replenish toward; ``None`` disables
+    ///     replenishment.
+    /// reserve_interest_destination : str | dict, optional
+    ///     ``"waterfall"`` (default, interest proceeds), ``"retain"``
+    ///     (capitalized into the reserve) or ``{"kind": "tranche",
+    ///     "tranche_id": "EQ"}`` (paid directly to that tranche).
+    /// currency : str, optional
+    ///     ISO-4217 code applied when a bare number is passed.
+    ///
+    /// Returns
+    /// -------
+    /// AssetPool
+    ///     A new pool with the reserve configured (the original is unchanged).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If an amount is not finite, a bare number has no currency, or the
+    ///     destination does not match its serde shape.
+    /// TypeError
+    ///     If an amount is neither ``Money`` nor a number.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.core.currency import Currency
+    /// >>> from finstack_quant.core.money import Money
+    /// >>> from finstack_quant.valuations.instruments import AssetPool
+    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reserve(
+    /// ...     Money(5_000_000.0, Currency("USD")), reserve_account_rate=0.03,
+    /// ...     reserve_interest_destination={"kind": "tranche", "tranche_id": "EQ"},
+    /// ... )
+    /// >>> (pool.reserve_account_rate, pool.reserve_interest_destination["kind"])
+    /// (0.03, 'tranche')
+    #[pyo3(signature = (reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None))]
+    #[pyo3(
+        text_signature = "($self, reserve_account, reserve_account_rate=0.0, reserve_target=None, reserve_interest_destination=None, currency=None)"
+    )]
+    fn with_reserve(
+        &self,
+        py: Python<'_>,
+        reserve_account: &Bound<'_, PyAny>,
+        reserve_account_rate: f64,
+        reserve_target: Option<&Bound<'_, PyAny>>,
+        reserve_interest_destination: Option<&Bound<'_, PyAny>>,
+        currency: Option<&str>,
+    ) -> PyResult<Self> {
+        let mut inner = self.inner.clone();
+        inner.reserve_account = money_from_py(reserve_account, currency, "reserve_account")?;
+        inner.reserve_account_rate = reserve_account_rate;
+        inner.reserve_target = reserve_target
+            .map(|value| money_from_py(value, currency, "reserve_target"))
+            .transpose()?;
+        inner.reserve_interest_destination = match reserve_interest_destination {
+            Some(value) => tagged_enum_from_py(py, value, "kind", "reserve_interest_destination")?,
+            None => ReserveInterestDestination::default(),
+        };
+        Ok(Self { inner })
+    }
+
     /// Deserialize from the JSON produced by ``to_json``.
     ///
     /// Parameters
@@ -241,6 +443,39 @@ impl PyAssetPool {
         money_to_py(self.inner.reserve_account)
     }
 
+    /// Annual interest rate earned by the reserve account, as a decimal.
+    #[getter]
+    fn reserve_account_rate(&self) -> f64 {
+        self.inner.reserve_account_rate
+    }
+
+    /// Reserve balance revolver repayments replenish toward, or ``None``.
+    #[getter]
+    fn reserve_target(&self) -> Option<PyMoney> {
+        self.inner.reserve_target.map(money_to_py)
+    }
+
+    /// Destination of the reserve interest as its serde ``dict``
+    /// (``{"kind": "waterfall"}``, ``{"kind": "retain"}`` or
+    /// ``{"kind": "tranche", "tranche_id": ...}``).
+    #[getter]
+    fn reserve_interest_destination<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.reserve_interest_destination)
+    }
+
+    /// Instrument collateral as its serde ``dict`` (``bonds``, ``term_loans``,
+    /// ``revolvers``, ``call_exercise``, ``put_exercise``, ``overrides``), or
+    /// ``None`` when the pool is modelled with asset rows or representative
+    /// lines.
+    #[getter]
+    fn instruments<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .instruments
+            .as_ref()
+            .map(|collateral| crate::bindings::pandas_utils::serde_to_py(py, collateral))
+            .transpose()
+    }
+
     /// Excess-spread account balance.
     #[getter]
     fn excess_spread_account(&self) -> PyMoney {
@@ -250,7 +485,7 @@ impl PyAssetPool {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "AssetPool(id='{}', deal_type='{}', base_currency='{}', assets={}, rep_lines={})",
+            "AssetPool(id='{}', deal_type='{}', base_currency='{}', assets={}, rep_lines={}, instruments={})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.deal_type).unwrap_or_default(),
             self.inner.base_currency,
@@ -259,6 +494,11 @@ impl PyAssetPool {
                 .rep_lines
                 .as_ref()
                 .map(|lines| lines.len().to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            self.inner
+                .instruments
+                .as_ref()
+                .map(|collateral| collateral.len().to_string())
                 .unwrap_or_else(|| "None".to_string()),
         )
     }

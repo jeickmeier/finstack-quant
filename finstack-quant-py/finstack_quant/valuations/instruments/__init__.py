@@ -32,6 +32,7 @@ ConvertibleBond = _valuations.instruments.ConvertibleBond
 ConvertibleBondBuilder = _valuations.instruments.ConvertibleBondBuilder
 CreditDefaultSwap = _valuations.instruments.CreditDefaultSwap
 CreditDefaultSwapBuilder = _valuations.instruments.CreditDefaultSwapBuilder
+EnhancedMonteCarloResult = _valuations.instruments.EnhancedMonteCarloResult
 EquityOption = _valuations.instruments.EquityOption
 EquityOptionBuilder = _valuations.instruments.EquityOptionBuilder
 FixedLegSpec = _valuations.instruments.FixedLegSpec
@@ -53,7 +54,11 @@ PikSchedule = _valuations.instruments.PikSchedule
 PremiumLegSpec = _valuations.instruments.PremiumLegSpec
 ProtectionLegSpec = _valuations.instruments.ProtectionLegSpec
 RepLine = _valuations.instruments.RepLine
+RevolvingCredit = _valuations.instruments.RevolvingCredit
+RevolvingCreditBuilder = _valuations.instruments.RevolvingCreditBuilder
 ScenarioTable = _valuations.instruments.ScenarioTable
+SimulationDiagnostics = _valuations.instruments.SimulationDiagnostics
+StochasticPricingResult = _valuations.instruments.StochasticPricingResult
 StructuredCredit = _valuations.instruments.StructuredCredit
 StructuredCreditBuilder = _valuations.instruments.StructuredCreditBuilder
 Swaption = _valuations.instruments.Swaption
@@ -102,6 +107,7 @@ __all__: list[str] = [
     "ConvertibleBondBuilder",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
+    "EnhancedMonteCarloResult",
     "EquityOption",
     "EquityOptionBuilder",
     "FixedLegSpec",
@@ -123,7 +129,11 @@ __all__: list[str] = [
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
+    "RevolvingCredit",
+    "RevolvingCreditBuilder",
     "ScenarioTable",
+    "SimulationDiagnostics",
+    "StochasticPricingResult",
     "StructuredCredit",
     "StructuredCreditBuilder",
     "Swaption",

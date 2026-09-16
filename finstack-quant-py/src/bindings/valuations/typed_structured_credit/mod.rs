@@ -16,7 +16,9 @@
 //! trips directly back into these constructors without any translation.
 
 mod asset_pool;
+mod diagnostics;
 mod rep_line;
+mod stochastic_result;
 mod structured_credit;
 mod tranche;
 mod tranche_structure;
@@ -24,7 +26,9 @@ mod tranche_structure;
 use pyo3::prelude::*;
 
 pub(crate) use asset_pool::PyAssetPool;
+pub(crate) use diagnostics::PySimulationDiagnostics;
 pub(crate) use rep_line::PyRepLine;
+pub(crate) use stochastic_result::PyStochasticPricingResult;
 pub(crate) use structured_credit::{PyStructuredCredit, PyStructuredCreditBuilder};
 pub(crate) use tranche::{PyTranche, PyTrancheBuilder};
 pub(crate) use tranche_structure::PyTrancheStructure;
@@ -39,6 +43,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTrancheStructure>()?;
     m.add_class::<PyStructuredCredit>()?;
     m.add_class::<PyStructuredCreditBuilder>()?;
+    m.add_class::<PyStochasticPricingResult>()?;
+    m.add_class::<PySimulationDiagnostics>()?;
     Ok(())
 }
 
@@ -46,4 +52,4 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &[];
+pub(crate) const EXPORTS: &[&str] = &["SimulationDiagnostics", "StochasticPricingResult"];

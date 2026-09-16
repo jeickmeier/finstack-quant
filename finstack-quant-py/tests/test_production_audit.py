@@ -555,7 +555,7 @@ def test_structured_credit_representative_collateral_preserves_pv() -> None:
     ]
     assert value() == pytest.approx(expected, abs=1e-6)
     pool["assets"].append(asset)
-    with pytest.raises(ValueError, match="representative lines, not both"):
+    with pytest.raises(ValueError, match="exactly one of assets, representative lines or instruments"):
         value()
 
 
