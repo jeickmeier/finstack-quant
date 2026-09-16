@@ -68,6 +68,30 @@ valuation-owned outputs.
 The path seed is fixed by the internal scenario configuration, so repeated
 runs and bump-and-reprice sensitivities reuse common random numbers.
 
+Pools of real instruments (`AssetPool::instruments`) price through the same
+modes. Each path resolves every name's default from its own hazard curve or
+the deal model — through the per-name copula when the default model is a
+copula — and advances each stochastic revolver's spread (CIR, market-anchored
+on its hazard curve) and utilization (exact OU toward the spread-linked
+target) with shocks loaded on the period systematic factor, so draws grow on
+the stress paths. The result adds `expected_collateral_draws` (mean funded
+draws per path) and `unfunded_draw_path_fraction` (paths on which the reserve
+and principal collections could not fund a draw). With zero utilization
+volatility, zero spread sensitivity and no default probability every path
+reproduces the deterministic instrument pool.
+
+For pools with stochastic revolvers the run also reports the **draw option
+cost**: every path is simulated twice on the same random numbers, once as
+is and once with each funded revolver draw accruing at the path's fair
+spread instead of its contractual margin; a tranche's share is its present
+value on the actual run less the counterfactual one, and
+`StochasticPricingResult::draw_option_cost` is the sum of the shares (the
+per-path values are in `draw_option_cost_paths`). It is negative when
+spreads widen after draws, and a pass-through single-revolver pool reproduces
+the standalone facility's `draw_option_cost` when the facility carries no
+credit risk; with credit risk the two engines apply their own default models
+to the annuity and agree only in expectation.
+
 ## Calibration ownership
 
 `calibrations.rs` reads the v1 structured-credit assumption registry and

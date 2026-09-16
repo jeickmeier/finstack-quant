@@ -1,14 +1,17 @@
 //! Metrics module for revolving credit facilities.
 //!
 //! Provides both standard metrics (PV, DV01, Theta, BucketedDV01, CS01) and
-//! facility-specific metrics (utilization rate, available capacity, and weighted average cost).
+//! facility-specific metrics (utilization rate, available capacity, weighted average
+//! cost, and the draw option cost of stochastic facilities).
 
 pub(crate) mod available_capacity;
 pub(crate) mod cs01;
+pub(crate) mod draw_option_cost;
 pub(crate) mod utilization_rate;
 pub(crate) mod weighted_average_cost;
 
 pub(crate) use available_capacity::AvailableCapacityCalculator;
+pub(crate) use draw_option_cost::DrawOptionCostCalculator;
 pub(crate) use utilization_rate::UtilizationRateCalculator;
 pub(crate) use weighted_average_cost::ApproxWeightedAverageCostCalculator;
 
@@ -83,6 +86,12 @@ pub(crate) fn register_revolving_credit_metrics(
     registry.register_metric(
         MetricId::custom("weighted_average_cost"),
         Arc::new(ApproxWeightedAverageCostCalculator),
+        &[InstrumentType::RevolvingCredit],
+    )?;
+
+    registry.register_metric(
+        MetricId::custom("draw_option_cost"),
+        Arc::new(DrawOptionCostCalculator),
         &[InstrumentType::RevolvingCredit],
     )?;
     Ok(())

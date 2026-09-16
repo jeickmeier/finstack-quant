@@ -73,6 +73,7 @@ fn create_pool() -> AssetPool {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         });
     }

@@ -36,6 +36,10 @@ pub struct UtilizationParams {
     pub theta: f64,
     /// Volatility (σ_U)
     pub sigma: f64,
+    /// Sensitivity of the target to the relative credit-spread change
+    /// (`β_U`): the step uses `θ(t) = clamp(θ_U + β_U · (s(t)/s(0) − 1), 0, 1)`.
+    /// Zero (the default) keeps the constant target.
+    pub spread_sensitivity: f64,
 }
 
 impl UtilizationParams {
@@ -72,7 +76,33 @@ impl UtilizationParams {
             kappa,
             theta,
             sigma,
+            spread_sensitivity: 0.0,
         })
+    }
+
+    /// Link the utilization target to the simulated credit spread.
+    ///
+    /// # Arguments
+    ///
+    /// * `spread_sensitivity` - Target shift per unit of relative spread
+    ///   change (`β_U`, decimal); `0.0` keeps the constant target. Must be
+    ///   finite; negative values (drawing less as spreads widen) are accepted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the value is
+    /// not finite.
+    pub fn with_spread_sensitivity(
+        mut self,
+        spread_sensitivity: f64,
+    ) -> finstack_quant_core::Result<Self> {
+        if !spread_sensitivity.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "utilization spread sensitivity must be finite, got {spread_sensitivity}"
+            )));
+        }
+        self.spread_sensitivity = spread_sensitivity;
+        Ok(self)
     }
 }
 
@@ -431,6 +461,10 @@ impl ProcessMetadata for RevolvingCreditProcess {
         params.add_param("util_kappa", self.params.utilization.kappa);
         params.add_param("util_theta", self.params.utilization.theta);
         params.add_param("util_sigma", self.params.utilization.sigma);
+        params.add_param(
+            "util_spread_sensitivity",
+            self.params.utilization.spread_sensitivity,
+        );
 
         // Interest rate parameters
         match &self.params.interest_rate {

@@ -26,6 +26,47 @@ struct ExpectedFlow {
     accrual_factor: f64,
 }
 
+/// Monte Carlo estimate of per-path values with Bessel-corrected variance.
+///
+/// Antithetic paths are NOT i.i.d. — each `(z, −z)` pair is negatively
+/// correlated by construction. Treating the `2N` pathwise values as
+/// independent overstates the effective sample size and misstates the
+/// standard error, so each adjacent antithetic pair is averaged into ONE
+/// i.i.d. sample first. The 95% interval assumes asymptotic normality.
+fn path_estimate(values: &[f64], antithetic: bool) -> Estimate {
+    let samples: Vec<f64> = if antithetic {
+        values
+            .chunks(2)
+            .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
+            .collect()
+    } else {
+        values.to_vec()
+    };
+    let n = samples.len() as f64;
+    let mean = if samples.is_empty() {
+        0.0
+    } else {
+        samples.iter().sum::<f64>() / n
+    };
+    let variance = if samples.len() > 1 {
+        samples.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
+    } else {
+        0.0
+    };
+    let stderr = if samples.is_empty() {
+        0.0
+    } else {
+        (variance / n).sqrt()
+    };
+    let z_95 = 1.96;
+    Estimate::new(
+        mean,
+        stderr,
+        (mean - z_95 * stderr, mean + z_95 * stderr),
+        samples.len(),
+    )
+}
+
 impl RevolvingCreditPricer {
     /// Expected cashflow schedule of a stochastic facility.
     ///
@@ -262,34 +303,15 @@ impl RevolvingCreditPricer {
         // pair into ONE i.i.d. sample first (pairs are adjacent in path
         // order), then applies the usual sample statistics.
         let pvs: Vec<f64> = path_results.iter().map(|r| r.pv.amount()).collect();
+        let costs: Vec<f64> = path_results
+            .iter()
+            .map(|r| r.draw_option_cost.amount())
+            .collect();
         let use_antithetic = stoch_spec.antithetic && !stoch_spec.use_sobol_qmc;
-        let samples: Vec<f64> = if use_antithetic {
-            pvs.chunks(2)
-                .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
-                .collect()
-        } else {
-            pvs.clone()
-        };
-        let n = samples.len() as f64;
-        let mean = samples.iter().sum::<f64>() / n;
-
-        // Use N-1 for unbiased variance estimation (Bessel's correction)
-        let variance = if samples.len() > 1 {
-            samples.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
-        } else {
-            0.0 // Single pair/path case
-        };
-        let stderr = (variance / n).sqrt();
-
-        // Compute 95% confidence interval (assuming asymptotic normality via CLT)
-        let z_95 = 1.96;
-        let ci_low = mean - z_95 * stderr;
-        let ci_high = mean + z_95 * stderr;
-
-        let estimate = MoneyEstimate::from_estimate(
-            Estimate::new(mean, stderr, (ci_low, ci_high), pvs.len()),
-            facility.commitment_amount.currency(),
-        )?;
+        let currency = facility.commitment_amount.currency();
+        let estimate = MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic), currency)?;
+        let draw_option_cost =
+            MoneyEstimate::from_estimate(path_estimate(&costs, use_antithetic), currency)?;
 
         let result = EnhancedMonteCarloResult {
             mc_result: MonteCarloResult {
@@ -298,6 +320,7 @@ impl RevolvingCreditPricer {
                 run: None,
             },
             path_results,
+            draw_option_cost,
         };
 
         // Touch exported details so they are live under `-D dead-code`.

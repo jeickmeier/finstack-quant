@@ -4,16 +4,78 @@ use super::components::compute_upfront_fee_pv;
 use super::results::PathResult;
 use super::unified::RevolvingCreditPricer;
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::{
-    CashflowEngine, PathAwareCashflowSchedule,
+    CashflowEngine, PathAwareCashflowSchedule, ThreeFactorPathData,
 };
 use crate::instruments::fixed_income::revolving_credit::types::{
     BaseRateSpec, DrawRepaySpec, RevolvingCredit,
 };
-use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use rust_decimal::prelude::ToPrimitive;
+
+/// Contractual credit margin of a facility for a draw on `date`: the spread
+/// over the index for floating facilities; for fixed-rate facilities the
+/// fixed rate less the simple par forward of the discount curve from `date`
+/// to maturity (ACT/365F), the spread embedded in the fixed rate.
+pub(super) fn contractual_margin(
+    facility: &RevolvingCredit,
+    disc_curve: &DiscountCurve,
+    date: Date,
+) -> Result<f64> {
+    match &facility.base_rate_spec {
+        BaseRateSpec::Floating(spec) => {
+            spec.spread_bp
+                .to_f64()
+                .map(|bp| bp / 10_000.0)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "spread {} cannot be represented as f64",
+                        spec.spread_bp
+                    ))
+                })
+        }
+        BaseRateSpec::Fixed { rate } => {
+            if facility.maturity <= date {
+                return Ok(*rate);
+            }
+            let df = disc_curve.df_between_dates(date, facility.maturity)?;
+            let tau = DayCount::Act365F.year_fraction(
+                date,
+                facility.maturity,
+                DayCountContext::default(),
+            )?;
+            let par = if df > 0.0 && tau > 0.0 {
+                (1.0 / df - 1.0) / tau
+            } else {
+                0.0
+            };
+            Ok(rate - par)
+        }
+    }
+}
+
+/// The fair spread of a facility whose spread process is constant: the
+/// configured constant, or zero for a facility without a hazard curve and
+/// without an explicit Monte Carlo configuration (the pricer synthesizes a
+/// zero constant spread for it). `None` when the spread is simulated.
+fn constant_fair_spread(facility: &RevolvingCredit) -> Option<f64> {
+    use crate::instruments::fixed_income::revolving_credit::types::CreditSpreadProcessSpec;
+    let DrawRepaySpec::Stochastic(spec) = &facility.draw_repay_spec else {
+        return None;
+    };
+    match spec.mc_config.as_ref() {
+        Some(config) => match &config.credit_spread_process {
+            CreditSpreadProcessSpec::Constant(spread) => Some(spread.max(0.0)),
+            CreditSpreadProcessSpec::Cir { .. }
+            | CreditSpreadProcessSpec::MarketAnchored { .. } => None,
+        },
+        None => facility.credit_curve_id.is_none().then_some(0.0),
+    }
+}
 
 pub(super) fn resolve_fixings<'a>(
     facility: &RevolvingCredit,
@@ -264,10 +326,23 @@ impl RevolvingCreditPricer {
             )?;
         }
 
+        let draw_option_cost = match path_schedule.path_data.as_ref() {
+            Some(path_data) if facility.is_stochastic() => Self::path_draw_option_cost(
+                facility,
+                as_of,
+                path_data,
+                disc_curve.as_ref(),
+                &df_asof_to,
+                sp_as_of,
+            )?,
+            _ => 0.0,
+        };
+
         let result = PathResult {
             pv: Money::new(total_pv, facility.commitment_amount.currency())?,
             path_data: path_schedule.path_data.clone(),
             cashflows: path_schedule.schedule.clone(),
+            draw_option_cost: Money::new(draw_option_cost, facility.commitment_amount.currency())?,
         };
 
         // Keep optional payloads live under `-D dead-code`:
@@ -276,6 +351,86 @@ impl RevolvingCreditPricer {
         let _ = result.path_data.is_some();
 
         Ok(result)
+    }
+
+    /// Option cost of the path's draws.
+    ///
+    /// Each draw `ΔD_j = C · (u_j − u_{j−1})⁺` at observation `j` is a
+    /// forward loan to maturity at the contractual margin `s_K` against the
+    /// path's fair spread `s(t_j)`, worth
+    /// `ΔD_j · (s_K − s(t_j)) · A_j` to the lender, where
+    /// `A_j = Σ_{m > j} DF(t_m) · SP(t_m) / SP(as_of) · dt_m` is the risky
+    /// annuity of the remaining accrual periods on the path (facility day
+    /// count, pathwise or curve discounting, pathwise survival). Negative
+    /// when the path's spread sits above the margin.
+    ///
+    /// # Arguments
+    ///
+    /// * `facility` - Facility supplying commitment, margin, day count and maturity.
+    /// * `as_of` - Valuation date; only draws after it count.
+    /// * `path_data` - Simulated utilization and spread on the observation grid.
+    /// * `disc_curve` - Deal discount curve, used for the fixed-rate margin's
+    ///   par forward.
+    /// * `df_asof_to` - Discount factor from `as_of` used for the path's cashflows.
+    /// * `sp_as_of` - Survival to `as_of` the path survivals are conditioned on.
+    fn path_draw_option_cost(
+        facility: &RevolvingCredit,
+        as_of: Date,
+        path_data: &ThreeFactorPathData,
+        disc_curve: &DiscountCurve,
+        df_asof_to: &dyn Fn(Date) -> Result<f64>,
+        sp_as_of: f64,
+    ) -> Result<f64> {
+        let dates = &path_data.payment_dates;
+        let n = dates.len();
+        if n < 2 || path_data.utilization_path.len() != n || path_data.credit_spread_path.len() != n
+        {
+            return Ok(0.0);
+        }
+        let survival = Self::compute_dynamic_survival_at_dates(
+            &path_data.credit_spread_path,
+            &path_data.time_points,
+            dates,
+            facility.recovery_rate,
+            facility.commitment_date,
+            super::super::MC_CLOCK_DAY_COUNT,
+        )?;
+
+        // Risky annuity of the accrual periods after each observation.
+        let mut annuity_after = vec![0.0_f64; n];
+        let mut running = 0.0;
+        for m in (1..n).rev() {
+            let (start, end) = (dates[m - 1], dates[m]);
+            if start >= as_of && end <= facility.maturity && end > start {
+                let dt =
+                    facility
+                        .day_count
+                        .year_fraction(start, end, DayCountContext::default())?;
+                running += df_asof_to(end)? * (survival[m] / sp_as_of) * dt;
+            }
+            annuity_after[m - 1] = running;
+        }
+
+        // A constant spread process is simulated with minimal CIR dynamics
+        // for numerical stability; the fair spread it stands for is the
+        // constant itself.
+        let constant_spread = constant_fair_spread(facility);
+        let commitment = facility.commitment_amount.amount();
+        let mut cost = 0.0;
+        for j in 1..n {
+            if dates[j] <= as_of {
+                continue;
+            }
+            let draw = commitment
+                * (path_data.utilization_path[j] - path_data.utilization_path[j - 1]).max(0.0);
+            if draw <= 0.0 {
+                continue;
+            }
+            let margin = contractual_margin(facility, disc_curve, dates[j])?;
+            let fair = constant_spread.unwrap_or_else(|| path_data.credit_spread_path[j].max(0.0));
+            cost += draw * (margin - fair) * annuity_after[j];
+        }
+        Ok(cost)
     }
 
     /// Price a deterministic facility by generating its contractual schedule.

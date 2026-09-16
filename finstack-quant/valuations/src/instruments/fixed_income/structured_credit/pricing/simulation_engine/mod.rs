@@ -30,10 +30,14 @@ use finstack_quant_models::monte_carlo::traits::RandomStream;
 use std::sync::Arc;
 
 mod conservation;
+mod exercise;
+mod instrument_flows;
+mod instrument_paths;
 mod orchestration;
 mod period_helpers;
 mod pool_flow_source;
 mod pool_flows;
+mod reserve;
 mod simulate_period;
 mod state;
 mod triggers;
@@ -43,11 +47,13 @@ use period_helpers::{
     collateral_asset_rate_for_period, live_afc_cap_rate, tranche_period_interest_due,
     SimulationPeriod, TrancheAccrualDates,
 };
+use pool_flow_source::period_averaged_monthly_rate;
 use pool_flows::{
     calculate_pool_flows_with_rates, PeriodDefaultOutcome, PoolFlowRates, PoolFlows,
     RatedPoolFlowRequest,
 };
 use simulate_period::simulate_period;
+pub use state::SimulationDiagnostics;
 use state::{
     cleanup_call_premium, step_down_metrics, SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS,
 };
@@ -57,13 +63,17 @@ use conservation::par_acquired_at_price;
 #[cfg(test)]
 use period_helpers::{current_collateral_wac, term_rate_for_period};
 
+pub(crate) use instrument_flows::PreparedInstrumentSchedules;
+pub(crate) use instrument_paths::InstrumentPathFlowSource;
+pub use orchestration::SimulationRun;
 pub(crate) use orchestration::{
-    aggregate_tranche_cashflows, prepare_deal_simulation, run_prepared_simulation_with_source,
-    run_simulation_with_source, take_tranche_cashflows, PreparedDealSimulation,
+    aggregate_tranche_cashflows, prepare_deal_simulation, run_simulation_with_source,
+    simulate_instrument_pool, simulate_prepared, simulate_with_source, take_tranche_cashflows,
+    PreparedDealSimulation,
 };
 pub(crate) use pool_flow_source::{
-    DeterministicPoolFlowSource, OasPathFlowSource, PerNameDefaultEngine, PerNamePeriodInput,
-    PeriodPoolShock, PoolFlowRequest, PoolFlowSource, StochasticPathFlowSource,
+    DeterministicPoolFlowSource, OasPathFlowSource, PathShocks, PerNameDefaultEngine,
+    PerNamePeriodInput, PeriodPoolShock, PoolFlowRequest, PoolFlowSource, StochasticPathFlowSource,
 };
 
 #[cfg(test)]

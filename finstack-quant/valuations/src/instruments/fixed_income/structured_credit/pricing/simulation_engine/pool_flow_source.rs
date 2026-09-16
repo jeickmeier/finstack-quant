@@ -39,7 +39,7 @@ pub(crate) struct PoolFlowRequest<'a, 's> {
 /// * `months_per_period` - Number of months the payment period spans.
 /// * `rate_at` - Monthly rate (SMM or MDR, decimal) at a given payment date
 ///   and seasoning month.
-fn period_averaged_monthly_rate(
+pub(super) fn period_averaged_monthly_rate(
     pay_date: Date,
     seasoning_end: u32,
     months_per_period: f64,
@@ -150,12 +150,12 @@ impl OasPathFlowSource {
     }
 }
 
-impl PoolFlowSource for OasPathFlowSource {
-    fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
+impl PeriodShockSource for OasPathFlowSource {
+    fn period_shock(&mut self, request: &PoolFlowRequest<'_, '_>) -> Result<PeriodShock> {
         const RATE_CLAMP: f64 = 0.9999;
 
-        // SC-M13: publish this period's rate shift so FLOATING coupons — both
-        // pool assets and tranches — follow the simulated path.
+        // SC-M13: this period's rate shift, so FLOATING coupons — both pool
+        // assets and tranches — follow the simulated path.
         //
         // Without it the OAS applied a stochastic discount factor to
         // DETERMINISTIC coupons. For a floater that is the wrong instrument
@@ -164,14 +164,12 @@ impl PoolFlowSource for OasPathFlowSource {
         // martingale correction keeps the mean PV unbiased so the OAS point
         // estimate survived, but the per-path dispersion — and therefore
         // `price_std_error` — measured a risk a CLO does not have.
-        {
-            let month = self.as_of.months_until(request.pay_date) as usize;
-            request.state.floating_rate_shift = self
-                .rate_shift_path
-                .as_ref()
-                .and_then(|p| p.get(month).copied())
-                .unwrap_or(0.0);
-        }
+        let month = self.as_of.months_until(request.pay_date) as usize;
+        let rate_shift = self
+            .rate_shift_path
+            .as_ref()
+            .and_then(|p| p.get(month).copied())
+            .unwrap_or(0.0);
         let base_smm = period_averaged_monthly_rate(
             request.pay_date,
             request.seasoning_months,
@@ -214,6 +212,20 @@ impl PoolFlowSource for OasPathFlowSource {
             smm = (smm * smm_mult).clamp(0.0, RATE_CLAMP);
         }
 
+        let mut shock = PeriodPoolShock::pool_wide(
+            smm,
+            mdr,
+            request.instrument.credit_model.recovery_spec.rate,
+        );
+        shock.systematic_z = self.credit_z.unwrap_or(0.0);
+        Ok(PeriodShock { shock, rate_shift })
+    }
+}
+
+impl PoolFlowSource for OasPathFlowSource {
+    fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
+        let period = self.period_shock(&request)?;
+        request.state.floating_rate_shift = period.rate_shift;
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
@@ -221,9 +233,9 @@ impl PoolFlowSource for OasPathFlowSource {
             months_per_period: request.months_per_period,
             context: request.context,
             rates: PoolFlowRates {
-                smm,
-                mdr,
-                recovery_rate: request.instrument.credit_model.recovery_spec.rate,
+                smm: period.shock.smm,
+                mdr: period.shock.mdr,
+                recovery_rate: period.shock.recovery_rate,
             },
             copula_outcome: None,
         })
@@ -261,6 +273,10 @@ pub(crate) struct PeriodPoolShock {
     /// Per-name copula inputs. `Some` ⇒ realize defaults name-by-name;
     /// `None` ⇒ apply the pool-wide LHP MDR.
     pub(crate) per_name: Option<PerNamePeriodInput>,
+    /// Period systematic credit factor `Z` (standard normal, low is stress),
+    /// available to instrument collateral whether or not the default model
+    /// is a copula; `0.0` when the scenario has no stochastic credit.
+    pub(crate) systematic_z: f64,
 }
 
 impl PeriodPoolShock {
@@ -271,7 +287,60 @@ impl PeriodPoolShock {
             mdr,
             recovery_rate,
             per_name: None,
+            systematic_z: 0.0,
         }
+    }
+}
+
+/// One period's scenario inputs for instrument collateral.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PeriodShock {
+    /// Pool-level prepayment, default and recovery assumptions.
+    pub(super) shock: PeriodPoolShock,
+    /// Additive shift of the simulated rate path over the forward curve,
+    /// applied to floating coupons; `0.0` without a rate path.
+    pub(super) rate_shift: f64,
+}
+
+/// Per-period scenario inputs consumed by the instrument path source.
+///
+/// Implemented by the pre-generated shock vector of the Monte Carlo engine
+/// and by the OAS scenario modulation, so both engines drive the same
+/// instrument path source.
+pub(crate) trait PeriodShockSource {
+    /// Scenario inputs for the period described by `request`.
+    fn period_shock(&mut self, request: &PoolFlowRequest<'_, '_>) -> Result<PeriodShock>;
+}
+
+/// Pre-generated period shocks of one Monte Carlo path.
+pub(crate) struct PathShocks {
+    shocks: Vec<PeriodPoolShock>,
+    next_period: usize,
+}
+
+impl PathShocks {
+    /// Wrap one path's period shocks, consumed in order.
+    pub(crate) fn new(shocks: Vec<PeriodPoolShock>) -> Self {
+        Self {
+            shocks,
+            next_period: 0,
+        }
+    }
+}
+
+impl PeriodShockSource for PathShocks {
+    fn period_shock(&mut self, _request: &PoolFlowRequest<'_, '_>) -> Result<PeriodShock> {
+        let shock = self.shocks.get(self.next_period).copied().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "stochastic path has no pool shock for payment period {}",
+                self.next_period + 1
+            ))
+        })?;
+        self.next_period += 1;
+        Ok(PeriodShock {
+            shock,
+            rate_shift: 0.0,
+        })
     }
 }
 
@@ -297,6 +366,10 @@ impl PeriodPoolShock {
 /// and is *not* negated: the χ²-based mixing is asymmetric, and standard
 /// antithetic treatment for the Student-t copula negates only the Gaussian
 /// components while keeping the mixing common to the pair.
+///
+/// Cloning yields an engine at the same stream position, which the
+/// instrument-collateral counterfactual run uses to replay a path.
+#[derive(Clone)]
 pub(crate) struct PerNameDefaultEngine {
     simulator: Arc<PerNameCopulaDefault>,
     granularity: PoolGranularity,
@@ -344,6 +417,68 @@ impl PerNameDefaultEngine {
             rng,
             antithetic: true,
             idiosyncratic_recovery_vol,
+        }
+    }
+}
+
+/// Which buffer [`PerNameDefaultEngine::resolve`] filled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PerNameResolution {
+    /// `defaults` holds one realized indicator per name.
+    Realized,
+    /// `conditional` holds one LHP conditional probability per name.
+    Conditional,
+}
+
+impl PerNameDefaultEngine {
+    /// Resolve one period's defaults for names with their own marginals.
+    ///
+    /// `PerName` granularity realizes each name (antithetic partners negate
+    /// their idiosyncratic draws); `LargeHomogeneous` evaluates each name's
+    /// conditional default probability under one shared mixing draw.
+    ///
+    /// # Arguments
+    ///
+    /// * `systematic_z` - Period systematic factor shared by every name.
+    /// * `marginal_pd` - Unconditional period default probability per live name.
+    /// * `defaults` - Filled with realized indicators under `PerName`.
+    /// * `conditional` - Filled with conditional probabilities under
+    ///   `LargeHomogeneous`.
+    pub(super) fn resolve(
+        &mut self,
+        systematic_z: f64,
+        marginal_pd: &[f64],
+        defaults: &mut Vec<bool>,
+        conditional: &mut Vec<f64>,
+    ) -> PerNameResolution {
+        match self.granularity {
+            PoolGranularity::PerName => {
+                if self.antithetic {
+                    self.simulator.simulate_period_antithetic(
+                        systematic_z,
+                        marginal_pd,
+                        &mut self.rng,
+                        defaults,
+                    );
+                } else {
+                    self.simulator.simulate_period(
+                        systematic_z,
+                        marginal_pd,
+                        &mut self.rng,
+                        defaults,
+                    );
+                }
+                PerNameResolution::Realized
+            }
+            PoolGranularity::LargeHomogeneous => {
+                self.simulator.conditional_default_probs(
+                    systematic_z,
+                    marginal_pd,
+                    &mut self.rng,
+                    conditional,
+                );
+                PerNameResolution::Conditional
+            }
         }
     }
 }

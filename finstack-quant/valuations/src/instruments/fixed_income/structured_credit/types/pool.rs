@@ -11,7 +11,9 @@ use finstack_quant_core::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
 use super::enums::{AssetType, DealType};
+use super::tranches::TrancheStructure;
 use crate::instruments::fixed_income::structured_credit::types::constants::BASIS_POINTS_DIVISOR;
 use finstack_quant_core::types::CreditRating;
 
@@ -81,6 +83,10 @@ pub struct PoolAsset {
     /// Per-asset recovery fraction in [0, 1]; overrides the deal recovery model.
     #[serde(default)]
     pub recovery_rate: Option<f64>,
+    /// Total commitment for revolving or delayed-draw collateral; `balance` is
+    /// the drawn part. `None` for fully funded assets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commitment: Option<Money>,
     /// Contractual periodic payment for level-pay assets. Required for exact
     /// seasoned-loan amortization; when absent it is inferred once from the
     /// current state and remaining contractual periods.
@@ -151,6 +157,7 @@ impl PoolAsset {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         })
     }
@@ -217,6 +224,7 @@ impl PoolAsset {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         }
     }
@@ -251,6 +259,7 @@ impl PoolAsset {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         }
     }
@@ -382,6 +391,10 @@ pub struct PoolStats {
     pub recovery_rate: f64,
     /// Prepayment rate (annualized)
     pub prepayment_rate: f64,
+    /// Undrawn commitment across revolving and delayed-draw collateral
+    /// (`commitment − balance`, performing assets only).
+    #[serde(default)]
+    pub undrawn_commitment: f64,
 }
 
 /// Main asset pool structure
@@ -431,6 +444,36 @@ pub struct AssetPool {
     /// Aggregated representative lines (optional optimization)
     /// Must be used with an empty `assets` vector; normalized into the same engine.
     pub rep_lines: Option<Vec<RepLine>>,
+
+    /// Real instruments held as collateral (bonds, term loans, revolvers).
+    /// Must be used with an empty `assets` vector and no `rep_lines`; the
+    /// simulation engine drives period flows from the instruments' own
+    /// schedules and materializes them into asset rows for every balance
+    /// consumer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruments: Option<InstrumentCollateral>,
+
+    /// Annual simple interest rate (decimal, ACT/360 on the opening balance
+    /// per legal period) earned by `reserve_account`. Defaults to `0.0`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub reserve_account_rate: f64,
+
+    /// Target reserve balance that revolver repayments replenish toward
+    /// before counting as principal collections. `None` disables
+    /// replenishment from repayments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserve_target: Option<Money>,
+
+    /// Where the interest earned on `reserve_account` is paid.
+    #[serde(
+        default,
+        skip_serializing_if = "ReserveInterestDestination::is_default"
+    )]
+    pub reserve_interest_destination: ReserveInterestDestination,
+}
+
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
 }
 
 /// Representative line for aggregated pool modeling
@@ -545,6 +588,10 @@ impl AssetPool {
             reserve_account: zero_money,
             excess_spread_account: zero_money,
             rep_lines: None,
+            instruments: None,
+            reserve_account_rate: 0.0,
+            reserve_target: None,
+            reserve_interest_destination: ReserveInterestDestination::Waterfall,
         }
     }
 
@@ -559,8 +606,26 @@ impl AssetPool {
         Ok(self)
     }
 
-    /// Normalize representative collateral into the canonical asset engine.
-    pub(crate) fn normalized(&self, closing_date: Date) -> finstack_quant_core::Result<Self> {
+    /// Normalize representative lines or instrument collateral into the
+    /// canonical asset rows the simulation engine consumes.
+    ///
+    /// Representative lines are expanded one row per line; instrument
+    /// collateral is validated against the pool base currency and
+    /// materialized by [`InstrumentCollateral::materialize`], with the
+    /// instruments themselves retained on the returned pool. A pool that
+    /// already holds `assets` is validated and returned unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `closing_date` - Deal closing date used to age representative
+    ///   lines (`seasoning_months`) and to count delayed draws already funded.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when more than one representation is
+    /// populated, when an override or rate is out of range, or when an
+    /// instrument fails its own validation or currency check.
+    pub fn normalized(&self, closing_date: Date) -> finstack_quant_core::Result<Self> {
         self.validate_representation()?;
         let mut pool = self.clone();
         if let Some(lines) = pool.rep_lines.take() {
@@ -605,9 +670,14 @@ impl AssetPool {
                     smm_override: line.cpr.map(|cpr| 1.0 - (1.0 - cpr).powf(1.0 / 12.0)),
                     mdr_override: line.cdr.map(|cdr| 1.0 - (1.0 - cdr).powf(1.0 / 12.0)),
                     recovery_rate: line.recovery_rate,
+                    commitment: None,
                     contractual_payment: None,
                 });
             }
+        }
+        if let Some(instruments) = pool.instruments.as_ref() {
+            instruments.validate(self.base_currency)?;
+            pool.assets = instruments.materialize(closing_date)?;
         }
         for asset in &pool.assets {
             pool.validate_asset_currency(asset)?;
@@ -625,15 +695,78 @@ impl AssetPool {
     }
 
     fn validate_representation(&self) -> finstack_quant_core::Result<()> {
-        if !self.assets.is_empty()
-            && self
-                .rep_lines
-                .as_ref()
-                .is_some_and(|lines| !lines.is_empty())
-        {
+        let has_assets = !self.assets.is_empty();
+        let has_rep_lines = self
+            .rep_lines
+            .as_ref()
+            .is_some_and(|lines| !lines.is_empty());
+        let has_instruments = self
+            .instruments
+            .as_ref()
+            .is_some_and(|collateral| !collateral.is_empty());
+        if has_rep_lines && (has_assets || has_instruments) {
             return Err(finstack_quant_core::Error::Validation(
-                "asset pool must contain assets or representative lines, not both".into(),
+                "asset pool must contain exactly one of assets, representative lines or \
+                 instruments"
+                    .into(),
             ));
+        }
+        // Assets may coexist with instruments only as their materialization
+        // (same ids, same count), which is what `normalized` produces.
+        if let Some(collateral) = self
+            .instruments
+            .as_ref()
+            .filter(|_| has_assets && has_instruments)
+        {
+            let aligned = self.assets.len() == collateral.len()
+                && self
+                    .assets
+                    .iter()
+                    .zip(collateral.iter())
+                    .all(|(asset, held)| &asset.id == held.id());
+            if !aligned {
+                return Err(finstack_quant_core::Error::Validation(
+                    "asset pool must contain exactly one of assets, representative lines or \
+                     instruments; assets alongside instruments must be their materialized rows"
+                        .into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate the reserve-account configuration against the deal tranches.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranches` - Deal capital structure; a `Tranche` interest destination
+    ///   must name one of its tranches.
+    pub fn validate_reserve_config(
+        &self,
+        tranches: &TrancheStructure,
+    ) -> finstack_quant_core::Result<()> {
+        if !self.reserve_account_rate.is_finite() || self.reserve_account_rate < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "reserve_account_rate must be a finite non-negative decimal, got {}",
+                self.reserve_account_rate
+            )));
+        }
+        if let Some(target) = self.reserve_target {
+            if target.currency() != self.base_currency || target.amount() < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "reserve_target must be a non-negative {} amount, got {target}",
+                    self.base_currency
+                )));
+            }
+        }
+        if let ReserveInterestDestination::Tranche { tranche_id } =
+            &self.reserve_interest_destination
+        {
+            if !tranches.tranches.iter().any(|t| &t.id == tranche_id) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "reserve_interest_destination names unknown tranche '{tranche_id}'"
+                )));
+            }
         }
         Ok(())
     }
@@ -664,6 +797,11 @@ impl AssetPool {
     /// Total pool balance
     pub fn total_balance(&self) -> finstack_quant_core::Result<Money> {
         self.validate_representation()?;
+        if let Some(instruments) = &self.instruments {
+            if self.assets.is_empty() && !instruments.is_empty() {
+                return instruments.total_balance(self.base_currency);
+            }
+        }
         if let Some(lines) = &self.rep_lines {
             if self.assets.is_empty() {
                 return lines
@@ -954,6 +1092,15 @@ pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
         cumulative_default_rate,
         recovery_rate: 0.0,   // Computed separately if needed
         prepayment_rate: 0.0, // Computed separately if needed
+        undrawn_commitment: pool
+            .assets
+            .iter()
+            .filter(|a| !a.is_defaulted)
+            .filter_map(|a| {
+                a.commitment
+                    .map(|c| (c.amount() - a.balance.amount()).max(0.0))
+            })
+            .sum(),
     }
 }
 

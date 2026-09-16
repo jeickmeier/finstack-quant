@@ -8,6 +8,7 @@
 //! - Behavioral model specifications
 //! - Result types for valuation
 
+pub(crate) mod collateral;
 pub(crate) mod constants;
 pub(crate) mod enums;
 pub(crate) mod pool;
@@ -28,6 +29,10 @@ mod structured_credit_impl;
 pub use enums::TrancheSeniority;
 pub use enums::{AssetType, DealType, PaymentMode, TriggerConsequence};
 
+pub use collateral::{
+    CallExercisePolicy, CollateralInstrument, InstrumentCollateral, InstrumentExerciseOverride,
+    PutExercisePolicy, ReserveInterestDestination,
+};
 pub use pool::AssetPool;
 pub use pool::{
     calculate_pool_stats, ConcentrationCheckResult, ConcentrationViolation, PoolAsset, PoolStats,

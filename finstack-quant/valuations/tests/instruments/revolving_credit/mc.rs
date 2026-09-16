@@ -46,6 +46,7 @@ fn test_mc_pricer_stochastic_utilization() {
                     target_rate: 0.6, // Mean-revert to 60% utilization
                     speed: 0.5,       // Moderate mean reversion
                     volatility: 0.15, // 15% volatility
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 10000, // 10k paths for reasonable convergence
                 seed: Some(42),   // Fixed seed for reproducibility
@@ -125,6 +126,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     target_rate: 0.4,
                     speed: 0.5,
                     volatility: 1e-8, // near-zero, but positive to satisfy model constraints
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 5000,
                 seed: Some(42),
@@ -169,6 +171,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     target_rate: 0.4,
                     speed: 0.5,
                     volatility: 0.20,
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 5000,
                 seed: Some(42),
@@ -222,6 +225,7 @@ fn test_mc_pricer_deterministic_reproducibility() {
                     target_rate: 0.5,
                     speed: 0.3,
                     volatility: 0.10,
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 1000,
                 seed: Some(12345),
@@ -283,6 +287,7 @@ fn test_mc_pricer_convergence() {
                         target_rate: 0.7,
                         speed: 0.4,
                         volatility: 0.20,
+                        spread_sensitivity: 0.0,
                     },
                     num_paths,
                     seed: Some(99999),
@@ -338,6 +343,7 @@ fn test_mc_utilization_mean_reversion() {
                     target_rate: 0.8, // Should drift toward 80%
                     speed: 1.0,       // Fast mean reversion
                     volatility: 0.05, // Low volatility
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 5000,
                 seed: Some(54321),
@@ -377,6 +383,7 @@ fn test_mc_utilization_mean_reversion() {
                     target_rate: 0.8, // Already at target
                     speed: 1.0,
                     volatility: 0.05,
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 5000,
                 seed: Some(54321),
@@ -486,6 +493,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                         target_rate: 0.5,
                         speed: 0.5,
                         volatility: 1e-8, // near-zero to keep utilization deterministic
+                        spread_sensitivity: 0.0,
                     },
                     num_paths: 1000,
                     seed: Some(42),
@@ -603,6 +611,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                         target_rate: 0.5,
                         speed: 0.5,
                         volatility: 1e-8,
+                        spread_sensitivity: 0.0,
                     },
                     num_paths: 64,
                     seed: Some(42),

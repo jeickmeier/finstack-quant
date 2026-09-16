@@ -57,6 +57,7 @@ fn utilization_process_strategy() -> impl Strategy<Value = UtilizationProcess> {
             target_rate: target,
             speed,
             volatility: vol,
+            spread_sensitivity: 0.0,
         }
     })
 }
@@ -73,11 +74,12 @@ proptest! {
             target_rate,
             speed,
             volatility,
+            spread_sensitivity: 0.0,
         };
 
         // Process should be constructible
         match process {
-            UtilizationProcess::MeanReverting { target_rate: t, speed: s, volatility: v } => {
+            UtilizationProcess::MeanReverting { target_rate: t, speed: s, volatility: v, .. } => {
                 prop_assert!((0.0..=1.0).contains(&t), "Target rate should be in [0, 1]");
                 prop_assert!(s > 0.0, "Speed should be positive");
                 prop_assert!(v >= 0.0, "Volatility should be non-negative");
@@ -289,6 +291,7 @@ proptest! {
             target_rate,
             speed,
             volatility,
+            spread_sensitivity: 0.0,
         };
 
         let spec = StochasticUtilizationSpec {

@@ -56,6 +56,30 @@ pub struct StochasticPricingResult {
 
     /// Tranche-level results
     pub tranche_results: Vec<TranchePricingResult>,
+
+    /// Fraction of paths on which a collateral draw could not be funded from
+    /// the reserve account and that period's principal collections (`0.0`
+    /// for pools without draws).
+    #[serde(default)]
+    pub unfunded_draw_path_fraction: f64,
+
+    /// Mean over paths of the collateral draws funded through the reserve
+    /// account and principal collections (revolver utilization increases,
+    /// delayed draws and loan-equivalent draws at default).
+    pub expected_collateral_draws: Money,
+
+    /// Mean over paths of the draw option cost: the value to the deal of its
+    /// revolvers' simulated draws having been made at the contractual margin
+    /// instead of each path's fair spread, obtained per path as the present
+    /// value of the actual tranche cashflows less that of a counterfactual
+    /// run where every draw accrues at its fair spread. Negative when spreads
+    /// widen; zero for pools without stochastic revolvers.
+    pub draw_option_cost: Money,
+
+    /// Per-path draw option cost in path order (same currency as `npv`),
+    /// populated only for pools with stochastic revolvers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub draw_option_cost_paths: Vec<f64>,
 }
 
 impl StochasticPricingResult {
@@ -87,6 +111,10 @@ impl StochasticPricingResult {
             num_paths,
             pricing_mode,
             tranche_results: Vec::new(),
+            unfunded_draw_path_fraction: 0.0,
+            expected_collateral_draws: Money::from((0_i64, currency)),
+            draw_option_cost: Money::from((0_i64, currency)),
+            draw_option_cost_paths: Vec::new(),
         }
     }
 
@@ -140,6 +168,12 @@ pub struct TranchePricingResult {
 
     /// Credit duration (price sensitivity to credit spread)
     pub credit_duration: f64,
+
+    /// This tranche's share of the deal's draw option cost: the mean over
+    /// paths of its present value on the actual run less that on the
+    /// counterfactual run where revolver draws accrue at their fair spread.
+    /// Tranche shares sum to the deal's `draw_option_cost` on every path.
+    pub draw_option_cost: Money,
 }
 
 impl TranchePricingResult {
@@ -164,7 +198,14 @@ impl TranchePricingResult {
             average_life: 0.0,
             spread: 0.0,
             credit_duration: 0.0,
+            draw_option_cost: Money::from((0_i64, currency)),
         }
+    }
+
+    /// Set the tranche's share of the deal draw option cost.
+    pub fn with_draw_option_cost(mut self, cost: Money) -> Self {
+        self.draw_option_cost = cost;
+        self
     }
 
     /// Set attachment and detachment points.

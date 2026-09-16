@@ -9,6 +9,7 @@ pub mod mc;
 mod basic;
 mod cashflows;
 mod construction;
+pub mod draw_option_cost;
 mod fixings;
 pub mod metrics;
 mod pricing;

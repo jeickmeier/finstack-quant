@@ -82,6 +82,35 @@ pub(super) struct SimulationState<'a> {
     /// so OAS-simulated coupons follow the same rate path as the discounting.
     /// Zero for every non-OAS run, making this exact identity there.
     pub(super) floating_rate_shift: f64,
+    /// Cumulative collateral draws funded from the reserve account.
+    pub(super) draws_from_reserve: Money,
+    /// Cumulative collateral draws funded from principal collections.
+    pub(super) draws_from_principal: Money,
+    /// Cumulative collateral draws that could not be funded.
+    pub(super) cumulative_unfunded_draws: Money,
+    /// Cumulative revolver repayments diverted to replenish the reserve.
+    pub(super) reserve_replenished: Money,
+    /// End-of-period reserve balances.
+    pub(super) reserve_balance_path: DatedFlows,
+    /// Reserve interest earned per period, before routing.
+    pub(super) reserve_interest_paid: DatedFlows,
+}
+
+/// Deal-level accounting produced alongside the tranche cashflows.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SimulationDiagnostics {
+    /// Reserve-account balance at the end of each simulated period.
+    pub reserve_balance_path: DatedFlows,
+    /// Reserve interest earned each period, before routing to its destination.
+    pub reserve_interest_paid: DatedFlows,
+    /// Collateral draws funded from the reserve account over the simulation.
+    pub draws_from_reserve: Money,
+    /// Collateral draws funded from principal collections over the simulation.
+    pub draws_from_principal: Money,
+    /// Collateral draws that could not be funded over the simulation.
+    pub unfunded_draws: Money,
+    /// Revolver repayments diverted to replenish the reserve over the simulation.
+    pub reserve_replenished: Money,
 }
 
 /// Deal-health metrics for this period's step-down trigger evaluation.
@@ -331,6 +360,12 @@ impl<'a> SimulationState<'a> {
             undistributed_interest: Money::from((0_i64, template.base_currency)),
             undistributed_principal: pool.collection_account,
             floating_rate_shift: 0.0,
+            draws_from_reserve: Money::from((0_i64, template.base_currency)),
+            draws_from_principal: Money::from((0_i64, template.base_currency)),
+            cumulative_unfunded_draws: Money::from((0_i64, template.base_currency)),
+            reserve_replenished: Money::from((0_i64, template.base_currency)),
+            reserve_balance_path: Vec::new(),
+            reserve_interest_paid: Vec::new(),
         }
     }
 
@@ -362,7 +397,18 @@ impl<'a> SimulationState<'a> {
         self.pool_outstanding.amount() <= self.pool_balance_cleanup_threshold
     }
 
-    pub(super) fn finalize(mut self) -> HashMap<String, TrancheCashflows> {
+    /// Finalize tranche results and return them with the deal-level accounting.
+    pub(super) fn finalize_with_diagnostics(
+        mut self,
+    ) -> (HashMap<String, TrancheCashflows>, SimulationDiagnostics) {
+        let diagnostics = SimulationDiagnostics {
+            reserve_balance_path: std::mem::take(&mut self.reserve_balance_path),
+            reserve_interest_paid: std::mem::take(&mut self.reserve_interest_paid),
+            draws_from_reserve: self.draws_from_reserve,
+            draws_from_principal: self.draws_from_principal,
+            unfunded_draws: self.cumulative_unfunded_draws,
+            reserve_replenished: self.reserve_replenished,
+        };
         for (tranche_id, res) in self.results.iter_mut() {
             let mut final_balance = self
                 .tranche_balances
@@ -426,6 +472,6 @@ impl<'a> SimulationState<'a> {
             res.detailed_flows.sort_by_key(|cf| cf.date);
         }
 
-        self.results
+        (self.results, diagnostics)
     }
 }

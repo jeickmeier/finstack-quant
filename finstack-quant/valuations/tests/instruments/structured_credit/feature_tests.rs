@@ -74,6 +74,7 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         });
     }
@@ -1261,6 +1262,7 @@ mod shifting_interest_tests {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         });
         let tranches = TrancheStructure::new(vec![

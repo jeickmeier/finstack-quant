@@ -409,10 +409,13 @@ RUNTIME_RESULT_EXCEPTIONS = (
         "src/instruments/fixed_income/dollar_roll/carry.rs",
         ("CarryResult",),
     ),
-    *_runtime_exception(
+    *_exception(
         "valuations",
         "src/instruments/fixed_income/revolving_credit/pricing/results.rs",
         ("PathResult", "EnhancedMonteCarloResult"),
+        "runtime-result",
+        "Round-trippable valuation output; no published JSON schema.",
+        frozenset({"JsonSchema"}),
     ),
     *_runtime_exception(
         "valuations",

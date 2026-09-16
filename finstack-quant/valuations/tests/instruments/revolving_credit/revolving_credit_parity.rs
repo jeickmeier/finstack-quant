@@ -94,6 +94,7 @@ mod tests {
                 target_rate: initial_utilization,
                 speed: 100.0,    // Very high speed to stay at target
                 volatility: 0.0, // Zero volatility
+                spread_sensitivity: 0.0,
             },
             num_paths: 1000, // Use many paths for stable average
             seed: Some(42),

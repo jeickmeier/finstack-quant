@@ -106,6 +106,43 @@ let deal = StructuredCredit::example();
 For full control use `StructuredCredit::builder()` and set `deal_type`, `pool`,
 `tranches`, `waterfall` and the credit model explicitly.
 
+### Instrument collateral
+
+A pool can hold real instruments instead of asset rows or rep lines:
+`AssetPool::instruments = Some(InstrumentCollateral { bonds, term_loans,
+revolvers, .. })` accepts any `Bond` (fixed, floating, step-up, amortizing,
+callable/puttable, custom cashflows), `TermLoan` (including delayed draws and
+PIK) and `RevolvingCredit` in the pool base currency. Each instrument's own
+`raw_cashflow_schedule` is bucketed by legal payment period; defaults come
+from the instrument's `credit_curve_id` when present, else from the deal
+`DefaultModelSpec`, and behavioural prepayment from the deal
+`PrepaymentModelSpec`. Call and put exercise follow
+`InstrumentCollateral::call_exercise` / `put_exercise`
+(`CallExercisePolicy::{Contractual, FirstCall, Worst, RefinancingIncentive}`,
+`PutExercisePolicy::{Never, FirstPut}`) with per-instrument `overrides`.
+
+Collateral draws (revolver utilization increases, delayed draws and
+loan-equivalent draws at default) are funded from `AssetPool::reserve_account`,
+then from the period's principal collections; revolver repayments replenish
+the reserve up to `reserve_target`. The reserve earns `reserve_account_rate`
+(annual decimal, ACT/360 on the opening balance) routed per
+`reserve_interest_destination`: the waterfall (default), a named tranche, or
+retained in the reserve. A deterministic run refuses a draw calendar the
+reserve cannot fund; stochastic runs cap the draw and report the affected
+paths (`StochasticPricingResult::unfunded_draw_path_fraction`).
+`run_simulation_with_diagnostics` returns the reserve path and draw funding
+alongside the tranche cashflows.
+
+Stochastic pricing (`price_stochastic*`, OAS) drives the same instrument
+engine path by path: per-name defaults through the deal's copula (or the
+period's realized pool rate), and for stochastic revolvers a spread process
+and a utilization process whose target can follow the spread
+(`UtilizationProcess::MeanReverting::spread_sensitivity`), so draws rise on
+the stress paths where names default. `StochasticPricingResult::draw_option_cost`
+(and each tranche's share) values those draws at the contractual margin
+against the path's fair spread; see
+[`pricing/stochastic/README.md`](pricing/stochastic/README.md).
+
 ## Valuation
 
 ```rust
@@ -308,6 +345,17 @@ introduce a metric on the discount curve's own day count.
 - Typical frequencies: ABS monthly, CLO quarterly, CMBS monthly, RMBS monthly.
 
 ## Bindings
+
+Instrument collateral is typed in Python: `AssetPool.with_instruments(bonds=,
+term_loans=, revolvers=, call_exercise=, put_exercise=, overrides=)` accepts
+the typed `Bond`, `TermLoan` and `RevolvingCredit` classes,
+`AssetPool.with_reserve(...)` configures the reserve account and its interest
+destination, `StructuredCredit.run_simulation_with_diagnostics(market, as_of)`
+returns the reserve path and draw funding (`SimulationDiagnostics`) and
+`StructuredCredit.price_stochastic(market, as_of, num_paths=, antithetic=)`
+returns a `StochasticPricingResult` with the tranche shares of the draw
+option cost and its per-path distribution (`draw_option_cost_dataframe()`).
+WASM carries the same fields in the deal JSON.
 
 Both bindings expose structured credit under their `instruments` namespace:
 

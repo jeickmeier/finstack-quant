@@ -60,6 +60,52 @@ impl RevolvingCreditDiscretization {
     }
 }
 
+/// One exact Ornstein–Uhlenbeck transition `dX = κ(θ − X)dt + σ dW`.
+///
+/// `X_{t+Δt} = θ + (X_t − θ)e^{−κΔt} + σ√[(1 − e^{−2κΔt})/(2κ)]·Z`, which
+/// carries the exact conditional mean and variance for any step; the
+/// small-`κΔt` limit `σ√Δt` avoids `0/0`.
+///
+/// # Arguments
+///
+/// * `x` - State at the start of the step.
+/// * `theta` - Long-run level the state reverts to.
+/// * `kappa` - Mean-reversion speed per year (must be positive).
+/// * `sigma` - Annualized volatility; `0.0` gives the deterministic drift.
+/// * `dt` - Step length in years.
+/// * `z` - Standard normal shock.
+pub(crate) fn ou_exact_step(x: f64, theta: f64, kappa: f64, sigma: f64, dt: f64, z: f64) -> f64 {
+    let exp_kappa_dt = (-kappa * dt).exp();
+    let std = if (kappa * dt).abs() < 1e-8 {
+        sigma * dt.sqrt()
+    } else {
+        sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
+    };
+    theta + (x - theta) * exp_kappa_dt + std * z
+}
+
+/// Utilization target linked to the simulated credit spread:
+/// `clamp(θ + β · (s / s₀ − 1), 0, 1)`.
+///
+/// # Arguments
+///
+/// * `theta` - Unlinked target utilization in `[0, 1]`.
+/// * `spread_sensitivity` - Target shift per unit of relative spread change (`β`).
+/// * `spread` - Current simulated spread (decimal).
+/// * `spread_0` - Initial spread the relative change is measured from; a
+///   non-positive value disables the link.
+pub(crate) fn spread_linked_target(
+    theta: f64,
+    spread_sensitivity: f64,
+    spread: f64,
+    spread_0: f64,
+) -> f64 {
+    if spread_sensitivity == 0.0 || spread_0 <= 0.0 {
+        return theta;
+    }
+    (theta + spread_sensitivity * (spread / spread_0 - 1.0)).clamp(0.0, 1.0)
+}
+
 impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
     fn step(
         &self,
@@ -101,19 +147,22 @@ impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
         // the (retained) clamp is now purely a defensive guard against rare
         // tail excursions rather than a bias-correction crutch.
         let util_params = &process.get_params().utilization;
-        let kappa = util_params.kappa;
-        let theta = util_params.theta;
-        let sigma = util_params.sigma;
-
-        let exp_kappa_dt = (-kappa * dt).exp();
-        // Conditional std dev: σ √[(1 - e^{-2κΔt}) / (2κ)], with the small-κΔt
-        // limit σ√Δt to avoid 0/0 when κΔt → 0.
-        let util_std = if (kappa * dt).abs() < 1e-8 {
-            sigma * dt.sqrt()
-        } else {
-            sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
-        };
-        x[0] = theta + (x[0] - theta) * exp_kappa_dt + util_std * z_corr[0];
+        // Adverse selection: the target follows the start-of-step spread
+        // relative to its initial level (`x[2]` is stepped afterwards).
+        let theta = spread_linked_target(
+            util_params.theta,
+            util_params.spread_sensitivity,
+            x[2].max(0.0),
+            process.get_params().credit_spread.initial,
+        );
+        x[0] = ou_exact_step(
+            x[0],
+            theta,
+            util_params.kappa,
+            util_params.sigma,
+            dt,
+            z_corr[0],
+        );
         // Utilization is a fraction in [0, 1], so the effective process is a
         // *clamped* OU. With θ well inside the interval and moderate σ the
         // exact transition already carries the correct moments and the clamp

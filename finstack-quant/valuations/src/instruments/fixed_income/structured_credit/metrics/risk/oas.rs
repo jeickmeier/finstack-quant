@@ -24,7 +24,8 @@
 //!   ([`crate::instruments::fixed_income::mbs_passthrough`]).
 
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
-    run_simulation_with_source, OasPathFlowSource,
+    prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, OasPathFlowSource,
+    PreparedInstrumentSchedules,
 };
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
@@ -36,6 +37,12 @@ use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::RandomStream;
 use serde::{Deserialize, Serialize};
+
+/// Substream offset of the instrument-collateral process draws inside one
+/// OAS scenario: scenario `p` uses `2p` for rates, `2p + 1` for credit and
+/// `2p + OAS_INSTRUMENT_STREAM_OFFSET` for revolver processes, which never
+/// collides for any `p` below the path cap.
+const OAS_INSTRUMENT_STREAM_OFFSET: u64 = 1 << 40;
 
 /// Configuration for the structured-credit OAS calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -204,6 +211,24 @@ pub fn calculate_tranche_oas(
         None
     };
 
+    // Resolve and prepare the deal once; every scenario reuses the schedule,
+    // waterfall and (for instrument collateral) the bucketed instrument
+    // schedules.
+    let resolved = deal.resolved_for_pricing()?;
+    let prepared = prepare_deal_simulation(&resolved, as_of)?.ok_or_else(|| {
+        finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+            id: format!("tranche:{tranche_id}"),
+        })
+    })?;
+    let instrument_schedules = if resolved.pool.instruments.is_some() {
+        Some(PreparedInstrumentSchedules::prepare(
+            &resolved, market, &prepared,
+        )?)
+    } else {
+        None
+    };
+    let asset_correlation = resolved.effective_asset_correlation()?;
+
     // Cache `(t, CF · base_df)` per scenario; trial OAS adds only `exp(-s · t)`.
     let mut scenarios: Vec<Vec<(f64, f64)>> = Vec::with_capacity(num_paths);
 
@@ -248,7 +273,7 @@ pub fn calculate_tranche_oas(
             None
         };
 
-        let mut source = OasPathFlowSource::new(
+        let modulation = OasPathFlowSource::new(
             as_of,
             rate_path,
             rate_shift_path,
@@ -257,7 +282,26 @@ pub fn calculate_tranche_oas(
             base_rate,
             config.credit_loading,
         );
-        let results = run_simulation_with_source(deal, market, as_of, &mut source)?;
+        let results = match &instrument_schedules {
+            Some(schedules) => {
+                // Instrument collateral: the same scenario modulation drives
+                // the instrument path engine; revolver process draws take the
+                // path's own substream, disjoint from the rate/credit draws.
+                let mut source = InstrumentPathFlowSource::new(
+                    schedules,
+                    modulation,
+                    None,
+                    asset_correlation,
+                    rng.substream(2 * path as u64 + OAS_INSTRUMENT_STREAM_OFFSET),
+                    false,
+                );
+                simulate_prepared(&resolved, market, &prepared, &mut source)?.tranches
+            }
+            None => {
+                let mut source = modulation;
+                simulate_prepared(&resolved, market, &prepared, &mut source)?.tranches
+            }
+        };
         let cashflows = &results
             .get(tranche_id)
             .ok_or_else(|| {

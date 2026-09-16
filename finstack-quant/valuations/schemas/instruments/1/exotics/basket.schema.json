@@ -752,6 +752,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "AssetPool identifier"
         },
+        "instruments": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstrumentCollateral"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Real instruments held as collateral (bonds, term loans, revolvers).\nMust be used with an empty `assets` vector and no `rep_lines`; the\nsimulation engine drives period flows from the instruments' own\nschedules and materializes them into asset rows for every balance\nconsumer."
+        },
         "reinvestment_period": {
           "anyOf": [
             {
@@ -776,6 +787,26 @@
         "reserve_account": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Reserve account balance (for credit enhancement)"
+        },
+        "reserve_account_rate": {
+          "description": "Annual simple interest rate (decimal, ACT/360 on the opening balance\nper legal period) earned by `reserve_account`. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "reserve_interest_destination": {
+          "$ref": "#/$defs/ReserveInterestDestination",
+          "description": "Where the interest earned on `reserve_account` is paid."
+        },
+        "reserve_target": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target reserve balance that revolver repayments replenish toward\nbefore counting as principal collections. `None` disables\nreplenishment from repayments."
         }
       },
       "required": [
@@ -3303,6 +3334,73 @@
           "const": "collateral_substitution_out",
           "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced.",
           "type": "string"
+        }
+      ]
+    },
+    "CallExercisePolicy": {
+      "description": "Rule the pool engine applies to issuer call options on the collateral.\n\nSet at the deal level on [`InstrumentCollateral::call_exercise`] and\noverridable per instrument through [`InstrumentExerciseOverride`].",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Never exercise: the instrument runs to its contractual schedule.",
+          "properties": {
+            "policy": {
+              "const": "contractual",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The issuer calls at the first call date, at that date's call price.",
+          "properties": {
+            "policy": {
+              "const": "first_call",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Redeem at the yield-to-worst date implied by the instrument's quoted\nclean price. Requires a quoted price on every instrument it applies to.",
+          "properties": {
+            "policy": {
+              "const": "worst",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The issuer calls at the next call date when the refinancing rate (the\nindex forward, or the simulated path rate, plus the instrument's own\nspread) is below the current coupon by more than `threshold_bp`.",
+          "properties": {
+            "policy": {
+              "const": "refinancing_incentive",
+              "type": "string"
+            },
+            "threshold_bp": {
+              "description": "Minimum coupon-over-refinancing-rate saving, in basis points, that\ntriggers exercise.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "policy",
+            "threshold_bp"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -12452,6 +12550,97 @@
       ],
       "type": "object"
     },
+    "InstrumentCollateral": {
+      "additionalProperties": false,
+      "description": "Real instruments held as pool collateral.\n\nExactly one collateral representation may be populated on an\n[`super::AssetPool`]: `assets`, `rep_lines` or `instruments`.",
+      "properties": {
+        "bonds": {
+          "default": [],
+          "description": "Bonds in any form: fixed, floating, step-up, amortizing, custom\ncashflows, with call/put schedules and return floors.",
+          "items": {
+            "$ref": "#/$defs/Bond"
+          },
+          "type": "array"
+        },
+        "call_exercise": {
+          "$ref": "#/$defs/CallExercisePolicy",
+          "default": {
+            "policy": "contractual"
+          },
+          "description": "Deal-level call exercise rule."
+        },
+        "overrides": {
+          "default": [],
+          "description": "Per-instrument exercise overrides.",
+          "items": {
+            "$ref": "#/$defs/InstrumentExerciseOverride"
+          },
+          "type": "array"
+        },
+        "put_exercise": {
+          "$ref": "#/$defs/PutExercisePolicy",
+          "default": {
+            "policy": "never"
+          },
+          "description": "Deal-level put exercise rule."
+        },
+        "revolvers": {
+          "default": [],
+          "description": "Revolving credit facilities.",
+          "items": {
+            "$ref": "#/$defs/RevolvingCredit"
+          },
+          "type": "array"
+        },
+        "term_loans": {
+          "default": [],
+          "description": "Term loans, including delayed-draw commitments, PIK and call schedules.",
+          "items": {
+            "$ref": "#/$defs/TermLoan"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "InstrumentExerciseOverride": {
+      "additionalProperties": false,
+      "description": "Per-instrument override of the deal-level exercise policies.",
+      "properties": {
+        "call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallExercisePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Call policy for this instrument; `None` keeps the deal-level policy."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Identifier of the bond or term loan the override applies to."
+        },
+        "put": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PutExercisePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Put policy for this instrument; `None` keeps the deal-level policy."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "InstrumentJson": {
       "description": "Canonical tagged union of all supported instrument serde types.",
       "oneOf": [
@@ -16062,6 +16251,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Current outstanding principal balance in the asset currency."
         },
+        "commitment": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total commitment for revolving or delayed-draw collateral; `balance` is\nthe drawn part. `None` for fully funded assets."
+        },
         "contractual_payment": {
           "anyOf": [
             {
@@ -16548,6 +16748,39 @@
           },
           "required": [
             "between"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PutExercisePolicy": {
+      "description": "Rule the pool engine applies to holder put options on the collateral.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Never exercise.",
+          "properties": {
+            "policy": {
+              "const": "never",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The holder puts at the first put date, at that date's put price.",
+          "properties": {
+            "policy": {
+              "const": "first_put",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
           ],
           "type": "object"
         }
@@ -17994,6 +18227,58 @@
           "const": "overnight",
           "description": "Overnight repo maturing next business day",
           "type": "string"
+        }
+      ]
+    },
+    "ReserveInterestDestination": {
+      "description": "Where the interest earned on the deal reserve account is paid.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Interest proceeds available to the waterfall (default).",
+          "properties": {
+            "kind": {
+              "const": "waterfall",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Paid directly to one tranche (the equity tranche, typically) before the\nwaterfall runs. Excluded from the interest-coverage numerator.",
+          "properties": {
+            "kind": {
+              "const": "tranche",
+              "type": "string"
+            },
+            "tranche_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier of the receiving tranche; must exist in the deal."
+            }
+          },
+          "required": [
+            "kind",
+            "tranche_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capitalized into the reserve account.",
+          "properties": {
+            "kind": {
+              "const": "retain",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -20523,6 +20808,12 @@
           "properties": {
             "speed": {
               "description": "Mean reversion speed (annualized).",
+              "format": "double",
+              "type": "number"
+            },
+            "spread_sensitivity": {
+              "default": 0.0,
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
               "format": "double",
               "type": "number"
             },

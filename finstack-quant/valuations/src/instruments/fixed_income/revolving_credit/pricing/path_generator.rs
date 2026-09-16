@@ -97,13 +97,18 @@ pub fn generate_three_factor_paths(
             target_rate,
             speed,
             volatility,
+            spread_sensitivity,
         } => {
             // Zero (or effectively-zero) volatility is parity mode: pass a
             // true σ = 0 so the utilization diffusion term vanishes exactly
             // rather than substituting a tiny placeholder volatility.
             let is_zero = volatility.abs() < 1e-8;
             let vol = if is_zero { 0.0 } else { *volatility };
-            (UtilizationParams::new(*speed, *target_rate, vol)?, is_zero)
+            (
+                UtilizationParams::new(*speed, *target_rate, vol)?
+                    .with_spread_sensitivity(*spread_sensitivity)?,
+                is_zero,
+            )
         }
     };
 
@@ -547,7 +552,20 @@ use super::super::MIN_CIR_SPREAD as CIR_MIN_SPREAD;
 /// For CIR processes, validates the Feller condition: 2κθ > σ². When violated,
 /// the process can reach zero. A warning is logged but the process proceeds
 /// since the QE discretization handles boundary behavior gracefully.
-fn build_credit_spread_params(
+/// Credit-spread process parameters for one facility.
+///
+/// Market-anchored specs start at the hazard curve's instantaneous spread on
+/// `simulation_anchor` and revert to the conditional average spread over the
+/// remaining tenor; explicit CIR and constant specs are guarded for
+/// stability.
+///
+/// # Arguments
+///
+/// * `mc_config` - Facility Monte Carlo configuration carrying the spread process.
+/// * `facility` - Facility supplying recovery and maturity for the anchoring.
+/// * `market` - Market context holding the hazard curve for anchored specs.
+/// * `simulation_anchor` - Date the spread state is anchored at.
+pub(crate) fn build_credit_spread_params(
     mc_config: &McConfig,
     facility: &RevolvingCredit,
     market: &MarketContext,
@@ -931,6 +949,7 @@ mod tests {
                 target_rate: 0.5,
                 speed: 1.0,
                 volatility: 0.1,
+                spread_sensitivity: 0.0,
             },
             num_paths: 2,
             seed: Some(7),

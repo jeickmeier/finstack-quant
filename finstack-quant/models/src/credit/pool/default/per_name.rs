@@ -242,6 +242,49 @@ impl PerNameCopulaDefault {
         }
     }
 
+    /// Per-name LHP conditional default probabilities for one period.
+    ///
+    /// The heterogeneous-pool form of [`Self::conditional_default_prob`]:
+    /// one shared mixing draw `W` is taken for the period (one uniform, as in
+    /// [`Self::simulate_period`]), then each name's
+    /// `E[1{Aᵢ ≤ cᵢ} | Z, W]` is evaluated at its own barrier
+    /// `cᵢ = Φ⁻¹(PDᵢ)` (or `t_ν⁻¹(PDᵢ)`). Names keep their own marginal
+    /// while sharing the systematic state, so an instrument pool whose names
+    /// carry different hazard curves can take the LHP limit name by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `systematic` - Period systematic factor `Z` shared by every name.
+    /// * `marginal_pd` - Unconditional period default probability per name,
+    ///   as decimals; one entry per still-performing name in pool order.
+    /// * `rng` - Path-local Philox stream; consumes exactly one uniform.
+    /// * `out` - Cleared and filled with one conditional probability per
+    ///   name, aligned with `marginal_pd`.
+    pub fn conditional_default_probs(
+        &self,
+        systematic: f64,
+        marginal_pd: &[f64],
+        rng: &mut PhiloxRng,
+        out: &mut Vec<f64>,
+    ) {
+        out.clear();
+        out.reserve(marginal_pd.len());
+        let mixing = self.copula.sample_mixing(rng.next_u01());
+        for &pd in marginal_pd {
+            let threshold = self.threshold_kind.threshold(pd);
+            let conditional = self
+                .copula
+                .conditional_default_prob_given_systematic_and_mixing(
+                    threshold,
+                    systematic,
+                    mixing,
+                    self.correlation,
+                )
+                .clamp(0.0, 1.0);
+            out.push(conditional);
+        }
+    }
+
     /// LHP conditional default probability for one period.
     ///
     /// This is `E[1{Aᵢ ≤ c} | Z, W]` — the `N → ∞` limit of
@@ -324,6 +367,36 @@ mod tests {
     }
 
     use super::*;
+
+    /// Per-name conditional default probabilities share one mixing draw per
+    /// period and reduce to the Gaussian closed form name by name, so a
+    /// heterogeneous pool can take the LHP limit without collapsing to a
+    /// single marginal.
+    #[test]
+    fn conditional_default_probs_match_the_closed_form_per_name() {
+        let rho = 0.30_f64;
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, rho).expect("copula builds");
+        let marginals = [0.01_f64, 0.05, 0.20];
+        let z = -1.2_f64;
+        let mut rng = PhiloxRng::new(9);
+        let mut out = Vec::new();
+        sim.conditional_default_probs(z, &marginals, &mut rng, &mut out);
+        assert_eq!(out.len(), marginals.len());
+        for (pd, cond) in marginals.iter().zip(&out) {
+            let threshold = standard_normal_inv_cdf(*pd);
+            let expected = finstack_quant_core::math::norm_cdf(
+                (threshold - rho.sqrt() * z) / (1.0 - rho).sqrt(),
+            );
+            assert!(
+                (cond - expected).abs() < 1e-12,
+                "pd {pd}: conditional {cond} vs closed form {expected}"
+            );
+        }
+        // Exactly one uniform is consumed per period, as in `simulate_period`.
+        let mut fresh = PhiloxRng::new(9);
+        let _ = fresh.next_u01();
+        assert_eq!(rng.next_u01().to_bits(), fresh.next_u01().to_bits());
+    }
 
     /// The per-name realization, averaged over the systematic factor and a
     /// large pool, must recover the unconditional marginal PD. Without this

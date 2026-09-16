@@ -77,6 +77,7 @@ impl StructuredCredit {
         let mut deal = self.clone();
         deal.credit_model = self.resolved_credit_model()?;
         deal.pool = self.pool.normalized(self.closing_date)?;
+        deal.pool.validate_reserve_config(&deal.tranches)?;
         for asset in &deal.pool.assets {
             if asset.is_defaulted {
                 if asset.default_date.is_none() || asset.recovery_amount.is_none() {

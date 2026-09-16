@@ -112,8 +112,8 @@ pub use pricing::unified::EnhancedMonteCarloResult;
 pub use pricing::unified::PathResult;
 pub use pricing::unified::RevolvingCreditPricer;
 pub use types::{
-    BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
-    UtilizationProcess,
+    BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditBuilder,
+    RevolvingCreditFees, UtilizationProcess,
 };
 
 pub use types::{

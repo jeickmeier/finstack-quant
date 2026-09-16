@@ -35,12 +35,14 @@ pub mod waterfall {
 }
 
 pub use types::{
-    calculate_pool_stats, AfcSpec, AllocationMode, AssetPool, AssetType, ConcentrationCheckResult,
-    ConcentrationViolation, ControlledAccumulationSpec, CoverageTestConfig, CoverageTestType,
-    CoverageTrigger, CreditModelConfig, DealConfig, DealDates, DealFees, DealType,
-    DefaultAssumptions, EarlyAmortizationSpec, ExcessSpreadSpec, ManagementFeeType, Metadata,
-    Overrides, PaymentCalculation, PaymentMode, PaymentRecord, PaymentType, PoolAsset, PoolStats,
-    Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
+    calculate_pool_stats, AfcSpec, AllocationMode, AssetPool, AssetType, CallExercisePolicy,
+    CollateralInstrument, ConcentrationCheckResult, ConcentrationViolation,
+    ControlledAccumulationSpec, CoverageTestConfig, CoverageTestType, CoverageTrigger,
+    CreditModelConfig, DealConfig, DealDates, DealFees, DealType, DefaultAssumptions,
+    EarlyAmortizationSpec, ExcessSpreadSpec, InstrumentCollateral, InstrumentExerciseOverride,
+    ManagementFeeType, Metadata, Overrides, PaymentCalculation, PaymentMode, PaymentRecord,
+    PaymentType, PoolAsset, PoolStats, PutExercisePolicy, Recipient, RecipientType,
+    ReinvestmentCriteria, ReinvestmentPeriod, RepLine, ReserveInterestDestination,
     RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
     StructuredCredit, StructuredCreditBuilder, Tranche, TrancheAccrualPeriod, TrancheBehaviorType,
     TrancheBuilder, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
@@ -68,6 +70,7 @@ pub use pricing::stochastic::PricingMode;
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;
 pub use pricing::waterfall::WaterfallContext;
+pub use pricing::{run_simulation_with_diagnostics, SimulationDiagnostics, SimulationRun};
 
 pub use metrics::{
     calculate_tranche_breakeven_cdr,

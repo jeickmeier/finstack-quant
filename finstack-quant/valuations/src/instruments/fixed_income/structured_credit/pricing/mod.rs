@@ -10,6 +10,7 @@
 pub(crate) mod coverage_tests;
 pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
+pub use simulation_engine::{SimulationDiagnostics, SimulationRun};
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 
@@ -44,8 +45,44 @@ pub fn run_simulation(
     let lifecycle =
         crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
     let effective_as_of = lifecycle.effective_as_of(context, as_of);
+    if instrument.pool.instruments.is_some() {
+        return simulation_engine::simulate_instrument_pool(instrument, context, effective_as_of)
+            .map(|run| run.tranches);
+    }
     let mut source = DeterministicPoolFlowSource;
     simulation_engine::run_simulation_with_source(instrument, context, effective_as_of, &mut source)
+}
+
+/// Run the deterministic cashflow simulation and return the tranche results
+/// together with the deal-level accounting (reserve balance path, reserve
+/// interest, draw funding).
+///
+/// # Arguments
+///
+/// * `instrument` - Validated structured-credit deal containing asset pool,
+///   tranche structure, waterfall, and deterministic credit/prepayment model.
+/// * `context` - Market context used for rate resets, discounting, and other
+///   projection dependencies.
+/// * `as_of` - Requested valuation date; lifecycle policy may resolve an
+///   effective date from the market context.
+///
+/// # Errors
+///
+/// Propagates validation, schedule and cash-conservation errors from the
+/// simulation engine.
+pub fn run_simulation_with_diagnostics(
+    instrument: &StructuredCredit,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<simulation_engine::SimulationRun> {
+    let lifecycle =
+        crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(instrument)?;
+    let effective_as_of = lifecycle.effective_as_of(context, as_of);
+    if instrument.pool.instruments.is_some() {
+        return simulation_engine::simulate_instrument_pool(instrument, context, effective_as_of);
+    }
+    let mut source = DeterministicPoolFlowSource;
+    simulation_engine::simulate_with_source(instrument, context, effective_as_of, &mut source)
 }
 
 /// Generate aggregated deterministic cashflows for all tranches.

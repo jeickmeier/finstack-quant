@@ -4,17 +4,18 @@ use super::config::{PricingMode, StochasticPricerConfig};
 use super::result::{StochasticPricingResult, TranchePricingResult};
 use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
-    prepare_deal_simulation, run_prepared_simulation_with_source, PerNameDefaultEngine,
-    PerNamePeriodInput, PeriodPoolShock, PreparedDealSimulation, StochasticPathFlowSource,
+    prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, PathShocks,
+    PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock, PreparedDealSimulation,
+    PreparedInstrumentSchedules, StochasticPathFlowSource,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    StructuredCredit, Tranche, TrancheSeniority,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
 };
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
+use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use finstack_quant_models::credit::pool::{
     MacroCreditFactors, PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec,
@@ -46,6 +47,15 @@ const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 /// sequence bit-identical — the credit factors, and therefore all existing
 /// default results, are unchanged.
 const PREPAY_FACTOR_SEED_SALT: u64 = 0x5052_4550_4159_5A32; // "PREPAYZ2"
+
+/// Seed salt for the instrument-collateral process draws.
+///
+/// Revolver spread and utilization shocks of instrument pools are drawn from
+/// a Philox stream seeded with `config.seed ^ INSTRUMENT_PATH_SEED_SALT`,
+/// disjoint from the systematic-factor, per-name and tree-tail stream
+/// spaces, so adding instrument collateral never perturbs the draws of the
+/// other channels.
+const INSTRUMENT_PATH_SEED_SALT: u64 = 0x494E_5354_5255_4D50; // "INSTRUMP"
 
 /// Seed salt for the tree-mode tail-month RNG.
 ///
@@ -98,6 +108,12 @@ pub(crate) struct PreparedRun {
     /// Loop-invariant deal simulation (validation, calendar, schedule,
     /// waterfall) prepared once for this run's valuation date.
     pub(crate) sim: PreparedDealSimulation,
+    /// Bucketed instrument schedules when the pool holds instrument
+    /// collateral; every path drives the instrument engine from them.
+    pub(crate) instrument_schedules: Option<PreparedInstrumentSchedules>,
+    /// Deal asset correlation loading instrument-collateral spread shocks on
+    /// the systematic factor.
+    pub(crate) asset_correlation: f64,
 }
 
 impl StochasticPricer {
@@ -112,7 +128,11 @@ impl StochasticPricer {
     ///
     /// Propagates invalid default-spec construction (e.g. Student-t dof ≤ 2)
     /// and unsupported latent-factor specs, once and before any path runs.
-    fn prepare_run(&self, instrument: &StructuredCredit) -> Result<PreparedRun> {
+    fn prepare_run(
+        &self,
+        instrument: &StructuredCredit,
+        context: &MarketContext,
+    ) -> Result<PreparedRun> {
         // Fail fast on invalid default specs and keep the built model so the
         // per-path hot loops can assume a validated, already-built spec.
         let default_model = self
@@ -151,6 +171,17 @@ impl StochasticPricer {
         };
         let factor_kappa = self.factor_mean_reversion();
         let factor_correlation = self.factor_correlation()?;
+        let instrument_schedules = if instrument.pool.instruments.is_some() {
+            Some(PreparedInstrumentSchedules::prepare(
+                instrument, context, &sim,
+            )?)
+        } else {
+            None
+        };
+        let asset_correlation = match copula_rho {
+            Some(rho) => rho,
+            None => instrument.effective_asset_correlation()?,
+        };
         Ok(PreparedRun {
             default_model,
             prepay_model,
@@ -159,6 +190,8 @@ impl StochasticPricer {
             factor_phi: (-factor_kappa / 12.0).exp(),
             factor_correlation,
             sim,
+            instrument_schedules,
+            asset_correlation,
         })
     }
 
@@ -168,7 +201,7 @@ impl StochasticPricer {
         instrument: &StructuredCredit,
         context: &MarketContext,
     ) -> Result<StochasticPricingResult> {
-        let prepared = self.prepare_run(instrument)?;
+        let prepared = self.prepare_run(instrument, context)?;
         match &self.config.pricing_mode {
             PricingMode::Tree => self.price_tree(instrument, context, &prepared),
             PricingMode::MonteCarlo {
@@ -205,7 +238,12 @@ impl StochasticPricer {
         let per_name_simulator = self.per_name_simulator()?;
         // Tree mode draws no antithetic pairs: every path is an independent
         // stratified node, so the std-error is the plain i.i.d. estimator.
-        let mut collector = ScenarioCollector::new(instrument, path_count, false)?;
+        let mut collector = ScenarioCollector::new(
+            instrument,
+            path_count,
+            false,
+            self.tracks_option_cost(prepared),
+        )?;
         for path_index in 0..path_count {
             let shocks =
                 self.tree_path_shocks(instrument, path_index, path_count, branch_count, prepared)?;
@@ -215,7 +253,14 @@ impl StochasticPricer {
             let per_name_engine = per_name_simulator
                 .as_ref()
                 .map(|sim| self.per_name_engine(sim, path_index, false));
-            let output = self.price_path(instrument, context, prepared, shocks, per_name_engine)?;
+            let output = self.price_path(
+                instrument,
+                context,
+                prepared,
+                shocks,
+                per_name_engine,
+                (path_index, false),
+            )?;
             collector.record_output(output);
         }
         collector.finalize(self, PricingMode::Tree)
@@ -372,7 +417,14 @@ impl StochasticPricer {
             let per_name_engine = per_name_simulator
                 .as_ref()
                 .map(|sim| self.per_name_engine(sim, path_index, antithetic));
-            self.price_path(instrument, context, prepared, shocks, per_name_engine)
+            self.price_path(
+                instrument,
+                context,
+                prepared,
+                shocks,
+                per_name_engine,
+                (path_index, antithetic),
+            )
         };
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -392,7 +444,12 @@ impl StochasticPricer {
             .map(price_factors)
             .collect::<Result<Vec<_>>>()?;
 
-        let mut collector = ScenarioCollector::new(instrument, num_paths, antithetic)?;
+        let mut collector = ScenarioCollector::new(
+            instrument,
+            num_paths,
+            antithetic,
+            self.tracks_option_cost(prepared),
+        )?;
         for output in outputs {
             collector.record_output(output);
         }
@@ -536,6 +593,28 @@ impl StochasticPricer {
         }
     }
 
+    /// Whether the run values revolver draws against their fair spread.
+    fn tracks_option_cost(&self, prepared: &PreparedRun) -> bool {
+        prepared
+            .instrument_schedules
+            .as_ref()
+            .is_some_and(PreparedInstrumentSchedules::has_draw_option_cost)
+    }
+
+    /// Path-local stream for the instrument-collateral process draws.
+    ///
+    /// Mirrors the per-name pairing: antithetic pairs `(2k, 2k+1)` share
+    /// `substream(k)` and the odd member negates its draws; independent
+    /// paths use `substream(path_index)`.
+    fn instrument_path_rng(&self, path_index: usize, antithetic: bool) -> (PhiloxRng, bool) {
+        let base = PhiloxRng::new(self.config.seed ^ INSTRUMENT_PATH_SEED_SALT);
+        if antithetic {
+            (base.substream((path_index / 2) as u64), path_index % 2 == 1)
+        } else {
+            (base.substream(path_index as u64), false)
+        }
+    }
+
     fn price_path(
         &self,
         instrument: &StructuredCredit,
@@ -543,16 +622,61 @@ impl StochasticPricer {
         prepared: &PreparedRun,
         shocks: Vec<PeriodPoolShock>,
         per_name_engine: Option<PerNameDefaultEngine>,
+        (path_index, antithetic): (usize, bool),
     ) -> Result<PathScenarioOutput> {
-        let mut source = match per_name_engine {
-            Some(engine) => StochasticPathFlowSource::with_per_name(shocks, engine),
-            None => StochasticPathFlowSource::new(shocks),
+        // Counterfactual tranche cashflows of the same path with revolver
+        // draws accruing at their fair spread; `None` without stochastic
+        // revolvers.
+        let mut counterfactual: Option<HashMap<String, TrancheCashflows>> = None;
+        let run = match prepared.instrument_schedules.as_ref() {
+            Some(schedules) => {
+                let (rng, negate) = self.instrument_path_rng(path_index, antithetic);
+                let replay = schedules
+                    .has_draw_option_cost()
+                    .then(|| (shocks.clone(), per_name_engine.clone(), rng.clone()));
+                let mut source = InstrumentPathFlowSource::new(
+                    schedules,
+                    PathShocks::new(shocks),
+                    per_name_engine,
+                    prepared.asset_correlation,
+                    rng,
+                    negate,
+                );
+                let run = simulate_prepared(instrument, context, &prepared.sim, &mut source)?;
+                if let Some((shocks, per_name_engine, rng)) = replay {
+                    // Same streams, same shocks: only the draw interest differs.
+                    let mut replayed = InstrumentPathFlowSource::new(
+                        schedules,
+                        PathShocks::new(shocks),
+                        per_name_engine,
+                        prepared.asset_correlation,
+                        rng,
+                        negate,
+                    )
+                    .with_counterfactual(source.take_draw_records());
+                    counterfactual = Some(
+                        simulate_prepared(instrument, context, &prepared.sim, &mut replayed)?
+                            .tranches,
+                    );
+                }
+                run
+            }
+            None => {
+                let mut source = match per_name_engine {
+                    Some(engine) => StochasticPathFlowSource::with_per_name(shocks, engine),
+                    None => StochasticPathFlowSource::new(shocks),
+                };
+                simulate_prepared(instrument, context, &prepared.sim, &mut source)?
+            }
         };
-        let path_results =
-            run_prepared_simulation_with_source(instrument, context, &prepared.sim, &mut source)?;
+        let path_results = run.tranches;
+        let unfunded_draws = run.diagnostics.unfunded_draws.amount() > 0.0;
+        let collateral_draws = run.diagnostics.draws_from_reserve.amount()
+            + run.diagnostics.draws_from_principal.amount();
 
         let mut deal_pv = 0.0;
         let mut deal_loss = 0.0;
+        let mut draw_option_cost = 0.0;
         let mut tranches = Vec::with_capacity(instrument.tranches.tranches.len());
         for (idx, tranche) in instrument.tranches.tranches.iter().enumerate() {
             let tranche_result = path_results.get(tranche.id.as_str()).ok_or_else(|| {
@@ -561,19 +685,35 @@ impl StochasticPricer {
                     tranche.id
                 ))
             })?;
-            let metrics = PathTrancheMetrics::from_cashflows(
+            let mut metrics = PathTrancheMetrics::from_cashflows(
                 tranche_result,
                 self.config.valuation_date,
                 &self.config.discount_curve,
             )?;
+            if let Some(fair) = counterfactual
+                .as_ref()
+                .and_then(|results| results.get(tranche.id.as_str()))
+            {
+                let fair_pv = PathTrancheMetrics::from_cashflows(
+                    fair,
+                    self.config.valuation_date,
+                    &self.config.discount_curve,
+                )?
+                .pv;
+                metrics.option_cost = metrics.pv - fair_pv;
+            }
             deal_pv += metrics.pv;
             deal_loss += metrics.loss;
+            draw_option_cost += metrics.option_cost;
             tranches.push((idx, metrics));
         }
         Ok(PathScenarioOutput {
             deal_pv,
             deal_loss,
             tranches,
+            unfunded_draws,
+            collateral_draws,
+            draw_option_cost,
         })
     }
 
@@ -857,6 +997,7 @@ impl StochasticPricer {
                 prepay_slice,
                 &mut burnout,
             );
+            shock.systematic_z = self.period_systematic_z(prepared, month_slice);
             shock.per_name = self.copula_period_input(prepared, start as u32, month_slice);
             shocks.push(shock);
         }
@@ -901,23 +1042,26 @@ impl StochasticPricer {
         }
         let marginal_pd = (1.0 - survival).clamp(0.0, 1.0);
 
-        // Period systematic factor (item 10).
-        //
-        // Multi-month periods use `Z_period = (Σ Zₘ)/s` so the copula
-        // conditions on the whole period (matching LHP/MDR aggregation).
-        // `s = period_factor_scale` keeps `Z_period ~ N(0,1)` under the AR(1)
-        // autocorrelation `φ`; `√M` is correct only for independent months.
-        let systematic_z = if self.has_stochastic_rates() && !factors.is_empty() {
+        Some(PerNamePeriodInput {
+            systematic_z: self.period_systematic_z(prepared, factors),
+            marginal_pd,
+        })
+    }
+
+    /// Period systematic factor (item 10).
+    ///
+    /// Multi-month periods use `Z_period = (Σ Zₘ)/s` so the copula
+    /// conditions on the whole period (matching LHP/MDR aggregation).
+    /// `s = period_factor_scale` keeps `Z_period ~ N(0,1)` under the AR(1)
+    /// autocorrelation `φ`; `√M` is correct only for independent months.
+    /// Zero without stochastic credit.
+    fn period_systematic_z(&self, prepared: &PreparedRun, factors: &[f64]) -> f64 {
+        if self.has_stochastic_rates() && !factors.is_empty() {
             let sum: f64 = factors.iter().sum();
             sum / Self::period_factor_scale(factors.len(), prepared.factor_phi)
         } else {
             0.0
-        };
-
-        Some(PerNamePeriodInput {
-            systematic_z,
-            marginal_pd,
-        })
+        }
     }
 
     fn aggregate_monthly_shocks(
@@ -1122,6 +1266,12 @@ struct PathScenarioOutput {
     deal_pv: f64,
     deal_loss: f64,
     tranches: Vec<(usize, PathTrancheMetrics)>,
+    /// A collateral draw could not be funded somewhere on the path.
+    unfunded_draws: bool,
+    /// Collateral draws funded on the path.
+    collateral_draws: f64,
+    /// Draw option cost of the path (sum of the tranche shares).
+    draw_option_cost: f64,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -1130,6 +1280,8 @@ struct PathTrancheMetrics {
     loss: f64,
     wal: f64,
     duration: f64,
+    /// Present value less the counterfactual (fair draw interest) present value.
+    option_cost: f64,
 }
 
 impl PathTrancheMetrics {
@@ -1168,6 +1320,7 @@ impl PathTrancheMetrics {
             } else {
                 0.0
             },
+            option_cost: 0.0,
         })
     }
 }
@@ -1182,6 +1335,7 @@ struct TrancheScenarioStats {
     losses: Vec<f64>,
     wal_sum: f64,
     duration_sum: f64,
+    option_cost_stats: OnlineStats,
 }
 
 impl TrancheScenarioStats {
@@ -1196,6 +1350,7 @@ impl TrancheScenarioStats {
             losses: Vec::with_capacity(num_paths),
             wal_sum: 0.0,
             duration_sum: 0.0,
+            option_cost_stats: OnlineStats::new(),
         }
     }
 
@@ -1205,6 +1360,7 @@ impl TrancheScenarioStats {
         self.losses.push(metrics.loss);
         self.wal_sum += metrics.wal;
         self.duration_sum += metrics.duration;
+        self.option_cost_stats.update(metrics.option_cost);
     }
 
     fn finalize(
@@ -1233,7 +1389,8 @@ impl TrancheScenarioStats {
             Money::new(es, currency)?,
         )
         .with_average_life(self.wal_sum / paths)
-        .with_credit_duration(self.duration_sum / paths))
+        .with_credit_duration(self.duration_sum / paths)
+        .with_draw_option_cost(Money::new(self.option_cost_stats.mean(), currency)?))
     }
 }
 
@@ -1253,10 +1410,22 @@ struct ScenarioCollector {
     /// path order (see `price_factor_sets`).
     deal_pvs: Vec<f64>,
     tranche_stats: Vec<TrancheScenarioStats>,
+    /// Paths on which a collateral draw could not be funded.
+    unfunded_paths: usize,
+    /// Collateral draws funded per path.
+    draw_stats: OnlineStats,
+    /// Per-path draw option cost, retained only for pools with stochastic
+    /// revolvers.
+    option_cost_paths: Option<Vec<f64>>,
 }
 
 impl ScenarioCollector {
-    fn new(instrument: &StructuredCredit, num_paths: usize, antithetic: bool) -> Result<Self> {
+    fn new(
+        instrument: &StructuredCredit,
+        num_paths: usize,
+        antithetic: bool,
+        track_option_cost: bool,
+    ) -> Result<Self> {
         if num_paths == 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "stochastic scenario collector requires at least one path".to_string(),
@@ -1276,6 +1445,9 @@ impl ScenarioCollector {
                 .iter()
                 .map(|tranche| TrancheScenarioStats::new(tranche, num_paths))
                 .collect(),
+            unfunded_paths: 0,
+            draw_stats: OnlineStats::new(),
+            option_cost_paths: track_option_cost.then(|| Vec::with_capacity(num_paths)),
         })
     }
 
@@ -1297,6 +1469,13 @@ impl ScenarioCollector {
             self.record_tranche(idx, metrics);
         }
         self.record_deal(output.deal_pv, output.deal_loss);
+        if output.unfunded_draws {
+            self.unfunded_paths += 1;
+        }
+        self.draw_stats.update(output.collateral_draws);
+        if let Some(paths) = self.option_cost_paths.as_mut() {
+            paths.push(output.draw_option_cost);
+        }
     }
 
     fn finalize(
@@ -1348,6 +1527,18 @@ impl ScenarioCollector {
         }
         result.pv_std_error = std_error;
         result.pv_confidence_interval = (mean_pv - 1.96 * std_error, mean_pv + 1.96 * std_error);
+        result.unfunded_draw_path_fraction =
+            self.unfunded_paths as f64 / self.num_paths.max(1) as f64;
+        result.expected_collateral_draws = Money::new(self.draw_stats.mean(), self.currency)?;
+        if let Some(paths) = self.option_cost_paths.take() {
+            let mean = if paths.is_empty() {
+                0.0
+            } else {
+                paths.iter().sum::<f64>() / paths.len() as f64
+            };
+            result.draw_option_cost = Money::new(mean, self.currency)?;
+            result.draw_option_cost_paths = paths;
+        }
         result.tranche_results = self
             .tranche_stats
             .into_iter()
@@ -1632,7 +1823,8 @@ mod tests {
     fn scenario_collector_variance_no_catastrophic_cancellation() {
         let instrument = test_instrument();
         let n = 1000usize;
-        let mut collector = ScenarioCollector::new(&instrument, n, false).expect("collector");
+        let mut collector =
+            ScenarioCollector::new(&instrument, n, false, false).expect("collector");
 
         // Synthetic PVs: alternating mean ± delta where delta is tiny relative to mean.
         // True population variance = delta² = 0.0025.
@@ -1860,7 +2052,9 @@ mod tests {
 
             let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
             let deal = simple_deal("CO-MOVE-DEAL");
-            let prepared = pricer.prepare_run(&deal).expect("prepared run");
+            let prepared = pricer
+                .prepare_run(&deal, &MarketContext::new())
+                .expect("prepared run");
             let shocks: Vec<_> = zs
                 .iter()
                 .map(|&z| pricer.monthly_shock(&prepared, 36, z, z, &mut 1.0))
@@ -2277,7 +2471,9 @@ mod per_name_copula_tests {
         // quarter is benign in month 1 but stressed in months 2 and 3 — a
         // month-1-only systematic factor would miss that stress entirely.
         let factors = vec![0.10_f64, -2.0, -1.5, 0.3, 0.4, 0.5];
-        let prepared = pricer.prepare_run(&deal).expect("prepared run");
+        let prepared = pricer
+            .prepare_run(&deal, &MarketContext::new())
+            .expect("prepared run");
         let shocks = pricer
             .path_shocks_from_factors(&deal, &factors, 0, &prepared)
             .expect("path shocks");
@@ -2567,7 +2763,9 @@ mod per_name_copula_tests {
             // the comparison is vacuous.
             cfg.tree_config.prepay_spec = rmbs_prepay_spec(0.06);
             let pricer = StochasticPricer::new(cfg);
-            let prepared = pricer.prepare_run(&deal).expect("prepared run");
+            let prepared = pricer
+                .prepare_run(&deal, &MarketContext::new())
+                .expect("prepared run");
             let factors: Vec<f64> = (0..24).map(|m| ((m as f64) * 0.37).sin()).collect();
             pricer
                 .path_shocks_from_factors(&deal, &factors, 0, &prepared)
@@ -2610,7 +2808,9 @@ mod per_name_copula_tests {
         let pricer = StochasticPricer::new(cfg);
 
         // Drive a strongly-prepaying path so realized runs above expected.
-        let prepared = pricer.prepare_run(&deal).expect("prepared run");
+        let prepared = pricer
+            .prepare_run(&deal, &MarketContext::new())
+            .expect("prepared run");
         let factors: Vec<f64> = (0..24).map(|_| 1.5_f64).collect();
         let mut burnout = 1.0_f64;
         let _ = pricer

@@ -1,5 +1,20 @@
 {
   "$defs": {
+    "AccrualMethod": {
+      "description": "Generic accrual method usable across instruments.\n\nThis mirrors the semantics of bond accrual methods but is defined at the\ncashflow layer so it can be reused by any instrument that exposes a\n`CashFlowSchedule`.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Linear accrual (simple interest interpolation).\n\n`Accrued = Coupon × (elapsed / period)`",
+          "type": "string"
+        },
+        {
+          "const": "compounded",
+          "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
+          "type": "string"
+        }
+      ]
+    },
     "AfcSpec": {
       "additionalProperties": false,
       "description": "Available-funds cap (net-WAC cap) specification.",
@@ -37,6 +52,135 @@
           "const": "pro_rata",
           "description": "Distribute proportionally by weight or equally if no weights",
           "type": "string"
+        }
+      ]
+    },
+    "AmortizationSpec": {
+      "description": "Amortization specification for principal over time.\n\nDescribes how principal amortizes or is exchanged during the life of the contract.\nUsed by instruments (e.g., bonds) and cashflow legs for consistent behavior.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No amortization – principal remains constant until final redemption.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Linear principal paydown towards a target final notional amount over all periods.",
+          "properties": {
+            "linear_to": {
+              "additionalProperties": false,
+              "properties": {
+                "final_notional": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+                  "description": "Target remaining principal at the end of the amortization schedule."
+                }
+              },
+              "required": [
+                "final_notional"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+          "properties": {
+            "step_remaining": {
+              "additionalProperties": false,
+              "properties": {
+                "schedule": {
+                  "description": "Ordered list of `(date, remaining_principal_after_date)`.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                      },
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "step_remaining"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed percentage of **original** notional paid each period (capped by remaining outstanding).\n\nThis is a sinking-fund style amortization where the payment amount is constant\nacross periods: `initial_notional * pct`. It does **not** compound (i.e., it is\nNOT percentage-of-remaining / declining-balance / mortgage-style).",
+          "properties": {
+            "percent_of_original_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of original notional paid per period (e.g., 0.05 = 5%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_original_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+          "properties": {
+            "custom_principal": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "description": "List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                      },
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "items"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "custom_principal"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -87,6 +231,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "AssetPool identifier"
         },
+        "instruments": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstrumentCollateral"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Real instruments held as collateral (bonds, term loans, revolvers).\nMust be used with an empty `assets` vector and no `rep_lines`; the\nsimulation engine drives period flows from the instruments' own\nschedules and materializes them into asset rows for every balance\nconsumer."
+        },
         "reinvestment_period": {
           "anyOf": [
             {
@@ -111,6 +266,26 @@
         "reserve_account": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Reserve account balance (for credit enhancement)"
+        },
+        "reserve_account_rate": {
+          "description": "Annual simple interest rate (decimal, ACT/360 on the opening balance\nper legal period) earned by `reserve_account`. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "reserve_interest_destination": {
+          "$ref": "#/$defs/ReserveInterestDestination",
+          "description": "Where the interest earned on `reserve_account` is paid."
+        },
+        "reserve_target": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target reserve balance that revolver repayments replenish toward\nbefore counting as principal collections. `None` disables\nreplenishment from repayments."
         }
       },
       "required": [
@@ -746,6 +921,801 @@
         }
       ]
     },
+    "BaseRateSpec": {
+      "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed rate (annualized).",
+          "properties": {
+            "fixed": {
+              "properties": {
+                "rate": {
+                  "description": "Annual interest rate (e.g., 0.05 for 5%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing.",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/FloatingRateSpec"
+            }
+          },
+          "required": [
+            "floating"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Bond": {
+      "additionalProperties": false,
+      "description": "Bond instrument with fixed, floating, or amortizing cashflows.\n\nCashflow sign convention (holder view):\n- All contractual cashflows **received by a long holder** (coupons,\n  amortization, final redemption) are represented as **positive** amounts.\n- Cash outflows for the holder (e.g., purchase price, funding, short\n  positions) are represented as **negative** amounts and are handled at\n  trade level rather than in the bond's contractual schedule.\n\nSupports call/put schedules, quoted prices for yield-to-maturity calculations,\nand custom cashflow schedule overrides. Uses a clean `CashflowSpec` that wraps\nthe canonical builder coupon specs for maximum flexibility and parity.\n\n[`crate::instruments::Instrument::value`] is the **dirty NPV at `as_of`**,\nnot the market dirty quote at settlement. Quoted YTM, z-spread, and DM\nremain settlement-anchored.",
+      "properties": {
+        "accrual_method": {
+          "$ref": "#/$defs/AccrualMethod",
+          "default": "linear",
+          "description": "Accrual method for interest calculation between coupon dates.\n\nDetermines how accrued interest is calculated:\n- `Linear` (default): Simple interest interpolation (most bonds)\n- `Compounded`: Actuarial accrual per ICMA Rule 251 (some European bonds)\n\nFor inflation-linked bonds (TIPS, UK Linkers), use the dedicated\n`InflationLinkedBond` instrument which handles index-ratio accrual."
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging."
+        },
+        "call_put": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallPutSchedule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional call/put schedule (dates and redemption prices as % of par amount)."
+        },
+        "cashflow_spec": {
+          "$ref": "#/$defs/CashflowSpec",
+          "description": "Cashflow specification (fixed, floating, or amortizing)."
+        },
+        "credit_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit curve identifier (default intensity). When present,\ncredit-rate pricing is enabled."
+        },
+        "custom_cashflows": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CashFlowSchedule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional pre-built cashflow schedule. If provided, this will be used instead of\ngenerating cashflows from the cashflow_spec."
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier for pricing."
+        },
+        "ex_coupon_calendar_id": {
+          "description": "Calendar identifier for ex-coupon day counting.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ex_coupon_days": {
+          "default": 0,
+          "description": "Number of ex-coupon days before coupon date.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional forward curve identifier for projected floating or asset-swap legs."
+        },
+        "funding_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional funding/repo curve for carry cost computation."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier for the bond."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs."
+        },
+        "issue_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Issue date of the bond."
+        },
+        "maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Maturity date of the bond."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Principal amount of the bond."
+        },
+        "return_floor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReturnFloorSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional guaranteed minimum-return (\"return floor\") call protection.\n\nWhen present, the bond is treated as prepayable across the protection\nwindow with redemption floored so the investor meets the target MOIC/XIRR.\nDeterministic pricing lowers it into `call_put`; stochastic\nrates-credit pricing evaluates it against each simulated distribution\nand balance path."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "settlement_days": {
+          "default": 0,
+          "description": "Number of settlement days after trade date (e.g., 2 for T+2).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "notional",
+        "issue_date",
+        "maturity",
+        "cashflow_spec",
+        "discount_curve_id",
+        "attributes"
+      ],
+      "type": "object"
+    },
+    "CFKind": {
+      "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.",
+      "oneOf": [
+        {
+          "const": "fixed",
+          "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional × rate × accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used.",
+          "type": "string"
+        },
+        {
+          "const": "float_reset",
+          "description": "Floating-rate coupon cash-flow (or index fixing event).\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus spread.\nThe `reset_date` field on [`CashFlow`] indicates when the rate was fixed.\nThe `rate` field stores the all-in rate (index + spread) if known.",
+          "type": "string"
+        },
+        {
+          "const": "inflation_coupon",
+          "description": "Inflation-linked coupon cash-flow.\n\nPeriodic coupon payment on an inflation-linked bond or swap leg where the\nreal coupon is multiplied by an index ratio (e.g., CPI / base CPI).\nThe `rate` field stores the real coupon rate when known.",
+          "type": "string"
+        },
+        {
+          "const": "fee",
+          "description": "Up-front fee or cost paid at inception.\n\nOne-time fee paid at trade date or settlement date, such as origination fees,\narrangement fees, or underwriting fees.",
+          "type": "string"
+        },
+        {
+          "const": "commitment_fee",
+          "description": "Commitment fee on undrawn balance.\n\nPeriodic fee charged on the undrawn portion of a revolving facility.\nTypically quoted in basis points per annum on the unused commitment.",
+          "type": "string"
+        },
+        {
+          "const": "usage_fee",
+          "description": "Usage fee on drawn balance.\n\nAdditional fee charged when facility utilization exceeds a threshold,\ncommon in leveraged loan facilities.",
+          "type": "string"
+        },
+        {
+          "const": "facility_fee",
+          "description": "Facility fee on total commitment.\n\nFee charged on the entire committed amount regardless of utilization,\ncovering the lender's cost of keeping the facility available.",
+          "type": "string"
+        },
+        {
+          "const": "notional",
+          "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Payment-in-kind interest capitalization.\n\nInterest that is added to the outstanding principal rather than paid in cash.\nCreates a new notional amount: `new_notional = old_notional + PIK_interest`.\nThe amount field represents the interest capitalized.",
+          "type": "string"
+        },
+        {
+          "const": "amortization",
+          "description": "Scheduled amortization (principal repayment).\n\nReduces the outstanding principal per the amortization schedule.\nAmount is positive from holder perspective (principal returned).\nAfter amortization: `remaining_notional = previous_notional - amortization`.",
+          "type": "string"
+        },
+        {
+          "const": "pre_payment",
+          "description": "Prepayment of principal (unscheduled early repayment).\n\nVoluntary or mandatory early return of principal, common in:\n- Mortgage-backed securities (borrower refinancing)\n- CLO/CDO structures (collateral prepayments)\n- Callable bonds (issuer exercise)",
+          "type": "string"
+        },
+        {
+          "const": "revolving_draw",
+          "description": "Revolving facility draw (borrowing).\n\nIncrease in outstanding principal when borrower draws on a revolving facility.\nFrom holder (lender) view: negative (cash out to borrower).\nIncreases the drawn balance used for interest calculations.",
+          "type": "string"
+        },
+        {
+          "const": "revolving_repayment",
+          "description": "Revolving facility repayment.\n\nDecrease in outstanding principal when borrower repays revolving facility.\nFrom holder (lender) view: positive (cash in from borrower).\nRestores availability under the commitment.",
+          "type": "string"
+        },
+        {
+          "const": "defaulted_notional",
+          "description": "Defaulted notional (principal written down due to credit event).\n\nRepresents the portion of principal that has experienced a credit event\n(failure to pay, bankruptcy, restructuring). Amount reflects the\nwrite-down from par.",
+          "type": "string"
+        },
+        {
+          "const": "recovery",
+          "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate × defaulted amount).",
+          "type": "string"
+        },
+        {
+          "const": "accrued_on_default",
+          "description": "Accrued-on-default interest (ISDA standard for CDS).\n\nInterest accrued but unpaid at the time of a credit event.\nUnder ISDA standard conventions, the protection buyer pays\nthe accrued premium from the last payment date to the default date.",
+          "type": "string"
+        },
+        {
+          "const": "stub",
+          "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length.",
+          "type": "string"
+        },
+        {
+          "const": "initial_margin_post",
+          "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies.",
+          "type": "string"
+        },
+        {
+          "const": "initial_margin_return",
+          "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated.",
+          "type": "string"
+        },
+        {
+          "const": "variation_margin_receive",
+          "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules.",
+          "type": "string"
+        },
+        {
+          "const": "variation_margin_pay",
+          "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules.",
+          "type": "string"
+        },
+        {
+          "const": "margin_interest",
+          "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA).",
+          "type": "string"
+        },
+        {
+          "const": "collateral_substitution_in",
+          "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset.",
+          "type": "string"
+        },
+        {
+          "const": "collateral_substitution_out",
+          "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced.",
+          "type": "string"
+        }
+      ]
+    },
+    "CallExercisePolicy": {
+      "description": "Rule the pool engine applies to issuer call options on the collateral.\n\nSet at the deal level on [`InstrumentCollateral::call_exercise`] and\noverridable per instrument through [`InstrumentExerciseOverride`].",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Never exercise: the instrument runs to its contractual schedule.",
+          "properties": {
+            "policy": {
+              "const": "contractual",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The issuer calls at the first call date, at that date's call price.",
+          "properties": {
+            "policy": {
+              "const": "first_call",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Redeem at the yield-to-worst date implied by the instrument's quoted\nclean price. Requires a quoted price on every instrument it applies to.",
+          "properties": {
+            "policy": {
+              "const": "worst",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The issuer calls at the next call date when the refinancing rate (the\nindex forward, or the simulated path rate, plus the instrument's own\nspread) is below the current coupon by more than `threshold_bp`.",
+          "properties": {
+            "policy": {
+              "const": "refinancing_incentive",
+              "type": "string"
+            },
+            "threshold_bp": {
+              "description": "Minimum coupon-over-refinancing-rate saving, in basis points, that\ntriggers exercise.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "policy",
+            "threshold_bp"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CallPut": {
+      "additionalProperties": false,
+      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
+      "properties": {
+        "end_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise."
+        },
+        "make_whole": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MakeWholeSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional make-whole call specification.\n\nWhen set, the call price is computed as:\n  `max(clean_floor, PV of remaining cashflows - accrued) + accrued`\n\nHere `clean_floor` is notional times `price_pct_of_par / 100`; the\nreference PV discounts remaining cashflows at the reference curve plus\nspread, and accrued interest is paid exactly once.\n\nThis ensures the holder is compensated at treasury + spread for early redemption.\nCommon in investment-grade corporate and convertible bonds."
+        },
+        "price_pct_of_par": {
+          "description": "Clean redemption price as percentage of par amount (100 means par).\nAccrued coupon interest at exercise is added to determine the cash payment.",
+          "format": "double",
+          "type": "number"
+        },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "First date when the option can be exercised."
+        }
+      },
+      "required": [
+        "start_date",
+        "end_date",
+        "price_pct_of_par"
+      ],
+      "type": "object"
+    },
+    "CallPutSchedule": {
+      "additionalProperties": false,
+      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
+      "properties": {
+        "calls": {
+          "description": "Call options (issuer can redeem early).",
+          "items": {
+            "$ref": "#/$defs/CallPut"
+          },
+          "type": "array"
+        },
+        "puts": {
+          "description": "Put options (holder can redeem early).",
+          "items": {
+            "$ref": "#/$defs/CallPut"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "calls",
+        "puts"
+      ],
+      "type": "object"
+    },
+    "CashFlow": {
+      "additionalProperties": false,
+      "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.",
+      "properties": {
+        "accrual": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CashFlowAccrual"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional contractual accrual metadata owned by this flow."
+        },
+        "accrual_factor": {
+          "description": "Accrual factor used for coupon amount and sensitivity.",
+          "format": "double",
+          "type": "number"
+        },
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Monetary amount including its currency."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`)."
+        },
+        "kind": {
+          "$ref": "#/$defs/CFKind",
+          "description": "Category/kind of cash-flow."
+        },
+        "principal_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
+        },
+        "principal_delta": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
+        },
+        "rate": {
+          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reset_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional index reset date (for floating coupons)."
+        }
+      },
+      "required": [
+        "date",
+        "amount",
+        "kind",
+        "accrual_factor"
+      ],
+      "type": "object"
+    },
+    "CashFlowAccrual": {
+      "additionalProperties": false,
+      "description": "Contractual accrual metadata attached to one cashflow.",
+      "properties": {
+        "calendar_id": {
+          "description": "Calendar identifier for calendar-dependent day counts, including BUS/252.\nRequired for BUS/252; otherwise optional. Joint calendars use `+`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coupon_period": {
+          "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used for the accrual factor."
+        },
+        "end": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual accrual-period end date."
+        },
+        "end_is_termination_date": {
+          "default": false,
+          "description": "Whether `end` is the instrument termination date, for the 30E/360 ISDA\nFebruary exception. Intermediate coupon and rate-step ends are false.",
+          "type": "boolean"
+        },
+        "projected_index_rate": {
+          "description": "Projected index rate before spread, gearing, caps, or floors.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual accrual-period start date."
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "day_count"
+      ],
+      "type": "object"
+    },
+    "CashFlowMeta": {
+      "additionalProperties": false,
+      "description": "Metadata shared by an entire cashflow schedule.\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
+      "properties": {
+        "calendar_ids": {
+          "description": "Holiday calendar IDs used for schedule adjustments.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "facility_limit": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional facility limit/commitment for instruments like RCFs."
+        },
+        "issue_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days."
+        },
+        "maturity_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual maturity date, distinct from an adjusted final payment date."
+        },
+        "projected_fixings": {
+          "description": "Raw index observations used by projected floating coupons, before spread,\ngearing, caps and floors; retained for deterministic time-roll fixings.",
+          "items": {
+            "$ref": "#/$defs/ProjectedFixing"
+          },
+          "type": "array"
+        },
+        "representation": {
+          "$ref": "#/$defs/CashflowRepresentation",
+          "default": "contractual",
+          "description": "Meaning of the schedule relative to waterfall policy."
+        }
+      },
+      "required": [
+        "calendar_ids"
+      ],
+      "type": "object"
+    },
+    "CashFlowSchedule": {
+      "additionalProperties": false,
+      "description": "Cashflow schedule output from the composable builder.\n\nContains ordered cashflows plus notional and a representative `DayCount`.\nMethods provide convenient accessors commonly used by pricing and analysis.",
+      "properties": {
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for interest calculations"
+        },
+        "flows": {
+          "description": "Ordered cashflows (coupons, principal payments, fees)",
+          "items": {
+            "$ref": "#/$defs/CashFlow"
+          },
+          "type": "array"
+        },
+        "meta": {
+          "$ref": "#/$defs/CashFlowMeta",
+          "description": "Additional metadata (calendars, facility limits)"
+        },
+        "notional": {
+          "$ref": "#/$defs/Notional",
+          "description": "Notional schedule (constant or amortizing)"
+        }
+      },
+      "required": [
+        "flows",
+        "notional",
+        "day_count",
+        "meta"
+      ],
+      "type": "object"
+    },
+    "CashSweepEvent": {
+      "additionalProperties": false,
+      "description": "Cash sweep event (mandatory prepayment from excess cash flow).\n\nRepresents scheduled or covenant-triggered prepayment from borrower's\nexcess cash flow, reducing outstanding principal.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Amount of mandatory prepayment"
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date of cash sweep prepayment"
+        }
+      },
+      "required": [
+        "date",
+        "amount"
+      ],
+      "type": "object"
+    },
+    "CashflowRepresentation": {
+      "description": "Meaning of the emitted schedule relative to pricing and waterfall policy.",
+      "oneOf": [
+        {
+          "const": "contractual",
+          "description": "Fixed or contractually scheduled future dated cash amounts.",
+          "type": "string"
+        },
+        {
+          "const": "projected",
+          "description": "Current-market or model-projected future dated cash amounts.",
+          "type": "string"
+        },
+        {
+          "const": "placeholder",
+          "description": "Intentionally empty because the contingent payoff policy is not modeled yet.",
+          "type": "string"
+        },
+        {
+          "const": "no_residual",
+          "description": "Intentionally empty because no future dated cashflows remain.",
+          "type": "string"
+        }
+      ]
+    },
+    "CashflowSpec": {
+      "description": "Thin facade over canonical builder coupon specs for bond cashflows.\n\nWraps `FixedCouponSpec` and `FloatingCouponSpec` from the cashflow builder,\nproviding convenience constructors with sensible defaults for common bond use cases.\nThis ensures parity with all builder features (floors/caps, BDC, calendars, PIK, etc.)\nwhile keeping the bond API simple.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed-rate bond using the canonical `FixedCouponSpec`.",
+          "properties": {
+            "fixed": {
+              "$ref": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating-rate note using the canonical `FloatingCouponSpec`.",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/FloatingCouponSpec"
+            }
+          },
+          "required": [
+            "floating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Step-up/step-down coupon bond with scheduled rate changes.",
+          "properties": {
+            "step_up": {
+              "$ref": "#/$defs/StepUpCouponSpec"
+            }
+          },
+          "required": [
+            "step_up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Amortizing bond (principal payments during life).",
+          "properties": {
+            "amortizing": {
+              "properties": {
+                "base": {
+                  "$ref": "#/$defs/CashflowSpec",
+                  "description": "Base cashflow specification (fixed or floating)."
+                },
+                "schedule": {
+                  "$ref": "#/$defs/AmortizationSpec",
+                  "description": "Amortization schedule."
+                }
+              },
+              "required": [
+                "base",
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "amortizing"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ClearingStatus": {
       "description": "Clearing status for OTC derivatives.\n\nDetermines whether a trade is cleared through a CCP or remains bilateral\nunder a CSA agreement.",
       "oneOf": [
@@ -878,6 +1848,40 @@
       "required": [
         "asset_class",
         "haircut"
+      ],
+      "type": "object"
+    },
+    "CommitmentFeeBase": {
+      "description": "Basis for calculating commitment fees on undrawn portions.\n\nDetermines the denominator for commitment fee calculations on\nrevolving or delayed-draw facilities.",
+      "oneOf": [
+        {
+          "const": "undrawn",
+          "description": "Fee based on total undrawn amount only",
+          "type": "string"
+        },
+        {
+          "const": "commitment_minus_outstanding",
+          "description": "Fee based on commitment limit minus outstanding principal",
+          "type": "string"
+        }
+      ]
+    },
+    "CommitmentStepDown": {
+      "additionalProperties": false,
+      "description": "Commitment step-down event for DDTL facilities.\n\nReduces the total commitment limit at a specified date, typically used\nto match construction completion or covenant requirements.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Effective date of the step-down"
+        },
+        "new_limit": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "New (lower) commitment limit after step-down"
+        }
+      },
+      "required": [
+        "date",
+        "new_limit"
       ],
       "type": "object"
     },
@@ -1052,6 +2056,49 @@
             "structure",
             "correlations",
             "labels"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CouponType": {
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Entire coupon paid in cash.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Entire coupon capitalized into principal.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Coupon split between cash and PIK.",
+          "properties": {
+            "split": {
+              "additionalProperties": false,
+              "properties": {
+                "cash_pct": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
+                },
+                "pik_pct": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
+                }
+              },
+              "required": [
+                "cash_pct",
+                "pik_pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "split"
           ],
           "type": "object"
         }
@@ -1272,6 +2319,109 @@
         }
       ]
     },
+    "CreditSpreadProcessSpec": {
+      "description": "Credit spread process specification.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "CIR process for stochastic credit spread/hazard rate.\n\nModels credit spread as: dλ_t = κ(θ - λ_t)dt + σ√λ_t dW_t",
+          "properties": {
+            "cir": {
+              "properties": {
+                "initial": {
+                  "description": "Initial credit spread",
+                  "format": "double",
+                  "type": "number"
+                },
+                "kappa": {
+                  "description": "Mean reversion speed (κ)",
+                  "format": "double",
+                  "type": "number"
+                },
+                "sigma": {
+                  "description": "Volatility (σ)",
+                  "format": "double",
+                  "type": "number"
+                },
+                "theta": {
+                  "description": "Long-term mean (θ)",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "kappa",
+                "theta",
+                "sigma",
+                "initial"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "cir"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Constant credit spread (no dynamics).",
+          "properties": {
+            "constant": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "constant"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Market-anchored credit spread process calibrated to a hazard curve and CDS option vol.\n\nAt the simulation anchor (the later of valuation and commitment date),\nthe initial spread is set from the contemporaneous hazard and the mean\nlevel is anchored to conditional survival over the remaining tenor.\nVolatility is scaled from the CDS index option implied volatility.",
+          "properties": {
+            "market_anchored": {
+              "properties": {
+                "credit_curve_id": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+                  "description": "Credit curve identifier in `MarketContext` used to anchor spreads."
+                },
+                "implied_vol": {
+                  "description": "Annualized CDS (index) option implied volatility for spreads.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "kappa": {
+                  "description": "Mean reversion speed (κ) of the CIR process.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "tenor_years": {
+                  "default": null,
+                  "description": "Optional tenor in years; if None, uses facility maturity horizon.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "credit_curve_id",
+                "kappa",
+                "implied_vol"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "market_anchored"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "CsaSpec": {
       "additionalProperties": false,
       "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```\nuse finstack_quant_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n    calendar_id: \"usny\".into(),\n};\n# Ok(())\n# }\n```",
@@ -1324,6 +2474,74 @@
         "eligible_collateral",
         "call_timing",
         "collateral_curve_id"
+      ],
+      "type": "object"
+    },
+    "DdtlSpec": {
+      "additionalProperties": false,
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50,        // 50 bp usage fee\n    commitment_fee_bp: 25,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "properties": {
+        "availability_end": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Last date draws are permitted (commitment expiry)"
+        },
+        "availability_start": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "First date draws are permitted"
+        },
+        "commitment_fee_bp": {
+          "description": "Commitment fee in basis points (on undrawn amounts)",
+          "format": "int32",
+          "type": "integer"
+        },
+        "commitment_limit": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total commitment limit available for draws"
+        },
+        "commitment_step_downs": {
+          "description": "Commitment step-down schedule",
+          "items": {
+            "$ref": "#/$defs/CommitmentStepDown"
+          },
+          "type": "array"
+        },
+        "draws": {
+          "description": "Scheduled or actual draw events",
+          "items": {
+            "$ref": "#/$defs/DrawEvent"
+          },
+          "type": "array"
+        },
+        "fee_base": {
+          "$ref": "#/$defs/CommitmentFeeBase",
+          "description": "Basis for commitment fee calculation"
+        },
+        "oid_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OidPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original issue discount policy, if applicable"
+        },
+        "usage_fee_bp": {
+          "description": "Usage fee in basis points (on drawn amounts)",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commitment_limit",
+        "availability_start",
+        "availability_end",
+        "draws",
+        "commitment_step_downs",
+        "usage_fee_bp",
+        "commitment_fee_bp",
+        "fee_base"
       ],
       "type": "object"
     },
@@ -1452,6 +2670,83 @@
         }
       ]
     },
+    "DrawEvent": {
+      "additionalProperties": false,
+      "description": "Draw event for delayed-draw term loans (DDTL).\n\nRepresents a scheduled or actual draw against the commitment, reducing\navailable capacity and increasing outstanding principal.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Amount drawn from available commitment"
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date of the draw"
+        }
+      },
+      "required": [
+        "date",
+        "amount"
+      ],
+      "type": "object"
+    },
+    "DrawRepayEvent": {
+      "additionalProperties": false,
+      "description": "A single draw or repayment event.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Amount being drawn or repaid (absolute value)."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date of the draw or repayment."
+        },
+        "is_draw": {
+          "description": "True if this is a draw, false if it's a repayment.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "date",
+        "amount",
+        "is_draw"
+      ],
+      "type": "object"
+    },
+    "DrawRepaySpec": {
+      "description": "Draw and repayment specification.\n\nDetermines whether the facility uses a known (deterministic) schedule\nor stochastic utilization for Monte Carlo pricing.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Deterministic schedule of draws and repayments.",
+          "properties": {
+            "deterministic": {
+              "items": {
+                "$ref": "#/$defs/DrawRepayEvent"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "deterministic"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Stochastic utilization for Monte Carlo simulation.",
+          "properties": {
+            "stochastic": {
+              "$ref": "#/$defs/StochasticUtilizationSpec"
+            }
+          },
+          "required": [
+            "stochastic"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "EarlyAmortizationSpec": {
       "additionalProperties": false,
       "description": "Early-amortization specification for revolving (master-trust) deals.\n\nWhile a deal's reinvestment/revolving period is active, principal is recycled\nand the investor (tranche) balances are held flat. If cumulative losses reach\n`max_cumulative_loss_pct`, an early-amortization event is triggered: the\nrevolving period ends immediately and the deal begins paying principal down\n(amortizing) even before its scheduled revolving-period end.",
@@ -1518,6 +2813,25 @@
       },
       "required": [
         "target_balance"
+      ],
+      "type": "object"
+    },
+    "FeeTier": {
+      "additionalProperties": false,
+      "description": "Fee tier for utilization-based fee structures.\n\nTiers are evaluated in order: the first tier where utilization >= threshold applies.\nTiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]\nrejects unordered tiers.",
+      "properties": {
+        "bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fee rate in basis points for this tier."
+        },
+        "threshold": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Utilization threshold (0.0 to 1.0). Fee applies when utilization >= this threshold."
+        }
+      },
+      "required": [
+        "threshold",
+        "bp"
       ],
       "type": "object"
     },
@@ -1692,6 +3006,69 @@
         "day_count",
         "start",
         "end"
+      ],
+      "type": "object"
+    },
+    "FloatingCouponSpec": {
+      "additionalProperties": false,
+      "description": "Floating coupon specification (composes FloatingRateSpec).\n\nUsed by the cashflow builder for instruments with floating rate coupons.\nEmbeds the canonical `FloatingRateSpec` for rate projection and adds\ncoupon-specific settings like payment frequency and PIK behavior.",
+      "properties": {
+        "adjust_accrual_dates": {
+          "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+          "type": "boolean"
+        },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+        },
+        "calendar_id": {
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
+          "type": "string"
+        },
+        "coupon_type": {
+          "$ref": "#/$defs/CouponType",
+          "default": "cash",
+          "description": "Coupon type (Cash/PIK/Split)."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "type": "boolean"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Accrual and payment frequency used to generate the schedule boundaries."
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after the adjusted accrual end date.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "rate_spec": {
+          "$ref": "#/$defs/FloatingRateSpec",
+          "description": "Floating rate specification (contains index, spread, floor, cap, etc)."
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
+        }
+      },
+      "required": [
+        "rate_spec",
+        "frequency",
+        "day_count",
+        "calendar_id"
       ],
       "type": "object"
     },
@@ -2011,10 +3388,142 @@
       ],
       "type": "object"
     },
+    "InstrumentCollateral": {
+      "additionalProperties": false,
+      "description": "Real instruments held as pool collateral.\n\nExactly one collateral representation may be populated on an\n[`super::AssetPool`]: `assets`, `rep_lines` or `instruments`.",
+      "properties": {
+        "bonds": {
+          "default": [],
+          "description": "Bonds in any form: fixed, floating, step-up, amortizing, custom\ncashflows, with call/put schedules and return floors.",
+          "items": {
+            "$ref": "#/$defs/Bond"
+          },
+          "type": "array"
+        },
+        "call_exercise": {
+          "$ref": "#/$defs/CallExercisePolicy",
+          "default": {
+            "policy": "contractual"
+          },
+          "description": "Deal-level call exercise rule."
+        },
+        "overrides": {
+          "default": [],
+          "description": "Per-instrument exercise overrides.",
+          "items": {
+            "$ref": "#/$defs/InstrumentExerciseOverride"
+          },
+          "type": "array"
+        },
+        "put_exercise": {
+          "$ref": "#/$defs/PutExercisePolicy",
+          "default": {
+            "policy": "never"
+          },
+          "description": "Deal-level put exercise rule."
+        },
+        "revolvers": {
+          "default": [],
+          "description": "Revolving credit facilities.",
+          "items": {
+            "$ref": "#/$defs/RevolvingCredit"
+          },
+          "type": "array"
+        },
+        "term_loans": {
+          "default": [],
+          "description": "Term loans, including delayed-draw commitments, PIK and call schedules.",
+          "items": {
+            "$ref": "#/$defs/TermLoan"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "InstrumentExerciseOverride": {
+      "additionalProperties": false,
+      "description": "Per-instrument override of the deal-level exercise policies.",
+      "properties": {
+        "call": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallExercisePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Call policy for this instrument; `None` keeps the deal-level policy."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Identifier of the bond or term loan the override applies to."
+        },
+        "put": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PutExercisePolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Put policy for this instrument; `None` keeps the deal-level policy."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "InstrumentSchema": {
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "InterestRateProcessSpec": {
+      "additionalProperties": false,
+      "description": "Interest rate process specification (for floating rates).",
+      "properties": {
+        "hull_white_1f": {
+          "properties": {
+            "initial": {
+              "description": "Initial short rate used only when `sigma == 0`. For a stochastic\nprocess, the pricer derives the initial rate from the facility's\ndiscount curve at the valuation anchor.",
+              "format": "double",
+              "type": "number"
+            },
+            "kappa": {
+              "description": "Mean reversion speed (κ)",
+              "format": "double",
+              "type": "number"
+            },
+            "sigma": {
+              "description": "Volatility (σ)",
+              "format": "double",
+              "type": "number"
+            },
+            "theta": {
+              "description": "Constant mean reversion level used only when `sigma == 0`. For a\nstochastic process, the pricer fits a time-dependent θ(t) to the\nfacility's discount curve.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kappa",
+            "sigma",
+            "initial",
+            "theta"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "hull_white_1f"
+      ],
+      "type": "object"
     },
     "InterestRateSwap": {
       "additionalProperties": false,
@@ -2078,6 +3587,144 @@
       ],
       "type": "object"
     },
+    "IssuePrice": {
+      "description": "Issue price = invested capital `V0` (amount funded at issue; IRR initial outflow\nand MOIC denominator).\n\nDefaults to [`IssuePrice::Par`] when not specified.",
+      "oneOf": [
+        {
+          "const": "par",
+          "description": "Par notional (default). `V0 = notional`.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit finite positive cash amount funded at issue. Must match the\nbond's notional currency.",
+          "properties": {
+            "amount": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Finite positive percent of par, e.g. `98.0` for 2 points of original\nissue discount.\n`V0 = notional * pct / 100`.",
+          "properties": {
+            "pct_of_par": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "pct_of_par"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LoanCall": {
+      "additionalProperties": false,
+      "description": "Borrower call option on term loan.\n\nRepresents the borrower's right to prepay the loan at a specified\nredemption price (typically at premium to par for early calls,\napproaching par near maturity).\n\n# Call Types\n\nThe `call_type` field determines how the call is exercised:\n- `Hard`: Standard call at `price_pct_of_par` on or after `date`\n- `Soft`: Premium call during protection period\n- `MakeWhole`: PV-based redemption at Treasury + spread\n\nFor `MakeWhole` calls, `price_pct_of_par` serves as the minimum\n(floor) redemption price. The actual price is the greater of\n`price_pct_of_par` and the make-whole amount.",
+      "properties": {
+        "call_type": {
+          "$ref": "#/$defs/LoanCallType",
+          "default": "hard",
+          "description": "Type of call provision. Defaults to `Hard` when unspecified."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Call date (earliest prepayment date for this call provision)"
+        },
+        "price_pct_of_par": {
+          "description": "Redemption price as percentage of par (e.g., 102.0 = 102% of par).\nFor make-whole calls, this is the minimum (floor) price.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "price_pct_of_par"
+      ],
+      "type": "object"
+    },
+    "LoanCallSchedule": {
+      "additionalProperties": false,
+      "description": "Complete call schedule for callable term loans.\n\nAggregates all borrower call provisions, typically with step-down\npremiums as the loan ages (e.g., 103% in year 1, 102% in year 2, par thereafter).\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet schedule = LoanCallSchedule {\n    calls: vec![\n        LoanCall {\n            date: create_date(2027, Month::January, 15)?,\n            price_pct_of_par: 103.0,  // 3% premium in year 2\n        },\n        LoanCall {\n            date: create_date(2028, Month::January, 15)?,\n            price_pct_of_par: 101.5,  // 1.5% premium in year 3\n        },\n        LoanCall {\n            date: create_date(2029, Month::January, 15)?,\n            price_pct_of_par: 100.0,  // At par thereafter\n        },\n    ],\n};\n# Ok(())\n# }\n```",
+      "properties": {
+        "calls": {
+          "description": "Ordered call provisions (typically sorted by date with descending premiums)",
+          "items": {
+            "$ref": "#/$defs/LoanCall"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "calls"
+      ],
+      "type": "object"
+    },
+    "LoanCallType": {
+      "description": "Type of borrower call provision on a term loan.\n\nInstitutional term loans use several types of call provisions:\n- **Hard call**: Non-callable until the call date, then callable at the stated price.\n- **Soft call**: Callable at any time, but subject to a premium (call protection).\n  Typically applies for the first 6-24 months (\"non-call period\").\n- **Make-whole**: Borrower must pay the present value of remaining cashflows\n  discounted at a reference rate (typically a Treasury rate) plus a spread.\n  This ensures the lender receives full economic value upon early prepayment.\n\n# Industry Practice\n\nLeveraged term loans typically have 6-12 months of soft call protection\n(101% of par, sometimes called \"soft call 101\"), after which they become\ncallable at par. Make-whole provisions are more common in investment-grade\nterm loans and private placements.",
+      "oneOf": [
+        {
+          "const": "hard",
+          "description": "Hard call: callable at the stated price on or after the call date.\nThis is the default if no call type is specified.",
+          "type": "string"
+        },
+        {
+          "const": "soft",
+          "description": "Soft call: callable with a premium during the call protection period.\nAfter the protection period, callable at par.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Make-whole call: borrower pays PV of remaining cashflows at a reference\nrate plus the specified spread. Ensures lender receives full economic value.",
+          "properties": {
+            "make_whole": {
+              "additionalProperties": false,
+              "properties": {
+                "treasury_spread_bp": {
+                  "description": "Spread over the reference rate in basis points (e.g., 50 = T+50bps).",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "treasury_spread_bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "make_whole"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MakeWholeSpec": {
+      "additionalProperties": false,
+      "description": "Make-whole call specification.\n\nDefines the reference curve and spread used to compute the make-whole redemption\nprice. The issuer pays the holder the greater of par and the present value of\nremaining cashflows discounted at the reference rate plus a spread.\n\n# Industry Practice\n\n- Investment-grade corporates: typically Treasury + 25-50 bp\n- High-yield: typically Treasury + 50-100 bp\n- Convertibles: typically Treasury + 50 bp",
+      "properties": {
+        "reference_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Reference curve identifier (e.g., \"USD-TREASURY\")."
+        },
+        "spread_bp": {
+          "description": "Spread over the reference curve in basis points (e.g., 50.0 = T+50bps).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "reference_curve_id",
+        "spread_bp"
+      ],
+      "type": "object"
+    },
     "ManagementFeeType": {
       "description": "Type of management fee",
       "oneOf": [
@@ -2136,6 +3783,26 @@
         "response_deadline_hours",
         "dispute_resolution_days",
         "delivery_grace_days"
+      ],
+      "type": "object"
+    },
+    "MarginStepUp": {
+      "additionalProperties": false,
+      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Effective date of margin increase"
+        },
+        "delta_bp": {
+          "description": "Increase in margin (basis points)",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "delta_bp"
       ],
       "type": "object"
     },
@@ -2206,6 +3873,64 @@
       },
       "type": "object"
     },
+    "McConfig": {
+      "additionalProperties": false,
+      "description": "Advanced Monte Carlo configuration for revolving credit facilities.\n\nEnables multi-factor modeling with credit risk, interest rate dynamics,\ncorrelation between factors, and default modeling.",
+      "properties": {
+        "correlation_matrix": {
+          "description": "Correlation matrix (3x3) between [utilization, rate, credit].\n\nMust be symmetric, positive definite, with ones on diagonal.\nIf None, factors are assumed independent.",
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "credit_spread_process": {
+          "$ref": "#/$defs/CreditSpreadProcessSpec",
+          "description": "Credit spread process specification."
+        },
+        "interest_rate_process": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InterestRateProcessSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Interest rate process specification (for floating rates).\n\nIf None, assumes fixed rate (no stochastic dynamics)."
+        },
+        "recovery_rate": {
+          "description": "Recovery rate on default (e.g., 0.4 for 40% recovery).\n\nUsed when propagating credit risk from market-anchored stochastic specs to\nthe deterministic fallback in `value()`. The path generator itself uses\n`RevolvingCredit::recovery_rate` for hazard-to-spread mapping, so these\nvalues should be kept consistent. When constructing `McConfig`, set this\nto the same value as `RevolvingCredit::recovery_rate`.",
+          "format": "double",
+          "type": "number"
+        },
+        "util_credit_corr": {
+          "default": null,
+          "description": "Optional utilization–credit correlation used when `correlation_matrix` is None.\n\nIf provided, builds a 3×3 matrix with:\n  [ [1, 0, rho], [0, 1, 0], [rho, 0, 1] ]\nrepresenting correlation between utilization and credit, with the rate\nfactor uncorrelated (kept fixed in 2‑factor mode).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "recovery_rate",
+        "credit_spread_process"
+      ],
+      "type": "object"
+    },
     "Metadata": {
       "additionalProperties": false,
       "description": "Deal metadata (counterparties and identifiers).",
@@ -2247,6 +3972,96 @@
         }
       },
       "type": "object"
+    },
+    "Notional": {
+      "additionalProperties": false,
+      "description": "Notional amount with an optional amortisation rule.\n\nCombines initial principal with amortization behavior for complete\nnotional lifecycle management.",
+      "properties": {
+        "amort": {
+          "$ref": "#/$defs/AmortizationSpec",
+          "description": "Amortisation rule applied after each period."
+        },
+        "initial": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Initial principal amount outstanding at leg inception."
+        }
+      },
+      "required": [
+        "initial",
+        "amort"
+      ],
+      "type": "object"
+    },
+    "OidEirSpec": {
+      "additionalProperties": false,
+      "description": "Optional configuration for effective interest rate (EIR) amortization schedules.\n\nWhen enabled, EIR amortization schedules are computed for reporting using\nthe loan's full cashflow schedule (including OID effects).",
+      "properties": {
+        "include_fees": {
+          "default": true,
+          "description": "Include fee cashflows (upfront, commitment, usage) in the EIR schedule.\n\nDefaults to true because these fees are typically part of the effective yield.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "OidPolicy": {
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Discount as percentage (basis points) withheld from each funded draw",
+          "properties": {
+            "withheld_pct": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "withheld_pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed facility-level discount amount withheld from funded proceeds,\npro-rated across draws by draw size",
+          "properties": {
+            "withheld_amount": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "withheld_amount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Discount as percentage of each draw tracked separately for amortization",
+          "properties": {
+            "separate_pct": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "separate_pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed facility-level discount amount tracked separately for\namortization, pro-rated across draws by draw size",
+          "properties": {
+            "separate_amount": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "separate_amount"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "OtcMarginSpec": {
       "additionalProperties": false,
@@ -2764,6 +4579,25 @@
         }
       ]
     },
+    "PikToggle": {
+      "additionalProperties": false,
+      "description": "Payment-in-kind (PIK) toggle event.\n\nEnables or disables PIK interest at a specified date. When enabled,\na portion of interest may be capitalized rather than paid in cash.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date PIK feature is toggled"
+        },
+        "enable_pik": {
+          "description": "True to enable PIK, false to disable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "date",
+        "enable_pik"
+      ],
+      "type": "object"
+    },
     "PoolAsset": {
       "additionalProperties": false,
       "description": "Individual asset held in a structured-credit collateral pool.\n\nMonetary fields use the asset's native currency. Rates are annual decimal\nrates unless a field explicitly says basis points.",
@@ -2787,6 +4621,17 @@
         "balance": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Current outstanding principal balance in the asset currency."
+        },
+        "commitment": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total commitment for revolving or delayed-draw collateral; `balance` is\nthe drawn part. `None` for fully funded assets."
         },
         "contractual_payment": {
           "anyOf": [
@@ -2986,6 +4831,157 @@
           "required": [
             "curve",
             "lockout_months"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ProjectedFixing": {
+      "additionalProperties": false,
+      "description": "One raw index observation needed by a projected floating coupon.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual index observation date, after fixing-calendar adjustments."
+        },
+        "series_id": {
+          "description": "Canonical market-series identifier, including the `FIXING:` prefix.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Raw observed quantity in the index convention: annualized decimal rate\nbefore spread/gearing/caps/floors for rates, or quote currency per base\ncurrency for an FX fixing series. The series identifier fixes orientation.\n`None` records an observation for which the coupon's fallback policy\nmasked a missing projection dependency; a time roll must supply an\nexisting fixing or fail explicitly when crossing that date.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "series_id",
+        "date"
+      ],
+      "type": "object"
+    },
+    "ProtectionWindow": {
+      "description": "When the return-floor protection window applies.\n\nThe window defines the interval over which the issuer can trigger a\nfloor-protected early redemption. Outside this window the floor is\ninactive (the bond behaves as uncallable or follows its normal call\nschedule). The floor binds only on early issuer-called redemptions; it\nnever applies at maturity.",
+      "oneOf": [
+        {
+          "const": "full",
+          "description": "From issue (or `as_of`) up to — but not including — maturity (default).\nThe floor applies to any early issuer-called redemption during the\nbond's life, but not to redemption at maturity.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Active only on or after this date (encodes a no-call period ending at\nmaturity). The floor is not applied to redemptions before `from`.",
+          "properties": {
+            "from": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit closed interval `[start, end]` (both ends inclusive). The floor\napplies only for redemptions with `start <= redemption_date <= end`.",
+          "properties": {
+            "between": {
+              "properties": {
+                "end": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Last date on which the floor-protected call window closes (inclusive)."
+                },
+                "start": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "First date on which the floor-protected call window opens."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "between"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PutExercisePolicy": {
+      "description": "Rule the pool engine applies to holder put options on the collateral.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Never exercise.",
+          "properties": {
+            "policy": {
+              "const": "never",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The holder puts at the first put date, at that date's put price.",
+          "properties": {
+            "policy": {
+              "const": "first_put",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RateSpec": {
+      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed annual rate in basis points",
+          "properties": {
+            "fixed": {
+              "properties": {
+                "rate_bp": {
+                  "description": "Fixed rate in basis points (e.g., 600 = 6%)",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "rate_bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating rate using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with full support\nfor floors, caps, gearing, and reset conventions.\n\n**Note on calendars**: The `FloatingRateSpec.calendar_id` field is ignored\nfor term loans. The loan-level `TermLoan::calendar_id` drives the payment\nschedule and business-day adjustments. Only `index_id`, `spread_bp`,\n`gearing`, `index_floor_bp`, `all_in_cap_bp`, and `reset_lag_days` are used from this\nspecification.",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/FloatingRateSpec"
+            }
+          },
+          "required": [
+            "floating"
           ],
           "type": "object"
         }
@@ -3225,6 +5221,298 @@
         "day_count"
       ],
       "type": "object"
+    },
+    "ReserveInterestDestination": {
+      "description": "Where the interest earned on the deal reserve account is paid.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Interest proceeds available to the waterfall (default).",
+          "properties": {
+            "kind": {
+              "const": "waterfall",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Paid directly to one tranche (the equity tranche, typically) before the\nwaterfall runs. Excluded from the interest-coverage numerator.",
+          "properties": {
+            "kind": {
+              "const": "tranche",
+              "type": "string"
+            },
+            "tranche_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Identifier of the receiving tranche; must exist in the deal."
+            }
+          },
+          "required": [
+            "kind",
+            "tranche_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capitalized into the reserve account.",
+          "properties": {
+            "kind": {
+              "const": "retain",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ReturnFloorKind": {
+      "description": "Which return metric is guaranteed by the floor, and its target.\n\nUse [`ReturnFloorKind::Moic`] for money-multiple protection (common in\nleveraged loans and private credit) or [`ReturnFloorKind::Xirr`] for\nannualized IRR protection.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Minimum money-on-money multiple (e.g. `1.25` = 1.25× invested capital).\n\nOn an early issuer-called redemption at time `t`, the redemption price is\nthe minimum amount such that `(received_cashflows + redemption) / V0 >=\nmultiple`, where `V0` is the invested capital defined by [`IssuePrice`].\nThe floor binds only on early redemptions, not at maturity.",
+          "properties": {
+            "moic": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "moic"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum annualized internal rate of return.\n\nOn an early issuer-called redemption at time `t`, the redemption price is\ncomputed so that the XIRR of all cashflows from issue equals the target\nrate. The floor binds only on early redemptions, not at maturity. Day\ncount defaults to Act/365F (matching `core::cashflow::xirr`) unless\noverridden via [`ReturnFloorSpec::day_count`].",
+          "properties": {
+            "xirr": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "xirr"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ReturnFloorSpec": {
+      "additionalProperties": false,
+      "description": "Guaranteed minimum-return call protection on a bond or loan.\n\nAttaching this spec declares that on any early issuer-called or prepaid\nredemption within the protection window, the redemption price will be\nfloored so the investor's realized return meets the target. This is the\nstandard private-credit loan model (often called a \"prepayment premium\" or\n\"call protection\" in credit agreements). The floor is anchored at the issue\ndate and issue price `V0`. The spec is lowered into a concrete call schedule\ndeterministically or evaluated path by path by the rates-credit LSMC engine.\n\n**Call-protection only**: the floor applies to EARLY issuer redemptions\nwithin the [`ProtectionWindow`] and never at maturity. The held-to-maturity\npath is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /\n[`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case\nreturn across all paths including the unfloored maturity path.\n\n# Mathematical Foundation\n\nLet:\n- `V0` = invested capital (issue price).\n- `t` = early-redemption date.\n- `cash_through(t)` = sum of positive cashflows received by the holder in\n  the half-open interval `(issue, t]` (coupons and amortization; excludes\n  the redemption itself).\n- `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.\n\n**MOIC floor** — minimum money-on-invested-capital multiple `m`:\n\n```text\ndirty_required(t) = m · V0 − cash_through(t)\n```\n\nThe clean redemption amount is `dirty_required(t) − accrued(t)`, floored by\nthe contractual clean call amount and par. The exercise engine adds\n`accrued(t)` exactly once, so the holder's total cash meets the target when\nthe return floor binds.\n\n**XIRR floor** — minimum annualized IRR `r`:\n\n```text\ndirty_required(t) = (1 + r)^yf(issue, t)\n                    · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))\n```\n\nThe day-count convention for `yf` defaults to `Act/365F`, matching\n[`finstack_quant_core::cashflow::xirr`] so the verification metrics\nreproduce the floor target exactly.\n\nFor both floors, accrued interest is subtracted before the clean redemption\nis clamped at par and divided by outstanding notional. Accrued is added once\nto the exercise proceeds by the pricing kernel.\n\n# Pricing behavior\n\n- Deterministic pricing produces a daily concrete call schedule.\n- Stochastic factors use pathwise cash and PIK state in the bond LSMC engine,\n  including term-reset and overnight floating coupons.\n- Contractual make-whole calls compose with the floor: every issuer exercise\n  amount is the greater of the return floor and that call's effective amount.\n- **`min_moic` / `min_xirr` shortcuts** set\n  [`ProtectionWindow::Full`] (prepayable across the bond's entire life).\n  Narrow the window via [`ReturnFloorSpec::window`] if a no-call period\n  applies.\n\n# Invariants\n\n- MOIC multiple must be positive (`> 0`).\n- XIRR rate must be finite and greater than `-1` (i.e., `-100%`).\n- A [`ProtectionWindow::Between`] window must have `start < end`.\n\n# References\n\n- **MOIC**: Standard private-equity and private-credit return metric.\n  MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &\n  Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and\n  Mergers & Acquisitions* (2nd ed.). Wiley Finance. `docs/REFERENCES.md#rosenbaum-pearl-2020`\n- **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.\n  C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).\n  McGraw-Hill. Chapter 5 (\"Net Present Value and Other Investment Criteria\").\n- **Call-protection / prepayment premiums**: Standard private-credit\n  agreement term. LSTA (Loan Syndications and Trading Association).\n  *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on\n  loan documentation and call protection.\n- **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f). `docs/REFERENCES.md#isda-2006-definitions`\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    ReturnFloorSpec, IssuePrice,\n};\nuse finstack_quant_core::types::Rate;\n\n// 1.20× MOIC floor at par, full protection window\nlet spec = ReturnFloorSpec::moic(1.20);\nassert!(spec.validate().is_ok());\n\n// 10% XIRR floor with 98 OID, validated\nlet spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0).expect(\"valid rate fixture\"))\n    .issue_price(IssuePrice::PctOfPar(98.0));\nassert!(spec.validate().is_ok());\n```\n\nAttach to a bond using the fluent builder:\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    Bond, ReturnFloorSpec, ProtectionWindow,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::Rate;\nuse time::macros::date;\n\n// 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.\nlet loan = Bond::fixed(\n    \"LOAN-001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    Rate::from_percent(10.0).expect(\"valid rate fixture\"),\n    date!(2025 - 01 - 01),\n    date!(2030 - 01 - 01),\n    finstack_quant_core::dates::StubKind::None,\n    \"USD-OIS\",\n)?\n.with_return_floor(\n    ReturnFloorSpec::moic(1.25)\n        .window(ProtectionWindow::From(date!(2027 - 01 - 01))),\n);\n# Ok::<(), Box<dyn std::error::Error>>(())\n```",
+      "properties": {
+        "day_count": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day count convention for XIRR discounting. Defaults to Act/365F\n(matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors."
+        },
+        "issue_price": {
+          "$ref": "#/$defs/IssuePrice",
+          "default": "par",
+          "description": "Issue price = invested capital `V0` (amount funded at issue). Default: par."
+        },
+        "kind": {
+          "$ref": "#/$defs/ReturnFloorKind",
+          "description": "Which return metric is guaranteed, and its target."
+        },
+        "window": {
+          "$ref": "#/$defs/ProtectionWindow",
+          "default": "full",
+          "description": "Protection window. Default: [`ProtectionWindow::Full`]."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "RevolvingCredit": {
+      "additionalProperties": false,
+      "description": "Revolving credit facility instrument.\n\nModels a credit facility with draws/repayments, interest payments on drawn\namounts, and fees (commitment, usage, facility, upfront). Supports both\ndeterministic schedules and stochastic utilization via Monte Carlo.\n\nSee unit tests and `examples/` for usage.",
+      "properties": {
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging"
+        },
+        "base_rate_spec": {
+          "$ref": "#/$defs/BaseRateSpec",
+          "description": "Base rate specification (fixed or floating)."
+        },
+        "commitment_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total committed amount for the facility."
+        },
+        "commitment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date when the facility becomes available."
+        },
+        "credit_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional credit curve identifier for credit risk modeling.\n\nWhen provided, survival probabilities from the hazard curve are applied\nto discount cashflows, adjusting for default risk."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for interest accrual."
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier for pricing."
+        },
+        "draw_repay_spec": {
+          "$ref": "#/$defs/DrawRepaySpec",
+          "description": "Draw and repayment schedule (deterministic or stochastic)."
+        },
+        "drawn_amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Current drawn amount (initial utilization)."
+        },
+        "fees": {
+          "$ref": "#/$defs/RevolvingCreditFees",
+          "description": "Fee structure for the facility."
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency for interest and fees."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier for the facility."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+        },
+        "leq": {
+          "default": 0.0,
+          "description": "Loan-equivalent exposure: the fraction of the undrawn commitment assumed\nto be drawn at default (Basel credit conversion factor), as a decimal in\n`[0, 1]`.\n\nEnters the default leg as additional exposure that the lender funds at\npar and recovers at `recovery_rate`, so each unit of LEQ draw costs\n`(1 − recovery_rate)` at default. Typical values are 0.3–0.75 depending\non rating and covenant protection. Defaults to `0.0` (no draw at\ndefault), which reproduces the plain recovery leg.",
+          "format": "double",
+          "type": "number"
+        },
+        "maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date when the facility expires."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "recovery_rate": {
+          "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
+          "format": "double",
+          "type": "number"
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub rule for schedule generation when dates don't align with frequency.\n\nDetermines how to handle partial periods at the start or end of the schedule:\n- `ShortFront`: Short stub at the beginning (most common for RCFs)\n- `ShortBack`: Short stub at the end\n- `LongFront`: Long stub at the beginning\n- `LongBack`: Long stub at the end\n- `None`: No stub allowed (dates must align exactly)\n\nDefaults to `ShortFront` for maximum flexibility with unaligned dates."
+        }
+      },
+      "required": [
+        "id",
+        "commitment_amount",
+        "drawn_amount",
+        "commitment_date",
+        "maturity",
+        "base_rate_spec",
+        "day_count",
+        "frequency",
+        "fees",
+        "draw_repay_spec",
+        "discount_curve_id",
+        "recovery_rate",
+        "attributes"
+      ],
+      "type": "object"
+    },
+    "RevolvingCreditFees": {
+      "additionalProperties": false,
+      "description": "Fee structure for a revolving credit facility.\n\nContains the various fees charged on the facility:\n- Upfront: one-time fee at commitment\n- Commitment: annual fee on undrawn amount (can be tiered by utilization)\n- Usage: annual fee on drawn amount (can be tiered by utilization)\n- Facility: annual fee on total commitment\n\nFlat fees can be represented as single-tier vectors.",
+      "properties": {
+        "commitment_fee_tiers": {
+          "default": [],
+          "description": "Commitment fee tiers (utilization-based). Empty vector means no commitment fee.\nTiers should be sorted by threshold ascending.",
+          "items": {
+            "$ref": "#/$defs/FeeTier"
+          },
+          "type": "array"
+        },
+        "facility_fee_bp": {
+          "description": "Annual facility fee rate on total commitment (basis points).\nFacility fee is not tiered (applies to total commitment regardless of utilization).",
+          "format": "double",
+          "type": "number"
+        },
+        "upfront_fee": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "One-time upfront fee paid by borrower to lender at commitment."
+        },
+        "usage_fee_tiers": {
+          "default": [],
+          "description": "Usage fee tiers (utilization-based). Empty vector means no usage fee.\nTiers should be sorted by threshold ascending.",
+          "items": {
+            "$ref": "#/$defs/FeeTier"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "facility_fee_bp"
+      ],
+      "type": "object"
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
     },
     "RoundingConvention": {
       "description": "Rounding convention for payments",
@@ -3466,6 +5754,87 @@
           "type": "object"
         }
       ]
+    },
+    "StepUpCouponSpec": {
+      "additionalProperties": false,
+      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
+      "properties": {
+        "adjust_accrual_dates": {
+          "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+          "type": "boolean"
+        },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+        },
+        "calendar_id": {
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
+          "type": "string"
+        },
+        "coupon_type": {
+          "$ref": "#/$defs/CouponType",
+          "default": "cash",
+          "description": "Coupon type (Cash/PIK/Split)."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "type": "boolean"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Accrual and payment frequency used to generate the schedule boundaries."
+        },
+        "initial_rate": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Initial coupon rate (annual, decimal). Used until the first step date."
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after the adjusted accrual end date.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+        },
+        "step_schedule": {
+          "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
+        }
+      },
+      "required": [
+        "initial_rate",
+        "step_schedule",
+        "frequency",
+        "day_count",
+        "calendar_id"
+      ],
+      "type": "object"
     },
     "StochasticDefaultSpec": {
       "description": "Stochastic default model specification.\n\nAllows default model selection and configuration without\nconstructing the full model.",
@@ -3778,6 +6147,57 @@
         }
       ]
     },
+    "StochasticUtilizationSpec": {
+      "additionalProperties": false,
+      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events).",
+      "properties": {
+        "antithetic": {
+          "default": false,
+          "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination.",
+          "type": "boolean"
+        },
+        "mc_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
+        },
+        "num_paths": {
+          "description": "Number of Monte Carlo paths to simulate.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seed": {
+          "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "use_sobol_qmc": {
+          "default": false,
+          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination.",
+          "type": "boolean"
+        },
+        "utilization_process": {
+          "$ref": "#/$defs/UtilizationProcess",
+          "description": "Utilization process specification."
+        }
+      },
+      "required": [
+        "utilization_process",
+        "num_paths"
+      ],
+      "type": "object"
+    },
     "StructuredCredit": {
       "additionalProperties": false,
       "description": "Unified structured credit instrument representation.\n\nThis single type handles CLO, ABS, CMBS, and RMBS instruments using\ncomposition for deal-specific differences.",
@@ -4056,6 +6476,330 @@
         }
       ]
     },
+    "TermLoan": {
+      "additionalProperties": false,
+      "description": "Term loan instrument with covenant and DDTL support.\n\nRepresents a fully-validated institutional term loan with support for:\n- Fixed or floating interest rates\n- Delayed-draw term loan (DDTL) features\n- Payment-in-kind (PIK) interest\n- Flexible amortization schedules\n- Covenant-driven events (margin step-ups, cash sweeps, PIK toggles)\n- Original issue discount (OID) handling\n- Borrower call schedules\n\n# Construction\n\nCreate via [`TermLoanSpec`] conversion or use the builder pattern:\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::TermLoanSpec;\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;\n\n# fn example(spec: TermLoanSpec) -> Result<(), Box<dyn std::error::Error>> {\nlet loan: TermLoan = spec.try_into()?;\n# let _ = loan;\n# Ok(())\n# }\n```\n\n# Cashflow Generation\n\nUses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:\n- `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)\n- `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata\n\n# Pricing\n\nImplements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)\nusing deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.\n\n# Invariants\n\n- `issue < maturity`\n- `notional_limit.currency() == currency`\n- All monetary amounts are in the same currency\n- Amortization does not exceed outstanding principal\n\n# Thread Safety\n\nThis type is `Send + Sync` as all fields are thread-safe.",
+      "properties": {
+        "amortization": {
+          "$ref": "#/$defs/TermLoanAmortizationSpec",
+          "description": "Amortization specification"
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for tagging and scenarios"
+        },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business day convention"
+        },
+        "calendar_id": {
+          "description": "Optional calendar id for adjustments",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "call_schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoanCallSchedule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional call schedule (borrower callability)"
+        },
+        "coupon_type": {
+          "$ref": "#/$defs/CouponType",
+          "default": "cash",
+          "description": "Coupon split type (Cash/PIK/Split)"
+        },
+        "covenants": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermLoanCovenantEvents"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional covenant spec"
+        },
+        "credit_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit curve identifier (defaults to discount_curve_id if None)"
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency for all cashflows"
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention"
+        },
+        "ddtl": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdtlSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional DDTL parameters; None => plain term loan"
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency for coupons/fees"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+        },
+        "issue_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Issue (effective) date"
+        },
+        "maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Maturity date"
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "notional_limit": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Maximum commitment / notional limit"
+        },
+        "oid_eir": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OidEirSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional EIR amortization settings for reporting schedules"
+        },
+        "rate": {
+          "$ref": "#/$defs/RateSpec",
+          "description": "Rate specification (fixed or floating)"
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "settlement_days": {
+          "default": 2,
+          "description": "Settlement days (T+n) used as the valuation/accrued anchor. Default is 2.\n\nNote: the LSTA target settlement for par/near-par secondary loan trades\nis T+7 (with delayed compensation beyond T+7, and T+20 for distressed).\nThe T+2 default here is a pricing-anchor choice, not an LSTA\nconvention; set `settlement_days: 7` to anchor at the LSTA par-trade\ntarget.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub rule"
+        },
+        "upfront_fee": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Upfront fee at issue (if any)"
+        }
+      },
+      "required": [
+        "id",
+        "currency",
+        "notional_limit",
+        "issue_date",
+        "maturity",
+        "rate",
+        "frequency",
+        "day_count",
+        "discount_curve_id",
+        "amortization",
+        "attributes"
+      ],
+      "type": "object"
+    },
+    "TermLoanAmortizationSpec": {
+      "description": "Principal amortization schedule specification.\n\nDefines how the loan principal is amortized over its life,\nfrom no amortization (bullet) to custom schedules.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Bullet loan with no scheduled amortization",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Linear amortization between start and end dates",
+          "properties": {
+            "linear": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Amortization end date (full repayment)"
+                },
+                "start": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Amortization start date"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Percentage of current outstanding principal per period (geometric decay).\n\nEach period, the amortization amount equals `bp / 10000 × current_outstanding`.\nBecause the percentage is applied to the declining balance, the dollar amount\ndecreases geometrically each period.\n\n**Note**: This is NOT the same as a flat percentage of original notional\n(which would produce equal dollar payments each period).  For example,\n250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $243,750 (2.5% × $9.75M)\n- Q3: $237,656 (2.5% × $9.506M)\n- etc.",
+          "properties": {
+            "percent_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "bp": {
+                  "description": "Percentage in basis points per payment period (applied to current outstanding)",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Flat dollar amortization each period (percentage of original notional).\n\nEach period, the amortization amount equals `bp / 10000 × original_notional`.\nBecause the percentage is applied to the fixed original balance, the dollar\namount is identical every period (unlike `PercentPerPeriod` which decays).\n\nFor example, 250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $250,000 (2.5% × $10M)\n- Q3: $250,000 (2.5% × $10M)\n- etc.",
+          "properties": {
+            "percent_of_original_notional": {
+              "additionalProperties": false,
+              "properties": {
+                "bp": {
+                  "description": "Percentage in basis points per payment period (applied to original notional)",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_original_notional"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom amortization schedule with explicit principal payments",
+          "properties": {
+            "custom": {
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                  },
+                  {
+                    "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TermLoanCovenantEvents": {
+      "additionalProperties": false,
+      "description": "Covenant-driven events for term loans.\n\nAggregates all covenant-triggered or scheduled events that modify\nloan terms, including margin increases, PIK toggles, cash sweeps,\nand draw restrictions.",
+      "properties": {
+        "cash_sweeps": {
+          "description": "Cash sweep (mandatory prepayment) schedule",
+          "items": {
+            "$ref": "#/$defs/CashSweepEvent"
+          },
+          "type": "array"
+        },
+        "draw_stop_dates": {
+          "description": "Dates on which draws are prohibited (covenant breach or scheduled)",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
+        "margin_stepups": {
+          "description": "Margin step-up schedule",
+          "items": {
+            "$ref": "#/$defs/MarginStepUp"
+          },
+          "type": "array"
+        },
+        "pik_toggles": {
+          "description": "PIK toggle schedule",
+          "items": {
+            "$ref": "#/$defs/PikToggle"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "margin_stepups",
+        "pik_toggles",
+        "cash_sweeps",
+        "draw_stop_dates"
+      ],
+      "type": "object"
+    },
     "Tranche": {
       "additionalProperties": false,
       "description": "Structured credit tranche with attachment/detachment points",
@@ -4316,6 +7060,47 @@
           "type": "string"
         }
       ]
+    },
+    "UtilizationProcess": {
+      "additionalProperties": false,
+      "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.).",
+      "properties": {
+        "mean_reverting": {
+          "properties": {
+            "speed": {
+              "description": "Mean reversion speed (annualized).",
+              "format": "double",
+              "type": "number"
+            },
+            "spread_sensitivity": {
+              "default": 0.0,
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "format": "double",
+              "type": "number"
+            },
+            "target_rate": {
+              "description": "Target utilization rate (0.0 to 1.0).",
+              "format": "double",
+              "type": "number"
+            },
+            "volatility": {
+              "description": "Volatility of utilization changes (annualized).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "target_rate",
+            "speed",
+            "volatility"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "mean_reverting"
+      ],
+      "type": "object"
     },
     "VmParameters": {
       "additionalProperties": false,

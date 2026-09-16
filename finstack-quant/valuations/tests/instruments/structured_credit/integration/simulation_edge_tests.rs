@@ -57,6 +57,7 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         smm_override: None,
         mdr_override: None,
         recovery_rate: None,
+        commitment: None,
         contractual_payment: None,
     }
 }

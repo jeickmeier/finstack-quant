@@ -339,6 +339,13 @@ impl StructuredCredit {
         Ok((prepay, default, correlation))
     }
 
+    /// Effective asset correlation of the deal's correlation structure (the
+    /// explicit structure, else the deal-type default), as a decimal.
+    pub(crate) fn effective_asset_correlation(&self) -> Result<f64> {
+        let (_, _, correlation) = self.effective_stochastic_specs()?;
+        Ok(correlation.asset_correlation())
+    }
+
     /// Generate cashflows for a specific tranche after waterfall allocation.
     pub fn get_tranche_cashflows(
         &self,

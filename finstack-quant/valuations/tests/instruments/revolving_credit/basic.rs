@@ -355,6 +355,7 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
                     target_rate: 0.5,
                     speed: 1.0,
                     volatility: 0.1,
+                    spread_sensitivity: 0.0,
                 },
                 num_paths: 16,
                 seed: Some(42),
@@ -763,6 +764,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
             target_rate: initial_util,
             speed: 100.0,     // Very high speed = stays at target
             volatility: 1e-6, // Near-zero volatility
+            spread_sensitivity: 0.0,
         },
         num_paths: 2000, // Use many paths for stable average
         seed: Some(42),

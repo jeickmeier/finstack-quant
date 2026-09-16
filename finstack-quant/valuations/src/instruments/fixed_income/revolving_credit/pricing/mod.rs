@@ -113,6 +113,7 @@ mod tests {
                         target_rate: 0.5,
                         speed: 1.0,
                         volatility: 0.1,
+                        spread_sensitivity: 0.0,
                     },
                     num_paths: 100,
                     seed: Some(42),

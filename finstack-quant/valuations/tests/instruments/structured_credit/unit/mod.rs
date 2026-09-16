@@ -3,6 +3,10 @@
 pub mod components;
 pub mod config_sensitivity_tests;
 pub mod constructors_tests;
+pub mod instrument_collateral_tests;
+pub mod instrument_pool_option_cost_tests;
+pub mod instrument_pool_stochastic_tests;
+pub mod instrument_pool_tests;
 pub mod metrics;
 pub mod per_name_copula_tests;
 pub mod stochastic_pricing_tests;

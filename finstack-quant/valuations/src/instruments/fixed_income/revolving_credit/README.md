@@ -191,6 +191,7 @@ let stochastic = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         target_rate: 0.5,
         speed: 1.0,
         volatility: 0.15,
+        spread_sensitivity: 0.0, // > 0 links the target to the simulated spread
     },
     num_paths: 10_000,
     seed: Some(42),
@@ -206,7 +207,13 @@ Factors, when `McConfig` is supplied:
   transition and is then clamped to `[0, 1]`. Keep the stationary standard
   deviation `volatility / sqrt(2 * speed)` small relative to the distance from
   `target_rate` to the nearest boundary, or the clamp biases the simulated mean
-  toward the interior.
+  toward the interior. With `spread_sensitivity` β > 0 the target follows the
+  simulated spread, `θ(t) = clamp(target_rate + β · (s(t)/s(0) − 1), 0, 1)`:
+  a borrower whose spread doubles draws toward `target_rate + β`. This is the
+  "draw on spread level" channel, on top of the shock correlation below; it
+  needs a stochastic spread process to have any effect. Zero `volatility`
+  freezes utilization (parity mode) in both the standalone facility and the
+  structured-credit pool engine.
 - **Short rate** — `InterestRateProcessSpec::HullWhite1F`. With `sigma > 0` the
   pricer fits θ(t) to the facility's discount curve and reads the initial rate
   from it, ignoring the supplied `initial`/`theta`. The simulated rate is the
@@ -267,7 +274,21 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::Revo
 let enhanced = RevolvingCreditPricer::price_with_paths(&facility, &market, as_of)?;
 let mean_pv = enhanced.mc_result.estimate.mean;
 let per_path = &enhanced.path_results;
+let option_cost = enhanced.draw_option_cost.mean; // negative when spreads widened
 ```
+
+**Draw option cost.** Each simulated draw `ΔD` at observation `t_d` is a
+forward loan to maturity at the contractual margin `s_K` (the spread over the
+index, or the fixed rate less the par forward to maturity) against the path's
+fair spread `s(t_d)`, worth `ΔD · (s_K − s(t_d)) · A(t_d, T)` to the lender
+with `A` the risky annuity of the remaining accrual periods on the path
+(`Σ DF · SP · dt`). `PathResult::draw_option_cost` sums the path's draws,
+`EnhancedMonteCarloResult::draw_option_cost` is the antithetic-aware Monte
+Carlo estimate, and `MetricId::custom("draw_option_cost")` reports its mean.
+The cost is negative when the path's spread sits above the margin, the
+opportunity cost the lender bears on fixed-margin commitments; a constant
+spread process equal to the margin gives exactly zero. Loan-equivalent draws
+at default are priced in the default leg, not here.
 
 ### Rate conventions
 
@@ -289,23 +310,29 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `custom("utilization_rate")` | Drawn / commitment at the valuation date |
 | `custom("available_capacity")` | Commitment − drawn |
 | `custom("weighted_average_cost")` | Approximate all-in cost of the facility |
+| `custom("draw_option_cost")` | Monte Carlo mean draw option cost of a stochastic facility (`0` for deterministic schedules) |
 
 `Theta` is registered universally by `metrics::standard_registry()`.
 
 ## Bindings
 
-Reachable from Python and WASM through the JSON envelope
-(`InstrumentJson::RevolvingCredit` inside `finstack_quant.instrument/1`):
+- **Python**: the typed `finstack_quant.valuations.instruments.RevolvingCredit`
+  class (`builder()`, `example()`, `from_json` / `to_json` / `to_dict`,
+  one getter per Rust field, `price` / `metric` on the `price_instrument`
+  pipeline, `expected_cashflows(market, as_of)` returning a
+  `CashFlowSchedule`, and `price_with_paths(market, as_of)` returning an
+  `EnhancedMonteCarloResult` with the per-path PVs, draw option costs and
+  factor trajectories plus `to_dataframe()`). Instances are accepted by
+  `price_instrument`, `instrument_cashflows_json` and
+  `AssetPool.with_instruments`.
+- **WASM**: the JSON-first `valuations.instruments.RevolvingCredit` class
+  (`fromJson`, `example`, `toJson`, `id`); price with
+  `valuations.instruments.priceInstrument` and the other generic entry points.
 
-- **Python**: `finstack_quant.valuations.instruments.price_instrument(...)` and
-  `finstack_quant.valuations.instruments.instrument_cashflows_json(...)`.
-- **WASM**: `valuations.instruments.priceInstrument`,
-  `valuations.instruments.instrumentCashflowsJson`.
-
-There is no typed `RevolvingCredit` class in either binding.
-
-Closest notebook:
-[`loans_and_credit_facilities.ipynb`](../../../../../../finstack-quant-py/examples/notebooks/02_pricing/instruments/loans_and_credit_facilities.ipynb).
+Notebooks:
+[`loans_and_credit_facilities.ipynb`](../../../../../../finstack-quant-py/examples/notebooks/02_pricing/instruments/loans_and_credit_facilities.ipynb)
+and, for pools of facilities tranched into notes,
+[`loan_pool_tranching.ipynb`](../../../../../../finstack-quant-py/examples/notebooks/02_pricing/instruments/loan_pool_tranching.ipynb).
 
 ## Limitations
 

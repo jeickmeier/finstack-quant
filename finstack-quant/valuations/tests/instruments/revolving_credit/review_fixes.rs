@@ -72,6 +72,7 @@ fn stochastic(
             target_rate: target,
             speed: 1.0,
             volatility,
+            spread_sensitivity: 0.0,
         },
         num_paths,
         seed: Some(42),

@@ -14,6 +14,15 @@ use crate::instruments::fixed_income::structured_credit::types::{PaymentCalculat
 /// applied at the point of default. This decouples loss recognition from cash
 /// timing of recovery receipts (which are lagged). Recoveries still flow through
 /// the waterfall as cash when they mature from the recovery queue.
+/// Zero out a negative residual within the de-minimis tolerance.
+fn snap_de_minimis(amount: Money) -> Money {
+    if amount.amount() < 0.0 && amount.amount() >= -WRITEDOWN_DE_MINIMIS {
+        Money::from((0_i64, amount.currency()))
+    } else {
+        amount
+    }
+}
+
 pub(super) fn simulate_period(
     state: &mut SimulationState,
     instrument: &StructuredCredit,
@@ -34,6 +43,11 @@ pub(super) fn simulate_period(
 
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = state.prev_date.unwrap_or(state.closing_date);
+
+    // Reserve interest accrues on the opening balance, before this period's
+    // collateral draws debit the account; it is routed after the pool flows.
+    let reserve_interest_amount =
+        super::reserve::reserve_interest_amount(state, period_start, pay_date)?;
 
     // Live available-funds cap for this period: the current collateral WAC (net
     // of the AFC fee load), read from the start-of-period pool state before this
@@ -69,6 +83,39 @@ pub(super) fn simulate_period(
         months_per_period,
         context,
     })?;
+
+    // Route the reserve interest per the pool's destination: waterfall
+    // proceeds, a named tranche (outside the waterfall and the IC numerator),
+    // or the reserve itself.
+    let reserve_interest =
+        super::reserve::route_reserve_interest(state, reserve_interest_amount, pay_date)?;
+
+    // Principal consumed by the collateral this period: draws funded from
+    // principal collections and revolver repayments diverted to replenish the
+    // reserve. Neither reaches the waterfall.
+    let principal_to_collateral = pool_flows
+        .draw_from_principal
+        .checked_add(pool_flows.reserve_replenished)?;
+    // Draw funding and replenishment are each bounded by the collections, so
+    // a negative remainder can only be float noise; snap it before the
+    // waterfall's sign check.
+    let pool_principal = snap_de_minimis(
+        pool_flows
+            .scheduled_principal
+            .checked_add(pool_flows.prepayment)?
+            .checked_sub(principal_to_collateral)?,
+    );
+    if pool_principal.amount() < -WRITEDOWN_DE_MINIMIS {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "collateral consumed {} of principal but only {} was collected on {}",
+            principal_to_collateral.amount(),
+            pool_flows
+                .scheduled_principal
+                .checked_add(pool_flows.prepayment)?
+                .amount(),
+            pay_date
+        )));
+    }
 
     // Preserve the opening claim before this period's projected writedowns or
     // distributions. Paid coupons can include prior deferrals and cannot be
@@ -250,9 +297,7 @@ pub(super) fn simulate_period(
         pool_flows
             .interest
             .checked_add(state.undistributed_interest)?,
-        pool_flows
-            .scheduled_principal
-            .checked_add(pool_flows.prepayment)?
+        pool_principal
             .checked_add(released_recoveries)?
             .checked_add(state.undistributed_principal)?,
         context,
@@ -304,10 +349,7 @@ pub(super) fn simulate_period(
     let principal_diverted = is_accumulating;
 
     let reinvested_cash = if is_reinvestment_active {
-        let recyclable = pool_flows
-            .scheduled_principal
-            .checked_add(pool_flows.prepayment)?
-            .checked_add(state.undistributed_principal)?;
+        let recyclable = pool_principal.checked_add(state.undistributed_principal)?;
         let required_paydown = state
             .tranches
             .tranches
@@ -345,10 +387,9 @@ pub(super) fn simulate_period(
     };
 
     // ── Step 3: Prepare waterfall inputs ─────────────────────────────
-    // Total principal from pool (scheduled + prepayment)
-    let total_principal_from_pool = pool_flows
-        .scheduled_principal
-        .checked_add(pool_flows.prepayment)?;
+    // Total principal from pool (scheduled + prepayment, net of principal
+    // consumed by collateral draws and reserve replenishment).
+    let total_principal_from_pool = pool_principal;
 
     // During reinvestment, principal collections are reinvested into new assets;
     // during controlled accumulation they are held in the funding account. Either
@@ -367,8 +408,12 @@ pub(super) fn simulate_period(
         .checked_add(state.undistributed_principal)?;
     principal_available_for_waterfall =
         principal_available_for_waterfall.checked_add(state.undistributed_principal)?;
+    // Interest proceeds: pool interest, call/put premia above par, reserve
+    // interest routed to the waterfall, plus interest carried from prior periods.
     let mut interest_available_for_waterfall = pool_flows
         .interest
+        .checked_add(pool_flows.call_premium)?
+        .checked_add(reserve_interest.to_waterfall)?
         .checked_add(state.undistributed_interest)?;
 
     let mut total_cash_for_waterfall =
@@ -755,8 +800,12 @@ pub(super) fn simulate_period(
             state.pool,
             waterfall_context,
         )?;
-    state.undistributed_interest = waterfall_result.remaining_interest;
-    state.undistributed_principal = waterfall_result.remaining_principal;
+    // Carry residual cash forward. Tier payments are rounded to the currency's
+    // smallest unit, so the residual can sit a few ulps below zero; snapping
+    // sub-cent negatives keeps a period with no other interest (an instrument
+    // pool between coupon dates) from failing the waterfall's sign check.
+    state.undistributed_interest = snap_de_minimis(waterfall_result.remaining_interest);
+    state.undistributed_principal = snap_de_minimis(waterfall_result.remaining_principal);
 
     // Update reserve balance from waterfall distributions to ReserveAccount recipients.
     for (recipient, amount) in &waterfall_result.distributions {
@@ -968,9 +1017,16 @@ pub(super) fn simulate_period(
     // Pool cash must equal recipient distributions plus residual cash and net
     // side-account capture. Reserve draws are negative capture; controlled-
     // accumulation releases add cash back to the waterfall.
+    // Principal consumed by collateral draws and reserve replenishment never
+    // reached the waterfall (positive capture); call premia and reserve
+    // interest routed to the waterfall are cash added on top of pool flows
+    // (negative capture).
     let side_net_capture =
         spread_net_capture + reserve_net_capture - funding_net_release - carried_cash.amount()
-            + reinvested_cash.amount();
+            + reinvested_cash.amount()
+            + principal_to_collateral.amount()
+            - pool_flows.call_premium.amount()
+            - reserve_interest.to_waterfall.amount();
     assert_cash_conserved(
         total_cash_for_waterfall,
         &pool_flows,
@@ -979,6 +1035,10 @@ pub(super) fn simulate_period(
         &waterfall_result,
         side_net_capture,
     )?;
+
+    state
+        .reserve_balance_path
+        .push((pay_date, state.reserve_balance));
 
     Ok(())
 }

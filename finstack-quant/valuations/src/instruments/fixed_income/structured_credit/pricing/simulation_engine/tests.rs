@@ -1259,6 +1259,7 @@ mod cases {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         });
         let tranche = Tranche::new(
@@ -1382,6 +1383,7 @@ mod cases {
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
+            commitment: None,
             contractual_payment: None,
         });
         let tranche = Tranche::new(
@@ -2525,6 +2527,7 @@ mod cases {
                 smm_override: None,
                 mdr_override,
                 recovery_rate: None,
+                commitment: None,
                 contractual_payment: None,
             });
             pool

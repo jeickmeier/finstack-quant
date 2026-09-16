@@ -7,6 +7,33 @@ pub(crate) struct PoolFlows {
     pub(super) prepayment: Money,
     pub(super) default: Money,
     pub(super) recovery: Money,
+    /// Collateral draws funded from this period's principal collections;
+    /// the engine keeps this amount out of the waterfall. Draws funded from
+    /// the reserve and unfunded draws are accumulated on the simulation state
+    /// by `reserve::fund_collateral_draws`.
+    pub(super) draw_from_principal: Money,
+    /// Revolver repayments diverted to replenish the reserve toward its
+    /// target; the engine keeps this amount out of the waterfall.
+    pub(super) reserve_replenished: Money,
+    /// Call/put redemption premium above par, treated as interest proceeds.
+    pub(super) call_premium: Money,
+}
+
+impl PoolFlows {
+    /// Zero flows in `currency`.
+    pub(super) fn zero(currency: Currency) -> Self {
+        let zero = Money::from((0_i64, currency));
+        Self {
+            interest: zero,
+            scheduled_principal: zero,
+            prepayment: zero,
+            default: zero,
+            recovery: zero,
+            draw_from_principal: zero,
+            reserve_replenished: zero,
+            call_premium: zero,
+        }
+    }
 }
 
 /// Calculate all pool flows for the period.
@@ -412,5 +439,6 @@ pub(super) fn calculate_pool_flows_with_rates(
         prepayment: total_prepay,
         default: total_default,
         recovery: total_recovery,
+        ..PoolFlows::zero(base_currency)
     })
 }

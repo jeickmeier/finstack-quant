@@ -760,6 +760,19 @@ pub enum UtilizationProcess {
         speed: f64,
         /// Volatility of utilization changes (annualized).
         volatility: f64,
+        /// Sensitivity of the utilization target to the simulated credit
+        /// spread (adverse selection), as a decimal per unit of relative
+        /// spread change.
+        ///
+        /// The target used by the OU step becomes
+        /// `θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
+        /// where `s(t)` is the simulated spread and `s(0)` its initial level,
+        /// so a spread that doubles raises the target by `spread_sensitivity`.
+        /// Defaults to `0.0` (no link); the utilization/credit shock
+        /// correlation in `McConfig` applies on top of it. Ignored when the
+        /// facility has no credit-spread process.
+        #[serde(default)]
+        spread_sensitivity: f64,
     },
 }
 
@@ -1000,6 +1013,7 @@ impl RevolvingCredit {
                         target_rate,
                         speed,
                         volatility,
+                        spread_sensitivity,
                     } => {
                         validation::require_with(
                             target_rate.is_finite() && (0.0..=1.0).contains(target_rate),
@@ -1018,6 +1032,12 @@ impl RevolvingCredit {
                             *volatility,
                             "RevolvingCredit utilization volatility",
                         )?;
+                        validation::require_with(spread_sensitivity.is_finite(), || {
+                            format!(
+                                "RevolvingCredit utilization spread_sensitivity must be finite, \
+                                 got {spread_sensitivity}"
+                            )
+                        })?;
                     }
                 }
                 if let Some(mc_config) = &spec.mc_config {
@@ -1309,6 +1329,7 @@ mod dependency_tests {
                 target_rate: 0.5,
                 speed: 1.0,
                 volatility: 0.1,
+                spread_sensitivity: 0.0,
             },
             num_paths: 100,
             seed: Some(7),

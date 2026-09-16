@@ -3681,6 +3681,12 @@
               "format": "double",
               "type": "number"
             },
+            "spread_sensitivity": {
+              "default": 0.0,
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "format": "double",
+              "type": "number"
+            },
             "target_rate": {
               "description": "Target utilization rate (0.0 to 1.0).",
               "format": "double",

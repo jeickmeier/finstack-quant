@@ -767,10 +767,26 @@
           "format": "double",
           "type": "number"
         },
+        "draw_option_cost": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Mean over paths of the draw option cost: the value to the deal of its\nrevolvers' simulated draws having been made at the contractual margin\ninstead of each path's fair spread, obtained per path as the present\nvalue of the actual tranche cashflows less that of a counterfactual\nrun where every draw accrues at its fair spread. Negative when spreads\nwiden; zero for pools without stochastic revolvers."
+        },
+        "draw_option_cost_paths": {
+          "description": "Per-path draw option cost in path order (same currency as `npv`),\npopulated only for pools with stochastic revolvers.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
         "es_confidence": {
           "description": "ES confidence level used",
           "format": "double",
           "type": "number"
+        },
+        "expected_collateral_draws": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Mean over paths of the collateral draws funded through the reserve\naccount and principal collections (revolver utilization increases,\ndelayed draws and loan-equivalent draws at default)."
         },
         "expected_loss": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -825,6 +841,12 @@
         "unexpected_loss": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Unexpected loss (loss standard deviation)"
+        },
+        "unfunded_draw_path_fraction": {
+          "default": 0.0,
+          "description": "Fraction of paths on which a collateral draw could not be funded from\nthe reserve account and that period's principal collections (`0.0`\nfor pools without draws).",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
@@ -839,7 +861,9 @@
         "pv_confidence_interval",
         "num_paths",
         "pricing_mode",
-        "tranche_results"
+        "tranche_results",
+        "expected_collateral_draws",
+        "draw_option_cost"
       ],
       "type": "object"
     },
@@ -1142,6 +1166,10 @@
           "format": "double",
           "type": "number"
         },
+        "draw_option_cost": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "This tranche's share of the deal's draw option cost: the mean over\npaths of its present value on the actual run less that on the\ncounterfactual run where revolver draws accrue at their fair spread.\nTranche shares sum to the deal's `draw_option_cost` on every path."
+        },
         "expected_loss": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Expected loss"
@@ -1183,7 +1211,8 @@
         "detachment",
         "average_life",
         "spread",
-        "credit_duration"
+        "credit_duration",
+        "draw_option_cost"
       ],
       "type": "object"
     },

@@ -356,18 +356,23 @@ pub(crate) fn prepare_deal_simulation(
     }))
 }
 
-/// Run the period-by-period waterfall against one path's flow source, using a
-/// prebuilt [`PreparedDealSimulation`]. Called once per scenario path by the
-/// stochastic engines; the deterministic paths go through
-/// [`run_simulation_with_source`], which prepares then delegates here.
-///
-/// Returns detailed cashflow results for each tranche.
-pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
+/// Tranche cashflows plus the deal-level accounting of one simulation run.
+#[derive(Debug, Clone)]
+pub struct SimulationRun {
+    /// Detailed cashflow results per tranche id.
+    pub tranches: HashMap<String, TrancheCashflows>,
+    /// Reserve, draw-funding and reserve-interest accounting.
+    pub diagnostics: SimulationDiagnostics,
+}
+
+/// Execute the prepared period loop and return tranche results with the
+/// deal-level diagnostics.
+pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
     instrument: &StructuredCredit,
     context: &MarketContext,
     prepared: &PreparedDealSimulation,
     source: &mut S,
-) -> Result<HashMap<String, TrancheCashflows>> {
+) -> Result<SimulationRun> {
     let pool = &instrument.pool;
     let tranches = &instrument.tranches;
     let as_of = prepared.valuation_date;
@@ -585,7 +590,11 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // after current terminal distributions have updated outstanding note par.
     drain_pending_recoveries_at_end(&mut state, prepared.calendar, prepared.convention)?;
 
-    Ok(state.finalize())
+    let (tranches, diagnostics) = state.finalize_with_diagnostics();
+    Ok(SimulationRun {
+        tranches,
+        diagnostics,
+    })
 }
 
 /// Run full cashflow simulation for a structured credit instrument.
@@ -593,7 +602,7 @@ pub(crate) fn run_prepared_simulation_with_source<S: PoolFlowSource + ?Sized>(
 /// Prepares the loop-invariant [`PreparedDealSimulation`] then executes the
 /// period loop. Single-shot callers (deterministic pricing, OAS scenarios)
 /// use this entry point; the stochastic engines prepare once per pricing run
-/// and call [`run_prepared_simulation_with_source`] per path.
+/// and call [`simulate_prepared`] per path.
 ///
 /// Returns detailed cashflow results for each tranche.
 pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
@@ -602,14 +611,71 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     as_of: Date,
     source: &mut S,
 ) -> Result<HashMap<String, TrancheCashflows>> {
+    simulate_with_source(instrument, context, as_of, source).map(|run| run.tranches)
+}
+
+/// Resolve, prepare and simulate a deal whose pool holds instrument
+/// collateral, driving period flows from the instruments' own schedules.
+///
+/// # Arguments
+///
+/// * `instrument` - Deal whose `pool.instruments` is populated.
+/// * `context` - Market context used to project every instrument schedule.
+/// * `as_of` - Valuation date.
+pub(crate) fn simulate_instrument_pool(
+    instrument: &StructuredCredit,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<SimulationRun> {
     let resolved = instrument.resolved_for_pricing()?;
     let instrument = &resolved;
+    let currency = instrument.pool.get_base_currency();
     match prepare_deal_simulation(instrument, as_of)? {
         Some(prepared) => {
-            run_prepared_simulation_with_source(instrument, context, &prepared, source)
+            let mut source = super::instrument_flows::InstrumentScheduleFlowSource::prepare(
+                instrument, context, &prepared,
+            )?;
+            simulate_prepared(instrument, context, &prepared, &mut source)
         }
+        None => Ok(SimulationRun {
+            tranches: HashMap::default(),
+            diagnostics: SimulationDiagnostics {
+                reserve_balance_path: Vec::new(),
+                reserve_interest_paid: Vec::new(),
+                draws_from_reserve: Money::from((0_i64, currency)),
+                draws_from_principal: Money::from((0_i64, currency)),
+                unfunded_draws: Money::from((0_i64, currency)),
+                reserve_replenished: Money::from((0_i64, currency)),
+            },
+        }),
+    }
+}
+
+/// Resolve, prepare and simulate a deal, returning tranche results with the
+/// deal-level diagnostics.
+pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
+    instrument: &StructuredCredit,
+    context: &MarketContext,
+    as_of: Date,
+    source: &mut S,
+) -> Result<SimulationRun> {
+    let resolved = instrument.resolved_for_pricing()?;
+    let instrument = &resolved;
+    let currency = instrument.pool.get_base_currency();
+    match prepare_deal_simulation(instrument, as_of)? {
+        Some(prepared) => simulate_prepared(instrument, context, &prepared, source),
         // Exhausted pool: nothing to simulate, empty result.
-        None => Ok(HashMap::default()),
+        None => Ok(SimulationRun {
+            tranches: HashMap::default(),
+            diagnostics: SimulationDiagnostics {
+                reserve_balance_path: Vec::new(),
+                reserve_interest_paid: Vec::new(),
+                draws_from_reserve: Money::from((0_i64, currency)),
+                draws_from_principal: Money::from((0_i64, currency)),
+                unfunded_draws: Money::from((0_i64, currency)),
+                reserve_replenished: Money::from((0_i64, currency)),
+            },
+        }),
     }
 }
 
