@@ -3,6 +3,7 @@ import * as wasm from '../../pkg/finstack_quant_wasm.js';
 export const instruments = {
   Bond: wasm.Bond,
   TermLoan: wasm.TermLoan,
+  RevolvingCredit: wasm.RevolvingCredit,
   bondFromCashflowsJson: wasm.bondFromCashflowsJson,
   validateInstrumentJson: wasm.validateInstrumentJson,
   priceInstrument: wasm.priceInstrument,

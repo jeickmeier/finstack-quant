@@ -6,7 +6,7 @@
 use finstack_quant_wasm::api::core::dates::{JsDayCount, JsTenor};
 use finstack_quant_wasm::api::core::money::JsMoney;
 use finstack_quant_wasm::api::core::types::{JsBps, JsRate};
-use finstack_quant_wasm::api::valuations::fixed_income::{JsBond, JsTermLoan};
+use finstack_quant_wasm::api::valuations::fixed_income::{JsBond, JsRevolvingCredit, JsTermLoan};
 use finstack_quant_wasm::api::valuations::pricing::price_instrument;
 use wasm_bindgen_test::*;
 
@@ -381,4 +381,22 @@ fn term_loan_from_json_rejects_invalid_json_and_wrong_type() {
     assert!(JsTermLoan::from_json("[1, 2").is_err());
     let bond_json = fixed_bond().to_json().unwrap();
     assert!(JsTermLoan::from_json(&bond_json).is_err());
+}
+
+#[wasm_bindgen_test]
+fn revolving_credit_example_round_trips_through_the_envelope() {
+    let facility = JsRevolvingCredit::example().expect("example facility");
+    assert_eq!(facility.id(), "RCF-USD-3Y");
+    let json = facility.to_json().expect("serialize");
+    let value: serde_json::Value = serde_json::from_str(&json).expect("valid json");
+    assert_eq!(value["instrument"]["type"], "revolving_credit");
+    let back = JsRevolvingCredit::from_json(&json).expect("parse");
+    assert_eq!(back.to_json().expect("serialize again"), json);
+}
+
+#[wasm_bindgen_test]
+fn revolving_credit_from_json_rejects_other_instrument_types() {
+    assert!(JsRevolvingCredit::from_json("{not valid json").is_err());
+    let loan_json = JsTermLoan::example().unwrap().to_json().unwrap();
+    assert!(JsRevolvingCredit::from_json(&loan_json).is_err());
 }

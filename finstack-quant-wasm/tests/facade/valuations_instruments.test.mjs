@@ -1,5 +1,5 @@
 /**
- * Typed Bond / TermLoan facade smoke tests for `valuations.instruments`.
+ * Typed Bond / TermLoan / RevolvingCredit facade smoke tests for `valuations.instruments`.
  *
  * Requires the wasm-pack web build: npm run build (mise run wasm-build).
  */
@@ -26,9 +26,19 @@ const { core, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
-test('instruments namespace exposes typed Bond and TermLoan classes', () => {
+test('instruments namespace exposes typed Bond, TermLoan and RevolvingCredit classes', () => {
   assert.equal(typeof valuations.instruments.Bond, 'function');
   assert.equal(typeof valuations.instruments.TermLoan, 'function');
+  assert.equal(typeof valuations.instruments.RevolvingCredit, 'function');
+});
+
+test('RevolvingCredit.example round-trips through the canonical envelope', () => {
+  const facility = valuations.instruments.RevolvingCredit.example();
+  assert.equal(facility.id, 'RCF-USD-3Y');
+  const json = facility.toJson();
+  assert.equal(JSON.parse(json).instrument.type, 'revolving_credit');
+  assert.equal(valuations.instruments.RevolvingCredit.fromJson(json).toJson(), json);
+  assert.throws(() => valuations.instruments.RevolvingCredit.fromJson('{not json'));
 });
 
 test('Bond.fixed constructs, round-trips through the canonical envelope', () => {

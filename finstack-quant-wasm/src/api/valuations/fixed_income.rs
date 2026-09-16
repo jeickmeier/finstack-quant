@@ -1,9 +1,11 @@
-//! Typed fixed-income instrument classes (`Bond`, `TermLoan`).
+//! Typed fixed-income instrument classes (`Bond`, `TermLoan`,
+//! `RevolvingCredit`).
 //!
 //! Thin wrappers over the canonical Rust structs
-//! [`finstack_quant_valuations::instruments::Bond`] and
-//! [`finstack_quant_valuations::instruments::TermLoan`]. Construction and
-//! validation stay in Rust; the wrappers convert to and from the canonical
+//! [`finstack_quant_valuations::instruments::Bond`],
+//! [`finstack_quant_valuations::instruments::TermLoan`] and
+//! [`finstack_quant_valuations::instruments::RevolvingCredit`]. Construction
+//! and validation stay in Rust; the wrappers convert to and from the canonical
 //! `finstack_quant.instrument/1` envelope accepted by the JSON loader.
 //!
 //! To price a typed instrument, pass its `toJson()` output to the generic
@@ -201,6 +203,68 @@ impl JsTermLoan {
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::TermLoan(
+            self.inner.clone(),
+        )))
+        .map_err(to_js_err)
+    }
+
+    /// Instrument identifier.
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> String {
+        self.inner.id.to_string()
+    }
+}
+
+/// Typed wrapper for the Rust `RevolvingCredit` instrument.
+///
+/// Construct via `RevolvingCredit.fromJson` with a canonical v1 instrument
+/// envelope or start from `RevolvingCredit.example()`; price by passing
+/// `toJson()` to the generic pricing entry points.
+#[wasm_bindgen(js_name = RevolvingCredit)]
+#[derive(Clone)]
+pub struct JsRevolvingCredit {
+    pub(crate) inner: finstack_quant_valuations::instruments::RevolvingCredit,
+}
+
+#[wasm_bindgen(js_class = RevolvingCredit)]
+impl JsRevolvingCredit {
+    /// Deserialize a revolving credit facility from its canonical v1 instrument envelope.
+    ///
+    /// Bare payloads are rejected; the loader's validation runs on the result.
+    /// @param json - A `finstack_quant.instrument/1` envelope containing type `"revolving_credit"`.
+    /// @returns The validated facility.
+    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: &str) -> Result<JsRevolvingCredit, JsValue> {
+        match parse_envelope(json)? {
+            InstrumentJson::RevolvingCredit(inner) => Ok(JsRevolvingCredit { inner }),
+            _ => Err(JsValue::from_str(
+                "expected instrument type \"revolving_credit\", got a different instrument type",
+            )),
+        }
+    }
+
+    /// Canonical example facility (mirrors Rust `RevolvingCredit::example`).
+    ///
+    /// Returns a three-year USD 50M SOFR + 250bp facility with USD 10M drawn
+    /// and a scheduled draw and repayment, useful as a starting point and in tests.
+    /// @returns The example facility.
+    /// @throws If construction fails (should not occur).
+    pub fn example() -> Result<JsRevolvingCredit, JsValue> {
+        finstack_quant_valuations::instruments::RevolvingCredit::example()
+            .map(|inner| JsRevolvingCredit { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
+    ///
+    /// Pass the result to `valuations.instruments.priceInstrument` (or the
+    /// other generic pricing entry points) to price this facility.
+    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `RevolvingCredit.fromJson`.
+    /// @throws If serialization fails.
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::RevolvingCredit(
             self.inner.clone(),
         )))
         .map_err(to_js_err)

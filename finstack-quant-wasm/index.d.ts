@@ -5262,6 +5262,64 @@ export interface TermLoanConstructor {
 }
 
 /**
+ * Typed revolving-credit facility handle; serialize with `toJson()` for generic pricing entry points.
+ *
+ * Thin wrapper over the canonical Rust `RevolvingCredit`. Serialize with
+ * `toJson()` and pass the result to `valuations.instruments.priceInstrument`
+ * (or the other generic pricing entry points) to price it.
+ */
+export interface RevolvingCredit extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier.
+   */
+  readonly id: string;
+  /**
+   * Serialize to a canonical `finstack_quant.instrument/1` envelope.
+   *
+   * Pass the result to `valuations.instruments.priceInstrument` (or the
+   * other generic pricing entry points) to price this facility.
+   * @returns Canonical instrument envelope accepted by `priceInstrument` and `RevolvingCredit.fromJson`.
+   * @throws If serialization fails.
+   */
+  toJson(): string;
+}
+
+/**
+ * Constructor surface for the typed `RevolvingCredit` WebAssembly instrument.
+ *
+ * Construct via `fromJson` with a canonical v1 instrument envelope or start
+ * from `example()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const facility = valuations.instruments.RevolvingCredit.example();
+ * const result = valuations.instruments.priceInstrument(facility.toJson(), marketJson, "2024-06-30", "default");
+ * ```
+ */
+export interface RevolvingCreditConstructor {
+  /**
+   * Deserialize a revolving credit facility from its canonical v1 instrument envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope containing type `"revolving_credit"`.
+   * @returns The validated facility.
+   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   */
+  fromJson(json: string): RevolvingCredit;
+  /**
+   * Canonical example facility (mirrors Rust `RevolvingCredit::example`).
+   *
+   * Returns a three-year USD 50M SOFR + 250bp facility with USD 10M drawn
+   * and a scheduled draw and repayment, useful as a starting point and in tests.
+   * @returns The example facility.
+   * @throws If construction fails (should not occur).
+   */
+  example(): RevolvingCredit;
+}
+
+/**
  * Currency-tagged monetary amount as carried on the wire.
  *
  * `amount` is an exact decimal **string** (not a JS number) so no precision is
@@ -5493,6 +5551,10 @@ export interface ValuationInstrumentsNamespace {
    * Typed `TermLoan` instrument class (see `TermLoanConstructor`).
    */
   TermLoan: TermLoanConstructor;
+  /**
+   * Typed `RevolvingCredit` instrument class (see `RevolvingCreditConstructor`).
+   */
+  RevolvingCredit: RevolvingCreditConstructor;
   /**
    * Construct a canonical bond instrument envelope from a cashflow schedule.
    * @returns Canonical bond instrument envelope JSON.

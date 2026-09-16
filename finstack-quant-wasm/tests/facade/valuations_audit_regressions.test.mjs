@@ -626,7 +626,7 @@ test('representative structured collateral preserves PV and rejects duplicates',
   ];
   assert.ok(Math.abs(value() - expected) < 1e-6);
   pool.assets.push(asset);
-  assert.throws(value, /representative lines, not both/);
+  assert.throws(value, /exactly one of assets, representative lines or instruments/);
 });
 
 for (const [endDate, periodDays] of [
