@@ -430,7 +430,8 @@ mod tests {
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
     use crate::instruments::fixed_income::structured_credit::types::{
         AssetPool, CallExercisePolicy, DealType, DefaultModelSpec, InstrumentCollateral,
-        PrepaymentModelSpec, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        PrepaymentModelSpec, PutExercisePolicy, Tranche, TrancheCoupon, TrancheSeniority,
+        TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
@@ -481,12 +482,19 @@ mod tests {
         call_exercise: CallExercisePolicy,
         maturity: Date,
     ) -> StructuredCredit {
+        pool_deal_from(
+            InstrumentCollateral {
+                bonds,
+                call_exercise,
+                ..Default::default()
+            },
+            maturity,
+        )
+    }
+
+    fn pool_deal_from(collateral: InstrumentCollateral, maturity: Date) -> StructuredCredit {
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
-        pool.instruments = Some(InstrumentCollateral {
-            bonds,
-            call_exercise,
-            ..Default::default()
-        });
+        pool.instruments = Some(collateral);
         let tranches = TrancheStructure::new(vec![
             Tranche::new(
                 "EQ",
@@ -645,6 +653,48 @@ mod tests {
         assert!(
             (date!(2026 - 01 - 15)..=date!(2026 - 05 - 01)).contains(&called),
             "the bond must be called at its first window on the low path, principal on {called}"
+        );
+    }
+
+    #[test]
+    fn reinvestment_incentive_puts_only_on_the_high_rate_path() {
+        let mut bond = Bond::example().expect("fixed bond");
+        bond.cashflow_spec =
+            CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
+        bond.call_put = Some(CallPutSchedule {
+            calls: Vec::new(),
+            puts: vec![CallPut {
+                start_date: date!(2026 - 01 - 15),
+                end_date: date!(2034 - 01 - 15),
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+        });
+        let deal = pool_deal_from(
+            InstrumentCollateral {
+                bonds: vec![bond],
+                put_exercise: PutExercisePolicy::ReinvestmentIncentive {
+                    threshold_bp: 300.0,
+                },
+                ..Default::default()
+            },
+            date!(2034 - 01 - 15),
+        );
+        let market = market();
+
+        // Flat curve: par reinvestment ≈ 3.4%, 60bp below the coupon.
+        let flat = run_with_shift(&deal, &market, 0.0);
+        assert!(
+            first_principal_date(&flat, "A") >= date!(2033 - 12 - 01),
+            "the bond must stay outstanding on the flat path, principal on {}",
+            first_principal_date(&flat, "A")
+        );
+        // 400bp higher: ≈ 7.4%, 340bp above the coupon, put at the first window.
+        let high = run_with_shift(&deal, &market, 0.04);
+        let put = first_principal_date(&high, "A");
+        assert!(
+            (date!(2026 - 01 - 15)..=date!(2026 - 05 - 01)).contains(&put),
+            "the bond must be put at its first window on the high path, principal on {put}"
         );
     }
 }

@@ -33,7 +33,8 @@ impl ExerciseWindow {
     }
 }
 
-/// How the refinancing rate is observed for `RefinancingIncentive`: the par
+/// How the market rate is observed for the incentive rules
+/// (`RefinancingIncentive` calls, `ReinvestmentIncentive` puts): the par
 /// forward on the deal discount curve, plus the simulated path's departure
 /// from that curve when the run carries a rate path.
 #[derive(Clone, Copy)]
@@ -56,8 +57,8 @@ pub(super) struct ExerciseTerms {
     pub(super) call_policy: CallExercisePolicy,
     /// Effective put policy.
     pub(super) put_policy: PutExercisePolicy,
-    /// Fixed coupon (annual decimal) for the refinancing-incentive test;
-    /// `None` for floating instruments, which never exercise under it.
+    /// Fixed coupon (annual decimal) for the incentive rules; `None` for
+    /// floating instruments, which never exercise under them.
     pub(super) fixed_coupon: Option<f64>,
     /// Contractual maturity, the end of the refinancing horizon.
     pub(super) maturity: Date,
@@ -82,7 +83,7 @@ impl ExerciseTerms {
     /// * `k` - Index of the legal period being simulated.
     /// * `prev_date` - Period start (exclusive).
     /// * `pay_date` - Period payment date (inclusive).
-    /// * `rate_view` - Refinancing-rate source for the incentive rule.
+    /// * `rate_view` - Market-rate source for the incentive rules.
     pub(super) fn evaluate(
         &self,
         k: usize,
@@ -93,7 +94,18 @@ impl ExerciseTerms {
         if let Some(call) = self.evaluate_call(k, prev_date, pay_date, rate_view)? {
             return Ok(Some(call));
         }
-        Ok(self.evaluate_put(prev_date, pay_date))
+        self.evaluate_put(prev_date, pay_date, rate_view)
+    }
+
+    /// Par rate from `pay_date` to maturity on the deal curve plus the path
+    /// shift; the incentive rules cannot run without the curve.
+    fn market_rate(&self, rate_view: RateView<'_>, pay_date: Date, rule: &str) -> Result<f64> {
+        let curve = rate_view.curve.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{rule} exercise requires the deal discount curve"
+            ))
+        })?;
+        Ok(par_forward_rate(curve, pay_date, self.maturity)? + rate_view.shift)
     }
 
     fn evaluate_call(
@@ -119,13 +131,7 @@ impl ExerciseTerms {
                 let (Some(window), Some(coupon)) = (open(), self.fixed_coupon) else {
                     return Ok(None);
                 };
-                let curve = rate_view.curve.ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "refinancing-incentive exercise requires the deal discount curve".into(),
-                    )
-                })?;
-                let refinancing =
-                    par_forward_rate(curve, pay_date, self.maturity)? + rate_view.shift;
+                let refinancing = self.market_rate(rate_view, pay_date, "refinancing-incentive")?;
                 if (coupon - refinancing) * 10_000.0 > *threshold_bp {
                     Ok(Some(Redemption {
                         price_pct: window.price_pct,
@@ -137,16 +143,32 @@ impl ExerciseTerms {
         }
     }
 
-    fn evaluate_put(&self, prev_date: Date, pay_date: Date) -> Option<Redemption> {
-        match self.put_policy {
-            PutExercisePolicy::Never => None,
-            PutExercisePolicy::FirstPut => self
-                .puts
-                .iter()
-                .find(|w| w.open_in(prev_date, pay_date))
-                .map(|w| Redemption {
-                    price_pct: w.price_pct,
-                }),
+    fn evaluate_put(
+        &self,
+        prev_date: Date,
+        pay_date: Date,
+        rate_view: RateView<'_>,
+    ) -> Result<Option<Redemption>> {
+        let open = || self.puts.iter().find(|w| w.open_in(prev_date, pay_date));
+        match &self.put_policy {
+            PutExercisePolicy::Never => Ok(None),
+            PutExercisePolicy::FirstPut => Ok(open().map(|w| Redemption {
+                price_pct: w.price_pct,
+            })),
+            PutExercisePolicy::ReinvestmentIncentive { threshold_bp } => {
+                let (Some(window), Some(coupon)) = (open(), self.fixed_coupon) else {
+                    return Ok(None);
+                };
+                let reinvestment =
+                    self.market_rate(rate_view, pay_date, "reinvestment-incentive")?;
+                if (reinvestment - coupon) * 10_000.0 > *threshold_bp {
+                    Ok(Some(Redemption {
+                        price_pct: window.price_pct,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
         }
     }
 }

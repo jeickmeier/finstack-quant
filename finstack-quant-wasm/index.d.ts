@@ -4157,10 +4157,7 @@ export interface FeaturesNamespace {
    * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
    * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal `values` and `time_key` lengths, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
-  rankToWeights(
-    values: FeatureValue[],
-    timeKey: string[]
-  ): FeatureValue[];
+  rankToWeights(values: FeatureValue[], timeKey: string[]): FeatureValue[];
   /**
    * Neutralize a signal and z-score residuals.
    * fit_intercept must be true (the default) to preserve exposure neutrality.
@@ -5283,6 +5280,48 @@ export interface RevolvingCredit extends WasmOwned {
    * @throws If serialization fails.
    */
   toJson(): string;
+  /**
+   * Price a stochastic facility with the path-retaining Monte Carlo engine.
+   *
+   * Mirrors Rust `RevolvingCreditPricer::price_with_paths` and Python
+   * `RevolvingCredit.price_with_paths`: every simulated path is kept with
+   * its present value, utilization and credit-spread samples, cashflows and
+   * draw option cost, next to the antithetic-aware estimates. The draw
+   * option cost is negative when draws at the fixed margin are worth less
+   * than at the path's fair spread.
+   * @param marketJson - Serialized `MarketContext` holding the facility's discount curve, its floating index forward curve and fixings, and the credit curve of a market-anchored spread process.
+   * @param asOf - Valuation date as an ISO 8601 `YYYY-MM-DD` string.
+   * @returns Plain `EnhancedMonteCarloResult` object with `mc_result`, one `path_results` entry per simulated path and the `draw_option_cost` estimate; path counts are plain numbers and `mc_result.run` is `null`.
+   * @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
+   */
+  priceWithPaths(marketJson: string, asOf: string): EnhancedMonteCarloResult;
+}
+
+/**
+ * Path-retaining Monte Carlo result of a stochastic revolving credit facility
+ * (`RevolvingCredit.priceWithPaths`), in the serde wire shape of the Rust
+ * `EnhancedMonteCarloResult`.
+ */
+export interface EnhancedMonteCarloResult {
+  /**
+   * Aggregate Monte Carlo result: the present-value `estimate` (`mean` money
+   * value, `stderr`, `ci_95` bounds, `num_paths` antithetic pairs and
+   * `num_simulated_paths` as plain numbers) plus `paths` and `run`, both
+   * `null` for this pricer (serde shape of the Rust `MonteCarloResult`).
+   */
+  mc_result: Record<string, unknown>;
+  /**
+   * One entry per simulated path in path order: `pv` and `draw_option_cost`
+   * money values, the utilization, credit-spread and rate samples under
+   * `path_data`, and the path's dated `cashflows`.
+   */
+  path_results: Array<Record<string, unknown>>;
+  /**
+   * Draw option cost across paths: `mean` money value, `stderr`, `ci_95`
+   * bounds and the path counts; negative when draws at the fixed margin are
+   * worth less than at the path's fair spread.
+   */
+  draw_option_cost: Record<string, unknown>;
 }
 
 /**
@@ -6559,7 +6598,7 @@ export interface SabrCalibrator extends WasmOwned {
    * @param shift - `null`/`undefined` fits the quotes as-is; a number is a fixed additive shift in the forward's units (decimal rate or price); `"auto"` picks the smallest standardized shift (1-4%) that leaves 10bp of headroom above the most negative forward or strike, or none when every input is non-negative. The shift used is stored on the fitted `SabrParameters`.
    * @throws Error - Throws a JavaScript exception if `shift` is neither `null`, a number, nor the string `"auto"`.
    */
-  withShift(shift: number | "auto" | null | undefined): SabrCalibrator;
+  withShift(shift: number | 'auto' | null | undefined): SabrCalibrator;
   /**
    * Return a copy of this calibrator with exact ATM pinning enabled or
    * disabled, preserving all other settings.

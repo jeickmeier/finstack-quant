@@ -119,7 +119,7 @@ from the instrument's `credit_curve_id` when present, else from the deal
 `PrepaymentModelSpec`. Call and put exercise follow
 `InstrumentCollateral::call_exercise` / `put_exercise`
 (`CallExercisePolicy::{Contractual, FirstCall, Worst, RefinancingIncentive}`,
-`PutExercisePolicy::{Never, FirstPut}`) with per-instrument `overrides`.
+`PutExercisePolicy::{Never, FirstPut, ReinvestmentIncentive{threshold_bp}}`) with per-instrument `overrides`.
 
 Collateral draws (revolver utilization increases, delayed draws and
 loan-equivalent draws at default) are funded from `AssetPool::reserve_account`,

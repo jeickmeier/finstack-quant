@@ -134,6 +134,17 @@ def test_pool_accessors_report_the_collateral_and_reserve() -> None:
         AssetPool("P", "clo", Currency("USD")).with_instruments(call_exercise="not_a_policy")
 
 
+def test_reinvestment_incentive_put_policy_round_trips_through_the_pool() -> None:
+    policy = {"policy": "reinvestment_incentive", "threshold_bp": 75.0}
+    pool = AssetPool("POOL-PY", "clo", Currency("USD")).with_instruments(bonds=[Bond.example()], put_exercise=policy)
+    collateral = pool.instruments
+    assert collateral is not None
+    assert collateral["put_exercise"] == policy
+    assert AssetPool.from_json(pool.to_json()).instruments["put_exercise"] == policy
+    with pytest.raises(ValueError, match="put_exercise"):
+        AssetPool("P", "clo", Currency("USD")).with_instruments(put_exercise={"policy": "reinvestment_incentive"})
+
+
 def test_deterministic_pool_prices_and_reports_the_reserve_path() -> None:
     deal = pool_deal(
         RevolvingCredit.example(), reserve=40_000_000.0, destination={"kind": "tranche", "tranche_id": "EQ"}

@@ -21,7 +21,7 @@ use crate::common::test_helpers::{flat_discount_curve, flat_forward_curve};
 
 const AS_OF: Date = date!(2024 - 01 - 15);
 const MATURITY: Date = date!(2027 - 01 - 15);
-const HAZARD_ID: &str = "BORROWER-HZ";
+pub(crate) const HAZARD_ID: &str = "BORROWER-HZ";
 const MARGIN_BP: i64 = 250;
 
 fn usd(amount: f64) -> Money {
@@ -49,7 +49,7 @@ pub(crate) fn widening_hazard_curve() -> HazardCurve {
         .expect("hazard curve")
 }
 
-fn floating_spec() -> FloatingRateSpec {
+pub(crate) fn floating_spec() -> FloatingRateSpec {
     FloatingRateSpec {
         index_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::from(MARGIN_BP),

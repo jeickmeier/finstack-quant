@@ -4943,6 +4943,26 @@
             "policy"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The holder puts at the next put date when the reinvestment rate (the\npar forward on the deal discount curve to the instrument's maturity,\nplus the simulated path's shift) is above the current coupon by more\nthan `threshold_bp`. Floating instruments never exercise under it.",
+          "properties": {
+            "policy": {
+              "const": "reinvestment_incentive",
+              "type": "string"
+            },
+            "threshold_bp": {
+              "description": "Minimum reinvestment-rate-over-coupon pickup, in basis points,\nthat triggers exercise.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "policy",
+            "threshold_bp"
+          ],
+          "type": "object"
         }
       ]
     },

@@ -120,3 +120,68 @@ test('listedProductCatalog exposes exact venue-filtered valuation routes', () =>
   );
   assert.throws(() => valuations.market.listedProductCatalog('mx'));
 });
+
+// Flat 3% USD-OIS discounting. `MarketContextState` denies unknown fields and
+// requires every key except `fx`, so the payload is spelled out in full.
+const FLAT_MARKET = JSON.stringify({
+  schema_version: 1,
+  curves: [
+    {
+      type: 'discount',
+      id: 'USD-OIS',
+      base: '2024-01-15',
+      day_count: 'act_365f',
+      knot_points: [
+        [0.0, 1.0],
+        [1.0, 0.9704455335485082],
+      ],
+      interp_style: 'log_linear',
+      extrapolation: 'flat_forward',
+      min_forward_rate: null,
+      allow_non_monotonic: false,
+      min_forward_tenor: 1e-6,
+      rate_calibration: null,
+      calibration_ois_cutoff_days: null,
+      fx_policy: null,
+    },
+  ],
+  fx: null,
+  surfaces: [],
+  prices: {},
+  series: [],
+  inflation_indices: [],
+  dividends: [],
+  credit_indices: [],
+  fx_delta_vol_surfaces: [],
+  vol_cubes: [],
+  collateral: {},
+  hierarchy: null,
+});
+
+test('RevolvingCredit.priceWithPaths keeps every simulated path of a stochastic facility', () => {
+  const envelope = JSON.parse(valuations.instruments.RevolvingCredit.example().toJson());
+  const spec = envelope.instrument.spec;
+  spec.base_rate_spec = { fixed: { rate: 0.06 } };
+  spec.draw_repay_spec = {
+    stochastic: {
+      utilization_process: { mean_reverting: { target_rate: 0.6, speed: 1.0, volatility: 0.25 } },
+      num_paths: 8,
+      seed: 42,
+      mc_config: { recovery_rate: spec.recovery_rate, credit_spread_process: { constant: 0.025 } },
+    },
+  };
+  const facility = valuations.instruments.RevolvingCredit.fromJson(JSON.stringify(envelope));
+  const result = facility.priceWithPaths(FLAT_MARKET, '2024-01-15');
+  assert.equal(result.path_results.length, 8);
+  assert.equal(result.mc_result.estimate.num_simulated_paths, 8);
+  assert.equal(result.draw_option_cost.mean.currency, 'USD');
+  assert.ok(
+    result.path_results.every((path) => Number.isFinite(Number(path.draw_option_cost.amount)))
+  );
+  // A deterministic draw schedule has no paths to simulate.
+  assert.throws(
+    () =>
+      valuations.instruments.RevolvingCredit.example().priceWithPaths(FLAT_MARKET, '2024-01-15'),
+    /stochastic/i
+  );
+});

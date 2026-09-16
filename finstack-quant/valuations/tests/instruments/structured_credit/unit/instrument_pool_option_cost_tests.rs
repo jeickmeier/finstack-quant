@@ -14,7 +14,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use time::macros::date;
 
 use super::instrument_pool_tests::{deal_with, DealSpec};
-use crate::revolving_credit::draw_option_cost::{market, revolver, widening_hazard_curve};
+use crate::revolving_credit::draw_option_cost::{
+    market, revolver, widening_hazard_curve, HAZARD_ID,
+};
 
 const CLOSING: Date = date!(2024 - 01 - 15);
 const MATURITY: Date = date!(2027 - 01 - 15);
@@ -160,5 +162,52 @@ fn tranche_option_costs_sum_to_the_deal_cost_and_equity_bears_the_most() {
     assert!(
         equity.abs() > senior.abs(),
         "equity {equity} must bear more than senior {senior}"
+    );
+}
+
+/// With credit risk the standalone facility discounts its annuity on the
+/// spread path's hazard while the pool realizes defaults name by name, so the
+/// two option costs agree in expectation rather than path by path: their
+/// Monte Carlo means must coincide within the combined standard error.
+#[test]
+fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expectation() {
+    const PATHS: usize = 512;
+    let spread = CreditSpreadProcessSpec::MarketAnchored {
+        credit_curve_id: HAZARD_ID.into(),
+        kappa: 0.5,
+        implied_vol: 0.4,
+        tenor_years: None,
+    };
+    let facility = revolver("RCF-POOL", 0.25, spread.clone(), PATHS);
+    let market = market().insert(widening_hazard_curve());
+    let standalone = RevolvingCreditPricer::price_with_paths(&facility, &market, CLOSING)
+        .expect("standalone pricing")
+        .draw_option_cost;
+
+    let mut deal = pool_of(Vec::new(), spread, 0.25);
+    for tranche in deal.tranches.tranches.iter_mut() {
+        if tranche.id.as_str() == "A" {
+            tranche.coupon = TrancheCoupon::Fixed { rate: 0.01 };
+        }
+    }
+    let pooled = deal
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(PATHS))
+        .expect("pool pricing");
+    let paths = &pooled.draw_option_cost_paths;
+    let n = paths.len() as f64;
+    let pool_mean = paths.iter().sum::<f64>() / n;
+    let pool_se =
+        (paths.iter().map(|x| (x - pool_mean).powi(2)).sum::<f64>() / (n - 1.0) / n).sqrt();
+    let standalone_mean = standalone.mean.amount();
+    let tolerance = 3.0 * (pool_se.powi(2) + standalone.stderr.powi(2)).sqrt();
+    assert!(
+        standalone_mean < 0.0 && pool_mean < 0.0,
+        "both costs are negative under widening: pool {pool_mean}, standalone {standalone_mean}"
+    );
+    assert!(
+        (pool_mean - standalone_mean).abs() <= tolerance,
+        "pool {pool_mean} (se {pool_se}) vs standalone {standalone_mean} (se {}) differ by more \
+         than {tolerance}",
+        standalone.stderr
     );
 }

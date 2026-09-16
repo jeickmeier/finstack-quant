@@ -31,7 +31,7 @@ use crate::instruments::fixed_income::revolving_credit::{
     StochasticUtilizationSpec, UtilizationProcess,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    CallExercisePolicy, CollateralInstrument, InstrumentCollateral,
+    CallExercisePolicy, CollateralInstrument, InstrumentCollateral, PutExercisePolicy,
 };
 use crate::instruments::fixed_income::term_loan::RateSpec;
 use finstack_quant_cashflows::traits::CashflowScheduleSource;
@@ -446,12 +446,15 @@ impl PreparedInstrumentSchedules {
                 &period_dates,
             )?);
         }
-        // The refinancing-incentive rule and the margin of a fixed-rate
-        // revolver with simulated draws both read the deal discount curve.
+        // The incentive exercise rules and the margin of a fixed-rate
+        // revolver with simulated draws all read the deal discount curve.
         let needs_discount_curve = schedules.iter().any(|s| {
             matches!(
                 s.exercise.call_policy,
                 CallExercisePolicy::RefinancingIncentive { .. }
+            ) || matches!(
+                s.exercise.put_policy,
+                PutExercisePolicy::ReinvestmentIncentive { .. }
             ) || s.revolver.as_ref().is_some_and(|r| {
                 r.utilization.is_some() && matches!(r.margin, MarginTerms::FixedRate(_))
             })

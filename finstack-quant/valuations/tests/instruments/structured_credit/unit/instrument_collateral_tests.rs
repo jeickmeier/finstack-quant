@@ -284,3 +284,17 @@ fn reserve_interest_destination_must_name_an_existing_tranche() {
         ReserveInterestDestination::Waterfall
     );
 }
+
+#[test]
+fn reinvestment_incentive_put_policy_round_trips() {
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::PutExercisePolicy;
+
+    let policy = PutExercisePolicy::ReinvestmentIncentive { threshold_bp: 50.0 };
+    let json = serde_json::to_string(&policy).expect("serialize");
+    assert_eq!(
+        json,
+        r#"{"policy":"reinvestment_incentive","threshold_bp":50.0}"#
+    );
+    let back: PutExercisePolicy = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back, policy);
+}

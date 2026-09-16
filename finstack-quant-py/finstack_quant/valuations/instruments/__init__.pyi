@@ -15915,7 +15915,9 @@ class AssetPool:
             ``"first_call"``, ``"worst"`` (yield-to-worst, needs a quoted clean
             price) or ``{"policy": "refinancing_incentive", "threshold_bp": 50.0}``.
         put_exercise : str | dict[str, Any], optional
-            Default holder-put policy: ``"never"`` (default) or ``"first_put"``.
+            Default holder-put policy: ``"never"`` (default), ``"first_put"``, or the
+            dict ``{"policy": "reinvestment_incentive", "threshold_bp": 50.0}`` (put
+            when the reinvestment rate exceeds the coupon by more than the threshold).
         overrides : list[dict[str, Any]], optional
             Per-instrument overrides ``{"id": ..., "call": {...}, "put": {...}}``.
 

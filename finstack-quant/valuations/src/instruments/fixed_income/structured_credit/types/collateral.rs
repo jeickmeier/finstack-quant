@@ -67,6 +67,15 @@ pub enum PutExercisePolicy {
     Never,
     /// The holder puts at the first put date, at that date's put price.
     FirstPut,
+    /// The holder puts at the next put date when the reinvestment rate (the
+    /// par forward on the deal discount curve to the instrument's maturity,
+    /// plus the simulated path's shift) is above the current coupon by more
+    /// than `threshold_bp`. Floating instruments never exercise under it.
+    ReinvestmentIncentive {
+        /// Minimum reinvestment-rate-over-coupon pickup, in basis points,
+        /// that triggers exercise.
+        threshold_bp: f64,
+    },
 }
 
 /// Per-instrument override of the deal-level exercise policies.

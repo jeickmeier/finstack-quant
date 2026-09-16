@@ -15,7 +15,7 @@
 use crate::api::core::dates::{JsDayCount, JsTenor};
 use crate::api::core::money::JsMoney;
 use crate::api::core::types::{JsBps, JsRate};
-use crate::utils::{parse_iso_date, to_js_err};
+use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 use wasm_bindgen::prelude::*;
@@ -274,5 +274,31 @@ impl JsRevolvingCredit {
     #[wasm_bindgen(getter)]
     pub fn id(&self) -> String {
         self.inner.id.to_string()
+    }
+
+    /// Price a stochastic facility with the path-retaining Monte Carlo engine.
+    ///
+    /// Mirrors Rust `RevolvingCreditPricer::price_with_paths` and Python
+    /// `RevolvingCredit.price_with_paths`: every simulated path is kept with
+    /// its present value, utilization and credit-spread samples, cashflows and
+    /// draw option cost, next to the antithetic-aware estimates. The draw
+    /// option cost is negative when draws at the fixed margin are worth less
+    /// than at the path's fair spread.
+    /// @param marketJson - Serialized `MarketContext` holding the facility's discount curve, its floating index forward curve and fixings, and the credit curve of a market-anchored spread process.
+    /// @param asOf - Valuation date as an ISO 8601 `YYYY-MM-DD` string.
+    /// @returns Plain `EnhancedMonteCarloResult` object with `mc_result`, one `path_results` entry per simulated path and the `draw_option_cost` estimate; path counts are plain numbers and `mc_result.run` is `null`.
+    /// @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
+    #[wasm_bindgen(js_name = priceWithPaths)]
+    pub fn price_with_paths(&self, market_json: &str, as_of: &str) -> Result<JsValue, JsValue> {
+        let market = super::pricing::parse_market_json(market_json)?;
+        let as_of = parse_iso_date(as_of)?;
+        let result =
+            finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(
+                &self.inner,
+                &market,
+                as_of,
+            )
+            .map_err(to_js_err)?;
+        to_js_value(&result)
     }
 }

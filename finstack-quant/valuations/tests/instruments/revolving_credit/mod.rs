@@ -19,3 +19,4 @@ mod revolving_credit_parity;
 mod revolving_credit_properties;
 mod test_pricing_review;
 pub mod validation;
+mod weighted_average_cost;

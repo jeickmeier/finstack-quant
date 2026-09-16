@@ -2,6 +2,8 @@
 
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
 use super::drawn_balance_as_of;
 
@@ -14,8 +16,9 @@ use super::drawn_balance_as_of;
 /// - Facility fee on total commitment
 ///
 /// **Note**: This is an approximation that assumes constant balances and flat fees.
-/// It uses a single 3M forward rate for floating facilities and ignores:
-/// - Curve term structure
+/// Floating facilities are projected at the time-weighted average of the index
+/// forward over the remaining reset grid (one point per payment period), so the
+/// curve's term structure enters only through that average. It ignores:
 /// - Intra-period event effects
 /// - Fee tiering (uses current utilization only)
 ///
@@ -34,9 +37,8 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
             crate::instruments::fixed_income::revolving_credit::types::BaseRateSpec::Floating(
                 spec,
             ) => {
-                // Use forward curve to get current rate
                 let fwd = context.curves.get_forward(spec.index_id.as_str())?;
-                let index_rate = fwd.rate(0.25); // Use 3M as representative
+                let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
                 let params = finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;
                 finstack_quant_cashflows::builder::rate_helpers::calculate_floating_rate(
                     index_rate, &params,
@@ -78,4 +80,32 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
 
         Ok(weighted_avg_cost)
     }
+}
+
+/// Time-weighted average of `forward`'s rate over the facility's reset grid
+/// from `as_of` to maturity, one point per payment period on an ACT/365F
+/// clock. Falls back to the spot forward once `as_of` reaches maturity.
+fn average_forward_rate(
+    forward: &ForwardCurve,
+    facility: &RevolvingCredit,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    if as_of >= facility.maturity {
+        return Ok(forward.rate(0.0));
+    }
+    let horizon =
+        DayCount::Act365F.year_fraction(as_of, facility.maturity, DayCountContext::default())?;
+    let step = facility.frequency.to_years().max(1.0 / 365.0);
+    let (mut weighted, mut weight, mut t) = (0.0, 0.0, 0.0);
+    while t < horizon {
+        let dt = step.min(horizon - t);
+        weighted += forward.rate(t) * dt;
+        weight += dt;
+        t += step;
+    }
+    Ok(if weight > 0.0 {
+        weighted / weight
+    } else {
+        forward.rate(0.0)
+    })
 }

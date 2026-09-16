@@ -3346,11 +3346,13 @@ instruments = [
 # the [wasm_portfolio_subset.class_methods] precedent). WASM method names
 # are camelCase as emitted by wasm-bindgen. Bond/TermLoan/RevolvingCredit are
 # JSON-first on both hosts; WASM has no typed `price` method (call
-# `priceInstrument` with `toJson()`).
+# `priceInstrument` with `toJson()`). RevolvingCredit additionally binds the
+# path-retaining `priceWithPaths` (plain-object `EnhancedMonteCarloResult`),
+# the twin of Python `price_with_paths`.
 [wasm_valuations_subset.class_methods]
 Bond = ["fixed", "floating", "fromJson", "toJson", "id"]
 TermLoan = ["fromJson", "example", "toJson", "id"]
-RevolvingCredit = ["fromJson", "example", "toJson", "id"]
+RevolvingCredit = ["fromJson", "example", "toJson", "id", "priceWithPaths"]
 FxForward = ["fromJson", "toJson", "id", "price"]
 FxOption = [
     "fromJson",
@@ -3382,6 +3384,7 @@ FxOption = [
 "RevolvingCredit.example" = "RevolvingCredit.example"
 "RevolvingCredit.to_json" = "RevolvingCredit.toJson"
 "RevolvingCredit.id" = "RevolvingCredit.id"
+"RevolvingCredit.price_with_paths" = "RevolvingCredit.priceWithPaths"
 "FxForward.from_json" = "FxForward.fromJson"
 "FxForward.to_json" = "FxForward.toJson"
 "FxForward.id" = "FxForward.id"

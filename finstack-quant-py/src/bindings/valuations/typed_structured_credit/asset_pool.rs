@@ -180,7 +180,9 @@ impl PyAssetPool {
     ///     quoted clean price) or ``{"policy": "refinancing_incentive",
     ///     "threshold_bp": 50.0}``.
     /// put_exercise : str, optional
-    ///     Default holder-put policy: ``"never"`` (default) or ``"first_put"``.
+    ///     Default holder-put policy: ``"never"`` (default), ``"first_put"``, or the
+    ///     dict ``{"policy": "reinvestment_incentive", "threshold_bp": 50.0}`` (put
+    ///     when the reinvestment rate exceeds the coupon by more than the threshold).
     /// overrides : list[dict], optional
     ///     Per-instrument overrides ``{"id": ..., "call": {...}, "put": {...}}``.
     ///
