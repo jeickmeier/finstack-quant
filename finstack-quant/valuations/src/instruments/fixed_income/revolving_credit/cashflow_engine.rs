@@ -34,8 +34,9 @@ use super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit};
 /// Path data from 3-factor Monte Carlo simulation.
 ///
 /// Contains the full trajectory of utilization, interest rates, and credit spreads
-/// at each contractual accrual boundary, enabling cashflow generation and
-/// survival probability computation.
+/// at each observation date (contractual accrual boundaries plus term-index
+/// reset dates), enabling cashflow generation and survival probability
+/// computation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ThreeFactorPathData {
@@ -45,12 +46,13 @@ pub struct ThreeFactorPathData {
     pub short_rate_path: Vec<f64>,
     /// Credit spread trajectory (for survival probability)
     pub credit_spread_path: Vec<f64>,
-    /// Time points corresponding to each value (years from commitment)
+    /// Time points corresponding to each value: years from the commitment date
+    /// on the ACT/365F model clock (`MC_CLOCK_DAY_COUNT`).
     pub time_points: Vec<f64>,
-    /// Contractual accrual-boundary dates aligned with trajectories.
-    ///
-    /// The compatibility name is retained because this payload predates the
-    /// separation of accrual and adjusted payment dates.
+    /// Observation dates aligned with the trajectories: the contractual
+    /// accrual boundaries plus every term-index reset date inside the facility
+    /// life, sorted ascending. The name predates the separation of accrual,
+    /// reset and adjusted payment dates.
     #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
@@ -70,7 +72,9 @@ impl ThreeFactorPathData {
     ///
     /// All four trajectories must be aligned 1:1 with `payment_dates`, there
     /// must be at least two points (a single point cannot define a period),
-    /// and `time_points` must be strictly increasing. Downstream consumers
+    /// `payment_dates` must be strictly increasing (the cashflow engine looks
+    /// accrual boundaries up by binary search), and `time_points` must be
+    /// strictly increasing. Downstream consumers
     /// index these vectors in lockstep — a length mismatch previously
     /// panicked deep inside the cashflow engine instead of returning an
     /// error.
@@ -93,6 +97,11 @@ impl ThreeFactorPathData {
                     "ThreeFactorPathData {name} length ({len}) must match payment_dates ({n})"
                 )));
             }
+        }
+        if self.payment_dates.windows(2).any(|w| w[1] <= w[0]) {
+            return Err(finstack_quant_core::Error::Validation(
+                "ThreeFactorPathData payment_dates must be strictly increasing".to_string(),
+            ));
         }
         if self
             .time_points
@@ -303,6 +312,17 @@ impl<'a> CashflowEngine<'a> {
             BaseRateSpec::Fixed { .. } => None,
         };
 
+        // Term-index facilities re-fix the coupon at every reset date, so the
+        // sub-period timeline must also be sliced on resets that fall inside
+        // an accrual period (reset frequency shorter than payment frequency).
+        // Overnight facilities compound daily fixings over the whole window.
+        let slice_on_resets = match &self.facility.base_rate_spec {
+            BaseRateSpec::Floating(spec) => {
+                super::utils::resolved_overnight_compounding(spec)?.is_none()
+            }
+            BaseRateSpec::Fixed { .. } => false,
+        };
+
         for (i, period) in self.payment_periods.iter().enumerate() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
@@ -319,6 +339,16 @@ impl<'a> CashflowEngine<'a> {
             for event in draw_repay_events.iter() {
                 if event.date > period_start && event.date < period_end {
                     timeline.push(event.date);
+                }
+            }
+            if slice_on_resets {
+                if let Some(ref reset_grid) = self.reset_dates {
+                    timeline.extend(
+                        reset_grid
+                            .iter()
+                            .copied()
+                            .filter(|&reset| reset > period_start && reset < period_end),
+                    );
                 }
             }
             timeline.push(period_end);
@@ -672,30 +702,65 @@ impl<'a> CashflowEngine<'a> {
         ))
     }
 
+    /// Last reset-effective date at or before `date` (falls back to `date`
+    /// itself when the facility has no reset grid).
+    fn reset_effective_at(&self, date: Date) -> Date {
+        self.reset_dates
+            .as_ref()
+            .and_then(|dates| dates.iter().rev().find(|&&reset| reset <= date).copied())
+            .unwrap_or(date)
+    }
+
     /// Build cashflow schedule from 3-factor path trajectory.
     ///
-    /// This generates cashflows period by period based on the utilization, rate,
-    /// and spread paths from Monte Carlo simulation.
+    /// The path is observed on the facility's observation grid (contractual
+    /// accrual boundaries plus term-index reset dates). Utilization is read at
+    /// each accrual boundary; a term-index coupon is re-fixed at every reset
+    /// date inside the period, so reset frequencies shorter than the payment
+    /// frequency are honoured exactly as in the deterministic engine.
     fn build_path_schedule(&self, path: &ThreeFactorPathData) -> Result<CashFlowSchedule> {
-        if path.payment_dates.len() != self.payment_periods.len() + 1 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RevolvingCredit path boundary count ({}) must equal period count + 1 ({})",
-                path.payment_dates.len(),
-                self.payment_periods.len() + 1
-            )));
-        }
+        let observation_index = |date: Date| -> Result<usize> {
+            path.payment_dates.binary_search(&date).map_err(|_| {
+                finstack_quant_core::Error::Validation(format!(
+                    "RevolvingCredit path observation grid does not contain the date {date}"
+                ))
+            })
+        };
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
         let ccy = self.facility.commitment_amount.currency();
-        let overnight_fwd = match &self.facility.base_rate_spec {
-            BaseRateSpec::Floating(spec)
-                if super::utils::resolved_overnight_compounding(spec)?.is_some() =>
-            {
-                self.market
-                    .map(|market| market.get_forward(spec.index_id.as_str()))
-                    .transpose()?
+
+        // Overnight facilities compound the forward curve over the whole
+        // period. Term-index facilities on a stochastic (Hull-White) short-rate
+        // path rebuild the index fixing as `F_index(t) + (r_t − f_OIS(t))`: the
+        // simulated rate is the OIS numeraire rate, so the deterministic
+        // index-over-OIS basis must be added back or the index forward curve
+        // is silently ignored.
+        let (overnight_fwd, term_basis_curves) = match &self.facility.base_rate_spec {
+            BaseRateSpec::Floating(spec) => {
+                let overnight = super::utils::resolved_overnight_compounding(spec)?.is_some();
+                match self.market {
+                    Some(market) if overnight => {
+                        (Some(market.get_forward(spec.index_id.as_str())?), None)
+                    }
+                    Some(market) if path.stochastic_rates => (
+                        None,
+                        Some((
+                            market.get_forward(spec.index_id.as_str())?,
+                            market.get_discount(self.facility.discount_curve_id.as_str())?,
+                        )),
+                    ),
+                    None if path.stochastic_rates => {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "Market context required to project the '{}' index over a \
+                             stochastic short-rate path",
+                            spec.index_id
+                        )));
+                    }
+                    Some(_) | None => (None, None),
+                }
             }
-            _ => None,
+            BaseRateSpec::Fixed { .. } => (None, None),
         };
 
         // Add initial draw at commitment_date (from lender perspective: negative cashflow)
@@ -722,14 +787,15 @@ impl<'a> CashflowEngine<'a> {
         // Process each contractual accrual period using path data observed on
         // its unadjusted boundaries. Payment adjustment changes settlement,
         // never the accrual interval.
-        for (i, period) in self.payment_periods.iter().enumerate() {
+        for period in self.payment_periods.iter() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
             let payment_date = period.payment_date;
+            let idx_start = observation_index(period_start)?;
+            let idx_end = observation_index(period_end)?;
 
-            let utilization_start = path.utilization_path[i].clamp(0.0, 1.0);
-            let utilization_end = path.utilization_path[i + 1].clamp(0.0, 1.0);
-            let short_rate = path.short_rate_path[i];
+            let utilization_start = path.utilization_path[idx_start].clamp(0.0, 1.0);
+            let utilization_end = path.utilization_path[idx_end].clamp(0.0, 1.0);
 
             // Use average utilization for interest calculation (time-weighted approximation).
             // This better captures the balance evolution within each period when utilization
@@ -739,75 +805,112 @@ impl<'a> CashflowEngine<'a> {
             let drawn_balance = self.facility.commitment_amount * avg_utilization;
             let undrawn_balance = self.facility.commitment_amount * (1.0 - avg_utilization);
 
-            // Contractual fixings override the simulated short rate once the
-            // fixing date has passed. Future reset dates remain stochastic.
-            let (interest_rate, fixing_date) = match &self.facility.base_rate_spec {
-                BaseRateSpec::Fixed { rate } => (*rate, None),
-                BaseRateSpec::Floating(spec) => {
-                    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-                    let reset_effective = self
-                        .reset_dates
-                        .as_ref()
-                        .and_then(|dates| {
-                            dates
-                                .iter()
-                                .rev()
-                                .find(|&&date| date <= period_start)
-                                .copied()
-                        })
-                        .unwrap_or(period_start);
-                    let fixing_date = super::utils::floating_fixing_date(
-                        spec,
-                        reset_effective,
-                        &self.facility.attributes,
-                    )?;
-                    let overnight = super::utils::resolved_overnight_compounding(spec)?;
-                    if let (Some(_), Some(fwd)) = (overnight.as_ref(), overnight_fwd.as_ref()) {
-                        (
-                            super::utils::project_revolver_floating_rate(
-                                super::utils::RevolverFloatingProjection {
-                                    accrual_start: period_start,
-                                    accrual_end: period_end,
-                                    as_of: self.as_of,
-                                    spec,
-                                    fwd: fwd.as_ref(),
-                                    day_count: self.day_count,
-                                    coupon_frequency: self.facility.frequency,
-                                    currency: ccy,
-                                    attributes: &self.facility.attributes,
-                                    fixings: self.fixing_series,
-                                },
-                                None,
-                            )?,
-                            Some(fixing_date),
-                        )
-                    } else {
-                        let base_rate = if fixing_date < self.as_of {
-                            finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                                self.fixing_series,
-                                spec.index_id.as_ref(),
-                                fixing_date,
-                                self.as_of,
-                            )?
-                        } else {
-                            short_rate
-                        };
-                        (
-                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                                base_rate, &params,
-                            ),
-                            Some(fixing_date),
-                        )
-                    }
-                }
-            };
-
             let dt = self.day_count.year_fraction(
                 period_start,
                 period_end,
                 DayCountContext::default(),
             )?;
-            let interest = drawn_balance * (interest_rate * dt);
+
+            // Contractual fixings override the simulated short rate once the
+            // fixing date has passed. Future reset dates remain stochastic.
+            let (interest, accrual, interest_rate, fixing_date) = match &self
+                .facility
+                .base_rate_spec
+            {
+                BaseRateSpec::Fixed { rate } => (drawn_balance * (*rate * dt), dt, *rate, None),
+                BaseRateSpec::Floating(spec) => {
+                    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                    if let Some(fwd) = overnight_fwd.as_ref() {
+                        let reset_effective = self.reset_effective_at(period_start);
+                        let fixing_date = super::utils::floating_fixing_date(
+                            spec,
+                            reset_effective,
+                            &self.facility.attributes,
+                        )?;
+                        let coupon_rate = super::utils::project_revolver_floating_rate(
+                            super::utils::RevolverFloatingProjection {
+                                accrual_start: period_start,
+                                accrual_end: period_end,
+                                as_of: self.as_of,
+                                spec,
+                                fwd: fwd.as_ref(),
+                                day_count: self.day_count,
+                                coupon_frequency: self.facility.frequency,
+                                currency: ccy,
+                                attributes: &self.facility.attributes,
+                                fixings: self.fixing_series,
+                            },
+                            None,
+                        )?;
+                        (
+                            drawn_balance * (coupon_rate * dt),
+                            dt,
+                            coupon_rate,
+                            Some(fixing_date),
+                        )
+                    } else {
+                        // Term index: slice the period on the observation grid
+                        // so every reset inside it re-fixes the coupon.
+                        let mut interest = Money::from((0_i64, ccy));
+                        let mut weighted_rate = 0.0;
+                        let mut accrual = 0.0;
+                        let mut first_fixing = None;
+                        for k in idx_start..idx_end {
+                            let sub_start = path.payment_dates[k];
+                            let sub_end = path.payment_dates[k + 1];
+                            let reset_effective = self.reset_effective_at(sub_start);
+                            let fixing_date = super::utils::floating_fixing_date(
+                                spec,
+                                reset_effective,
+                                &self.facility.attributes,
+                            )?;
+                            first_fixing.get_or_insert(fixing_date);
+                            let base_rate = if fixing_date < self.as_of {
+                                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                                    self.fixing_series,
+                                    spec.index_id.as_ref(),
+                                    fixing_date,
+                                    self.as_of,
+                                )?
+                            } else {
+                                let simulated =
+                                    path.short_rate_path[observation_index(reset_effective)?];
+                                match term_basis_curves.as_ref() {
+                                    Some((fwd, disc)) => {
+                                        simulated
+                                            + super::utils::index_basis_at(
+                                                reset_effective,
+                                                self.facility.commitment_date.max(self.as_of),
+                                                fwd.as_ref(),
+                                                disc.as_ref(),
+                                            )?
+                                    }
+                                    None => simulated,
+                                }
+                            };
+                            let coupon_rate =
+                                crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                                    base_rate, &params,
+                                );
+                            let sub_dt = self.day_count.year_fraction(
+                                sub_start,
+                                sub_end,
+                                DayCountContext::default(),
+                            )?;
+                            interest =
+                                interest.checked_add(drawn_balance * (coupon_rate * sub_dt))?;
+                            weighted_rate += coupon_rate * sub_dt;
+                            accrual += sub_dt;
+                        }
+                        let avg_rate = if accrual > 0.0 {
+                            weighted_rate / accrual
+                        } else {
+                            0.0
+                        };
+                        (interest, accrual, avg_rate, first_fixing)
+                    }
+                }
+            };
 
             if payment_date > self.as_of && !rc.is_effectively_zero_money(interest.amount(), ccy) {
                 flows.push(CashFlow::new(
@@ -818,7 +921,7 @@ impl<'a> CashflowEngine<'a> {
                         BaseRateSpec::Fixed { .. } => CFKind::Fixed,
                         BaseRateSpec::Floating(_) => CFKind::FloatReset,
                     },
-                    dt,
+                    accrual,
                     Some(interest_rate),
                 ));
             }
@@ -826,7 +929,6 @@ impl<'a> CashflowEngine<'a> {
             // Calculate and emit fee cashflows using centralized functions.
             // Use average utilization for fee tier determination to match the interest
             // calculation above and avoid tier-boundary artifacts.
-            let avg_util = (utilization_start + utilization_end) / 2.0;
             if payment_date > self.as_of {
                 emit_revolving_credit_fees(
                     &mut flows,
@@ -835,8 +937,8 @@ impl<'a> CashflowEngine<'a> {
                         drawn_balance: drawn_balance.amount(),
                         undrawn_balance: undrawn_balance.amount(),
                         commitment_amount: self.facility.commitment_amount.amount(),
-                        commitment_fee_bp: self.facility.fees.commitment_fee_bp(avg_util),
-                        usage_fee_bp: self.facility.fees.usage_fee_bp(avg_util),
+                        commitment_fee_bp: self.facility.fees.commitment_fee_bp(avg_utilization),
+                        usage_fee_bp: self.facility.fees.usage_fee_bp(avg_utilization),
                         facility_fee_bp: self.facility.fees.facility_fee_bp,
                         year_fraction: dt,
                         currency: ccy,
@@ -846,7 +948,8 @@ impl<'a> CashflowEngine<'a> {
 
             // Handle principal flows from utilization changes. Interest uses
             // average start/end utilization, so book the matching funding leg
-            // at the period midpoint rather than deferring it to period end.
+            // at the midpoint of the simulated interval rather than deferring
+            // it to period end.
             //
             // Convention: the simulated path only observes utilization at
             // period boundaries, so the exact timing of the change within the
@@ -856,9 +959,17 @@ impl<'a> CashflowEngine<'a> {
             // accrual above. This intentionally differs from the
             // deterministic engine, which posts principal exactly on
             // contractual draw/repay event dates.
+            //
+            // For the period containing the valuation date the simulated
+            // interval starts at `as_of` (the utilization there is the known
+            // t₀ state), so the midpoint is taken over `[as_of, period_end]`;
+            // taking it over the full period would drop the funding leg for
+            // a valuation past the period midpoint while keeping its interest
+            // and terminal repayment.
             let utilization_change = utilization_end - prev_utilization;
-            let principal_date =
-                period_start + time::Duration::days((period_end - period_start).whole_days() / 2);
+            let simulated_from = period_start.max(self.as_of);
+            let half_days = ((period_end - simulated_from).whole_days() / 2).max(1);
+            let principal_date = simulated_from + time::Duration::days(half_days);
             if principal_date > self.as_of
                 && utilization_change.abs() > super::UTILIZATION_CHANGE_THRESHOLD
             {

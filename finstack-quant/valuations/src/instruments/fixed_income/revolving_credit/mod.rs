@@ -96,6 +96,17 @@ pub const MIN_CIR_SPREAD: f64 = 1e-8;
 /// Maximum allowed recovery rate (inclusive).
 pub const MAX_RECOVERY_RATE: f64 = 1.0;
 
+/// Day count of the Monte Carlo model clock.
+///
+/// Factor paths (`ThreeFactorPathData::time_points`), the pathwise bank
+/// account and pathwise survival integrate on ACT/365F years, the clock the
+/// `finstack_quant_models` rate and credit processes are calibrated on. Interest
+/// and fee accrual keep the facility's own `day_count`; only the simulation
+/// time axis is fixed here, so an ACT/360 facility no longer over-accrues its
+/// Hull-White numeraire by the 365/360 ratio.
+pub const MC_CLOCK_DAY_COUNT: finstack_quant_core::dates::DayCount =
+    finstack_quant_core::dates::DayCount::Act365F;
+
 pub use cashflow_engine::{PathAwareCashflowSchedule, ThreeFactorPathData};
 pub use pricing::unified::EnhancedMonteCarloResult;
 pub use pricing::unified::PathResult;

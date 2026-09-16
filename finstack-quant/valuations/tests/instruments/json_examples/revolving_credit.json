@@ -73,6 +73,7 @@
         "unit": "months"
       },
       "id": "RCF-USD-3Y",
+      "leq": 0.0,
       "maturity": "2027-01-01",
       "recovery_rate": 0.0,
       "stub": "short_front"

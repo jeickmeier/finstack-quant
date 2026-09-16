@@ -659,6 +659,12 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
+        "leq": {
+          "default": 0.0,
+          "description": "Loan-equivalent exposure: the fraction of the undrawn commitment assumed\nto be drawn at default (Basel credit conversion factor), as a decimal in\n`[0, 1]`.\n\nEnters the default leg as additional exposure that the lender funds at\npar and recovers at `recovery_rate`, so each unit of LEQ draw costs\n`(1 − recovery_rate)` at default. Typical values are 0.3–0.75 depending\non rating and covenant protection. Defaults to `0.0` (no draw at\ndefault), which reproduces the plain recovery leg.",
+          "format": "double",
+          "type": "number"
+        },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Date when the facility expires."
@@ -955,6 +961,7 @@
             "unit": "months"
           },
           "id": "RCF-USD-3Y",
+          "leq": 0.0,
           "maturity": "2027-01-01",
           "recovery_rate": 0.0,
           "stub": "short_front"

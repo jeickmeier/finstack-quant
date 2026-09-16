@@ -24,10 +24,10 @@ Import path:
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
 | `StochasticUtilizationSpec`, `UtilizationProcess` | Path count, seed, antithetic/Sobol switch, and the utilization process. |
 | `McConfig`, `CreditSpreadProcessSpec`, `InterestRateProcessSpec` | Optional multi-factor dynamics: correlation matrix, credit-spread and short-rate processes. |
-| `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture. |
+| `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
 | `EnhancedMonteCarloResult`, `PathResult` | MC statistics plus per-path PV, cashflows and factor trajectories. |
 | `PathAwareCashflowSchedule`, `ThreeFactorPathData` | Cashflow schedule carrying the simulated factor path. |
-| `ZERO_TOLERANCE`, `UTILIZATION_CHANGE_THRESHOLD`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE` | Module numerical constants. |
+| `ZERO_TOLERANCE`, `UTILIZATION_CHANGE_THRESHOLD`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
 
 Note that `pricer` and `types` are `pub(crate)` submodules — import the names
 above from the module root, not from `revolving_credit::types::…`.
@@ -40,9 +40,11 @@ revolving_credit/
 ├── types.rs              # RevolvingCredit, fees, rate/draw specs, MC config, Instrument impl
 ├── cashflow_engine.rs    # single engine for both deterministic and path-driven schedules
 ├── utils.rs              # calendar-aware schedules, reset dates, floating projection, balance evolution
-├── pricer/
-│   ├── unified.rs                    # RevolvingCreditPricer: single-path PV, MC aggregation, path capture
-│   ├── components.rs                 # upfront-fee PV, discount factors, survival weights, rate projection
+├── pricing/
+│   ├── unified.rs                    # RevolvingCreditPricer: registry entry, mode dispatch
+│   ├── path_pricing.rs               # single-path PV: discounting, survival, default leg (recovery + LEQ)
+│   ├── stochastic.rs                 # MC orchestration, statistics, expected cashflows
+│   ├── components.rs                 # upfront-fee PV
 │   ├── path_generator.rs             # 3-factor path generation (Philox or Sobol, optional antithetic)
 │   ├── monte_carlo_process.rs        # utilization / rate / spread process definitions
 │   └── monte_carlo_discretization.rs # discretization schemes
@@ -99,6 +101,13 @@ Notes that bite:
 - `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected);
   `flat_bp` takes typed `Bps` and does not.
 - `recovery_rate` is required and must be a finite decimal in `[0, 1]`.
+- `leq` (loan-equivalent exposure, Basel CCF) is the fraction of the undrawn
+  commitment assumed drawn at default, in `[0, 1]`; it defaults to `0.0`.
+- A facility `credit_curve_id` on a stochastic facility requires a
+  `CreditSpreadProcessSpec::MarketAnchored` process on that same curve (the
+  synthesized default already is). An explicit `Cir`/`Constant` process
+  ignores the curve, so hazard CS01 would silently report zero; `validate()`
+  rejects the combination.
 - `antithetic` and `use_sobol_qmc` are mutually exclusive; `validate()` rejects
   the combination.
 
@@ -114,12 +123,21 @@ Lender perspective:
 events, accrues interest and fees on the exact drawn balance in each sub-period,
 and posts principal on the contractual event dates.
 
-**Stochastic mode** consumes simulated factor paths that observe utilization
-only at period boundaries. Accruals use the average of start and end
-utilization; the matching principal delta is posted at the **period midpoint**,
-which is the unbiased timing for a change occurring uniformly within the period
-and keeps the funding leg consistent with the average-utilization accrual. Any
-outstanding balance is repaid at maturity.
+**Stochastic mode** consumes simulated factor paths observed on the
+facility's observation grid (accrual boundaries plus term-index reset dates).
+Accruals use the average of start and end utilization; the matching principal
+delta is posted at the **midpoint of the simulated interval** (`[period start,
+period end]`, or `[as_of, period end]` for the period containing the valuation
+date), which is the unbiased timing for a change occurring uniformly within the
+interval and keeps the funding leg consistent with the average-utilization
+accrual. Any outstanding balance is repaid at maturity. Term-index coupons are
+re-fixed at every reset date inside the period, so a reset frequency shorter
+than the payment frequency is honoured in both engines.
+
+For a stochastic facility `CashflowScheduleSource::raw_cashflow_schedule` (and
+therefore theta carry and the JSON cashflow exporters) returns the **expected
+schedule**: the per-path schedules averaged flow by flow, which is well
+defined because every path books its flows on the same dates.
 
 Same-date flow ordering is deterministic: interest/reset → fees →
 amortization/PIK → notional.
@@ -143,11 +161,17 @@ Tiered fees select the highest tier whose threshold is at or below the current
 utilization. Fee tiers must be sorted by threshold ascending — `validate()`
 enforces it.
 
-### Survival weighting
+### Survival weighting and the default leg
 
 ```text
-PV = Σ_i CF_i * DF(t_i) * SP(t_i) + PV(upfront fee)
+PV = Σ_i CF_i * DF(t_i) * SP(t_i)
+   + Σ_k PD(t_{k-1}, t_k) * DF(t_k) * [ R * E_drawn(t_k) + LEQ * U(t_k) * (R − 1) ]
+   + PV(upfront fee)
 ```
+
+The second line is the default leg on a monthly-or-finer grid: recovery `R` on
+the drawn balance `E_drawn`, plus the loan-equivalent draw `LEQ · U` of the
+undrawn commitment `U`, which the lender funds at par and recovers at `R`.
 
 - With `credit_curve_id` and no path data, `SP(t)` comes from the hazard curve
   at each cashflow date.
@@ -185,10 +209,13 @@ Factors, when `McConfig` is supplied:
   toward the interior.
 - **Short rate** — `InterestRateProcessSpec::HullWhite1F`. With `sigma > 0` the
   pricer fits θ(t) to the facility's discount curve and reads the initial rate
-  from it, ignoring the supplied `initial`/`theta`. With `sigma == 0` the
-  supplied constants are used verbatim (deterministic parity mode). The σ → 0
-  limit of the stochastic branch therefore does **not** converge to the σ = 0
-  branch unless the supplied constants are already curve-consistent.
+  from it, ignoring the supplied `initial`/`theta`. The simulated rate is the
+  OIS numeraire (pathwise bank-account discounting); a term-index fixing is
+  rebuilt as `F_index(t) + (r_t − f_OIS(t))`, so the OIS/index basis is kept
+  and the σ → 0 limit reproduces the deterministic-forward valuation. With
+  `sigma == 0` the supplied constants are used verbatim (deterministic parity
+  mode), which does **not** coincide with the σ → 0 limit unless the supplied
+  constants are curve-consistent.
 - **Credit spread** — `CreditSpreadProcessSpec::{Cir, Constant, MarketAnchored}`.
   `MarketAnchored` anchors the initial spread and mean level to a hazard curve
   and scales volatility from a CDS index implied vol.
@@ -207,6 +234,12 @@ spread up ⇒ utilization up ⇒ higher exposure at default. Pass an explicit
 **Determinism**: the seed is always fixed (`None` falls back to 42), so
 bump-and-reprice sensitivities reuse the same variates for base and bumped runs
 (common random numbers) and finite-difference Greeks carry no MC noise.
+
+**Clock**: simulation time, pathwise survival and the pathwise bank account run
+on the ACT/365F model clock (`MC_CLOCK_DAY_COUNT`), the clock the rate and
+credit processes are calibrated on; interest and fee accrual keep the
+facility's `day_count`. Seasoned facilities simulate from the valuation date
+with the current drawn amount as the known t₀ state.
 
 ## Pricing
 

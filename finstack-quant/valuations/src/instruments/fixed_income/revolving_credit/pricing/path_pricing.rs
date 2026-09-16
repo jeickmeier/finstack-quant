@@ -68,7 +68,7 @@ impl RevolvingCreditPricer {
                 &cashflow_dates,
                 facility.recovery_rate,
                 facility.commitment_date,
-                facility.day_count,
+                super::super::MC_CLOCK_DAY_COUNT,
             )?
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
             // Static survival from hazard curve
@@ -100,7 +100,7 @@ impl RevolvingCreditPricer {
                 &[as_of],
                 facility.recovery_rate,
                 facility.commitment_date,
-                facility.day_count,
+                super::super::MC_CLOCK_DAY_COUNT,
             )?[0]
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
             let hazard = market.get_hazard(hazard_id.as_str())?;
@@ -133,14 +133,14 @@ impl RevolvingCreditPricer {
             .filter(|p| p.stochastic_rates);
         // Signed so pre-commitment valuation dates do not error; only the
         // pathwise branch consumes this.
-        let t_asof_path = facility.day_count.signed_year_fraction(
+        let t_asof_path = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
             facility.commitment_date,
             as_of,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
         let df_asof_to = |date: Date| -> Result<f64> {
             if let Some(p) = pathwise_rates {
-                let t = facility.day_count.signed_year_fraction(
+                let t = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
                     facility.commitment_date,
                     date,
                     finstack_quant_core::dates::DayCountContext::default(),
@@ -183,9 +183,17 @@ impl RevolvingCreditPricer {
             total_pv += cf.amount.amount() * df * survival;
         }
 
-        // Recovery Leg PV — trapezoidal integration on a monthly-or-finer grid.
-        // PV_rec = Sum [ Exposure(t) * RecoveryRate * DF(t) * ProbDefault(t-1, t) ]
-        if facility.recovery_rate > 0.0 {
+        // Default leg PV — trapezoidal integration on a monthly-or-finer grid.
+        //
+        //   PV_def = Σ PD(t-1, t) · DF(t) · [ R · E_drawn(t) + LEQ · U(t) · (R − 1) ]
+        //
+        // `E_drawn` is the drawn balance and `U` the undrawn commitment at the
+        // grid date. The borrower is assumed to draw `leq` of the undrawn
+        // commitment at default (loan-equivalent exposure, Basel CCF); the
+        // lender funds that draw at par and recovers it at `R`, a net (R − 1)
+        // per unit. With `leq = 0` this is the plain recovery leg.
+        let commitment = facility.commitment_amount.amount();
+        if facility.recovery_rate > 0.0 || facility.leq > 0.0 {
             let future_grid = Self::build_recovery_grid(facility, as_of, path_schedule)?;
 
             if !future_grid.is_empty() {
@@ -196,7 +204,7 @@ impl RevolvingCreditPricer {
                         &future_grid,
                         facility.recovery_rate,
                         facility.commitment_date,
-                        facility.day_count,
+                        super::super::MC_CLOCK_DAY_COUNT,
                     )?
                 } else if let Some(ref hazard_id) = facility.credit_curve_id {
                     let hazard = market.get_hazard(hazard_id.as_str())?;
@@ -232,8 +240,12 @@ impl RevolvingCreditPricer {
                     let df_curr = df_asof_to(curr_date)?;
                     let df_avg = (df_prev + df_curr) / 2.0;
                     let exposure_avg = (prev_exposure + curr_exposure) / 2.0;
+                    let undrawn_avg = (commitment - exposure_avg).max(0.0);
 
-                    total_pv += exposure_avg * facility.recovery_rate * df_avg * prob_default;
+                    total_pv += df_avg
+                        * prob_default
+                        * (exposure_avg * facility.recovery_rate
+                            + facility.leq * undrawn_avg * (facility.recovery_rate - 1.0));
 
                     prev_sp = curr_sp;
                     prev_exposure = curr_exposure;
@@ -393,7 +405,7 @@ impl RevolvingCreditPricer {
                     let util = Self::interpolate_utilization_at_date(
                         date,
                         facility.commitment_date,
-                        facility.day_count,
+                        super::super::MC_CLOCK_DAY_COUNT,
                         &path_data.time_points,
                         &path_data.utilization_path,
                     )?;

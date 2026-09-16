@@ -6,14 +6,111 @@ use super::results::EnhancedMonteCarloResult;
 use super::unified::{
     RevolvingCreditPricer, DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
 };
+use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
+use crate::cashflow::traits::{schedule_from_classified_flows, ScheduleBuildOpts};
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
 use crate::instruments::fixed_income::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::Result;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::monte_carlo::estimate::Estimate;
 use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
+
+/// Accumulator for one expected flow across Monte Carlo paths.
+struct ExpectedFlow {
+    amount: Money,
+    rate_sum: f64,
+    rate_count: usize,
+    accrual_factor: f64,
+}
+
 impl RevolvingCreditPricer {
+    /// Expected cashflow schedule of a stochastic facility.
+    ///
+    /// Runs the Monte Carlo valuation and averages the per-path schedules flow
+    /// by flow. Every path books its flows on the same dates (the adjusted
+    /// payment dates of the accrual periods and the midpoint funding dates of
+    /// the observation grid), so averaging amounts and coupon rates per
+    /// `(date, reset date, kind)` is a well-defined expectation. A flow absent
+    /// on some paths (a commitment fee on a fully drawn path, for example)
+    /// contributes zero on those paths. This backs `CashflowScheduleSource`
+    /// for stochastic facilities, i.e. theta carry and the JSON cashflow
+    /// exporters, and is deterministic under the fixed simulation seed.
+    ///
+    /// # Arguments
+    ///
+    /// * `facility` - Revolving credit facility; must carry a stochastic
+    ///   draw/repay spec.
+    /// * `market` - Curves used to generate and project each path.
+    /// * `as_of` - Valuation date; flows paid on or before it are excluded.
+    pub fn expected_cashflows(
+        facility: &RevolvingCredit,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<CashFlowSchedule> {
+        let enhanced = Self::price_with_paths(facility, market, as_of)?;
+        let num_paths = enhanced.path_results.len() as f64;
+        let ccy = facility.commitment_amount.currency();
+
+        // Insertion order of the first appearance keeps the schedule stable
+        // (paths share dates and emission order).
+        let mut order: Vec<(Date, Option<Date>, CFKind)> = Vec::new();
+        let mut buckets: HashMap<(Date, Option<Date>, CFKind), ExpectedFlow> = HashMap::default();
+        for path in &enhanced.path_results {
+            for cf in path.cashflows.get_flows() {
+                let key = (cf.date, cf.reset_date, cf.kind);
+                let entry = buckets.entry(key).or_insert_with(|| {
+                    order.push(key);
+                    ExpectedFlow {
+                        amount: Money::from((0_i64, ccy)),
+                        rate_sum: 0.0,
+                        rate_count: 0,
+                        accrual_factor: cf.accrual_factor,
+                    }
+                });
+                entry.amount = entry.amount.checked_add(cf.amount)?;
+                if let Some(rate) = cf.rate {
+                    entry.rate_sum += rate;
+                    entry.rate_count += 1;
+                }
+            }
+        }
+
+        let flows = order
+            .into_iter()
+            .map(|key| {
+                let flow = &buckets[&key];
+                let rate = (flow.rate_count > 0).then(|| flow.rate_sum / flow.rate_count as f64);
+                CashFlow::new(
+                    key.0,
+                    key.1,
+                    flow.amount * (1.0 / num_paths),
+                    key.2,
+                    flow.accrual_factor,
+                    rate,
+                )
+            })
+            .collect();
+
+        Ok(schedule_from_classified_flows(
+            flows,
+            facility.day_count,
+            ScheduleBuildOpts {
+                notional_hint: Some(Money::from((0_i64, ccy))),
+                meta: CashFlowMeta {
+                    projected_fixings: Vec::new(),
+                    representation: CashflowRepresentation::Projected,
+                    calendar_ids: Vec::new(),
+                    facility_limit: Some(facility.commitment_amount),
+                    issue_date: Some(facility.commitment_date),
+                    maturity_date: None,
+                },
+            },
+        ))
+    }
+
     /// Price with full MC path capture for analysis.
     ///
     /// # Arguments
@@ -115,7 +212,9 @@ impl RevolvingCreditPricer {
         // short-rate process drives only reset dates that have not fixed yet.
         let fixings = resolve_fixings(facility, market);
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
-        let accrual_boundary_dates = super::super::utils::build_accrual_boundary_dates(facility)?;
+        // Factor state is observed on accrual boundaries plus term-index
+        // reset dates so intra-period resets re-fix the coupon.
+        let observation_dates = super::super::utils::build_observation_dates(facility)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(
@@ -123,7 +222,7 @@ impl RevolvingCreditPricer {
             mc_config,
             facility,
             market,
-            &accrual_boundary_dates,
+            &observation_dates,
             as_of,
         )?;
 

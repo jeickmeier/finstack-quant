@@ -263,10 +263,11 @@ mod tests {
         let diff = (pv_det.amount() - pv_stoch.amount()).abs();
         let relative_error = diff / pv_det.amount().abs().max(1.0);
 
-        // Slightly relaxed tolerance for MC vs deterministic (0.05% vs 0.01%)
-        // Small differences arise from spot rate interpolation vs period rate projection
+        // The deterministic-forward path records the index projection at each
+        // observation date on the curve's own clock, exactly as the
+        // deterministic engine does, so the two agree to rounding.
         assert!(
-            relative_error < 5e-4,
+            relative_error < 1e-9,
             "Floating rate parity failed: det={}, stoch={}, diff={}, rel_err={:.6}",
             pv_det.amount(),
             pv_stoch.amount(),

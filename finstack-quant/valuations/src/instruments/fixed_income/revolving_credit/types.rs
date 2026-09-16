@@ -89,6 +89,19 @@ pub struct RevolvingCredit {
     /// Callers must provide the value explicitly; zero recovery remains valid.
     pub recovery_rate: f64,
 
+    /// Loan-equivalent exposure: the fraction of the undrawn commitment assumed
+    /// to be drawn at default (Basel credit conversion factor), as a decimal in
+    /// `[0, 1]`.
+    ///
+    /// Enters the default leg as additional exposure that the lender funds at
+    /// par and recovers at `recovery_rate`, so each unit of LEQ draw costs
+    /// `(1 − recovery_rate)` at default. Typical values are 0.3–0.75 depending
+    /// on rating and covenant protection. Defaults to `0.0` (no draw at
+    /// default), which reproduces the plain recovery leg.
+    #[builder(default)]
+    #[serde(default)]
+    pub leq: f64,
+
     /// Stub rule for schedule generation when dates don't align with frequency.
     ///
     /// Determines how to handle partial periods at the start or end of the schedule:
@@ -669,6 +682,17 @@ pub enum CreditSpreadProcessSpec {
     },
 }
 
+impl CreditSpreadProcessSpec {
+    /// Short wire-style name of the process variant, for diagnostics.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Cir { .. } => "cir",
+            Self::Constant(_) => "constant",
+            Self::MarketAnchored { .. } => "market_anchored",
+        }
+    }
+}
+
 /// Interest rate process specification (for floating rates).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -826,6 +850,16 @@ impl RevolvingCredit {
                 format!(
                     "RevolvingCredit recovery_rate must be a finite decimal in [0, {}], got {}",
                     MAX_RECOVERY_RATE, self.recovery_rate
+                )
+            },
+        )?;
+
+        validation::require_with(
+            self.leq.is_finite() && (0.0..=1.0).contains(&self.leq),
+            || {
+                format!(
+                    "RevolvingCredit leq must be a finite decimal in [0, 1], got {}",
+                    self.leq
                 )
             },
         )?;
@@ -998,6 +1032,38 @@ impl RevolvingCredit {
                             )
                         },
                     )?;
+                    // A hazard curve on the facility is both the CS01 bump
+                    // target and the anchor for pathwise survival. Any other
+                    // spread process ignores the curve, so a hazard bump would
+                    // reprice to the same PV and report a silent zero CS01.
+                    if let Some(curve) = &self.credit_curve_id {
+                        match &mc_config.credit_spread_process {
+                            CreditSpreadProcessSpec::MarketAnchored {
+                                credit_curve_id, ..
+                            } if credit_curve_id == curve => {}
+                            CreditSpreadProcessSpec::MarketAnchored {
+                                credit_curve_id, ..
+                            } => {
+                                return Err(finstack_quant_core::Error::Validation(format!(
+                                    "RevolvingCredit {}: McConfig market-anchored credit curve \
+                                     '{}' must equal the facility credit_curve_id '{}'",
+                                    self.id, credit_curve_id, curve
+                                )));
+                            }
+                            other => {
+                                return Err(finstack_quant_core::Error::Validation(format!(
+                                    "RevolvingCredit {}: credit_curve_id '{}' requires \
+                                     CreditSpreadProcessSpec::MarketAnchored on that curve; the \
+                                     supplied '{}' process ignores the curve, so hazard CS01 \
+                                     would silently report zero. Drop credit_curve_id to price \
+                                     on an explicit spread process",
+                                    self.id,
+                                    curve,
+                                    other.kind()
+                                )));
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1118,9 +1184,17 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        // Only works for deterministic specs
-        if !self.is_deterministic() {
-            return Err(finstack_quant_core::InputError::Invalid.into());
+        // Stochastic facilities expose their Monte Carlo expected schedule
+        // (path-averaged flow by flow) so theta carry and the exporters work.
+        if self.is_stochastic() {
+            return crate::instruments::fixed_income::revolving_credit::pricing::unified::RevolvingCreditPricer::expected_cashflows(
+                self, curves, as_of,
+            )
+            .map(|schedule| {
+                schedule.with_representation(
+                    crate::cashflow::builder::CashflowRepresentation::Projected,
+                )
+            });
         }
 
         use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;

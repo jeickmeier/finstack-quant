@@ -15,6 +15,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
+use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
@@ -104,6 +105,59 @@ pub(super) fn build_accrual_boundary_dates(facility: &RevolvingCredit) -> Result
     Ok(std::iter::once(facility.commitment_date)
         .chain(periods.into_iter().map(|period| period.accrual_end))
         .collect())
+}
+
+/// Build the Monte Carlo observation dates: contractual accrual boundaries
+/// plus every floating-rate reset date strictly inside the facility life,
+/// sorted and deduplicated.
+///
+/// The path generator records factor state on these dates, so a reset
+/// frequency shorter than the payment frequency sees a fresh short-rate
+/// observation at each reset rather than at the accrual-period start only.
+pub(super) fn build_observation_dates(facility: &RevolvingCredit) -> Result<Vec<Date>> {
+    let mut dates = build_accrual_boundary_dates(facility)?;
+    if let Some(resets) = build_reset_dates(facility)? {
+        dates.extend(
+            resets
+                .into_iter()
+                .filter(|&reset| reset > facility.commitment_date && reset < facility.maturity),
+        );
+    }
+    dates.sort_unstable();
+    dates.dedup();
+    Ok(dates)
+}
+
+/// Deterministic index-over-OIS basis at `date`: the term index forward minus
+/// the discount curve's instantaneous forward on the ACT/365F model clock.
+///
+/// The stochastic-rates path simulates the OIS numeraire short rate on the
+/// model clock anchored at `anchor` (the same clock `prepare_hw1f_params` and
+/// `initial_short_rate_from_curve` use), so a term-index fixing is rebuilt as
+/// `F_index(t) + (r_t − f_OIS(t))`. Adding the basis keeps the σ → 0 limit
+/// equal to the deterministic index forward and preserves the OIS/index basis
+/// in expectation; using the bare short rate silently priced every index
+/// coupon off the discount curve.
+///
+/// # Arguments
+///
+/// * `date` - Reset-effective date of the fixing being projected.
+/// * `anchor` - Simulation anchor (t = 0 of the short-rate process): the later
+///   of the valuation and commitment dates.
+/// * `fwd` - Term index forward curve (e.g. `USD-SOFR-3M`).
+/// * `disc` - Facility discount curve the Hull-White process was fitted to.
+pub(super) fn index_basis_at(
+    date: Date,
+    anchor: Date,
+    fwd: &ForwardCurve,
+    disc: &dyn Discounting,
+) -> Result<f64> {
+    use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
+
+    let index_forward = crate::cashflow::builder::rate_helpers::project_index_rate(date, fwd)?;
+    let model_curve = ModelDiscountCurve::new(disc, anchor)?;
+    let ois_forward = model_curve.instantaneous_forward(model_time(anchor, date).max(0.0))?;
+    Ok(index_forward - ois_forward)
 }
 
 /// Build reset schedule dates for floating rate facilities.
@@ -410,6 +464,7 @@ mod tests {
             discount_curve_id: "USD-OIS".into(),
             credit_curve_id: None,
             recovery_rate: 0.0,
+            leq: 0.0,
             stub: StubKind::ShortFront,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),

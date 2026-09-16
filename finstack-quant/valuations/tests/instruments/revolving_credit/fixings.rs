@@ -452,10 +452,22 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
             payment_dates,
             stochastic_rates: true,
         };
-        let market = MarketContext::new().insert_series(
-            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(commitment_date, fixing)], None)
-                .expect("fixing series"),
-        );
+        // A stochastic-rates path projects unfixed resets as the index
+        // forward plus the short rate's deviation from the OIS forward, so
+        // the market must carry both curves; the first coupon below still
+        // comes from the contractual fixing.
+        let market = MarketContext::new()
+            .insert(build_flat_discount_curve(0.03, commitment_date, "USD-OIS"))
+            .insert(build_flat_forward_curve(
+                0.04,
+                commitment_date,
+                "USD-SOFR-3M",
+                0.25,
+            ))
+            .insert_series(
+                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(commitment_date, fixing)], None)
+                    .expect("fixing series"),
+            );
         let fixings =
             finstack_quant_core::market_data::fixings::get_fixing_series(&market, "USD-SOFR-3M")
                 .ok();

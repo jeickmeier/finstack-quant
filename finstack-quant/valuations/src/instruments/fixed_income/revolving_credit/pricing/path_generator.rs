@@ -37,10 +37,6 @@ use super::super::types::{
     BaseRateSpec, CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
     StochasticUtilizationSpec, UtilizationProcess,
 };
-use super::super::utils::interpolate_rate;
-
-/// Type alias for optional rate curve data (times and rates).
-type RateCurveData = Option<(Vec<f64>, Vec<f64>)>;
 
 /// Generate 3-factor MC paths using the existing process infrastructure.
 ///
@@ -53,10 +49,12 @@ type RateCurveData = Option<(Vec<f64>, Vec<f64>)>;
 /// * `mc_config` - Monte Carlo configuration with correlation and process details
 /// * `facility` - Revolving credit facility
 /// * `market` - Market context for curves
-/// * `payment_dates` - Payment schedule dates
+/// * `payment_dates` - Observation dates on which factor state is recorded:
+///   the contractual accrual boundaries plus term-index reset dates (see
+///   `utils::build_observation_dates`), sorted ascending.
 /// * `as_of` - Valuation date; simulation starts here (not at the commitment
 ///   date) with the facility's current utilization as the known t₀ state.
-///   Payment dates at or before `as_of` record the t₀ state.
+///   Observation dates at or before `as_of` record the t₀ state.
 ///
 /// # Variance Reduction
 ///
@@ -82,8 +80,9 @@ pub fn generate_three_factor_paths(
         )));
     }
 
-    // Use facility's day count for consistent time calculations
-    let day_count = facility.day_count;
+    // Simulation time runs on the ACT/365F model clock (the clock the rate and
+    // credit processes are calibrated on); accrual keeps the facility day count.
+    let day_count = super::super::MC_CLOCK_DAY_COUNT;
     // All stochastic factors start at the valuation date for seasoned
     // facilities.  Keep path time on the facility axis, but retain the
     // simulation anchor so curve-fitted models can use their own t=0.
@@ -109,9 +108,13 @@ pub fn generate_three_factor_paths(
     };
 
     let disc_curve = market.get_discount(facility.discount_curve_id.as_str())?;
-    let (interest_rate_spec, rate_curve_opt, rate_time_offset): (
+    // `obs_forward_rates` is `Some` in deterministic-forward mode: the index
+    // forward read on the curve's own clock at each observation date, recorded
+    // verbatim as the path's short rate so the stochastic engine projects the
+    // same fixing the deterministic engine does.
+    let (interest_rate_spec, obs_forward_rates, rate_time_offset): (
         InterestRateSpec,
-        RateCurveData,
+        Option<Vec<f64>>,
         f64,
     ) = match &facility.base_rate_spec {
         BaseRateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
@@ -189,12 +192,20 @@ pub fn generate_three_factor_paths(
                         facility.commitment_date,
                         DayCountContext::default(),
                     )?;
+                    let observed = payment_dates
+                        .iter()
+                        .map(|&date| {
+                            let t = fwd.day_count().signed_year_fraction(
+                                fwd.base_date(),
+                                date,
+                                DayCountContext::default(),
+                            )?;
+                            Ok(fwd.rate(t.max(0.0)))
+                        })
+                        .collect::<Result<Vec<f64>>>()?;
                     (
-                        InterestRateSpec::DeterministicForward {
-                            times: times.clone(),
-                            rates: rates.clone(),
-                        },
-                        Some((times, rates)),
+                        InterestRateSpec::DeterministicForward { times, rates },
+                        Some(observed),
                         curve_offset,
                     )
                 }
@@ -263,9 +274,15 @@ pub fn generate_three_factor_paths(
         sim_times.push(sim_start + 1e-6);
     }
 
-    // Refine grid to ensure no step exceeds MAX_MC_TIME_STEP for numerical stability
+    // Refine grid to ensure no step exceeds MAX_MC_TIME_STEP for numerical
+    // stability. Stepping stays on the facility axis so `time_offset`
+    // semantics are unchanged, but `TimeGrid` requires its first point to be
+    // exactly zero, so the grid is validated on the anchor-relative axis.
+    // Seasoned facilities start at `sim_start > 0`; validating the facility
+    // axis directly rejected every valuation after the commitment date.
     let refined = refine_time_grid(&sim_times);
-    let time_grid = TimeGrid::from_times(refined.times.clone())?;
+    let time_grid = TimeGrid::from_times(refined.times.iter().map(|t| t - sim_start).collect())?;
+    let times_ref: &[f64] = &refined.times;
 
     let disc = RevolvingCreditDiscretization::new(process.correlation())?;
 
@@ -282,6 +299,7 @@ pub fn generate_three_factor_paths(
             .initial_state_at(facility.utilization_rate(), sim_start)
     };
     let num_payment_dates = payment_dates.len();
+    let obs_rates: Option<&[f64]> = obs_forward_rates.as_deref();
 
     let mut paths = Vec::with_capacity(num_paths);
     let seed = stoch_spec.seed.unwrap_or(42);
@@ -323,17 +341,12 @@ pub fn generate_three_factor_paths(
             let mut short_rate_path = Vec::with_capacity(num_payment_dates);
             let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
 
-            // For deterministic forward, set initial rate from curve on the
-            // CURVE's time axis (market-t = time_offset + path-t).
-            if let Some((ref times, ref rates)) = rate_curve_opt {
-                state[1] = interpolate_rate(rate_time_offset + time_grid.times()[0], times, rates);
-            }
-
             // Record the t₀ state for every payment date at/before as_of
             // (at least the first).
             for _ in 0..num_initial {
+                let idx = utilization_path.len();
                 utilization_path.push(state[0].clamp(0.0, 1.0));
-                short_rate_path.push(state[1]);
+                short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                 credit_spread_path.push(state[2].max(0.0));
             }
 
@@ -342,10 +355,10 @@ pub fn generate_three_factor_paths(
 
             // Evolve through time on the refined grid
             for i in 0..num_steps {
-                let t_next = time_grid.times()[i + 1];
+                let t_next = times_ref[i + 1];
 
                 {
-                    let t = time_grid.times()[i];
+                    let t = times_ref[i];
                     let dt = t_next - t;
 
                     // Slice this step's factors out of the path's Sobol point
@@ -362,19 +375,14 @@ pub fn generate_three_factor_paths(
                     }
                 }
 
-                // For deterministic forward, manually update short rate from
-                // the curve on its own axis (market-t = time_offset + path-t).
-                if let Some((ref times, ref rates)) = rate_curve_opt {
-                    state[1] = interpolate_rate(rate_time_offset + t_next, times, rates);
-                }
-
-                // Only record state at payment dates (not intermediate steps)
+                // Only record state at observation dates (not intermediate steps)
                 if next_payment_idx < refined.payment_indices.len()
                     && i + 1 == refined.payment_indices[next_payment_idx]
                     && utilization_path.len() < num_payment_dates
                 {
+                    let idx = utilization_path.len();
                     utilization_path.push(state[0].clamp(0.0, 1.0));
-                    short_rate_path.push(state[1]);
+                    short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                     credit_spread_path.push(state[2].max(0.0));
                     next_payment_idx += 1;
                 }
@@ -410,7 +418,6 @@ pub fn generate_three_factor_paths(
         let raw_time_points_ref = &raw_time_points;
         let payment_dates_ref = payment_dates;
         let payment_indices_ref = &refined.payment_indices;
-        let times_ref = time_grid.times();
 
         let generate_iteration = |iter_idx: usize| {
             // Each iteration has its own RNG substream and its own
@@ -439,15 +446,12 @@ pub fn generate_three_factor_paths(
                 let mut short_rate_path = Vec::with_capacity(num_payment_dates);
                 let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
 
-                if let Some((ref times, ref rates)) = rate_curve_opt {
-                    state[1] = interpolate_rate(rate_time_offset + times_ref[0], times, rates);
-                }
-
                 // Record the t₀ state for every payment date at/before
                 // as_of (at least the first).
                 for _ in 0..num_initial {
+                    let idx = utilization_path.len();
                     utilization_path.push(state[0].clamp(0.0, 1.0));
-                    short_rate_path.push(state[1]);
+                    short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                     credit_spread_path.push(state[2].max(0.0));
                 }
 
@@ -476,16 +480,13 @@ pub fn generate_three_factor_paths(
                         }
                     }
 
-                    if let Some((ref times, ref rates)) = rate_curve_opt {
-                        state[1] = interpolate_rate(rate_time_offset + t_next, times, rates);
-                    }
-
                     if next_payment_idx < payment_indices_ref.len()
                         && i + 1 == payment_indices_ref[next_payment_idx]
                         && utilization_path.len() < num_payment_dates
                     {
+                        let idx = utilization_path.len();
                         utilization_path.push(state[0].clamp(0.0, 1.0));
-                        short_rate_path.push(state[1]);
+                        short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                         credit_spread_path.push(state[2].max(0.0));
                         next_payment_idx += 1;
                     }
