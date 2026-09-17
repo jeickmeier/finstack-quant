@@ -79,6 +79,8 @@ pub fn resolve_waterfall(
 /// [`StepDownTrigger`] for the exact conventions of each.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct StepDownMetrics {
+    /// Delinquent balance as a fraction of the current pool balance.
+    pub delinquency_rate: f64,
     /// Cumulative loss as a fraction of the original pool balance.
     pub cumulative_loss_fraction: f64,
     /// Overcollateralization ratio: current pool ÷ rated (non-equity) notes.
@@ -93,6 +95,7 @@ fn trigger_passes(trigger: &StepDownTrigger, metrics: &StepDownMetrics) -> bool 
         StepDownTrigger::MaxCumulativeLoss(max) => metrics.cumulative_loss_fraction <= *max,
         StepDownTrigger::MinOcRatio(min) => metrics.oc_ratio >= *min,
         StepDownTrigger::MinCreditEnhancement(min) => metrics.credit_enhancement >= *min,
+        StepDownTrigger::MaxDelinquency(max) => metrics.delinquency_rate <= *max,
     }
 }
 
@@ -333,6 +336,7 @@ mod step_down_weight_tests {
     /// Metrics that pass every trigger, so the date alone drives activation.
     fn healthy_metrics() -> StepDownMetrics {
         StepDownMetrics {
+            delinquency_rate: 0.0,
             cumulative_loss_fraction: 0.0,
             oc_ratio: 2.0,
             credit_enhancement: 0.5,

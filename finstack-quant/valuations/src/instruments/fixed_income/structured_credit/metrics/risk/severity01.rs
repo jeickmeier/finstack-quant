@@ -14,6 +14,7 @@
 //! This metric is related to Recovery01 but measures sensitivity to loss severity
 //! rather than recovery. For constant recovery, Severity01 ≈ -Recovery01.
 
+use super::effective_recovery;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -32,22 +33,31 @@ impl MetricCalculator for Severity01Calculator {
         use crate::cashflow::builder::RecoveryModelSpec;
 
         // Loss Severity = 1 - Recovery Rate
-        // So bumping severity up means bumping recovery down, and vice versa
-        let recovery_up = RecoveryModelSpec {
-            rate: (instrument.credit_model.recovery_spec.rate - SEVERITY_BUMP).clamp(0.0, 1.0),
-            recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
+        // So bumping severity up means bumping recovery down, and vice versa.
+        // A severity vector by month of default is bumped entry by entry.
+        let base = &instrument.credit_model.recovery_spec;
+        let bumped = |recovery_delta: f64| -> RecoveryModelSpec {
+            let mut spec = base.clone();
+            spec.rate = (base.rate + recovery_delta).clamp(0.0, 1.0);
+            if let Some(severities) = &base.severity_vector {
+                spec.severity_vector = Some(
+                    severities
+                        .iter()
+                        .map(|severity| (severity - recovery_delta).clamp(0.0, 1.0))
+                        .collect(),
+                );
+            }
+            spec
         };
-
-        let recovery_down = RecoveryModelSpec {
-            rate: (instrument.credit_model.recovery_spec.rate + SEVERITY_BUMP).clamp(0.0, 1.0),
-            recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
-        };
+        let recovery_up = bumped(-SEVERITY_BUMP);
+        let recovery_down = bumped(SEVERITY_BUMP);
 
         // Actual severity bump width after clamping recovery to [0, 1]. Severity
-        // = 1 − recovery, so Δseverity = recovery_down.rate − recovery_up.rate.
-        // Using the nominal 2·bump would bias the sensitivity when recovery sits
-        // within one bump of 0 or 1 and one side clamps.
-        let achieved_bump = recovery_down.rate - recovery_up.rate;
+        // = 1 − recovery, so Δseverity = recovery_down − recovery_up on the
+        // effective (vector-averaged) recovery. Using the nominal 2·bump would
+        // bias the sensitivity when recovery sits within one bump of 0 or 1
+        // and one side clamps.
+        let achieved_bump = effective_recovery(&recovery_down) - effective_recovery(&recovery_up);
 
         // Calculate up scenario (lower recovery = higher severity)
         let mut inst_up = instrument.clone();

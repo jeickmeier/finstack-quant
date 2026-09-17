@@ -6,7 +6,7 @@
     "description": "Synthetic CLO mezzanine structured credit base-case fixture. Two-step calibration: USD-SOFR-DISC bootstrapped from synthetic SOFR OIS quotes, SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. SOFR-1M auxiliary forward curve preserved in prior_market. Self-test contract: re-running calibration + waterfall pricing must reproduce the recorded values within solver tolerance.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "2026-09-09 pricing reference: the synthetic dirty quote is USD 10,952,985.036977235, constructed as sum(CF * DF * exp(-0.10 * t)) with Act365F t from 2026-04-30. The previous USD 5m quote implied 5,799.49bp, outside the supported spread range, and has been replaced rather than changing production limits. The reference test independently checks the 1,000bp spread and forward-difference CS01, while direct +/-1bp curve repricing checks DV01. Current outputs after input reconciliation and valuation-date-aware coverage projection are NPV USD 13,607,846.71744143, future expected loss USD 934,624.078306567, DV01 USD -246.7844843501225 per bp, and CS01 USD -2,271.8577877022326 per bp. Existing metric tolerances are unchanged. 2026-09-09 input reconciliation: BOND1 is explicitly assumed to default on 2026-04-01 with USD 8m defaulted par and a USD 1m unreceived recovery claim. The effective nine-month lag makes the claim due 2027-01-01, paid on the next eligible contractual payment date. Cumulative defaults are USD 8m and received recoveries are zero. The USD 7m historical loss is already reflected in current tranche balances: equity zero and senior USD 43m; it must not be written down again. The non-revolving senior note has no target balance. These are synthetic assumptions, not external benchmark observations. Earlier captures below predate this input reconciliation. Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs. Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan §16). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 — reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923. Input ownership updated 2026-09-09: the former 25% quote used 20m collateral as its denominator. The identical 5m USD dirty settlement target is now explicit in market_quotes. Expected values and tolerances are unchanged.",
+    "source_detail": "2026-09-09 pricing reference: the synthetic dirty quote is USD 10,952,985.036977235, constructed as sum(CF * DF * exp(-0.10 * t)) with Act365F t from 2026-04-30. The previous USD 5m quote implied 5,799.49bp, outside the supported spread range, and has been replaced rather than changing production limits. The reference test independently checks the 1,000bp spread and forward-difference CS01, while direct +/-1bp curve repricing checks DV01. Current outputs after input reconciliation and valuation-date-aware coverage projection are NPV USD 13,607,846.71744143, future expected loss USD 934,624.078306567, DV01 USD -246.7844843501225 per bp, and CS01 USD -2,271.8577877022326 per bp. Existing metric tolerances are unchanged. 2026-09-09 input reconciliation: BOND1 is explicitly assumed to default on 2026-04-01 with USD 8m defaulted par and a USD 1m unreceived recovery claim. The effective nine-month lag makes the claim due 2027-01-01, paid on the next eligible contractual payment date. Cumulative defaults are USD 8m and received recoveries are zero. The USD 7m historical loss is already reflected in current tranche balances: equity zero and senior USD 43m; it must not be written down again. The non-revolving senior note has no target balance. These are synthetic assumptions, not external benchmark observations. Earlier captures below predate this input reconciliation. Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs. Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan §16). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 — reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923. Input ownership updated 2026-09-09: the former 25% quote used 20m collateral as its denominator. The identical 5m USD dirty settlement target is now explicit in market_quotes. Expected values and tolerances are unchanged. Re-blessed 2026-09-17 (structured-credit vertical coverage, Phases A-B): under the par-preserving loss policy CLO/ABS notes carry par and realize unpaid principal once, as a write-down on the final settlement date, so expected_loss now includes the shortfall the impaired notes never recover instead of only the projected new defaults. The inert hedge swap (calendar 'USD', no SOFR-3M projection curve; previously an NPV overlay that never reached these metrics) was removed from the instrument now that swaps flow through the waterfall. Old: expected_loss=934624.078306567. New: expected_loss=37127779.72011075. npv, dv01, cs01 and z_spread are unchanged. 2026-09-17: the behavior_overrides.abs_speed override (0.012) was retired with the ABS prepayment curve; cpr_annual is now its annual equivalent 1 − (1 − 0.012)^12 = 0.13486609002406202, so the effective constant-SMM prepayment model and every expected value are unchanged.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "Devin",
@@ -507,6 +507,7 @@
           "reinvestment_period": {
             "end_date": "2026-01-01",
             "is_active": true,
+            "amortizing_tranches": ["SENIOR"],
             "criteria": {
               "max_price": 102.5,
               "min_yield": 0.04,
@@ -549,7 +550,6 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "target_balance": null,
               "coupon": {
                 "fixed": {
                   "rate": 0.12
@@ -576,8 +576,6 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "is_revolving": true,
-              "can_reinvest": true,
               "maturity": "2034-01-01",
               "payment_priority": 2,
               "attributes": {
@@ -604,7 +602,6 @@
                 "amount": "43000000",
                 "currency": "USD"
               },
-              "target_balance": null,
               "coupon": {
                 "floating": {
                   "index_id": "SOFR-3M",
@@ -634,8 +631,6 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "is_revolving": false,
-              "can_reinvest": false,
               "maturity": "2034-01-01",
               "payment_priority": 1,
               "attributes": {
@@ -697,8 +692,7 @@
           "trustee_id": "Trustee-T"
         },
         "behavior_overrides": {
-          "cpr_annual": 0.18,
-          "abs_speed": 0.012,
+          "cpr_annual": 0.13486609002406202,
           "psa_speed_multiplier": 1.3,
           "cdr_annual": 0.025,
           "sda_speed_multiplier": 1.1,
@@ -732,52 +726,7 @@
           "inter_sector": 0.12,
           "prepay_default": -0.18
         },
-        "hedge_swaps": [
-          {
-            "id": "HEDGE-SWAP",
-            "notional": {
-              "amount": "10000000",
-              "currency": "USD"
-            },
-            "side": "pay",
-            "fixed": {
-              "discount_curve_id": "USD-OIS",
-              "rate": "0.015",
-              "frequency": {
-                "count": 6,
-                "unit": "months"
-              },
-              "day_count": "30_360",
-              "calendar_id": "USD",
-              "stub": "none",
-              "start": "2024-01-01",
-              "end": "2028-01-01",
-              "par_method": null,
-              "compounding_simple": true
-            },
-            "float": {
-              "discount_curve_id": "USD-OIS",
-              "forward_curve_id": "USD-SOFR-3M",
-              "spread_bp": "0.0",
-              "frequency": {
-                "count": 3,
-                "unit": "months"
-              },
-              "day_count": "act_360",
-              "calendar_id": "USD",
-              "stub": "none",
-              "reset_lag_days": 2,
-              "fixing_calendar_id": null,
-              "start": "2024-01-01",
-              "end": "2028-01-01",
-              "compounding": "simple"
-            },
-            "attributes": {
-              "tags": [],
-              "meta": {}
-            }
-          }
-        ],
+        "hedge_swaps": [],
         "payment_calendar_id": "nyse",
         "payment_business_day_convention": "modified_following",
         "instrument_pricing_overrides": {
@@ -790,7 +739,7 @@
   },
   "expected": {
     "npv": 13607846.71744143,
-    "expected_loss": 934624.078306567,
+    "expected_loss": 37127779.72011075,
     "dv01": -246.7844843501225,
     "cs01": -2271.8577877022326,
     "z_spread": 0.1

@@ -1788,6 +1788,111 @@ class DefaultModelSpec:
         """
         ...
 
+    @staticmethod
+    def vector(monthly_cdr: list[float]) -> DefaultModelSpec:
+        """
+        Explicit CDR vector by seasoning month; the last entry extends to
+        maturity.
+
+        Parameters
+        ----------
+        monthly_cdr : list[float]
+            Annual CDR as a decimal per seasoning month (non-empty).
+
+        Returns
+        -------
+        DefaultModelSpec
+            A default model on the vector curve.
+
+        Raises
+        ------
+        TypeError
+            If ``monthly_cdr`` is not a list of floats.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> DefaultModelSpec.vector([0.01, 0.02]).curve["monthly_cdr"]
+        [0.01, 0.02]
+        """
+        ...
+
+    @staticmethod
+    def cumulative_loss(cumulative_net_loss_pct: list[float], severity: float) -> DefaultModelSpec:
+        """
+        Cumulative net-loss curve; defaults are the loss increments grossed up
+        by severity.
+
+        Parameters
+        ----------
+        cumulative_net_loss_pct : list[float]
+            Cumulative loss in percent of the original balance per seasoning
+            month (non-decreasing).
+        severity : float
+            Loss given default as a decimal in ``(0, 1]``.
+
+        Returns
+        -------
+        DefaultModelSpec
+            A default model on the cumulative-loss curve.
+
+        Raises
+        ------
+        TypeError
+            If ``cumulative_net_loss_pct`` is not a list of floats.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> DefaultModelSpec.cumulative_loss([1.0, 2.0], 0.5).curve["severity"]
+        0.5
+        """
+        ...
+
+    @staticmethod
+    def timing(cumulative_default_rate: float, annual_pct: list[float]) -> DefaultModelSpec:
+        """
+        Default-timing curve: a lifetime default rate spread over years of
+        seasoning.
+
+        Parameters
+        ----------
+        cumulative_default_rate : float
+            Lifetime default rate as a decimal of the original balance.
+        annual_pct : list[float]
+            Percent of the lifetime defaults realized in each year of seasoning
+            (sums to 100).
+
+        Returns
+        -------
+        DefaultModelSpec
+            A default model on the timing curve.
+
+        Raises
+        ------
+        TypeError
+            If ``annual_pct`` is not a list of floats.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> DefaultModelSpec.timing(0.10, [20.0, 30.0, 50.0]).curve["cumulative_default_rate"]
+        0.1
+        """
+        ...
+
+    def validate(self) -> None:
+        """
+        Validate the curve shape.
+
+        Raises
+        ------
+        ValueError
+            If a rate is non-finite or out of range, a cumulative-loss curve
+            decreases, or a timing curve does not sum to 100.
+        """
+        ...
+
     def mdr(self, seasoning_months: int) -> float:
         """
         Monthly default rate (MDR) for the supplied seasoning.
@@ -3782,6 +3887,77 @@ class PrepaymentModelSpec:
         """
         ...
 
+    @staticmethod
+    def abs(speed: float) -> PrepaymentModelSpec:
+        """
+        ABS convention: ``speed`` of the ORIGINAL balance prepays each month,
+        so ``SMM_t = speed / (1 - speed * (t - 1))``.
+
+        Parameters
+        ----------
+        speed : float
+            Monthly prepayment as a decimal fraction of the original balance
+            (``0.015`` = 1.5% ABS), in ``[0, 1)``.
+
+        Returns
+        -------
+        PrepaymentModelSpec
+            A prepayment model on the ABS curve.
+
+        Raises
+        ------
+        OverflowError
+            Never; range validation happens in :meth:`validate`.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
+        >>> PrepaymentModelSpec.abs(0.015).curve["speed"]
+        0.015
+        """
+        ...
+
+    @staticmethod
+    def vector(monthly_cpr: list[float]) -> PrepaymentModelSpec:
+        """
+        Explicit CPR vector by seasoning month; the last entry extends to
+        maturity.
+
+        Parameters
+        ----------
+        monthly_cpr : list[float]
+            Annual CPR as a decimal per seasoning month (non-empty).
+
+        Returns
+        -------
+        PrepaymentModelSpec
+            A prepayment model on the vector curve.
+
+        Raises
+        ------
+        TypeError
+            If ``monthly_cpr`` is not a list of floats.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
+        >>> PrepaymentModelSpec.vector([0.05, 0.10]).curve["monthly_cpr"]
+        [0.05, 0.1]
+        """
+        ...
+
+    def validate(self) -> None:
+        """
+        Validate the curve shape.
+
+        Raises
+        ------
+        ValueError
+            If a rate is non-finite or outside ``[0, 1]``, the ABS speed is out
+            of range, or a vector is empty.
+        """
+        ...
+
     def smm(self, seasoning_months: int) -> float:
         """
         Single-month mortality (SMM) for the supplied seasoning.
@@ -4089,6 +4265,72 @@ class RecoveryModelSpec:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def with_severity_vector(self, severity_vector: list[float]) -> RecoveryModelSpec:
+        """
+        Return a copy carrying a seasoning-indexed severity vector.
+
+        Parameters
+        ----------
+        severity_vector : list[float]
+            Loss given default as decimals in ``[0, 1]``, one entry per
+            seasoning month (the last entry extends); overrides ``1 - rate``
+            where present.
+
+        Returns
+        -------
+        RecoveryModelSpec
+            A new spec with the vector attached (this spec is unchanged).
+
+        Raises
+        ------
+        TypeError
+            If ``severity_vector`` is not a list of floats.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import RecoveryModelSpec
+        >>> RecoveryModelSpec(0.4, 12).with_severity_vector([0.5, 0.6]).recovery_rate(1)
+        0.5
+        """
+        ...
+
+    @property
+    def severity_vector(self) -> list[float] | None:
+        """
+        Severity vector by seasoning month.
+
+        Returns
+        -------
+        list[float] | None
+            ``None`` when only ``rate`` applies.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def recovery_rate(self, seasoning_months: int) -> float:
+        """
+        Recovery rate for the supplied seasoning.
+
+        Parameters
+        ----------
+        seasoning_months : int
+            Months since origination (zero-based index into the vector).
+
+        Returns
+        -------
+        float
+            ``1 - severity`` from the vector when present, else ``rate``.
+
+        Raises
+        ------
+        OverflowError
+            If ``seasoning_months`` is outside the unsigned 32-bit range.
         """
         ...
 

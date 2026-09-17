@@ -98,6 +98,54 @@ impl PyTrancheStructure {
     /// ------
     /// ValueError
     ///     If the JSON is malformed or has the wrong shape.
+    /// Build a structure whose attachment and detachment points come from
+    /// the balance shares alone (mirrors Rust ``TrancheStructure::from_balances``).
+    ///
+    /// Any points declared on the tranches are discarded: the first-loss
+    /// class attaches at 0, each senior class stacks on top in
+    /// payment-priority order and the most senior class detaches at 100.
+    ///
+    /// Parameters
+    /// ----------
+    /// tranches : list[Tranche]
+    ///     Notes of the capital structure; ``seniority`` and
+    ///     ``original_balance`` decide the boundaries.
+    ///
+    /// Returns
+    /// -------
+    /// TrancheStructure
+    ///     The validated structure with derived points.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the list is empty or the notes mix currencies.
+    ///
+    /// Examples
+    /// --------
+    /// >>> import datetime
+    /// >>> from finstack_quant.core.currency import Currency
+    /// >>> from finstack_quant.core.money import Money
+    /// >>> from finstack_quant.valuations.instruments import Tranche, TrancheStructure
+    /// >>> def note(id_, seniority, balance):
+    /// ...     return (Tranche.builder().id(id_).seniority(seniority).original_balance(Money(balance, Currency("USD")))
+    /// ...             .coupon_fixed(0.05).maturity(datetime.date(2031, 1, 15)).build())
+    /// >>> structure = TrancheStructure.from_balances([note("A", "senior", 60.0), note("B", "mezzanine", 30.0), note("E", "equity", 10.0)])
+    /// >>> [(t.id, t.attachment_point, t.detachment_point) for t in structure.tranches]
+    /// [('A', 40.0, 100.0), ('B', 10.0, 40.0), ('E', 0.0, 10.0)]
+    #[staticmethod]
+    #[pyo3(text_signature = "(tranches)")]
+    fn from_balances(tranches: Vec<PyRef<'_, PyTranche>>) -> PyResult<Self> {
+        let inner = TrancheStructure::from_balances(
+            tranches
+                .iter()
+                .map(|t| t.inner.clone())
+                .collect::<Vec<Tranche>>(),
+        )
+        .map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {

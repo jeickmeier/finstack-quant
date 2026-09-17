@@ -165,8 +165,11 @@ def test_deterministic_pool_prices_and_reports_the_reserve_path() -> None:
     interest = sum(m.amount for _, m in diagnostics.reserve_interest_paid)
     assert interest > 0.0
     frame = diagnostics.to_dataframe()
-    assert list(frame.columns) == ["date", "reserve_balance", "reserve_interest"]
+    assert list(frame.columns)[:3] == ["date", "pool_balance", "pool_factor"]
+    assert {"reserve_balance", "reserve_interest", "funding_account"} <= set(frame.columns)
+    assert len(frame) == len(diagnostics.periods) == len(path)
     assert frame["reserve_interest"].sum() == pytest.approx(interest)
+    assert list(frame["reserve_balance"]) == pytest.approx([m.amount for _, m in path])
     again = SimulationDiagnostics.from_json(diagnostics.to_json())
     assert again.draws_from_reserve == diagnostics.draws_from_reserve
     restored = pickle.loads(pickle.dumps(diagnostics))  # noqa: S301 - trusted in-process round trip
@@ -218,3 +221,27 @@ def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:
     assert "StochasticPricingResult" in repr(result)
     with pytest.raises(ValueError, match="at least one"):
         deal.price_stochastic(ctx, AS_OF, num_paths=0)
+
+
+def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collateral() -> None:
+    period = {
+        "end_date": "2028-01-15",
+        "is_active": True,
+        "criteria": {"max_price": 100.0, "min_yield": 0.0, "maintain_credit_quality": True, "maintain_wal": True},
+        "amortizing_tranches": ["A"],
+        "assumptions": None,
+    }
+    pool = (
+        AssetPool("POOL-PY", "clo", Currency("USD"))
+        .with_instruments(bonds=[Bond.example()])
+        .with_reinvestment_period(period)
+    )
+    assert pool.reinvestment_period == period
+    assert AssetPool.from_json(pool.to_json()).reinvestment_period == period
+    assert AssetPool("P", "clo", Currency("USD")).reinvestment_period is None
+    # Recycled principal cannot be placed into schedule-driven instruments, so
+    # the deal is rejected before it is simulated.
+    with pytest.raises(ValueError, match="reinvestment_period is not supported for instrument collateral"):
+        StructuredCredit.new_clo("POOL-DEAL", pool, tranches(48_600_000.0, 5_400_000.0), AS_OF, MATURITY, "USD-OIS")
+    with pytest.raises(ValueError, match="reinvestment_period"):
+        AssetPool("P", "clo", Currency("USD")).with_reinvestment_period({"end_date": "2028-01-15"})

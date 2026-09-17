@@ -3,7 +3,7 @@
 //! This module provides OC and IC test calculations for waterfall diversion.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, Tranche, TrancheStructure,
+    AssetPool, CoverageRules, Tranche, TrancheStructure,
 };
 use crate::instruments::fixed_income::structured_credit::utils::frequency_periods_per_year;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -12,7 +12,6 @@ use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::{Error as CoreError, InputError};
-use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +39,14 @@ pub enum CoverageTest {
         /// Required IC ratio (e.g., 1.20 = 120%).
         required_ratio: f64,
     },
+    /// Borrowing-base coverage: advance-rate-weighted eligible collateral over
+    /// the tested class and its seniors.
+    BorrowingBase {
+        /// Test identifier.
+        id: String,
+        /// Minimum passing ratio.
+        required_ratio: f64,
+    },
 }
 
 impl CoverageTest {
@@ -61,17 +68,30 @@ impl CoverageTest {
         }
     }
 
+    /// Borrowing-base test at `required_ratio` (1.0 = the base must cover
+    /// the tested stack); the rules come from `TestContext::rules`.
+    pub fn new_borrowing_base(required_ratio: f64) -> Self {
+        Self::BorrowingBase {
+            id: format!("bb_test_{}", (required_ratio * 100.0).round() as u32),
+            required_ratio,
+        }
+    }
+
     /// Get the test ID.
     pub fn id(&self) -> &str {
         match self {
-            Self::Oc { id, .. } | Self::Ic { id, .. } => id.as_str(),
+            Self::Oc { id, .. } | Self::Ic { id, .. } | Self::BorrowingBase { id, .. } => {
+                id.as_str()
+            }
         }
     }
 
     /// Get the required ratio for this test.
     pub fn required_level(&self) -> f64 {
         match self {
-            Self::Oc { required_ratio, .. } | Self::Ic { required_ratio, .. } => *required_ratio,
+            Self::Oc { required_ratio, .. }
+            | Self::Ic { required_ratio, .. }
+            | Self::BorrowingBase { required_ratio, .. } => *required_ratio,
         }
     }
 
@@ -93,7 +113,89 @@ impl CoverageTest {
             Self::Ic { id, required_ratio } => {
                 self.calculate_ic(context, id.clone(), *required_ratio)
             }
+            Self::BorrowingBase { id, required_ratio } => {
+                self.calculate_borrowing_base(context, id.clone(), *required_ratio)
+            }
         }
+    }
+
+    /// Borrowing base over the tested stack: numerator from the live asset
+    /// balances (or the closing balances) under `rules.borrowing_base`, the
+    /// OC denominator; the cure is the paydown that restores the ratio.
+    fn calculate_borrowing_base(
+        &self,
+        context: &TestContext,
+        test_id: String,
+        required_ratio: f64,
+    ) -> Result<TestResult> {
+        let rules = context
+            .rules
+            .and_then(|rules| rules.borrowing_base.as_ref())
+            .ok_or_else(|| {
+                CoreError::Validation(format!(
+                    "borrowing-base test {test_id} needs coverage_rules.borrowing_base"
+                ))
+            })?;
+        let tranche = context
+            .tranches
+            .tranches
+            .iter()
+            .find(|t| t.id.as_str() == context.tranche_id)
+            .ok_or_else(|| {
+                CoreError::from(InputError::NotFound {
+                    id: format!("tranche:{}", context.tranche_id),
+                })
+            })?;
+        let tranche_balance = context
+            .tranche_balances
+            .and_then(|b| b.get(tranche.id.as_str()))
+            .copied()
+            .unwrap_or(tranche.current_balance);
+        let senior_balance = if let Some(tb) = context.tranche_balances {
+            context
+                .tranches
+                .senior_to(context.tranche_id)
+                .iter()
+                .try_fold(
+                    Money::from((0_i64, tranche_balance.currency())),
+                    |acc, t| {
+                        let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
+                        acc.checked_add(bal)
+                    },
+                )?
+        } else {
+            context.tranches.senior_balance(context.tranche_id)
+        };
+        // Cash held for the collateral counts at a 100% advance rate: the
+        // principal funding account and this period's principal collections
+        // (both sit in the trust's accounts until reinvested or applied).
+        let numerator = rules
+            .evaluate(context.pool, context.asset_balances)?
+            .borrowing_base
+            .checked_add(context.restricted_cash)?
+            .checked_add(context.cash_balance)?;
+        let denominator = tranche_balance.checked_add(senior_balance)?;
+        let ratio = if denominator.amount() > 0.0 {
+            numerator.amount() / denominator.amount()
+        } else {
+            f64::INFINITY
+        };
+        let is_passing = ratio >= required_ratio;
+        let cure_amount = if !is_passing && required_ratio > 0.0 {
+            let paydown = (denominator.amount() - numerator.amount() / required_ratio)
+                .max(0.0)
+                .min(denominator.amount());
+            Some(Money::new(paydown, denominator.currency())?)
+        } else {
+            None
+        };
+        Ok(TestResult {
+            test_id,
+            tranche_id: context.tranche_id.to_string(),
+            current_ratio: ratio,
+            is_passing,
+            cure_amount,
+        })
     }
 
     fn calculate_oc(
@@ -142,27 +244,18 @@ impl CoverageTest {
         // aggregate current balance is available, preserve that balance and
         // approximate composition with the closing pool's haircut factor.
         let mut numerator = if let Some(asset_balances) = context.asset_balances {
-            collateral_balance_with_haircuts(
+            collateral_value(
                 context.pool,
                 performing_only,
-                context.haircuts,
+                context.rules,
                 Some(asset_balances),
             )?
         } else {
             match context.current_pool_balance {
-                Some(current) if context.haircuts.is_some_and(|h| !h.is_empty()) => {
-                    let gross = collateral_balance_with_haircuts(
-                        context.pool,
-                        performing_only,
-                        None,
-                        None,
-                    )?;
-                    let haircut = collateral_balance_with_haircuts(
-                        context.pool,
-                        performing_only,
-                        context.haircuts,
-                        None,
-                    )?;
+                Some(current) if context.rules.is_some_and(CoverageRules::adjusts_collateral) => {
+                    let gross = collateral_value(context.pool, performing_only, None, None)?;
+                    let haircut =
+                        collateral_value(context.pool, performing_only, context.rules, None)?;
                     let factor = if gross.amount() > 0.0 {
                         (haircut.amount() / gross.amount()).clamp(0.0, 1.0)
                     } else {
@@ -171,12 +264,7 @@ impl CoverageTest {
                     Money::new(current.amount() * factor, current.currency())?
                 }
                 Some(current) => current,
-                None => collateral_balance_with_haircuts(
-                    context.pool,
-                    performing_only,
-                    context.haircuts,
-                    None,
-                )?,
+                None => collateral_value(context.pool, performing_only, context.rules, None)?,
             }
         };
 
@@ -188,6 +276,12 @@ impl CoverageTest {
         // included. The funding account is an accumulated balance, not a
         // collection, and secures the notes either way.
         numerator = numerator.checked_add(context.restricted_cash)?;
+        // Defaulted collateral is carried at its modeled recovery value until
+        // the recovery cash arrives (CLO indenture convention: defaulted
+        // obligations at the lower of market value and the assumed recovery),
+        // so a default reduces par-OC by the expected loss, not by the whole
+        // defaulted par.
+        numerator = numerator.checked_add(context.defaulted_collateral_value)?;
 
         // OC denominator = test tranche balance + all senior tranche balances
         // i.e., Sum(all tranche balances at this seniority level and above)
@@ -199,12 +293,7 @@ impl CoverageTest {
             f64::INFINITY
         };
 
-        let mut is_passing = ratio >= required_ratio;
-        if let Some(threshold) = context.par_value_threshold {
-            if ratio < threshold {
-                is_passing = false;
-            }
-        }
+        let is_passing = ratio >= required_ratio;
 
         // Note paydown needed to restore OC. When cash is included in the
         // numerator, diversion removes `X` from numerator and denominator:
@@ -499,10 +588,9 @@ pub struct TestContext<'a> {
     pub cash_balance: Money,
     /// Interest collections.
     pub interest_collections: Money,
-    /// Optional rating haircuts for collateral.
-    pub haircuts: Option<&'a BTreeMap<CreditRating, f64>>,
-    /// Optional par value threshold (ratio).
-    pub par_value_threshold: Option<f64>,
+    /// Collateral valuation rules for the OC numerator (rating haircuts,
+    /// discount obligations, excess CCC); `None` values collateral at par.
+    pub rules: Option<&'a CoverageRules>,
     /// Optional market context for floating rate index lookups in IC tests.
     pub market: Option<&'a MarketContext>,
     /// Current tranche balances (overrides `tranche.current_balance` when present).
@@ -529,6 +617,11 @@ pub struct TestContext<'a> {
     /// Real indentures count principal-collection-account cash in par-value
     /// tests.
     pub restricted_cash: Money,
+    /// Recovery value of defaulted collateral whose recovery cash has not yet
+    /// arrived (the pending recovery claims). Counted in the OC numerator so
+    /// a default costs the test its expected loss rather than the full
+    /// defaulted par.
+    pub defaulted_collateral_value: Money,
     /// Per-tranche interest-claim caps extracted from the waterfall spec
     /// (see `pricing::waterfall::interest_claim_caps`): value `None` =
     /// uncapped claim, `Some(cap)` = coupon capped at `cap`, absent key = the
@@ -567,10 +660,26 @@ pub struct TestResult {
     pub cure_amount: Option<Money>,
 }
 
-fn collateral_balance_with_haircuts(
+/// Whether `rating` is CCC+ or lower.
+fn is_ccc_or_below(rating: CreditRating) -> bool {
+    matches!(
+        rating,
+        CreditRating::CCCPlus
+            | CreditRating::CCC
+            | CreditRating::CCCMinus
+            | CreditRating::CC
+            | CreditRating::C
+            | CreditRating::D
+    )
+}
+
+/// Value of the collateral for an OC numerator: current par (or the closing
+/// balances) after the rating haircuts, discount-obligation and excess-CCC
+/// rules in `rules`; plain par when no rule adjusts collateral.
+fn collateral_value(
     pool: &AssetPool,
     performing_only: bool,
-    haircuts: Option<&BTreeMap<CreditRating, f64>>,
+    rules: Option<&CoverageRules>,
     current_balances: Option<&[f64]>,
 ) -> Result<Money> {
     if let Some(balances) = current_balances {
@@ -591,7 +700,8 @@ fn collateral_balance_with_haircuts(
         }
     }
 
-    if current_balances.is_none() && haircuts.map(|h| h.is_empty()).unwrap_or(true) {
+    let adjusts = rules.is_some_and(CoverageRules::adjusts_collateral);
+    if current_balances.is_none() && !adjusts {
         return Ok(if performing_only {
             pool.performing_balance()?
         } else {
@@ -599,16 +709,27 @@ fn collateral_balance_with_haircuts(
         });
     }
 
-    let mut total = Money::from((0_i64, pool.get_base_currency()));
+    let haircuts = rules.map(|r| &r.rating_haircuts);
+    let discount = rules.and_then(|r| r.discount_obligation);
+    let ccc = rules.and_then(|r| r.ccc_bucket);
+
+    let mut total = 0.0_f64;
+    let mut performing_par = 0.0_f64;
+    let mut ccc_par = 0.0_f64;
+    let mut ccc_market_value = 0.0_f64;
     for (index, asset) in pool.assets.iter().enumerate() {
         if performing_only && asset.is_defaulted {
             continue;
         }
-
-        let mut amount = current_balances
+        let balance = current_balances
             .and_then(|balances| balances.get(index))
             .copied()
             .unwrap_or_else(|| asset.balance.amount());
+        performing_par += balance;
+
+        // Carry each asset at the lowest of par, haircut par and the discount
+        // obligation's purchase price.
+        let mut carried = balance;
         if let Some(map) = haircuts {
             let haircut = asset
                 .credit_quality
@@ -616,13 +737,45 @@ fn collateral_balance_with_haircuts(
                 .or_else(|| map.get(&CreditRating::NR).copied())
                 .unwrap_or(0.0)
                 .clamp(0.0, 1.0);
-            amount *= 1.0 - haircut;
+            carried = carried.min(balance * (1.0 - haircut));
         }
-
-        total = total.checked_add(Money::new(amount, total.currency())?)?;
+        if let (Some(rule), Some(price)) = (discount, asset.purchase_price) {
+            let closing_par = asset.balance.amount();
+            if closing_par > 0.0 {
+                let price_pct = 100.0 * price.amount() / closing_par;
+                if price_pct < rule.price_threshold_pct {
+                    carried = carried.min(balance * price_pct / 100.0);
+                }
+            }
+        }
+        if ccc.is_some() && asset.credit_quality.is_some_and(is_ccc_or_below) {
+            ccc_par += balance;
+            ccc_market_value += balance * asset.market_price_pct.unwrap_or(100.0) / 100.0;
+        }
+        total += carried;
     }
 
-    Ok(total)
+    // Excess CCC: the par above the bucket is carried at the CCC assets'
+    // average market price (or excluded), never above par.
+    if let Some(rule) = ccc {
+        let allowed = performing_par * rule.threshold_pct / 100.0;
+        let excess = (ccc_par - allowed).max(0.0);
+        if excess > 0.0 {
+            let market_fraction = if ccc_par > 0.0 {
+                (ccc_market_value / ccc_par).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            let carried_fraction = if rule.carry_at_market_value {
+                market_fraction
+            } else {
+                0.0
+            };
+            total -= excess * (1.0 - carried_fraction);
+        }
+    }
+
+    Money::new(total.max(0.0), pool.get_base_currency())
 }
 
 #[cfg(test)]
@@ -675,8 +828,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -684,6 +836,7 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -724,8 +877,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -733,6 +885,7 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -778,8 +931,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -787,6 +939,7 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: Some(&deferred),
@@ -838,8 +991,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((1_500_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -847,6 +999,7 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: Some(&deferred),
@@ -899,8 +1052,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::new(cash, Currency::USD).expect("valid money fixture"),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -910,6 +1062,7 @@ mod tests {
             ),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["SENIOR"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -980,8 +1133,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -991,6 +1143,7 @@ mod tests {
             ),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["SENIOR"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1147,8 +1300,7 @@ mod tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((100_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1156,6 +1308,7 @@ mod tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["TEST_TRANCHE"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1192,6 +1345,7 @@ mod haircut_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use rust_decimal::Decimal;
+    use std::collections::BTreeMap;
     use time::Month;
 
     fn maturity() -> Date {
@@ -1265,8 +1419,7 @@ mod haircut_tests {
                 period_start: Some(period_start),
                 cash_balance: Money::from((0_i64, Currency::USD)),
                 interest_collections: Money::from((10_000_i64, Currency::USD)),
-                haircuts: None,
-                par_value_threshold: None,
+                rules: None,
                 market: Some(&market),
                 tranche_balances: Some(&balances),
                 payable_principal_tranche_ids: None,
@@ -1274,6 +1427,7 @@ mod haircut_tests {
                 current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
                 senior_fees: Money::new(fees, Currency::USD).expect("valid money fixture"),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
+                defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
                 interest_claim_caps: &uncapped_claims(&["A"]),
                 floating_rate_shift: 0.0,
                 deferred_interest: None,
@@ -1333,8 +1487,7 @@ mod haircut_tests {
             cash_balance: Money::from((0_i64, Currency::USD)),
             // Collections far below what the coupon demands => a hard breach.
             interest_collections: Money::from((100_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: Some(&market),
             tranche_balances: Some(&balances),
             payable_principal_tranche_ids: None,
@@ -1342,6 +1495,7 @@ mod haircut_tests {
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1419,8 +1573,7 @@ mod haircut_tests {
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::new(collections, Currency::USD)
                 .expect("valid money fixture"),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1428,6 +1581,7 @@ mod haircut_tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["B"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1523,8 +1677,7 @@ mod haircut_tests {
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::new(collections, Currency::USD)
                 .expect("valid money fixture"),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: Some(&market),
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1532,6 +1685,7 @@ mod haircut_tests {
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1605,7 +1759,10 @@ mod haircut_tests {
         let pool = rated_pool();
         let tranches = single_tranche();
         let market = MarketContext::new();
-        let haircuts = ccc_haircuts();
+        let rules = CoverageRules {
+            rating_haircuts: ccc_haircuts(),
+            ..Default::default()
+        };
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
         // The pool has amortized from 1,000,000 to 400,000.
@@ -1619,8 +1776,7 @@ mod haircut_tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: Some(&haircuts),
-            par_value_threshold: None,
+            rules: Some(&rules),
             market: Some(&market),
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1628,6 +1784,7 @@ mod haircut_tests {
             current_pool_balance: Some(current),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1654,7 +1811,10 @@ mod haircut_tests {
     fn coverage_economics_oc_haircuts_use_uneven_live_asset_balances() {
         let pool = rated_pool();
         let tranches = single_tranche();
-        let haircuts = ccc_haircuts();
+        let rules = CoverageRules {
+            rating_haircuts: ccc_haircuts(),
+            ..Default::default()
+        };
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         // Closing balances are 500k AAA / 500k CCC. Live balances have become
         // 100k AAA / 300k CCC, so a 50% CCC haircut produces 250k, not the
@@ -1669,8 +1829,7 @@ mod haircut_tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: Some(&haircuts),
-            par_value_threshold: None,
+            rules: Some(&rules),
             market: None,
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1678,6 +1837,7 @@ mod haircut_tests {
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,
@@ -1710,8 +1870,7 @@ mod haircut_tests {
             period_start: None,
             cash_balance: Money::from((0_i64, Currency::USD)),
             interest_collections: Money::from((0_i64, Currency::USD)),
-            haircuts: None,
-            par_value_threshold: None,
+            rules: None,
             market: Some(&market),
             tranche_balances: None,
             payable_principal_tranche_ids: None,
@@ -1719,6 +1878,7 @@ mod haircut_tests {
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
+            defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
             interest_claim_caps: &uncapped_claims(&["A"]),
             floating_rate_shift: 0.0,
             deferred_interest: None,

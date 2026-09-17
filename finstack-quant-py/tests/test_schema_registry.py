@@ -130,7 +130,7 @@ def test_every_registry_crate_publishes_the_same_surface() -> None:
 
 def test_indexes_together_cover_the_whole_published_corpus() -> None:
     paths = {row["path"] for namespace in NAMESPACES for row in json.loads(namespace.index())["artifacts"]}
-    assert len(paths) == 116, "the ten indexes must account for every checked-in artifact"
+    assert len(paths) == 117, "the ten indexes must account for every checked-in artifact"
 
 
 @pytest.mark.parametrize("namespace", NAMESPACES)

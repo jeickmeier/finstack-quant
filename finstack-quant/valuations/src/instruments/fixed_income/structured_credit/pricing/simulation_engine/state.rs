@@ -1,13 +1,10 @@
 use super::*;
+use finstack_quant_core::types::CreditRating;
 
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
 pub(super) const WRITEDOWN_DE_MINIMIS: f64 = 0.01;
 
 /// Cleanup-call premium; currently zero because the deal has no premium term.
-pub(super) fn cleanup_call_premium(_instrument: &StructuredCredit, _tranche_balance: f64) -> f64 {
-    0.0
-}
-
 /// Internal state for period-by-period simulation.
 pub(super) struct SimulationState<'a> {
     /// AssetPool state (SoA layout)
@@ -22,13 +19,27 @@ pub(super) struct SimulationState<'a> {
     pub(super) prev_date: Option<Date>,
     pub(super) base_currency: Currency,
     pub(super) recovery_lag_months: u32,
-    pub(super) pool: &'a AssetPool,
+    /// Asset pool; owned once a reinvestment purchase has added a synthetic row.
+    pub(super) pool: std::borrow::Cow<'a, AssetPool>,
     pub(super) tranches: &'a TrancheStructure,
     pub(super) closing_date: Date,
     pub(super) pool_balance_cleanup_threshold: f64,
     pub(super) tranche_recipient_keys: Vec<RecipientType>,
     /// Independently evolving OC/IC breach states for this simulation path.
     pub(super) tranche_triggers: Vec<super::triggers::TrancheTriggerState>,
+    /// Projected hedge-swap flows for this run, bucketed per period by
+    /// `hedges::period_hedge_flows`.
+    pub(super) hedge_schedules: Vec<super::hedges::HedgeSchedule>,
+    /// Servicer advances of missed P&I not yet reimbursed from recoveries.
+    pub(super) servicer_advances_outstanding: f64,
+    /// Annualized excess spread realized in each simulated period, oldest
+    /// first; the early-amortization excess-spread test reads the last three.
+    pub(super) excess_spread_history: Vec<f64>,
+    /// Per-period deal accounting for [`SimulationDiagnostics::periods`].
+    pub(super) period_diagnostics: Vec<PeriodDiagnostics>,
+    /// Whether an early-amortization event has occurred; once set the
+    /// revolving period stays closed.
+    pub(super) early_amortization_triggered: bool,
     /// Cumulative net loss realized in this scenario
     /// (`default_amount * (1 - recovery_rate)`), accumulated period by period.
     ///
@@ -96,9 +107,79 @@ pub(super) struct SimulationState<'a> {
     pub(super) reserve_interest_paid: DatedFlows,
 }
 
+/// One coverage test as the waterfall executor evaluated it in a period.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct CoverageTestDiagnostic {
+    /// `CoverageTestSpec::id` of the test.
+    pub test_id: String,
+    /// Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
+    pub ratio: f64,
+    /// Trigger level the ratio was tested against.
+    pub trigger_level: f64,
+    /// `ratio − trigger_level`; negative while the test fails.
+    pub cushion: f64,
+    /// Whether the test passed in this period.
+    pub passing: bool,
+}
+
+/// Deal accounting for one payment period, recorded after the waterfall.
+///
+/// Balances are end-of-period; collections, defaults, recoveries and fees are
+/// the period's amounts; composition statistics are balance-weighted over the
+/// performing pool at period end.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PeriodDiagnostics {
+    /// Payment date of the period.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Collateral balance at period end.
+    pub pool_balance: Money,
+    /// `pool_balance` divided by the pool balance at simulation start.
+    pub pool_factor: f64,
+    /// Balance-weighted coupon of the fixed-rate collateral (decimal).
+    pub weighted_avg_coupon: f64,
+    /// Balance-weighted spread of the floating-rate collateral (basis points).
+    pub weighted_avg_spread_bp: f64,
+    /// Balance-weighted Moody's rating factor of the collateral.
+    pub warf: f64,
+    /// Interest collected from the pool (including servicer advances).
+    pub interest_collections: Money,
+    /// Scheduled and prepaid principal collected from the pool.
+    pub principal_collections: Money,
+    /// Par that defaulted (charged off) this period.
+    pub defaults: Money,
+    /// Recovery cash released to the waterfall this period.
+    pub recoveries: Money,
+    /// Principal recycled into replacement collateral this period.
+    pub reinvested_par: Money,
+    /// Fees paid through the waterfall this period.
+    pub fees_paid: Money,
+    /// Reserve account balance at period end.
+    pub reserve_balance: Money,
+    /// Excess-spread account balance at period end.
+    pub spread_account: Money,
+    /// Controlled-accumulation funding account at period end.
+    pub funding_account: Money,
+    /// Delinquent collateral balance at period end (delinquency model).
+    pub delinquent_balance: Money,
+    /// Annualized excess spread realized this period (decimal).
+    pub excess_spread: f64,
+    /// Every coverage test the executor evaluated this period.
+    pub coverage_tests: Vec<CoverageTestDiagnostic>,
+}
+
 /// Deal-level accounting produced alongside the tranche cashflows.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SimulationDiagnostics {
+    /// Per-period deal accounting, in payment order.
+    #[serde(default)]
+    pub periods: Vec<PeriodDiagnostics>,
     /// Reserve-account balance at the end of each simulated period.
     pub reserve_balance_path: DatedFlows,
     /// Reserve interest earned each period, before routing to its destination.
@@ -130,6 +211,17 @@ pub(super) fn step_down_metrics(
     // accumulation and can trip a step-down trigger that has not truly fired.
     // Same reasoning as the coverage-test numerator in `simulate_period`.
     let pool = state.pool_outstanding.amount() + state.principal_funding_account.amount();
+    let delinquent: f64 = state
+        .pool_state
+        .delinquent
+        .iter()
+        .map(|buckets| super::delinquency::delinquent_balance(buckets))
+        .sum();
+    let delinquency_rate = if state.pool_outstanding.amount() > 0.0 {
+        delinquent / state.pool_outstanding.amount()
+    } else {
+        0.0
+    };
     let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
         state.cumulative_realized_loss / state.total_pool_balance.amount()
     } else {
@@ -155,6 +247,7 @@ pub(super) fn step_down_metrics(
         .and_then(|t| state.tranche_balances.get(t.id.as_str()))
         .map_or(0.0, |m| m.amount());
     crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
+        delinquency_rate,
         cumulative_loss_fraction,
         oc_ratio: if rated_note_balance > 0.0 {
             pool / rated_note_balance
@@ -316,7 +409,7 @@ impl<'a> SimulationState<'a> {
                 asset.default_date,
                 asset.recovery_amount,
             ) {
-                recovery_queue.add_recovery(date, amount);
+                recovery_queue.add_recovery(date, amount, asset.balance);
             }
         }
         let initial_realized_loss =
@@ -341,12 +434,17 @@ impl<'a> SimulationState<'a> {
             prev_date: Some(state_date),
             base_currency: template.base_currency,
             recovery_lag_months,
-            pool,
+            pool: std::borrow::Cow::Borrowed(pool),
             tranches,
             closing_date,
             pool_balance_cleanup_threshold: template.pool_balance_cleanup_threshold,
             tranche_recipient_keys: template.tranche_recipient_keys.clone(),
             tranche_triggers: super::triggers::initial_states(tranches),
+            hedge_schedules: Vec::new(),
+            servicer_advances_outstanding: 0.0,
+            excess_spread_history: Vec::new(),
+            period_diagnostics: Vec::new(),
+            early_amortization_triggered: false,
             cumulative_realized_loss: initial_realized_loss,
             initial_realized_loss,
             cumulative_loss_unallocated: 0.0,
@@ -402,6 +500,7 @@ impl<'a> SimulationState<'a> {
         mut self,
     ) -> (HashMap<String, TrancheCashflows>, SimulationDiagnostics) {
         let diagnostics = SimulationDiagnostics {
+            periods: std::mem::take(&mut self.period_diagnostics),
             reserve_balance_path: std::mem::take(&mut self.reserve_balance_path),
             reserve_interest_paid: std::mem::take(&mut self.reserve_interest_paid),
             draws_from_reserve: self.draws_from_reserve,
@@ -474,4 +573,44 @@ impl<'a> SimulationState<'a> {
 
         (self.results, diagnostics)
     }
+}
+
+/// Balance-weighted composition of the performing pool: fixed-rate coupon,
+/// floating spread (bp) and Moody's rating factor.
+pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64)> {
+    let mut fixed_balance = 0.0_f64;
+    let mut coupon = 0.0_f64;
+    let mut floating_balance = 0.0_f64;
+    let mut spread = 0.0_f64;
+    let mut rated_balance = 0.0_f64;
+    let mut factor = 0.0_f64;
+    for (i, balance) in state.pool_state.balances.iter().enumerate() {
+        if *balance <= 0.0 || state.pool_state.is_defaulted[i] {
+            continue;
+        }
+        match (
+            state.pool_state.curve_indices[i],
+            state.pool_state.spread_bp[i],
+        ) {
+            (Some(_), Some(spread_bp)) => {
+                floating_balance += balance;
+                spread += balance * spread_bp;
+            }
+            _ => {
+                fixed_balance += balance;
+                coupon += balance * state.pool_state.rates[i];
+            }
+        }
+        if let Some(asset) = state.pool.assets.get(i) {
+            let rating = asset.credit_quality.unwrap_or(CreditRating::NR);
+            rated_balance += balance;
+            factor += balance * finstack_quant_models::credit::moodys_warf_factor(rating)?;
+        }
+    }
+    let weighted = |sum: f64, total: f64| if total > 0.0 { sum / total } else { 0.0 };
+    Ok((
+        weighted(coupon, fixed_balance),
+        weighted(spread, floating_balance),
+        weighted(factor, rated_balance),
+    ))
 }

@@ -5,11 +5,13 @@ use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::valuations::convert::{
-    attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr, rate_decimal_from_py,
+    attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr,
+    rate_decimal_from_py,
 };
 use crate::errors::{core_to_py, value_error};
+use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    Tranche, TrancheCoupon, TrancheSeniority,
+    CoverageTrigger, Tranche, TrancheCoupon, TrancheSeniority,
 };
 
 use super::super::instruments::enum_from_str;
@@ -98,15 +100,18 @@ impl PyTranche {
         self.inner.id.to_string()
     }
 
-    /// Attachment point in percent of the capital structure (0-100 scale).
+    /// Attachment point in percent of the capital structure (0-100 scale),
+    /// or ``None`` for a note built without points that has not yet joined
+    /// a ``TrancheStructure`` (which derives it from the balance shares).
     #[getter]
-    fn attachment_point(&self) -> f64 {
+    fn attachment_point(&self) -> Option<f64> {
         self.inner.attachment_point
     }
 
-    /// Detachment point in percent of the capital structure (0-100 scale).
+    /// Detachment point in percent of the capital structure (0-100 scale),
+    /// or ``None`` until derived (see ``attachment_point``).
     #[getter]
-    fn detachment_point(&self) -> f64 {
+    fn detachment_point(&self) -> Option<f64> {
         self.inner.detachment_point
     }
 
@@ -144,12 +149,6 @@ impl PyTranche {
         money_to_py(self.inner.current_balance)
     }
 
-    /// Target balance for revolving structures, or ``None``.
-    #[getter]
-    fn target_balance(&self) -> Option<PyMoney> {
-        self.inner.target_balance.map(money_to_py)
-    }
-
     /// Coupon definition as a plain ``dict`` (``TrancheCoupon`` serde shape).
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -180,22 +179,32 @@ impl PyTranche {
         self.inner.pik_enabled
     }
 
-    /// Whether the tranche balance revolves.
-    #[getter]
-    fn is_revolving(&self) -> bool {
-        self.inner.is_revolving
-    }
-
-    /// Whether principal collections may be reinvested.
-    #[getter]
-    fn can_reinvest(&self) -> bool {
-        self.inner.can_reinvest
-    }
-
     /// Legal final maturity as ``datetime.date``.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.maturity)
+    }
+
+    /// Per-tranche overcollateralization trigger as its ``CoverageTrigger``
+    /// serde ``dict``, or ``None``.
+    #[getter]
+    fn oc_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .oc_trigger
+            .as_ref()
+            .map(|trigger| crate::bindings::pandas_utils::serde_to_py(py, trigger))
+            .transpose()
+    }
+
+    /// Per-tranche interest-coverage trigger as its ``CoverageTrigger``
+    /// serde ``dict``, or ``None``.
+    #[getter]
+    fn ic_trigger<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .ic_trigger
+            .as_ref()
+            .map(|trigger| crate::bindings::pandas_utils::serde_to_py(py, trigger))
+            .transpose()
     }
 
     /// Payment priority rank (1 = most senior).
@@ -216,8 +225,8 @@ impl PyTranche {
             "Tranche(id='{}', seniority='{}', attachment_point={}, detachment_point={}, original_balance={}, maturity='{}', pik_enabled={})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.seniority).unwrap_or_default(),
-            self.inner.attachment_point,
-            self.inner.detachment_point,
+            opt_repr(self.inner.attachment_point),
+            opt_repr(self.inner.detachment_point),
             self.inner.original_balance.amount(),
             self.inner.maturity,
             bool_repr(self.inner.pik_enabled),
@@ -535,6 +544,202 @@ impl PyTrancheBuilder {
         Ok(slf)
     }
 
+    /// Set the current (factored) balance.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : Money
+    ///     Outstanding principal today, at most the original balance.
+    ///     Defaults to the original balance when never set.
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If this builder was already consumed by a prior call to
+    ///     :meth:`TrancheBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn current_balance<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: PyRef<'_, PyMoney>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.current_balance(value.inner));
+        Ok(slf)
+    }
+
+    /// Set interest already deferred (unpaid, still owed) at closing.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : Money
+    ///     Deferred interest carried into the projection; zero when never
+    ///     set.
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If this builder was already consumed by a prior call to
+    ///     :meth:`TrancheBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn deferred_interest<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: PyRef<'_, PyMoney>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.deferred_interest(value.inner));
+        Ok(slf)
+    }
+
+    /// Enable payment-in-kind accretion of interest shortfalls.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : bool
+    ///     ``True`` capitalizes unpaid interest into the balance; ``False``
+    ///     (the default) defers it as a claim.
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If this builder was already consumed by a prior call to
+    ///     :meth:`TrancheBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn pik_enabled<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.pik_enabled(value));
+        Ok(slf)
+    }
+
+    /// Set the credit rating.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : str
+    ///     Rating string (``"AAA"``, ``"BBB"``, ``"NR"`` ...).
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` is not a known rating or the builder was consumed.
+    #[pyo3(text_signature = "($self, value)")]
+    fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+        let rating: CreditRating = enum_from_str(value, "rating")?;
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.rating(rating));
+        Ok(slf)
+    }
+
+    /// Attach a per-tranche overcollateralization trigger.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     ``CoverageTrigger`` serde object: ``trigger_level`` (ratio),
+    ///     optional ``cure_level``, ``consequence`` (``"divert_interest"``,
+    ///     ``"pay_down_senior"`` ...) and breach memory fields.
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``CoverageTrigger`` shape.
+    #[pyo3(text_signature = "($self, value)")]
+    fn oc_trigger<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let trigger: CoverageTrigger =
+            crate::bindings::module_utils::py_to_serde(py, value, "oc_trigger")?;
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.oc_trigger(trigger));
+        Ok(slf)
+    }
+
+    /// Attach a per-tranche interest-coverage trigger.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     ``CoverageTrigger`` serde object (see :meth:`oc_trigger`).
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``CoverageTrigger`` shape.
+    #[pyo3(text_signature = "($self, value)")]
+    fn ic_trigger<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let trigger: CoverageTrigger =
+            crate::bindings::module_utils::py_to_serde(py, value, "ic_trigger")?;
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.ic_trigger(trigger));
+        Ok(slf)
+    }
+
+    /// Set free-form attributes (tags and metadata).
+    ///
+    /// Parameters
+    /// ----------
+    /// value : Attributes | dict[str, str]
+    ///     Attribute bag; a dict populates ``meta`` (an optional ``"tags"``
+    ///     list populates ``tags``).
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` is neither ``Attributes`` nor a string dict.
+    #[pyo3(text_signature = "($self, value)")]
+    fn attributes<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let attributes = attributes_from_py(value)?;
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.attributes(attributes));
+        Ok(slf)
+    }
+
     /// Build the validated tranche.
     ///
     /// Returns
@@ -551,8 +756,16 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
         let mut b = take_tranche(&mut slf)?;
-        if let (Some(attachment), Some(detachment)) = (slf.attachment_point, slf.detachment_point) {
-            b = b.attachment_detachment(attachment, detachment);
+        match (slf.attachment_point, slf.detachment_point) {
+            (Some(attachment), Some(detachment)) => {
+                b = b.attachment_detachment(attachment, detachment);
+            }
+            (None, None) => {}
+            _ => {
+                return Err(value_error(
+                    "attachment_point and detachment_point must be set together, or both omitted so the TrancheStructure derives them from the balances",
+                ));
+            }
         }
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyTranche { inner })

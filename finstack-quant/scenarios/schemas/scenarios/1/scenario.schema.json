@@ -1368,6 +1368,11 @@
           "const": "volatility_index_future_option",
           "description": "Exchange-listed option on a volatility-index futures contract.",
           "type": "string"
+        },
+        {
+          "const": "asset_backed_facility",
+          "description": "Asset-backed facility (warehouse line against a collateral pool).",
+          "type": "string"
         }
       ]
     },

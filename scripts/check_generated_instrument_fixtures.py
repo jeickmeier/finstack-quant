@@ -9,7 +9,7 @@ import tomllib
 
 MANIFEST = Path("finstack-quant/valuations/tests/instruments/coverage_manifest.toml")
 INSTRUMENTS_DIR = MANIFEST.parent
-EXPECTED_CANONICAL_FIXTURES = 77
+EXPECTED_CANONICAL_FIXTURES = 78
 
 
 def canonical_fixture_entries(root: Path) -> list[tuple[str, Path]]:

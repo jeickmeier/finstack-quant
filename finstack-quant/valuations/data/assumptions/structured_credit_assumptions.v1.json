@@ -16,36 +16,6 @@
     "guarantee_fee_rate": 0.0025,
     "psa_multiplier": 1.0
   },
-  "seasonality": {
-    "mortgage": [
-      0.94,
-      0.76,
-      0.74,
-      0.95,
-      0.98,
-      0.92,
-      1.1,
-      1.18,
-      1.22,
-      1.23,
-      0.98,
-      1.0
-    ],
-    "credit_card": [
-      1.15,
-      1.1,
-      1.0,
-      0.95,
-      0.95,
-      0.95,
-      0.95,
-      0.95,
-      1.0,
-      1.05,
-      1.05,
-      1.1
-    ]
-  },
   "scenario_grids": {
     "psa_speeds": [
       0.25,
@@ -97,10 +67,6 @@
     "psa": {
       "ramp_months": 30,
       "terminal_cpr": 0.06
-    },
-    "auto_abs": {
-      "monthly_speed": 0.015,
-      "ramp_months": 12
     }
   },
   "default_models": {
@@ -206,153 +172,6 @@
       "haircut": 0.15
     }
   ],
-  "asset_type_defaults": {
-    "base_cdr_annual": 0.02,
-    "base_recovery_rate": 0.4,
-    "base_cpr_annual": 0.05,
-    "cpr_by_asset_type": [
-      {
-        "asset_type": "mortgage",
-        "value": 0.06
-      },
-      {
-        "asset_type": "rmbs",
-        "value": 0.06
-      },
-      {
-        "asset_type": "auto",
-        "value": 0.18
-      },
-      {
-        "asset_type": "abs_auto",
-        "value": 0.18
-      },
-      {
-        "asset_type": "card",
-        "value": 0.15
-      },
-      {
-        "asset_type": "credit_card",
-        "value": 0.15
-      },
-      {
-        "asset_type": "cc",
-        "value": 0.15
-      },
-      {
-        "asset_type": "commercial",
-        "value": 0.1
-      },
-      {
-        "asset_type": "cmbs",
-        "value": 0.1
-      },
-      {
-        "asset_type": "cre",
-        "value": 0.1
-      },
-      {
-        "asset_type": "student",
-        "value": 0.03
-      },
-      {
-        "asset_type": "student_loan",
-        "value": 0.03
-      }
-    ],
-    "cdr_by_asset_type": [
-      {
-        "asset_type": "mortgage",
-        "value": 0.002
-      },
-      {
-        "asset_type": "rmbs",
-        "value": 0.002
-      },
-      {
-        "asset_type": "auto",
-        "value": 0.02
-      },
-      {
-        "asset_type": "abs_auto",
-        "value": 0.02
-      },
-      {
-        "asset_type": "consumer",
-        "value": 0.02
-      },
-      {
-        "asset_type": "card",
-        "value": 0.048
-      },
-      {
-        "asset_type": "credit_card",
-        "value": 0.048
-      },
-      {
-        "asset_type": "corporate",
-        "value": 0.02
-      },
-      {
-        "asset_type": "clo",
-        "value": 0.02
-      },
-      {
-        "asset_type": "commercial",
-        "value": 0.02
-      }
-    ],
-    "recovery_by_asset_type": [
-      {
-        "asset_type": "mortgage",
-        "value": 0.6
-      },
-      {
-        "asset_type": "rmbs",
-        "value": 0.6
-      },
-      {
-        "asset_type": "collateral",
-        "value": 0.6
-      },
-      {
-        "asset_type": "auto",
-        "value": 0.45
-      },
-      {
-        "asset_type": "abs_auto",
-        "value": 0.45
-      },
-      {
-        "asset_type": "consumer",
-        "value": 0.45
-      },
-      {
-        "asset_type": "card",
-        "value": 0.05
-      },
-      {
-        "asset_type": "credit_card",
-        "value": 0.05
-      },
-      {
-        "asset_type": "unsecured",
-        "value": 0.05
-      },
-      {
-        "asset_type": "corporate",
-        "value": 0.4
-      },
-      {
-        "asset_type": "clo",
-        "value": 0.4
-      },
-      {
-        "asset_type": "commercial",
-        "value": 0.4
-      }
-    ]
-  },
   "deal_profiles": [
     {
       "ids": [
@@ -366,15 +185,11 @@
         "subordinated_mgmt_fee_bp": 20.0,
         "servicing_fee_bp": 0.0,
         "master_servicer_fee_bp": null,
-        "special_servicer_fee_bp": null
-      },
-      "assumptions": {
-        "base_cdr_annual": 0.02,
-        "base_recovery_rate": 0.4,
-        "base_cpr_annual": 0.15,
-        "psa_speed": null,
-        "sda_speed": null,
-        "abs_speed_monthly": null
+        "special_servicer_fee_bp": null,
+        "incentive_fee": {
+          "hurdle_irr": 0.12,
+          "share_pct": 0.2
+        }
       },
       "constructor": {
         "frequency": "quarterly",
@@ -400,14 +215,6 @@
         "servicing_fee_bp": 25.0,
         "master_servicer_fee_bp": null,
         "special_servicer_fee_bp": null
-      },
-      "assumptions": {
-        "base_cdr_annual": 0.006,
-        "base_recovery_rate": 0.6,
-        "base_cpr_annual": 0.06,
-        "psa_speed": 1.0,
-        "sda_speed": 1.0,
-        "abs_speed_monthly": null
       },
       "constructor": {
         "frequency": "monthly",
@@ -437,14 +244,6 @@
         "master_servicer_fee_bp": null,
         "special_servicer_fee_bp": null
       },
-      "assumptions": {
-        "base_cdr_annual": 0.02,
-        "base_recovery_rate": 0.45,
-        "base_cpr_annual": 0.0,
-        "psa_speed": null,
-        "sda_speed": null,
-        "abs_speed_monthly": 0.015
-      },
       "constructor": {
         "frequency": "monthly",
         "prepayment": {
@@ -469,14 +268,6 @@
         "servicing_fee_bp": 0.0,
         "master_servicer_fee_bp": 25.0,
         "special_servicer_fee_bp": 25.0
-      },
-      "assumptions": {
-        "base_cdr_annual": 0.005,
-        "base_recovery_rate": 0.65,
-        "base_cpr_annual": 0.1,
-        "psa_speed": null,
-        "sda_speed": null,
-        "abs_speed_monthly": null
       },
       "constructor": {
         "frequency": "monthly",

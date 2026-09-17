@@ -492,3 +492,110 @@ fn unfundable_draw_calendar_fails_at_preparation() {
         "{message}"
     );
 }
+
+/// Instrument-pool twin of the cross-account funding test: with no reserve, a
+/// revolver draw is funded from the period's principal collections first,
+/// the residual principal then tops up the senior coupon shortfall, and the
+/// deal reports no unfunded draw.
+#[test]
+fn principal_funds_the_draw_first_and_then_the_senior_coupon_shortfall() {
+    let closing = date!(2024 - 01 - 01);
+    let maturity = date!(2027 - 01 - 01);
+    let market = MarketContext::new();
+    // 8M repaid on 2024-02-15 and 5M drawn on 2024-03-01, both inside the
+    // first quarterly period.
+    let facility = {
+        let mut facility = fixed_revolver(closing, maturity);
+        facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![
+            DrawRepayEvent {
+                date: date!(2024 - 02 - 15),
+                amount: usd(8_000_000.0),
+                is_draw: false,
+            },
+            DrawRepayEvent {
+                date: date!(2024 - 03 - 01),
+                amount: usd(5_000_000.0),
+                is_draw: true,
+            },
+        ]);
+        facility
+    };
+    let build = |covers: Option<bool>| {
+        let mut deal = deal_with(DealSpec {
+            collateral: InstrumentCollateral {
+                revolvers: vec![facility.clone()],
+                ..Default::default()
+            },
+            reserve: 0.0,
+            reserve_target: None,
+            closing,
+            maturity,
+            senior: 9_000_000.0,
+            equity: 1_000_000.0,
+        });
+        // A 20% senior coupon the facility's quarterly interest cannot cover.
+        for tranche in deal.tranches.tranches.iter_mut() {
+            if tranche.id.as_str() == "A" {
+                tranche.coupon = TrancheCoupon::Fixed { rate: 0.20 };
+            }
+        }
+        deal.principal_covers_senior_interest = covers;
+        deal
+    };
+    let funded = run_simulation_with_diagnostics(&build(None), &market, closing).expect("funded");
+    let separate =
+        run_simulation_with_diagnostics(&build(Some(false)), &market, closing).expect("separate");
+    let first = date!(2024 - 04 - 01);
+    let on = |flows: &[(Date, Money)]| -> f64 {
+        flows
+            .iter()
+            .filter(|(date, _)| *date == first)
+            .map(|(_, amount)| amount.amount())
+            .sum()
+    };
+
+    for run in [&funded, &separate] {
+        let d = &run.diagnostics;
+        assert_eq!(d.draws_from_reserve, usd(0.0));
+        assert_eq!(d.draws_from_principal, usd(5_000_000.0));
+        assert_eq!(d.unfunded_draws, usd(0.0));
+    }
+    let a_coupon = 9_000_000.0 * 0.20 * 91.0 / 360.0;
+    let a = &funded.tranches["A"];
+    // Later periods collect no principal at all, so only the first period's
+    // coupon can be topped up.
+    assert!(
+        on(&a.deferred_flows) < 1.0,
+        "the residual principal tops up A's first coupon, got {}",
+        on(&a.deferred_flows)
+    );
+    assert!(
+        (on(&a.interest_flows) - a_coupon).abs() < 1.0,
+        "A's first coupon is whole: {} vs {a_coupon}",
+        on(&a.interest_flows)
+    );
+    let deferred = on(&separate.tranches["A"].deferred_flows);
+    assert!(
+        deferred > 0.0,
+        "with separate accounts the facility interest cannot cover the coupon"
+    );
+    // Cash to A on the first date is the same either way: the top-up only
+    // reclassifies principal as coupon.
+    let funded_cash = on(&a.interest_flows) + on(&a.principal_flows);
+    let separate_cash =
+        on(&separate.tranches["A"].interest_flows) + on(&separate.tranches["A"].principal_flows);
+    assert!(
+        (funded_cash - separate_cash).abs() < 1.0,
+        "funded {funded_cash} vs separate {separate_cash}"
+    );
+    assert!(
+        (on(&a.principal_flows) - (on(&separate.tranches["A"].principal_flows) - deferred)).abs()
+            < 1.0,
+        "A's principal is reduced by exactly the coupon shortfall"
+    );
+    // 8M repaid less the 5M draw leaves 3M of principal for the period.
+    assert!(
+        (separate_cash - (on(&separate.tranches["A"].interest_flows) + 3_000_000.0)).abs() < 1.0,
+        "the period's principal proceeds are the repayment net of the draw"
+    );
+}

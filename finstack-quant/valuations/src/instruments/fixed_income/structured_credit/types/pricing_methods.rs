@@ -252,8 +252,8 @@ impl StructuredCredit {
         const EPS: f64 = 1e-9;
 
         for (idx, tranche) in self.tranches.tranches.iter().enumerate() {
-            let attachment = tranche.attachment_point;
-            let detachment = tranche.detachment_point;
+            let attachment = tranche.attachment_pct();
+            let detachment = tranche.detachment_pct();
             if !attachment.is_finite() || !detachment.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "structured-credit tranche '{}' has non-finite attachment/detachment",
@@ -319,6 +319,41 @@ impl StructuredCredit {
         CorrelationStructure,
     )> {
         let model = self.resolved_credit_model()?;
+        // The stochastic engines size defaults from a per-month rate on the
+        // surviving balance; curves stated against the original balance and
+        // severities by month of default are deterministic-only.
+        if matches!(
+            model.default_spec.curve,
+            Some(
+                crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. }
+                    | crate::cashflow::builder::DefaultCurve::Timing { .. }
+            )
+        ) {
+            return Err(finstack_quant_core::Error::Validation(
+                "stochastic pricing supports constant, SDA and vector default curves; \
+                 cumulative-loss and timing curves are deterministic-only"
+                    .to_string(),
+            ));
+        }
+        if model.recovery_spec.severity_vector.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "stochastic pricing uses a flat recovery rate; \
+                 recovery_spec.severity_vector is deterministic-only"
+                    .to_string(),
+            ));
+        }
+        if self
+            .pool
+            .assets
+            .iter()
+            .any(|asset| asset.liquidation.is_some())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "stochastic pricing does not model NPL resolution timelines; \
+                 PoolAsset.liquidation is deterministic-only"
+                    .to_string(),
+            ));
+        }
         let prepay = model
             .stochastic_prepay_spec
             .unwrap_or_else(|| StochasticPrepaySpec::deterministic(model.prepayment_spec));
@@ -406,9 +441,12 @@ impl StructuredCredit {
     /// * `metrics` - Additional registered metrics. Mandatory result fields are
     ///   calculated even when this list is empty; calculation failures propagate.
     ///
-    /// Prices and yields use buyer settlement entitlement. PV remains at valuation;
-    /// spread results use an external clean/dirty quote when supplied, otherwise
-    /// the model's dirty settlement value. Z-spread is returned in basis points.
+    /// Prices and yields use buyer settlement entitlement and are quoted per
+    /// the tranche's CURRENT balance (the factor-adjusted secondary-market
+    /// basis; `factor` reports current over original face). PV remains at
+    /// valuation; spread results use an external clean/dirty quote when
+    /// supplied, otherwise the model's dirty settlement value. Z-spread is
+    /// returned in basis points.
     pub fn value_tranche_with_metrics(
         &self,
         tranche_id: &str,
@@ -431,12 +469,18 @@ impl StructuredCredit {
             })?;
         let cashflow_result = self.get_tranche_cashflows(tranche_id, context, as_of)?;
         let pv = self.value_tranche_cashflows(&cashflow_result, context, effective_as_of)?;
+        // Prices are per CURRENT face (the factor-adjusted quote basis).
         let quote = super::super::metrics::quote::SettlementQuote::for_tranche(
             self,
             effective_as_of,
-            tranche.original_balance.amount(),
+            tranche.current_balance.amount(),
             &cashflow_result,
         )?;
+        let factor = if tranche.original_balance.amount() > 0.0 {
+            tranche.current_balance.amount() / tranche.original_balance.amount()
+        } else {
+            0.0
+        };
         let disc = context.get_discount(&self.discount_curve_id)?;
         let model_dirty = quote.model_dirty(&cashflow_result.cashflows, &disc)?;
         let target = quote.external_target(self)?.unwrap_or(model_dirty);
@@ -453,7 +497,7 @@ impl StructuredCredit {
         metric_context.tagged_cashflows = Some(cashflow_result.detailed_flows.clone());
         metric_context.detailed_tranche_cashflows = Some(cashflow_result.clone());
         metric_context.discount_curve_id = Some(self.discount_curve_id.to_owned());
-        metric_context.notional = Some(tranche.original_balance);
+        metric_context.notional = Some(tranche.current_balance);
         let mut requested = metrics.to_vec();
         for required in [
             MetricId::Accrued,
@@ -509,6 +553,7 @@ impl StructuredCredit {
             pv,
             clean_price,
             dirty_price,
+            factor,
             accrued,
             wal,
             modified_duration,

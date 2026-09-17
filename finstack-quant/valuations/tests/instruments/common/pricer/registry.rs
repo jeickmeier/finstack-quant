@@ -463,6 +463,7 @@ fn standard_pricer_registry_has_exact_expected_coverage() {
         (I::FxFutureOption, vec![M::Discounting]),
         (I::CommodityFutureOption, vec![M::Discounting]),
         (I::VolatilityIndexFutureOption, vec![M::Discounting]),
+        (I::AssetBackedFacility, vec![M::Discounting]),
     ]);
 
     assert_eq!(standard_pricer_registry().all_models_grouped(), expected);

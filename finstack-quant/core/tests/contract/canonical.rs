@@ -283,15 +283,7 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
         ),
         (
             "valuations/src/instruments/fixed_income/structured_credit/types/waterfall.rs",
-            "CoverageTestRules",
-        ),
-        (
-            "valuations/src/instruments/fixed_income/structured_credit/types/setup.rs",
-            "CoverageTestConfig",
-        ),
-        (
-            "valuations/src/instruments/fixed_income/structured_credit/types/setup.rs",
-            "DefaultAssumptions",
+            "CoverageRules",
         ),
         ("margin/src/regulatory/sa_ccr/types.rs", "EadResult"),
         ("margin/src/regulatory/frtb/types.rs", "FrtbSbaResult"),

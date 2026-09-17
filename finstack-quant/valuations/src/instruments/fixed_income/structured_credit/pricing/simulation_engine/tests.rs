@@ -55,6 +55,8 @@ mod cases {
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
             end_date: deal.maturity,
             is_active: true,
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
             criteria: ReinvestmentCriteria::default(),
         });
         let mut state = SimulationState::new(
@@ -92,8 +94,12 @@ mod cases {
     fn production_waterfall_trap_cure_rebreach_conserves_interest() {
         use crate::instruments::fixed_income::structured_credit::TriggerConsequence;
         let deal = production_trigger_deal(TriggerConsequence::TrapExcessSpread);
-        let waterfall =
-            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let waterfall = Waterfall::standard_sequential(
+            Currency::USD,
+            &deal.tranches,
+            crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+            &[],
+        );
         let mut state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -165,10 +171,10 @@ mod cases {
         ] {
             let deal = production_trigger_deal(consequence);
             let waterfall = Waterfall::standard_sequential(
-                deal.deal_type,
                 Currency::USD,
                 &deal.tranches,
-                vec![],
+                crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+                &[],
             );
             let mut state = SimulationState::new(
                 &deal.pool,
@@ -210,18 +216,22 @@ mod cases {
         let first = deal.first_payment_date;
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
-        deal.tranches.tranches[0].is_revolving = true;
-        deal.tranches.tranches[0].can_reinvest = true;
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
             end_date: first,
             is_active: true,
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
             criteria: ReinvestmentCriteria {
                 max_price: 99.0,
                 ..Default::default()
             },
         });
-        let waterfall =
-            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let waterfall = Waterfall::standard_sequential(
+            Currency::USD,
+            &deal.tranches,
+            crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+            &[],
+        );
         let mut state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -280,17 +290,19 @@ mod cases {
         };
         let mut deal = production_trigger_deal(TriggerConsequence::StopReinvestment);
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.36);
-        for tranche in &mut deal.tranches.tranches {
-            tranche.is_revolving = true;
-            tranche.can_reinvest = true;
-        }
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
             end_date: deal.maturity,
             is_active: true,
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
             criteria: ReinvestmentCriteria::default(),
         });
-        let waterfall =
-            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let waterfall = Waterfall::standard_sequential(
+            Currency::USD,
+            &deal.tranches,
+            crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+            &[],
+        );
         let mut state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -408,8 +420,12 @@ mod cases {
         .expect("capital structure");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
-        let waterfall =
-            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let waterfall = Waterfall::standard_sequential(
+            Currency::USD,
+            &deal.tranches,
+            crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+            &[],
+        );
         let mut state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -461,10 +477,16 @@ mod cases {
         deal.pool.reinvestment_period = Some(ReinvestmentPeriod {
             end_date: deal.maturity,
             is_active: false,
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
             criteria: ReinvestmentCriteria::default(),
         });
-        let waterfall =
-            Waterfall::standard_sequential(deal.deal_type, Currency::USD, &deal.tranches, vec![]);
+        let waterfall = Waterfall::standard_sequential(
+            Currency::USD,
+            &deal.tranches,
+            crate::instruments::fixed_income::structured_credit::TemplateFees::default(),
+            &[],
+        );
         let mut state = SimulationState::new(
             &deal.pool,
             &deal.tranches,
@@ -978,6 +1000,8 @@ mod cases {
                 pool.reinvestment_period = Some(ReinvestmentPeriod {
                     end_date: reinvest_end,
                     is_active: true,
+                    amortizing_tranches: Vec::new(),
+                    assumptions: None,
                     criteria: ReinvestmentCriteria::default(),
                 });
             }
@@ -1000,8 +1024,6 @@ mod cases {
                 "USD-OIS",
             )
             .with_payment_calendar("nyse");
-            instrument.tranches.tranches[0].is_revolving = with_reinvestment;
-            instrument.tranches.tranches[0].can_reinvest = with_reinvestment;
             instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
             instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
             instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1261,6 +1283,13 @@ mod cases {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
         let tranche = Tranche::new(
             "A",
@@ -1293,6 +1322,8 @@ mod cases {
             context: &market,
             rates,
             copula_outcome: None,
+            delinquency: None,
+            card: None,
         })
         .expect("period 1 flows");
         let level_payment = state.pool_state.level_payments[0]
@@ -1316,6 +1347,8 @@ mod cases {
             context: &market,
             rates,
             copula_outcome: None,
+            delinquency: None,
+            card: None,
         })
         .expect("period 2 flows");
 
@@ -1385,6 +1418,13 @@ mod cases {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
         let tranche = Tranche::new(
             "A",
@@ -1431,6 +1471,8 @@ mod cases {
                 context: &market,
                 rates,
                 copula_outcome: None,
+                delinquency: None,
+                card: None,
             })
             .expect("pool flows");
             let principal = flows.scheduled_principal.amount() + flows.prepayment.amount();
@@ -1536,6 +1578,8 @@ mod cases {
                 context: &market,
                 rates,
                 copula_outcome: None,
+                delinquency: None,
+                card: None,
             })
             .expect("pool flows");
             prev = pay;
@@ -1845,9 +1889,7 @@ mod cases {
     /// A two-class CLO-shaped deal (senior note + equity) carrying enough
     /// collateral defaults to erode overcollateralization.
     fn oc_trigger_deal(
-        triggers: Vec<
-            crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger,
-        >,
+        triggers: Vec<crate::instruments::fixed_income::structured_credit::types::CoverageTestSpec>,
     ) -> StructuredCredit {
         let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
@@ -1898,9 +1940,7 @@ mod cases {
     /// A three-class CLO (senior / mezzanine / equity) — the realistic shape,
     /// where a failing OC test has subordinated interest available to divert.
     fn clo_with_mezz(
-        triggers: Vec<
-            crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger,
-        >,
+        triggers: Vec<crate::instruments::fixed_income::structured_credit::types::CoverageTestSpec>,
     ) -> StructuredCredit {
         let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
         let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
@@ -1969,16 +2009,12 @@ mod cases {
     /// Failing OC test traps subordinated interest and accelerates senior principal.
     #[test]
     fn failing_oc_test_diverts_subordinated_interest_to_senior_principal() {
-        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+        use crate::instruments::fixed_income::structured_credit::types::CoverageTestSpec;
 
         let untriggered = clo_with_mezz(vec![]);
         // Pool 10M against 7M senior = 143% OC at closing. A 175% requirement
         // breaches from the first period.
-        let triggered = clo_with_mezz(vec![CoverageTrigger {
-            tranche_id: "CLASS_A".to_string(),
-            oc_trigger: Some(1.75),
-            ic_trigger: None,
-        }]);
+        let triggered = clo_with_mezz(vec![CoverageTestSpec::oc("CLASS_A", 1.75)]);
 
         // Assert timing: excess cure cash returns to CLASS_B, so lifetime totals
         // can converge while the trap still delays subordinated interest.
@@ -2015,9 +2051,8 @@ mod cases {
             "a breaching OC test must DEFER subordinated interest: CLASS_B \
              interest WAL was {mezz_wal_with:.4}y with the trigger vs \
              {mezz_wal_without:.4}y without. Equal values mean the cure has no \
-             source — the debt-interest tier is not split at the \
-             senior/subordinated boundary, or the divertible tier is \
-             unreachable (SC-M30)."
+             source — the test position is not placed between the senior and \
+             subordinated interest tiers (SC-M30)."
         );
 
         // Faster delevering reduces lifetime interest, so measure the senior
@@ -2070,24 +2105,13 @@ mod cases {
         assert_eq!(
             tier_ids,
             vec![
-                "senior_interest",
-                "subordinated_interest",
+                "CLASS_A_interest",
+                "CLASS_B_interest",
                 "principal",
                 "equity"
             ],
-            "the standard waterfall must split debt interest at the \
-             senior/subordinated boundary"
-        );
-
-        let sub_tier = waterfall
-            .tiers
-            .iter()
-            .find(|t| t.id == "subordinated_interest")
-            .expect("subordinated interest tier");
-        assert!(
-            sub_tier.divertible,
-            "the subordinated interest tier must be divertible — it is the \
-             source a real CLO OC cure draws on"
+            "the standard waterfall must give every note its own interest tier \
+             so coverage tests can sit between them"
         );
 
         // Interest recipients must still appear in payment_priority order
@@ -2113,20 +2137,16 @@ mod cases {
     fn oc_trigger_is_evaluated_and_reports_its_breach() {
         use crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall;
         use crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext;
-        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+        use crate::instruments::fixed_income::structured_credit::types::CoverageTestSpec;
 
         // A 150% OC requirement against a 10M pool supporting an 8M senior note
         // (125% at closing) is breached immediately.
-        let deal = oc_trigger_deal(vec![CoverageTrigger {
-            tranche_id: "CLASS_A".to_string(),
-            oc_trigger: Some(1.50),
-            ic_trigger: None,
-        }]);
+        let deal = oc_trigger_deal(vec![CoverageTestSpec::oc("CLASS_A", 1.50)]);
         let waterfall = deal
             .create_waterfall()
             .expect("valid create_waterfall fixture");
         assert_eq!(
-            waterfall.coverage_triggers.len(),
+            waterfall.coverage_tests().count(),
             1,
             "deal trigger must reach the executing waterfall"
         );
@@ -2152,8 +2172,10 @@ mod cases {
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
+                defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
                 recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
+                equity_history: None,
             },
         )
         .expect("waterfall executes");
@@ -2203,8 +2225,10 @@ mod cases {
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
+                defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
                 recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
+                equity_history: None,
             },
         )
         .expect("waterfall executes");
@@ -2227,7 +2251,7 @@ mod cases {
             .create_waterfall()
             .expect("valid create_waterfall fixture");
         assert!(
-            waterfall.coverage_triggers.is_empty(),
+            waterfall.coverage_tests().next().is_none(),
             "deal with no triggers must build a waterfall with none"
         );
     }
@@ -2235,14 +2259,10 @@ mod cases {
     /// Trigger naming an unknown tranche is rejected.
     #[test]
     fn coverage_trigger_for_unknown_tranche_is_rejected() {
-        use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+        use crate::instruments::fixed_income::structured_credit::types::CoverageTestSpec;
 
         let err = oc_trigger_deal(vec![])
-            .with_coverage_triggers(vec![CoverageTrigger {
-                tranche_id: "NOT_A_TRANCHE".to_string(),
-                oc_trigger: Some(1.2),
-                ic_trigger: None,
-            }])
+            .with_coverage_triggers(vec![CoverageTestSpec::oc("NOT_A_TRANCHE", 1.2)])
             .expect_err("a trigger naming an unknown tranche must be rejected");
         let msg = err.to_string();
         assert!(
@@ -2305,8 +2325,10 @@ mod cases {
                     deferred_interest: None,
                     reserve_balance: Money::from((0_i64, ccy)),
                     restricted_cash: Money::from((0_i64, Currency::USD)),
+                    defaulted_collateral_value: Money::from((0_i64, Currency::USD)),
                     recovery_proceeds: Money::from((0_i64, ccy)),
                     floating_rate_shift: 0.0,
+                    equity_history: None,
                 },
             )
             .expect("waterfall executes")
@@ -2529,6 +2551,13 @@ mod cases {
                 recovery_rate: None,
                 commitment: None,
                 contractual_payment: None,
+                market_price_pct: None,
+                delinquency_buckets: None,
+                balloon: None,
+                prepayment_penalty: None,
+                special_servicing: None,
+                noi: None,
+                liquidation: None,
             });
             pool
         };
@@ -2561,6 +2590,8 @@ mod cases {
                     recovery_rate: 0.40,
                 },
                 copula_outcome: None,
+                delinquency: None,
+                card: None,
             })
             .expect("flows");
             flows.interest.amount()

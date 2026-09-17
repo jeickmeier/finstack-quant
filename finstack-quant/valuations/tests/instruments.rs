@@ -226,6 +226,10 @@ mod repo;
 #[path = "instruments/revolving_credit/mod.rs"]
 mod revolving_credit;
 
+/// Asset-backed facility tests - warehouse lines against collateral pools
+#[path = "instruments/asset_backed_facility/mod.rs"]
+mod asset_backed_facility;
+
 /// Term loan tests - Institutional term loans and DDTL facilities
 #[path = "instruments/term_loan/mod.rs"]
 mod term_loan;

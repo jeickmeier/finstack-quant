@@ -5259,6 +5259,87 @@ export interface TermLoanConstructor {
 }
 
 /**
+ * Borrowing base of a collateral pool on the closing balances, as returned by
+ * `AssetBackedFacility.borrowingBase`. Money values are plain
+ * `{ amount, currency }` objects.
+ */
+export interface BorrowingBaseReport {
+  /**
+   * Collateral balance that meets the eligibility criteria, before the
+   * concentration limits.
+   */
+  eligible_collateral: MoneyValue;
+  /**
+   * Eligible balance excluded by the concentration limits.
+   */
+  concentration_excess: MoneyValue;
+  /**
+   * Advance-rate-weighted eligible collateral after the limits.
+   */
+  borrowing_base: MoneyValue;
+}
+
+/**
+ * Typed asset-backed facility handle (a warehouse line against a collateral pool); serialize with `toJson()` for generic pricing entry points.
+ *
+ * Thin wrapper over the canonical Rust `AssetBackedFacility`. Serialize with
+ * `toJson()` and pass the result to `valuations.instruments.priceInstrument`
+ * (or the other generic pricing entry points) to price the lender's flows;
+ * the facility's borrowing-base metrics (`abf_borrowing_base`,
+ * `abf_borrowing_base_cushion`, `abf_advance_rate_utilization`,
+ * `abf_facility_irr`, `abf_residual_irr`) are available there too.
+ */
+export interface AssetBackedFacility extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier.
+   */
+  readonly id: string;
+  /**
+   * Serialize to a canonical `finstack_quant.instrument/1` envelope.
+   * @returns Canonical instrument envelope accepted by `priceInstrument` and `AssetBackedFacility.fromJson`.
+   * @throws If serialization fails.
+   */
+  toJson(): string;
+  /**
+   * Borrowing base on the closing collateral.
+   * @returns Plain `BorrowingBaseReport` object.
+   * @throws If the borrowing-base rules are malformed.
+   */
+  borrowingBase(): BorrowingBaseReport;
+}
+
+/**
+ * Constructor surface for the typed `AssetBackedFacility` WebAssembly instrument.
+ *
+ * Construct via `fromJson` with a canonical v1 instrument envelope or start
+ * from `example()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const facility = valuations.instruments.AssetBackedFacility.example();
+ * const base = facility.borrowingBase();
+ * const result = valuations.instruments.priceInstrument(facility.toJson(), marketJson, "2024-01-15", "default");
+ * ```
+ */
+export interface AssetBackedFacilityConstructor {
+  /**
+   * Parse a canonical `finstack_quant.instrument/1` envelope whose instrument is an `asset_backed_facility`.
+   * @param json - Canonical instrument envelope JSON.
+   * @returns The typed facility.
+   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   */
+  fromJson(json: string): AssetBackedFacility;
+  /**
+   * The canonical example facility: the example CLO pool financed by a USD 80M commitment drawn USD 70M.
+   * @returns The example facility.
+   * @throws If construction fails (should not occur).
+   */
+  example(): AssetBackedFacility;
+}
+
+/**
  * Typed revolving-credit facility handle; serialize with `toJson()` for generic pricing entry points.
  *
  * Thin wrapper over the canonical Rust `RevolvingCredit`. Serialize with
@@ -5595,6 +5676,10 @@ export interface ValuationInstrumentsNamespace {
    */
   RevolvingCredit: RevolvingCreditConstructor;
   /**
+   * Typed `AssetBackedFacility` instrument class (see `AssetBackedFacilityConstructor`).
+   */
+  AssetBackedFacility: AssetBackedFacilityConstructor;
+  /**
    * Construct a canonical bond instrument envelope from a cashflow schedule.
    * @returns Canonical bond instrument envelope JSON.
    * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
@@ -5882,11 +5967,12 @@ export interface OasResult {
    */
   oas: number;
   /**
-   * Model price at the solved OAS, as a percentage of original balance.
+   * Model price at the solved OAS, as a percentage of the tranche's current
+   * balance (the factor-adjusted quote basis).
    */
   model_price: number;
   /**
-   * Target market price, as a percentage of original balance.
+   * Target market price, as a percentage of current balance.
    */
   market_price: number;
   /**
@@ -5895,7 +5981,7 @@ export interface OasResult {
   num_paths: number;
   /**
    * Monte-Carlo standard error of the mean price, as a percentage of
-   * original balance.
+   * current balance.
    */
   price_std_error: number;
 }
@@ -5919,9 +6005,15 @@ export interface TrancheMetrics {
    */
   pv: number;
   /**
-   * Model price, as a percentage of original balance.
+   * Model clean price, as a percentage of the tranche's current balance (the
+   * factor-adjusted secondary-market quote basis).
    */
   price_pct: number;
+  /**
+   * Pool factor of the note: current balance over original balance, so a
+   * price on original face is `price_pct * factor`.
+   */
+  factor: number;
   /**
    * Weighted-average life, in years.
    */
@@ -5948,10 +6040,25 @@ export interface TrancheMetrics {
    */
   convexity: number;
   /**
-   * Price the z-spread/CS01 were solved against, as a percentage of original
+   * Price the z-spread/CS01 were solved against, as a percentage of current
    * balance.
    */
   target_price_pct: number;
+  /**
+   * Weighted-average life to the deal's assumed call, in years. Absent when
+   * the deal carries no `call_assumption` covering this tranche.
+   */
+  wal_to_call?: number;
+  /**
+   * Z-spread of the to-call cashflows to `target_price_pct`, in basis
+   * points. Absent without a call.
+   */
+  z_spread_to_call_bp?: number;
+  /**
+   * Discount margin to call for a floating-rate tranche, in basis points.
+   * Absent for fixed-rate tranches or without a call.
+   */
+  dm_to_call_bp?: number;
 }
 
 /**

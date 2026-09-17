@@ -357,6 +357,13 @@ impl InstrumentCollateral {
                 recovery_rate: None,
                 commitment: None,
                 contractual_payment: None,
+                market_price_pct: None,
+                delinquency_buckets: None,
+                balloon: None,
+                prepayment_penalty: None,
+                special_servicing: None,
+                noi: None,
+                liquidation: None,
             });
         }
         for loan in &self.term_loans {
@@ -386,6 +393,13 @@ impl InstrumentCollateral {
                 recovery_rate: None,
                 commitment: loan.ddtl.as_ref().map(|ddtl| ddtl.commitment_limit),
                 contractual_payment: None,
+                market_price_pct: None,
+                delinquency_buckets: None,
+                balloon: None,
+                prepayment_penalty: None,
+                special_servicing: None,
+                noi: None,
+                liquidation: None,
             });
         }
         for facility in &self.revolvers {
@@ -415,6 +429,13 @@ impl InstrumentCollateral {
                 recovery_rate: Some(facility.recovery_rate),
                 commitment: Some(facility.commitment_amount),
                 contractual_payment: None,
+                market_price_pct: None,
+                delinquency_buckets: None,
+                balloon: None,
+                prepayment_penalty: None,
+                special_servicing: None,
+                noi: None,
+                liquidation: None,
             });
         }
         Ok(rows)

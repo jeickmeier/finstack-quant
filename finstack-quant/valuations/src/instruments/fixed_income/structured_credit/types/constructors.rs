@@ -189,6 +189,8 @@ impl StructuredCredit {
                 stochastic_prepay_spec: None,
                 stochastic_default_spec: None,
                 correlation_structure: None,
+                delinquency: None,
+                card: None,
             },
             market_conditions: MarketConditions::default(),
             credit_factors: config.credit_factors,
@@ -197,6 +199,14 @@ impl StructuredCredit {
             // Hedge swaps default to empty
             hedge_swaps: Vec::new(),
             cleanup_call_pct: None,
+            // Deal-type market convention; see `LossAllocationPolicy::default_for`.
+            loss_allocation: None,
+            // Deal-type convention; see `effective_principal_covers_senior_interest`.
+            principal_covers_senior_interest: None,
+            // Par-OC unless rules are attached; see `CoverageRules::clo_standard`.
+            coverage_rules: None,
+            call_assumption: None,
+            liquidation_price_pct: None,
             // No declarative waterfall rules by default.
             waterfall_rules: None,
             // Template waterfall by default; custom via `with_waterfall`.

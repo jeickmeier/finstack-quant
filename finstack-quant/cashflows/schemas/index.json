@@ -18,7 +18,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
-      "bytes": 1932,
+      "bytes": 5002,
       "kind": "component",
       "path": "schemas/cashflow/1/default_model_spec.schema.json",
       "summary": "Hazard or CDR assumption driving credit losses.",
@@ -34,7 +34,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
-      "bytes": 2858,
+      "bytes": 4361,
       "kind": "component",
       "path": "schemas/cashflow/1/prepayment_model_spec.schema.json",
       "summary": "CPR, PSA or custom vector driving voluntary prepayments.",
@@ -42,7 +42,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",
-      "bytes": 747,
+      "bytes": 1117,
       "kind": "component",
       "path": "schemas/cashflow/1/recovery_model_spec.schema.json",
       "summary": "Recovery rate and lag applied to defaulted balances.",

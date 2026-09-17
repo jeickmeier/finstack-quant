@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 916276,
+      "bytes": 979902,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 915243,
+      "bytes": 978869,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -425,6 +425,14 @@
       "title": "agency_tba"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
+      "bytes": 251600,
+      "kind": "input",
+      "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
+      "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
+      "title": "asset_backed_facility"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
       "bytes": 88663,
       "kind": "input",
@@ -474,7 +482,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 317269,
+      "bytes": 368129,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -594,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1001428,
+      "bytes": 1068779,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",

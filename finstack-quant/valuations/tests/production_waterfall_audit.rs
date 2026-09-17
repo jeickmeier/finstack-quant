@@ -3,8 +3,8 @@
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, money::Money};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    execute_waterfall, PaymentCalculation, PaymentType, Recipient, RecipientType, StructuredCredit,
-    Waterfall, WaterfallContext, WaterfallDistribution, WaterfallTier,
+    execute_waterfall, FundingSource, PaymentCalculation, PaymentType, Recipient, RecipientType,
+    StructuredCredit, Waterfall, WaterfallContext, WaterfallDistribution, WaterfallTier,
 };
 use time::macros::date;
 
@@ -48,18 +48,31 @@ fn execute(
             deferred_interest: None,
             reserve_balance: usd(0.0),
             restricted_cash: usd(0.0),
+            defaulted_collateral_value: usd(0.0),
             recovery_proceeds: usd(0.0),
             floating_rate_shift: 0.0,
+            equity_history: None,
         },
     )
 }
 
 #[test]
-fn production_waterfall_principal_cannot_fund_fees() {
+fn production_waterfall_principal_cannot_fund_fees_unless_the_tier_draws_on_it() {
     let waterfall = Waterfall::new(Currency::USD).add_tier(fee("fee", 1, 50.0));
     let result = execute(&waterfall, 10.0, 100.0).expect("waterfall");
     assert_eq!(result.tier_allocations[0].1, usd(10.0));
     assert_eq!(result.remaining_cash, usd(100.0));
+    assert_eq!(result.principal_used_for_interest, usd(0.0));
+
+    // The same tier funded interest-then-principal tops up from principal.
+    let waterfall = Waterfall::new(Currency::USD)
+        .add_tier(fee("fee", 1, 50.0).funding(FundingSource::InterestThenPrincipal));
+    let result = execute(&waterfall, 10.0, 100.0).expect("waterfall");
+    assert_eq!(result.tier_allocations[0].1, usd(50.0));
+    assert_eq!(result.principal_used_for_interest, usd(40.0));
+    assert_eq!(result.remaining_interest, usd(0.0));
+    assert_eq!(result.remaining_principal, usd(60.0));
+    assert_eq!(result.remaining_cash, usd(60.0));
 }
 
 #[test]

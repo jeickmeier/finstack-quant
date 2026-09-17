@@ -3,7 +3,8 @@
 //! This module contains all data structures for waterfall distribution:
 //! - Payment recipients and calculation methods
 //! - Tier structures and allocation modes
-//! - Coverage triggers for OC/IC tests
+//! - Coverage-test positions (`PaymentType::CoverageTest` tiers carrying
+//!   `CoverageTestSpec`s) for OC/IC diversion
 //! - Result types for waterfall execution
 //!
 //! Execution logic is in `crate::instruments::fixed_income::structured_credit::pricing::waterfall`.
@@ -93,6 +94,19 @@ pub enum PaymentCalculation {
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
     },
+    /// Percentage of the specially serviced collateral balance (CMBS special
+    /// servicing fee): the balances of pool assets carrying a
+    /// `special_servicing` spec.
+    PercentageOfSpecialServiced {
+        /// Rate.
+        rate: f64,
+        /// Annualized.
+        annualized: bool,
+        /// Day count convention for annualization.
+        day_count: Option<finstack_quant_core::dates::DayCount>,
+        /// Rounding convention.
+        rounding: Option<RoundingConvention>,
+    },
     /// Interest due on tranche
     TrancheInterest {
         /// Tranche id.
@@ -104,7 +118,10 @@ pub enum PaymentCalculation {
     TranchePrincipal {
         /// Tranche id.
         tranche_id: String,
-        /// Target balance.
+        /// Balance the regular principal pass amortizes the tranche down to;
+        /// `None` pays it in full. A coverage-test cure diversion at an earlier
+        /// position pays toward zero and counts toward this target, so the
+        /// regular pass only completes the remaining distance to it.
         target_balance: Option<Money>,
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
@@ -136,6 +153,56 @@ pub enum PaymentCalculation {
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
     },
+    /// Manager incentive fee: `share_pct` of the cash reaching this recipient
+    /// once the equity IRR to date (the [`EquityHistory`] in the
+    /// `WaterfallContext`, plus this cash on the payment date) reaches
+    /// `hurdle_irr`; nothing before that, and nothing when no equity history
+    /// is supplied.
+    IncentiveFee {
+        /// Equity IRR hurdle as an annual decimal.
+        hurdle_irr: f64,
+        /// Share of the residual paid once the hurdle is met, in `[0, 1]`.
+        share_pct: f64,
+    },
+}
+
+/// Equity's cash history to date, the input of an incentive-fee IRR test.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EquityHistory {
+    /// Date the equity capital was invested (the deal closing date).
+    pub invested_on: Date,
+    /// Equity capital invested at closing (the equity notes' original par).
+    pub invested: Money,
+    /// Every distribution to equity so far, in date order.
+    pub distributions: Vec<(Date, Money)>,
+}
+
+impl EquityHistory {
+    /// Annual IRR of the equity investment against its distributions to date
+    /// plus `candidate` paid on `payment_date`, or `None` when no IRR exists
+    /// (no capital invested, or no sign change yet).
+    ///
+    /// # Arguments
+    ///
+    /// * `payment_date` - Date the candidate distribution would be paid.
+    /// * `candidate` - Cash that would reach equity on `payment_date`.
+    #[must_use]
+    pub fn irr_with(&self, payment_date: Date, candidate: Money) -> Option<f64> {
+        if self.invested.amount() <= 0.0 {
+            return None;
+        }
+        let mut flows: Vec<(Date, f64)> = Vec::with_capacity(self.distributions.len() + 2);
+        flows.push((self.invested_on, -self.invested.amount()));
+        flows.extend(
+            self.distributions
+                .iter()
+                .map(|(date, amount)| (*date, amount.amount())),
+        );
+        flows.push((payment_date, candidate.amount()));
+        finstack_quant_core::cashflow::xirr(&flows, None)
+            .ok()
+            .filter(|irr| irr.is_finite())
+    }
 }
 
 /// Declarative, additively-applied waterfall rules layered onto a deal's base
@@ -250,6 +317,9 @@ impl WaterfallRules {
                     StepDownTrigger::MinCreditEnhancement(v) => {
                         unit(*v, "step_down trigger MinCreditEnhancement")?;
                     }
+                    StepDownTrigger::MaxDelinquency(v) => {
+                        unit(*v, "step_down trigger MaxDelinquency")?;
+                    }
                     StepDownTrigger::MinOcRatio(v) => {
                         if !v.is_finite() || *v < 0.0 {
                             return Err(invalid(format!(
@@ -295,6 +365,13 @@ impl WaterfallRules {
                 ea.max_cumulative_loss_pct,
                 "early_amortization.max_cumulative_loss_pct",
             )?;
+            if let Some(floor) = ea.min_excess_spread_3m {
+                if !floor.is_finite() {
+                    return Err(invalid(format!(
+                        "waterfall_rules: early_amortization.min_excess_spread_3m must be finite, got {floor}"
+                    )));
+                }
+            }
         }
 
         if let Some(ca) = &self.controlled_accumulation {
@@ -365,9 +442,8 @@ pub struct ExcessSpreadSpec {
 ///   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
 ///   lowest-priority one is taken as the reference.
 ///
-/// Delinquency triggers are intentionally absent: the simulation engine models
-/// defaults and recoveries but not a separate delinquency state, so there is no
-/// delinquency rate to test against.
+/// `MaxDelinquency` reads the delinquent share of the pool, which is zero
+/// unless the deal carries a `credit_model.delinquency` model.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
@@ -382,6 +458,10 @@ pub enum StepDownTrigger {
     /// Passes while senior credit enhancement (`(pool − senior note) ÷ pool`) is
     /// at or above this level.
     MinCreditEnhancement(f64),
+    /// Passes while the delinquent balance (every bucket of the deal's
+    /// delinquency model) as a fraction of the current pool balance is at or
+    /// below this level.
+    MaxDelinquency(f64),
 }
 
 /// Step-down specification for senior/subordinate principal allocation.
@@ -451,6 +531,12 @@ pub struct EarlyAmortizationSpec {
     /// Cumulative-loss fraction (decimal, of the original pool balance) at or
     /// above which the revolving period ends early and amortization begins.
     pub max_cumulative_loss_pct: f64,
+    /// Annualized excess spread (decimal of the opening pool balance: pool
+    /// interest less debt coupons due, fees paid and net charge-offs) whose
+    /// three-period trailing average, once it falls below this floor, ends the
+    /// revolving period for good. `None` disables the excess-spread test.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_excess_spread_3m: Option<f64>,
 }
 
 /// Controlled-accumulation specification for revolving (master-trust) deals.
@@ -519,6 +605,12 @@ pub enum PaymentType {
     Principal,
     /// Excess-interest distribution; does not retire equity principal.
     Residual,
+    /// Coverage-test position: the tier pays nobody itself. While any of its
+    /// [`WaterfallTier::tests`] fails, the interest still undistributed at
+    /// this point in the waterfall is diverted (up to the cure amount) per the
+    /// test's [`CoverageTestAction`], so only tiers ranked below the test can
+    /// lose cash to it.
+    CoverageTest,
 }
 
 /// Individual payment recipient within a tier
@@ -605,7 +697,46 @@ impl Recipient {
     }
 }
 
-/// Waterfall tier with multiple recipients
+/// Collection account(s) a waterfall tier draws on.
+///
+/// Interest and principal proceeds are separate accounts in the executor.
+/// A tier normally draws on the account matching its [`PaymentType`]; a
+/// `Fee` or `Interest` tier may instead be allowed to top up from principal
+/// proceeds (the CLO principal-waterfall convention that senior fees and
+/// senior note interest shortfalls are paid from principal before any note
+/// is redeemed). Cash taken from principal this way is reported as
+/// [`WaterfallDistribution::principal_used_for_interest`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FundingSource {
+    /// Interest proceeds only (the default for fee, interest and residual tiers).
+    Interest,
+    /// Principal proceeds only (the default for principal tiers).
+    Principal,
+    /// Interest proceeds first, then principal proceeds for any shortfall.
+    InterestThenPrincipal,
+}
+
+impl FundingSource {
+    /// Account a tier of `payment_type` draws on when it sets no explicit
+    /// funding source.
+    ///
+    /// # Arguments
+    ///
+    /// * `payment_type` - Tier classification; `Principal` tiers draw on
+    ///   principal proceeds, every other tier on interest proceeds.
+    #[must_use]
+    pub fn default_for(payment_type: PaymentType) -> Self {
+        match payment_type {
+            PaymentType::Principal => Self::Principal,
+            _ => Self::Interest,
+        }
+    }
+}
+
+/// Waterfall tier: a payment step with recipients, or a coverage-test
+/// position ([`PaymentType::CoverageTest`]) carrying `tests` and no recipients.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -614,14 +745,22 @@ pub struct WaterfallTier {
     pub id: String,
     /// Priority order (lower = higher priority)
     pub priority: usize,
-    /// Recipients in this tier
+    /// Recipients in this tier (empty for a coverage-test tier)
     pub recipients: Vec<Recipient>,
     /// Payment type classification
     pub payment_type: PaymentType,
     /// How to allocate within tier
     pub allocation_mode: AllocationMode,
-    /// Whether this tier can be diverted if coverage tests fail
-    pub divertible: bool,
+    /// Coverage tests evaluated at this position (only for
+    /// [`PaymentType::CoverageTest`] tiers; empty otherwise). Every test in
+    /// one tier shares the same [`CoverageTestAction`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<CoverageTestSpec>,
+    /// Collection account(s) this tier draws on; `None` uses
+    /// [`FundingSource::default_for`] the tier's `payment_type`. See
+    /// [`Self::effective_funding`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding: Option<FundingSource>,
 }
 
 impl WaterfallTier {
@@ -634,7 +773,54 @@ impl WaterfallTier {
             recipients: Vec::new(),
             payment_type,
             allocation_mode: AllocationMode::Sequential,
-            divertible: false,
+            tests: Vec::new(),
+            funding: None,
+        }
+    }
+
+    /// Set the collection account(s) this tier draws on.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - Account(s) to pay this tier from; `InterestThenPrincipal`
+    ///   lets a fee or interest tier top up from principal proceeds.
+    #[must_use]
+    pub fn funding(mut self, source: FundingSource) -> Self {
+        self.funding = Some(source);
+        self
+    }
+
+    /// Account(s) this tier draws on: the explicit `funding`, or the default
+    /// for its `payment_type`.
+    #[must_use]
+    pub fn effective_funding(&self) -> FundingSource {
+        self.funding
+            .unwrap_or_else(|| FundingSource::default_for(self.payment_type))
+    }
+
+    /// Create a coverage-test tier at `priority` carrying `tests`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique tier identifier.
+    /// * `priority` - Position in the waterfall (lower runs first); `0` lets
+    ///   [`WaterfallBuilder::add_tier`] assign the next priority.
+    /// * `tests` - Coverage tests evaluated at this position; they must share
+    ///   one [`CoverageTestAction`].
+    #[must_use]
+    pub fn coverage_tests(
+        id: impl Into<String>,
+        priority: usize,
+        tests: Vec<CoverageTestSpec>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            priority,
+            recipients: Vec::new(),
+            payment_type: PaymentType::CoverageTest,
+            allocation_mode: AllocationMode::Sequential,
+            tests,
+            funding: None,
         }
     }
 
@@ -652,11 +838,17 @@ impl WaterfallTier {
         self
     }
 
-    /// Mark as divertible
-    #[must_use]
-    pub fn divertible(mut self, divertible: bool) -> Self {
-        self.divertible = divertible;
-        self
+    /// Tranche ids whose interest claim this tier pays.
+    pub(crate) fn interest_tranche_ids(&self) -> impl Iterator<Item = &str> {
+        self.recipients
+            .iter()
+            .filter_map(|recipient| match &recipient.calculation {
+                PaymentCalculation::TrancheInterest { tranche_id, .. }
+                | PaymentCalculation::CappedTrancheInterest { tranche_id, .. } => {
+                    Some(tranche_id.as_str())
+                }
+                _ => None,
+            })
     }
 }
 
@@ -708,6 +900,11 @@ pub struct WaterfallDistribution {
     pub remaining_interest: Money,
     /// Undistributed principal retained for reinvestment or debt repayment.
     pub remaining_principal: Money,
+    /// Principal proceeds spent on fee or interest tiers whose
+    /// [`FundingSource`] is `InterestThenPrincipal`. Already netted out of
+    /// `remaining_principal`; reported so the principal account's use is
+    /// visible.
+    pub principal_used_for_interest: Money,
     /// Whether any diversions occurred
     pub had_diversions: bool,
     /// Diversion reason if applicable
@@ -770,69 +967,294 @@ pub struct PaymentRecord {
     pub diverted: bool,
 }
 
-/// Simple OC/IC trigger for diversion
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Collateral valuation rules for the OC tests: rating haircuts, the value
+/// carried for defaulted collateral, the excess-CCC bucket and discount
+/// obligations (CLO indenture conventions). Percentages are percent values
+/// (`7.5` = 7.5%); haircuts are decimal fractions.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct CoverageTestRules {
-    /// Haircuts applied by collateral rating
-    pub haircuts: BTreeMap<CreditRating, f64>,
-    /// Optional par-value threshold ratio (collateral / liabilities)
-    pub par_value_threshold: Option<f64>,
+pub struct CoverageRules {
+    /// Haircut applied to the par of performing collateral by rating, as a
+    /// decimal fraction (`0.5` carries the asset at half par); unrated assets
+    /// use the `NR` entry when present.
+    #[serde(default)]
+    pub rating_haircuts: BTreeMap<CreditRating, f64>,
+    /// Value carried for defaulted collateral whose recovery cash has not yet
+    /// arrived.
+    #[serde(default)]
+    pub defaulted_valuation: DefaultedValuation,
+    /// Excess-CCC bucket: collateral rated CCC+ and below beyond
+    /// `threshold_pct` of the performing pool is carried at market value or
+    /// excluded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ccc_bucket: Option<CccBucketRule>,
+    /// Discount obligations: collateral bought below `price_threshold_pct` of
+    /// par is carried at its purchase price.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discount_obligation: Option<DiscountObligationRule>,
+    /// Advance rates and concentration limits evaluated by
+    /// `CoverageTestType::BorrowingBase` tests; `None` makes such a test a
+    /// validation error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub borrowing_base: Option<super::borrowing_base::BorrowingBaseRules>,
 }
 
-impl CoverageTestRules {
-    /// Create new coverage rules.
-    pub fn new<I>(haircuts: I, par_value_threshold: Option<f64>) -> Self
-    where
-        I: IntoIterator<Item = (CreditRating, f64)>,
-    {
+/// How defaulted collateral enters the OC numerator until its recovery cash
+/// arrives.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum DefaultedValuation {
+    /// At the modeled recovery value of the pending claims (the default).
+    #[default]
+    Recovery,
+    /// At `pct` percent of the defaulted par (a market-value convention).
+    MarketValue {
+        /// Percent of defaulted par carried (`40.0` = 40%).
+        pct: f64,
+    },
+}
+
+/// Excess-CCC bucket rule.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct CccBucketRule {
+    /// Share of the performing pool, in percent, that CCC+ and lower rated
+    /// collateral may occupy at par (`7.5` = 7.5%).
+    pub threshold_pct: f64,
+    /// `true` carries the excess at the assets' `market_price_pct` (assets
+    /// without a price stay at par); `false` excludes the excess entirely.
+    pub carry_at_market_value: bool,
+}
+
+/// Discount-obligation rule.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DiscountObligationRule {
+    /// Purchase price, in percent of par, below which an asset is a discount
+    /// obligation carried at its purchase price (`80.0` = 80% of par).
+    pub price_threshold_pct: f64,
+}
+
+impl CoverageRules {
+    /// Standard CLO rules from the embedded assumption registry: its rating
+    /// haircuts, defaulted collateral at recovery, a 7.5% CCC bucket carried
+    /// at market value and an 80% discount-obligation threshold.
+    #[must_use]
+    pub fn clo_standard() -> Self {
+        let registry =
+            crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic();
         Self {
-            haircuts: haircuts.into_iter().collect(),
-            par_value_threshold,
+            rating_haircuts: registry.coverage_haircuts().into_iter().collect(),
+            defaulted_valuation: DefaultedValuation::Recovery,
+            ccc_bucket: Some(CccBucketRule {
+                threshold_pct: 7.5,
+                carry_at_market_value: true,
+            }),
+            discount_obligation: Some(DiscountObligationRule {
+                price_threshold_pct: 80.0,
+            }),
+            borrowing_base: None,
         }
     }
 
-    /// Empty/default rules (no haircuts, no threshold).
-    pub fn empty() -> Self {
-        Self {
-            haircuts: BTreeMap::new(),
-            par_value_threshold: None,
-        }
-    }
-
-    /// Check whether no rules are configured.
+    /// Whether the rules leave every test at plain par with defaulted
+    /// collateral at recovery.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.haircuts.is_empty() && self.par_value_threshold.is_none()
+        self.rating_haircuts.is_empty()
+            && self.defaulted_valuation == DefaultedValuation::Recovery
+            && self.ccc_bucket.is_none()
+            && self.discount_obligation.is_none()
+            && self.borrowing_base.is_none()
     }
-}
 
-impl From<&super::setup::CoverageTestConfig> for CoverageTestRules {
-    fn from(config: &super::setup::CoverageTestConfig) -> Self {
-        Self {
-            haircuts: config.haircuts.clone(),
-            par_value_threshold: config.par_value_threshold,
+    /// Whether any rule changes the value of performing collateral.
+    #[must_use]
+    pub fn adjusts_collateral(&self) -> bool {
+        !self.rating_haircuts.is_empty()
+            || self.ccc_bucket.is_some()
+            || self.discount_obligation.is_some()
+    }
+
+    /// Reject non-finite or out-of-range parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when a haircut is outside `[0, 1]`, a
+    /// market-value or threshold percent is outside `[0, 100]`, or any value
+    /// is non-finite.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if let Some(rules) = &self.borrowing_base {
+            rules.validate()?;
         }
+        let invalid = |msg: &str| finstack_quant_core::Error::Validation(msg.to_string());
+        if self
+            .rating_haircuts
+            .values()
+            .any(|h| !h.is_finite() || !(0.0..=1.0).contains(h))
+        {
+            return Err(invalid(
+                "coverage rating haircuts must be decimal fractions in [0, 1]",
+            ));
+        }
+        if let DefaultedValuation::MarketValue { pct } = self.defaulted_valuation {
+            if !pct.is_finite() || !(0.0..=100.0).contains(&pct) {
+                return Err(invalid(
+                    "defaulted market value must be a percent in [0, 100]",
+                ));
+            }
+        }
+        if let Some(bucket) = self.ccc_bucket {
+            if !bucket.threshold_pct.is_finite() || !(0.0..=100.0).contains(&bucket.threshold_pct) {
+                return Err(invalid(
+                    "CCC bucket threshold must be a percent in [0, 100]",
+                ));
+            }
+        }
+        if let Some(rule) = self.discount_obligation {
+            if !rule.price_threshold_pct.is_finite() || rule.price_threshold_pct <= 0.0 {
+                return Err(invalid(
+                    "discount obligation price threshold must be a positive percent of par",
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
-/// Coverage trigger definition used for diversion logic (OC/IC thresholds).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// What a failing coverage test does with the interest it diverts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum CoverageTestAction {
+    /// Pay down the notes of the senior-most principal tier, in its recipient
+    /// order, until the test is cured (the standard OC/IC turbo).
+    #[default]
+    PayDownSenior,
+    /// Retain the diverted interest as principal proceeds (a CLO
+    /// reinvestment OC test): it is reinvested while the reinvestment period
+    /// is active and repays notes through the principal tier afterwards.
+    Reinvest,
+}
+
+/// One coverage test at a position in the waterfall.
+///
+/// The ratio is computed on the period's collateral and note balances
+/// (overcollateralization: collateral value over the tested class and every
+/// class senior to it; interest coverage: interest collections net of senior
+/// fees over the interest due to the same classes); the *position* of the
+/// tier that carries the test decides which cash a failure can divert.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-// Distinct from the tranche-level `types::tranches::CoverageTrigger`.
-#[cfg_attr(feature = "json-schema", schemars(rename = "WaterfallCoverageTrigger"))]
-pub struct CoverageTrigger {
-    /// Tranche where test applies
+pub struct CoverageTestSpec {
+    /// Unique test identifier, reported in `WaterfallDistribution::coverage_tests`
+    /// (`OC_<tranche>` / `IC_<tranche>` by convention).
+    pub id: String,
+    /// Tested class; the ratio covers this class and every class senior to it.
     pub tranche_id: String,
-    /// OC trigger level (e.g., 1.15 = 115%)
-    pub oc_trigger: Option<f64>,
-    /// IC trigger level (e.g., 1.10 = 110%)
-    pub ic_trigger: Option<f64>,
+    /// Overcollateralization or interest coverage.
+    pub kind: CoverageTestType,
+    /// Minimum ratio that passes (1.20 means 120%).
+    pub trigger_level: f64,
+    /// What a failure does with the diverted interest.
+    #[serde(default)]
+    pub action: CoverageTestAction,
+    /// Template placement: the test tier follows the interest tier of this
+    /// tranche instead of the tested tranche's own. Used only when the deal
+    /// synthesizes its waterfall; a custom waterfall places test tiers
+    /// explicitly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_tranche: Option<String>,
+}
+
+impl CoverageTestSpec {
+    fn new(tranche_id: impl Into<String>, kind: CoverageTestType, trigger_level: f64) -> Self {
+        let tranche_id = tranche_id.into();
+        Self {
+            id: format!("{}_{tranche_id}", kind.label()),
+            tranche_id,
+            kind,
+            trigger_level,
+            action: CoverageTestAction::default(),
+            after_tranche: None,
+        }
+    }
+
+    /// Overcollateralization test on `tranche_id` at `trigger_level`
+    /// (1.20 means 120%), id `OC_<tranche_id>`, paying down senior notes on
+    /// failure.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Tested class; the denominator is this class plus
+    ///   every class senior to it.
+    /// * `trigger_level` - Minimum passing ratio as a decimal multiple.
+    #[must_use]
+    pub fn oc(tranche_id: impl Into<String>, trigger_level: f64) -> Self {
+        Self::new(tranche_id, CoverageTestType::Oc, trigger_level)
+    }
+
+    /// Interest coverage test on `tranche_id` at `trigger_level` (1.10 means
+    /// 110%), id `IC_<tranche_id>`, paying down senior notes on failure.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Tested class; interest due covers this class plus
+    ///   every class senior to it.
+    /// * `trigger_level` - Minimum passing ratio as a decimal multiple.
+    #[must_use]
+    pub fn ic(tranche_id: impl Into<String>, trigger_level: f64) -> Self {
+        Self::new(tranche_id, CoverageTestType::Ic, trigger_level)
+    }
+
+    /// Borrowing-base test on `tranche_id` at `trigger_level` (1.0 means the
+    /// borrowing base must cover the tested class and every class senior to
+    /// it), id `BB_<tranche_id>`, paying down senior notes on failure. The
+    /// advance rates and concentration limits come from
+    /// `CoverageRules::borrowing_base`.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Tested class; the denominator is this class plus
+    ///   every class senior to it.
+    /// * `trigger_level` - Minimum passing ratio as a decimal multiple.
+    #[must_use]
+    pub fn borrowing_base(tranche_id: impl Into<String>, trigger_level: f64) -> Self {
+        Self::new(tranche_id, CoverageTestType::BorrowingBase, trigger_level)
+    }
+
+    /// Set what a failure does with the diverted interest.
+    #[must_use]
+    pub fn with_action(mut self, action: CoverageTestAction) -> Self {
+        self.action = action;
+        self
+    }
+
+    /// Place the template test tier after `tranche_id`'s interest tier.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Class whose interest tier the test follows.
+    #[must_use]
+    pub fn after_tranche(mut self, tranche_id: impl Into<String>) -> Self {
+        self.after_tranche = Some(tranche_id.into());
+        self
+    }
+
+    /// Tranche whose interest tier the template places this test after.
+    pub fn placement_tranche(&self) -> &str {
+        self.after_tranche.as_deref().unwrap_or(&self.tranche_id)
+    }
 }
 
 /// Type of coverage test (simplified to OC/IC only)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -841,6 +1263,21 @@ pub enum CoverageTestType {
     Oc,
     /// Interest coverage test
     Ic,
+    /// Borrowing-base test: advance-rate-weighted eligible collateral (after
+    /// the concentration limits in `CoverageRules::borrowing_base`) over the
+    /// tested class plus every class senior to it.
+    BorrowingBase,
+}
+
+impl CoverageTestType {
+    /// Upper-case label used in test ids (`OC` / `IC`).
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Oc => "OC",
+            Self::Ic => "IC",
+            Self::BorrowingBase => "BB",
+        }
+    }
 }
 
 // WATERFALL WORKSPACE (Pre-allocated Buffers)
@@ -900,14 +1337,13 @@ impl Default for WaterfallWorkspace {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Waterfall {
-    /// Ordered payment tiers
+    /// Ordered payment tiers, including [`PaymentType::CoverageTest`] positions
     pub tiers: Vec<WaterfallTier>,
-    /// Coverage triggers for OC/IC diversion
-    pub coverage_triggers: Vec<CoverageTrigger>,
     /// Base currency
     pub base_currency: Currency,
-    /// Optional coverage test rules (haircuts, par thresholds)
-    pub coverage_rules: Option<CoverageTestRules>,
+    /// Collateral valuation rules for the OC tests; `None` values collateral
+    /// at par with defaulted assets at recovery.
+    pub coverage_rules: Option<CoverageRules>,
 }
 
 impl Waterfall {
@@ -924,7 +1360,6 @@ impl Waterfall {
     pub fn new(base_currency: Currency) -> Self {
         Self {
             tiers: Vec::new(),
-            coverage_triggers: Vec::new(),
             base_currency,
             coverage_rules: None,
         }
@@ -938,58 +1373,112 @@ impl Waterfall {
         self
     }
 
-    /// Add coverage trigger for OC/IC diversion
+    /// Attach collateral valuation rules for the OC tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `rules` - Rating haircuts, defaulted-asset valuation, CCC bucket and
+    ///   discount-obligation rules applied by every OC test.
     #[must_use]
-    pub fn add_coverage_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.coverage_triggers.push(trigger);
+    pub fn with_coverage_rules(mut self, rules: CoverageRules) -> Self {
+        self.coverage_rules = Some(rules);
         self
     }
 
-    /// Attach coverage test rules (e.g., rating haircuts).
-    #[must_use]
-    pub fn with_coverage_rules(mut self, rules: CoverageTestRules) -> Self {
-        self.coverage_rules = Some(rules);
-        self
+    /// Every coverage test in the waterfall, in tier priority order.
+    pub fn coverage_tests(&self) -> impl Iterator<Item = &CoverageTestSpec> {
+        let mut tiers: Vec<&WaterfallTier> = self.tiers.iter().collect();
+        tiers.sort_by_key(|tier| tier.priority);
+        tiers
+            .into_iter()
+            .filter(|tier| tier.payment_type == PaymentType::CoverageTest)
+            .flat_map(|tier| tier.tests.iter())
+    }
+
+    /// Insert `test` as a coverage-test position immediately after the tier
+    /// that pays `spec.placement_tranche()`'s interest (or after the last
+    /// interest tier when that tranche has no interest recipient), joining an
+    /// existing test tier at that position when one is already there.
+    /// Priorities are renumbered `1..=n` in order.
+    ///
+    /// # Arguments
+    ///
+    /// * `test` - Coverage test to place.
+    pub fn insert_coverage_test(&mut self, test: CoverageTestSpec) {
+        self.tiers.sort_by_key(|tier| tier.priority);
+        let placement = test.placement_tranche().to_string();
+        let anchor = self
+            .tiers
+            .iter()
+            .position(|tier| tier.interest_tranche_ids().any(|id| id == placement))
+            .or_else(|| {
+                self.tiers
+                    .iter()
+                    .rposition(|tier| tier.payment_type == PaymentType::Interest)
+            });
+        let insert_at = anchor.map_or(0, |i| i + 1);
+        match self.tiers.get_mut(insert_at) {
+            Some(existing)
+                if existing.payment_type == PaymentType::CoverageTest
+                    && existing
+                        .tests
+                        .first()
+                        .is_none_or(|first| first.action == test.action) =>
+            {
+                existing.tests.push(test);
+            }
+            _ => {
+                let tier =
+                    WaterfallTier::coverage_tests(format!("{placement}_coverage"), 0, vec![test]);
+                self.tiers.insert(insert_at, tier);
+            }
+        }
+        for (index, tier) in self.tiers.iter_mut().enumerate() {
+            tier.priority = index + 1;
+        }
     }
 
     /// Create a standard sequential waterfall for a given tranche structure.
     ///
     /// Shared skeleton:
     /// 1. Fees tier (sequential)
-    /// 2. Interest (sequential, by priority)
+    /// 2. One interest tier per note class in payment-priority order, each
+    ///    followed by the coverage tests placed on that class
     /// 3. Principal (sequential, by priority)
-    /// 4. Equity residual (divertible so an OC/IC cure can turbo excess)
+    /// 4. Equity residual
     ///
-    /// CLO/CBO deals split interest at the senior/subordinated boundary and
-    /// mark the subordinated half divertible so an OC/IC cure can trap junior
-    /// coupon (INTEX/Bloomberg CLO). ABS, RMBS, CMBS, auto, and card deals
-    /// keep a single non-divertible interest tier: coupons are paid in
-    /// priority order even when a coverage test fails; only residual cash
-    /// is available to turbo.
+    /// Paying interest class by class (INTEX/Bloomberg ordering) lets a
+    /// coverage test sit after any class, so a failing Class D test can only
+    /// trap the interest ranked below Class D, and lets
+    /// [`Self::fund_senior_interest_from_principal`] single out the senior
+    /// coupons. Every tier draws on its default [`FundingSource`].
     ///
     /// # Arguments
     ///
-    /// * `deal_type` - Deal family that selects CLO-style junior-interest
-    ///   diversion versus passthrough coupons
     /// * `base_currency` - Deal currency of the waterfall; tranche balances and fees must
     ///   match this currency.
     /// * `tranches` - Capital structure whose notes become sequential interest and
     ///   principal recipients.
-    /// * `fee_recipients` - Fee-tier recipients inserted ahead of interest when non-empty;
-    ///   an empty vec omits the fees tier.
+    /// * `fees` - Senior fee recipients (a tier ahead of every note), junior
+    ///   fee recipients (a tier after every note coupon, ahead of principal)
+    ///   and the incentive-fee recipient (a tier ahead of the residual); empty
+    ///   lists omit their tiers.
+    /// * `coverage_tests` - Deal-level coverage tests, each placed after the
+    ///   interest tier of its [`CoverageTestSpec::placement_tranche`].
     pub fn standard_sequential(
-        deal_type: super::DealType,
         base_currency: Currency,
         tranches: &super::TrancheStructure,
-        fee_recipients: Vec<Recipient>,
+        fees: TemplateFees,
+        coverage_tests: &[CoverageTestSpec],
     ) -> Self {
         let mut engine = Self::new(base_currency);
         let mut priority = 1;
 
-        if !fee_recipients.is_empty() {
+        if !fees.senior.is_empty() {
             let fees_tier = WaterfallTier::new("fees", priority, PaymentType::Fee)
                 .allocation_mode(AllocationMode::Sequential);
-            let fees_tier = fee_recipients
+            let fees_tier = fees
+                .senior
                 .into_iter()
                 .fold(fees_tier, |tier, recipient| tier.add_recipient(recipient));
             engine.tiers.push(fees_tier);
@@ -999,71 +1488,39 @@ impl Waterfall {
         let mut sorted_tranches = tranches.tranches.clone();
         sorted_tranches.sort_by_key(|t| t.payment_priority);
 
-        let trap_junior_interest = matches!(deal_type, super::DealType::Clo | super::DealType::Cbo);
+        // One interest tier per class in payment-priority order, so a
+        // coverage-test position can sit after any class and a funding source
+        // can single out the senior coupons. Sequential allocation makes the
+        // split an identity when nothing sits between the tiers.
+        for tranche in &sorted_tranches {
+            if tranche.seniority == super::TrancheSeniority::Equity {
+                continue;
+            }
+            let tier = WaterfallTier::new(
+                format!("{}_interest", tranche.id.as_str()),
+                priority,
+                PaymentType::Interest,
+            )
+            .allocation_mode(AllocationMode::Sequential)
+            .add_recipient(Recipient::tranche_interest(
+                format!("{}_interest", tranche.id.as_str()),
+                tranche.id.as_str(),
+            ));
+            engine.tiers.push(tier);
+            priority += 1;
+        }
 
-        if trap_junior_interest {
-            // Split debt interest at the senior/subordinated boundary and mark
-            // the subordinated half divertible so an OC cure can trap junior
-            // coupon (INTEX/Bloomberg CLO). Sequential allocation makes the
-            // split an identity when no test is failing.
-            let mut senior_interest_recipients = Vec::new();
-            let mut subordinated_interest_recipients = Vec::new();
-            for tranche in &sorted_tranches {
-                if tranche.seniority == super::TrancheSeniority::Equity {
-                    continue;
-                }
-                let recipient = Recipient::tranche_interest(
-                    format!("{}_interest", tranche.id.as_str()),
-                    tranche.id.as_str(),
-                );
-                if tranche.seniority == super::TrancheSeniority::Senior {
-                    senior_interest_recipients.push(recipient);
-                } else {
-                    subordinated_interest_recipients.push(recipient);
-                }
-            }
-
-            if !senior_interest_recipients.is_empty() {
-                let tier = WaterfallTier::new("senior_interest", priority, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential);
-                let tier = senior_interest_recipients
-                    .into_iter()
-                    .fold(tier, |tier, recipient| tier.add_recipient(recipient));
-                engine.tiers.push(tier);
-                priority += 1;
-            }
-
-            if !subordinated_interest_recipients.is_empty() {
-                let tier =
-                    WaterfallTier::new("subordinated_interest", priority, PaymentType::Interest)
-                        .allocation_mode(AllocationMode::Sequential)
-                        .divertible(true);
-                let tier = subordinated_interest_recipients
-                    .into_iter()
-                    .fold(tier, |tier, recipient| tier.add_recipient(recipient));
-                engine.tiers.push(tier);
-                priority += 1;
-            }
-        } else {
-            let interest_recipients: Vec<Recipient> = sorted_tranches
-                .iter()
-                .filter(|tranche| tranche.seniority != super::TrancheSeniority::Equity)
-                .map(|tranche| {
-                    Recipient::tranche_interest(
-                        format!("{}_interest", tranche.id.as_str()),
-                        tranche.id.as_str(),
-                    )
-                })
-                .collect();
-            if !interest_recipients.is_empty() {
-                let tier = WaterfallTier::new("interest", priority, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential);
-                let tier = interest_recipients
-                    .into_iter()
-                    .fold(tier, |tier, recipient| tier.add_recipient(recipient));
-                engine.tiers.push(tier);
-                priority += 1;
-            }
+        // Junior fees (the subordinated management fee) rank after every note
+        // coupon and ahead of principal.
+        if !fees.junior.is_empty() {
+            let junior_tier = WaterfallTier::new("junior_fees", priority, PaymentType::Fee)
+                .allocation_mode(AllocationMode::Sequential);
+            let junior_tier = fees
+                .junior
+                .into_iter()
+                .fold(junior_tier, |tier, recipient| tier.add_recipient(recipient));
+            engine.tiers.push(junior_tier);
+            priority += 1;
         }
 
         let mut principal_recipients = Vec::new();
@@ -1082,24 +1539,30 @@ impl Waterfall {
             RecipientType::Equity,
             PaymentCalculation::ResidualCash,
         ));
-        if !principal_recipients.is_empty() {
-            let principal_tier = WaterfallTier::new("principal", priority, PaymentType::Principal)
-                .allocation_mode(AllocationMode::Sequential);
-            let principal_tier = principal_recipients
-                .into_iter()
-                .fold(principal_tier, |tier, recipient| {
-                    tier.add_recipient(recipient)
-                });
-            engine.tiers.push(principal_tier);
+        let principal_tier = WaterfallTier::new("principal", priority, PaymentType::Principal)
+            .allocation_mode(AllocationMode::Sequential);
+        let principal_tier = principal_recipients
+            .into_iter()
+            .fold(principal_tier, |tier, recipient| {
+                tier.add_recipient(recipient)
+            });
+        engine.tiers.push(principal_tier);
+        priority += 1;
+
+        // The manager's incentive fee takes its share of the residual ahead
+        // of equity once the equity IRR hurdle is met.
+        if let Some(incentive) = fees.incentive {
+            let incentive_tier = WaterfallTier::new("incentive_fee", priority, PaymentType::Fee)
+                .allocation_mode(AllocationMode::Sequential)
+                .add_recipient(incentive);
+            engine.tiers.push(incentive_tier);
             priority += 1;
         }
 
-        // Equity tier is divertible: when OC/IC tests fail, residual cash that
-        // would go to equity is redirected to the most senior principal tier
-        // (cash trap / turbo paydown). This matches INTEX/Bloomberg CLO convention.
+        // Residual interest reaches equity only after every coverage-test
+        // position above has been satisfied.
         let equity_tier = WaterfallTier::new("equity", priority, PaymentType::Residual)
             .allocation_mode(AllocationMode::Sequential)
-            .divertible(true)
             .add_recipient(Recipient::new(
                 "equity_distribution",
                 RecipientType::Equity,
@@ -1107,8 +1570,130 @@ impl Waterfall {
             ));
         engine.tiers.push(equity_tier);
 
+        for test in coverage_tests {
+            engine.insert_coverage_test(test.clone());
+        }
+
         engine
     }
+
+    /// Add a hedge-swap counterparty payment at the fee position `priority`.
+    ///
+    /// `SeniorFee` joins the leading fee tier, or opens one ahead of every
+    /// other tier; `JuniorFee` joins the fee tier after the last note coupon
+    /// (the junior fee tier), or opens one there ahead of principal.
+    /// Priorities are renumbered `1..=n` in order.
+    ///
+    /// # Arguments
+    ///
+    /// * `recipient` - Fixed-amount payment to the swap counterparty for the
+    ///   period.
+    /// * `priority` - Fee position the payment ranks in.
+    pub fn insert_hedge_payment(&mut self, recipient: Recipient, priority: super::SwapPriority) {
+        self.tiers.sort_by_key(|tier| tier.priority);
+        match priority {
+            super::SwapPriority::SeniorFee => match self.tiers.first_mut() {
+                Some(first) if first.payment_type == PaymentType::Fee => {
+                    first.recipients.push(recipient);
+                }
+                _ => {
+                    let tier = WaterfallTier::new("hedge_fees", 0, PaymentType::Fee)
+                        .add_recipient(recipient);
+                    self.tiers.insert(0, tier);
+                }
+            },
+            super::SwapPriority::JuniorFee => {
+                // After the last note coupon (and the coverage tests placed on
+                // it), ahead of principal and the residual.
+                let last_interest = self
+                    .tiers
+                    .iter()
+                    .rposition(|tier| tier.payment_type == PaymentType::Interest);
+                let anchor = self
+                    .tiers
+                    .iter()
+                    .enumerate()
+                    .position(|(index, tier)| {
+                        last_interest.is_none_or(|last| index > last)
+                            && matches!(
+                                tier.payment_type,
+                                PaymentType::Principal | PaymentType::Residual
+                            )
+                    })
+                    .unwrap_or(self.tiers.len());
+                let joins_junior_fee_tier = anchor > 0
+                    && self.tiers[anchor - 1].payment_type == PaymentType::Fee
+                    && last_interest.is_some_and(|last| anchor - 1 > last);
+                if joins_junior_fee_tier {
+                    self.tiers[anchor - 1].recipients.push(recipient);
+                } else {
+                    let tier = WaterfallTier::new("junior_hedge_fees", 0, PaymentType::Fee)
+                        .add_recipient(recipient);
+                    self.tiers.insert(anchor, tier);
+                }
+            }
+        }
+        for (index, tier) in self.tiers.iter_mut().enumerate() {
+            tier.priority = index + 1;
+        }
+    }
+
+    /// Let senior fees and senior note interest top up from principal
+    /// proceeds (the CLO principal-waterfall convention).
+    ///
+    /// Sets [`FundingSource::InterestThenPrincipal`] on every `Fee` tier ranked
+    /// ahead of the first interest tier and on every `Interest` tier whose
+    /// interest recipients are all
+    /// [`TrancheSeniority::Senior`](super::TrancheSeniority::Senior) notes
+    /// of `tranches`. Tiers paying any mezzanine or subordinated coupon are
+    /// left on interest proceeds.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranches` - Capital structure used to classify each interest
+    ///   recipient's seniority.
+    pub fn fund_senior_interest_from_principal(&mut self, tranches: &super::TrancheStructure) {
+        let is_senior = |id: &str| {
+            tranches
+                .tranches
+                .iter()
+                .any(|t| t.id.as_str() == id && t.seniority == super::TrancheSeniority::Senior)
+        };
+        let first_interest = self
+            .tiers
+            .iter()
+            .position(|tier| tier.payment_type == PaymentType::Interest)
+            .unwrap_or(self.tiers.len());
+        for (index, tier) in self.tiers.iter_mut().enumerate() {
+            let senior_only = match tier.payment_type {
+                // Only fees ranked ahead of the notes; junior and incentive
+                // fee tiers stay on interest proceeds.
+                PaymentType::Fee => index < first_interest,
+                PaymentType::Interest => {
+                    let mut ids = tier.interest_tranche_ids().peekable();
+                    ids.peek().is_some() && ids.all(is_senior)
+                }
+                _ => false,
+            };
+            if senior_only {
+                tier.funding = Some(FundingSource::InterestThenPrincipal);
+            }
+        }
+    }
+}
+
+/// Fee recipients of the standard template, by rank.
+#[derive(Debug, Clone, Default)]
+pub struct TemplateFees {
+    /// Senior fees paid ahead of every note (trustee, senior management,
+    /// servicing); an empty list omits the fees tier.
+    pub senior: Vec<Recipient>,
+    /// Junior fees paid after every note coupon and ahead of principal (the
+    /// subordinated management fee); an empty list omits the tier.
+    pub junior: Vec<Recipient>,
+    /// Manager incentive fee paid from the residual ahead of equity once the
+    /// equity IRR hurdle is met ([`PaymentCalculation::IncentiveFee`]).
+    pub incentive: Option<Recipient>,
 }
 
 /// Builder for waterfall engine
@@ -1138,16 +1723,9 @@ impl WaterfallBuilder {
         self
     }
 
-    /// Add coverage trigger
-    #[must_use]
-    pub fn add_coverage_trigger(mut self, trigger: CoverageTrigger) -> Self {
-        self.engine = self.engine.add_coverage_trigger(trigger);
-        self
-    }
-
     /// Attach coverage test rules (haircuts, par thresholds).
     #[must_use]
-    pub fn coverage_rules(mut self, rules: CoverageTestRules) -> Self {
+    pub fn coverage_rules(mut self, rules: CoverageRules) -> Self {
         self.engine = self.engine.with_coverage_rules(rules);
         self
     }

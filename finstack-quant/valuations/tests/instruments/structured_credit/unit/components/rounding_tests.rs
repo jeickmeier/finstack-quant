@@ -61,8 +61,10 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
         deferred_interest: None,
         reserve_balance: Money::new(0.0, currency).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        defaulted_collateral_value: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         recovery_proceeds: Money::new(0.0, currency).expect("valid money fixture"),
         floating_rate_shift: 0.0,
+        equity_history: None,
     };
 
     let result =

@@ -91,13 +91,14 @@ impl Default for OasConfig {
 pub struct OasResult {
     /// Option-adjusted spread (decimal; `0.01` = 100 bp).
     pub oas: f64,
-    /// Model clean settlement price (% of original balance) at the solved OAS.
+    /// Model clean settlement price (% of the tranche's CURRENT balance, the
+    /// factor-adjusted quote basis) at the solved OAS.
     pub model_price: f64,
-    /// Target clean settlement price (% of original balance).
+    /// Target clean settlement price (% of current balance).
     pub market_price: f64,
     /// Number of scenarios used.
     pub num_paths: usize,
-    /// Monte-Carlo standard error of the mean price (% of original balance).
+    /// Monte-Carlo standard error of the mean price (% of current balance).
     pub price_std_error: f64,
 }
 
@@ -109,9 +110,10 @@ pub struct OasResult {
 ///   and its waterfall and credit assumptions.
 /// * `tranche_id` - Identifier of the tranche whose option-adjusted spread is
 ///   solved.
-/// * `market_price_pct` - Observed clean price as a percentage of original
-///   tranche balance. Accrued interest is added exactly once at the deal's
-///   quote settlement date; payments on or before settlement are excluded.
+/// * `market_price_pct` - Observed clean price as a percentage of the
+///   tranche's CURRENT balance (the factor-adjusted quote basis). Accrued
+///   interest is added exactly once at the deal's quote settlement date;
+///   payments on or before settlement are excluded.
 /// * `market` - Market context supplying the discount curve and stochastic
 ///   scenario dependencies.
 /// * `as_of` - Valuation date used for projected tranche cashflows and
@@ -142,12 +144,13 @@ pub fn calculate_tranche_oas(
                 id: format!("tranche:{tranche_id}"),
             })
         })?;
-    let original_balance = tranche.original_balance.amount();
+    // Prices are per CURRENT face (the factor-adjusted quote basis).
+    let current_balance = tranche.current_balance.amount();
     let base_cashflows = deal.get_tranche_cashflows(tranche_id, market, as_of)?;
     let quote = super::super::quote::SettlementQuote::for_tranche(
         deal,
         as_of,
-        original_balance,
+        current_balance,
         &base_cashflows,
     )?;
     let target_pv = quote.clean_target(market_price_pct)?;
@@ -363,14 +366,14 @@ pub fn calculate_tranche_oas(
         .collect();
     let mean_pv = path_pvs.iter().sum::<f64>() / path_count;
     let model_price = quote.clean_price(mean_pv);
-    let price_std_error = if num_paths > 1 && original_balance > 0.0 {
+    let price_std_error = if num_paths > 1 && current_balance > 0.0 {
         // Bessel-corrected standard error of the mean: sqrt(var / n).
         let var = path_pvs
             .iter()
             .map(|pv| (pv - mean_pv).powi(2))
             .sum::<f64>()
             / (path_count - 1.0);
-        (var / path_count).sqrt() / original_balance * 100.0
+        (var / path_count).sqrt() / current_balance * 100.0
     } else {
         0.0
     };

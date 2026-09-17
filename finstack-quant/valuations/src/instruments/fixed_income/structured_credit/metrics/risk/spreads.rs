@@ -484,7 +484,7 @@ pub fn calculate_tranche_discount_margin(
     let quote = super::super::quote::SettlementQuote::for_tranche(
         deal,
         as_of,
-        tranche.original_balance.amount(),
+        tranche.current_balance.amount(),
         &cashflows,
     )?;
     if target_pv.currency() != tranche.original_balance.currency() {

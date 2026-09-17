@@ -1102,11 +1102,21 @@ public = [
 # Structured-credit note prices/spreads use quote_settlement_date (valuation when absent).
 # Python exposes the builder setter/getter; WASM carries the same optional ISO date in JSON.
 # MarketQuoteOverrides owns clean-price points and dirty currency targets; the duplicate
-# MetricPricingOverrides.quoted_price_pct is removed. TrancheAccrualPeriod and raw
-# TrancheCashflows remain Rust diagnostic results; hosts expose typed tranche summaries.
+# MetricPricingOverrides.quoted_price_pct is removed. Python binds the whole
+# typed structured-credit surface: PoolAsset (one constructor keyword per Rust
+# field), Tranche/StructuredCredit builders with one setter per settable Rust
+# field (the three *_pricing_overrides bags stay Rust-only), CallAssumption,
+# CoverageRules, HedgeSwap, Waterfall (create_waterfall introspection),
+# TrancheCashflows (tranche_cashflows) and EquityMetrics (equity_metrics);
+# SimulationDiagnostics carries the per-period record. TrancheAccrualPeriod,
+# CoverageTestSpec, CoverageTrigger, DelinquencyModel, CardPortfolioSpec and the
+# CMBS PoolAsset sub-specs stay dict/JSON sub-fields. WASM stays JSON-first;
+# its TrancheMetrics shape carries the *_to_call twins.
 [crates.valuations.instruments]
 python_package = "finstack_quant.valuations.instruments"
 public = [
+    "AssetBackedFacility",
+    "AssetBackedFacilityBuilder",
     "AssetPool",
     "BarrierCrossing",
     "Bond",
@@ -1118,23 +1128,28 @@ public = [
     "CDSTranche",
     "CDSTrancheBuilder",
     "CDSTrancheParams",
+    "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
     "EnhancedMonteCarloResult",
+    "EquityMetrics",
     "EquityOption",
     "EquityOptionBuilder",
+    "FacilityProjection",
     "FixedLegSpec",
     "FloatLegSpec",
     "FxForward",
     "FxForwardBuilder",
     "FxOption",
     "FxOptionBuilder",
+    "HedgeSwap",
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "MarketHistory",
@@ -1145,6 +1160,7 @@ public = [
     "PathStatistics",
     "PikMode",
     "PikSchedule",
+    "PoolAsset",
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
@@ -1161,8 +1177,10 @@ public = [
     "TermLoanBuilder",
     "Tranche",
     "TrancheBuilder",
+    "TrancheCashflows",
     "TrancheMetrics",
     "TrancheStructure",
+    "Waterfall",
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_models",
@@ -3126,6 +3144,7 @@ callable_range_accrual_accrued = "callableRangeAccrualAccrued"
 "instruments.Bond" = "Bond"
 "instruments.TermLoan" = "TermLoan"
 "instruments.RevolvingCredit" = "RevolvingCredit"
+"instruments.AssetBackedFacility" = "AssetBackedFacility"
 "instruments.bond_from_cashflows_json" = "bondFromCashflowsJson"
 "instruments.instrument_cashflows_json" = "instrumentCashflowsJson"
 "instruments.FxForward" = "FxForward"
@@ -3191,6 +3210,7 @@ fx = [
     "QuantoOption",
 ]
 instruments = [
+    "AssetBackedFacility",
     "Bond",
     "RevolvingCredit",
     "TermLoan",
@@ -3252,8 +3272,10 @@ instruments = [
 # CapFloor), credit (CreditDefaultSwap/CDSIndex/CDSTranche), equity
 # (EquityOption/ConvertibleBond), legs (FixedLegSpec/FloatLegSpec/
 # PremiumLegSpec/ProtectionLegSpec), and structured credit (StructuredCredit
-# + component types) — while WASM reaches these products through JSON-first
-# entry points only.
+# + component types: PoolAsset, RepLine, AssetPool, Tranche, TrancheStructure,
+# CallAssumption, CoverageRules, HedgeSwap, Waterfall, TrancheCashflows,
+# EquityMetrics, SimulationDiagnostics, StochasticPricingResult) — while WASM
+# reaches these products through JSON-first entry points only.
 #
 # `Bond.price_merton_mc` and the whole Merton-MC family (MertonMcConfig/
 # MertonMcResult/PathStatistics/PikMode/PikSchedule) are deliberately
@@ -3287,6 +3309,8 @@ composite = [
     "WeightingMethod",
 ]
 instruments = [
+    "AssetBackedFacility",
+    "AssetBackedFacilityBuilder",
     "AssetPool",
     "BarrierCrossing",
     "BondBuilder",
@@ -3297,21 +3321,26 @@ instruments = [
     "CDSTranche",
     "CDSTrancheBuilder",
     "CDSTrancheParams",
+    "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
     "EnhancedMonteCarloResult",
+    "EquityMetrics",
     "EquityOption",
     "EquityOptionBuilder",
+    "FacilityProjection",
     "FixedLegSpec",
     "FloatLegSpec",
     "FxForwardBuilder",
     "FxOptionBuilder",
+    "HedgeSwap",
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "MarketHistory",
@@ -3322,6 +3351,7 @@ instruments = [
     "PathStatistics",
     "PikMode",
     "PikSchedule",
+    "PoolAsset",
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
@@ -3336,8 +3366,10 @@ instruments = [
     "TermLoanBuilder",
     "Tranche",
     "TrancheBuilder",
+    "TrancheCashflows",
     "TrancheMetrics",
     "TrancheStructure",
+    "Waterfall",
     "pretty_instrument_json",
     "validate_typed_instrument_json",
 ]
@@ -3348,8 +3380,10 @@ instruments = [
 # JSON-first on both hosts; WASM has no typed `price` method (call
 # `priceInstrument` with `toJson()`). RevolvingCredit additionally binds the
 # path-retaining `priceWithPaths` (plain-object `EnhancedMonteCarloResult`),
-# the twin of Python `price_with_paths`.
+# the twin of Python `price_with_paths`. AssetBackedFacility binds the
+# borrowing-base report (`borrowingBase`), the twin of Python `borrowing_base`.
 [wasm_valuations_subset.class_methods]
+AssetBackedFacility = ["fromJson", "example", "toJson", "id", "borrowingBase"]
 Bond = ["fixed", "floating", "fromJson", "toJson", "id"]
 TermLoan = ["fromJson", "example", "toJson", "id"]
 RevolvingCredit = ["fromJson", "example", "toJson", "id", "priceWithPaths"]
@@ -3371,6 +3405,11 @@ FxOption = [
 ]
 
 [wasm_valuations_subset.python_js_method_map]
+"AssetBackedFacility.from_json" = "AssetBackedFacility.fromJson"
+"AssetBackedFacility.example" = "AssetBackedFacility.example"
+"AssetBackedFacility.to_json" = "AssetBackedFacility.toJson"
+"AssetBackedFacility.id" = "AssetBackedFacility.id"
+"AssetBackedFacility.borrowing_base" = "AssetBackedFacility.borrowingBase"
 "Bond.fixed" = "Bond.fixed"
 "Bond.floating" = "Bond.floating"
 "Bond.from_json" = "Bond.fromJson"

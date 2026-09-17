@@ -45,7 +45,8 @@ pub(crate) mod summary;
 mod tranche_analytics;
 
 pub use deal_specific::{
-    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, CmbsDscrCalculator,
+    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsDelinquencyCalculator,
+    AbsExcessSpreadCalculator, AbsPaymentRateCalculator, CmbsDscrCalculator,
 };
 pub use pool::{CdrCalculator, CloWarfCalculator, CloWasCalculator, CprCalculator, WamCalculator};
 pub use pricing::{
@@ -60,7 +61,9 @@ pub use risk::{
     ZSpreadCalculator,
 };
 pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
-pub use summary::{calculate_tranche_metrics, TrancheMetrics};
+pub use summary::{
+    calculate_equity_metrics, calculate_tranche_metrics, EquityMetrics, TrancheMetrics,
+};
 pub use tranche_analytics::{
     structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
     structured_credit_tranche_metrics, structured_credit_tranche_oas,
@@ -116,6 +119,21 @@ pub(crate) fn register_structured_credit_metrics(
     registry.register_metric(
         MetricId::AbsChargeOff,
         Arc::new(deal_specific::AbsChargeOffCalculator),
+        &[InstrumentType::StructuredCredit],
+    )?;
+    registry.register_metric(
+        MetricId::AbsDelinquency,
+        Arc::new(deal_specific::AbsDelinquencyCalculator),
+        &[InstrumentType::StructuredCredit],
+    )?;
+    registry.register_metric(
+        MetricId::AbsExcessSpread,
+        Arc::new(deal_specific::AbsExcessSpreadCalculator),
+        &[InstrumentType::StructuredCredit],
+    )?;
+    registry.register_metric(
+        MetricId::AbsPaymentRate,
+        Arc::new(deal_specific::AbsPaymentRateCalculator),
         &[InstrumentType::StructuredCredit],
     )?;
     registry.register_metric(
@@ -175,6 +193,9 @@ mod tests {
         for id in [
             MetricId::CloWas,
             MetricId::AbsChargeOff,
+            MetricId::AbsDelinquency,
+            MetricId::AbsExcessSpread,
+            MetricId::AbsPaymentRate,
             MetricId::AbsCreditEnhancement,
         ] {
             assert!(

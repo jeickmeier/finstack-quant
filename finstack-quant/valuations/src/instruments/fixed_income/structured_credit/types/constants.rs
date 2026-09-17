@@ -3,8 +3,10 @@
 //! This module contains all industry-standard constants, default values,
 //! and fee structures used across structured credit modeling.
 
-use super::{DealFees, DefaultAssumptions};
-use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
+use super::DealFees;
+use crate::instruments::fixed_income::structured_credit::assumptions::{
+    embedded_registry_or_panic, StandardRates,
+};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 
@@ -49,16 +51,6 @@ pub const Z_SPREAD_INITIAL_BRACKET: f64 = 0.05; // ±500 bp
 
 /// Lower bound for prepayment rates expressed as a decimal fraction.
 pub const MIN_PREPAYMENT_RATE: f64 = 0.0;
-
-/// Mortgage prepayment seasonality adjustments by month (Jan=index 0).
-pub fn mortgage_seasonality() -> [f64; 12] {
-    embedded_registry_or_panic().mortgage_seasonality()
-}
-
-/// Credit card payment seasonality adjustments by month (Jan=index 0).
-pub fn credit_card_seasonality() -> [f64; 12] {
-    embedded_registry_or_panic().credit_card_seasonality()
-}
 
 /// Baseline unemployment rate for default models.
 pub fn baseline_unemployment_rate() -> f64 {
@@ -165,20 +157,6 @@ pub fn psa_terminal_cpr() -> f64 {
     embedded_registry_or_panic().psa_curve().terminal_cpr
 }
 
-/// Default auto loan ABS speed (monthly).
-pub fn default_auto_abs_speed() -> f64 {
-    embedded_registry_or_panic()
-        .auto_abs_prepayment()
-        .monthly_speed
-}
-
-/// Default auto loan ramp period (months).
-pub fn default_auto_ramp_months() -> u32 {
-    embedded_registry_or_panic()
-        .auto_abs_prepayment()
-        .ramp_months
-}
-
 /// Standard SDA peak month for mortgages.
 pub fn sda_peak_month() -> u32 {
     embedded_registry_or_panic().sda_curve().peak_month
@@ -243,75 +221,62 @@ pub fn default_max_dip() -> f64 {
 
 /// Standard CLO CDR (annual).
 pub fn clo_standard_cdr() -> f64 {
-    clo_assumptions().base_cdr_annual
+    standard_rates("clo_standard").cdr_annual
 }
 
 /// Standard CLO recovery rate.
 pub fn clo_standard_recovery() -> f64 {
-    clo_assumptions().base_recovery_rate
+    standard_rates("clo_standard").recovery_rate
 }
 
 /// Standard CLO CPR (annual).
 pub fn clo_standard_cpr() -> f64 {
-    clo_assumptions().base_cpr_annual
+    standard_rates("clo_standard").prepayment_rate
 }
 
 /// Standard RMBS CDR (annual).
 pub fn rmbs_standard_cdr() -> f64 {
-    rmbs_assumptions().base_cdr_annual
+    standard_rates("rmbs_standard").cdr_annual
 }
 
 /// Standard RMBS recovery rate.
 pub fn rmbs_standard_recovery() -> f64 {
-    rmbs_assumptions().base_recovery_rate
+    standard_rates("rmbs_standard").recovery_rate
 }
 
-/// Standard RMBS CPR (annual).
-pub fn rmbs_standard_cpr() -> f64 {
-    rmbs_assumptions().base_cpr_annual
-}
-
-/// Standard RMBS PSA speed.
+/// Standard RMBS PSA speed (multiplier of the PSA ramp).
 pub fn rmbs_standard_psa() -> f64 {
-    required_optional(rmbs_assumptions().psa_speed, "standard RMBS PSA speed")
-}
-
-/// Standard RMBS SDA speed.
-pub fn rmbs_standard_sda() -> f64 {
-    required_optional(rmbs_assumptions().sda_speed, "standard RMBS SDA speed")
+    standard_rates("rmbs_standard").prepayment_rate
 }
 
 /// Standard Auto ABS CDR (annual).
 pub fn abs_auto_standard_cdr() -> f64 {
-    abs_assumptions().base_cdr_annual
+    standard_rates("abs_auto_standard").cdr_annual
 }
 
 /// Standard Auto ABS recovery rate.
 pub fn abs_auto_standard_recovery() -> f64 {
-    abs_assumptions().base_recovery_rate
+    standard_rates("abs_auto_standard").recovery_rate
 }
 
 /// Standard Auto ABS speed (monthly).
 pub fn abs_auto_standard_speed() -> f64 {
-    required_optional(
-        abs_assumptions().abs_speed_monthly,
-        "standard auto ABS monthly speed",
-    )
+    standard_rates("abs_auto_standard").prepayment_rate
 }
 
 /// Standard CMBS CDR (annual).
 pub fn cmbs_standard_cdr() -> f64 {
-    cmbs_assumptions().base_cdr_annual
+    standard_rates("cmbs_standard").cdr_annual
 }
 
 /// Standard CMBS recovery rate.
 pub fn cmbs_standard_recovery() -> f64 {
-    cmbs_assumptions().base_recovery_rate
+    standard_rates("cmbs_standard").recovery_rate
 }
 
-/// Standard CMBS CPR (annual).
+/// Standard CMBS CPR (annual, after the lockout).
 pub fn cmbs_standard_cpr() -> f64 {
-    cmbs_assumptions().base_cpr_annual
+    standard_rates("cmbs_standard").prepayment_rate
 }
 
 #[allow(clippy::expect_used)]
@@ -322,6 +287,10 @@ fn required_assumption<T>(result: Result<T>) -> T {
 #[allow(clippy::expect_used)]
 fn required_optional<T>(value: Option<T>, _label: &str) -> T {
     value.expect("embedded structured-credit assumptions registry optional value should exist")
+}
+
+fn standard_rates(profile_id: &str) -> StandardRates {
+    required_assumption(embedded_registry_or_panic().standard_rates(profile_id))
 }
 
 fn clo_fees() -> DealFees {
@@ -338,20 +307,4 @@ fn cmbs_fees() -> DealFees {
 
 fn rmbs_fees() -> DealFees {
     DealFees::rmbs_standard(Currency::USD)
-}
-
-fn clo_assumptions() -> DefaultAssumptions {
-    required_assumption(embedded_registry_or_panic().default_assumptions("clo_standard"))
-}
-
-fn rmbs_assumptions() -> DefaultAssumptions {
-    required_assumption(embedded_registry_or_panic().default_assumptions("rmbs_standard"))
-}
-
-fn abs_assumptions() -> DefaultAssumptions {
-    required_assumption(embedded_registry_or_panic().default_assumptions("abs_auto_standard"))
-}
-
-fn cmbs_assumptions() -> DefaultAssumptions {
-    required_assumption(embedded_registry_or_panic().default_assumptions("cmbs_standard"))
 }

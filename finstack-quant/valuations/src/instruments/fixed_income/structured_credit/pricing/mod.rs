@@ -10,7 +10,9 @@
 pub(crate) mod coverage_tests;
 pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
-pub use simulation_engine::{SimulationDiagnostics, SimulationRun};
+pub use simulation_engine::{
+    CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics, SimulationRun,
+};
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 

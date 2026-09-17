@@ -4,6 +4,7 @@ export const instruments = {
   Bond: wasm.Bond,
   TermLoan: wasm.TermLoan,
   RevolvingCredit: wasm.RevolvingCredit,
+  AssetBackedFacility: wasm.AssetBackedFacility,
   bondFromCashflowsJson: wasm.bondFromCashflowsJson,
   validateInstrumentJson: wasm.validateInstrumentJson,
   priceInstrument: wasm.priceInstrument,

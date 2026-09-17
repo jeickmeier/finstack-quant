@@ -411,6 +411,7 @@ def test_tranche_metrics_from_json_uses_json_keyword() -> None:
         "currency": "USD",
         "pv": 950_000.0,
         "price_pct": 95.0,
+        "factor": 1.0,
         "wal": 4.1,
         "z_spread_bp": 150.0,
         "cs01": -380.0,

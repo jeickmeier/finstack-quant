@@ -204,7 +204,7 @@ fn stochastic_json_result_contains_full_tranche_details() {
 #[test]
 fn invalid_attachment_detachment_errors_locally() {
     let mut sc = structured_credit(false);
-    sc.tranches.tranches[1].attachment_point = 75.0;
+    sc.tranches.tranches[1].attachment_point = Some(75.0);
     let market = fixed_market();
 
     let err = sc

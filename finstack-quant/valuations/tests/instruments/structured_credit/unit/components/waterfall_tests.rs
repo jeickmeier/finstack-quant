@@ -11,8 +11,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AllocationMode, ManagementFeeType, PaymentCalculation, PaymentType, Recipient, RecipientType,
-    Waterfall, WaterfallBuilder, WaterfallTier,
+    AllocationMode, CoverageTestSpec, FundingSource, ManagementFeeType, PaymentCalculation,
+    PaymentType, Recipient, RecipientType, TemplateFees, Waterfall, WaterfallBuilder,
+    WaterfallTier,
 };
 
 // Waterfall Builder Tests
@@ -82,25 +83,33 @@ fn test_waterfall_builder_tier_types() {
 }
 
 #[test]
-fn test_waterfall_tier_divertible() {
-    // Arrange & Act
+fn test_waterfall_coverage_test_tier() {
+    // Arrange & Act: a coverage-test position between interest and principal.
     let waterfall = WaterfallBuilder::new(Currency::USD)
         .add_tier(
             WaterfallTier::new("interest", 1, PaymentType::Interest)
-                .divertible(false)
                 .add_recipient(Recipient::tranche_interest("a_int", "A")),
         )
+        .add_tier(WaterfallTier::coverage_tests(
+            "a_coverage",
+            2,
+            vec![
+                CoverageTestSpec::oc("A", 1.2),
+                CoverageTestSpec::ic("A", 1.1),
+            ],
+        ))
         .add_tier(
-            WaterfallTier::new("principal", 2, PaymentType::Principal)
-                .divertible(true)
+            WaterfallTier::new("principal", 3, PaymentType::Principal)
                 .add_recipient(Recipient::tranche_principal("a_prin", "A", None)),
         )
         .build()
         .expect("build waterfall");
 
     // Assert
-    assert!(!waterfall.tiers[0].divertible);
-    assert!(waterfall.tiers[1].divertible);
+    assert_eq!(waterfall.tiers[1].payment_type, PaymentType::CoverageTest);
+    assert!(waterfall.tiers[1].recipients.is_empty());
+    let ids: Vec<&str> = waterfall.coverage_tests().map(|t| t.id.as_str()).collect();
+    assert_eq!(ids, vec!["OC_A", "IC_A"]);
 }
 
 // Payment Priority Tests
@@ -264,7 +273,7 @@ fn test_waterfall_engine_creation() {
 
     assert_eq!(engine.base_currency, Currency::USD);
     assert_eq!(engine.tiers.len(), 0);
-    assert_eq!(engine.coverage_triggers.len(), 0);
+    assert_eq!(engine.coverage_tests().count(), 0);
 }
 
 #[test]
@@ -288,7 +297,7 @@ fn test_waterfall_engine_add_tier() {
 fn abs_template_does_not_trap_junior_coupon() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        DealType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -325,33 +334,50 @@ fn abs_template_does_not_trap_junior_coupon() {
     .expect("equity");
     let structure = TrancheStructure::new(vec![senior, mezz, equity]).expect("structure");
 
-    let clo = Waterfall::standard_sequential(DealType::Clo, Currency::USD, &structure, Vec::new());
-    let abs = Waterfall::standard_sequential(DealType::Abs, Currency::USD, &structure, Vec::new());
+    let tests = vec![CoverageTestSpec::oc("B", 1.15)];
+    let waterfall =
+        Waterfall::standard_sequential(Currency::USD, &structure, TemplateFees::default(), &tests);
 
-    let clo_sub = clo
+    // One interest tier per class, the B test right after B's coupon, so a
+    // failing B test can trap only what ranks below B. Every tier draws on
+    // its default account until the deal opts senior coupons into principal.
+    let ids: Vec<&str> = waterfall
         .tiers
         .iter()
-        .find(|tier| tier.id == "subordinated_interest")
-        .expect("CLO template splits junior interest");
-    assert!(
-        clo_sub.divertible,
-        "CLO junior coupon must be divertible on an OC/IC fail"
+        .map(|tier| tier.id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        vec![
+            "A_interest",
+            "B_interest",
+            "B_coverage",
+            "principal",
+            "equity"
+        ],
+        "the template places the test after the tested class's coupon"
     );
-
-    let abs_interest = abs
+    assert!(waterfall
         .tiers
         .iter()
-        .find(|tier| tier.payment_type == PaymentType::Interest)
-        .expect("ABS template has one interest tier");
-    assert_eq!(abs_interest.id, "interest");
-    assert!(
-        !abs_interest.divertible,
-        "ABS/RMBS/CMBS coupons stay payable when a coverage test fails"
+        .all(|tier| tier.effective_funding() == FundingSource::default_for(tier.payment_type)));
+    assert_eq!(waterfall.tiers[0].payment_type, PaymentType::Interest);
+    assert_eq!(
+        waterfall.tiers[0].recipients.len(),
+        1,
+        "each class has its own interest tier"
     );
-    assert!(
-        abs.tiers
-            .iter()
-            .all(|tier| tier.id != "subordinated_interest"),
-        "ABS must not use the CLO junior-interest trap"
+
+    let mut funded = waterfall.clone();
+    funded.fund_senior_interest_from_principal(&structure);
+    assert_eq!(
+        funded.tiers[0].effective_funding(),
+        FundingSource::InterestThenPrincipal,
+        "the senior coupon may top up from principal"
+    );
+    assert_eq!(
+        funded.tiers[1].effective_funding(),
+        FundingSource::Interest,
+        "the mezzanine coupon stays on interest proceeds"
     );
 }

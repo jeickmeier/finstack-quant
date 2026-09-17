@@ -4,7 +4,7 @@ use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
@@ -12,8 +12,8 @@ use finstack_quant_models::credit::pool::{
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
-    scenario_table, AssetPool, DealType, OasConfig, PoolAsset, PricingMode, ScenarioGrid,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, PricingMode,
+    ScenarioGrid, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, PricingOptions, ScenarioPricingOverrides,
@@ -62,14 +62,6 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
         .knots(vec![(0.0, 1.0), (5.0, 0.95)])
         .build()
         .expect("discount curve")
-}
-
-fn forward_curve(base_date: Date) -> ForwardCurve {
-    ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base_date)
-        .knots([(0.0, 0.03), (10.0, 0.03)])
-        .build()
-        .expect("forward curve")
 }
 
 fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
@@ -407,12 +399,6 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         scenario_table(&sc, "missing", &market, closing_date(), &grid)
             .expect_err("invalid scenario table")
             .to_string(),
-        sc.hedge_npv(&market, closing_date())
-            .expect_err("invalid hedge pricing")
-            .to_string(),
-        sc.price_with_hedges(&market, closing_date())
-            .expect_err("invalid hedged pricing")
-            .to_string(),
         sc.price_with_metrics_standalone(&market, closing_date(), &[])
             .expect_err("invalid metric pricing")
             .to_string(),
@@ -446,10 +432,10 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
             .expect("example hedge swap");
     swap.fixed.end = swap.fixed.start;
     swap.float.end = swap.float.start;
-    let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(swap);
+    let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
 
     let err = sc
-        .hedge_npv(&MarketContext::new(), closing_date())
+        .price_with_metrics_standalone(&MarketContext::new(), closing_date(), &[])
         .expect_err("invalid nested hedge must fail before missing curves");
     let message = err.to_string();
     assert!(
@@ -460,70 +446,15 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
 }
 
 #[test]
-fn hedge_pricing_applies_nested_swap_scenario_once() {
+fn with_hedge_swap_attaches_a_waterfall_settled_swap() {
     let swap =
         finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
             .expect("example hedge swap");
-    let as_of = Date::from_calendar_date(2023, Month::December, 20).expect("date");
-    let market = MarketContext::new()
-        .insert(discount_curve(as_of))
-        .insert(forward_curve(as_of));
-    let baseline = build_sc("ABS-HEDGE-SCENARIO", 1_000_000.0)
-        .with_hedge_swap(swap.clone())
-        .hedge_npv(&market, as_of)
-        .expect("baseline hedge npv")
-        .amount();
-
-    let mut shocked_swap = swap;
-    shocked_swap.scenario_pricing_overrides =
-        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
-    let shocked = build_sc("ABS-HEDGE-SCENARIO", 1_000_000.0)
-        .with_hedge_swap(shocked_swap)
-        .hedge_npv(&market, as_of)
-        .expect("shocked hedge npv")
-        .amount();
-
-    assert!(baseline.abs() > 1.0);
-    assert!((shocked - baseline * 0.90).abs() <= 1e-10 * baseline.abs().max(1.0));
-}
-
-#[test]
-fn hedge_helpers_track_attached_swaps() {
-    let swap =
-        finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example_standard()
-            .expect("example hedge swap");
-    let mut sc = build_sc("ABS-HEDGED", 1_000_000.0);
-    assert!(!sc.has_hedges());
-    assert_eq!(sc.hedge_count(), 0);
-
-    sc.add_hedge_swap(swap.clone());
-    assert!(sc.has_hedges());
-    assert_eq!(sc.hedge_count(), 1);
-
-    sc.add_hedge_swaps(vec![swap.clone()]);
-    assert_eq!(sc.hedge_count(), 2);
-
-    let chained = build_sc("ABS-HEDGED-BUILDER", 1_000_000.0)
-        .with_hedge_swap(swap.clone())
-        .with_hedge_swaps(vec![swap]);
-    assert!(chained.has_hedges());
-    assert_eq!(chained.hedge_count(), 2);
-}
-
-#[test]
-fn hedge_valuation_helpers_return_zero_when_no_swaps_are_attached() {
-    let sc = build_sc("ABS-UNHEDGED", 1_000_000.0).with_payment_calendar("nyse");
-    let mut market = MarketContext::new();
-    market = market.insert(discount_curve(closing_date()));
-
-    let hedge_npv = sc.hedge_npv(&market, closing_date()).expect("hedge npv");
-    let (deal_npv, hedges, total) = sc
-        .price_with_hedges(&market, closing_date())
-        .expect("combined hedge pricing");
-
-    assert_eq!(hedge_npv.amount(), 0.0);
-    assert_eq!(hedges.amount(), 0.0);
-    assert_eq!(deal_npv, total);
+    let sc = build_sc("ABS-HEDGED", 1_000_000.0);
+    assert!(sc.hedge_swaps.is_empty());
+    let hedged = sc.with_hedge_swap(HedgeSwap::new(swap.clone()).on_pool_par().junior());
+    assert_eq!(hedged.hedge_swaps.len(), 1);
+    assert_eq!(hedged.hedge_swaps[0].swap.id, swap.id);
 }
 
 /// Regression: the `pv_std_error` of a large-PV deal stays accurate when using

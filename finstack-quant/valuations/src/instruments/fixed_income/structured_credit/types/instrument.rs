@@ -1,4 +1,4 @@
-use super::{DealType, StructuredCredit, TrancheCoupon};
+use super::{DealType, StructuredCredit, TrancheCoupon, TrancheSeniority};
 use crate::cashflow::traits::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
@@ -6,7 +6,7 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_core::cashflow::Discountable;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
@@ -90,8 +90,46 @@ impl Instrument for StructuredCredit {
             }
         }
         self.validate_custom_waterfall()?;
-        for swap in &self.hedge_swaps {
-            swap.validate_for_pricing()?;
+        let base_currency = self.pool.get_base_currency();
+        for hedge in &self.hedge_swaps {
+            hedge.validate(base_currency, &self.tranches)?;
+        }
+        if let Some(rules) = &self.coverage_rules {
+            rules.validate()?;
+        }
+        self.validate_delinquency()?;
+        self.validate_cmbs_terms()?;
+        self.validate_liquidation_terms()?;
+        if let Some(call) = &self.call_assumption {
+            call.validate(
+                self.tranches
+                    .tranches
+                    .iter()
+                    .filter(|tranche| tranche.seniority != TrancheSeniority::Equity)
+                    .map(|tranche| tranche.id.as_str()),
+            )?;
+            if call.date < self.closing_date || call.date > self.maturity {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "call_assumption.date {} must lie between closing {} and maturity {}",
+                    call.date, self.closing_date, self.maturity
+                )));
+            }
+        }
+        if let Some(price) = self.liquidation_price_pct {
+            if !price.is_finite() || price <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "liquidation_price_pct ({price}) must be a finite positive percent of par"
+                )));
+            }
+        }
+        if let Some(card) = &self.credit_model.card {
+            card.validate()?;
+            if self.pool.instruments.is_some() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "credit_model.card applies to asset and rep-line pools, not instrument collateral"
+                        .to_string(),
+                ));
+            }
         }
         Ok(())
     }
@@ -114,7 +152,13 @@ impl Instrument for StructuredCredit {
         as_of: Date,
     ) {
         context.discount_curve_id = Some(self.discount_curve_id.to_owned());
-        context.notional = Some(self.tranches.total_size);
+        // Deal-level prices are per CURRENT face: the sum of the current
+        // tranche balances (debt and equity), the factor-adjusted quote basis.
+        let current_face = self.tranches.tranches.iter().try_fold(
+            Money::from((0_i64, self.tranches.total_size.currency())),
+            |acc, tranche| acc.checked_add(tranche.current_balance),
+        );
+        context.notional = current_face.ok().or(Some(self.tranches.total_size));
         if let Ok(results) =
             crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
                 self, market, as_of,
@@ -176,4 +220,125 @@ impl Instrument for StructuredCredit {
     }
 
     crate::impl_focused_pricing_overrides!();
+}
+
+impl StructuredCredit {
+    /// Commercial-mortgage terms on every asset must be well formed and the
+    /// property NOI must be a finite amount in the asset's currency.
+    fn validate_cmbs_terms(&self) -> finstack_quant_core::Result<()> {
+        for asset in &self.pool.assets {
+            if let Some(balloon) = asset.balloon {
+                balloon.validate()?;
+            }
+            if let Some(penalty) = asset.prepayment_penalty {
+                penalty.validate()?;
+            }
+            if let Some(special) = asset.special_servicing {
+                special.validate()?;
+            }
+            if let Some(noi) = asset.noi {
+                if noi.currency() != asset.balance.currency() || !noi.amount().is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "asset {} noi must be a finite amount in {}",
+                        asset.id,
+                        asset.balance.currency()
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Non-performing loan terms: a valid timeline on an asset row that is
+    /// carried as performing (the timeline replaces the default flag and the
+    /// recovery inputs), resolving inside the deal's life.
+    fn validate_liquidation_terms(&self) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        for asset in &self.pool.assets {
+            let Some(spec) = asset.liquidation else {
+                continue;
+            };
+            spec.validate()?;
+            if self.pool.instruments.is_some() {
+                return Err(invalid(format!(
+                    "asset {}: liquidation terms apply to asset rows, not instrument collateral",
+                    asset.id
+                )));
+            }
+            if asset.is_defaulted || asset.recovery_amount.is_some() || asset.default_date.is_some()
+            {
+                return Err(invalid(format!(
+                    "asset {} carries liquidation terms: leave is_defaulted false and \
+                     recovery_amount/default_date unset (the resolution timeline books the default)",
+                    asset.id
+                )));
+            }
+            let months = i32::try_from(spec.months_to_resolution).map_err(|_| {
+                invalid(format!(
+                    "asset {}: months_to_resolution is too large",
+                    asset.id
+                ))
+            })?;
+            if self.closing_date.add_months(months) > self.maturity {
+                return Err(invalid(format!(
+                    "asset {} resolves {} months after closing, past the deal maturity {}",
+                    asset.id, spec.months_to_resolution, self.maturity
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// The delinquency model and every asset's seeded buckets must agree.
+    fn validate_delinquency(&self) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        let model = self.credit_model.delinquency.as_ref();
+        if let Some(model) = model {
+            model.validate()?;
+            if self.pool.instruments.is_some() {
+                return Err(invalid(
+                    "credit_model.delinquency applies to asset and rep-line pools, not instrument collateral"
+                        .to_string(),
+                ));
+            }
+        }
+        for asset in &self.pool.assets {
+            let Some(buckets) = &asset.delinquency_buckets else {
+                continue;
+            };
+            let Some(model) = model else {
+                return Err(invalid(format!(
+                    "asset {} carries delinquency_buckets but the deal has no credit_model.delinquency",
+                    asset.id
+                )));
+            };
+            if buckets.len() != model.buckets() {
+                return Err(invalid(format!(
+                    "asset {} has {} delinquency buckets but the model defines {}",
+                    asset.id,
+                    buckets.len(),
+                    model.buckets()
+                )));
+            }
+            let mut total = 0.0;
+            for bucket in buckets {
+                if bucket.currency() != asset.balance.currency() || bucket.amount() < 0.0 {
+                    return Err(invalid(format!(
+                        "asset {} delinquency buckets must be non-negative amounts in {}",
+                        asset.id,
+                        asset.balance.currency()
+                    )));
+                }
+                total += bucket.amount();
+            }
+            if total > asset.balance.amount() * (1.0 + 1e-9) {
+                return Err(invalid(format!(
+                    "asset {} delinquent balance {total} exceeds its balance {}",
+                    asset.id,
+                    asset.balance.amount()
+                )));
+            }
+        }
+        Ok(())
+    }
 }

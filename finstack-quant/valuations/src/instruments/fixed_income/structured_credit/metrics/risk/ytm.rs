@@ -120,7 +120,7 @@ impl MetricCalculator for YtmCalculator {
         })?;
 
         // Convert price points back to currency using original notional.
-        let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(context)?;
+        let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::quote_notional(context)?;
         let target_value = quote.external_target(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?)?.unwrap_or(notional * (dirty_price / 100.0));
 
         let settlement = super::super::quote::settlement_date(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?, context.as_of)?;

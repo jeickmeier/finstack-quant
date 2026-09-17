@@ -19,7 +19,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
@@ -79,6 +79,13 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         };
         pool.assets.push(asset);
     }
@@ -166,8 +173,10 @@ fn run_waterfall(
         deferred_interest: None,
         reserve_balance: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        defaulted_collateral_value: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         recovery_proceeds: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         floating_rate_shift: 0.0,
+        equity_history: None,
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(
         waterfall, tranches, pool, context,
@@ -217,11 +226,19 @@ fn test_golden_clo_2_0_full_payment() {
                 .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B"))
                 .add_recipient(Recipient::tranche_interest("class_c_int", "CLASS_C")),
         )
-        // Tier 3: Principal (divertible)
+        // Tier 3: Class A coverage tests (after every note coupon)
+        .add_tier(WaterfallTier::coverage_tests(
+            "coverage",
+            3,
+            vec![
+                CoverageTestSpec::oc("CLASS_A", 1.25),
+                CoverageTestSpec::ic("CLASS_A", 1.20),
+            ],
+        ))
+        // Tier 4: Principal
         .add_tier(
-            WaterfallTier::new("principal", 3, PaymentType::Principal)
+            WaterfallTier::new("principal", 4, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential)
-                .divertible(true)
                 .add_recipient(Recipient::tranche_principal(
                     "class_a_prin",
                     "CLASS_A",
@@ -238,9 +255,9 @@ fn test_golden_clo_2_0_full_payment() {
                     None,
                 )),
         )
-        // Tier 4: Equity
+        // Tier 5: Equity
         .add_tier(
-            WaterfallTier::new("equity", 4, PaymentType::Residual)
+            WaterfallTier::new("equity", 5, PaymentType::Residual)
                 .allocation_mode(AllocationMode::Sequential)
                 .add_recipient(Recipient::new(
                     "equity_dist",
@@ -248,11 +265,6 @@ fn test_golden_clo_2_0_full_payment() {
                     PaymentCalculation::ResidualCash,
                 )),
         )
-        .add_coverage_trigger(CoverageTrigger {
-            tranche_id: "CLASS_A".into(),
-            oc_trigger: Some(1.25),
-            ic_trigger: Some(1.20),
-        })
         .build()
         .expect("build waterfall");
 
@@ -274,8 +286,14 @@ fn test_golden_clo_2_0_full_payment() {
         &market,
     );
 
-    // Verify tier allocations
-    assert_eq!(result.tier_allocations.len(), 4);
+    // Verify tier allocations (fees, interest, coverage position, principal, equity)
+    assert_eq!(result.tier_allocations.len(), 5);
+    assert_eq!(result.tier_allocations[2].0, "coverage");
+    assert_eq!(
+        result.tier_allocations[2].1.amount(),
+        0.0,
+        "a passing coverage position diverts nothing"
+    );
 
     // Tier 1: Fees
     let (tier_id, amount) = &result.tier_allocations[0];
@@ -357,10 +375,17 @@ fn test_golden_clo_oc_breach_diversion() {
                 .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
                 .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
         )
+        // Class A OC test (125% required) after the note coupons: on a breach
+        // the interest still undistributed here pays down Class A.
+        .add_tier(WaterfallTier::coverage_tests(
+            "a_coverage",
+            3,
+            vec![CoverageTestSpec::oc("CLASS_A", 1.25)],
+        ))
         .add_tier(
             // Senior principal: small scheduled paydown (target balance just
             // below par) so the regular pass leaves cash for the junior tier.
-            WaterfallTier::new("senior_principal", 3, PaymentType::Principal)
+            WaterfallTier::new("senior_principal", 4, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential)
                 .add_recipient(Recipient::tranche_principal(
                     "class_a_prin",
@@ -369,11 +394,8 @@ fn test_golden_clo_oc_breach_diversion() {
                 )),
         )
         .add_tier(
-            // Junior principal is the divertible tier: on an OC breach its
-            // cash is redirected to the senior principal tier above it.
-            WaterfallTier::new("junior_principal", 4, PaymentType::Principal)
+            WaterfallTier::new("junior_principal", 5, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential)
-                .divertible(true)
                 .add_recipient(Recipient::tranche_principal(
                     "class_b_prin",
                     "CLASS_B",
@@ -381,23 +403,20 @@ fn test_golden_clo_oc_breach_diversion() {
                 )),
         )
         .add_tier(
-            WaterfallTier::new("equity", 5, PaymentType::Residual).add_recipient(Recipient::new(
+            WaterfallTier::new("equity", 6, PaymentType::Residual).add_recipient(Recipient::new(
                 "equity",
                 RecipientType::Equity,
                 PaymentCalculation::ResidualCash,
             )),
         )
-        .add_coverage_trigger(CoverageTrigger {
-            tranche_id: "CLASS_A".into(),
-            oc_trigger: Some(1.25), // 125% OC required
-            ic_trigger: None,
-        })
         .build()
         .expect("build waterfall");
 
     let market = create_test_market();
-    let available_cash = Money::new(5_000_000.0, currency).expect("valid money fixture");
-    let interest_collections = Money::new(2_500_000.0, currency).expect("valid money fixture");
+    // Interest well above the ~2.8M of quarterly coupons, so the failing test
+    // has excess interest to divert to Class A principal.
+    let available_cash = Money::new(6_500_000.0, currency).expect("valid money fixture");
+    let interest_collections = Money::new(4_000_000.0, currency).expect("valid money fixture");
     let payment_date = Date::from_calendar_date(2024, time::Month::April, 1).unwrap();
     let pool_balance = Money::new(200_000_000.0, currency).expect("valid money fixture");
 
@@ -443,6 +462,24 @@ fn test_golden_clo_oc_breach_diversion() {
             .all(|record| record.amount.amount() > 0.0),
         "Diversion records should have positive amounts"
     );
+    // Only interest ranked below the test position is diverted: the fees and
+    // note coupons above it are paid in full and the diversion pays Class A.
+    let senior_to_test: f64 = result
+        .payment_records
+        .iter()
+        .filter(|r| r.priority < 3)
+        .map(|r| r.paid_amount.amount())
+        .sum();
+    assert!(
+        (result.diverted_cash.amount() - (4_000_000.0 - senior_to_test)).abs() < CASH_TOLERANCE,
+        "diverted cash {} must be the interest left after the senior tiers ({})",
+        result.diverted_cash.amount(),
+        4_000_000.0 - senior_to_test
+    );
+    assert!(result
+        .diverted_amounts
+        .iter()
+        .all(|record| record.target_tranche == "class_a_prin"));
 }
 
 #[test]
@@ -512,7 +549,6 @@ fn test_golden_cmbs_sequential_pay() {
         .add_tier(
             WaterfallTier::new("principal", 3, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential)
-                .divertible(false) // CMBS doesn't divert
                 .add_recipient(Recipient::tranche_principal(
                     "class_a_prin",
                     "CLASS_A",

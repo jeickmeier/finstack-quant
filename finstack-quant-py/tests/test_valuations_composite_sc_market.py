@@ -242,8 +242,9 @@ def test_tranche_structure_rep_line_and_asset_pool_contracts() -> None:
     assert pool.cumulative_defaults == Money(0.0, Currency("USD"))
     assert AssetPool.from_json(pool.to_json()).to_json() == pool.to_json()
     assert pickle.loads(pickle.dumps(pool)).to_json() == pool.to_json()  # noqa: S301
-    assert pool.assets([]).asset_records == []
-    assert pool.assets(()).to_json() == pool.assets([]).to_json()
+    assert pool.with_assets([]).asset_records == []
+    assert pool.assets == []
+    assert pool.with_assets(()).to_json() == pool.with_assets([]).to_json()
 
 
 def _market() -> MarketContext:

@@ -13,6 +13,7 @@ mod merton_mc;
 mod pricing;
 mod schema;
 mod structured_credit;
+pub(crate) mod typed_asset_backed_facility;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
@@ -663,6 +664,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_fx::register(py, &m)?;
     typed_structured_credit::register(py, &m)?;
     typed_revolving_credit::register(py, &m)?;
+    typed_asset_backed_facility::register(py, &m)?;
     pricing::register(py, &m)?;
     structured_credit::register(&m)?;
     let mut exports = vec![
@@ -721,6 +723,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_fx::EXPORTS);
     exports.extend_from_slice(typed_structured_credit::EXPORTS);
     exports.extend_from_slice(typed_revolving_credit::EXPORTS);
+    exports.extend_from_slice(typed_asset_backed_facility::EXPORTS);
     exports.extend_from_slice(pricing::EXPORTS);
     exports.sort_unstable();
     exports.dedup();

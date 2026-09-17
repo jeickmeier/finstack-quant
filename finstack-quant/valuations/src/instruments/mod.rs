@@ -97,6 +97,7 @@
 //! | `ConvertibleBond` | Bonds with equity conversion |
 //! | `TermLoan` | Bilateral term loans |
 //! | `RevolvingCredit` | Revolving credit facilities |
+//! | `AssetBackedFacility` | Warehouse lines against collateral pools |
 //! | `StructuredCredit` | ABS, CLO, RMBS, CMBS |
 //! | `AgencyMbsPassthrough` | Agency MBS pass-throughs |
 //! | `AgencyCmo` | Collateralized mortgage obligations |
@@ -198,10 +199,11 @@ pub mod fx;
 pub mod rates;
 
 pub use fixed_income::{
-    AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, Bond, BondFuture, BondFutureBuilder,
-    BondFutureSpecs, BondSettlementConvention, CmoTranche, CmoTrancheType, CmoWaterfall,
-    ConvertibleBond, DeliverableBond, DollarRoll, FIIndexTotalReturnSwap, InflationLinkedBond,
-    PoolType, RevolvingCredit, StructuredCredit, TbaTerm, TermLoan,
+    AgencyCmo, AgencyMbsPassthrough, AgencyProgram, AgencyTba, AssetBackedFacility, Bond,
+    BondFuture, BondFutureBuilder, BondFutureSpecs, BondSettlementConvention, CmoTranche,
+    CmoTrancheType, CmoWaterfall, ConvertibleBond, DeliverableBond, DollarRoll,
+    FIIndexTotalReturnSwap, InflationLinkedBond, PoolType, RevolvingCredit, StructuredCredit,
+    TbaTerm, TermLoan,
 };
 
 pub use rates::{

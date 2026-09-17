@@ -15,6 +15,73 @@
         }
       ]
     },
+    "AdvanceRate": {
+      "additionalProperties": false,
+      "description": "Advance rate applied to one collateral class.\n\n`asset_class` is the wire name of the [`AssetType`](super::AssetType)\nvariant (`\"first_lien_loan\"`, `\"new_auto_loan\"`, ...) or `\"*\"` for every\nclass without a more specific entry; collateral with no matching entry is\nineligible.",
+      "properties": {
+        "asset_class": {
+          "description": "Collateral class the rate applies to (`AssetType` wire name or `\"*\"`).",
+          "type": "string"
+        },
+        "eligibility": {
+          "$ref": "#/$defs/EligibilityRule",
+          "default": {
+            "exclude_defaulted": true,
+            "max_maturity": null
+          },
+          "description": "Eligibility criteria the collateral must meet to count."
+        },
+        "rate": {
+          "description": "Advance rate as a decimal share of eligible balance (`0.8` = 80%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "asset_class",
+        "rate"
+      ],
+      "type": "object"
+    },
+    "AdvancingPolicy": {
+      "description": "Servicer advancing policy for missed principal and interest.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The servicer advances nothing; delinquent balances simply stop paying.",
+          "properties": {
+            "policy": {
+              "const": "none",
+              "type": "string"
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The servicer advances the interest and scheduled principal that\ndelinquent balances miss, as long as the advances outstanding stay\nwithin `recoverability_cap_pct` percent of the delinquent balance.\nAdvances are reimbursed from the recovery proceeds of charge-offs\nbefore that cash reaches the waterfall.",
+          "properties": {
+            "policy": {
+              "const": "principal_and_interest",
+              "type": "string"
+            },
+            "recoverability_cap_pct": {
+              "description": "Cap on advances outstanding as a percent of the delinquent\nbalance (`100.0` = advance up to the full delinquent balance).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "policy",
+            "recoverability_cap_pct"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AfcSpec": {
       "additionalProperties": false,
       "description": "Available-funds cap (net-WAC cap) specification.",
@@ -436,6 +503,70 @@
         }
       ]
     },
+    "AmortizationEvent": {
+      "description": "Event that ends the revolving period early and turns the facility out\n(principal collections then repay the lender sequentially).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A scheduled amortization date earlier than `revolving_end`.",
+          "properties": {
+            "date": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Date revolving stops."
+            },
+            "kind": {
+              "const": "date",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "date"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cumulative collateral losses above `max_pct` percent of the original\ncollateral end revolving.",
+          "properties": {
+            "kind": {
+              "const": "cumulative_loss",
+              "type": "string"
+            },
+            "max_pct": {
+              "description": "Loss threshold in percent of original collateral (`4.0` = 4%).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "max_pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A three-period average excess spread below `min_3m` (annual decimal)\nends revolving.",
+          "properties": {
+            "kind": {
+              "const": "excess_spread",
+              "type": "string"
+            },
+            "min_3m": {
+              "description": "Excess-spread floor as an annual decimal (`0.01` = 1%).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "min_3m"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AmortizationSpec": {
       "description": "Amortization specification for principal over time.\n\nDescribes how principal amortizes or is exchanged during the life of the contract.\nUsed by instruments (e.g., bonds) and cashflow legs for consistent behavior.",
       "oneOf": [
@@ -702,6 +833,228 @@
         "spot_id",
         "vol_surface_id",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "AssetBackedFacility": {
+      "additionalProperties": false,
+      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); percentages are\npercent values (`max_pct`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "properties": {
+        "amortization_events": {
+          "description": "Events that end revolving early.",
+          "items": {
+            "$ref": "#/$defs/AmortizationEvent"
+          },
+          "type": "array"
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Free-form attributes (tags and metadata)."
+        },
+        "borrowing_base_rules": {
+          "$ref": "#/$defs/BorrowingBaseRules",
+          "description": "Advance rates, eligibility and concentration limits that define the\nborrowing base."
+        },
+        "card": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CardPortfolioSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit-card master-trust portfolio model. Asset and rep-line\npools only: the pool is the investor interest in the receivables, the\nspec's payment rate, portfolio yield and charge-off rate replace the\nprepayment, coupon and default assumptions. See [`CardPortfolioSpec`]."
+        },
+        "closing_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Closing date; the first payment date is one `frequency` later."
+        },
+        "collateral": {
+          "$ref": "#/$defs/AssetPool",
+          "description": "Collateral pool the facility lends against (asset rows, rep lines or\ninstrument collateral)."
+        },
+        "commitment": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Total commitment in the collateral currency."
+        },
+        "correlation_structure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CorrelationStructure"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional correlation structure for stochastic modeling."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "default": "act_360",
+          "description": "Accrual convention of the facility interest and unused fee."
+        },
+        "default_spec": {
+          "$ref": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
+          "default": {
+            "cdr": 0.02,
+            "curve": null
+          },
+          "description": "Default model specification."
+        },
+        "delinquency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DelinquencyModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional roll-rate delinquency model with servicer advancing and loan\nmodification. Asset and rep-line pools only: the default model then\nfeeds the first delinquency bucket and only the roll out of the last\nbucket charges off. See [`DelinquencyModel`]."
+        },
+        "discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve for the facility and residual cashflows."
+        },
+        "drawn": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Amount drawn at closing, in the collateral currency; at most the\ncommitment and strictly below the collateral balance."
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency of interest, fees and the borrowing-base test."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Stable facility identifier."
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Forward-curve identifier of the floating index; `None` makes\n`margin_bp` the all-in fixed rate."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "default": {},
+          "description": "Instrument-level pricing overrides."
+        },
+        "liquidation_price_pct": {
+          "description": "Price the collateral realizes when the term-out ends and the\nremaining collateral is liquidated to repay the facility, as a percent\nof par (`None` = par).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "margin_bp": {
+          "description": "Margin over the index (or the all-in fixed rate) in basis points.",
+          "format": "double",
+          "type": "number"
+        },
+        "maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Legal final maturity of the facility."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "default": {
+            "mc_seed_scenario": null,
+            "theta_period": null
+          },
+          "description": "Metric-level pricing overrides."
+        },
+        "payment_calendar_id": {
+          "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "prepayment_spec": {
+          "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+          "default": {
+            "cpr": 0.2,
+            "curve": null
+          },
+          "description": "Prepayment model specification."
+        },
+        "recovery_spec": {
+          "$ref": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",
+          "default": {
+            "rate": 0.5,
+            "recovery_lag": 12
+          },
+          "description": "Recovery model specification."
+        },
+        "revolving_end": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Scheduled end of the revolving period."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "default": {},
+          "description": "Scenario-level pricing overrides."
+        },
+        "stochastic_default_spec": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StochasticDefaultSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional stochastic default model specification."
+        },
+        "stochastic_prepay_spec": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StochasticPrepaySpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional stochastic prepayment model specification."
+        },
+        "term_out": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermOutSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Term-out window after revolving; `None` lets the collateral run to\n`maturity`."
+        },
+        "unused_fee_bp": {
+          "default": 0.0,
+          "description": "Fee on the undrawn commitment in basis points per annum.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "collateral",
+        "borrowing_base_rules",
+        "commitment",
+        "drawn",
+        "margin_bp",
+        "closing_date",
+        "revolving_end",
+        "maturity",
+        "frequency",
+        "discount_curve_id"
       ],
       "type": "object"
     },
@@ -1644,6 +1997,36 @@
           "type": "string"
         }
       ]
+    },
+    "BalloonSpec": {
+      "additionalProperties": false,
+      "description": "Balloon maturity behavior of a commercial mortgage.\n\nAt the loan's maturity the share `default_prob` of the balance fails to\nrefinance and is extended by `extension_months` at `extension_rate` (the\nloan's own coupon when `None`); the rest pays as the balloon. The extended\nbalance pays at the extended maturity (one extension per loan).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::BalloonSpec;\n\n// 30% of the balloon extends two years at 7%.\nlet balloon = BalloonSpec { default_prob: 0.3, extension_months: 24, extension_rate: Some(0.07) };\nassert!(balloon.validate().is_ok());\n```",
+      "properties": {
+        "default_prob": {
+          "description": "Share of the balloon balance that fails to refinance at maturity, as\na decimal in `[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        },
+        "extension_months": {
+          "description": "Months the non-refinancing share is extended.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "extension_rate": {
+          "description": "Annual coupon of the extended balance as a decimal; `None` keeps the\nloan's coupon.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "default_prob",
+        "extension_months"
+      ],
+      "type": "object"
     },
     "BarrierDirection": {
       "description": "Barrier direction for touch options.",
@@ -2698,6 +3081,31 @@
       ],
       "type": "object"
     },
+    "BorrowingBaseRules": {
+      "additionalProperties": false,
+      "description": "Advance rates and concentration limits that define a borrowing base.",
+      "properties": {
+        "advance_rates": {
+          "description": "Advance rate per collateral class (first match wins, `\"*\"` last).",
+          "items": {
+            "$ref": "#/$defs/AdvanceRate"
+          },
+          "type": "array"
+        },
+        "concentration_limits": {
+          "default": [],
+          "description": "Concentration limits applied to the eligible collateral before the\nadvance rates, in order.",
+          "items": {
+            "$ref": "#/$defs/ConcentrationLimit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "advance_rates"
+      ],
+      "type": "object"
+    },
     "BoundsType": {
       "description": "Specifies how the range bounds are interpreted.",
       "oneOf": [
@@ -3337,6 +3745,31 @@
         }
       ]
     },
+    "CallAssumption": {
+      "additionalProperties": false,
+      "description": "Assumed optional redemption on a date at a price.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::{\n    CallAssumption, CallScope,\n};\nuse time::Month;\n\nlet date = Date::from_calendar_date(2027, Month::January, 15).unwrap();\nlet call = CallAssumption::new(date, 100.0);\nassert_eq!(call.scope, CallScope::Deal);\n```",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Earliest redemption date; the call settles on the first payment date\nat or after it."
+        },
+        "price_pct": {
+          "description": "Redemption price as a percent of the notes' current balance\n(`100.0` = par; above par the premium is paid as interest, below par\nthe shortfall is a principal write-down).",
+          "format": "double",
+          "type": "number"
+        },
+        "scope": {
+          "$ref": "#/$defs/CallScope",
+          "description": "Whole deal or a single class."
+        }
+      },
+      "required": [
+        "date",
+        "price_pct",
+        "scope"
+      ],
+      "type": "object"
+    },
     "CallExercisePolicy": {
       "description": "Rule the pool engine applies to issuer call options on the collateral.\n\nSet at the deal level on [`InstrumentCollateral::call_exercise`] and\noverridable per instrument through [`InstrumentExerciseOverride`].",
       "oneOf": [
@@ -3464,6 +3897,29 @@
         "puts"
       ],
       "type": "object"
+    },
+    "CallScope": {
+      "description": "Which notes an assumed call redeems.",
+      "oneOf": [
+        {
+          "const": "deal",
+          "description": "The whole deal is called: collateral is liquidated and every note is\nredeemed; the projection ends on the call date.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One class is refinanced at the call price; the deal's cashflows are\nunchanged and only that class's `*_to_call` metrics truncate.",
+          "properties": {
+            "tranche": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tranche"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "CallableRangeAccrual": {
       "additionalProperties": false,
@@ -3685,6 +4141,33 @@
           "type": "string"
         }
       ]
+    },
+    "CardPortfolioSpec": {
+      "additionalProperties": false,
+      "description": "Portfolio assumptions for a credit-card master trust.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::CardPortfolioSpec;\n\n// 15% monthly payment rate, 18% portfolio yield, 5% annual charge-offs.\nlet spec = CardPortfolioSpec::new(0.15, 0.18, 0.05);\nassert!(spec.validate().is_ok());\n```",
+      "properties": {
+        "charge_off_rate": {
+          "description": "Annual charge-off rate as a decimal of the receivables balance;\nreplaces the default model unless an asset carries `mdr_override`.",
+          "format": "double",
+          "type": "number"
+        },
+        "monthly_payment_rate": {
+          "description": "Share of the receivables balance paid down each month, as a decimal\n(`0.15` = 15% monthly payment rate). Drives principal collections in\nplace of the prepayment model.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_yield": {
+          "description": "Annual portfolio yield (finance charges, interchange and fees) as a\ndecimal of the receivables balance; replaces the assets' coupons.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "monthly_payment_rate",
+        "portfolio_yield",
+        "charge_off_rate"
+      ],
+      "type": "object"
     },
     "CashFlow": {
       "additionalProperties": false,
@@ -4078,6 +4561,26 @@
           "type": "string"
         }
       ]
+    },
+    "CccBucketRule": {
+      "additionalProperties": false,
+      "description": "Excess-CCC bucket rule.",
+      "properties": {
+        "carry_at_market_value": {
+          "description": "`true` carries the excess at the assets' `market_price_pct` (assets\nwithout a price stay at par); `false` excludes the excess entirely.",
+          "type": "boolean"
+        },
+        "threshold_pct": {
+          "description": "Share of the performing pool, in percent, that CCC+ and lower rated\ncollateral may occupy at par (`7.5` = 7.5%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold_pct",
+        "carry_at_market_value"
+      ],
+      "type": "object"
     },
     "CdsConvention": {
       "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
@@ -6367,6 +6870,46 @@
       ],
       "type": "object"
     },
+    "ConcentrationLimit": {
+      "additionalProperties": false,
+      "description": "Cap on the eligible collateral any one obligor, industry or asset class\nmay contribute; balance above the cap is excluded from the borrowing base.",
+      "properties": {
+        "max_pct": {
+          "description": "Maximum share of the eligible collateral, in percent (`20.0` = 20%).",
+          "format": "double",
+          "type": "number"
+        },
+        "scope": {
+          "$ref": "#/$defs/ConcentrationScope",
+          "description": "Dimension the cap is measured on."
+        }
+      },
+      "required": [
+        "scope",
+        "max_pct"
+      ],
+      "type": "object"
+    },
+    "ConcentrationScope": {
+      "description": "Dimension a concentration limit is measured on.",
+      "oneOf": [
+        {
+          "const": "obligor",
+          "description": "Per `PoolAsset::obligor_id`.",
+          "type": "string"
+        },
+        {
+          "const": "industry",
+          "description": "Per `PoolAsset::industry`.",
+          "type": "string"
+        },
+        {
+          "const": "asset_class",
+          "description": "Per `AssetType` wire name.",
+          "type": "string"
+        }
+      ]
+    },
     "ConstituentReference": {
       "description": "Reference to a constituent asset in the basket",
       "oneOf": [
@@ -6974,31 +7517,136 @@
         }
       ]
     },
-    "CoverageTestRules": {
+    "CoverageRules": {
       "additionalProperties": false,
-      "description": "Simple OC/IC trigger for diversion",
+      "description": "Collateral valuation rules for the OC tests: rating haircuts, the value\ncarried for defaulted collateral, the excess-CCC bucket and discount\nobligations (CLO indenture conventions). Percentages are percent values\n(`7.5` = 7.5%); haircuts are decimal fractions.",
       "properties": {
-        "haircuts": {
+        "borrowing_base": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BorrowingBaseRules"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Advance rates and concentration limits evaluated by\n`CoverageTestType::BorrowingBase` tests; `None` makes such a test a\nvalidation error."
+        },
+        "ccc_bucket": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CccBucketRule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Excess-CCC bucket: collateral rated CCC+ and below beyond\n`threshold_pct` of the performing pool is carried at market value or\nexcluded."
+        },
+        "defaulted_valuation": {
+          "$ref": "#/$defs/DefaultedValuation",
+          "default": "recovery",
+          "description": "Value carried for defaulted collateral whose recovery cash has not yet\narrived."
+        },
+        "discount_obligation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscountObligationRule"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Discount obligations: collateral bought below `price_threshold_pct` of\npar is carried at its purchase price."
+        },
+        "rating_haircuts": {
           "additionalProperties": {
             "format": "double",
             "type": "number"
           },
-          "description": "Haircuts applied by collateral rating",
+          "default": {},
+          "description": "Haircut applied to the par of performing collateral by rating, as a\ndecimal fraction (`0.5` carries the asset at half par); unrated assets\nuse the `NR` entry when present.",
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "CoverageTestAction": {
+      "description": "What a failing coverage test does with the interest it diverts.",
+      "oneOf": [
+        {
+          "const": "pay_down_senior",
+          "description": "Pay down the notes of the senior-most principal tier, in its recipient\norder, until the test is cured (the standard OC/IC turbo).",
+          "type": "string"
         },
-        "par_value_threshold": {
-          "description": "Optional par-value threshold ratio (collateral / liabilities)",
-          "format": "double",
+        {
+          "const": "reinvest",
+          "description": "Retain the diverted interest as principal proceeds (a CLO\nreinvestment OC test): it is reinvested while the reinvestment period\nis active and repays notes through the principal tier afterwards.",
+          "type": "string"
+        }
+      ]
+    },
+    "CoverageTestSpec": {
+      "additionalProperties": false,
+      "description": "One coverage test at a position in the waterfall.\n\nThe ratio is computed on the period's collateral and note balances\n(overcollateralization: collateral value over the tested class and every\nclass senior to it; interest coverage: interest collections net of senior\nfees over the interest due to the same classes); the *position* of the\ntier that carries the test decides which cash a failure can divert.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/CoverageTestAction",
+          "default": "pay_down_senior",
+          "description": "What a failure does with the diverted interest."
+        },
+        "after_tranche": {
+          "description": "Template placement: the test tier follows the interest tier of this\ntranche instead of the tested tranche's own. Used only when the deal\nsynthesizes its waterfall; a custom waterfall places test tiers\nexplicitly.",
           "type": [
-            "number",
+            "string",
             "null"
           ]
+        },
+        "id": {
+          "description": "Unique test identifier, reported in `WaterfallDistribution::coverage_tests`\n(`OC_<tranche>` / `IC_<tranche>` by convention).",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CoverageTestType",
+          "description": "Overcollateralization or interest coverage."
+        },
+        "tranche_id": {
+          "description": "Tested class; the ratio covers this class and every class senior to it.",
+          "type": "string"
+        },
+        "trigger_level": {
+          "description": "Minimum ratio that passes (1.20 means 120%).",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
-        "haircuts"
+        "id",
+        "tranche_id",
+        "kind",
+        "trigger_level"
       ],
       "type": "object"
+    },
+    "CoverageTestType": {
+      "description": "Type of coverage test (simplified to OC/IC only)",
+      "oneOf": [
+        {
+          "const": "oc",
+          "description": "Overcollateralization test",
+          "type": "string"
+        },
+        {
+          "const": "ic",
+          "description": "Interest coverage test",
+          "type": "string"
+        },
+        {
+          "const": "borrowing_base",
+          "description": "Borrowing-base test: advance-rate-weighted eligible collateral (after\nthe concentration limits in `CoverageRules::borrowing_base`) over the\ntested class plus every class senior to it.",
+          "type": "string"
+        }
+      ]
     },
     "CoverageTrigger": {
       "additionalProperties": false,
@@ -7555,6 +8203,17 @@
       "additionalProperties": false,
       "description": "Fee structure for structured credit deals",
       "properties": {
+        "incentive_fee": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IncentiveFeeSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Manager incentive fee paid from the residual once equity has earned\nits hurdle IRR; `None` for deals without one."
+        },
         "master_servicer_fee_bp": {
           "description": "Master servicer fee (for CMBS/RMBS, basis points)",
           "format": "double",
@@ -7582,7 +8241,7 @@
           ]
         },
         "subordinated_mgmt_fee_bp": {
-          "description": "Subordinated management fee (basis points per annum)",
+          "description": "Subordinated management fee (basis points per annum), paid after every\nnote coupon.",
           "format": "double",
           "type": "number"
         },
@@ -7673,6 +8332,117 @@
             "speed_multiplier"
           ],
           "type": "object"
+        },
+        {
+          "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "vector",
+              "type": "string"
+            },
+            "monthly_cdr": {
+              "description": "Annual CDR per month of seasoning as decimals, month 1 first.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "curve",
+            "monthly_cdr"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. The `cdr` field is ignored.",
+          "properties": {
+            "cumulative_net_loss_pct": {
+              "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "curve": {
+              "const": "cumulative_loss",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_net_loss_pct",
+            "severity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored.",
+          "properties": {
+            "annual_pct": {
+              "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "cumulative_default_rate": {
+              "description": "Lifetime defaults as a decimal fraction of the original balance.",
+              "format": "double",
+              "type": "number"
+            },
+            "curve": {
+              "const": "timing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_default_rate",
+            "annual_pct"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DefaultedValuation": {
+      "description": "How defaulted collateral enters the OC numerator until its recovery cash\narrives.",
+      "oneOf": [
+        {
+          "const": "recovery",
+          "description": "At the modeled recovery value of the pending claims (the default).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "At `pct` percent of the defaulted par (a market-value convention).",
+          "properties": {
+            "market_value": {
+              "properties": {
+                "pct": {
+                  "description": "Percent of defaulted par carried (`40.0` = 40%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "market_value"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -7695,6 +8465,51 @@
           "type": "string"
         }
       ]
+    },
+    "DelinquencyModel": {
+      "additionalProperties": false,
+      "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n    .with_advancing(AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n    });\nassert_eq!(model.buckets(), 3);\n```",
+      "properties": {
+        "advancing": {
+          "$ref": "#/$defs/AdvancingPolicy",
+          "default": {
+            "policy": "none"
+          },
+          "description": "Servicer advancing of the interest and scheduled principal that\ndelinquent balances miss. Defaults to no advancing."
+        },
+        "cure_rates": {
+          "description": "Monthly probability, per bucket, that the bucket's balance returns to\ncurrent. Decimals in `[0, 1]`, same length as `roll_rates`, with\n`roll + cure ≤ 1` for every bucket.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "modification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModificationSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Loan modification program applied to delinquent balances every\nmonth; `None` for no modifications."
+        },
+        "roll_rates": {
+          "description": "Monthly probability, per bucket, that the bucket's balance rolls to\nthe next bucket; the last entry rolls to charge-off. Decimals in\n`[0, 1]`; the length is the number of buckets.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "roll_rates",
+        "cure_rates"
+      ],
+      "type": "object"
     },
     "DeliverableBond": {
       "additionalProperties": false,
@@ -7877,6 +8692,21 @@
         "name",
         "quantity",
         "exercise_price"
+      ],
+      "type": "object"
+    },
+    "DiscountObligationRule": {
+      "additionalProperties": false,
+      "description": "Discount-obligation rule.",
+      "properties": {
+        "price_threshold_pct": {
+          "description": "Purchase price, in percent of par, below which an asset is a discount\nobligation carried at its purchase price (`80.0` = 80% of par).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "price_threshold_pct"
       ],
       "type": "object"
     },
@@ -8275,11 +9105,43 @@
           "description": "Cumulative-loss fraction (decimal, of the original pool balance) at or\nabove which the revolving period ends early and amortization begins.",
           "format": "double",
           "type": "number"
+        },
+        "min_excess_spread_3m": {
+          "description": "Annualized excess spread (decimal of the opening pool balance: pool\ninterest less debt coupons due, fees paid and net charge-offs) whose\nthree-period trailing average, once it falls below this floor, ends the\nrevolving period for good. `None` disables the excess-spread test.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
         "max_cumulative_loss_pct"
       ],
+      "type": "object"
+    },
+    "EligibilityRule": {
+      "additionalProperties": false,
+      "description": "Eligibility criteria for collateral under an advance rate.",
+      "properties": {
+        "exclude_defaulted": {
+          "default": true,
+          "description": "Defaulted collateral is ineligible (the default).",
+          "type": "boolean"
+        },
+        "max_maturity": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Collateral maturing after this date is ineligible."
+        }
+      },
       "type": "object"
     },
     "EligibleCollateralSchedule": {
@@ -10530,6 +11392,26 @@
         }
       ]
     },
+    "FundingSource": {
+      "description": "Collection account(s) a waterfall tier draws on.\n\nInterest and principal proceeds are separate accounts in the executor.\nA tier normally draws on the account matching its [`PaymentType`]; a\n`Fee` or `Interest` tier may instead be allowed to top up from principal\nproceeds (the CLO principal-waterfall convention that senior fees and\nsenior note interest shortfalls are paid from principal before any note\nis redeemed). Cash taken from principal this way is reported as\n[`WaterfallDistribution::principal_used_for_interest`].",
+      "oneOf": [
+        {
+          "const": "interest",
+          "description": "Interest proceeds only (the default for fee, interest and residual tiers).",
+          "type": "string"
+        },
+        {
+          "const": "principal",
+          "description": "Principal proceeds only (the default for principal tiers).",
+          "type": "string"
+        },
+        {
+          "const": "interest_then_principal",
+          "description": "Interest proceeds first, then principal proceeds for any shortfall.",
+          "type": "string"
+        }
+      ]
+    },
     "FutureContractSpecs": {
       "additionalProperties": false,
       "description": "Contract specifications for interest rate futures.\n\nEncapsulates exchange-defined contract parameters and optional convexity\nadjustment for pricing.",
@@ -11886,6 +12768,30 @@
       ],
       "type": "object"
     },
+    "HedgeSwap": {
+      "additionalProperties": false,
+      "description": "An interest rate swap the deal pays and receives through its waterfall.",
+      "properties": {
+        "notional": {
+          "$ref": "#/$defs/SwapNotional",
+          "description": "Notional the flows track each period."
+        },
+        "priority": {
+          "$ref": "#/$defs/SwapPriority",
+          "description": "Fee tier the net payments rank in."
+        },
+        "swap": {
+          "$ref": "#/$defs/InterestRateSwap",
+          "description": "The swap; its `side` is the deal's side (`Pay` pays fixed and\nreceives floating), and its notional currency must be the deal's."
+        }
+      },
+      "required": [
+        "swap",
+        "notional",
+        "priority"
+      ],
+      "type": "object"
+    },
     "Hurdle": {
       "additionalProperties": false,
       "description": "Hurdle types for waterfall tiers.",
@@ -12002,6 +12908,27 @@
         "threshold",
         "mta",
         "segregated"
+      ],
+      "type": "object"
+    },
+    "IncentiveFeeSpec": {
+      "additionalProperties": false,
+      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share_pct`\nof the residual interest proceeds ahead of equity.",
+      "properties": {
+        "hurdle_irr": {
+          "description": "Equity IRR hurdle as an annual decimal (`0.12` = 12%).",
+          "format": "double",
+          "type": "number"
+        },
+        "share_pct": {
+          "description": "Share of the residual paid to the manager once the hurdle is met, as\na decimal fraction in `[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "hurdle_irr",
+        "share_pct"
       ],
       "type": "object"
     },
@@ -13996,6 +14923,24 @@
         },
         {
           "additionalProperties": false,
+          "description": "Canonical `asset_backed_facility` instrument payload.",
+          "properties": {
+            "spec": {
+              "$ref": "#/$defs/AssetBackedFacility"
+            },
+            "type": {
+              "const": "asset_backed_facility",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "spec"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Canonical `levered_real_estate_equity` instrument payload.",
           "properties": {
             "spec": {
@@ -14434,6 +15379,48 @@
       ],
       "type": "object"
     },
+    "LiquidationSpec": {
+      "additionalProperties": false,
+      "description": "Resolution timeline of a non-performing loan.\n\nThe loan pays no interest or principal from closing until the first\npayment date at or after `months_to_resolution` months. On that date the\nshare `1 − reperformance_prob` of the balance liquidates: it is booked as\na default whose recovery is `(proceeds_pct − carry_cost_pct)%` of the\nliquidated balance, released after the deal's recovery lag like any other\nrecovery. The share `reperformance_prob` re-performs: it becomes a\nperforming loan on its original amortization terms at `modified_rate`\n(the loan's coupon when `None`) from the following period on, with the\nlevel payment recast on the re-performing balance.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::LiquidationSpec;\n\n// Two-year workout: 55% gross proceeds less 5% carry, 20% re-performs at 4%.\nlet spec = LiquidationSpec {\n    months_to_resolution: 24,\n    proceeds_pct: 55.0,\n    carry_cost_pct: 5.0,\n    reperformance_prob: 0.2,\n    modified_rate: Some(0.04),\n};\nassert!(spec.validate().is_ok());\nassert!((spec.net_proceeds_fraction() - 0.5).abs() < 1e-12);\n```",
+      "properties": {
+        "carry_cost_pct": {
+          "default": 0.0,
+          "description": "Carry costs over the workout (taxes, insurance, legal, servicing\nadvances) as a percent of the liquidated balance, deducted from the\nproceeds.",
+          "format": "double",
+          "type": "number"
+        },
+        "modified_rate": {
+          "description": "Annual coupon the re-performing share pays as a decimal; `None` keeps\nthe loan's coupon.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "months_to_resolution": {
+          "description": "Months from the deal closing date to the resolution date.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "proceeds_pct": {
+          "description": "Gross liquidation proceeds as a percent of the liquidated balance.",
+          "format": "double",
+          "type": "number"
+        },
+        "reperformance_prob": {
+          "default": 0.0,
+          "description": "Share of the balance that re-performs at resolution instead of\nliquidating, as a decimal in `[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "months_to_resolution",
+        "proceeds_pct"
+      ],
+      "type": "object"
+    },
     "ListedFutureSettlement": {
       "description": "Final settlement mode for a listed future.",
       "oneOf": [
@@ -14777,6 +15764,21 @@
         }
       ]
     },
+    "LossAllocationPolicy": {
+      "description": "How collateral losses reach the note balances.\n\nRealized net loss (`default × (1 − recovery)`) is always tracked for the\ncumulative-loss triggers; this policy decides whether it also reduces the\nnotes' outstanding principal before legal final.\n\n| Policy | Market | Note balances | Loss realized |\n|---|---|---|---|\n| `WriteDown` | RMBS, CMBS | reduced junior-first at each default | at default |\n| `ParPreserving` | CLO, CBO, ABS, cards | carried at par; OC tests and the residual absorb losses | unpaid principal at legal final / liquidation |\n\nUnder `ParPreserving` a subordinated note keeps accruing its full coupon\nahead of the residual holder; the OC numerator carries each defaulted\nasset at its modeled recovery value until the recovery cash arrives.",
+      "oneOf": [
+        {
+          "const": "write_down",
+          "description": "Allocate realized net loss to the notes junior-first when the\ncollateral defaults (realized-loss allocation).",
+          "type": "string"
+        },
+        {
+          "const": "par_preserving",
+          "description": "Keep note balances at par; losses surface through coverage tests and\nas a principal shortfall at legal final.",
+          "type": "string"
+        }
+      ]
+    },
     "MakeWholeSpec": {
       "additionalProperties": false,
       "description": "Make-whole call specification.\n\nDefines the reference curve and spread used to compute the make-whole redemption\nprice. The issuer pays the holder the greater of par and the present value of\nremaining cashflows discounted at the reference rate plus a spread.\n\n# Industry Practice\n\n- Investment-grade corporates: typically Treasury + 25-50 bp\n- High-yield: typically Treasury + 50-100 bp\n- Convertibles: typically Treasury + 50 bp",
@@ -15048,6 +16050,34 @@
     "MetricId": {
       "description": "Strongly-typed metric identifier.\n\nProvides compile-time validation, autocomplete support, and safe refactoring\nwhen metric names change. Covers bond, IRS, deposit, and risk metrics.\n\nSee unit tests and `examples/` for usage.",
       "type": "string"
+    },
+    "ModificationSpec": {
+      "additionalProperties": false,
+      "description": "Loan modification program: every month a share of each delinquency\nbucket is modified back to current with a lower coupon and, for\nlevel-pay collateral, a recast payment over an extended term.\n\nOn a rep line the modified share blends into the line's coupon and level\npayment; the line's maturity is unchanged, so principal the extended term\npushes past it is paid as a balloon on that date.",
+      "properties": {
+        "rate_reduction_bp": {
+          "description": "Coupon reduction granted to modified balances, in basis points.",
+          "format": "double",
+          "type": "number"
+        },
+        "share_of_delinquent": {
+          "description": "Share of each bucket's balance modified per month, as a decimal in\n`[0, 1]`.",
+          "format": "double",
+          "type": "number"
+        },
+        "term_extension_months": {
+          "description": "Term extension granted to modified level-pay balances, in months.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rate_reduction_bp",
+        "term_extension_months",
+        "share_of_delinquent"
+      ],
+      "type": "object"
     },
     "Monitoring": {
       "description": "Contractual barrier-monitoring convention.",
@@ -15678,14 +16708,6 @@
       "additionalProperties": false,
       "description": "Behavioral overrides for prepayment, default, and recovery assumptions.",
       "properties": {
-        "abs_speed": {
-          "description": "Override prepayment with monthly ABS speed.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "cdr_annual": {
           "description": "Override default with constant annual CDR.",
           "format": "double",
@@ -15728,7 +16750,7 @@
           ]
         },
         "reinvestment_price": {
-          "description": "Reinvestment price constraint (% of par).",
+          "description": "Override the replacement-collateral purchase price during the\nreinvestment period, as a percent of par (`97.5` = 97.5); takes\nprecedence over `ReinvestmentAssumptions::price_pct`.",
           "format": "double",
           "type": [
             "number",
@@ -15887,6 +16909,57 @@
         },
         {
           "additionalProperties": false,
+          "description": "Percentage of the specially serviced collateral balance (CMBS special\nservicing fee): the balances of pool assets carrying a\n`special_servicing` spec.",
+          "properties": {
+            "percentage_of_special_serviced": {
+              "additionalProperties": false,
+              "properties": {
+                "annualized": {
+                  "description": "Annualized.",
+                  "type": "boolean"
+                },
+                "day_count": {
+                  "anyOf": [
+                    {
+                      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Day count convention for annualization."
+                },
+                "rate": {
+                  "description": "Rate.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "rounding": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/RoundingConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Rounding convention."
+                }
+              },
+              "required": [
+                "rate",
+                "annualized"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percentage_of_special_serviced"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Interest due on tranche",
           "properties": {
             "tranche_interest": {
@@ -15946,7 +17019,7 @@
                       "type": "null"
                     }
                   ],
-                  "description": "Target balance."
+                  "description": "Balance the regular principal pass amortizes the tranche down to;\n`None` pays it in full. A coverage-test cure diversion at an earlier\nposition pays toward zero and counts toward this target, so the\nregular pass only completes the remaining distance to it."
                 },
                 "tranche_id": {
                   "description": "Tranche id.",
@@ -16031,6 +17104,36 @@
             "capped_tranche_interest"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Manager incentive fee: `share_pct` of the cash reaching this recipient\nonce the equity IRR to date (the [`EquityHistory`] in the\n`WaterfallContext`, plus this cash on the payment date) reaches\n`hurdle_irr`; nothing before that, and nothing when no equity history\nis supplied.",
+          "properties": {
+            "incentive_fee": {
+              "additionalProperties": false,
+              "properties": {
+                "hurdle_irr": {
+                  "description": "Equity IRR hurdle as an annual decimal.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "share_pct": {
+                  "description": "Share of the residual paid once the hurdle is met, in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "hurdle_irr",
+                "share_pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "incentive_fee"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -16055,6 +17158,11 @@
         {
           "const": "residual",
           "description": "Excess-interest distribution; does not retire equity principal.",
+          "type": "string"
+        },
+        {
+          "const": "coverage_test",
+          "description": "Coverage-test position: the tier pays nobody itself. While any of its\n[`WaterfallTier::tests`] fails, the interest still undistributed at\nthis point in the waterfall is diverted (up to the cure amount) per the\ntest's [`CoverageTestAction`], so only tiers ranked below the test can\nlose cash to it.",
           "type": "string"
         }
       ]
@@ -16251,6 +17359,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Current outstanding principal balance in the asset currency."
         },
+        "balloon": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BalloonSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Balloon maturity behavior (commercial mortgages): the share that does\nnot refinance at maturity is extended instead of paid."
+        },
         "commitment": {
           "anyOf": [
             {
@@ -16301,6 +17420,16 @@
           "default": null,
           "description": "Economic default date for the outstanding recovery claim; required for defaulted assets."
         },
+        "delinquency_buckets": {
+          "description": "Delinquent balance per bucket (30, 60, 90 days past due, ...) at the\nvaluation date, in the pool's currency. Requires\n`credit_model.delinquency` with the same number of buckets; the sum\nmust not exceed `balance`. `None` for a fully current asset.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
@@ -16323,6 +17452,25 @@
           "description": "Whether the asset is currently treated as defaulted by the pool model.",
           "type": "boolean"
         },
+        "liquidation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiquidationSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Non-performing loan resolution: the loan pays nothing until the\nresolution date, where a share liquidates (a default whose recovery\nis the net proceeds) and the rest re-performs. The timeline replaces\nthe default flag: `is_defaulted` stays `false` and\n`recovery_amount`/`default_date` stay unset."
+        },
+        "market_price_pct": {
+          "description": "Market price as percent of par (`60.0` = 60% of par). Read by the\nexcess-CCC coverage rule; an asset without a price is carried at par.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Contractual maturity date of the asset."
@@ -16336,12 +17484,34 @@
             "null"
           ]
         },
+        "noi": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Annual net operating income of the property securing the loan, for\nthe pool debt-service coverage ratio."
+        },
         "obligor_id": {
           "description": "Optional obligor identifier used for single-name concentration limits.",
           "type": [
             "string",
             "null"
           ]
+        },
+        "prepayment_penalty": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrepaymentPenalty"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment penalty the borrower pays on voluntary prepayment; the\npremium is collected as interest."
         },
         "purchase_price": {
           "anyOf": [
@@ -16387,6 +17557,17 @@
             "number",
             "null"
           ]
+        },
+        "special_servicing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpecialServicingSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Special-servicing state: an appraisal reduction cuts the interest\nadvanced on the loan, and the special servicing fee accrues on it."
         },
         "spread_bp": {
           "description": "Spread over the reference index in basis points for floating-rate assets.\nWeighted-average-spread calculations use this field rather than the\nall-in coupon because the index component is not a credit spread.",
@@ -16557,6 +17738,116 @@
           "required": [
             "curve",
             "lockout_months"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "abs",
+              "type": "string"
+            },
+            "speed": {
+              "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "vector",
+              "type": "string"
+            },
+            "monthly_cpr": {
+              "description": "Annual CPR per month of seasoning as decimals, month 1 first.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "curve",
+            "monthly_cpr"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PrepaymentPenalty": {
+      "description": "Prepayment penalty a borrower pays on voluntary prepayment; the premium\nreaches the trust as interest collections.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A fixed percent of the prepaid balance.",
+          "properties": {
+            "kind": {
+              "const": "fixed",
+              "type": "string"
+            },
+            "pct": {
+              "description": "Premium in percent of the prepaid balance (`3.0` = 3%).",
+              "format": "double",
+              "type": "number"
+            },
+            "through": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last date the penalty applies; `None` applies it to maturity."
+            }
+          },
+          "required": [
+            "kind",
+            "pct"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Yield maintenance: the coupon the trust loses over the remaining\nterm, `prepaid × max(0, coupon − reinvestment_rate) × years to\nmaturity` (undiscounted).",
+          "properties": {
+            "kind": {
+              "const": "yield_maintenance",
+              "type": "string"
+            },
+            "reinvestment_rate": {
+              "description": "Annual rate the prepaid principal is assumed to be reinvested at,\nas a decimal.",
+              "format": "double",
+              "type": "number"
+            },
+            "through": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Last date the penalty applies; `None` applies it to maturity."
+            }
+          },
+          "required": [
+            "kind",
+            "reinvestment_rate"
           ],
           "type": "object"
         }
@@ -17881,6 +19172,49 @@
         }
       ]
     },
+    "ReinvestmentAssumptions": {
+      "additionalProperties": false,
+      "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `index_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
+      "properties": {
+        "coupon_floor": {
+          "description": "Minimum all-in annual coupon as a decimal (a floor on the resolved\nindex plus spread), if any.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "index_id": {
+          "description": "Floating-rate index id (a forward curve in the market context), or\n`None` for a fixed coupon.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maturity_months": {
+          "description": "Months from the purchase date to the bullet maturity.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "price_pct": {
+          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price`.",
+          "format": "double",
+          "type": "number"
+        },
+        "spread_bp": {
+          "description": "Spread over the index in basis points (the whole coupon in basis\npoints when `index_id` is `None`).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "spread_bp",
+        "price_pct",
+        "maturity_months"
+      ],
+      "type": "object"
+    },
     "ReinvestmentCriteria": {
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
@@ -17914,18 +19248,38 @@
     },
     "ReinvestmentPeriod": {
       "additionalProperties": false,
-      "description": "Reinvestment period and rules",
+      "description": "Deal-level reinvestment period and rules.\n\nWhile the period is active (`is_active` and the payment date is on or\nbefore `end_date`), principal proceeds are recycled into collateral\ninstead of repaying the notes. Every note is held flat except those listed\nin `amortizing_tranches`, which are paid down first; only the principal\nleft after their paydown is reinvested.",
       "properties": {
+        "amortizing_tranches": {
+          "default": [],
+          "description": "Notes paid down from principal proceeds during the period, in the\nprincipal waterfall's order; every other note is held flat. Must name\nnon-equity tranches of the deal.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "assumptions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReinvestmentAssumptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Terms of the replacement collateral. `None` clones the surviving pool\npro rata; `Some` books each period's purchases as a synthetic\n`REINVEST-{n}` first-lien row with these terms."
+        },
         "criteria": {
           "$ref": "#/$defs/ReinvestmentCriteria",
-          "description": "Criteria for new investments"
+          "description": "Eligibility criteria for purchases."
         },
         "end_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "End date of reinvestment period"
+          "description": "Inclusive end date of the reinvestment period."
         },
         "is_active": {
-          "description": "Whether reinvestment is currently active",
+          "description": "Whether reinvestment is currently active.",
           "type": "boolean"
         }
       },
@@ -18996,6 +20350,21 @@
       ],
       "type": "object"
     },
+    "SpecialServicingSpec": {
+      "additionalProperties": false,
+      "description": "Special-servicing state of a commercial mortgage.\n\nThe appraisal reduction cuts the interest advanced on the loan\n(an appraisal subordinate entitlement reduction, ASER): the trust\ncollects interest on `1 − appraisal_reduction_pct / 100` of the balance\nand the shortfall falls on the most junior classes first through the\nsequential interest waterfall. The special servicing fee accrues only on\nspecially serviced balances.",
+      "properties": {
+        "appraisal_reduction_pct": {
+          "description": "Appraisal reduction in percent of the loan balance (`40.0` = 40%).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "appraisal_reduction_pct"
+      ],
+      "type": "object"
+    },
     "StepDownSpec": {
       "additionalProperties": false,
       "description": "Step-down specification for senior/subordinate principal allocation.\n\nPrincipal is paid sequentially (senior first) until the deal seasons past\n`step_down_date`; from then on, *if* every configured [`StepDownTrigger`]\npasses, principal switches to pro-rata across the debt tranches, releasing\nsubordination to the juniors. While any trigger is breached the deal reverts\nto sequential, so the switch is re-evaluated every period (non-sticky). An\nempty `triggers` list steps down purely on the date.",
@@ -19019,7 +20388,7 @@
       "type": "object"
     },
     "StepDownTrigger": {
-      "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the *single* most-senior tranche by payment\n  priority — for pari-passu senior classes (e.g. A-1/A-2) only the\n  lowest-priority one is taken as the reference.\n\nDelinquency triggers are intentionally absent: the simulation engine models\ndefaults and recoveries but not a separate delinquency state, so there is no\ndelinquency rate to test against.",
+      "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the *single* most-senior tranche by payment\n  priority — for pari-passu senior classes (e.g. A-1/A-2) only the\n  lowest-priority one is taken as the reference.\n\n`MaxDelinquency` reads the delinquent share of the pool, which is zero\nunless the deal carries a `credit_model.delinquency` model.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -19060,6 +20429,20 @@
           },
           "required": [
             "min_credit_enhancement"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Passes while the delinquent balance (every bucket of the deal's\ndelinquency model) as a fraction of the current pool balance is at or\nbelow this level.",
+          "properties": {
+            "max_delinquency": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "max_delinquency"
           ],
           "type": "object"
         }
@@ -19154,7 +20537,7 @@
           "description": "Use deterministic default model (no stochastic component).",
           "properties": {
             "cdr": {
-              "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when [`DefaultCurve::Sda`] is active: the\nannual CDR is then derived entirely from the SDA seasoning curve and\nits `speed_multiplier`.",
+              "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
               "format": "double",
               "type": "number"
             },
@@ -19297,7 +20680,7 @@
           "description": "Use deterministic prepayment model (no stochastic component).",
           "properties": {
             "cpr": {
-              "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`] is active: the\nannual CPR is then derived entirely from the PSA seasoning ramp and\nits `speed_multiplier`. It IS used by [`PrepaymentCurve::CmbsLockout`]\nas the post-lockout CPR.",
+              "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
               "format": "double",
               "type": "number"
             },
@@ -19519,7 +20902,6 @@
         "behavior_overrides": {
           "$ref": "#/$defs/Overrides",
           "default": {
-            "abs_speed": null,
             "cdr_annual": null,
             "cpr_annual": null,
             "psa_speed_multiplier": null,
@@ -19529,6 +20911,28 @@
             "sda_speed_multiplier": null
           },
           "description": "Behavioral assumption overrides."
+        },
+        "call_assumption": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallAssumption"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Assumed optional redemption for price-to-call analytics. A deal-scope\ncall liquidates the collateral at [`Self::liquidation_price_pct`] on\nthe first payment date at or after the call date and redeems every\nnote at the call price, ending the projection; a tranche-scope call\nleaves the deal's cashflows unchanged and only truncates that class's\n`*_to_call` metrics. `TrancheMetrics` always reports the to-maturity\nfigures (projected without the call) next to the twins."
+        },
+        "card": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CardPortfolioSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional credit-card master-trust portfolio model. Asset and rep-line\npools only: the pool is the investor interest in the receivables, the\nspec's payment rate, portfolio yield and charge-off rate replace the\nprepayment, coupon and default assumptions. See [`CardPortfolioSpec`]."
         },
         "cleanup_call_pct": {
           "description": "Clean-up call pool factor threshold (percentage of original balance).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
@@ -19553,10 +20957,21 @@
           ],
           "description": "Optional correlation structure for stochastic modeling."
         },
+        "coverage_rules": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CoverageRules"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Collateral valuation rules for the OC tests: rating haircuts, the\nvalue carried for defaulted collateral, the excess-CCC bucket and\ndiscount obligations. `None` values performing collateral at par with\ndefaulted collateral at its modeled recovery. Attached to the template\nwaterfall by [`Self::create_waterfall`], and to a custom\n[`Self::waterfall`] that carries no rules of its own."
+        },
         "coverage_triggers": {
-          "description": "Overcollateralization / interest-coverage triggers evaluated each period.\n\nEach entry names a tranche and the OC and/or IC level that must be\nmaintained for it. When a test fails, the cure amount is diverted from\nthe divertible tiers to redeem senior notes. CLO/CBO templates may\ntrap junior coupon; ABS/RMBS/CMBS turbo residual only. Empty (the\ndefault) means no coverage tests run.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;\n\n// Class A must maintain 120% OC and 115% IC.\nlet trigger = CoverageTrigger {\n    tranche_id: \"CLASS_A\".to_string(),\n    oc_trigger: Some(1.20),\n    ic_trigger: Some(1.15),\n};\nassert_eq!(trigger.oc_trigger, Some(1.20));\n```\n\nUse the fully-qualified waterfall type here: the public re-export\n`structured_credit::CoverageTrigger` is a different per-tranche\nbreach-state record that shares the name.",
+          "description": "Overcollateralization / interest-coverage tests evaluated each period.\n\nEach test names the tested class, its kind and level, and what a\nfailure does with the diverted interest. The synthesized template\nplaces each test as a [`PaymentType::CoverageTest`] tier right after\nthe interest tier of its [`CoverageTestSpec::placement_tranche`]\n(CLO/CBO: per-class interest tiers; ABS/RMBS/CMBS: after the single\ninterest tier, so only residual cash turbos). A custom\n[`Self::waterfall`] receives them the same way. Only cash ranked below\nthe test position can be diverted. Empty (the default) means no\ncoverage tests run.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;\n\n// Class B must maintain 120% OC (tested on A + B) and 115% IC.\nlet tests = vec![\n    CoverageTestSpec::oc(\"CLASS_B\", 1.20),\n    CoverageTestSpec::ic(\"CLASS_B\", 1.15),\n];\nassert_eq!(tests[0].id, \"OC_CLASS_B\");\n```\n\nDistinct from the per-tranche [`Tranche::oc_trigger`] /\n[`Tranche::ic_trigger`] (`structured_credit::CoverageTrigger`), which\ncarry breach/cure memory and non-diversion consequences.",
           "items": {
-            "$ref": "#/$defs/WaterfallCoverageTrigger"
+            "$ref": "#/$defs/CoverageTestSpec"
           },
           "type": "array"
         },
@@ -19587,6 +21002,17 @@
           },
           "description": "Default model specification."
         },
+        "delinquency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DelinquencyModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional roll-rate delinquency model with servicer advancing and loan\nmodification. Asset and rep-line pools only: the default model then\nfeeds the first delinquency bucket and only the roll out of the last\nbucket charges off. See [`DelinquencyModel`]."
+        },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve for valuation."
@@ -19612,9 +21038,9 @@
         },
         "hedge_swaps": {
           "default": [],
-          "description": "Interest rate swaps used to hedge basis or interest rate risk.",
+          "description": "Interest rate swaps settled through the waterfall: net receipts join\ninterest proceeds, net payments rank as senior or junior fees. See\n[`HedgeSwap`].",
           "items": {
-            "$ref": "#/$defs/InterestRateSwap"
+            "$ref": "#/$defs/HedgeSwap"
           },
           "type": "array"
         },
@@ -19625,6 +21051,25 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Attributes for scenario selection.\nInstrument-owned pricing inputs."
+        },
+        "liquidation_price_pct": {
+          "description": "Price at which the collateral is realized when the deal is called or\ncleaned up, as a percent of par (`None` = par). The clean-up call is\nonly exercised when the liquidation proceeds, pending recoveries and\nevery cash account together cover the notes' claims.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "loss_allocation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LossAllocationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How collateral losses reach the note balances.\n\n`None` (the default) selects the market convention for the deal type\nvia [`LossAllocationPolicy::default_for`]: realized-loss write-downs\nfor RMBS and CMBS, par-preserving balances for CLO/CBO/ABS/cards. Set\nexplicitly to override; see [`Self::effective_loss_allocation`]."
         },
         "market_conditions": {
           "$ref": "#/$defs/MarketConditions",
@@ -19667,6 +21112,13 @@
             "curve": null
           },
           "description": "Prepayment model specification."
+        },
+        "principal_covers_senior_interest": {
+          "description": "Whether the template waterfall pays senior fees and senior note\ninterest shortfalls from principal proceeds before any note is\nredeemed (the CLO principal-waterfall convention).\n\n`None` (the default) follows the deal type: `true` for CLO/CBO,\n`false` otherwise. Ignored by a custom [`Self::waterfall`], whose tiers\ncarry their own [`FundingSource`]; see\n[`Waterfall::fund_senior_interest_from_principal`] and\n[`Self::effective_principal_covers_senior_interest`].",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "quote_settlement_date": {
           "anyOf": [
@@ -19782,6 +21234,49 @@
         {
           "const": "long_back",
           "description": "Long stub period at the end of the schedule (merges final two periods).",
+          "type": "string"
+        }
+      ]
+    },
+    "SwapNotional": {
+      "description": "Notional a hedge swap's flows are scaled to each period.",
+      "oneOf": [
+        {
+          "const": "contractual",
+          "description": "The swap's own contractual notional; flows are used as scheduled.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Balance-guaranteed swap on one note: each period's flows are rescaled\nby `note balance at period start / contractual notional`.",
+          "properties": {
+            "tranche_par": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tranche_par"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "pool_par",
+          "description": "Balance-guaranteed swap on the collateral: flows are rescaled by\n`performing pool balance at period start / contractual notional`.",
+          "type": "string"
+        }
+      ]
+    },
+    "SwapPriority": {
+      "description": "Where a hedge swap's net payments rank in the waterfall.",
+      "oneOf": [
+        {
+          "const": "senior_fee",
+          "description": "With the senior fees, ahead of every note (the usual hedge ranking).",
+          "type": "string"
+        },
+        {
+          "const": "junior_fee",
+          "description": "After note interest and principal, ahead of the residual.",
           "type": "string"
         }
       ]
@@ -20365,6 +21860,22 @@
       ],
       "type": "object"
     },
+    "TermOutSpec": {
+      "additionalProperties": false,
+      "description": "Term-out after revolving: collateral principal repays the facility\nsequentially for `months` after the (possibly accelerated) revolving end,\nand whatever collateral is left is then liquidated at the facility's\n`liquidation_price_pct` to repay the balance (the residual takes the\nrest).",
+      "properties": {
+        "months": {
+          "description": "Months from the revolving end to the facility's final repayment date.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "months"
+      ],
+      "type": "object"
+    },
     "TerminalValueSpec": {
       "description": "Terminal value calculation method for DCF.",
       "oneOf": [
@@ -20480,9 +21991,12 @@
       "description": "Structured credit tranche with attachment/detachment points",
       "properties": {
         "attachment_point": {
-          "description": "Structural boundaries (as % of total capital structure)",
+          "description": "Lower structural boundary as a percent of the capital structure\n(`0.0` for the first-loss class). `None` until\n[`TrancheStructure::new`] derives it from the balance shares in\npayment-priority order; a declared value must match that share\nwithin the structure's thickness tolerance.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -20492,10 +22006,6 @@
           "$ref": "#/$defs/TrancheBehaviorType",
           "default": "standard",
           "description": "Behavioral classification for specialized handling"
-        },
-        "can_reinvest": {
-          "description": "Whether reinvestment of principal is permitted",
-          "type": "boolean"
         },
         "coupon": {
           "$ref": "#/$defs/TrancheCoupon",
@@ -20514,9 +22024,12 @@
           "description": "Accumulated deferred interest (if payment has been deferred)"
         },
         "detachment_point": {
-          "description": "Detachment point as percentage (upper loss bound for this tranche)",
+          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attachment_point`] when `None`.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -20536,10 +22049,6 @@
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique tranche identifier"
-        },
-        "is_revolving": {
-          "description": "Structural features",
-          "type": "boolean"
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -20585,23 +22094,10 @@
         "seniority": {
           "$ref": "#/$defs/TrancheSeniority",
           "description": "Tranche characteristics"
-        },
-        "target_balance": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Target balance for revolving period (optional, for revolving structures)"
         }
       },
       "required": [
         "id",
-        "attachment_point",
-        "detachment_point",
         "seniority",
         "original_balance",
         "current_balance",
@@ -20609,8 +22105,6 @@
         "frequency",
         "day_count",
         "deferred_interest",
-        "is_revolving",
-        "can_reinvest",
         "maturity",
         "payment_priority",
         "attributes"
@@ -21244,23 +22738,16 @@
         "coverage_rules": {
           "anyOf": [
             {
-              "$ref": "#/$defs/CoverageTestRules"
+              "$ref": "#/$defs/CoverageRules"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional coverage test rules (haircuts, par thresholds)"
-        },
-        "coverage_triggers": {
-          "description": "Coverage triggers for OC/IC diversion",
-          "items": {
-            "$ref": "#/$defs/WaterfallCoverageTrigger"
-          },
-          "type": "array"
+          "description": "Collateral valuation rules for the OC tests; `None` values collateral\nat par with defaulted assets at recovery."
         },
         "tiers": {
-          "description": "Ordered payment tiers",
+          "description": "Ordered payment tiers, including [`PaymentType::CoverageTest`] positions",
           "items": {
             "$ref": "#/$defs/WaterfallTier"
           },
@@ -21269,38 +22756,7 @@
       },
       "required": [
         "tiers",
-        "coverage_triggers",
         "base_currency"
-      ],
-      "type": "object"
-    },
-    "WaterfallCoverageTrigger": {
-      "additionalProperties": false,
-      "description": "Coverage trigger definition used for diversion logic (OC/IC thresholds).",
-      "properties": {
-        "ic_trigger": {
-          "description": "IC trigger level (e.g., 1.10 = 110%)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "oc_trigger": {
-          "description": "OC trigger level (e.g., 1.15 = 115%)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "tranche_id": {
-          "description": "Tranche where test applies",
-          "type": "string"
-        }
-      },
-      "required": [
-        "tranche_id"
       ],
       "type": "object"
     },
@@ -21394,15 +22850,22 @@
     },
     "WaterfallTier": {
       "additionalProperties": false,
-      "description": "Waterfall tier with multiple recipients",
+      "description": "Waterfall tier: a payment step with recipients, or a coverage-test\nposition ([`PaymentType::CoverageTest`]) carrying `tests` and no recipients.",
       "properties": {
         "allocation_mode": {
           "$ref": "#/$defs/AllocationMode",
           "description": "How to allocate within tier"
         },
-        "divertible": {
-          "description": "Whether this tier can be diverted if coverage tests fail",
-          "type": "boolean"
+        "funding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FundingSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Collection account(s) this tier draws on; `None` uses\n[`FundingSource::default_for`] the tier's `payment_type`. See\n[`Self::effective_funding`]."
         },
         "id": {
           "description": "Unique tier identifier",
@@ -21419,9 +22882,16 @@
           "type": "integer"
         },
         "recipients": {
-          "description": "Recipients in this tier",
+          "description": "Recipients in this tier (empty for a coverage-test tier)",
           "items": {
             "$ref": "#/$defs/Recipient"
+          },
+          "type": "array"
+        },
+        "tests": {
+          "description": "Coverage tests evaluated at this position (only for\n[`PaymentType::CoverageTest`] tiers; empty otherwise). Every test in\none tier shares the same [`CoverageTestAction`].",
+          "items": {
+            "$ref": "#/$defs/CoverageTestSpec"
           },
           "type": "array"
         }
@@ -21431,8 +22901,7 @@
         "priority",
         "recipients",
         "payment_type",
-        "allocation_mode",
-        "divertible"
+        "allocation_mode"
       ],
       "type": "object"
     },

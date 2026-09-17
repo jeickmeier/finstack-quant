@@ -59,6 +59,13 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         recovery_rate: None,
         commitment: None,
         contractual_payment: None,
+        market_price_pct: None,
+        delinquency_buckets: None,
+        balloon: None,
+        prepayment_penalty: None,
+        special_servicing: None,
+        noi: None,
+        liquidation: None,
     }
 }
 
@@ -355,10 +362,12 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
     pool.reinvestment_period = Some(ReinvestmentPeriod {
         end_date: reinvest_end,
         is_active: true,
+        amortizing_tranches: Vec::new(),
+        assumptions: None,
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let mut clo = StructuredCredit::new_clo(
+    let clo = StructuredCredit::new_clo(
         "CLO_REINVEST",
         pool,
         single_tranche(balance * 2.0),
@@ -367,9 +376,6 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
         "USD_OIS",
     )
     .with_payment_calendar("nyse");
-
-    clo.tranches.tranches[0].is_revolving = true;
-    clo.tranches.tranches[0].can_reinvest = true;
 
     let market = flat_market();
 
@@ -451,10 +457,12 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
     pool_reinvest.reinvestment_period = Some(ReinvestmentPeriod {
         end_date: reinvest_end,
         is_active: true,
+        amortizing_tranches: Vec::new(),
+        assumptions: None,
         criteria: ReinvestmentCriteria::default(),
     });
 
-    let mut clo_reinvest = StructuredCredit::new_clo(
+    let clo_reinvest = StructuredCredit::new_clo(
         "CLO_REINVEST",
         pool_reinvest,
         single_tranche(balance * 2.0),
@@ -463,9 +471,6 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         "USD_OIS",
     )
     .with_payment_calendar("nyse");
-
-    clo_reinvest.tranches.tranches[0].is_revolving = true;
-    clo_reinvest.tranches.tranches[0].can_reinvest = true;
 
     // Deal WITHOUT reinvestment (same pool, no reinvestment period)
     let mut pool_no_reinvest = AssetPool::new("POOL_NO_REINVEST", DealType::Clo, Currency::USD);

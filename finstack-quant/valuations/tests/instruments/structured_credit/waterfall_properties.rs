@@ -72,8 +72,10 @@ fn run_waterfall(
         deferred_interest: None,
         reserve_balance: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        defaulted_collateral_value: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         recovery_proceeds: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         floating_rate_shift: 0.0,
+        equity_history: None,
     };
     finstack_quant_valuations::instruments::fixed_income::structured_credit::execute_waterfall(
         waterfall, tranches, pool, context,
@@ -493,17 +495,15 @@ fn property_diversion_tracking() {
 
     let waterfall = WaterfallBuilder::new(currency)
         .add_tier(
-            WaterfallTier::new("tier1", 1, PaymentType::Principal)
-                .divertible(true)
-                .add_recipient(Recipient::new(
-                    "principal",
-                    RecipientType::Tranche("TEST_TRANCHE".into()),
-                    PaymentCalculation::TranchePrincipal {
-                        tranche_id: "TEST_TRANCHE".into(),
-                        target_balance: None,
-                        rounding: None,
-                    },
-                )),
+            WaterfallTier::new("tier1", 1, PaymentType::Principal).add_recipient(Recipient::new(
+                "principal",
+                RecipientType::Tranche("TEST_TRANCHE".into()),
+                PaymentCalculation::TranchePrincipal {
+                    tranche_id: "TEST_TRANCHE".into(),
+                    target_balance: None,
+                    rounding: None,
+                },
+            )),
         )
         .build()
         .expect("build waterfall");

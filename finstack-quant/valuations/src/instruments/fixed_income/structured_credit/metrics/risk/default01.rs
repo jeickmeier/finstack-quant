@@ -53,6 +53,75 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             let achieved = (mult_up - mult_down) * sda_peak_cdr;
             (up, down, achieved)
         }
+        // Explicit vectors are bumped additively, entry by entry.
+        Some(DefaultCurve::Vector { monthly_cdr }) => {
+            let shifted = |delta: f64| -> Vec<f64> {
+                monthly_cdr
+                    .iter()
+                    .map(|cdr| (cdr + delta).clamp(0.0, 1.0))
+                    .collect()
+            };
+            let up_vec = shifted(DEFAULT_BUMP_CDR);
+            let down_vec = shifted(-DEFAULT_BUMP_CDR);
+            let achieved =
+                up_vec.first().copied().unwrap_or(0.0) - down_vec.first().copied().unwrap_or(0.0);
+            let up = DefaultModelSpec {
+                cdr: spec.cdr,
+                curve: Some(DefaultCurve::Vector {
+                    monthly_cdr: up_vec,
+                }),
+            };
+            let down = DefaultModelSpec {
+                cdr: spec.cdr,
+                curve: Some(DefaultCurve::Vector {
+                    monthly_cdr: down_vec,
+                }),
+            };
+            (up, down, achieved)
+        }
+        // Lifetime curves state defaults as a share of the original balance,
+        // so the bump is 1bp of *lifetime* cumulative defaults: the loss
+        // curve is scaled so its terminal default fraction moves by the bump.
+        Some(DefaultCurve::CumulativeLoss {
+            cumulative_net_loss_pct,
+            severity,
+        }) => {
+            let terminal = cumulative_net_loss_pct.last().copied().unwrap_or(0.0);
+            let delta_pct = DEFAULT_BUMP_CDR * severity * 100.0;
+            let scaled = |delta: f64| -> Vec<f64> {
+                if terminal > 0.0 {
+                    let factor = (terminal + delta).max(0.0) / terminal;
+                    cumulative_net_loss_pct
+                        .iter()
+                        .map(|loss| loss * factor)
+                        .collect()
+                } else {
+                    cumulative_net_loss_pct
+                        .iter()
+                        .map(|loss| (loss + delta).max(0.0))
+                        .collect()
+                }
+            };
+            let up_vec = scaled(delta_pct);
+            let down_vec = scaled(-delta_pct);
+            let achieved = (up_vec.last().copied().unwrap_or(0.0)
+                - down_vec.last().copied().unwrap_or(0.0))
+                / 100.0
+                / severity;
+            let up = DefaultModelSpec::cumulative_loss(up_vec, *severity);
+            let down = DefaultModelSpec::cumulative_loss(down_vec, *severity);
+            (up, down, achieved)
+        }
+        Some(DefaultCurve::Timing {
+            cumulative_default_rate,
+            annual_pct,
+        }) => {
+            let rate_up = (cumulative_default_rate + DEFAULT_BUMP_CDR).min(1.0);
+            let rate_down = (cumulative_default_rate - DEFAULT_BUMP_CDR).max(0.0);
+            let up = DefaultModelSpec::timing(rate_up, annual_pct.clone());
+            let down = DefaultModelSpec::timing(rate_down, annual_pct.clone());
+            (up, down, rate_up - rate_down)
+        }
         // Constant / no curve read `cdr` directly.
         _ => {
             let cdr_up = (spec.cdr + DEFAULT_BUMP_CDR).max(0.0);

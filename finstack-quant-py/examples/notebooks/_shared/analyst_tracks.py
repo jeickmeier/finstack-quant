@@ -407,7 +407,7 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
         }
         for i, industry in enumerate(("software", "healthcare", "industrials", "consumer", "services"))
     ]
-    pool = AssetPool("ANALYST-CLO-POOL", "clo", "USD").assets(assets)
+    pool = AssetPool("ANALYST-CLO-POOL", "clo", "USD").with_assets(assets)
     notes = []
     for iid, seniority, amount, coupon, attach, detach in (
         ("AAA", "senior", 80_000_000.0, 0.04, 0.0, 80.0),
@@ -438,7 +438,15 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
         "fees": None,
         "coverage_triggers": []
         if oc_trigger is None
-        else [{"tranche_id": "AAA", "oc_trigger": oc_trigger, "ic_trigger": None}],
+        else [
+            {
+                "id": "OC_AAA",
+                "tranche_id": "AAA",
+                "kind": "oc",
+                "trigger_level": oc_trigger,
+                "action": "pay_down_senior",
+            }
+        ],
     })
     spec.update({
         "prepayment_spec": {"cpr": 0.0, "curve": None},

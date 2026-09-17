@@ -84,6 +84,13 @@ fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
         recovery_rate: None,
         commitment: None,
         contractual_payment: None,
+        market_price_pct: None,
+        delinquency_buckets: None,
+        balloon: None,
+        prepayment_penalty: None,
+        special_servicing: None,
+        noi: None,
+        liquidation: None,
     });
     pool
 }
@@ -938,6 +945,13 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
     }
 

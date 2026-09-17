@@ -25,6 +25,7 @@
 
 use super::super::clamped_cpr_to_smm;
 use super::traits::StochasticPrepayment;
+use finstack_quant_cashflows::builder::smm_to_cpr;
 use finstack_quant_cashflows::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 
 /// Factor-correlated prepayment model.
@@ -68,6 +69,15 @@ impl FactorCorrelatedPrepay {
 
         match &self.base_spec.curve {
             None | Some(PrepaymentCurve::Constant) => self.base_spec.cpr,
+            // Curves that state the monthly rate directly: annualize the
+            // spec's own SMM so the factor shock scales the same speed the
+            // deterministic engine would apply.
+            Some(PrepaymentCurve::Abs { .. } | PrepaymentCurve::Vector { .. }) => self
+                .base_spec
+                .smm(seasoning)
+                .ok()
+                .and_then(|smm| smm_to_cpr(smm).ok())
+                .unwrap_or(0.0),
             Some(PrepaymentCurve::Psa { speed_multiplier }) => {
                 // PSA ramp: 0.2% CPR per month up to month 30, then flat at 6% × speed
                 let base_cpr = if seasoning < 30 {

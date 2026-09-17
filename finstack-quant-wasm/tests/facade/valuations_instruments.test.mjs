@@ -32,6 +32,20 @@ test('instruments namespace exposes typed Bond, TermLoan and RevolvingCredit cla
   assert.equal(typeof valuations.instruments.RevolvingCredit, 'function');
 });
 
+test('AssetBackedFacility.example round-trips and reports its borrowing base', () => {
+  assert.equal(typeof valuations.instruments.AssetBackedFacility, 'function');
+  const facility = valuations.instruments.AssetBackedFacility.example();
+  assert.equal(facility.id, 'ABF-EXAMPLE');
+  const envelope = JSON.parse(facility.toJson());
+  assert.equal(envelope.instrument.type, 'asset_backed_facility');
+  const again = valuations.instruments.AssetBackedFacility.fromJson(facility.toJson());
+  assert.equal(again.toJson(), facility.toJson());
+  const report = facility.borrowingBase();
+  assert.equal(report.borrowing_base.currency, 'USD');
+  assert.ok(Number(report.borrowing_base.amount) >= 70_000_000);
+  assert.throws(() => valuations.instruments.AssetBackedFacility.fromJson('{}'));
+});
+
 test('RevolvingCredit.example round-trips through the canonical envelope', () => {
   const facility = valuations.instruments.RevolvingCredit.example();
   assert.equal(facility.id, 'RCF-USD-3Y');

@@ -189,6 +189,8 @@ pub enum InstrumentType {
     CommodityFutureOption = 91,
     /// Exchange-listed option on a volatility-index futures contract.
     VolatilityIndexFutureOption = 92,
+    /// Asset-backed facility (warehouse line against a collateral pool).
+    AssetBackedFacility = 93,
 }
 
 use strum::IntoEnumIterator;
@@ -228,6 +230,7 @@ impl InstrumentType {
             InstrumentType::StructuredCredit => "structured_credit",
             InstrumentType::PrivateMarketsFund => "private_markets_fund",
             InstrumentType::RevolvingCredit => "revolving_credit",
+            InstrumentType::AssetBackedFacility => "asset_backed_facility",
             InstrumentType::AsianOption => "asian_option",
             InstrumentType::BarrierOption => "barrier_option",
             InstrumentType::LookbackOption => "lookback_option",

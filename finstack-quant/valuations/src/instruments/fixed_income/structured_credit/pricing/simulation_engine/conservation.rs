@@ -1,4 +1,8 @@
 use super::*;
+use crate::instruments::fixed_income::structured_credit::types::{
+    AssetType, PoolAsset, ReinvestmentAssumptions,
+};
+use finstack_quant_core::dates::DayCount;
 
 /// Per-period cash-conservation invariant (debug/test builds only).
 ///
@@ -141,6 +145,18 @@ pub(super) fn recycle_reinvestment_principal(
     if price_fraction * 100.0 > criteria.max_price || recyclable.amount() <= 0.0 {
         return Ok(Money::from((0_i64, state.base_currency)));
     }
+    if let Some(assumptions) = period.assumptions.clone() {
+        let min_yield = criteria.min_yield;
+        return purchase_replacement_collateral(
+            state,
+            recyclable,
+            price_fraction,
+            min_yield,
+            payment_date,
+            market,
+            &assumptions,
+        );
+    }
     // Replacement collateral keeps the surviving pool's composition and
     // contractual maturities. Requiring every component to be eligible avoids
     // silently changing credit-quality weights or WAL by selective purchases.
@@ -162,6 +178,7 @@ pub(super) fn recycle_reinvestment_principal(
         } else {
             state.pool_state.rates[i]
         };
+        let coupon = state.pool_state.rate_floors[i].map_or(coupon, |floor| coupon.max(floor));
         if state.pool_state.maturities[i] <= payment_date
             || coupon / price_fraction < criteria.min_yield
         {
@@ -200,6 +217,91 @@ pub(super) fn recycle_reinvestment_principal(
             *payment *= state.pool_state.balances[i] / balance;
         }
     }
+    Ok(recyclable)
+}
+
+/// Book a reinvestment purchase as a synthetic first-lien bullet row with the
+/// deal's `ReinvestmentAssumptions` instead of cloning the surviving pool.
+///
+/// The row `REINVEST-{n}` matures `maturity_months` after `payment_date`,
+/// capped at the notes' legal final, accrues ACT/360 at the index plus spread
+/// (floored at `coupon_floor`) or at the spread as a fixed coupon, and is
+/// bought at `price_fraction` of par. A purchase whose current yield is below
+/// `min_yield` is ineligible and leaves the cash in the principal account.
+fn purchase_replacement_collateral(
+    state: &mut SimulationState,
+    recyclable: Money,
+    price_fraction: f64,
+    min_yield: f64,
+    payment_date: Date,
+    market: &MarketContext,
+    assumptions: &ReinvestmentAssumptions,
+) -> Result<Money> {
+    use finstack_quant_core::dates::DateExt;
+    let legal_final = state
+        .tranches
+        .tranches
+        .iter()
+        .map(|tranche| tranche.maturity)
+        .max()
+        .unwrap_or(payment_date);
+    let months = i32::try_from(assumptions.maturity_months).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "reinvestment maturity of {} months is out of range",
+            assumptions.maturity_months
+        ))
+    })?;
+    let maturity = payment_date.add_months(months).min(legal_final);
+    if maturity <= payment_date {
+        return Ok(Money::from((0_i64, state.base_currency)));
+    }
+    let spread = assumptions.spread_bp / 10_000.0;
+    let coupon = match &assumptions.index_id {
+        Some(index) => collateral_asset_rate_for_period(
+            market.get_forward(index)?.as_ref(),
+            market,
+            payment_date,
+            spread,
+            Some(assumptions.spread_bp),
+            state.floating_rate_shift,
+        )?,
+        None => spread,
+    };
+    let coupon = assumptions
+        .coupon_floor
+        .map_or(coupon, |floor| coupon.max(floor));
+    if coupon / price_fraction < min_yield {
+        return Ok(Money::from((0_i64, state.base_currency)));
+    }
+    let par = Money::new(
+        par_acquired_at_price(recyclable.amount(), price_fraction),
+        state.base_currency,
+    )?;
+    let purchases = state
+        .pool_state
+        .ids
+        .iter()
+        .filter(|id| id.starts_with("REINVEST-"))
+        .count();
+    let id = format!("REINVEST-{}", purchases + 1);
+    let mut asset = match &assumptions.index_id {
+        Some(index) => PoolAsset::floating_rate_loan(
+            id,
+            par,
+            index.clone(),
+            assumptions.spread_bp,
+            maturity,
+            DayCount::Act360,
+        ),
+        None => PoolAsset::fixed_rate_bond(id, par, spread, maturity, DayCount::Act360),
+    };
+    asset.asset_type = AssetType::FirstLienLoan { industry: None };
+    asset.purchase_price = Some(recyclable);
+    asset.acquisition_date = Some(payment_date);
+    state
+        .pool_state
+        .push_asset(&asset, assumptions.coupon_floor);
+    state.pool.to_mut().assets.push(asset);
     Ok(recyclable)
 }
 

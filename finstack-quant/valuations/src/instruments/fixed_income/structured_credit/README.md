@@ -22,14 +22,23 @@ There is **no `prelude` module** — import the names you need directly.
 | `Tranche`, `TrancheBuilder`, `TrancheStructure`, `TrancheCoupon`, `TrancheBehaviorType` | Capital structure. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |
 | `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec` | Declarative rules layered onto the base waterfall by `resolve_waterfall`. |
-| `CoverageTrigger` (tranche-level), `waterfall::CoverageTrigger` (waterfall-level), `CoverageTestConfig`, `CoverageTestType`, `TriggerConsequence` | OC/IC triggers — see [Coverage triggers](#coverage-triggers), the two types are different. |
-| `DealConfig`, `DealDates`, `DealFees`, `DefaultAssumptions` | Deal setup and behavioral defaults. |
+| `CoverageTestSpec`, `CoverageTestAction`, `CoverageTestType`, `CoverageTrigger` (tranche-level), `TriggerConsequence` | OC/IC tests as waterfall positions — see [Coverage tests](#coverage-tests). |
+| `DealFees`, `IncentiveFeeSpec` | Fee schedule the template turns into senior, junior and incentive fee tiers. |
+| `CoverageRules`, `DefaultedValuation`, `CccBucketRule`, `DiscountObligationRule` | Collateral valuation rules for the OC tests (rating haircuts, defaulted-asset value, excess-CCC bucket, discount obligations); `CoverageRules::clo_standard()` from the registry. |
 | `PrepaymentModelSpec`, `DefaultModelSpec`, `RecoveryModelSpec`, `PrepaymentCurve`, `DefaultCurve` | Deterministic behavioral models. |
 | `PricingMode` | Valuation-owned stochastic pricing mode — see [`pricing/stochastic/README.md`](pricing/stochastic/README.md). |
 | `StochasticPrepaySpec`, `StochasticDefaultSpec`, `CorrelationStructure`, `PoolGranularity` | Models-owned stochastic inputs; import from `finstack_quant_models::credit::pool`. |
 | `StochasticPricingResult`, `TranchePricingResult` | Stochastic output. |
-| `ReinvestmentPeriod`, `ReinvestmentCriteria` | CLO reinvestment contract used by the simulation engine. |
+| `ReinvestmentPeriod`, `ReinvestmentCriteria`, `ReinvestmentAssumptions` | Deal-level reinvestment contract: window, eligibility, notes that amortize inside the window, and the replacement-collateral terms — see [Collection accounts and current-state inputs](#collection-accounts-and-current-state-inputs). |
+| `LossAllocationPolicy` | `Tranche` loss treatment per deal type: `WriteDown` (RMBS/CMBS default) allocates realized losses at default, `ParPreserving` (CLO/CBO/ABS default) carries par and realizes the shortfall at legal final; override with `StructuredCredit.loss_allocation`. |
 | `EarlyAmortizationSpec`, `ControlledAccumulationSpec`, `ExcessSpreadSpec` | ABS/credit-card structural features. |
+| `CardPortfolioSpec`, `DelinquencyModel`, `AdvancingPolicy`, `ModificationSpec` | Card master-trust portfolio model and roll-rate delinquency with servicer advancing — see [Behavioral models](#behavioral-models). |
+| `BalloonSpec`, `PrepaymentPenalty`, `SpecialServicingSpec` | Commercial-mortgage loan terms on `PoolAsset` — see [CMBS collateral terms](#cmbs-collateral-terms). |
+| `LiquidationSpec` | NPL/RPL resolution timeline on `PoolAsset.liquidation` — see [NPL / RPL resolution](#npl--rpl-resolution). |
+| `BorrowingBaseRules`, `AdvanceRate`, `EligibilityRule`, `ConcentrationLimit`, `ConcentrationScope`, `BorrowingBaseReport` | Advance rates, eligibility and concentration limits behind the borrowing-base coverage test and the `asset_backed_facility` instrument. |
+| `HedgeSwap`, `SwapNotional`, `SwapPriority` | Interest-rate hedges paid through the waterfall as senior or junior fee recipients. |
+| `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
+| `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
 | `run_simulation`, `generate_cashflows`, `generate_tranche_cashflows` | Deterministic projection entry points. |
 | `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution`, `resolve_waterfall` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
@@ -73,12 +82,12 @@ structured_credit/
 
 | Deal type | Collateral | Registry defaults | Deal-specific metrics |
 |-----------|-----------|-------------------|-----------------------|
-| `DealType::Abs` | Auto loans, credit cards | `abs_auto_standard` | `AbsChargeOff`, `AbsCreditEnhancement` |
+| `DealType::Abs` | Auto loans, credit cards (`credit_model.card`) | `abs_auto_standard` | `AbsChargeOff`, `AbsCreditEnhancement`, `AbsExcessSpread`, `AbsPaymentRate`, `AbsDelinquency` |
 | `DealType::Clo` | Leveraged loans | `clo_standard` | `CloWarf`, `CloWas` |
 | `DealType::Cmbs` | Commercial mortgages | `cmbs_standard` | `CmbsDscr` |
-| `DealType::Rmbs` | Residential mortgages | `rmbs_standard` | — (use `WAL`) |
+| `DealType::Rmbs` | Residential mortgages, NPL/RPL pools (`PoolAsset.liquidation`) | `rmbs_standard` | — (use `WAL`) |
 
-`new_*` constructors pull their `DealConfig` and `DefaultAssumptions` from the
+`new_*` constructors pull their frequency, prepayment, default and recovery defaults from the
 embedded registry in
 [`data/assumptions/structured_credit_assumptions.v1.json`](../../../../data/assumptions/structured_credit_assumptions.v1.json)
 (fee defaults, PSA/SDA parameters, concentration limits, standard speeds).
@@ -226,9 +235,42 @@ balances, deferred interest, reserve and restricted cash, recovery proceeds and
 an OAS floating-rate shift. `execute_waterfall_with_explanation` returns the
 same distribution with a trace.
 
-`Waterfall::standard_sequential` is deal-type aware: CLO/CBO deals split
-interest so an OC/IC fail can trap junior coupon; ABS/RMBS/CMBS keep a
-single non-divertible interest tier and turbo only residual cash.
+`Waterfall::standard_sequential` gives every note its own interest tier, in
+seniority order, so a coverage-test position can sit between any two coupons;
+principal and the residual follow. Coverage tests are inserted after the
+interest tier of the class they are placed on (`insert_coverage_test`).
+
+Interest and principal proceeds are separate accounts. Each tier draws on the
+account matching its `PaymentType` unless it sets a `FundingSource`:
+`InterestThenPrincipal` lets a fee or interest tier top up from principal
+proceeds, and the cash taken is reported as
+`WaterfallDistribution::principal_used_for_interest`. The template applies
+this to senior fees and senior note coupons when
+`StructuredCredit::principal_covers_senior_interest` is in force (the default
+for CLO/CBO deals, off for every other deal type; explicit `Some(_)`
+overrides), via `Waterfall::fund_senior_interest_from_principal`. Custom
+waterfalls set `WaterfallTier::funding` per tier.
+
+Hedge swaps (`StructuredCredit::hedge_swaps`, `HedgeSwap { swap, notional,
+priority }`) settle through the waterfall rather than as an NPV overlay: each
+period the swap's net flow from the deal's side is bucketed, a net receipt
+joins interest proceeds and a net payment becomes a `SwapCounterparty` fee
+recipient in the senior fee tier (`SwapPriority::SeniorFee`, so it nets out of
+the IC numerator) or in a fee tier ahead of the residual (`JuniorFee`).
+`SwapNotional::TranchePar`/`PoolPar` rescale the flows each period to the note
+or performing pool balance (balance-guaranteed swaps); `Contractual` uses the
+swap's own notional.
+
+Fees (`DealFees`, `TemplateFees`): the trustee, senior management and
+servicing fees form the leading `fees` tier; `subordinated_mgmt_fee_bp` forms a
+`junior_fees` tier after every note coupon and ahead of principal; and
+`incentive_fee` (`IncentiveFeeSpec { hurdle_irr, share_pct }`, 12% / 20% in the
+standard CLO registry) forms an `incentive_fee` tier ahead of the residual
+whose `PaymentCalculation::IncentiveFee` pays `share_pct` of the residual only
+once the equity IRR to date (`WaterfallContext::equity_history`, capital at
+closing against every equity distribution plus the residual on the payment
+date) reaches the hurdle. Junior and incentive fees always draw on interest
+proceeds.
 
 Non-PIK deferred interest is a carried claim paid from later interest
 collections. It does not compound. Interest coverage uses the same
@@ -243,13 +285,62 @@ Declarative rules (`WaterfallRules`: available-funds cap, step-down triggers,
 shifting interest) are layered onto the base waterfall by `resolve_waterfall`,
 which is the identity when no rules are configured.
 
-### Coverage triggers
+### Attachment points
 
-Two distinct types share the name `CoverageTrigger`. They are not
-interchangeable:
+`Tranche.attachment_point` / `detachment_point` are `Option<f64>` percents.
+`Tranche::from_balance(...)` (and a `TrancheBuilder` without points) leaves
+them `None`; `TrancheStructure::new` derives them from the original-balance
+shares in payment-priority order (first-loss class at 0, most senior class
+detaching at exactly 100) and validates any declared points against those
+same shares within 0.5%. `TrancheStructure::from_balances(tranches)` discards
+declared points and derives all of them. The stochastic pricer's
+`TranchePricingResult.attachment` / `detachment` read the resolved points, so
+a derived structure prices exactly like its declared twin
+(`unit/attachment_derivation_tests.rs`).
+
+### Coverage tests
+
+An OC/IC test is a *position* in the waterfall: a `PaymentType::CoverageTest`
+tier carrying one or more `CoverageTestSpec`s. While any test at that position
+fails, the interest still undistributed there — never the coupons already paid
+above it — is diverted up to the binding cure (the largest failing cure, not
+the sum) to the earliest principal tier's recipients in order
+(`CoverageTestAction::PayDownSenior`), or retained as principal proceeds
+(`CoverageTestAction::Reinvest`). A Class D test placed after D's own coupon
+therefore traps only the residual; a Class A test placed after A's coupon traps
+the mezzanine coupons and the residual. Every failing test also suspends
+reinvestment for the period.
 
 ```rust
-// Tranche-level: a threshold and what happens while it is breached.
+// Deal-level: placed after the tested class's interest tier by `create_waterfall`.
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
+
+let deal = deal.with_coverage_triggers(vec![
+    CoverageTestSpec::oc("CLASS_B", 1.20),
+    CoverageTestSpec::ic("CLASS_B", 1.15).after_tranche("CLASS_A"),
+])?;
+```
+
+```rust
+// Custom waterfall: an explicit test position between two interest tiers.
+let waterfall = WaterfallBuilder::new(Currency::USD)
+    .add_tier(WaterfallTier::new("a_interest", 1, PaymentType::Interest)
+        .add_recipient(Recipient::tranche_interest("a_int", "CLASS_A")))
+    .add_tier(WaterfallTier::coverage_tests("a_coverage", 2, vec![
+        CoverageTestSpec::oc("CLASS_A", 1.25),
+        CoverageTestSpec::ic("CLASS_A", 1.20),
+    ]))
+    // ... junior interest, principal, residual ...
+    .build()?;
+```
+
+Tranche-level `CoverageTrigger`s (`Tranche::oc_trigger` / `ic_trigger`) are the
+stateful variant: a threshold, a cure level and a `TriggerConsequence`. A
+breached `DivertCashFlow` trigger inserts the same test position after that
+tranche's interest tier for the period; the other consequences act on
+reinvestment and amortization.
+
+```rust
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTrigger, TriggerConsequence,
 };
@@ -258,19 +349,37 @@ let trigger = CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
     .with_cure_level(1.25);
 ```
 
-```rust
-// Waterfall-level: which tranche's OC/IC levels gate diversion in the waterfall.
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+#### Borrowing-base tests
 
-let waterfall = WaterfallBuilder::new(Currency::USD)
-    // ... tiers ...
-    .add_coverage_trigger(CoverageTrigger {
-        tranche_id: "CLASS_A".into(),
-        oc_trigger: Some(1.25),
-        ic_trigger: Some(1.20),
-    })
-    .build()?;
-```
+`CoverageTestSpec::borrowing_base(tranche_id, required_ratio)` is a third
+test kind (`CoverageTestType::BorrowingBase`): its numerator is the
+`BorrowingBaseRules` on `CoverageRules.borrowing_base` evaluated on the live
+asset balances (advance rates by `AssetType` wire name or `"*"`, eligibility,
+concentration limits that scale each over-cap obligor/industry/class down to
+its cap) plus the collection and funding-account cash, its denominator the
+tested class's balance plus everything senior. It diverts and cures like an
+OC test and is what the `asset_backed_facility` instrument synthesizes; any
+deal can carry one. `BorrowingBaseRules::evaluate` returns the
+`BorrowingBaseReport` (eligible collateral, concentration excess, base).
+
+#### Coverage rules
+
+`CoverageRules` (`StructuredCredit::coverage_rules`, or `Waterfall::coverage_rules`
+on a custom waterfall) decide what the OC numerator counts. Without rules
+collateral is carried at par and defaulted assets at their modeled recovery.
+`CoverageRules::clo_standard()` is the indenture convention from the registry;
+each rule can also be set individually:
+
+| Rule | Effect on the OC numerator |
+|------|----------------------------|
+| `rating_haircuts` (`CreditRating` → decimal fraction) | Each asset is carried at `par × (1 − haircut)` for its `credit_quality` (the `NR` entry covers unrated assets, including materialized instrument collateral). |
+| `defaulted_valuation` | `Recovery` (default) carries pending defaulted par at its modeled recovery; `MarketValue { pct }` carries it at `pct`% of par. |
+| `ccc_bucket { threshold_pct, carry_at_market_value }` | CCC-and-below par above `threshold_pct`% of performing par is carried at the CCC assets' balance-weighted `PoolAsset::market_price_pct` (or excluded). |
+| `discount_obligation { price_threshold_pct }` | An asset whose `purchase_price` is below the threshold (percent of closing par) is carried at that purchase price. |
+
+An asset is always carried at the lowest of the applicable values, never above
+par. Percent fields are percents (`7.5`, `80.0`, `60.0`); haircuts are decimal
+fractions. `unit/coverage_rules_tests.rs` hand-computes each rule.
 
 ## Behavioral models
 
@@ -281,9 +390,168 @@ Deterministic (single path, `PrepaymentModelSpec` / `DefaultModelSpec` /
 |-------|------|-----|
 | PSA | Prepayment | RMBS standard ramp |
 | Constant CPR | Prepayment | Flat annual rate |
+| CMBS lockout | Prepayment | Zero for `lockout_months`, then constant CPR |
+| ABS speed (`PrepaymentModelSpec::abs`) | Prepayment | Auto/consumer ABS: `SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi); `new_abs` uses the registry's 1.5% ABS |
+| Vector (`PrepaymentModelSpec::vector`) | Prepayment | Explicit annual CPR per seasoning month, last value held |
 | SDA | Default | RMBS standard ramp |
 | Constant CDR | Default | Flat annual rate |
+| Vector (`DefaultModelSpec::vector`) | Default | Explicit annual CDR per seasoning month, last value held |
+| Cumulative loss (`DefaultModelSpec::cumulative_loss`) | Default | Rating-agency net-loss curve (percent of the pool balance at simulation start) plus severity; the engine sizes each month's defaults against the surviving balance (`mdr_with_survival`) so the curve is reproduced on amortizing pools |
+| Timing (`DefaultModelSpec::timing`) | Default | Lifetime cumulative default rate spread by annual timing percentages (e.g. 15/30/30/15/10), linear within each year |
 | Constant recovery | Recovery | Fixed rate with resolution lag |
+| Severity vector (`RecoveryModelSpec::with_severity_vector`) | Recovery | Loss severity by month of default, last value held |
+
+Cumulative-loss and timing curves and severity vectors are deterministic-only:
+stochastic pricing rejects them at validation because the path engines size
+defaults from a per-month rate on the surviving balance.
+
+### Delinquency, advancing and modification
+
+`credit_model.delinquency: Option<DelinquencyModel>` (asset and rep-line pools
+only) turns the default model into the *entry* into 30 days delinquent.
+Balances then roll bucket to bucket (`roll_rates`, monthly), cure back to
+current (`cure_rates`) or stay; the roll out of the last bucket is the
+charge-off, which enters the recovery queue like any default. Delinquent
+balances remain in the pool's par (OC tests, step-down metrics and the
+cleanup-call factor all count them) but pay no interest or scheduled
+principal until they cure; balances still delinquent at the loan's maturity
+charge off.
+
+- `AdvancingPolicy::PrincipalAndInterest { recoverability_cap_pct }` makes the
+  servicer advance the interest and scheduled principal the delinquent
+  balance misses, while advances outstanding stay within the cap (percent of
+  the delinquent balance). Advances are reimbursed from recovery proceeds
+  before that cash reaches the waterfall.
+- `ModificationSpec { rate_reduction_bp, term_extension_months,
+  share_of_delinquent }` modifies a share of every bucket back to current each
+  month; on a rep line the concession blends into the line's coupon (spread
+  for floaters) and, for level-pay collateral, the recast payment over the
+  extended term. The line's maturity is unchanged.
+- `PoolAsset::delinquency_buckets` seeds the buckets of a seasoned pool (one
+  amount per bucket) and drives the `abs_delinquency` metric.
+- `StepDownTrigger::MaxDelinquency(max)` passes while the delinquent share of
+  the pool is at or below `max`.
+
+`unit/delinquency_tests.rs` checks the bucket recursion, cures, advancing and
+the trigger against hand computations.
+
+### Card master trusts
+
+`credit_model.card: Option<CardPortfolioSpec>` (asset and rep-line pools
+only) prices a credit-card master trust. The pool is the investor interest in
+the receivables and the spec replaces the collateral's behavioral inputs:
+
+| Field | Replaces | Effect |
+|-------|----------|--------|
+| `monthly_payment_rate` | prepayment model | Principal collections are the payment rate on the receivables; the revolving period (`pool.reinvestment_period`) recycles them into new receivables, controlled accumulation or amortization then pays the notes. |
+| `portfolio_yield` | asset coupons | Interest collections are the annual yield (finance charges and fees) on the performing receivables. |
+| `charge_off_rate` | default model | Annual charge-offs (an asset `mdr_override` still wins); recoveries follow `recovery_spec`. |
+
+`EarlyAmortizationSpec::min_excess_spread_3m` adds the excess-spread test:
+every period the engine records the annualized excess spread realized on the
+opening pool balance (interest collections less debt coupons due, fees paid
+and net charge-offs), and once the three-period trailing average falls below
+the floor the revolving period ends for good. `abs_excess_spread` reports
+the static excess spread (yield − balance-weighted debt coupon − servicing fee
+− charge-off rate, percent per annum) and `abs_payment_rate` the monthly
+payment rate in percent. The seller's interest and cardholder purchase rate
+are outside the model: purchases are whatever the revolving period recycles.
+`unit/card_master_trust_tests.rs` hand-computes the metrics, the
+early-amortization timing and the accumulation bullet.
+
+### CMBS collateral terms
+
+Commercial mortgages carry their terms on the `PoolAsset`:
+
+- `balloon: Option<BalloonSpec { default_prob, extension_months,
+  extension_rate }>` — at the loan's maturity the share `default_prob` of the
+  balance fails to refinance and is extended `extension_months` at
+  `extension_rate` (the loan's coupon when `None`); the rest pays as the
+  balloon. One extension per loan; the extended balance pays at the extended
+  maturity.
+- `prepayment_penalty: Option<PrepaymentPenalty>` — `Fixed { pct, through }`
+  charges `pct` percent of prepaid principal, `YieldMaintenance {
+  reinvestment_rate, through }` charges `prepaid × max(0, coupon −
+  reinvestment_rate) × years to maturity` (undiscounted). The premium is
+  collected as interest; nothing is charged after `through`.
+- `special_servicing: Option<SpecialServicingSpec { appraisal_reduction_pct }>`
+  — the appraisal reduction (ASER) cuts the interest advanced on the loan to
+  `1 − pct/100` of the balance; the shortfall falls on the most junior
+  classes through the sequential interest waterfall. The template's
+  `special_servicer_fee_bp` accrues only on specially serviced balances via
+  `PaymentCalculation::PercentageOfSpecialServiced` (custom waterfalls can use
+  the same calculation).
+- `noi: Option<Money>` — annual net operating income; when any asset carries
+  it, `MetricId::CmbsDscr` is pool NOI over pool debt service (twelve
+  contractual payments for level-pay loans, the coupon on the balance for
+  interest-only loans), otherwise the deal-level `credit_factors` are used.
+
+`unit/cmbs_tests.rs` covers the balloon extension, the ASER shortfall
+ordering, both penalties, the special fee base and the loan-level DSCR.
+
+### NPL / RPL resolution
+
+A non-performing loan carries `liquidation: Option<LiquidationSpec {
+months_to_resolution, proceeds_pct, carry_cost_pct, reperformance_prob,
+modified_rate }>` on its `PoolAsset` and stays `is_defaulted: false` (the
+timeline replaces the default flag; `recovery_amount` / `default_date` must be
+unset). It pays nothing until the first payment date at or after
+`months_to_resolution` months from closing. There the share
+`1 − reperformance_prob` liquidates — booked as a default whose recovery is
+`(proceeds_pct − carry_cost_pct)%` of the liquidated balance, released after
+the deal's `recovery_lag` like any other recovery — and the share
+`reperformance_prob` re-performs at `modified_rate` (the loan's coupon when
+`None`) on its original amortization terms from the next period on, with the
+level payment recast on the re-performing balance. Coverage tests carry the
+loan at par until resolution unless a coverage rule (`discount_obligation`,
+`rating_haircuts`) says otherwise, so NPL deals bought at a discount size
+their notes on price with `LossAllocationPolicy::ParPreserving` or add a
+`discount_obligation` rule. Asset rows only; stochastic pricing rejects
+liquidation terms. `unit/npl_tests.rs` covers the timeline, the net proceeds
+and the modified coupon.
+
+### Calls and clean-up calls
+
+- `StructuredCredit::call_assumption: Option<CallAssumption { date, price_pct,
+  scope }>` prices the deal to an assumed optional redemption. `CallScope::Deal`
+  liquidates the collateral on the first payment date at or after `date` and
+  redeems every note at `price_pct` of its balance plus stub accrued and
+  deferred interest (a premium over par is interest, a discount is a principal
+  write-down); the projection ends there and equity takes the residual.
+  `CallScope::Tranche(id)` leaves the deal's cashflows unchanged and prices
+  only that class to its refinancing.
+- `TrancheMetrics` always reports `wal`, `z_spread_bp` and the other figures
+  to maturity (projected without the call) and adds `wal_to_call`,
+  `z_spread_to_call_bp` and, for floaters, `dm_to_call_bp` when a call covers
+  the tranche.
+- `liquidation_price_pct` (percent of par, `None` = par) is the price the
+  collateral realizes in a deal call or clean-up call. Proceeds are the
+  liquidated pool plus pending recoveries and every cash account (funding,
+  reserve, spread, undistributed). The clean-up call (`cleanup_call_pct`) is
+  exercised only when those proceeds cover the debt notes' claims; a call
+  assumption redeems regardless, bounded by the proceeds.
+
+`unit/call_tests.rs` covers the redemption, the twins and the proceeds test.
+
+### Deal diagnostics and equity analytics
+
+`run_simulation_with_diagnostics` returns `SimulationRun { tranches,
+diagnostics }`. Besides the reserve fields, `SimulationDiagnostics::periods`
+holds one `PeriodDiagnostics` per payment date: end-of-period pool balance and
+factor, balance-weighted coupon / spread / WARF of the performing collateral,
+the period's interest and principal collections, defaults, released
+recoveries, reinvested par and fees paid, the reserve, spread and funding
+account balances, the delinquent balance, the realized excess spread, and
+every coverage test as the executor evaluated it (`CoverageTestDiagnostic {
+test_id, ratio, trigger_level, cushion, passing }`; a single source, not a
+recomputation).
+
+`calculate_equity_metrics(deal, market, as_of, purchase_price_pct)` returns
+`EquityMetrics { invested, irr, moic, nav_pct, cash_on_cash }` for the residual
+class: `−invested` on the valuation date against every projected distribution
+(reserve interest routed to equity included), solved with `xirr`.
+`unit/diagnostics_tests.rs` checks the coverage record, the IRR and the JSON
+round-trip.
 
 Stochastic (multi-path, `pricing::stochastic`): copula-based and
 intensity-process defaults, factor-correlated / Richard-Roll /
@@ -325,6 +593,13 @@ Registered for `InstrumentType::StructuredCredit`:
 
 `Theta` is registered universally by `metrics::standard_registry()`.
 
+**Price basis**: note prices, quotes and spread solves are per CURRENT face
+(`Tranche::current_balance`); `TrancheMetrics::factor` and
+`TrancheValuation::factor` report `current / original`, and the deal-level
+notional is the sum of current balances. A note paid down to factor 0.5 that is
+worth par prints `price_pct ≈ 100`, not 50, and a desk quote of 99.0 solves a
+sensible spread on a seasoned trade.
+
 **Metric time basis**: every structured-credit risk metric measures time on
 Act/365F (the crate-internal `structured_credit::metrics::METRIC_TIME_BASIS`),
 so duration and convexity are quoted
@@ -360,23 +635,45 @@ WASM carries the same fields in the deal JSON.
 Both bindings expose structured credit under their `instruments` namespace:
 
 - **Python** (`finstack_quant.valuations.instruments`): typed
-  `StructuredCredit`, `StructuredCreditBuilder`, `AssetPool`, `RepLine`,
-  `Tranche`, `TrancheBuilder`, `TrancheStructure`, plus tranche analytics
-  `structured_credit_tranche_metrics`, `structured_credit_tranche_oas`,
-  `structured_credit_tranche_discount_margin`,
+  `StructuredCredit`, `StructuredCreditBuilder` (one setter per settable Rust
+  field: credit model specs, `delinquency`, `card`, `coverage_triggers`,
+  `coverage_rules`, `call_assumption`, `cleanup_call_pct`,
+  `liquidation_price_pct`, `loss_allocation`,
+  `principal_covers_senior_interest`, `waterfall`, `hedge_swaps`, `fees`,
+  `waterfall_rules`, `behavior_overrides`, `attributes` ...), `AssetPool`
+  (`with_assets`, `with_rep_lines`, `with_instruments`, `with_reserve`,
+  `with_reinvestment_period`, `with_accounts`), `PoolAsset` (one constructor
+  keyword per Rust field, `fixed_rate_bond` / `floating_rate_loan`),
+  `RepLine`, `Tranche`, `TrancheBuilder` (`current_balance`,
+  `deferred_interest`, `rating`, `pik_enabled`, `oc_trigger`, `ic_trigger`,
+  `attributes`), `TrancheStructure`, `CallAssumption`, `CoverageRules`,
+  `HedgeSwap`, `Waterfall` (`StructuredCredit.create_waterfall()`
+  introspection); deal methods `with_standard_fees`,
+  `enable_stochastic_defaults`, `tranche_cashflows` (`TrancheCashflows`),
+  `equity_metrics` (`EquityMetrics`), `run_simulation_with_diagnostics`
+  (`SimulationDiagnostics` with the per-period record and coverage-test
+  frame), `price_stochastic`; tranche analytics
+  `structured_credit_tranche_metrics` (with the `*_to_call` twins),
+  `structured_credit_tranche_oas`, `structured_credit_tranche_discount_margin`,
   `structured_credit_tranche_breakeven_cdr`,
   `structured_credit_tranche_scenario_table` and the result types
   `TrancheMetrics`, `OasResult`, `ScenarioTable`. Generic pricing via
-  `price_instrument(...)`.
-- **WASM** (`valuations.instruments`): `structuredCreditTrancheMetrics`,
-  `structuredCreditTrancheOas`, `structuredCreditTrancheDiscountMargin`,
+  `price_instrument(...)`. `tests/parity/test_structured_credit_fields.py`
+  checks every schema field of the five core types against the getters and
+  setters; `tests/test_typed_structured_credit_surface.py` rebuilds the CLO
+  regression golden from typed calls alone.
+- **WASM** (`valuations.instruments`): `structuredCreditTrancheMetrics`
+  (its `TrancheMetrics` shape carries the optional `wal_to_call`,
+  `z_spread_to_call_bp`, `dm_to_call_bp`), `structuredCreditTrancheOas`,
+  `structuredCreditTrancheDiscountMargin`,
   `structuredCreditTrancheBreakevenCdr`,
   `structuredCreditTrancheScenarioTable`, plus `priceInstrument` and
   `instrumentCashflowsJson` on the `InstrumentJson::StructuredCredit` envelope.
 
-Deep sub-configs (`WaterfallRules`, `CreditModelConfig`, `DealFees`,
-loan-level `PoolAsset`, floating `TrancheCoupon`) stay JSON sub-fields in both
-bindings.
+Deep sub-configs (`WaterfallRules`, the stochastic specs, `DealFees`,
+`DelinquencyModel`, `CardPortfolioSpec`, `CoverageTestSpec`,
+`CoverageTrigger`, the CMBS `PoolAsset` sub-specs, floating `TrancheCoupon`)
+stay dict / JSON sub-fields in Python and everything stays JSON in WASM.
 
 ## Verification
 
@@ -422,21 +719,30 @@ that par. The claim enters the recovery queue once, with payment at the default 
 plus the canonical recovery lag. Current note balances must already reflect past
 losses; those losses inform cumulative triggers without another write-down.
 
-`pool.reinvestment_period` is the sole reinvestment configuration. Both `is_active`
-and its inclusive end date control purchases. Revolving notes retain their configured
-`target_balance`, or current balance when no target is supplied; other notes amortize.
-Principal that cannot be invested stays in the principal account until eligible
-placement or the end of the revolving period. Replacements preserve the surviving
-collateral profile pro rata, including credit-quality weights, maturities, and level
-payments. `max_price` is percent of par; `min_yield` is annual decimal current yield
-(coupon divided by price fraction). Floating replacement coupons use the current
-projection. No unspecified eligibility filter is assumed.
+`pool.reinvestment_period` is the sole reinvestment configuration; it is not
+available for instrument-collateral pools. Both `is_active` and its inclusive end
+date control purchases. Every note is held flat during the period except those named
+in `amortizing_tranches`, which are paid down first; only the principal left after
+their paydown is recycled. Principal that cannot be invested stays in the principal
+account until eligible placement or the end of the revolving period. Without
+`assumptions`, replacements preserve the surviving collateral profile pro rata,
+including credit-quality weights, maturities, and level payments. With
+`ReinvestmentAssumptions { spread_bp, price_pct, maturity_months, index_id,
+coupon_floor }`, each period's purchases are booked as a synthetic `REINVEST-{n}`
+first-lien bullet row (ACT/360, maturity capped at legal final) at the stated
+terms, so the replacement spread, price and tenor drive WAS, par build and
+excess spread. `max_price` is percent of par; `min_yield` is annual decimal current
+yield (coupon divided by price fraction). Floating replacement coupons use the
+current projection. No unspecified eligibility filter is assumed.
+`StructuredCredit::behavior_overrides.reinvestment_price` (percent of par)
+overrides the purchase price from `price_pct` for scenario work.
 
 Tranche coverage triggers retain their first breach date until the cure ratio is
-reached. `divert_cash_flow` pays the coverage cure from divertible interest;
+reached. `divert_cash_flow` places a coverage-test position after the tranche's
+interest tier and pays the cure from the interest below it;
 `trap_excess_spread` holds residual interest until cure; `stop_reinvestment` suspends
 purchases; `accelerate_amortization` also uses residual interest to repay debt below
 revolving targets. A subsequent breach starts a new breach date. Configure an OC or IC
-test in either the tranche or waterfall, avoiding duplicate definitions of the same
-test. Removed fields include duplicate reinvestment end dates, expected maturity,
+test either as a tranche trigger or as a deal/waterfall coverage test, avoiding
+duplicate definitions of the same test. Removed fields include duplicate reinvestment end dates, expected maturity,
 tranche credit-enhancement balances, and consequences without executable parameters.

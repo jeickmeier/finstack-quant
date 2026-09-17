@@ -14,6 +14,7 @@ worked examples. This file links to them and does not repeat them.
 
 | Directory | Prices | Market convention / model | Own README |
 |-----------|--------|---------------------------|------------|
+| `asset_backed_facility/` | Warehouse lines and asset-backed facilities against a collateral pool — advance rates, eligibility, concentration limits, borrowing-base test, unused fee, revolving period, early-amortization events and term-out | Synthesizes a two-class `structured_credit` deal (facility note + residual) and runs the pool/waterfall engine; `BorrowingBaseRules` also drive the `CoverageTestType::BorrowingBase` test in any deal | no |
 | `bond/` | Fixed, floating, step-up, amortizing, callable/putable and PIK bonds | ISDA/ICMA accrual and clean-vs-dirty quoting; discounting, hazard-rate, tree/OAS and Merton-MC paths | [yes](bond/README.md) |
 | `bond_future/` | Deliverable-basket bond futures | Marks the caller-supplied CTD only — refresh it with `determine_ctd_by_implied_repo` when the basket can switch; `value()` will not search. Clean price per 100 face divided by the exchange conversion factor, marked against `quoted_price` with no further discounting because futures settle by daily variation margin. Carry uses `repo_curve_id` when present, else `discount_curve_id` | [yes](bond_future/README.md) |
 | `cmo/` | Agency CMO tranches | `CmoTrancheType` = `Sequential`, `Pac`, `Support`, `InterestOnly`, `PrincipalOnly`, `Accrual`. Z-tranche accrual is capitalized and redirected as accretion-directed principal (Fabozzi, *MBS Handbook* 7e, Ch. 21). Every fixed-coupon principal tranche must sit at or below the collateral net pass-through coupon | no |
@@ -97,7 +98,7 @@ sites, which are *not* all named after the directory:
 |------|------------------------|
 | Pricer | `src/pricer/fixed_income.rs` for most leaves. `Bond` and `BondFuture` register in `src/pricer/rates.rs`; `StructuredCredit` in `src/pricer/credit.rs` |
 | Instrument key | `InstrumentType` variant in `src/pricer/keys.rs` |
-| JSON tag | One line in `with_instrument_json_registry!` in `../json_loader.rs`, category `"fixed_income"`. Current tags: `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `trs_fixed_income_index`, `bond_future`, `structured_credit`. `bond_future` and `structured_credit` are registered `boxed:` because of their size |
+| JSON tag | One line in `with_instrument_json_registry!` in `../json_loader.rs`, category `"fixed_income"`. Current tags: `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `asset_backed_facility`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `trs_fixed_income_index`, `bond_future`, `structured_credit`. `bond_future`, `structured_credit` and `asset_backed_facility` are registered `boxed:` because of their size |
 | Metrics | `register_<name>_metrics(&mut MetricRegistry)` in the leaf's `metrics/`, called from `register_fixed_income_instrument_metrics` in `src/metrics/core/standard_registry.rs` |
 | Margin | Optional `finstack_quant_margin::Marginable` impl in `../marginable.rs`, reached only through `Instrument::as_marginable` |
 | Schemas | `mise run rust-gen-schemas`, verified by `mise run rust-check-schemas` |
@@ -105,7 +106,7 @@ sites, which are *not* all named after the directory:
 ## Tests and benches
 
 Integration tests live in `../../../tests/instruments/<leaf>/`, all compiled
-into the single `instruments` target. Leaves with a dedicated directory: `bond`,
+into the single `instruments` target. Leaves with a dedicated directory: `asset_backed_facility`, `bond`,
 `bond_future`, `convertible`, `inflation_linked_bond`, `revolving_credit`,
 `structured_credit`, `term_loan`. `fi_trs` shares `tests/instruments/trs/` with
 the equity TRS (`test_fi_index_trs.rs`). The four mortgage leaves

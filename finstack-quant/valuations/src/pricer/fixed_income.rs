@@ -42,6 +42,14 @@ pub(crate) fn register_fixed_income_pricers(
         ),
     )?;
 
+    // Asset-backed facility — priced off the synthetic deal's lender flows via
+    // Instrument::base_value.
+    register_generic!(
+        registry,
+        InstrumentType::AssetBackedFacility,
+        crate::instruments::fixed_income::asset_backed_facility::AssetBackedFacility
+    );
+
     // Term Loan (including DDTL)
     registry.register(
         crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer,

@@ -20,6 +20,17 @@
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
+    },
+    "severity_vector": {
+      "description": "Loss severity (`1 − recovery`) by month of default as decimals in\n`[0, 1]`, month 1 first; the last value is held. When present it\nreplaces `rate` for defaults in that month.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
     }
   },
   "required": [

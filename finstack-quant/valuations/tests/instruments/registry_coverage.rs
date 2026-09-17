@@ -320,7 +320,7 @@ fn registry_coverage_manifest_is_checked_in() {
 /// Kept in Rust so `mise run rust-test` / CI Test Rust do not require `uv` or a
 /// Python runtime. The Python script remains the mise/`gen-check` entry point.
 fn generated_fixtures_are_valid(root: &Path) -> bool {
-    const EXPECTED_CANONICAL_FIXTURES: usize = 77;
+    const EXPECTED_CANONICAL_FIXTURES: usize = 78;
     let manifest_path = root
         .join("finstack-quant")
         .join("valuations")
@@ -454,7 +454,7 @@ fn generator_freshness_check_rejects_non_registry_fixtures() {
 #[test]
 fn public_registry_lists_only_canonical_tags() {
     let registry = registry_tags();
-    assert_eq!(registry.len(), 77, "canonical registry tag count drifted");
+    assert_eq!(registry.len(), 78, "canonical registry tag count drifted");
     assert!(registry.contains(&"snowball"));
     assert!(!registry.contains(&"inverse_floater"));
 }

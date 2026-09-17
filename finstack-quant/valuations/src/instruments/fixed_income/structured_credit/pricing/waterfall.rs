@@ -5,9 +5,10 @@
 
 use super::coverage_tests::{CoverageTest, TestContext};
 use crate::instruments::fixed_income::structured_credit::types::{
-    AfcSpec, AllocationMode, AssetPool, DiversionRecord, PaymentCalculation, PaymentRecord,
-    PaymentType, Recipient, RecipientType, RoundingConvention, Tranche, TrancheCoupon,
-    TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
+    AfcSpec, AllocationMode, AssetPool, CoverageTestAction, CoverageTestSpec, CoverageTestType,
+    DiversionRecord, EquityHistory, FundingSource, PaymentCalculation, PaymentRecord, PaymentType,
+    Recipient, RecipientType, RoundingConvention, Tranche, TrancheCoupon, TrancheStructure,
+    Waterfall, WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -88,6 +89,9 @@ pub struct WaterfallContext<'a> {
     /// Trust-held collateral cash outside the asset balances (N2): the
     /// controlled-accumulation funding account. Counted in the OC numerator.
     pub restricted_cash: Money,
+    /// Recovery value of defaulted collateral not yet received as cash
+    /// (pending recovery claims). Counted in the OC numerator.
+    pub defaulted_collateral_value: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
     /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
@@ -95,6 +99,42 @@ pub struct WaterfallContext<'a> {
     /// the interest the waterfall allocates matches the interest the engine
     /// records on the same rate path.
     pub floating_rate_shift: f64,
+    /// Equity's cash to date, the input of any
+    /// [`PaymentCalculation::IncentiveFee`] recipient's hurdle test; `None`
+    /// pays no incentive fee.
+    pub equity_history: Option<&'a EquityHistory>,
+}
+
+/// Balance of the specially serviced collateral, the base of the CMBS
+/// special servicing fee: the live per-asset balances when the engine
+/// supplies them, else the closing balances of the assets that carry a
+/// `special_servicing` spec.
+///
+/// # Arguments
+///
+/// * `pool` - The collateral pool; only non-defaulted assets with a
+///   `special_servicing` spec count.
+/// * `asset_balances` - Current per-asset balances aligned with
+///   `pool.assets`, or `None` to use the closing balances.
+/// * `currency` - Currency of the returned balance.
+pub(crate) fn special_serviced_balance(
+    pool: &AssetPool,
+    asset_balances: Option<&[f64]>,
+    currency: Currency,
+) -> Result<Money> {
+    Money::new(
+        pool.assets
+            .iter()
+            .enumerate()
+            .filter(|(_, asset)| asset.special_servicing.is_some() && !asset.is_defaulted)
+            .map(|(index, asset)| {
+                asset_balances
+                    .and_then(|balances| balances.get(index).copied())
+                    .unwrap_or_else(|| asset.balance.amount())
+            })
+            .sum::<f64>(),
+        currency,
+    )
 }
 
 /// Execute waterfall to distribute available cash.
@@ -165,11 +205,15 @@ fn execute_waterfall_core(
         tranche_index.insert(t.id.as_str(), i);
     }
 
+    let special_serviced_balance =
+        special_serviced_balance(pool, context.asset_balances, waterfall.base_currency)?;
+
     let allocation_ctx = AllocationContext {
         base_currency: waterfall.base_currency,
         tranches,
         tranche_index,
         pool_balance: context.pool_balance,
+        special_serviced_balance,
         payment_date: context.payment_date,
         valuation_date: context.valuation_date,
         market: context.market,
@@ -177,6 +221,7 @@ fn execute_waterfall_core(
         deferred_interest: context.deferred_interest,
         reserve_balance: context.reserve_balance,
         floating_rate_shift: context.floating_rate_shift,
+        equity_history: context.equity_history,
     };
 
     let diversion_principal_tier = waterfall
@@ -206,6 +251,7 @@ fn execute_waterfall_core(
             tranche_balances: context.tranche_balances,
             deferred_interest: context.deferred_interest,
             pool_balance: context.pool_balance,
+            special_serviced_balance,
             period_start: context.period_start,
             payment_date: context.payment_date,
             valuation_date: context.valuation_date,
@@ -215,9 +261,13 @@ fn execute_waterfall_core(
         },
     )?;
 
-    // Evaluate coverage tests against current balances.
+    // Evaluate every coverage test carried by the waterfall's test tiers on
+    // the period's balances and collections. The ratio does not depend on the
+    // tier's position; the position decides what cash a failure can divert.
+    let specs: Vec<&CoverageTestSpec> = waterfall.coverage_tests().collect();
     let coverage_test_results = evaluate_coverage_tests(
         waterfall,
+        &specs,
         tranches,
         pool,
         context.payment_date,
@@ -232,29 +282,10 @@ fn execute_waterfall_core(
         &payable_principal_tranche_ids,
         senior_fees,
         context.restricted_cash,
+        context.defaulted_collateral_value,
         context.floating_rate_shift,
         context.deferred_interest,
     )?;
-
-    // Coverage tests share senior balances, so one paydown de-leverages every
-    // applicable test. Under the INTEX/Bloomberg convention the binding
-    // diversion is therefore the maximum failing cure, not their sum.
-    let diversion_active = coverage_test_results.iter().any(|r| !r.is_passing);
-    let total_cure_amount: Money = {
-        let mut binding_cure = 0.0_f64;
-        for r in &coverage_test_results {
-            if let Some(cure) = r.cure_amount {
-                if cure.amount() > 0.0 {
-                    binding_cure = binding_cure.max(cure.amount());
-                }
-            }
-        }
-        Money::new(binding_cure, waterfall.base_currency)?
-    };
-    if diversion_active {
-        had_diversions = true;
-        diversion_reason = Some("OC or IC test failed".to_string());
-    }
 
     let mut allocation_output = if let Some(ref mut ws) = workspace {
         // Clear workspace buffers and reuse them
@@ -290,51 +321,119 @@ fn execute_waterfall_core(
     // Storage for tier allocations (will be moved to workspace or returned directly)
     let mut tier_allocations = Vec::with_capacity(waterfall.tiers.len());
 
-    // Track how much cure cash has already been diverted (for partial diversion).
-    let mut cure_remaining = total_cure_amount;
-
     // Net all principal paid during the period against the period-start balance
     // so regular and diverted tiers cannot retire the same notional twice.
     let mut principal_paid_in_period: HashMap<String, Money> = HashMap::default();
 
-    for tier in tiers {
-        let remaining = if tier.payment_type == PaymentType::Principal {
-            principal_remaining
-        } else {
-            interest_remaining
-        };
-        let (target_recipients, tier_diverted): (&[Recipient], bool) =
-            if tier.divertible && diversion_active && cure_remaining.amount() > 0.0 {
-                // Cure pays the earliest principal tier in its configured
-                // recipient order (it may sit later than this divertible
-                // interest tier). Early principal is booked in
-                // `principal_paid_in_period` so the principal tier nets it and
-                // cannot double-pay.
-                diversion_principal_tier
-                    .map(|s| (&s.recipients[..], true))
-                    .unwrap_or((&tier.recipients[..], false))
-            } else {
-                (&tier.recipients[..], false)
-            };
+    // Interest a `Reinvest` test retained as principal proceeds this period.
+    let mut diverted_to_reinvestment = Money::from((0_i64, waterfall.base_currency));
+    // Principal proceeds spent by `InterestThenPrincipal` tiers.
+    let mut principal_used_for_interest = Money::from((0_i64, waterfall.base_currency));
+    let mut reinvestment_diversions: Vec<DiversionRecord> = Vec::new();
 
-        // When diverting with a cure amount, cap the diversion at the cure amount.
-        // This implements partial diversion (INTEX-standard): only redirect enough
-        // cash to cure the OC/IC breach, not the entire tier's allocation.
-        let effective_remaining = if tier_diverted && cure_remaining.amount() > 0.0 {
-            let capped = remaining.amount().min(cure_remaining.amount());
-            Money::new(capped, waterfall.base_currency)?
-        } else {
-            remaining
+    for tier in tiers {
+        if tier.payment_type == PaymentType::CoverageTest {
+            // A coverage-test position: while any of its tests fails, the
+            // interest still undistributed here is diverted up to the binding
+            // cure. Tests at one position share the senior balances they
+            // de-lever, so the binding cure is the maximum failing cure, not
+            // the sum (INTEX/Bloomberg convention). Only cash ranked below
+            // this position can be diverted, because everything above has
+            // already been paid.
+            let mut binding_cure = 0.0_f64;
+            let mut failing: Vec<&str> = Vec::new();
+            for test in &tier.tests {
+                if let Some(result) = coverage_test_results
+                    .iter()
+                    .find(|result| result.test_id == test.id)
+                {
+                    if !result.is_passing {
+                        failing.push(test.id.as_str());
+                        if let Some(cure) = result.cure_amount {
+                            binding_cure = binding_cure.max(cure.amount());
+                        }
+                    }
+                }
+            }
+            if failing.is_empty() {
+                tier_allocations.push((
+                    tier.id.clone(),
+                    Money::from((0_i64, waterfall.base_currency)),
+                ));
+                continue;
+            }
+            had_diversions = true;
+            diversion_reason = Some(format!("coverage test failed: {}", failing.join(", ")));
+            let divertible = interest_remaining.amount().min(binding_cure).max(0.0);
+            let divertible = Money::new(divertible, waterfall.base_currency)?;
+            let action = tier
+                .tests
+                .first()
+                .map(|test| test.action)
+                .unwrap_or_default();
+            let tier_cash = match action {
+                CoverageTestAction::PayDownSenior => {
+                    // Pay the earliest principal tier in its configured
+                    // recipient order. Early principal is booked in
+                    // `principal_paid_in_period` so the principal tier nets
+                    // it and cannot double-pay.
+                    match diversion_principal_tier {
+                        Some(principal_tier) if divertible.amount() > 0.0 => allocate_sequential(
+                            &allocation_ctx,
+                            tier,
+                            &principal_tier.recipients[..],
+                            divertible,
+                            context.period_start,
+                            true,
+                            &mut allocation_output,
+                            &explain,
+                            &mut principal_paid_in_period,
+                        )?,
+                        _ => Money::from((0_i64, waterfall.base_currency)),
+                    }
+                }
+                CoverageTestAction::Reinvest => {
+                    // Retained as principal proceeds: reinvested while the
+                    // reinvestment period is active, otherwise repaid through
+                    // the principal tier next period.
+                    if divertible.amount() > 0.0 {
+                        diverted_to_reinvestment =
+                            diverted_to_reinvestment.checked_add(divertible)?;
+                        reinvestment_diversions.push(DiversionRecord {
+                            source_tier: tier.id.clone(),
+                            target_tranche: "principal_account".to_string(),
+                            amount: divertible,
+                            reason: diversion_reason
+                                .clone()
+                                .unwrap_or_else(|| "Waterfall diversion".to_string()),
+                        });
+                    }
+                    divertible
+                }
+            };
+            total_diverted = total_diverted.checked_add(tier_cash)?;
+            interest_remaining = interest_remaining.checked_sub(tier_cash)?;
+            tier_allocations.push((tier.id.clone(), tier_cash));
+            continue;
+        }
+
+        let funding = tier.effective_funding();
+        let remaining = match funding {
+            FundingSource::Principal => principal_remaining,
+            FundingSource::Interest => interest_remaining,
+            FundingSource::InterestThenPrincipal => {
+                interest_remaining.checked_add(principal_remaining)?
+            }
         };
 
         let tier_cash = match tier.allocation_mode {
             AllocationMode::Sequential => allocate_sequential(
                 &allocation_ctx,
                 tier,
-                target_recipients,
-                effective_remaining,
+                &tier.recipients[..],
+                remaining,
                 context.period_start,
-                tier_diverted,
+                false,
                 &mut allocation_output,
                 &explain,
                 &mut principal_paid_in_period,
@@ -342,62 +441,41 @@ fn execute_waterfall_core(
             AllocationMode::ProRata => allocate_pro_rata(
                 &allocation_ctx,
                 tier,
-                target_recipients,
-                effective_remaining,
+                &tier.recipients[..],
+                remaining,
                 context.period_start,
-                tier_diverted,
+                false,
                 &mut allocation_output,
                 &explain,
                 &mut principal_paid_in_period,
             )?,
         };
 
-        let mut tier_cash = tier_cash;
-        if tier_diverted {
-            total_diverted = total_diverted.checked_add(tier_cash)?;
-            cure_remaining = cure_remaining
-                .checked_sub(tier_cash)
-                .unwrap_or(Money::from((0_i64, waterfall.base_currency)));
-
-            // A partial diversion redirects only the cure amount; remaining
-            // cash still belongs to the divertible tier's own recipients.
-            let leftover = remaining.checked_sub(tier_cash)?;
-            if leftover.amount() > 0.0 && !tier.recipients.is_empty() {
-                let own_cash = match tier.allocation_mode {
-                    AllocationMode::Sequential => allocate_sequential(
-                        &allocation_ctx,
-                        tier,
-                        &tier.recipients[..],
-                        leftover,
-                        context.period_start,
-                        false,
-                        &mut allocation_output,
-                        &explain,
-                        &mut principal_paid_in_period,
-                    )?,
-                    AllocationMode::ProRata => allocate_pro_rata(
-                        &allocation_ctx,
-                        tier,
-                        &tier.recipients[..],
-                        leftover,
-                        context.period_start,
-                        false,
-                        &mut allocation_output,
-                        &explain,
-                        &mut principal_paid_in_period,
-                    )?,
-                };
-                tier_cash = tier_cash.checked_add(own_cash)?;
+        tier_allocations.push((tier.id.clone(), tier_cash));
+        match funding {
+            FundingSource::Principal => {
+                principal_remaining = principal_remaining.checked_sub(tier_cash)?;
+            }
+            FundingSource::Interest => {
+                interest_remaining = interest_remaining.checked_sub(tier_cash)?;
+            }
+            FundingSource::InterestThenPrincipal => {
+                // Interest proceeds first; only the shortfall touches principal.
+                let from_interest = Money::new(
+                    tier_cash.amount().min(interest_remaining.amount()).max(0.0),
+                    waterfall.base_currency,
+                )?;
+                let from_principal = tier_cash.checked_sub(from_interest)?;
+                interest_remaining = interest_remaining.checked_sub(from_interest)?;
+                principal_remaining = principal_remaining.checked_sub(from_principal)?;
+                principal_used_for_interest =
+                    principal_used_for_interest.checked_add(from_principal)?;
             }
         }
-
-        tier_allocations.push((tier.id.clone(), tier_cash));
-        if tier.payment_type == PaymentType::Principal {
-            principal_remaining = principal_remaining.checked_sub(tier_cash)?;
-        } else {
-            interest_remaining = interest_remaining.checked_sub(tier_cash)?;
-        }
     }
+
+    // Interest retained by a `Reinvest` test carries forward as principal.
+    principal_remaining = principal_remaining.checked_add(diverted_to_reinvestment)?;
 
     let coverage_tests_public: Vec<(String, f64, bool)> = coverage_test_results
         .iter()
@@ -407,7 +485,7 @@ fn execute_waterfall_core(
     // A failing coverage test with no cash to divert (e.g. an empty waterfall
     // period) must NOT fabricate records carrying the theoretical cure amount;
     // `had_diversions` / `coverage_tests` already report the breach itself.
-    let diverted_amounts: Vec<DiversionRecord> = allocation_output
+    let mut diverted_amounts: Vec<DiversionRecord> = allocation_output
         .payment_records
         .iter()
         .filter(|record| record.diverted && record.paid_amount.amount() > 0.0)
@@ -420,6 +498,7 @@ fn execute_waterfall_core(
                 .unwrap_or_else(|| "Waterfall diversion".to_string()),
         })
         .collect();
+    diverted_amounts.extend(reinvestment_diversions);
 
     let distribution = WaterfallDistribution {
         payment_date: context.payment_date,
@@ -441,6 +520,7 @@ fn execute_waterfall_core(
         remaining_cash: interest_remaining.checked_add(principal_remaining)?,
         remaining_interest: interest_remaining,
         remaining_principal: principal_remaining,
+        principal_used_for_interest,
         had_diversions,
         diversion_reason,
         diverted_amounts,
@@ -492,6 +572,8 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) tranche_index: HashMap<&'a str, usize>,
     /// Current pool balance
     pub(crate) pool_balance: Money,
+    /// Balance of the specially serviced collateral (special servicing fee base).
+    pub(crate) special_serviced_balance: Money,
     /// Payment date
     pub(crate) payment_date: Date,
     /// Valuation date for fixing lifecycle decisions.
@@ -509,6 +591,8 @@ pub(crate) struct AllocationContext<'a> {
     /// waterfall *allocates* on the same rate path as the interest the engine
     /// *records* in Step 5.
     pub(crate) floating_rate_shift: f64,
+    /// Equity cash to date for incentive-fee IRR tests.
+    pub(crate) equity_history: Option<&'a EquityHistory>,
 }
 
 /// Mutable output for allocation tracking.
@@ -573,6 +657,7 @@ fn allocate_sequential(
             ctx.tranche_balances,
             ctx.deferred_interest,
             ctx.pool_balance,
+            ctx.special_serviced_balance,
             period_start,
             ctx.payment_date,
             ctx.valuation_date,
@@ -581,6 +666,7 @@ fn allocate_sequential(
             principal_paid_in_period,
             diverted,
             ctx.floating_rate_shift,
+            ctx.equity_history,
         )?;
 
         let paid = if requested.amount() <= available.amount() {
@@ -704,6 +790,7 @@ fn allocate_pro_rata(
             ctx.tranche_balances,
             ctx.deferred_interest,
             ctx.pool_balance,
+            ctx.special_serviced_balance,
             period_start,
             ctx.payment_date,
             ctx.valuation_date,
@@ -712,6 +799,7 @@ fn allocate_pro_rata(
             principal_paid_in_period,
             diverted,
             ctx.floating_rate_shift,
+            ctx.equity_history,
         )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
@@ -1067,6 +1155,8 @@ pub(crate) struct SeniorFeeInputs<'a> {
     pub deferred_interest: Option<&'a HashMap<String, Money>>,
     /// Collateral balance the percentage-of-collateral fees accrue on.
     pub pool_balance: Money,
+    /// Balance of the specially serviced collateral (special servicing fee base).
+    pub special_serviced_balance: Money,
     /// Accrual period start.
     pub period_start: Date,
     /// Payment date.
@@ -1129,6 +1219,7 @@ pub(crate) fn senior_fee_accrual(
                 inputs.tranche_balances,
                 inputs.deferred_interest,
                 inputs.pool_balance,
+                inputs.special_serviced_balance,
                 inputs.period_start,
                 inputs.payment_date,
                 inputs.valuation_date,
@@ -1137,6 +1228,7 @@ pub(crate) fn senior_fee_accrual(
                 &empty_in_period,
                 false,
                 inputs.floating_rate_shift,
+                None,
             )?;
             total = total.checked_add(amount)?;
         }
@@ -1144,9 +1236,15 @@ pub(crate) fn senior_fee_accrual(
     Ok(total)
 }
 
+/// Evaluate `specs` on the period's balances and collections.
+///
+/// The ratio of each test is independent of the tier position that carries
+/// it; the executor uses the position only to decide what cash a failure can
+/// divert. `waterfall` supplies the interest-claim caps and coverage rules.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn evaluate_coverage_tests(
     waterfall: &Waterfall,
+    specs: &[&CoverageTestSpec],
     tranches: &TrancheStructure,
     pool: &AssetPool,
     as_of: Date,
@@ -1161,10 +1259,11 @@ pub(super) fn evaluate_coverage_tests(
     payable_principal_tranche_ids: &[&str],
     senior_fees: Money,
     restricted_cash: Money,
+    defaulted_collateral_value: Money,
     floating_rate_shift: f64,
     deferred_interest: Option<&HashMap<String, Money>>,
 ) -> Result<Vec<CoverageTestResult>> {
-    let mut results = Vec::with_capacity(waterfall.coverage_triggers.len() * 2);
+    let mut results = Vec::with_capacity(specs.len());
 
     // The waterfall spec defines each tranche's interest CLAIM (uncapped,
     // capped, or absent); the IC test must measure coverage of those claims,
@@ -1173,86 +1272,46 @@ pub(super) fn evaluate_coverage_tests(
     // so no AFC override applies here.
     let claim_caps = interest_claim_caps(waterfall, None, 0.0);
 
-    let (haircuts, par_value_threshold) = match waterfall.coverage_rules.as_ref() {
-        Some(rules) if !rules.is_empty() => (
-            if rules.haircuts.is_empty() {
-                None
-            } else {
-                Some(&rules.haircuts)
-            },
-            rules.par_value_threshold,
-        ),
-        _ => (None, None),
-    };
+    let rules = waterfall
+        .coverage_rules
+        .as_ref()
+        .filter(|rules| !rules.is_empty());
 
-    for trigger in &waterfall.coverage_triggers {
-        if let Some(oc_trigger_level) = trigger.oc_trigger {
-            let ctx = TestContext {
-                pool,
-                tranches,
-                tranche_id: &trigger.tranche_id,
-                as_of,
-                valuation_date,
-                period_start: Some(period_start),
-                cash_balance: principal_collections,
-                interest_collections,
-                haircuts,
-                par_value_threshold,
-                market: Some(market),
-                tranche_balances,
-                payable_principal_tranche_ids: Some(payable_principal_tranche_ids),
-                asset_balances,
-                current_pool_balance: Some(current_pool_balance),
-                senior_fees,
-                restricted_cash,
-                interest_claim_caps: &claim_caps,
-                floating_rate_shift,
-                deferred_interest,
-            };
-
-            let oc_test = CoverageTest::new_oc(oc_trigger_level);
-            let result = oc_test.calculate(&ctx)?;
-            results.push(CoverageTestResult {
-                test_id: format!("OC_{}", trigger.tranche_id),
-                current_ratio: result.current_ratio,
-                is_passing: result.is_passing,
-                cure_amount: result.cure_amount,
-            });
-        }
-
-        if let Some(ic_trigger_level) = trigger.ic_trigger {
-            let ctx = TestContext {
-                pool,
-                tranches,
-                tranche_id: &trigger.tranche_id,
-                as_of,
-                valuation_date,
-                period_start: Some(period_start),
-                cash_balance: principal_collections,
-                interest_collections,
-                haircuts,
-                par_value_threshold,
-                market: Some(market),
-                tranche_balances,
-                payable_principal_tranche_ids: Some(payable_principal_tranche_ids),
-                asset_balances,
-                current_pool_balance: Some(current_pool_balance),
-                senior_fees,
-                restricted_cash,
-                interest_claim_caps: &claim_caps,
-                floating_rate_shift,
-                deferred_interest,
-            };
-
-            let ic_test = CoverageTest::new_ic(ic_trigger_level);
-            let result = ic_test.calculate(&ctx)?;
-            results.push(CoverageTestResult {
-                test_id: format!("IC_{}", trigger.tranche_id),
-                current_ratio: result.current_ratio,
-                is_passing: result.is_passing,
-                cure_amount: result.cure_amount,
-            });
-        }
+    for spec in specs {
+        let ctx = TestContext {
+            pool,
+            tranches,
+            tranche_id: &spec.tranche_id,
+            as_of,
+            valuation_date,
+            period_start: Some(period_start),
+            cash_balance: principal_collections,
+            interest_collections,
+            rules,
+            market: Some(market),
+            tranche_balances,
+            payable_principal_tranche_ids: Some(payable_principal_tranche_ids),
+            asset_balances,
+            current_pool_balance: Some(current_pool_balance),
+            senior_fees,
+            restricted_cash,
+            defaulted_collateral_value,
+            interest_claim_caps: &claim_caps,
+            floating_rate_shift,
+            deferred_interest,
+        };
+        let test = match spec.kind {
+            CoverageTestType::Oc => CoverageTest::new_oc(spec.trigger_level),
+            CoverageTestType::Ic => CoverageTest::new_ic(spec.trigger_level),
+            CoverageTestType::BorrowingBase => CoverageTest::new_borrowing_base(spec.trigger_level),
+        };
+        let result = test.calculate(&ctx)?;
+        results.push(CoverageTestResult {
+            test_id: spec.id.clone(),
+            current_ratio: result.current_ratio,
+            is_passing: result.is_passing,
+            cure_amount: result.cure_amount,
+        });
     }
 
     Ok(results)
@@ -1300,6 +1359,7 @@ fn calculate_payment_amount(
     tranche_balances: Option<&HashMap<String, Money>>,
     deferred_interest: Option<&HashMap<String, Money>>,
     pool_balance: Money,
+    special_serviced_balance: Money,
     period_start: Date,
     payment_date: Date,
     valuation_date: Date,
@@ -1308,6 +1368,7 @@ fn calculate_payment_amount(
     principal_paid_in_period: &HashMap<String, Money>,
     diverted: bool,
     floating_rate_shift: f64,
+    equity_history: Option<&EquityHistory>,
 ) -> Result<Money> {
     let (raw_amount, rounding) = match calculation {
         PaymentCalculation::FixedAmount { amount, rounding } => (amount.amount(), *rounding),
@@ -1328,6 +1389,27 @@ fn calculate_payment_amount(
                 1.0
             };
             (pool_balance.amount() * rate * accrual_fraction, *rounding)
+        }
+
+        PaymentCalculation::PercentageOfSpecialServiced {
+            rate,
+            annualized,
+            day_count,
+            rounding,
+        } => {
+            let accrual_fraction = if *annualized {
+                day_count.unwrap_or(DayCount::Act360).year_fraction(
+                    period_start,
+                    payment_date,
+                    DayCountContext::default(),
+                )?
+            } else {
+                1.0
+            };
+            (
+                special_serviced_balance.amount() * rate * accrual_fraction,
+                *rounding,
+            )
         }
 
         PaymentCalculation::TrancheInterest {
@@ -1448,6 +1530,24 @@ fn calculate_payment_amount(
 
         PaymentCalculation::ResidualCash => (available.amount(), None),
 
+        PaymentCalculation::IncentiveFee {
+            hurdle_irr,
+            share_pct,
+        } => {
+            // The hurdle is tested with this tier's cash counted as an equity
+            // distribution on the payment date; before it is met the manager
+            // takes nothing and the cash flows on to the residual.
+            let earned = equity_history
+                .and_then(|history| history.irr_with(payment_date, available))
+                .is_some_and(|irr| irr >= *hurdle_irr);
+            let fee = if earned {
+                available.amount() * share_pct
+            } else {
+                0.0
+            };
+            (fee, None)
+        }
+
         PaymentCalculation::ReserveReplenishment { target_balance } => {
             // Shortfall = max(0, target - current). Current balance is passed
             // dynamically from SimulationState, not stored in the waterfall definition.
@@ -1522,338 +1622,396 @@ mod to_currency_units_tests {
 }
 
 #[cfg(test)]
-mod ic_diversion_tests {
+mod coverage_position_tests {
+    //! Positional coverage tests: a `PaymentType::CoverageTest` tier can only
+    //! divert the interest still undistributed at its position, so a test on
+    //! a junior class never traps a senior class's coupon. The IC cure-sizing
+    //! rules (recipient order, out-of-denominator recipients) are covered at
+    //! the `CoverageTest::calculate` level in `coverage_tests.rs`.
     use super::execute_waterfall;
     use super::WaterfallContext;
-    use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
     use crate::instruments::fixed_income::structured_credit::types::{
-        AllocationMode, AssetPool, DealType, PaymentCalculation, PaymentType, Recipient,
-        RecipientType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-        WaterfallBuilder, WaterfallTier,
+        AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
+        PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority,
+        TrancheStructure, WaterfallBuilder, WaterfallTier,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CreditRating, InstrumentId};
     use time::Month;
 
-    /// W-21: when only the IC test breaches (OC test passes), the waterfall
-    /// must still divert cash. Before the fix the IC `cure_amount` was always
-    /// `None`, so `total_cure_amount` was zero and nothing was diverted.
-    #[test]
-    fn ic_only_breach_diverts_cash() {
-        let currency = Currency::USD;
+    fn usd(amount: f64) -> Money {
+        Money::new(amount, Currency::USD).expect("valid money fixture")
+    }
 
-        // AssetPool with a single large performing asset: OC numerator is huge so
-        // the OC test comfortably passes.
-        let mut pool = AssetPool::new("POOL", DealType::Clo, currency);
-        {
-            use crate::instruments::fixed_income::structured_credit::types::{
-                AssetType, PoolAsset,
-            };
-            use finstack_quant_core::types::{CreditRating, InstrumentId};
-            pool.assets.push(PoolAsset {
-                day_count: finstack_quant_core::dates::DayCount::Act360,
-                id: InstrumentId::new("ASSET_0"),
-                asset_type: AssetType::FirstLienLoan {
-                    industry: Some("Technology".into()),
-                },
-                balance: Money::from((500_000_000_i64, currency)),
-                rate: 0.08,
-                spread_bp: Some(400.0),
-                index_id: None,
-                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-                credit_quality: Some(CreditRating::BB),
+    fn maturity() -> Date {
+        Date::from_calendar_date(2031, Month::January, 1).expect("date")
+    }
+
+    fn pool_with(balance: f64) -> AssetPool {
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        pool.assets.push(PoolAsset {
+            day_count: finstack_quant_core::dates::DayCount::Act360,
+            id: InstrumentId::new("ASSET_0"),
+            asset_type: AssetType::FirstLienLoan {
                 industry: Some("Technology".into()),
-                obligor_id: Some("OBLIGOR_0".into()),
-                is_defaulted: false,
-                recovery_amount: None,
-                default_date: None,
-                purchase_price: None,
-                acquisition_date: None,
-                smm_override: None,
-                mdr_override: None,
-                recovery_rate: None,
-                commitment: None,
-                contractual_payment: None,
-            });
-        }
+            },
+            balance: usd(balance),
+            rate: 0.08,
+            spread_bp: Some(400.0),
+            index_id: None,
+            maturity: maturity(),
+            credit_quality: Some(CreditRating::BB),
+            industry: Some("Technology".into()),
+            obligor_id: Some("OBLIGOR_0".into()),
+            is_defaulted: false,
+            recovery_amount: None,
+            default_date: None,
+            purchase_price: None,
+            acquisition_date: None,
+            smm_override: None,
+            mdr_override: None,
+            recovery_rate: None,
+            commitment: None,
+            contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
+        });
+        pool
+    }
 
-        // Two tranches: a senior CLASS_A and a subordinated CLASS_B.
-        // Attachment points match the 100M/30M balance split (76.9/23.1).
-        let class_a = Tranche::new(
-            "CLASS_A",
-            0.0,
-            76.9,
-            TrancheSeniority::Senior,
-            Money::from((100_000_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.05 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+    fn tranche(id: &str, a: f64, d: f64, sen: TrancheSeniority, bal: f64, cpn: f64) -> Tranche {
+        Tranche::new(
+            id,
+            a,
+            d,
+            sen,
+            usd(bal),
+            TrancheCoupon::Fixed { rate: cpn },
+            maturity(),
         )
-        .unwrap();
-        let class_b = Tranche::new(
-            "CLASS_B",
-            76.9,
-            100.0,
-            TrancheSeniority::Subordinated,
-            Money::from((30_000_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.08 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        )
-        .unwrap();
-        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
+        .expect("tranche")
+    }
 
-        let waterfall = WaterfallBuilder::new(currency)
-            .add_tier(
-                WaterfallTier::new("interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
-                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
-            )
-            // Senior principal tier (CLASS_A) — diversion target. CLASS_A has
-            // a target balance of 95M so absent any breach it only takes a 5M
-            // scheduled paydown, leaving cash for the junior principal tier.
-            .add_tier(
-                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::tranche_principal(
-                        "class_a_prin",
-                        "CLASS_A",
-                        Some(Money::from((95_000_000_i64, currency))),
-                    )),
-            )
-            // Junior principal tier (CLASS_B) — divertible: on a coverage
-            // breach its cash is redirected to the senior principal tier.
-            .add_tier(
-                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .divertible(true)
-                    .add_recipient(Recipient::tranche_principal(
-                        "class_b_prin",
-                        "CLASS_B",
-                        None,
-                    )),
-            )
-            .add_tier(
-                WaterfallTier::new("equity", 4, PaymentType::Residual)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::new(
-                        "equity_dist",
-                        RecipientType::Equity,
-                        PaymentCalculation::ResidualCash,
-                    )),
-            )
-            // OC trigger 1.05: numerator ~= 500M+cash, denominator = 130M => OC
-            // ratio ~3.9, passes easily. IC trigger 1.20: interest collections
-            // are deliberately tiny, so the IC test fails.
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_A".into(),
-                oc_trigger: Some(1.05),
-                ic_trigger: Some(1.20),
-            })
-            .build()
-            .expect("build waterfall");
-
-        let market = MarketContext::new();
-        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
-        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
-
-        // Plenty of cash to distribute, but interest collections far below the
-        // interest due on the tranches => IC test breaches.
-        let context = WaterfallContext {
-            available_cash: Money::from((20_000_000_i64, currency)),
-            interest_collections: Money::from((100_000_i64, currency)),
-            principal_collections: Money::from((19_900_000_i64, currency)),
+    fn context<'a>(
+        market: &'a MarketContext,
+        interest: f64,
+        principal: f64,
+        pool_balance: f64,
+    ) -> WaterfallContext<'a> {
+        let payment_date = Date::from_calendar_date(2024, Month::April, 1).expect("date");
+        let period_start = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        WaterfallContext {
+            available_cash: usd(interest + principal),
+            interest_collections: usd(interest),
+            principal_collections: usd(principal),
             payment_date,
             period_start,
             valuation_date: period_start,
-            pool_balance: Money::from((500_000_000_i64, currency)),
-            market: &market,
+            pool_balance: usd(pool_balance),
+            market,
             tranche_balances: None,
             asset_balances: None,
             deferred_interest: None,
-            reserve_balance: Money::from((0_i64, currency)),
-            restricted_cash: Money::from((0_i64, Currency::USD)),
-            recovery_proceeds: Money::from((0_i64, currency)),
+            reserve_balance: usd(0.0),
+            restricted_cash: usd(0.0),
+            defaulted_collateral_value: usd(0.0),
+            recovery_proceeds: usd(0.0),
             floating_rate_shift: 0.0,
-        };
+            equity_history: None,
+        }
+    }
 
-        let result =
-            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
+    fn paid_to(result: &super::WaterfallDistribution, recipient_id: &str) -> f64 {
+        result
+            .payment_records
+            .iter()
+            .filter(|r| r.recipient_id == recipient_id)
+            .map(|r| r.paid_amount.amount())
+            .sum()
+    }
 
-        // OC test passes, IC test fails.
+    /// A test after Class B's interest can trap Class C's coupon and the
+    /// residual, never Class A's or B's.
+    #[test]
+    fn test_after_a_junior_class_leaves_senior_coupons_intact() {
+        let pool = pool_with(120_000_000.0);
+        let tranches = TrancheStructure::new(vec![
+            tranche("A", 0.0, 60.0, TrancheSeniority::Senior, 60_000_000.0, 0.05),
+            tranche(
+                "B",
+                60.0,
+                80.0,
+                TrancheSeniority::Mezzanine,
+                20_000_000.0,
+                0.07,
+            ),
+            tranche(
+                "C",
+                80.0,
+                100.0,
+                TrancheSeniority::Subordinated,
+                20_000_000.0,
+                0.10,
+            ),
+        ])
+        .expect("structure");
+        // Collateral 120M + 0 principal cash against A + B = 80M gives 1.50,
+        // so a 1.60 test on B fails while everything is otherwise healthy.
+        let waterfall = WaterfallBuilder::new(Currency::USD)
+            .add_tier(
+                WaterfallTier::new("a_interest", 1, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("a_int", "A")),
+            )
+            .add_tier(
+                WaterfallTier::new("b_interest", 2, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("b_int", "B")),
+            )
+            .add_tier(WaterfallTier::coverage_tests(
+                "b_coverage",
+                3,
+                vec![CoverageTestSpec::oc("B", 1.60)],
+            ))
+            .add_tier(
+                WaterfallTier::new("c_interest", 4, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("c_int", "C")),
+            )
+            .add_tier(
+                WaterfallTier::new("principal", 5, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal("a_prin", "A", None))
+                    .add_recipient(Recipient::tranche_principal("b_prin", "B", None))
+                    .add_recipient(Recipient::tranche_principal("c_prin", "C", None)),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 6, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            )
+            .build()
+            .expect("waterfall");
+        let market = MarketContext::new();
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &pool,
+            context(&market, 3_000_000.0, 0.0, 120_000_000.0),
+        )
+        .expect("waterfall execution");
+
         let oc = result
             .coverage_tests
             .iter()
-            .find(|(id, _, _)| id.starts_with("OC_"))
-            .expect("OC test result present");
+            .find(|(id, _, _)| id == "OC_B")
+            .expect("OC_B evaluated");
+        assert!(!oc.2, "the B test must fail (ratio {})", oc.1);
+        assert!(result.had_diversions);
+
+        let a_interest = paid_to(&result, "a_int");
+        let b_interest = paid_to(&result, "b_int");
+        let c_interest = paid_to(&result, "c_int");
+        // Fixed coupons accrue ACT/360 over the 91-day Jan-1 to Apr-1 period.
+        let accrual = 91.0 / 360.0;
+        assert!(
+            (a_interest - 60_000_000.0 * 0.05 * accrual).abs() < 1.0,
+            "A coupon is paid in full above the test, got {a_interest}"
+        );
+        assert!(
+            (b_interest - 20_000_000.0 * 0.07 * accrual).abs() < 1.0,
+            "B coupon is paid in full above the test, got {b_interest}"
+        );
+        assert!(
+            c_interest < 1.0,
+            "C's coupon sits below the failing test and is diverted, got {c_interest}"
+        );
+        // Everything left after B's coupon went to A principal, up to the cure.
+        let a_principal = paid_to(&result, "a_prin");
+        let remaining_after_b = 3_000_000.0 - a_interest - b_interest;
+        assert!(
+            (a_principal - remaining_after_b).abs() < 1.0,
+            "diverted interest {remaining_after_b} must pay down A, got {a_principal}"
+        );
+        assert!(
+            (result.diverted_cash.amount() - a_principal).abs() < 1.0,
+            "diverted cash {} must equal the senior paydown {a_principal}",
+            result.diverted_cash.amount()
+        );
+    }
+
+    /// W-21: an IC-only breach diverts the interest below the test position.
+    #[test]
+    fn ic_only_breach_diverts_interest_below_the_test() {
+        let pool = pool_with(500_000_000.0);
+        let tranches = TrancheStructure::new(vec![
+            tranche(
+                "CLASS_A",
+                0.0,
+                76.9,
+                TrancheSeniority::Senior,
+                100_000_000.0,
+                0.05,
+            ),
+            tranche(
+                "CLASS_B",
+                76.9,
+                100.0,
+                TrancheSeniority::Subordinated,
+                30_000_000.0,
+                0.08,
+            ),
+        ])
+        .expect("structure");
+        let waterfall = WaterfallBuilder::new(Currency::USD)
+            .add_tier(
+                WaterfallTier::new("a_interest", 1, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A")),
+            )
+            // OC 1.05 passes easily (500M collateral); IC 1.20 fails because
+            // collections (1.4M) do not cover 1.2 × A's 1.25M coupon.
+            .add_tier(WaterfallTier::coverage_tests(
+                "a_coverage",
+                2,
+                vec![
+                    CoverageTestSpec::oc("CLASS_A", 1.05),
+                    CoverageTestSpec::ic("CLASS_A", 1.20),
+                ],
+            ))
+            .add_tier(
+                WaterfallTier::new("b_interest", 3, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
+            )
+            .add_tier(
+                WaterfallTier::new("principal", 4, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_a_prin",
+                        "CLASS_A",
+                        None,
+                    ))
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_b_prin",
+                        "CLASS_B",
+                        None,
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 5, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            )
+            .build()
+            .expect("waterfall");
+        let market = MarketContext::new();
+        let principal_collections = 19_900_000.0;
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &pool,
+            context(&market, 1_400_000.0, principal_collections, 500_000_000.0),
+        )
+        .expect("waterfall execution");
+
+        let oc = result
+            .coverage_tests
+            .iter()
+            .find(|(id, _, _)| id == "OC_CLASS_A")
+            .expect("OC result present");
         let ic = result
             .coverage_tests
             .iter()
-            .find(|(id, _, _)| id.starts_with("IC_"))
-            .expect("IC test result present");
+            .find(|(id, _, _)| id == "IC_CLASS_A")
+            .expect("IC result present");
         assert!(oc.2, "OC test should pass (ratio {})", oc.1);
         assert!(!ic.2, "IC test should fail (ratio {})", ic.1);
 
-        // W-21: the IC-only breach must divert cash, and the diverted amount
-        // must equal the IC cure (the senior interest shortfall) — i.e. partial
-        // diversion. Before the fix the IC `cure_amount` was `None`, so
-        // `total_cure_amount` was zero, the partial-diversion cap was skipped,
-        // and the FULL junior tier (the entire 5M senior-principal need) was
-        // diverted instead of just the cure.
+        let a_interest = paid_to(&result, "class_a_int");
+        let diverted = result.diverted_cash.amount();
         assert!(
-            result.diverted_cash.amount() > 0.0,
-            "IC-only breach must divert cash, got {}",
-            result.diverted_cash.amount()
-        );
-
-        // Independently derive the expected IC cure:
-        //   cure = required_ratio * interest_due(CLASS_A) - interest_collections
-        // CLASS_A has no senior tranches, so total interest due is its own.
-        let class_a = tranches
-            .tranches
-            .iter()
-            .find(|t| t.id.as_str() == "CLASS_A")
-            .expect("CLASS_A present");
-        let yf = class_a
-            .day_count
-            .year_fraction(
-                period_start,
-                payment_date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .expect("year fraction");
-        let interest_due =
-            class_a.current_balance.amount() * class_a.coupon.current_rate(payment_date) * yf;
-        // SC-M08: the cure is a PRINCIPAL PAYDOWN, not a cash shortfall.
-        //
-        // Paying down senior principal adds nothing to interest collections, so
-        // the old `1.20 * interest_due - 100_000` cash shortfall cured nothing
-        // when applied as a paydown. De-levering needs
-        // `X >= (I_due - I_coll/R) / (r*tau)`, which here is ~93.4M against a
-        // 100M CLASS_A — i.e. the breach is so severe that no available cash
-        // can cure it.
-        //
-        // Asserting the diversion equals the 1,416,667 cash shortfall would
-        // be a 66x under-cure. With the correct cure exceeding every dollar
-        // in the waterfall, the diversion is bounded by AVAILABLE CASH rather
-        // than by the cure — which is the right behaviour: divert everything
-        // you have and still fail the test.
-        let rate_tau = class_a.coupon.current_rate(payment_date) * yf;
-        let delevering_cure = (interest_due - 100_000.0 / 1.20) / rate_tau;
-        assert!(
-            delevering_cure > 5_000_000.0,
-            "test setup: this breach must be severe enough that the cure \
-             exceeds available cash, got {delevering_cure:.2}"
-        );
-
-        assert!(
-            result.diverted_cash.amount() > 1_416_667.0,
-            "the diversion must exceed the pre-SC-M08 cash shortfall of \
-             1,416,667 — that figure under-cured an IC breach by ~66x. Got {}",
-            result.diverted_cash.amount()
+            (diverted - (1_400_000.0 - a_interest)).abs() < 1.0,
+            "the interest left after A's coupon ({}) is diverted, got {diverted}",
+            1_400_000.0 - a_interest
         );
         assert!(
-            result.diverted_cash.amount() <= result.total_available.amount() + 1.0,
-            "the diversion can never exceed the cash actually available: {} vs {}",
-            result.diverted_cash.amount(),
-            result.total_available.amount()
+            paid_to(&result, "class_b_int") < 1.0,
+            "B's coupon sits below the failing test"
+        );
+        // The diverted interest pays A principal on top of the period's
+        // principal collections, which A absorbs in full (no target balance).
+        let a_principal = paid_to(&result, "class_a_prin");
+        assert!(
+            (a_principal - (principal_collections + diverted)).abs() < 1.0,
+            "A principal must be the collections plus the diversion, got {a_principal}"
+        );
+        assert!(
+            paid_to(&result, "class_b_prin") < 1.0,
+            "no principal reaches B while A is outstanding"
         );
     }
 
-    /// Item 4 — coverage cures must NOT be summed across tranches.
-    ///
-    /// Two OC triggers (one on the senior tranche, one on the subordinated
-    /// tranche) both breach. The OC tests share the senior tranche balance in
-    /// their denominators, so a single senior paydown de-leverages both — the
-    /// binding cure is the MAX of the two, not the sum. Summing them
-    /// over-diverts cash. This test asserts the diverted cash equals the
-    /// larger cure and is strictly below the sum of the two cures.
+    /// Two tests at one position share the senior balances they de-lever, so
+    /// the binding cure is the maximum, not the sum.
     #[test]
-    fn coverage_cures_are_not_summed_across_tranches() {
-        let currency = Currency::USD;
-
-        // AssetPool: one performing asset sized so BOTH OC tests breach but by
-        // different amounts (the junior test, with a smaller denominator,
-        // needs a larger cure than the senior test).
-        let mut pool = AssetPool::new("POOL", DealType::Clo, currency);
-        {
-            use crate::instruments::fixed_income::structured_credit::types::{
-                AssetType, PoolAsset,
-            };
-            use finstack_quant_core::types::{CreditRating, InstrumentId};
-            pool.assets.push(PoolAsset {
-                day_count: finstack_quant_core::dates::DayCount::Act360,
-                id: InstrumentId::new("ASSET_0"),
-                asset_type: AssetType::FirstLienLoan {
-                    industry: Some("Technology".into()),
-                },
-                // Collateral deliberately below the tranche par stack so both
-                // OC ratios breach their triggers.
-                balance: Money::from((118_000_000_i64, currency)),
-                rate: 0.08,
-                spread_bp: Some(400.0),
-                index_id: None,
-                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-                credit_quality: Some(CreditRating::BB),
-                industry: Some("Technology".into()),
-                obligor_id: Some("OBLIGOR_0".into()),
-                is_defaulted: false,
-                recovery_amount: None,
-                default_date: None,
-                purchase_price: None,
-                acquisition_date: None,
-                smm_override: None,
-                mdr_override: None,
-                recovery_rate: None,
-                commitment: None,
-                contractual_payment: None,
-            });
-        }
-
-        // Senior 100M, subordinated 30M.
-        let class_a = Tranche::new(
-            "CLASS_A",
-            0.0,
-            77.0,
-            TrancheSeniority::Senior,
-            Money::from((100_000_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.05 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        )
-        .unwrap();
-        let class_b = Tranche::new(
-            "CLASS_B",
-            77.0,
-            100.0,
-            TrancheSeniority::Subordinated,
-            Money::from((30_000_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.08 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        )
-        .unwrap();
-        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
-
-        let waterfall = WaterfallBuilder::new(currency)
+    fn coverage_cures_at_one_position_are_not_summed() {
+        let pool = pool_with(118_000_000.0);
+        let tranches = TrancheStructure::new(vec![
+            tranche(
+                "CLASS_A",
+                0.0,
+                77.0,
+                TrancheSeniority::Senior,
+                100_000_000.0,
+                0.05,
+            ),
+            tranche(
+                "CLASS_B",
+                77.0,
+                100.0,
+                TrancheSeniority::Subordinated,
+                30_000_000.0,
+                0.08,
+            ),
+        ])
+        .expect("structure");
+        let waterfall = WaterfallBuilder::new(Currency::USD)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
                     .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
             )
+            // Numerator = 118M collateral + 20M principal cash = 138M.
+            // CLASS_A denominator 100M (1.38) breaches 1.39; CLASS_B
+            // denominator 130M (1.06) breaches 1.07 by more.
+            .add_tier(WaterfallTier::coverage_tests(
+                "coverage",
+                2,
+                vec![
+                    CoverageTestSpec::oc("CLASS_A", 1.39),
+                    CoverageTestSpec::oc("CLASS_B", 1.07),
+                ],
+            ))
             .add_tier(
-                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
+                WaterfallTier::new("principal", 3, PaymentType::Principal)
                     .allocation_mode(AllocationMode::Sequential)
                     .add_recipient(Recipient::tranche_principal(
                         "class_a_prin",
                         "CLASS_A",
-                        Some(Money::from((99_000_000_i64, currency))),
-                    )),
-            )
-            .add_tier(
-                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .divertible(true)
+                        Some(usd(99_000_000.0)),
+                    ))
                     .add_recipient(Recipient::tranche_principal(
                         "class_b_prin",
                         "CLASS_B",
@@ -1861,188 +2019,101 @@ mod ic_diversion_tests {
                     )),
             )
             .add_tier(
-                WaterfallTier::new("equity", 4, PaymentType::Residual)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::new(
+                WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(
+                    Recipient::new(
                         "equity_dist",
                         RecipientType::Equity,
                         PaymentCalculation::ResidualCash,
-                    )),
+                    ),
+                ),
             )
-            // Two OC triggers. Numerator = 118M collateral + 20M principal
-            // cash = 138M. CLASS_A denominator = 100M (ratio 1.38); CLASS_B
-            // denominator = 130M (ratio 1.06). Triggers set above each ratio
-            // so BOTH breach, with materially different cure amounts.
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_A".into(),
-                oc_trigger: Some(1.70),
-                ic_trigger: None,
-            })
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_B".into(),
-                oc_trigger: Some(1.30),
-                ic_trigger: None,
-            })
             .build()
-            .expect("build waterfall");
-
+            .expect("waterfall");
         let market = MarketContext::new();
-        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
-        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &pool,
+            context(&market, 25_000_000.0, 20_000_000.0, 118_000_000.0),
+        )
+        .expect("waterfall execution");
 
-        let context = WaterfallContext {
-            available_cash: Money::from((40_000_000_i64, currency)),
-            interest_collections: Money::from((20_000_000_i64, currency)),
-            principal_collections: Money::from((20_000_000_i64, currency)),
-            payment_date,
-            period_start,
-            valuation_date: period_start,
-            pool_balance: Money::from((118_000_000_i64, currency)),
-            market: &market,
-            tranche_balances: None,
-            asset_balances: None,
-            deferred_interest: None,
-            reserve_balance: Money::from((0_i64, currency)),
-            restricted_cash: Money::from((0_i64, Currency::USD)),
-            recovery_proceeds: Money::from((0_i64, currency)),
-            floating_rate_shift: 0.0,
-        };
-
-        let result =
-            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
-
-        // Both OC tests must fail for this test to exercise the summing bug.
-        let failing: Vec<_> = result
+        let failing = result
             .coverage_tests
             .iter()
             .filter(|(_, _, passing)| !passing)
-            .collect();
+            .count();
         assert_eq!(
-            failing.len(),
-            2,
-            "test setup: both OC tests must breach; got {:?}",
+            failing, 2,
+            "both OC tests must breach: {:?}",
             result.coverage_tests
         );
 
-        // Independently derive the two OC cures.
-        // numerator = collateral + principal collections (par-OC: only the
-        // principal cash component enters the numerator). Diverting X removes
-        // X from the numerator and pays down X of the (shared) senior
-        // denominator:
-        //   X = (numerator − ratio·denominator) / (1 − ratio)
-        let numerator = 118_000_000.0_f64 + 20_000_000.0; // collateral + principal cash
+        // Diverting X removes X from the numerator's cash and pays down X of
+        // the shared senior denominator: X = (num − r·den) / (1 − r).
+        let numerator = 118_000_000.0_f64 + 20_000_000.0;
         let cure = |ratio: f64, denom: f64| (numerator - ratio * denom) / (1.0 - ratio);
-        let cure_a = cure(1.70, 100_000_000.0);
-        let cure_b = cure(1.30, 130_000_000.0);
-        assert!(cure_a > 0.0 && cure_b > 0.0, "both cures must be positive");
+        let cure_a = cure(1.39, 100_000_000.0);
+        let cure_b = cure(1.07, 130_000_000.0);
         let binding = cure_a.max(cure_b);
         let summed = cure_a + cure_b;
+        let interest_left =
+            25_000_000.0 - paid_to(&result, "class_a_int") - paid_to(&result, "class_b_int");
         assert!(
-            (summed - binding).abs() > 1_000_000.0,
-            "test setup: the two cures must differ enough that sum vs max is \
-             materially distinguishable (sum={summed:.0}, max={binding:.0})"
+            summed < interest_left,
+            "fixture: both cures ({summed}) must be fundable from the interest left ({interest_left})"
         );
-
-        // Diverted cash is capped at the binding (max) cure, not the sum.
         let diverted = result.diverted_cash.amount();
         assert!(
-            diverted <= binding + 1.0,
-            "diverted cash {diverted:.0} must not exceed the binding (max) \
-             cure {binding:.0} (sum of cures would be {summed:.0})"
-        );
-        assert!(
-            diverted < summed - 1_000_000.0,
-            "diverted cash {diverted:.0} must be strictly below the summed \
-             cures {summed:.0} — coverage cures are not additive across \
-             tranches"
+            (diverted - binding).abs() < 1.0,
+            "diverted {diverted} must equal the binding (max) cure {binding}, not the sum {summed}"
         );
     }
 
-    /// Diversion nets principal already paid this period (no over-pay / negative balance).
+    /// Principal paid by a diversion is netted by the regular principal tier.
     #[test]
     fn diversion_never_over_pays_senior_principal() {
-        let currency = Currency::USD;
-
-        let mut pool = AssetPool::new("POOL", DealType::Clo, currency);
-        {
-            use crate::instruments::fixed_income::structured_credit::types::{
-                AssetType, PoolAsset,
-            };
-            use finstack_quant_core::types::{CreditRating, InstrumentId};
-            pool.assets.push(PoolAsset {
-                day_count: finstack_quant_core::dates::DayCount::Act360,
-                id: InstrumentId::new("ASSET_0"),
-                asset_type: AssetType::FirstLienLoan {
-                    industry: Some("Technology".into()),
-                },
-                // Collateral below the tranche stack so the OC test breaches
-                // and the junior tier diverts to the senior principal tier.
-                balance: Money::from((20_000_000_i64, currency)),
-                rate: 0.08,
-                spread_bp: Some(400.0),
-                index_id: None,
-                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-                credit_quality: Some(CreditRating::BB),
-                industry: Some("Technology".into()),
-                obligor_id: Some("OBLIGOR_0".into()),
-                is_defaulted: false,
-                recovery_amount: None,
-                default_date: None,
-                purchase_price: None,
-                acquisition_date: None,
-                smm_override: None,
-                mdr_override: None,
-                recovery_rate: None,
-                commitment: None,
-                contractual_payment: None,
-            });
-        }
-
-        // Small senior tranche: 3M. Plenty of cash (10M) so its regular
-        // principal tier (target None → pay to zero) retires it in full.
+        let pool = pool_with(20_000_000.0);
         let class_a_balance = 3_000_000.0;
-        let class_a = Tranche::new(
-            "CLASS_A",
-            0.0,
-            10.0,
-            TrancheSeniority::Senior,
-            Money::new(class_a_balance, currency).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        )
-        .unwrap();
-        let class_b = Tranche::new(
-            "CLASS_B",
-            10.0,
-            100.0,
-            TrancheSeniority::Subordinated,
-            Money::from((27_000_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.08 },
-            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
-        )
-        .unwrap();
-        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
-
-        let waterfall = WaterfallBuilder::new(currency)
+        let tranches = TrancheStructure::new(vec![
+            tranche(
+                "CLASS_A",
+                0.0,
+                10.0,
+                TrancheSeniority::Senior,
+                class_a_balance,
+                0.05,
+            ),
+            tranche(
+                "CLASS_B",
+                10.0,
+                100.0,
+                TrancheSeniority::Subordinated,
+                27_000_000.0,
+                0.08,
+            ),
+        ])
+        .expect("structure");
+        let waterfall = WaterfallBuilder::new(Currency::USD)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
                     .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
             )
+            // Collateral 20M + 9M cash against the 30M stack breaches 1.20.
+            .add_tier(WaterfallTier::coverage_tests(
+                "coverage",
+                2,
+                vec![CoverageTestSpec::oc("CLASS_B", 1.20)],
+            ))
             .add_tier(
-                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
+                WaterfallTier::new("principal", 3, PaymentType::Principal)
                     .allocation_mode(AllocationMode::Sequential)
                     .add_recipient(Recipient::tranche_principal(
                         "class_a_prin",
                         "CLASS_A",
                         None,
-                    )),
-            )
-            .add_tier(
-                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .divertible(true)
+                    ))
                     .add_recipient(Recipient::tranche_principal(
                         "class_b_prin",
                         "CLASS_B",
@@ -2050,136 +2121,174 @@ mod ic_diversion_tests {
                     )),
             )
             .add_tier(
-                WaterfallTier::new("equity", 4, PaymentType::Residual)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::new(
+                WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(
+                    Recipient::new(
                         "equity_dist",
                         RecipientType::Equity,
                         PaymentCalculation::ResidualCash,
-                    )),
+                    ),
+                ),
             )
-            // Collateral 20M + cash vs 30M stack: the OC test breaches.
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_B".into(),
-                oc_trigger: Some(1.20),
-                ic_trigger: None,
-            })
             .build()
-            .expect("build waterfall");
-
+            .expect("waterfall");
         let market = MarketContext::new();
-        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
-        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &pool,
+            context(&market, 1_000_000.0, 9_000_000.0, 20_000_000.0),
+        )
+        .expect("waterfall execution");
 
-        let context = WaterfallContext {
-            available_cash: Money::from((10_000_000_i64, currency)),
-            interest_collections: Money::from((1_000_000_i64, currency)),
-            principal_collections: Money::from((9_000_000_i64, currency)),
-            payment_date,
-            period_start,
-            valuation_date: period_start,
-            pool_balance: Money::from((20_000_000_i64, currency)),
-            market: &market,
-            tranche_balances: None,
-            asset_balances: None,
-            deferred_interest: None,
-            reserve_balance: Money::from((0_i64, currency)),
-            restricted_cash: Money::from((0_i64, Currency::USD)),
-            recovery_proceeds: Money::from((0_i64, currency)),
-            floating_rate_shift: 0.0,
-        };
-
-        let result =
-            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
-
+        assert!(result.had_diversions, "the OC breach must divert");
         assert!(
-            result.had_diversions,
-            "test setup: the OC breach must trigger a diversion"
+            result.diverted_cash.amount() > 0.0,
+            "interest left after the coupons must reach A principal"
         );
-
-        // Invariant: total principal paid to CLASS_A across ALL tiers
-        // (regular + diverted) must not exceed its period-start balance —
-        // i.e. the post-payment balance never goes negative.
-        let class_a_principal_paid: f64 = result
-            .payment_records
-            .iter()
-            .filter(|r| r.recipient_id == "class_a_prin")
-            .map(|r| r.paid_amount.amount())
-            .sum();
+        let class_a_principal_paid = paid_to(&result, "class_a_prin");
         assert!(
             class_a_principal_paid <= class_a_balance + 1e-6,
             "CLASS_A principal paid {class_a_principal_paid:.2} exceeds its \
-             balance {class_a_balance:.2}: diversion used a stale \
-             period-start balance and over-paid principal"
+             balance {class_a_balance:.2}: the regular tier did not net the diversion"
+        );
+        assert!(
+            (class_a_principal_paid - class_a_balance).abs() < 1e-6,
+            "with 9M of principal the senior is retired exactly once"
         );
     }
 
+    /// A `Reinvest` test retains the diverted interest as principal proceeds
+    /// instead of paying notes.
+    #[test]
+    fn reinvest_action_retains_diverted_interest_as_principal() {
+        let pool = pool_with(100_000_000.0);
+        let tranches = TrancheStructure::new(vec![
+            tranche(
+                "CLASS_A",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                80_000_000.0,
+                0.05,
+            ),
+            tranche(
+                "CLASS_B",
+                80.0,
+                100.0,
+                TrancheSeniority::Subordinated,
+                20_000_000.0,
+                0.08,
+            ),
+        ])
+        .expect("structure");
+        let waterfall = WaterfallBuilder::new(Currency::USD)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
+                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
+            )
+            // 100M against 100M of notes fails a 1.05 reinvestment OC test.
+            .add_tier(WaterfallTier::coverage_tests(
+                "reinvestment_oc",
+                2,
+                vec![CoverageTestSpec::oc("CLASS_B", 1.05)
+                    .with_action(super::CoverageTestAction::Reinvest)],
+            ))
+            .add_tier(
+                WaterfallTier::new("principal", 3, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_a_prin",
+                        "CLASS_A",
+                        Some(usd(80_000_000.0)),
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(
+                    Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    ),
+                ),
+            )
+            .build()
+            .expect("waterfall");
+        let market = MarketContext::new();
+        let result = execute_waterfall(
+            &waterfall,
+            &tranches,
+            &pool,
+            context(&market, 2_500_000.0, 0.0, 100_000_000.0),
+        )
+        .expect("waterfall execution");
+
+        let coupons = paid_to(&result, "class_a_int") + paid_to(&result, "class_b_int");
+        let retained = 2_500_000.0 - coupons;
+        assert!(retained > 0.0, "fixture: excess interest must exist");
+        assert!(
+            (result.remaining_principal.amount() - retained).abs() < 1.0,
+            "diverted interest is carried as principal: got {}, expected {retained}",
+            result.remaining_principal.amount()
+        );
+        assert!(
+            paid_to(&result, "class_a_prin") < 1.0,
+            "a Reinvest test does not pay down notes this period"
+        );
+        assert!(
+            result
+                .distributions
+                .get(&RecipientType::Equity)
+                .is_none_or(|m| m.amount() < 1.0),
+            "nothing reaches equity below a failing test"
+        );
+        assert!(result
+            .diverted_amounts
+            .iter()
+            .any(|record| record.target_tranche == "principal_account"));
+    }
+
+    /// A fee tier ranked behind note interest is junior to the IC claim and
+    /// must not reduce its numerator.
     #[test]
     fn coverage_economics_late_junior_fee_is_not_deducted_from_ic_numerator() {
-        let currency = Currency::USD;
-        let pool = AssetPool::new("POOL", DealType::Clo, currency);
-        let tranche = Tranche::new(
+        let pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        let tranches = TrancheStructure::new(vec![tranche(
             "CLASS_A",
             0.0,
             100.0,
             TrancheSeniority::Senior,
-            Money::from((100_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.05 },
-            Date::from_calendar_date(2031, Month::January, 1).expect("date"),
-        )
-        .expect("tranche");
-        let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
-        let build_waterfall = |late_fee: Option<f64>| {
-            let mut builder = WaterfallBuilder::new(currency).add_tier(
-                WaterfallTier::new("note_interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::tranche_interest("class_a_interest", "CLASS_A")),
-            );
+            100_000.0,
+            0.05,
+        )])
+        .expect("structure");
+        let build = |late_fee: Option<f64>| {
+            let mut builder = WaterfallBuilder::new(Currency::USD)
+                .add_tier(
+                    WaterfallTier::new("note_interest", 1, PaymentType::Interest)
+                        .add_recipient(Recipient::tranche_interest("class_a_interest", "CLASS_A")),
+                )
+                .add_tier(WaterfallTier::coverage_tests(
+                    "coverage",
+                    2,
+                    vec![CoverageTestSpec::ic("CLASS_A", 1.0)],
+                ));
             if let Some(amount) = late_fee {
                 builder = builder.add_tier(
-                    WaterfallTier::new("junior_fee", 2, PaymentType::Fee)
-                        .allocation_mode(AllocationMode::Sequential)
-                        .add_recipient(Recipient::fixed_fee(
-                            "junior_fee_recipient",
-                            "junior_manager",
-                            Money::new(amount, currency).expect("valid money fixture"),
-                        )),
+                    WaterfallTier::new("junior_fee", 3, PaymentType::Fee).add_recipient(
+                        Recipient::fixed_fee("junior_fee_recipient", "junior_manager", usd(amount)),
+                    ),
                 );
             }
-            builder
-                .add_coverage_trigger(CoverageTrigger {
-                    tranche_id: "CLASS_A".into(),
-                    oc_trigger: None,
-                    ic_trigger: Some(1.0),
-                })
-                .build()
-                .expect("waterfall")
+            builder.build().expect("waterfall")
         };
         let market = MarketContext::new();
-        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("period start");
-        let payment_date = Date::from_calendar_date(2025, Month::April, 1).expect("payment date");
-        let run = |late_fee| {
+        let ratio = |late_fee| {
             execute_waterfall(
-                &build_waterfall(late_fee),
+                &build(late_fee),
                 &tranches,
                 &pool,
-                WaterfallContext {
-                    available_cash: Money::from((2_000_i64, currency)),
-                    interest_collections: Money::from((2_000_i64, currency)),
-                    principal_collections: Money::from((0_i64, currency)),
-                    payment_date,
-                    period_start,
-                    valuation_date: period_start,
-                    pool_balance: Money::from((100_000_i64, currency)),
-                    market: &market,
-                    tranche_balances: None,
-                    asset_balances: None,
-                    deferred_interest: None,
-                    reserve_balance: Money::from((0_i64, currency)),
-                    restricted_cash: Money::from((0_i64, Currency::USD)),
-                    recovery_proceeds: Money::from((0_i64, currency)),
-                    floating_rate_shift: 0.0,
-                },
+                context(&market, 2_000.0, 0.0, 100_000.0),
             )
             .expect("waterfall execution")
             .coverage_tests
@@ -2188,225 +2297,12 @@ mod ic_diversion_tests {
             .expect("IC result")
             .1
         };
-
-        let without_late_fee = run(None);
-        let with_late_fee = run(Some(500.0));
+        let without = ratio(None);
+        let with = ratio(Some(500.0));
         assert!(
-            (with_late_fee - without_late_fee).abs() < 1e-12,
-            "a fee tier behind note interest is junior to the IC claim and must \
-             not reduce its numerator: without={without_late_fee}, \
-             with={with_late_fee}"
-        );
-    }
-
-    #[test]
-    fn coverage_economics_custom_principal_recipient_order_drives_ic_cure() {
-        let currency = Currency::USD;
-        let pool = AssetPool::new("POOL", DealType::Clo, currency);
-        let maturity = Date::from_calendar_date(2031, Month::January, 1).expect("date");
-        let class_a = Tranche::new(
-            "CLASS_A",
-            0.0,
-            50.0,
-            TrancheSeniority::Senior,
-            Money::from((100_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.04 },
-            maturity,
-        )
-        .expect("class A");
-        let class_b = Tranche::new(
-            "CLASS_B",
-            50.0,
-            100.0,
-            TrancheSeniority::Subordinated,
-            Money::from((100_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.16 },
-            maturity,
-        )
-        .expect("class B");
-        let tranches = TrancheStructure::new(vec![class_a, class_b]).expect("tranche structure");
-
-        // The custom principal tier intentionally pays B before A, opposite
-        // structural payment_priority. Its scheduled targets equal current
-        // balances, so the tier only pays when coverage diversion is active.
-        let waterfall = WaterfallBuilder::new(currency)
-            .add_tier(
-                WaterfallTier::new("interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A"))
-                    .add_recipient(Recipient::tranche_interest("b_interest", "CLASS_B")),
-            )
-            .add_tier(
-                WaterfallTier::new("custom_principal", 2, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .divertible(true)
-                    .add_recipient(Recipient::tranche_principal(
-                        "b_principal",
-                        "CLASS_B",
-                        Some(Money::from((100_000_i64, currency))),
-                    ))
-                    .add_recipient(Recipient::tranche_principal(
-                        "a_principal",
-                        "CLASS_A",
-                        Some(Money::from((100_000_i64, currency))),
-                    )),
-            )
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_B".into(),
-                oc_trigger: None,
-                ic_trigger: Some(1.0),
-            })
-            .build()
-            .expect("waterfall");
-        let market = MarketContext::new();
-        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("period start");
-        let payment_date = Date::from_calendar_date(2025, Month::April, 1).expect("payment date");
-
-        let result = execute_waterfall(
-            &waterfall,
-            &tranches,
-            &pool,
-            WaterfallContext {
-                available_cash: Money::from((104_500_i64, currency)),
-                interest_collections: Money::from((4_500_i64, currency)),
-                principal_collections: Money::from((100_000_i64, currency)),
-                payment_date,
-                period_start,
-                valuation_date: period_start,
-                pool_balance: Money::from((200_000_i64, currency)),
-                market: &market,
-                tranche_balances: None,
-                asset_balances: None,
-                deferred_interest: None,
-                reserve_balance: Money::from((0_i64, currency)),
-                restricted_cash: Money::from((0_i64, Currency::USD)),
-                recovery_proceeds: Money::from((0_i64, currency)),
-                floating_rate_shift: 0.0,
-            },
-        )
-        .expect("waterfall execution");
-
-        // Total quarterly interest is 5,000. Collections of 4,500 require a
-        // 500 reduction. Since B is the first actual principal recipient and
-        // has rate×tau = 16%×0.25 = 4%, the cure is 500/4% = 12,500.
-        assert!(
-            (result.diverted_cash.amount() - 12_500.0).abs() < 1e-6,
-            "custom B-then-A principal order must size the cure from B's rate: \
-             expected 12,500, got {}",
-            result.diverted_cash.amount()
-        );
-        let first_diverted = result
-            .payment_records
-            .iter()
-            .find(|record| record.diverted && record.paid_amount.amount() > 0.0)
-            .expect("diverted payment");
-        assert_eq!(first_diverted.recipient_id, "b_principal");
-    }
-
-    #[test]
-    fn coverage_economics_non_curative_principal_recipient_consumes_cure_cash() {
-        let currency = Currency::USD;
-        let pool = AssetPool::new("POOL", DealType::Clo, currency);
-        let maturity = Date::from_calendar_date(2031, Month::January, 1).expect("date");
-        // Attachment points match the 100k/5k balance split (95.2/4.8).
-        let class_a = Tranche::new(
-            "CLASS_A",
-            0.0,
-            95.2,
-            TrancheSeniority::Senior,
-            Money::from((100_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.04 },
-            maturity,
-        )
-        .expect("class A");
-        let class_b = Tranche::new(
-            "CLASS_B",
-            95.2,
-            100.0,
-            TrancheSeniority::Subordinated,
-            Money::from((5_000_i64, currency)),
-            TrancheCoupon::Fixed { rate: 0.16 },
-            maturity,
-        )
-        .expect("class B");
-        let tranches = TrancheStructure::new(vec![class_a, class_b]).expect("tranche structure");
-        let waterfall = WaterfallBuilder::new(currency)
-            .add_tier(
-                WaterfallTier::new("interest", 1, PaymentType::Interest)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .add_recipient(Recipient::tranche_interest("a_interest", "CLASS_A")),
-            )
-            .add_tier(
-                WaterfallTier::new("custom_principal", 2, PaymentType::Principal)
-                    .allocation_mode(AllocationMode::Sequential)
-                    .divertible(true)
-                    // B is junior to the tested A denominator. The waterfall
-                    // still pays B first, so its full balance consumes cure
-                    // cash without reducing A's IC interest denominator.
-                    .add_recipient(Recipient::tranche_principal(
-                        "b_principal",
-                        "CLASS_B",
-                        Some(Money::from((5_000_i64, currency))),
-                    ))
-                    .add_recipient(Recipient::tranche_principal(
-                        "a_principal",
-                        "CLASS_A",
-                        Some(Money::from((100_000_i64, currency))),
-                    )),
-            )
-            .add_coverage_trigger(CoverageTrigger {
-                tranche_id: "CLASS_A".into(),
-                oc_trigger: None,
-                ic_trigger: Some(1.0),
-            })
-            .build()
-            .expect("waterfall");
-        let market = MarketContext::new();
-        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("period start");
-        let payment_date = Date::from_calendar_date(2025, Month::April, 1).expect("payment date");
-
-        let result = execute_waterfall(
-            &waterfall,
-            &tranches,
-            &pool,
-            WaterfallContext {
-                available_cash: Money::from((20_900_i64, currency)),
-                interest_collections: Money::from((900_i64, currency)),
-                principal_collections: Money::from((20_000_i64, currency)),
-                payment_date,
-                period_start,
-                valuation_date: period_start,
-                pool_balance: Money::from((105_000_i64, currency)),
-                market: &market,
-                tranche_balances: None,
-                asset_balances: None,
-                deferred_interest: None,
-                reserve_balance: Money::from((0_i64, currency)),
-                restricted_cash: Money::from((0_i64, Currency::USD)),
-                recovery_proceeds: Money::from((0_i64, currency)),
-                floating_rate_shift: 0.0,
-            },
-        )
-        .expect("waterfall execution");
-
-        // A owes 1,000 quarterly interest; 900 collections require reducing
-        // A's interest by 100, which needs 10,000 of A principal at 4%×0.25.
-        // B consumes 5,000 first without curing A, so total diversion is 15,000.
-        assert!(
-            (result.diverted_cash.amount() - 15_000.0).abs() < 1e-6,
-            "cure must include 5,000 consumed by out-of-denominator B plus \
-             10,000 curative A paydown; got {}",
-            result.diverted_cash.amount()
-        );
-        let diverted: Vec<_> = result
-            .payment_records
-            .iter()
-            .filter(|record| record.diverted && record.paid_amount.amount() > 0.0)
-            .map(|record| (record.recipient_id.as_str(), record.paid_amount.amount()))
-            .collect();
-        assert_eq!(
-            diverted,
-            vec![("b_principal", 5_000.0), ("a_principal", 10_000.0)]
+            (with - without).abs() < 1e-12,
+            "a fee tier behind note interest must not reduce the IC numerator: \
+             without={without}, with={with}"
         );
     }
 }
@@ -2484,8 +2380,10 @@ mod water_fill_tests {
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, ccy)),
+                defaulted_collateral_value: Money::from((0_i64, ccy)),
                 recovery_proceeds: Money::from((0_i64, ccy)),
                 floating_rate_shift: 0.0,
+                equity_history: None,
             },
         )
         .expect("waterfall executes");

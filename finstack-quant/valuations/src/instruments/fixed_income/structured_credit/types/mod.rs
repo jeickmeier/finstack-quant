@@ -8,9 +8,16 @@
 //! - Behavioral model specifications
 //! - Result types for valuation
 
+pub(crate) mod borrowing_base;
+pub(crate) mod call;
+pub(crate) mod card;
+pub(crate) mod cmbs;
 pub(crate) mod collateral;
 pub(crate) mod constants;
+pub(crate) mod delinquency;
 pub(crate) mod enums;
+pub(crate) mod hedges;
+pub(crate) mod npl;
 pub(crate) mod pool;
 /// SoA layout for pool assets.
 pub(crate) mod pool_state;
@@ -26,8 +33,18 @@ mod resolved;
 mod stochastic;
 mod structured_credit_impl;
 
+pub use borrowing_base::{
+    AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,
+    EligibilityRule,
+};
+pub use call::{CallAssumption, CallScope};
+pub use card::CardPortfolioSpec;
+pub use cmbs::{BalloonSpec, PrepaymentPenalty, SpecialServicingSpec};
+pub use delinquency::{AdvancingPolicy, DelinquencyModel, ModificationSpec};
 pub use enums::TrancheSeniority;
-pub use enums::{AssetType, DealType, PaymentMode, TriggerConsequence};
+pub use enums::{AssetType, DealType, LossAllocationPolicy, PaymentMode, TriggerConsequence};
+pub use hedges::{HedgeSwap, SwapNotional, SwapPriority};
+pub use npl::LiquidationSpec;
 
 pub use collateral::{
     CallExercisePolicy, CollateralInstrument, InstrumentCollateral, InstrumentExerciseOverride,
@@ -36,7 +53,7 @@ pub use collateral::{
 pub use pool::AssetPool;
 pub use pool::{
     calculate_pool_stats, ConcentrationCheckResult, ConcentrationViolation, PoolAsset, PoolStats,
-    ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
 };
 pub(crate) use pool_state::PoolState;
 
@@ -44,14 +61,16 @@ pub use tranches::{
     CoverageTrigger, Tranche, TrancheBehaviorType, TrancheBuilder, TrancheCoupon, TrancheStructure,
 };
 
-pub use setup::{CoverageTestConfig, DealConfig, DealDates, DealFees, DefaultAssumptions};
+pub use setup::{DealFees, IncentiveFeeSpec};
 
 pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
-    AfcSpec, AllocationMode, ControlledAccumulationSpec, CoverageTestType, EarlyAmortizationSpec,
-    ExcessSpreadSpec, ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient,
-    RecipientType, RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec,
-    StepDownTrigger, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    AfcSpec, AllocationMode, CccBucketRule, ControlledAccumulationSpec, CoverageRules,
+    CoverageTestAction, CoverageTestSpec, CoverageTestType, DefaultedValuation,
+    DiscountObligationRule, EarlyAmortizationSpec, EquityHistory, ExcessSpreadSpec, FundingSource,
+    ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType,
+    RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
+    TemplateFees, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
     WaterfallTier, WaterfallWorkspace,
 };
 
@@ -64,7 +83,6 @@ use finstack_quant_models::credit::pool::{
 pub use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -116,8 +134,6 @@ pub struct Metadata {
 pub struct Overrides {
     /// Override prepayment with constant annual CPR.
     pub cpr_annual: Option<f64>,
-    /// Override prepayment with monthly ABS speed.
-    pub abs_speed: Option<f64>,
     /// Override prepayment with PSA multiplier.
     pub psa_speed_multiplier: Option<f64>,
     /// Override default with constant annual CDR.
@@ -128,7 +144,9 @@ pub struct Overrides {
     pub recovery_rate: Option<f64>,
     /// Override recovery lag (months).
     pub recovery_lag_months: Option<u32>,
-    /// Reinvestment price constraint (% of par).
+    /// Override the replacement-collateral purchase price during the
+    /// reinvestment period, as a percent of par (`97.5` = 97.5); takes
+    /// precedence over `ReinvestmentAssumptions::price_pct`.
     pub reinvestment_price: Option<f64>,
 }
 
@@ -163,6 +181,20 @@ pub struct CreditModelConfig {
     /// Optional correlation structure for stochastic modeling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correlation_structure: Option<CorrelationStructure>,
+
+    /// Optional roll-rate delinquency model with servicer advancing and loan
+    /// modification. Asset and rep-line pools only: the default model then
+    /// feeds the first delinquency bucket and only the roll out of the last
+    /// bucket charges off. See [`DelinquencyModel`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delinquency: Option<DelinquencyModel>,
+
+    /// Optional credit-card master-trust portfolio model. Asset and rep-line
+    /// pools only: the pool is the investor interest in the receivables, the
+    /// spec's payment rate, portfolio yield and charge-off rate replace the
+    /// prepayment, coupon and default assumptions. See [`CardPortfolioSpec`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<CardPortfolioSpec>,
 }
 
 /// Unified structured credit instrument representation.
@@ -288,9 +320,11 @@ pub struct StructuredCredit {
     #[serde(default)]
     pub behavior_overrides: Overrides,
 
-    /// Interest rate swaps used to hedge basis or interest rate risk.
+    /// Interest rate swaps settled through the waterfall: net receipts join
+    /// interest proceeds, net payments rank as senior or junior fees. See
+    /// [`HedgeSwap`].
     #[serde(default)]
-    pub hedge_swaps: Vec<InterestRateSwap>,
+    pub hedge_swaps: Vec<HedgeSwap>,
 
     /// Senior transaction fees paid ahead of every note.
     ///
@@ -300,34 +334,37 @@ pub struct StructuredCredit {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fees: Option<DealFees>,
 
-    /// Overcollateralization / interest-coverage triggers evaluated each period.
+    /// Overcollateralization / interest-coverage tests evaluated each period.
     ///
-    /// Each entry names a tranche and the OC and/or IC level that must be
-    /// maintained for it. When a test fails, the cure amount is diverted from
-    /// the divertible tiers to redeem senior notes. CLO/CBO templates may
-    /// trap junior coupon; ABS/RMBS/CMBS turbo residual only. Empty (the
-    /// default) means no coverage tests run.
+    /// Each test names the tested class, its kind and level, and what a
+    /// failure does with the diverted interest. The synthesized template
+    /// places each test as a [`PaymentType::CoverageTest`] tier right after
+    /// the interest tier of its [`CoverageTestSpec::placement_tranche`]
+    /// (CLO/CBO: per-class interest tiers; ABS/RMBS/CMBS: after the single
+    /// interest tier, so only residual cash turbos). A custom
+    /// [`Self::waterfall`] receives them the same way. Only cash ranked below
+    /// the test position can be diverted. Empty (the default) means no
+    /// coverage tests run.
     ///
     /// # Examples
     ///
     /// ```
-    /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+    /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
     ///
-    /// // Class A must maintain 120% OC and 115% IC.
-    /// let trigger = CoverageTrigger {
-    ///     tranche_id: "CLASS_A".to_string(),
-    ///     oc_trigger: Some(1.20),
-    ///     ic_trigger: Some(1.15),
-    /// };
-    /// assert_eq!(trigger.oc_trigger, Some(1.20));
+    /// // Class B must maintain 120% OC (tested on A + B) and 115% IC.
+    /// let tests = vec![
+    ///     CoverageTestSpec::oc("CLASS_B", 1.20),
+    ///     CoverageTestSpec::ic("CLASS_B", 1.15),
+    /// ];
+    /// assert_eq!(tests[0].id, "OC_CLASS_B");
     /// ```
     ///
-    /// Use the fully-qualified waterfall type here: the public re-export
-    /// `structured_credit::CoverageTrigger` is a different per-tranche
-    /// breach-state record that shares the name.
+    /// Distinct from the per-tranche [`Tranche::oc_trigger`] /
+    /// [`Tranche::ic_trigger`] (`structured_credit::CoverageTrigger`), which
+    /// carry breach/cure memory and non-diversion consequences.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub coverage_triggers: Vec<waterfall::CoverageTrigger>,
+    pub coverage_triggers: Vec<CoverageTestSpec>,
 
     /// Clean-up call pool factor threshold (percentage of original balance).
     ///
@@ -339,6 +376,58 @@ pub struct StructuredCredit {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cleanup_call_pct: Option<f64>,
+
+    /// Assumed optional redemption for price-to-call analytics. A deal-scope
+    /// call liquidates the collateral at [`Self::liquidation_price_pct`] on
+    /// the first payment date at or after the call date and redeems every
+    /// note at the call price, ending the projection; a tranche-scope call
+    /// leaves the deal's cashflows unchanged and only truncates that class's
+    /// `*_to_call` metrics. `TrancheMetrics` always reports the to-maturity
+    /// figures (projected without the call) next to the twins.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call_assumption: Option<CallAssumption>,
+
+    /// Price at which the collateral is realized when the deal is called or
+    /// cleaned up, as a percent of par (`None` = par). The clean-up call is
+    /// only exercised when the liquidation proceeds, pending recoveries and
+    /// every cash account together cover the notes' claims.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liquidation_price_pct: Option<f64>,
+
+    /// How collateral losses reach the note balances.
+    ///
+    /// `None` (the default) selects the market convention for the deal type
+    /// via [`LossAllocationPolicy::default_for`]: realized-loss write-downs
+    /// for RMBS and CMBS, par-preserving balances for CLO/CBO/ABS/cards. Set
+    /// explicitly to override; see [`Self::effective_loss_allocation`].
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_allocation: Option<LossAllocationPolicy>,
+
+    /// Whether the template waterfall pays senior fees and senior note
+    /// interest shortfalls from principal proceeds before any note is
+    /// redeemed (the CLO principal-waterfall convention).
+    ///
+    /// `None` (the default) follows the deal type: `true` for CLO/CBO,
+    /// `false` otherwise. Ignored by a custom [`Self::waterfall`], whose tiers
+    /// carry their own [`FundingSource`]; see
+    /// [`Waterfall::fund_senior_interest_from_principal`] and
+    /// [`Self::effective_principal_covers_senior_interest`].
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal_covers_senior_interest: Option<bool>,
+
+    /// Collateral valuation rules for the OC tests: rating haircuts, the
+    /// value carried for defaulted collateral, the excess-CCC bucket and
+    /// discount obligations. `None` values performing collateral at par with
+    /// defaulted collateral at its modeled recovery. Attached to the template
+    /// waterfall by [`Self::create_waterfall`], and to a custom
+    /// [`Self::waterfall`] that carries no rules of its own.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage_rules: Option<CoverageRules>,
 
     /// Declarative waterfall rules (available-funds caps, etc.) layered onto the
     /// base waterfall by `resolve_waterfall`. `None` reproduces the base

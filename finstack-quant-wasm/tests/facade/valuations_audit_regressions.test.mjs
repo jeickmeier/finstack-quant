@@ -656,8 +656,6 @@ for (const [endDate, periodDays] of [
         seniority: 'equity',
         coupon: { fixed: { rate: 0 } },
         maturity: endDate,
-        is_revolving: true,
-        can_reinvest: true,
       });
       spec.pool.reinvestment_period = {
         end_date: endDate,

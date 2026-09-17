@@ -60,9 +60,6 @@ def test_structured_credit_inactive_reinvestment_matches_no_reinvestment() -> No
     spec = fixture["instrument"]["instrument"]["spec"]
     spec["prepayment_spec"] = {"cpr": 0.36, "curve": None}
     spec["default_spec"] = {"cdr": 0.0, "curve": None}
-    for tranche in spec["tranches"]["tranches"]:
-        tranche["is_revolving"] = True
-        tranche["can_reinvest"] = True
 
     def value() -> float:
         return price_instrument(
@@ -96,9 +93,7 @@ def test_structured_credit_ineligible_reinvestment_conserves_cash(
     spec["prepayment_spec"] = {"cpr": 0.36, "curve": None}
     spec["default_spec"] = {"cdr": 0.0, "curve": None}
     tranche = spec["tranches"]["tranches"][0]
-    tranche.update(
-        seniority="equity", coupon={"fixed": {"rate": 0.0}}, maturity=end_date, is_revolving=True, can_reinvest=True
-    )
+    tranche.update(seniority="equity", coupon={"fixed": {"rate": 0.0}}, maturity=end_date)
     spec["pool"]["reinvestment_period"] = {
         "end_date": end_date,
         "is_active": True,

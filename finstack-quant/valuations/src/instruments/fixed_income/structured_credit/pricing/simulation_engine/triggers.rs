@@ -1,12 +1,25 @@
 //! Tranche coverage state and executable period consequences.
+//!
+//! Two kinds of coverage test coexist:
+//!
+//! * the waterfall's own [`CoverageTestSpec`] tiers, stateless positions
+//!   evaluated by the executor every period; and
+//! * per-tranche [`CoverageTrigger`]s (`Tranche::oc_trigger` /
+//!   `Tranche::ic_trigger`), which carry breach/cure memory and a
+//!   [`TriggerConsequence`]. A `DivertCashFlow` consequence is realized by
+//!   inserting a coverage-test tier after the tranche's interest tier for the
+//!   period, so it diverts positionally like every other test.
+//!
+//! Both feed the CLO reinvestment rule: while any coverage test fails,
+//! principal proceeds are not reinvested but repay the notes.
 
 use super::*;
 use crate::instruments::fixed_income::structured_credit::pricing::waterfall::{
-    evaluate_coverage_tests, senior_fee_accrual, SeniorFeeInputs,
+    evaluate_coverage_tests, senior_fee_accrual, special_serviced_balance, SeniorFeeInputs,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    waterfall::CoverageTrigger as WaterfallTrigger, CoverageTrigger, PaymentCalculation,
-    PaymentType, TriggerConsequence,
+    CoverageTestAction, CoverageTestSpec, CoverageTrigger, PaymentCalculation, PaymentType,
+    TriggerConsequence,
 };
 
 pub(super) struct TrancheTriggerState {
@@ -38,15 +51,21 @@ pub(super) fn initial_states(tranches: &TrancheStructure) -> Vec<TrancheTriggerS
 
 #[derive(Default)]
 pub(super) struct TriggerActions {
+    /// Suspend collateral purchases this period (a `StopReinvestment` or
+    /// `AccelerateAmortization` consequence, or any failing coverage test).
     pub(super) stop_reinvestment: bool,
     pub(super) accelerate: bool,
     trap: bool,
-    diversions: Vec<WaterfallTrigger>,
+    /// Coverage tests to place after their tranche's interest tier for this
+    /// period (breached `DivertCashFlow` triggers).
+    diversions: Vec<CoverageTestSpec>,
 }
 
 impl TriggerActions {
     pub(super) fn apply(&self, waterfall: &mut Waterfall) {
-        waterfall.coverage_triggers.extend(self.diversions.clone());
+        for test in &self.diversions {
+            waterfall.insert_coverage_test(test.clone());
+        }
         if self.accelerate {
             let mut principal = waterfall
                 .tiers
@@ -79,7 +98,6 @@ impl TriggerActions {
                 }
                 if tier.payment_type == PaymentType::Residual {
                     tier.recipients.clone_from(&principal);
-                    tier.divertible = false;
                 }
             }
         } else if self.trap {
@@ -92,20 +110,38 @@ impl TriggerActions {
     }
 }
 
+/// Period cash the coverage tests are evaluated against.
+#[derive(Clone, Copy)]
+pub(super) struct TriggerCashInputs {
+    /// Interest proceeds available this period (pool interest plus carry).
+    pub(super) interest: Money,
+    /// Principal proceeds available this period (collections, released
+    /// recoveries and carry).
+    pub(super) principal: Money,
+    /// Recovery value of defaulted collateral not yet received as cash,
+    /// counted in the OC numerator.
+    pub(super) defaulted_collateral_value: Money,
+}
+
+/// Advance the per-tranche breach/cure states and evaluate the waterfall's
+/// own coverage tests for this period's reinvestment rule.
 pub(super) fn advance(
     state: &mut SimulationState,
     waterfall: &Waterfall,
     period: SimulationPeriod,
     period_start: Date,
-    interest: Money,
-    principal: Money,
+    cash: TriggerCashInputs,
     market: &MarketContext,
 ) -> Result<TriggerActions> {
-    if state.tranche_triggers.is_empty() {
-        return Ok(TriggerActions::default());
-    }
-    let mut tests = waterfall.clone();
-    tests.coverage_triggers.clear();
+    let TriggerCashInputs {
+        interest,
+        principal,
+        defaulted_collateral_value,
+    } = cash;
+
+    // Tranche-level triggers, at their trigger or cure level depending on
+    // the saved breach state.
+    let mut specs: Vec<CoverageTestSpec> = Vec::with_capacity(state.tranche_triggers.len());
     for saved in &state.tranche_triggers {
         let trigger = &saved.trigger;
         if !trigger.trigger_level.is_finite()
@@ -127,12 +163,19 @@ pub(super) fn advance(
         } else {
             trigger.trigger_level
         };
-        tests.coverage_triggers.push(WaterfallTrigger {
-            tranche_id: saved.tranche_id.clone(),
-            oc_trigger: saved.oc.then_some(level),
-            ic_trigger: (!saved.oc).then_some(level),
-        });
+        let mut spec = if saved.oc {
+            CoverageTestSpec::oc(saved.tranche_id.clone(), level)
+        } else {
+            CoverageTestSpec::ic(saved.tranche_id.clone(), level)
+        };
+        spec.id = format!("{}_trigger", spec.id);
+        specs.push(spec);
     }
+    let waterfall_specs: Vec<CoverageTestSpec> = waterfall.coverage_tests().cloned().collect();
+    if specs.is_empty() && waterfall_specs.is_empty() {
+        return Ok(TriggerActions::default());
+    }
+
     let tranche_index = state
         .tranches
         .tranches
@@ -141,8 +184,13 @@ pub(super) fn advance(
         .map(|(i, tranche)| (tranche.id.as_str(), i))
         .collect();
     let pool_balance = Money::new(state.pool_state.balances.iter().sum(), state.base_currency)?;
+    let special_serviced_balance = special_serviced_balance(
+        &state.pool,
+        Some(&state.pool_state.balances),
+        state.base_currency,
+    )?;
     let fees = senior_fee_accrual(
-        &tests,
+        waterfall,
         state.tranches,
         &tranche_index,
         SeniorFeeInputs {
@@ -150,6 +198,7 @@ pub(super) fn advance(
             tranche_balances: Some(&state.tranche_balances),
             deferred_interest: Some(&state.deferred_interest),
             pool_balance,
+            special_serviced_balance,
             period_start,
             payment_date: period.payment,
             valuation_date: period.valuation,
@@ -170,10 +219,12 @@ pub(super) fn advance(
             _ => None,
         })
         .collect();
+    let all_specs: Vec<&CoverageTestSpec> = specs.iter().chain(waterfall_specs.iter()).collect();
     let results = evaluate_coverage_tests(
-        &tests,
+        waterfall,
+        &all_specs,
         state.tranches,
-        state.pool,
+        &state.pool,
         period.payment,
         period_start,
         period.valuation,
@@ -186,29 +237,25 @@ pub(super) fn advance(
         &payable,
         fees,
         state.principal_funding_account,
+        defaulted_collateral_value,
         state.floating_rate_shift,
         Some(&state.deferred_interest),
     )?;
+
     let mut actions = TriggerActions::default();
-    for (saved, test) in state
-        .tranche_triggers
-        .iter_mut()
-        .zip(&tests.coverage_triggers)
-    {
-        let id = format!(
-            "{}_{}",
-            if saved.oc { "OC" } else { "IC" },
-            saved.tranche_id
-        );
+    for (saved, spec) in state.tranche_triggers.iter_mut().zip(specs.iter()) {
         let result = results
             .iter()
-            .find(|result| result.test_id == id)
+            .find(|result| result.test_id == spec.id)
             .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!("missing trigger result {id}"))
+                finstack_quant_core::Error::Validation(format!(
+                    "missing trigger result {}",
+                    spec.id
+                ))
             })?;
         if saved.trigger.update(result.current_ratio, period.payment) {
             match saved.trigger.consequence {
-                TriggerConsequence::DivertCashFlow => actions.diversions.push(test.clone()),
+                TriggerConsequence::DivertCashFlow => actions.diversions.push(spec.clone()),
                 TriggerConsequence::TrapExcessSpread => actions.trap = true,
                 TriggerConsequence::AccelerateAmortization => {
                     actions.accelerate = true;
@@ -217,6 +264,19 @@ pub(super) fn advance(
                 TriggerConsequence::StopReinvestment => actions.stop_reinvestment = true,
             }
         }
+    }
+    // CLO reinvestment requires the coverage tests to pass: while a test whose
+    // cure pays down the notes fails, principal proceeds repay the notes
+    // instead of buying collateral. A failing `Reinvest` test keeps the window
+    // open: its cure is recycled to rebuild par.
+    if results.iter().any(|result| {
+        !result.is_passing
+            && all_specs
+                .iter()
+                .find(|spec| spec.id == result.test_id)
+                .is_none_or(|spec| spec.action == CoverageTestAction::PayDownSenior)
+    }) {
+        actions.stop_reinvestment = true;
     }
     Ok(actions)
 }

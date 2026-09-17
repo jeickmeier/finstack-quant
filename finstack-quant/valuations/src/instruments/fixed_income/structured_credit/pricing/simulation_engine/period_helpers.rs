@@ -101,6 +101,8 @@ pub(super) fn current_collateral_wac(
         } else {
             state.pool_state.rates[i]
         };
+        let all_in_rate =
+            state.pool_state.rate_floors[i].map_or(all_in_rate, |floor| all_in_rate.max(floor));
         weighted += all_in_rate * b;
         balance += b;
     }

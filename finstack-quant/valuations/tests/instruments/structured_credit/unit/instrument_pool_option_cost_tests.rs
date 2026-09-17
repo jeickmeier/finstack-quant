@@ -9,7 +9,8 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, RevolvingCreditPricer,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    InstrumentCollateral, PricingMode, StochasticPricingResult, StructuredCredit, TrancheCoupon,
+    run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral, PricingMode,
+    StochasticPricingResult, StructuredCredit, TrancheCoupon,
 };
 use time::macros::date;
 
@@ -209,5 +210,111 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
         "pool {pool_mean} (se {pool_se}) vs standalone {standalone_mean} (se {}) differ by more \
          than {tolerance}",
         standalone.stderr
+    );
+}
+
+/// Instrument-pool twin of the positional coverage test: an OC position
+/// after A's coupon traps the residual and pays it to A's principal only.
+/// The draw option cost allocation runs the same waterfall, so the tranche
+/// shares still sum to the deal cost.
+#[test]
+fn senior_coverage_position_diverts_to_the_senior_note_only() {
+    let build = |tests: Vec<CoverageTestSpec>| {
+        let mut deal = pool_of(
+            vec![Bond::example().expect("fixed bond")],
+            CreditSpreadProcessSpec::MarketAnchored {
+                credit_curve_id: HAZARD_ID.into(),
+                kappa: 0.5,
+                implied_vol: 0.4,
+                tenor_years: None,
+            },
+            0.25,
+        )
+        .with_coverage_triggers(tests)
+        .expect("coverage tests");
+        // A 1% senior coupon leaves excess spread every period, so there is
+        // a residual for the failing position to trap.
+        for tranche in deal.tranches.tranches.iter_mut() {
+            if tranche.id.as_str() == "A" {
+                tranche.coupon = TrancheCoupon::Fixed { rate: 0.01 };
+            }
+        }
+        deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
+        deal
+    };
+    // A 5.0x OC level the collateral can never reach: the position fails on
+    // every payment date and diverts everything below A's coupon.
+    let breached = build(vec![CoverageTestSpec::oc("A", 5.0)]);
+    let control = build(Vec::new());
+    let market = market().insert(widening_hazard_curve());
+
+    let run = run_simulation_with_diagnostics(&breached, &market, CLOSING)
+        .expect("simulation")
+        .tranches;
+    let base = run_simulation_with_diagnostics(&control, &market, CLOSING)
+        .expect("simulation")
+        .tranches;
+    let on = |flows: &[(Date, finstack_quant_core::money::Money)], date: Date| -> f64 {
+        flows
+            .iter()
+            .filter(|(flow_date, _)| *flow_date == date)
+            .map(|(_, amount)| amount.amount())
+            .sum()
+    };
+    assert!(
+        run["A"].deferred_flows.is_empty(),
+        "A's coupon ranks above the test and is never deferred"
+    );
+    // Before legal final A is outstanding, so the trapped residual can only
+    // pay A: on every date the control deal paid equity, the breached deal
+    // pays at least that residual to A's principal on top of the scheduled
+    // paydown, and exactly it on the first date, before the earlier cures
+    // have lowered A's coupon and enlarged the residual.
+    let residual_dates: Vec<Date> = base["EQ"]
+        .interest_flows
+        .iter()
+        .filter(|(date, amount)| *date < MATURITY && amount.amount() > 0.0)
+        .map(|(date, _)| *date)
+        .collect();
+    assert!(
+        residual_dates.len() >= 4,
+        "the control deal pays equity a residual most periods, got {residual_dates:?}"
+    );
+    for (i, date) in residual_dates.iter().enumerate() {
+        let residual = on(&base["EQ"].interest_flows, *date);
+        let extra_paydown =
+            on(&run["A"].principal_flows, *date) - on(&base["A"].principal_flows, *date);
+        assert!(
+            extra_paydown >= residual - 1.0,
+            "on {date} A's extra paydown {extra_paydown} must cover the trapped residual {residual}"
+        );
+        assert!(
+            i > 0 || (extra_paydown - residual).abs() < 1.0,
+            "on the first breach {date} A's extra paydown {extra_paydown} is exactly the \
+             residual {residual}"
+        );
+        assert!(
+            on(&run["EQ"].interest_flows, *date) < 1.0
+                && on(&run["EQ"].principal_flows, *date) < 1.0,
+            "equity receives nothing on {date} while the position fails"
+        );
+    }
+
+    let result = breached
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(100))
+        .expect("pricing");
+    let deal_cost = result.draw_option_cost.amount();
+    assert!(deal_cost < 0.0, "deal cost {deal_cost}");
+    let senior_share = tranche_cost(&result, "A");
+    let equity_share = tranche_cost(&result, "EQ");
+    assert!(
+        (senior_share + equity_share - deal_cost).abs() <= 1e-6 * deal_cost.abs(),
+        "senior {senior_share} + equity {equity_share} vs deal {deal_cost}"
+    );
+    // The cure only accelerates A's principal; the fair-versus-actual draw
+    // interest still lands on the residual holder at legal final.
+    assert!(
+        equity_share.abs() > senior_share.abs(),
+        "equity {equity_share} still bears more of the cost than senior {senior_share}"
     );
 }

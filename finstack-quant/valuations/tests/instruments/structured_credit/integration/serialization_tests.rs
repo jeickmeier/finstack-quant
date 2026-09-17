@@ -11,10 +11,10 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageTrigger, DealType, DefaultModelSpec, Overrides, PoolAsset,
+    AssetPool, CoverageTrigger, DealType, DefaultModelSpec, HedgeSwap, Overrides, PoolAsset,
     PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    TriggerConsequence,
+    StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCoupon, TrancheSeniority,
+    TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Attributes;
@@ -268,6 +268,8 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     pool.reinvestment_period = Some(ReinvestmentPeriod {
         end_date: reinvestment_end,
         is_active: true,
+        amortizing_tranches: Vec::new(),
+        assumptions: None,
         criteria: ReinvestmentCriteria {
             max_price: 102.5,
             min_yield: 0.04,
@@ -307,8 +309,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     .with_ic_trigger(CoverageTrigger::new(
         1.05,
         TriggerConsequence::DivertCashFlow,
-    ))
-    .revolving();
+    ));
     equity.rating = Some(CreditRating::BB);
     equity.attributes = Attributes::new()
         .with_tag("equity")
@@ -343,8 +344,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         legal,
     )
     .unwrap();
-    senior.target_balance =
-        Some(Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"));
     senior.rating = Some(CreditRating::AAA);
     senior.attributes = Attributes::new().with_tag("senior");
 
@@ -385,7 +384,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
 
     deal.behavior_overrides = Overrides {
         cpr_annual: Some(0.18),
-        abs_speed: Some(0.012),
         psa_speed_multiplier: Some(1.3),
         cdr_annual: Some(0.025),
         sda_speed_multiplier: Some(1.1),
@@ -413,7 +411,8 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         PayReceive::Pay,
     )
     .expect("valid swap");
-    deal.hedge_swaps.push(swap);
+    deal.hedge_swaps
+        .push(HedgeSwap::new(swap).on_tranche_par("SENIOR"));
 
     deal
 }
@@ -474,7 +473,6 @@ fn test_structured_credit_full_feature_json_roundtrip() {
 
     let orig_senior = &original.tranches.tranches[1];
     let parsed_senior = &parsed.tranches.tranches[1];
-    assert_eq!(orig_senior.target_balance, parsed_senior.target_balance);
     assert_eq!(orig_senior.rating, parsed_senior.rating);
 
     // Behavioral specs and overrides
@@ -525,7 +523,15 @@ fn test_structured_credit_full_feature_json_roundtrip() {
 
     // Hedge swap coverage
     assert_eq!(original.hedge_swaps.len(), parsed.hedge_swaps.len());
-    assert_eq!(original.hedge_swaps[0].id, parsed.hedge_swaps[0].id);
+    assert_eq!(
+        original.hedge_swaps[0].swap.id,
+        parsed.hedge_swaps[0].swap.id
+    );
+    assert_eq!(
+        parsed.hedge_swaps[0].notional,
+        SwapNotional::TranchePar("SENIOR".into())
+    );
+    assert_eq!(parsed.hedge_swaps[0].priority, SwapPriority::SeniorFee);
 }
 
 #[test]

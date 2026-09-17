@@ -76,6 +76,13 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
     }
     pool
@@ -1264,6 +1271,13 @@ mod shifting_interest_tests {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
         let tranches = TrancheStructure::new(vec![
             Tranche::new(
@@ -1502,6 +1516,8 @@ mod early_amortization_tests {
         pool.reinvestment_period = Some(ReinvestmentPeriod {
             end_date: revolving_end(),
             is_active: true,
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
             criteria: ReinvestmentCriteria::default(),
         });
         let tranches = TrancheStructure::new(vec![
@@ -1530,10 +1546,6 @@ mod early_amortization_tests {
         let mut sc =
             StructuredCredit::new_abs("ABS-EA", pool, tranches, closing(), maturity(), "USD-OIS")
                 .with_payment_calendar("nyse");
-        for tranche in &mut sc.tranches.tranches {
-            tranche.is_revolving = true;
-            tranche.can_reinvest = true;
-        }
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1545,6 +1557,7 @@ mod early_amortization_tests {
                 shifting_interest: None,
                 early_amortization: Some(EarlyAmortizationSpec {
                     max_cumulative_loss_pct: threshold,
+                    min_excess_spread_3m: None,
                 }),
                 controlled_accumulation: None,
             });
@@ -1728,7 +1741,7 @@ mod controlled_accumulation_tests {
     /// senior down.
     #[test]
     fn accumulated_principal_counts_toward_the_oc_test() {
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 
         let mut accum = deal(Some(ControlledAccumulationSpec {
             start_date: closing(),
@@ -1736,11 +1749,10 @@ mod controlled_accumulation_tests {
         }));
         // The deal is heavily over-collateralized, so any OC breach during
         // accumulation is spurious.
-        accum.coverage_triggers = vec![CoverageTrigger {
-            tranche_id: accum.tranches.tranches[0].id.as_str().to_string(),
-            oc_trigger: Some(1.02),
-            ic_trigger: None,
-        }];
+        accum.coverage_triggers = vec![CoverageTestSpec::oc(
+            accum.tranches.tranches[0].id.as_str(),
+            1.02,
+        )];
 
         let senior_paid = senior_principal_between(&accum, closing(), bullet());
         assert!(
@@ -1779,6 +1791,7 @@ mod controlled_accumulation_tests {
             if let Some(rules) = sc.waterfall_rules.as_mut() {
                 rules.early_amortization = Some(EarlyAmortizationSpec {
                     max_cumulative_loss_pct: max_loss,
+                    min_excess_spread_3m: None,
                 });
             }
             sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);

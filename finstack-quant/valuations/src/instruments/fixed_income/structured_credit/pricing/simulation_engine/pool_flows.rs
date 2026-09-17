@@ -83,6 +83,10 @@ pub(super) struct RatedPoolFlowRequest<'a, 's> {
     /// `Some` when the scenario default model is a copula (per-name or LHP);
     /// `None` for the legacy pool-wide MDR / deterministic path.
     pub(super) copula_outcome: Option<PeriodDefaultOutcome<'a>>,
+    /// Roll-rate delinquency model, when the deal carries one.
+    pub(super) delinquency: Option<&'a DelinquencyModel>,
+    /// Card master-trust portfolio model, when the deal carries one.
+    pub(super) card: Option<&'a CardPortfolioSpec>,
 }
 
 pub(super) fn calculate_pool_flows_with_rates(
@@ -167,6 +171,39 @@ pub(super) fn calculate_pool_flows_with_rates(
             continue;
         }
 
+        // ── NPL/RPL resolution ────────────────────────────────────────
+        // A non-performing loan pays nothing until its resolution date.
+        // There the liquidated share is booked as a default whose recovery
+        // is the net proceeds (released through the recovery lag queue like
+        // any other), and the re-performing share becomes a performing loan
+        // at the modified coupon from the next period on, its level payment
+        // recast on the re-performing balance.
+        if let Some(spec) = state.pool_state.liquidation[i] {
+            let months = i32::try_from(spec.months_to_resolution).unwrap_or(i32::MAX);
+            if request.pay_date < state.closing_date.add_months(months) {
+                continue;
+            }
+            state.pool_state.liquidation[i] = None;
+            let liquidated = balance * (1.0 - spec.reperformance_prob.clamp(0.0, 1.0));
+            let proceeds = liquidated * spec.net_proceeds_fraction();
+            total_default = total_default.checked_add(Money::new(liquidated, base_currency)?)?;
+            total_recovery = total_recovery.checked_add(Money::new(proceeds, base_currency)?)?;
+            let reperforming = balance - liquidated;
+            if reperforming <= balance * 1e-10 {
+                state.pool_state.is_defaulted[i] = true;
+                state.pool_state.balances[i] = 0.0;
+                continue;
+            }
+            state.pool_state.balances[i] = reperforming;
+            state.pool_state.level_payments[i] = None;
+            if let Some(rate) = spec.modified_rate {
+                state.pool_state.rates[i] = rate;
+                state.pool_state.spread_bp[i] = None;
+                state.pool_state.curve_indices[i] = None;
+            }
+            continue;
+        }
+
         // Skip already-defaulted assets: prevents pre-existing defaulted assets
         // (e.g. assets that entered the pool in workout) from accruing interest,
         // defaulting again, or prepaying. Also guards against assets marked as
@@ -214,6 +251,15 @@ pub(super) fn calculate_pool_flows_with_rates(
         } else {
             global_period_mdr
         };
+        // Card receivables charge off at the portfolio's annual rate; an
+        // explicit per-asset MDR override still wins.
+        let period_mdr = match (request.card, state.pool_state.mdr_overrides[i]) {
+            (Some(card), None) => {
+                1.0 - (1.0 - card.charge_off_rate.clamp(0.0, 1.0))
+                    .powf(request.months_per_period / 12.0)
+            }
+            _ => period_mdr,
+        };
 
         // 1. Interest -- computed first so matured assets still pay their final coupon
         let rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
@@ -228,6 +274,9 @@ pub(super) fn calculate_pool_flows_with_rates(
         } else {
             state.pool_state.rates[i]
         };
+        let rate = state.pool_state.rate_floors[i].map_or(rate, |floor| rate.max(floor));
+        // Card receivables earn the portfolio yield, not a contractual coupon.
+        let rate = request.card.map_or(rate, |card| card.portfolio_yield);
 
         // Mid-period maturities accrue interest only through maturity.
         let interest_end = state.pool_state.maturities[i].min(request.pay_date);
@@ -246,9 +295,48 @@ pub(super) fn calculate_pool_flows_with_rates(
         // accrues the full period. Net interest is therefore scaled by
         // `(1 − 0.5·period_mdr)` rather than accruing the full pre-default
         // balance for the whole period.
-        let default_accrual_haircut = 1.0 - 0.5 * period_mdr.clamp(0.0, 1.0);
+        // Delinquency buckets: with a model, the default rate is the entry
+        // into 30 days delinquent, balances roll or cure month by month, and
+        // only the roll out of the last bucket is a charge-off. Delinquent
+        // balances stay in the asset's par but pay no interest or scheduled
+        // principal until they cure.
+        let mut delinquent_bop = 0.0_f64;
+        let mut performing_bop = balance;
+        let delinquency = request.delinquency.map(|model| {
+            let buckets = &mut state.pool_state.delinquent[i];
+            if buckets.len() != model.buckets() {
+                buckets.resize(model.buckets(), 0.0);
+            }
+            delinquent_bop = super::delinquency::delinquent_balance(buckets);
+            performing_bop = (balance - delinquent_bop).max(0.0);
+            let mut performing = performing_bop;
+            let months = request.months_per_period.round().max(1.0) as u32;
+            let monthly_entry =
+                1.0 - (1.0 - period_mdr.clamp(0.0, 1.0)).powf(1.0 / f64::from(months));
+            let outcome = super::delinquency::roll_period(
+                buckets,
+                &mut performing,
+                monthly_entry,
+                months,
+                model,
+            );
+            (outcome, performing)
+        });
+        // Share of the performing balance that stopped paying this period:
+        // the default rate without a model, the bucket entry with one.
+        let attrition_frac = match &delinquency {
+            Some((outcome, _)) if performing_bop > 0.0 => {
+                (outcome.entered / performing_bop).clamp(0.0, 1.0)
+            }
+            Some(_) => 0.0,
+            None => period_mdr,
+        };
+        let default_accrual_haircut = 1.0 - 0.5 * attrition_frac.clamp(0.0, 1.0);
+        // Appraisal reduction (ASER): interest is advanced only on the
+        // appraised share of a specially serviced loan.
+        let appraisal_haircut = 1.0 - state.pool_state.appraisal_reduction[i].clamp(0.0, 1.0);
         let interest = Money::new(
-            balance * rate * accrual_factor * default_accrual_haircut,
+            performing_bop * rate * accrual_factor * default_accrual_haircut * appraisal_haircut,
             base_currency,
         )?;
         total_interest = total_interest.checked_add(interest)?;
@@ -263,8 +351,17 @@ pub(super) fn calculate_pool_flows_with_rates(
         // reconciles with the mid-period interest-accrual haircut above,
         // which already assumes the defaulting fraction comes out of the
         // pre-scheduled (BOP) balance.
-        let default_amt = balance * period_mdr;
+        let default_amt = match &delinquency {
+            Some((outcome, _)) => outcome.charged_off,
+            None => balance * period_mdr,
+        };
         let balance_after_default = balance - default_amt;
+        // Performing balance after this period's entries, cures and
+        // modifications; the whole survivor without a delinquency model.
+        let performing_after = match &delinquency {
+            Some((_, performing)) => performing.clamp(0.0, balance_after_default),
+            None => balance_after_default,
+        };
 
         // Per-name defaults recover at their own idiosyncratically-dispersed
         // rate; the LHP and legacy paths use the period systematic recovery.
@@ -274,6 +371,15 @@ pub(super) fn calculate_pool_flows_with_rates(
                 None => request.rates.recovery_rate,
             });
         let recovery_amt = default_amt * asset_recovery_rate;
+        // Servicer advances are reimbursed from recovery proceeds before the
+        // cash reaches the waterfall.
+        let recovery_amt = if delinquency.is_some() && state.servicer_advances_outstanding > 0.0 {
+            let reimbursed = recovery_amt.min(state.servicer_advances_outstanding);
+            state.servicer_advances_outstanding -= reimbursed;
+            recovery_amt - reimbursed
+        } else {
+            recovery_amt
+        };
         total_default = total_default.checked_add(Money::new(default_amt, base_currency)?)?;
         total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_currency)?)?;
 
@@ -292,9 +398,40 @@ pub(super) fn calculate_pool_flows_with_rates(
         // Interest was already computed above (capped at maturity date, with
         // the default haircut applied).
         if request.pay_date >= state.pool_state.maturities[i] {
-            let balloon = Money::new(balance_after_default, base_currency)?;
+            // Balances still delinquent at maturity never pay: charge them off
+            // (with recovery) and pay the performing balance as the balloon.
+            let matured_delinquent = if delinquency.is_some() {
+                let buckets = &mut state.pool_state.delinquent[i];
+                let amount = super::delinquency::delinquent_balance(buckets);
+                buckets.iter_mut().for_each(|bucket| *bucket = 0.0);
+                amount.min(balance_after_default)
+            } else {
+                0.0
+            };
+            if matured_delinquent > 0.0 {
+                let matured_recovery = matured_delinquent * asset_recovery_rate;
+                total_default =
+                    total_default.checked_add(Money::new(matured_delinquent, base_currency)?)?;
+                total_recovery =
+                    total_recovery.checked_add(Money::new(matured_recovery, base_currency)?)?;
+            }
+            // Balloon: the share that cannot refinance is extended instead of
+            // paid, at the extension coupon, and pays at the extended maturity.
+            let performing_at_maturity = balance_after_default - matured_delinquent;
+            let extended = match state.pool_state.balloon[i].take() {
+                Some(spec) if spec.default_prob > 0.0 => {
+                    state.pool_state.maturities[i] = state.pool_state.maturities[i]
+                        .add_months(i32::try_from(spec.extension_months).unwrap_or(i32::MAX));
+                    if let Some(extension_rate) = spec.extension_rate {
+                        state.pool_state.rates[i] = extension_rate;
+                    }
+                    performing_at_maturity * spec.default_prob.clamp(0.0, 1.0)
+                }
+                _ => 0.0,
+            };
+            let balloon = Money::new(performing_at_maturity - extended, base_currency)?;
             total_scheduled = total_scheduled.checked_add(balloon)?;
-            state.pool_state.balances[i] = 0.0;
+            state.pool_state.balances[i] = extended;
             continue;
         }
 
@@ -307,6 +444,11 @@ pub(super) fn calculate_pool_flows_with_rates(
         } else {
             global_period_smm
         };
+        // Cardholder payments retire principal at the monthly payment rate;
+        // the revolving period recycles them into new receivables.
+        let period_smm = request.card.map_or(period_smm, |card| {
+            1.0 - (1.0 - card.monthly_payment_rate.clamp(0.0, 1.0)).powf(request.months_per_period)
+        });
 
         // Level-pay loans retain their contractual payment after prepayment;
         // prepayment shortens the term rather than recasting the payment.
@@ -332,15 +474,15 @@ pub(super) fn calculate_pool_flows_with_rates(
             // Resolve the frozen contractual level payment, computing it once
             // on the first period the asset amortizes (period-native math:
             // level_payment = P * r_p / (1 − (1+r_p)^−n_p)).
+            let months_per_period_u32 = request.months_per_period.round().max(1.0) as u32;
+            let remaining_months = request
+                .pay_date
+                .months_until(state.pool_state.maturities[i]);
+            let remaining_periods_f64 =
+                f64::from(remaining_months.div_ceil(months_per_period_u32) + 1);
             let level_payment = match state.pool_state.level_payments[i] {
                 Some(lp) => lp,
                 None => {
-                    let months_per_period = request.months_per_period.round().max(1.0) as u32;
-                    let remaining_months = request
-                        .pay_date
-                        .months_until(state.pool_state.maturities[i]);
-                    let remaining_periods = remaining_months.div_ceil(months_per_period) + 1;
-                    let remaining_periods_f64 = f64::from(remaining_periods);
                     let denom = 1.0 - (1.0 + period_rate).powf(-remaining_periods_f64);
                     if !remaining_periods_f64.is_finite() || !denom.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(
@@ -369,7 +511,27 @@ pub(super) fn calculate_pool_flows_with_rates(
             // applied pro-rata across the (rep-line) asset, so the surviving
             // pool's aggregate level payment scales by this period's survival
             // fraction.
-            let surviving_payment = level_payment * (1.0 - period_mdr);
+            let mut surviving_payment = level_payment * (1.0 - attrition_frac);
+            if let (Some(model), Some((outcome, _))) = (request.delinquency, &delinquency) {
+                // Cured loans resume their contractual payment; modified loans
+                // return at the reduced coupon over the extended term.
+                let per_unit = if performing_bop > 0.0 {
+                    level_payment / performing_bop
+                } else {
+                    level_payment_per_unit(period_rate, remaining_periods_f64)
+                };
+                surviving_payment += outcome.cured * per_unit;
+                if let Some(spec) = model.modification {
+                    let reduced_rate = (rate - spec.rate_reduction_bp / 10_000.0).max(0.0)
+                        * request.months_per_period
+                        / 12.0;
+                    let extended_periods = remaining_periods_f64
+                        + f64::from(spec.term_extension_months)
+                            / request.months_per_period.max(1.0);
+                    surviving_payment +=
+                        outcome.modified * level_payment_per_unit(reduced_rate, extended_periods);
+                }
+            }
 
             // Prepaid loans' contractual payments terminate too. SMM is Single
             // Monthly *Mortality* — the fraction of the rep-line that pays off
@@ -408,9 +570,9 @@ pub(super) fn calculate_pool_flows_with_rates(
             // shrinks and the principal portion grows — the correct level-pay
             // profile. Bounded by the surviving balance so the loan never
             // over-amortizes.
-            (surviving_payment - balance_after_default * period_rate)
+            (surviving_payment - performing_after * period_rate)
                 .max(0.0)
-                .min(balance_after_default)
+                .min(performing_after)
         } else {
             0.0
         };
@@ -418,8 +580,54 @@ pub(super) fn calculate_pool_flows_with_rates(
         total_scheduled =
             total_scheduled.checked_add(Money::new(scheduled_principal, base_currency)?)?;
 
-        // Balance after default and scheduled amortization
-        let balance_after_sched = balance_after_default - scheduled_principal;
+        if let (Some(model), Some((outcome, _))) = (request.delinquency, &delinquency) {
+            // Modified loans blend their coupon concession into the line.
+            if let Some(spec) = model.modification {
+                if outcome.modified > 0.0 && performing_after > 0.0 {
+                    let weight = (outcome.modified / performing_after).min(1.0);
+                    if state.pool_state.curve_indices[i].is_some() {
+                        if let Some(spread) = state.pool_state.spread_bp[i].as_mut() {
+                            *spread -= spec.rate_reduction_bp * weight;
+                        }
+                    } else {
+                        state.pool_state.rates[i] = (state.pool_state.rates[i]
+                            - spec.rate_reduction_bp / 10_000.0 * weight)
+                            .max(0.0);
+                    }
+                }
+            }
+            // Servicer advances of the P&I the delinquent balance missed,
+            // capped by what the servicer deems recoverable.
+            if let AdvancingPolicy::PrincipalAndInterest {
+                recoverability_cap_pct,
+            } = model.advancing
+            {
+                let delinquent_after =
+                    super::delinquency::delinquent_balance(&state.pool_state.delinquent[i]);
+                let missed_interest = delinquent_bop * rate * accrual_factor;
+                let missed_principal = if performing_after > 0.0 {
+                    scheduled_principal * delinquent_bop / performing_after
+                } else {
+                    0.0
+                };
+                let missed = missed_interest + missed_principal;
+                let room = (recoverability_cap_pct / 100.0 * delinquent_after
+                    - state.servicer_advances_outstanding)
+                    .max(0.0);
+                let advanced = missed.min(room);
+                if advanced > 0.0 && missed > 0.0 {
+                    let advanced_interest = advanced * missed_interest / missed;
+                    total_interest = total_interest
+                        .checked_add(Money::new(advanced_interest, base_currency)?)?;
+                    total_scheduled = total_scheduled
+                        .checked_add(Money::new(advanced - advanced_interest, base_currency)?)?;
+                    state.servicer_advances_outstanding += advanced;
+                }
+            }
+        }
+
+        // Balance after default and scheduled amortization (performing part)
+        let balance_after_sched = performing_after - scheduled_principal;
 
         // Prepayment LAST: SMM applies to the survivor balance after
         // scheduled principal (Intex/Moody's Analytics & SIFMA standard
@@ -428,8 +636,20 @@ pub(super) fn calculate_pool_flows_with_rates(
         // above so the contractual level payment could scale by it.
         let prepay_amt = balance_after_sched * period_smm;
         total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_currency)?)?;
+        // Prepayment penalties reach the trust as interest.
+        if let Some(penalty) = state.pool_state.prepayment_penalty[i] {
+            let premium = penalty.premium(
+                prepay_amt,
+                rate,
+                request.pay_date,
+                state.pool_state.maturities[i],
+            );
+            if premium > 0.0 {
+                total_interest = total_interest.checked_add(Money::new(premium, base_currency)?)?;
+            }
+        }
 
-        let new_balance = balance_after_sched - prepay_amt;
+        let new_balance = balance_after_default - scheduled_principal - prepay_amt;
         state.pool_state.balances[i] = new_balance.max(0.0);
     }
 
@@ -441,4 +661,22 @@ pub(super) fn calculate_pool_flows_with_rates(
         recovery: total_recovery,
         ..PoolFlows::zero(base_currency)
     })
+}
+
+/// Level payment per unit of balance over `periods` payment periods at
+/// `period_rate` (nominal per-period rate): `r / (1 − (1 + r)^−n)`, or
+/// `1 / n` at a zero rate. Pays the whole balance when the term is empty.
+fn level_payment_per_unit(period_rate: f64, periods: f64) -> f64 {
+    if !periods.is_finite() || periods <= 0.0 {
+        return 1.0;
+    }
+    if period_rate.abs() < 1e-12 {
+        return 1.0 / periods;
+    }
+    let denom = 1.0 - (1.0 + period_rate).powf(-periods);
+    if denom.is_finite() && denom.abs() > 1e-12 {
+        period_rate / denom
+    } else {
+        1.0
+    }
 }

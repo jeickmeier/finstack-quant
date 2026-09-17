@@ -144,11 +144,28 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             });
         }
 
-        // Check for empty tiers (except residual tiers which can have ResidualCash recipient)
-        if tier.recipients.is_empty() && tier.payment_type != PaymentType::Residual {
+        // Check for empty tiers (residual tiers may be empty; coverage-test
+        // tiers carry tests instead of recipients).
+        let is_test_tier = tier.payment_type == PaymentType::CoverageTest;
+        if tier.recipients.is_empty() && !is_test_tier && tier.payment_type != PaymentType::Residual
+        {
             errors.push(ValidationError::EmptyTier {
                 tier_id: tier.id.clone(),
             });
+        }
+        if is_test_tier && tier.tests.is_empty() {
+            errors.push(ValidationError::EmptyTier {
+                tier_id: tier.id.clone(),
+            });
+        }
+        for test in &tier.tests {
+            if !test.trigger_level.is_finite() || test.trigger_level <= 0.0 {
+                errors.push(ValidationError::InvalidWeight {
+                    tier_id: tier.id.clone(),
+                    recipient_id: test.id.clone(),
+                    weight: test.trigger_level,
+                });
+            }
         }
 
         let mut seen_recipient_ids = HashSet::default();
@@ -182,7 +199,8 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             // right place to reject it, with the tier and recipient named.
             let bad_amount = match &recipient.calculation {
                 PaymentCalculation::FixedAmount { amount, .. } => !amount.amount().is_finite(),
-                PaymentCalculation::PercentageOfCollateral { rate, .. } => !rate.is_finite(),
+                PaymentCalculation::PercentageOfCollateral { rate, .. }
+                | PaymentCalculation::PercentageOfSpecialServiced { rate, .. } => !rate.is_finite(),
                 PaymentCalculation::CappedTrancheInterest { cap_rate, .. } => !cap_rate.is_finite(),
                 PaymentCalculation::ReserveReplenishment { target_balance } => {
                     !target_balance.amount().is_finite()
@@ -231,7 +249,7 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
 /// SC-m20: this previously also took `diversion_rules` and `coverage_test_ids`.
 /// Both existed only to validate the `DiversionEngine` rule graph, a
 /// declarative diversion mechanism that was never wired to waterfall
-/// execution — the live path uses `tier.divertible` plus the coverage tests.
+/// execution — the live path evaluates coverage-test positions inside the waterfall.
 /// The engine and its validation are removed; what remains validates the tiers
 /// that actually govern allocation.
 pub fn is_valid_waterfall_spec(tiers: &[WaterfallTier]) -> bool {
@@ -249,7 +267,7 @@ pub fn is_valid_waterfall_spec(tiers: &[WaterfallTier]) -> bool {
 /// SC-m20: this previously also took `diversion_rules` and `coverage_test_ids`.
 /// Both existed only to validate the `DiversionEngine` rule graph, a
 /// declarative diversion mechanism that was never wired to waterfall
-/// execution — the live path uses `tier.divertible` plus the coverage tests.
+/// execution — the live path evaluates coverage-test positions inside the waterfall.
 /// The engine and its validation are removed; what remains validates the tiers
 /// that actually govern allocation.
 pub fn get_validation_errors(tiers: &[WaterfallTier]) -> Vec<ValidationError> {

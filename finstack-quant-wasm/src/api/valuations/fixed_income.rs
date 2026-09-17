@@ -215,6 +215,75 @@ impl JsTermLoan {
     }
 }
 
+/// Typed wrapper for the Rust `AssetBackedFacility` instrument (a warehouse
+/// line against a collateral pool under advance rates, concentration limits
+/// and a borrowing-base test).
+///
+/// Construct via `AssetBackedFacility.fromJson` with a canonical v1
+/// instrument envelope or start from `AssetBackedFacility.example()`; price
+/// by passing `toJson()` to `valuations.instruments.priceInstrument`.
+#[wasm_bindgen(js_name = AssetBackedFacility)]
+#[derive(Clone)]
+pub struct JsAssetBackedFacility {
+    pub(crate) inner: finstack_quant_valuations::instruments::AssetBackedFacility,
+}
+
+#[wasm_bindgen(js_class = AssetBackedFacility)]
+impl JsAssetBackedFacility {
+    /// Parse a canonical `finstack_quant.instrument/1` envelope whose
+    /// instrument is an `asset_backed_facility`.
+    /// @param json - Canonical instrument envelope JSON.
+    /// @returns The typed facility.
+    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: &str) -> Result<JsAssetBackedFacility, JsValue> {
+        match parse_envelope(json)? {
+            InstrumentJson::AssetBackedFacility(inner) => Ok(JsAssetBackedFacility { inner: *inner }),
+            _ => Err(JsValue::from_str(
+                "expected instrument type \"asset_backed_facility\", got a different instrument type",
+            )),
+        }
+    }
+
+    /// The canonical example facility: the example CLO pool financed by a
+    /// USD 80M commitment drawn USD 70M.
+    /// @returns The example facility.
+    /// @throws If construction fails (should not occur).
+    pub fn example() -> Result<JsAssetBackedFacility, JsValue> {
+        finstack_quant_valuations::instruments::AssetBackedFacility::example()
+            .map(|inner| JsAssetBackedFacility { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
+    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `AssetBackedFacility.fromJson`.
+    /// @throws If serialization fails.
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&InstrumentEnvelope::new(
+            InstrumentJson::AssetBackedFacility(Box::new(self.inner.clone())),
+        ))
+        .map_err(to_js_err)
+    }
+
+    /// Instrument identifier.
+    /// @returns Stable instrument identifier.
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> String {
+        self.inner.id.to_string()
+    }
+
+    /// Borrowing base on the closing collateral: eligible collateral,
+    /// concentration excess and the advance-rate-weighted base.
+    /// @returns Plain `BorrowingBaseReport` object with `eligible_collateral`, `concentration_excess` and `borrowing_base` Money values.
+    /// @throws If the borrowing-base rules are malformed.
+    #[wasm_bindgen(js_name = borrowingBase)]
+    pub fn borrowing_base(&self) -> Result<JsValue, JsValue> {
+        let report = self.inner.borrowing_base().map_err(to_js_err)?;
+        to_js_value(&report)
+    }
+}
+
 /// Typed wrapper for the Rust `RevolvingCredit` instrument.
 ///
 /// Construct via `RevolvingCredit.fromJson` with a canonical v1 instrument

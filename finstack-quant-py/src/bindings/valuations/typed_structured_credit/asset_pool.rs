@@ -9,11 +9,12 @@ use crate::bindings::valuations::typed_revolving_credit::PyRevolvingCredit;
 use crate::errors::serde_json_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CallExercisePolicy, DealType, InstrumentCollateral, InstrumentExerciseOverride,
-    PoolAsset, PutExercisePolicy, ReserveInterestDestination,
+    PutExercisePolicy, ReinvestmentPeriod, ReserveInterestDestination,
 };
 
 use super::super::instruments::enum_from_str;
-use super::PyRepLine;
+use super::pool_asset::pool_assets_from_py;
+use super::{PyPoolAsset, PyRepLine};
 
 /// Parse an internally tagged policy/destination enum from a bare variant
 /// name (``"first_call"``), a ``dict`` in the serde shape, or a JSON ``str``.
@@ -131,14 +132,11 @@ impl PyAssetPool {
 
     /// Attach loan-level assets, returning a new pool.
     ///
-    /// Loan-level ``PoolAsset`` records carry ~30 fields and stay in their
-    /// serde dict shape; use :meth:`with_rep_lines` for the typed,
-    /// aggregated path.
-    ///
     /// Parameters
     /// ----------
-    /// value : list[dict] | str
-    ///     ``PoolAsset`` objects as a list of dicts or a JSON array string.
+    /// value : list[PoolAsset | dict] | str
+    ///     Typed :class:`PoolAsset` rows, their serde dicts, or a JSON
+    ///     array string (mixing typed rows and dicts is allowed).
     ///
     /// Returns
     /// -------
@@ -150,9 +148,8 @@ impl PyAssetPool {
     /// ValueError
     ///     If ``value`` does not match the ``PoolAsset`` list shape.
     #[pyo3(text_signature = "($self, value)")]
-    fn assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let assets: Vec<PoolAsset> =
-            crate::bindings::module_utils::py_to_serde(py, value, "assets")?;
+    fn with_assets(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let assets = pool_assets_from_py(py, value)?;
         let mut inner = self.inner.clone();
         inner.assets = assets;
         Ok(Self { inner })
@@ -335,6 +332,123 @@ impl PyAssetPool {
         Ok(Self { inner })
     }
 
+    /// Configure the deal-level reinvestment period, returning a new pool.
+    ///
+    /// Principal proceeds collected while the period is active are recycled
+    /// into collateral instead of repaying the notes; every note is held flat
+    /// except those listed in ``amortizing_tranches``, which are paid down
+    /// first. Instrument-collateral pools cannot reinvest.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict[str, Any] | str
+    ///     ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
+    ///     string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
+    ///     (``max_price`` percent of par, ``min_yield`` annual decimal current
+    ///     yield, ``maintain_credit_quality``, ``maintain_wal``), optional
+    ///     ``amortizing_tranches`` (note ids paid down inside the window) and
+    ///     optional ``assumptions`` (``spread_bp``, ``price_pct``,
+    ///     ``maturity_months``, ``index_id``, ``coupon_floor``) describing the
+    ///     replacement collateral; omitted assumptions clone the surviving
+    ///     pool pro rata.
+    ///
+    /// Returns
+    /// -------
+    /// AssetPool
+    ///     A new pool with the reinvestment period set (the original is
+    ///     unchanged).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``ReinvestmentPeriod`` serde shape.
+    ///     Tranche ids, dates and assumption ranges are validated when the
+    ///     deal is built or priced.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.core.currency import Currency
+    /// >>> from finstack_quant.valuations.instruments import AssetPool
+    /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reinvestment_period({
+    /// ...     "end_date": "2028-01-01", "is_active": True,
+    /// ...     "criteria": {"max_price": 100.0, "min_yield": 0.0,
+    /// ...                  "maintain_credit_quality": True, "maintain_wal": True},
+    /// ...     "amortizing_tranches": ["A"],
+    /// ... })
+    /// >>> pool.reinvestment_period["amortizing_tranches"]
+    /// ['A']
+    #[pyo3(text_signature = "($self, value)")]
+    fn with_reinvestment_period(&self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let period: ReinvestmentPeriod = if let Ok(text) = value.extract::<String>() {
+            serde_json::from_str(&text)
+                .map_err(|err| serde_json_to_py(err, "invalid reinvestment_period"))?
+        } else {
+            crate::bindings::module_utils::py_to_serde(py, value, "reinvestment_period")?
+        };
+        let mut inner = self.inner.clone();
+        inner.reinvestment_period = Some(period);
+        Ok(Self { inner })
+    }
+
+    /// Set the pool's historical tallies and cash accounts, returning a new
+    /// pool (seasoned-deal inputs).
+    ///
+    /// Parameters
+    /// ----------
+    /// cumulative_defaults : Money, optional
+    ///     Defaulted par to date; unchanged when omitted.
+    /// cumulative_recoveries : Money, optional
+    ///     Recoveries received to date; unchanged when omitted.
+    /// cumulative_prepayments : Money, optional
+    ///     Prepayments received to date; unchanged when omitted.
+    /// cumulative_scheduled_amortization : Money, optional
+    ///     Scheduled principal received to date; unchanged when omitted.
+    /// collection_account : Money, optional
+    ///     Undistributed collections held at closing; unchanged when omitted.
+    /// excess_spread_account : Money, optional
+    ///     Trapped excess spread held at closing; unchanged when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// AssetPool
+    ///     A new pool with the supplied balances (the original is unchanged).
+    #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None))]
+    #[pyo3(
+        text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None)"
+    )]
+    // PyO3 binding: one keyword per pool account field.
+    #[allow(clippy::too_many_arguments)]
+    fn with_accounts(
+        &self,
+        cumulative_defaults: Option<PyRef<'_, PyMoney>>,
+        cumulative_recoveries: Option<PyRef<'_, PyMoney>>,
+        cumulative_prepayments: Option<PyRef<'_, PyMoney>>,
+        cumulative_scheduled_amortization: Option<PyRef<'_, PyMoney>>,
+        collection_account: Option<PyRef<'_, PyMoney>>,
+        excess_spread_account: Option<PyRef<'_, PyMoney>>,
+    ) -> Self {
+        let mut inner = self.inner.clone();
+        if let Some(value) = cumulative_defaults {
+            inner.cumulative_defaults = value.inner;
+        }
+        if let Some(value) = cumulative_recoveries {
+            inner.cumulative_recoveries = value.inner;
+        }
+        if let Some(value) = cumulative_prepayments {
+            inner.cumulative_prepayments = value.inner;
+        }
+        if let Some(value) = cumulative_scheduled_amortization {
+            inner.cumulative_scheduled_amortization = value.inner;
+        }
+        if let Some(value) = collection_account {
+            inner.collection_account = value.inner;
+        }
+        if let Some(value) = excess_spread_account {
+            inner.excess_spread_account = value.inner;
+        }
+        Self { inner }
+    }
+
     /// Deserialize from the JSON produced by ``to_json``.
     ///
     /// Parameters
@@ -394,6 +508,19 @@ impl PyAssetPool {
     #[getter]
     fn asset_records<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.assets)
+    }
+
+    /// Loan-level assets as typed :class:`PoolAsset` rows (empty when rep
+    /// lines or instruments are used).
+    #[getter]
+    fn assets(&self) -> Vec<PyPoolAsset> {
+        self.inner
+            .assets
+            .iter()
+            .map(|asset| PyPoolAsset {
+                inner: asset.clone(),
+            })
+            .collect()
     }
 
     /// Representative lines, or ``None`` when the pool is modelled loan-level.
@@ -475,6 +602,16 @@ impl PyAssetPool {
             .instruments
             .as_ref()
             .map(|collateral| crate::bindings::pandas_utils::serde_to_py(py, collateral))
+            .transpose()
+    }
+
+    /// Reinvestment period as its serde ``dict``, or ``None``.
+    #[getter]
+    fn reinvestment_period<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .reinvestment_period
+            .as_ref()
+            .map(|period| crate::bindings::pandas_utils::serde_to_py(py, period))
             .transpose()
     }
 

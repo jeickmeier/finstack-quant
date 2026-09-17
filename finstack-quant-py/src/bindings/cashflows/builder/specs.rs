@@ -1928,6 +1928,39 @@ impl PyPrepaymentModelSpec {
         }
     }
 
+    /// ABS convention: ``speed`` percent of the ORIGINAL balance prepays each
+    /// month, so ``SMM_t = speed / (1 - speed * (t - 1))`` (``0.015`` = 1.5%
+    /// ABS).
+    #[staticmethod]
+    #[pyo3(text_signature = "(speed)")]
+    fn abs(speed: f64) -> Self {
+        Self {
+            inner: PrepaymentModelSpec::abs(speed),
+        }
+    }
+
+    /// Explicit monthly CPR vector (annual decimals, one entry per seasoning
+    /// month); the last entry extends to maturity.
+    #[staticmethod]
+    #[pyo3(text_signature = "(monthly_cpr)")]
+    fn vector(monthly_cpr: Vec<f64>) -> Self {
+        Self {
+            inner: PrepaymentModelSpec::vector(monthly_cpr),
+        }
+    }
+
+    /// Validate the curve shape (finite, non-negative rates in range).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a rate is non-finite or outside ``[0, 1]``, the ABS speed is
+    ///     out of range, or a vector is empty.
+    #[pyo3(text_signature = "(self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(core_to_py)
+    }
+
     /// Annual constant prepayment rate (decimal).
     #[getter]
     fn cpr(&self) -> f64 {
@@ -2009,6 +2042,51 @@ impl PyDefaultModelSpec {
         }
     }
 
+    /// Explicit monthly CDR vector (annual decimals, one entry per seasoning
+    /// month); the last entry extends to maturity.
+    #[staticmethod]
+    #[pyo3(text_signature = "(monthly_cdr)")]
+    fn vector(monthly_cdr: Vec<f64>) -> Self {
+        Self {
+            inner: DefaultModelSpec::vector(monthly_cdr),
+        }
+    }
+
+    /// Cumulative net-loss curve: ``cumulative_net_loss_pct`` is the
+    /// cumulative loss in percent of the original balance per seasoning
+    /// month (non-decreasing), ``severity`` the loss given default as a
+    /// decimal; defaults are the loss increments grossed up by severity.
+    #[staticmethod]
+    #[pyo3(text_signature = "(cumulative_net_loss_pct, severity)")]
+    fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> Self {
+        Self {
+            inner: DefaultModelSpec::cumulative_loss(cumulative_net_loss_pct, severity),
+        }
+    }
+
+    /// Default-timing curve: ``cumulative_default_rate`` is the lifetime
+    /// default rate as a decimal of the original balance, ``annual_pct`` the
+    /// percent of it realized in each year of seasoning (sums to 100).
+    #[staticmethod]
+    #[pyo3(text_signature = "(cumulative_default_rate, annual_pct)")]
+    fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> Self {
+        Self {
+            inner: DefaultModelSpec::timing(cumulative_default_rate, annual_pct),
+        }
+    }
+
+    /// Validate the curve shape.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a rate is non-finite or out of range, a cumulative-loss curve
+    ///     decreases, or a timing curve does not sum to 100.
+    #[pyo3(text_signature = "(self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(core_to_py)
+    }
+
     /// Annual constant default rate (decimal).
     #[getter]
     fn cdr(&self) -> f64 {
@@ -2088,6 +2166,40 @@ impl PyRecoveryModelSpec {
     #[getter]
     fn recovery_lag(&self) -> u32 {
         self.inner.recovery_lag
+    }
+
+    /// Return a copy carrying a seasoning-indexed severity vector (loss given
+    /// default as decimals, one entry per month; the last entry extends).
+    ///
+    /// Parameters
+    /// ----------
+    /// severity_vector : list[float]
+    ///     Loss severities in ``[0, 1]`` by seasoning month; overrides
+    ///     ``1 - rate`` where present.
+    ///
+    /// Returns
+    /// -------
+    /// RecoveryModelSpec
+    ///     A new spec with the vector attached.
+    #[pyo3(text_signature = "(self, severity_vector)")]
+    fn with_severity_vector(&self, severity_vector: Vec<f64>) -> Self {
+        Self {
+            inner: self.inner.clone().with_severity_vector(severity_vector),
+        }
+    }
+
+    /// Severity vector by seasoning month, or ``None`` when only ``rate``
+    /// applies.
+    #[getter]
+    fn severity_vector(&self) -> Option<Vec<f64>> {
+        self.inner.severity_vector.clone()
+    }
+
+    /// Recovery rate (decimal) for the supplied seasoning: ``1 - severity``
+    /// from the vector when present, else ``rate``.
+    #[pyo3(text_signature = "(self, seasoning_months)")]
+    fn recovery_rate(&self, seasoning_months: u32) -> f64 {
+        self.inner.recovery_rate(seasoning_months)
     }
 
     /// Validate that the rate is finite and in ``[0, 1]``.

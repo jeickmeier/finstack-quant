@@ -364,7 +364,6 @@ mod tests {
                 .sum();
             assert_eq!(written_down, historical_loss);
             for tranche in &deal.tranches.tranches {
-                assert!(tranche.target_balance.is_none());
                 match tranche.id.as_str() {
                     "EQUITY" => assert_eq!(tranche.current_balance.amount(), 0.0),
                     "SENIOR" => assert_eq!(tranche.current_balance.amount(), 43_000_000.0),
@@ -388,6 +387,9 @@ mod tests {
             panic!("expected structured credit");
         };
         deal.pool.assets.retain(|asset| asset.is_defaulted);
+        // The empty market cannot project the fixture swap; this test is
+        // about the default claim, not the hedge.
+        deal.hedge_swaps.clear();
         let zero = Money::from((0_i64, Currency::USD));
         deal.pool.collection_account = zero;
         deal.pool.reserve_account = zero;
@@ -413,8 +415,18 @@ mod tests {
         );
         assert_eq!(flows.total_principal.amount(), 1_000_000.0);
         assert_eq!(flows.total_interest.amount(), 0.0);
-        assert_eq!(flows.total_writedown.amount(), 0.0);
-        assert_eq!(flows.final_balance.amount(), 42_000_000.0);
+        // The claim is the deal's only remaining collateral, so the 42M the
+        // senior never receives is realized once, as a principal shortfall on
+        // the final settlement date — not as a repeat of the historical loss.
+        assert_eq!(
+            flows.writedown_flows,
+            vec![(
+                date!(2027 - 01 - 04),
+                Money::from((42_000_000_i64, Currency::USD))
+            )]
+        );
+        assert_eq!(flows.total_writedown.amount(), 42_000_000.0);
+        assert_eq!(flows.final_balance.amount(), 0.0);
     }
 
     #[test]

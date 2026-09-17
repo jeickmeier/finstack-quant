@@ -5,7 +5,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::ca
     CloCalibration, CmbsCalibration, RmbsCalibration,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    CreditFactors, DealFees, DealType, DefaultAssumptions,
+    CreditFactors, DealFees, DealType, IncentiveFeeSpec,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Tenor;
@@ -14,7 +14,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::{Error, HashMap, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<StructuredCreditAssumptionRegistry> =
     EmbeddedJsonRegistry::new(
@@ -30,7 +29,6 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
     market_conditions: MarketConditionsRecord,
     credit_model_defaults: CreditModelDefaultsRecord,
     cmo_collateral_defaults: CmoCollateralDefaultsRecord,
-    seasonality: SeasonalityRecord,
     scenario_grids: ScenarioGridsRecord,
     simulation: SimulationRecord,
     concentration_limits: ConcentrationLimitsRecord,
@@ -38,7 +36,6 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
     default_models: DefaultModelsRecord,
     stochastic_calibrations: StochasticCalibrationsRecord,
     coverage_haircuts: Vec<CoverageHaircutRecord>,
-    asset_type_defaults: AssetTypeDefaultsRecord,
     deal_profiles: Vec<DealProfileRecord>,
 }
 
@@ -91,14 +88,6 @@ impl StructuredCreditAssumptionRegistry {
         self.simulation.pool_balance_cleanup_threshold
     }
 
-    pub(crate) fn mortgage_seasonality(&self) -> [f64; 12] {
-        month_array(&self.seasonality.mortgage)
-    }
-
-    pub(crate) fn credit_card_seasonality(&self) -> [f64; 12] {
-        month_array(&self.seasonality.credit_card)
-    }
-
     pub(crate) fn standard_psa_speeds(&self) -> &[f64] {
         &self.scenario_grids.psa_speeds
     }
@@ -128,13 +117,6 @@ impl StructuredCreditAssumptionRegistry {
             max_second_lien: self.concentration_limits.max_second_lien,
             max_cov_lite: self.concentration_limits.max_cov_lite,
             max_dip: self.concentration_limits.max_dip,
-        }
-    }
-
-    pub(crate) fn auto_abs_prepayment(&self) -> AutoAbsPrepaymentDefaults {
-        AutoAbsPrepaymentDefaults {
-            monthly_speed: self.prepayment_models.auto_abs.monthly_speed,
-            ramp_months: self.prepayment_models.auto_abs.ramp_months,
         }
     }
 
@@ -211,25 +193,8 @@ impl StructuredCreditAssumptionRegistry {
             servicing_fee_bp: fees.servicing_fee_bp,
             master_servicer_fee_bp: fees.master_servicer_fee_bp,
             special_servicer_fee_bp: fees.special_servicer_fee_bp,
+            incentive_fee: fees.incentive_fee,
         })
-    }
-
-    pub(crate) fn default_assumptions(&self, id: &str) -> Result<DefaultAssumptions> {
-        Ok(default_assumptions_from_record(
-            &self.deal_profile(id)?.assumptions,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        ))
-    }
-
-    pub(crate) fn generic_default_assumptions(&self) -> DefaultAssumptions {
-        default_assumptions_from_record(
-            &self.asset_type_defaults.assumptions(),
-            assumption_map(&self.asset_type_defaults.cpr_by_asset_type),
-            assumption_map(&self.asset_type_defaults.cdr_by_asset_type),
-            assumption_map(&self.asset_type_defaults.recovery_by_asset_type),
-        )
     }
 
     pub(crate) fn constructor_defaults(&self, id: &str) -> Result<ConstructorDefaults> {
@@ -246,13 +211,13 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
-    pub(crate) fn profile_id_for_deal_type(&self, deal_type: DealType) -> &'static str {
-        match deal_type {
-            DealType::Clo => "clo_standard",
-            DealType::Rmbs => "rmbs_standard",
-            DealType::Cmbs => "cmbs_standard",
-            _ => "abs_auto_standard",
-        }
+    pub(crate) fn standard_rates(&self, id: &str) -> Result<StandardRates> {
+        let profile = self.deal_profile(id)?;
+        Ok(StandardRates {
+            prepayment_rate: profile.constructor.prepayment.rate,
+            cdr_annual: profile.constructor.default_cdr_annual,
+            recovery_rate: profile.constructor.recovery_rate,
+        })
     }
 
     fn deal_profile(&self, id: &str) -> Result<&DealProfileRecord> {
@@ -305,8 +270,6 @@ impl StructuredCreditAssumptionRegistry {
             self.cmo_collateral_defaults.psa_multiplier,
             "CMO collateral PSA multiplier",
         )?;
-        validate_seasonality("mortgage", &self.seasonality.mortgage)?;
-        validate_seasonality("credit card", &self.seasonality.credit_card)?;
         validate_nonnegative_finite(
             self.simulation.pool_balance_cleanup_threshold,
             "pool balance cleanup threshold",
@@ -328,14 +291,6 @@ impl StructuredCreditAssumptionRegistry {
         finstack_quant_core::validation::validate_f64_unit_interval(
             self.prepayment_models.psa.terminal_cpr,
             "PSA terminal CPR",
-        )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.prepayment_models.auto_abs.monthly_speed,
-            "auto ABS monthly speed",
-        )?;
-        validate_nonzero_u32(
-            self.prepayment_models.auto_abs.ramp_months,
-            "auto ABS ramp months",
         )?;
         validate_nonzero_u32(self.default_models.sda.peak_month, "SDA peak month")?;
         finstack_quant_core::validation::validate_f64_unit_interval(
@@ -399,26 +354,7 @@ impl StructuredCreditAssumptionRegistry {
         for record in &self.stochastic_calibrations.cmbs_profiles {
             validate_cmbs_stochastic_record(record)?;
         }
-        validate_assumption_record(&self.asset_type_defaults.assumptions())?;
-        for point in self
-            .asset_type_defaults
-            .cpr_by_asset_type
-            .iter()
-            .chain(self.asset_type_defaults.cdr_by_asset_type.iter())
-            .chain(self.asset_type_defaults.recovery_by_asset_type.iter())
-        {
-            if point.asset_type.trim().is_empty() {
-                return Err(Error::Validation(
-                    "structured-credit asset-type assumption has blank asset type".to_string(),
-                ));
-            }
-            finstack_quant_core::validation::validate_f64_unit_interval(
-                point.value,
-                "asset-type assumption",
-            )?;
-        }
         for profile in &self.deal_profiles {
-            validate_assumption_record(&profile.assumptions)?;
             validate_fee_record(&profile.fees)?;
             validate_constructor_record(&profile.constructor)?;
         }
@@ -432,6 +368,19 @@ pub(crate) struct ConstructorDefaults {
     pub(crate) default_spec: DefaultModelSpec,
     pub(crate) recovery_spec: RecoveryModelSpec,
     pub(crate) credit_factors: CreditFactors,
+}
+
+/// Headline rates of a deal profile's constructor record, as exposed by the
+/// deal-type constants (`clo_standard_cdr`, `rmbs_standard_psa`, ...).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StandardRates {
+    /// Prepayment speed in the profile's own unit: annual CPR for CLO and
+    /// CMBS, PSA multiplier for RMBS, monthly ABS speed for auto ABS.
+    pub(crate) prepayment_rate: f64,
+    /// Annual constant default rate.
+    pub(crate) cdr_annual: f64,
+    /// Recovery rate as a decimal fraction of defaulted par.
+    pub(crate) recovery_rate: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -463,12 +412,6 @@ pub(crate) struct ConcentrationLimits {
     pub(crate) max_second_lien: f64,
     pub(crate) max_cov_lite: f64,
     pub(crate) max_dip: f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct AutoAbsPrepaymentDefaults {
-    pub(crate) monthly_speed: f64,
-    pub(crate) ramp_months: u32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -507,13 +450,6 @@ struct CmoCollateralDefaultsRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SeasonalityRecord {
-    mortgage: Vec<f64>,
-    credit_card: Vec<f64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct ScenarioGridsRecord {
     psa_speeds: Vec<f64>,
     cdr_rates: Vec<f64>,
@@ -544,7 +480,6 @@ struct ConcentrationLimitsRecord {
 #[serde(deny_unknown_fields)]
 struct PrepaymentModelsRecord {
     psa: PsaRecord,
-    auto_abs: AutoAbsPrepaymentRecord,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -552,13 +487,6 @@ struct PrepaymentModelsRecord {
 struct PsaRecord {
     ramp_months: u32,
     terminal_cpr: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AutoAbsPrepaymentRecord {
-    monthly_speed: f64,
-    ramp_months: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -633,42 +561,10 @@ struct CoverageHaircutRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct AssetTypeDefaultsRecord {
-    base_cdr_annual: f64,
-    base_recovery_rate: f64,
-    base_cpr_annual: f64,
-    cpr_by_asset_type: Vec<AssetTypeAssumptionRecord>,
-    cdr_by_asset_type: Vec<AssetTypeAssumptionRecord>,
-    recovery_by_asset_type: Vec<AssetTypeAssumptionRecord>,
-}
-
-impl AssetTypeDefaultsRecord {
-    fn assumptions(&self) -> AssumptionRecord {
-        AssumptionRecord {
-            base_cdr_annual: self.base_cdr_annual,
-            base_recovery_rate: self.base_recovery_rate,
-            base_cpr_annual: self.base_cpr_annual,
-            psa_speed: None,
-            sda_speed: None,
-            abs_speed_monthly: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AssetTypeAssumptionRecord {
-    asset_type: String,
-    value: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct DealProfileRecord {
     ids: Vec<String>,
     deal_type: DealType,
     fees: FeeRecord,
-    assumptions: AssumptionRecord,
     constructor: ConstructorRecord,
 }
 
@@ -681,17 +577,8 @@ struct FeeRecord {
     servicing_fee_bp: f64,
     master_servicer_fee_bp: Option<f64>,
     special_servicer_fee_bp: Option<f64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AssumptionRecord {
-    base_cdr_annual: f64,
-    base_recovery_rate: f64,
-    base_cpr_annual: f64,
-    psa_speed: Option<f64>,
-    sda_speed: Option<f64>,
-    abs_speed_monthly: Option<f64>,
+    #[serde(default)]
+    incentive_fee: Option<IncentiveFeeSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -733,9 +620,7 @@ impl ConstructorPrepaymentRecord {
         match self.kind {
             ConstructorPrepaymentKind::ConstantCpr => PrepaymentModelSpec::constant_cpr(self.rate),
             ConstructorPrepaymentKind::Psa => PrepaymentModelSpec::psa(self.rate),
-            ConstructorPrepaymentKind::MonthlyAbsSpeed => {
-                PrepaymentModelSpec::constant_cpr(1.0 - (1.0 - self.rate).powi(12))
-            }
+            ConstructorPrepaymentKind::MonthlyAbsSpeed => PrepaymentModelSpec::abs(self.rate),
             ConstructorPrepaymentKind::CmbsLockout => {
                 PrepaymentModelSpec::cmbs_with_lockout(self.lockout_months.unwrap_or(0), self.rate)
             }
@@ -766,64 +651,6 @@ fn validate_registry(
 ) -> Result<StructuredCreditAssumptionRegistry> {
     registry.validate()?;
     Ok(registry)
-}
-
-fn default_assumptions_from_record(
-    record: &AssumptionRecord,
-    cpr_by_asset_type: BTreeMap<String, f64>,
-    cdr_by_asset_type: BTreeMap<String, f64>,
-    recovery_by_asset_type: BTreeMap<String, f64>,
-) -> DefaultAssumptions {
-    DefaultAssumptions {
-        base_cdr_annual: record.base_cdr_annual,
-        base_recovery_rate: record.base_recovery_rate,
-        base_cpr_annual: record.base_cpr_annual,
-        psa_speed: record.psa_speed,
-        sda_speed: record.sda_speed,
-        abs_speed_monthly: record.abs_speed_monthly,
-        cpr_by_asset_type,
-        cdr_by_asset_type,
-        recovery_by_asset_type,
-    }
-}
-
-fn assumption_map(records: &[AssetTypeAssumptionRecord]) -> BTreeMap<String, f64> {
-    let mut assumptions = BTreeMap::new();
-    for record in records {
-        assumptions.insert(record.asset_type.clone(), record.value);
-    }
-    assumptions
-}
-
-fn month_array(values: &[f64]) -> [f64; 12] {
-    let mut months = [0.0; 12];
-    months.copy_from_slice(values);
-    months
-}
-
-fn validate_assumption_record(record: &AssumptionRecord) -> Result<()> {
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.base_cdr_annual,
-        "base CDR",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.base_recovery_rate,
-        "base recovery rate",
-    )?;
-    finstack_quant_core::validation::validate_f64_unit_interval(
-        record.base_cpr_annual,
-        "base CPR",
-    )?;
-    if let Some(speed) = record.psa_speed {
-        validate_nonnegative_finite(speed, "PSA speed")?;
-    }
-    if let Some(speed) = record.sda_speed {
-        validate_nonnegative_finite(speed, "SDA speed")?;
-    }
-    if let Some(speed) = record.abs_speed_monthly {
-        finstack_quant_core::validation::validate_f64_unit_interval(speed, "ABS monthly speed")?;
-    }
-    Ok(())
 }
 
 fn validate_rmbs_stochastic_record(record: &RmbsStochasticRecord) -> Result<()> {
@@ -962,6 +789,16 @@ fn validate_fee_record(record: &FeeRecord) -> Result<()> {
     if let Some(fee) = record.master_servicer_fee_bp {
         validate_nonnegative_finite(fee, "master servicer fee bp")?;
     }
+    if let Some(incentive) = record.incentive_fee {
+        if !incentive.hurdle_irr.is_finite()
+            || !incentive.share_pct.is_finite()
+            || !(0.0..=1.0).contains(&incentive.share_pct)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "incentive fee needs a finite hurdle IRR and a share in [0, 1]".into(),
+            ));
+        }
+    }
     if let Some(fee) = record.special_servicer_fee_bp {
         validate_nonnegative_finite(fee, "special servicer fee bp")?;
     }
@@ -988,15 +825,6 @@ fn validate_constructor_record(record: &ConstructorRecord) -> Result<()> {
         "constructor recovery rate",
     )?;
     Ok(())
-}
-
-fn validate_seasonality(label: &str, values: &[f64]) -> Result<()> {
-    if values.len() != 12 {
-        return Err(Error::Validation(format!(
-            "structured-credit assumptions registry {label} seasonality must contain 12 months"
-        )));
-    }
-    validate_grid(label, values)
 }
 
 fn validate_grid(label: &str, values: &[f64]) -> Result<()> {

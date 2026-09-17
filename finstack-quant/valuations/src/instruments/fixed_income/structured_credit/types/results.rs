@@ -126,10 +126,13 @@ pub struct TrancheValuation {
     pub tranche_id: String,
     /// Present value of all cashflows.
     pub pv: Money,
-    /// Clean settlement price as a percentage of original note balance.
+    /// Clean settlement price as a percentage of the CURRENT note balance
+    /// (the factor-adjusted secondary-market quote basis).
     pub clean_price: f64,
-    /// Dirty settlement price as a percentage of original note balance.
+    /// Dirty settlement price as a percentage of the CURRENT note balance.
     pub dirty_price: f64,
+    /// Pool factor of the note: `current_balance / original_balance`.
+    pub factor: f64,
     /// Current-period accrued interest at buyer settlement in note currency.
     pub accrued: Money,
     /// Weighted average life.

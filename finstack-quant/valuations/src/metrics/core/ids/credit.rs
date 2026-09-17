@@ -133,6 +133,9 @@ impl MetricId {
     /// Credit enhancement level - Subordination as % of pool
     pub const AbsCreditEnhancement: Self = Self(Cow::Borrowed("abs_ce_level"));
 
+    /// Monthly principal payment rate of a card master trust, percent per month
+    pub const AbsPaymentRate: Self = Self(Cow::Borrowed("abs_payment_rate"));
+
     // CLO-specific Metrics
 
     /// Weighted Average Rating Factor
@@ -166,6 +169,23 @@ impl MetricId {
 
     /// Credit Enhancement Level
     pub const CmbsCreditEnhancement: Self = Self(Cow::Borrowed("cmbs_ce_level"));
+
+    // Asset-backed facility metrics
+
+    /// Borrowing base on the closing collateral, in currency units
+    pub const AbfBorrowingBase: Self = Self(Cow::Borrowed("abf_borrowing_base"));
+
+    /// Borrowing-base cushion, (base − drawn) / base in percent
+    pub const AbfBorrowingBaseCushion: Self = Self(Cow::Borrowed("abf_borrowing_base_cushion"));
+
+    /// Advance-rate utilization, drawn / borrowing base
+    pub const AbfAdvanceRateUtilization: Self = Self(Cow::Borrowed("abf_advance_rate_utilization"));
+
+    /// Lender IRR of the facility flows (annual decimal)
+    pub const AbfFacilityIrr: Self = Self(Cow::Borrowed("abf_facility_irr"));
+
+    /// Residual IRR of the synthetic deal (annual decimal)
+    pub const AbfResidualIrr: Self = Self(Cow::Borrowed("abf_residual_irr"));
 
     // RMBS-specific Metrics
 

@@ -91,8 +91,8 @@ impl MetricGroup {
             MetricGroup::Rates => (101, 129),
             MetricGroup::Fx => (129, 136),
             MetricGroup::Equity => (136, 155),
-            MetricGroup::StructuredCredit => (155, 184),
-            MetricGroup::Alternatives => (184, 210),
+            MetricGroup::StructuredCredit => (155, 190),
+            MetricGroup::Alternatives => (190, 216),
         }
     }
 }

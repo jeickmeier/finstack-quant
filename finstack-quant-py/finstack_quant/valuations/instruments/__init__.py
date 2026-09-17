@@ -13,6 +13,8 @@ Examples:
 
 from finstack_quant.finstack_quant import valuations as _valuations
 
+AssetBackedFacility = _valuations.instruments.AssetBackedFacility
+AssetBackedFacilityBuilder = _valuations.instruments.AssetBackedFacilityBuilder
 AssetPool = _valuations.instruments.AssetPool
 BarrierCrossing = _valuations.instruments.BarrierCrossing
 Bond = _valuations.instruments.Bond
@@ -24,23 +26,28 @@ CDSIndexParams = _valuations.instruments.CDSIndexParams
 CDSTranche = _valuations.instruments.CDSTranche
 CDSTrancheBuilder = _valuations.instruments.CDSTrancheBuilder
 CDSTrancheParams = _valuations.instruments.CDSTrancheParams
+CallAssumption = _valuations.instruments.CallAssumption
 CallPutSchedule = _valuations.instruments.CallPutSchedule
 CapFloor = _valuations.instruments.CapFloor
 CapFloorBuilder = _valuations.instruments.CapFloorBuilder
 ConversionSpec = _valuations.instruments.ConversionSpec
 ConvertibleBond = _valuations.instruments.ConvertibleBond
 ConvertibleBondBuilder = _valuations.instruments.ConvertibleBondBuilder
+CoverageRules = _valuations.instruments.CoverageRules
 CreditDefaultSwap = _valuations.instruments.CreditDefaultSwap
 CreditDefaultSwapBuilder = _valuations.instruments.CreditDefaultSwapBuilder
 EnhancedMonteCarloResult = _valuations.instruments.EnhancedMonteCarloResult
+EquityMetrics = _valuations.instruments.EquityMetrics
 EquityOption = _valuations.instruments.EquityOption
 EquityOptionBuilder = _valuations.instruments.EquityOptionBuilder
+FacilityProjection = _valuations.instruments.FacilityProjection
 FixedLegSpec = _valuations.instruments.FixedLegSpec
 FloatLegSpec = _valuations.instruments.FloatLegSpec
 FxForward = _valuations.instruments.FxForward
 FxForwardBuilder = _valuations.instruments.FxForwardBuilder
 FxOption = _valuations.instruments.FxOption
 FxOptionBuilder = _valuations.instruments.FxOptionBuilder
+HedgeSwap = _valuations.instruments.HedgeSwap
 InterestRateSwap = _valuations.instruments.InterestRateSwap
 InterestRateSwapBuilder = _valuations.instruments.InterestRateSwapBuilder
 MarketHistory = _valuations.instruments.MarketHistory
@@ -51,6 +58,7 @@ OasResult = _valuations.instruments.OasResult
 PathStatistics = _valuations.instruments.PathStatistics
 PikMode = _valuations.instruments.PikMode
 PikSchedule = _valuations.instruments.PikSchedule
+PoolAsset = _valuations.instruments.PoolAsset
 PremiumLegSpec = _valuations.instruments.PremiumLegSpec
 ProtectionLegSpec = _valuations.instruments.ProtectionLegSpec
 RepLine = _valuations.instruments.RepLine
@@ -67,8 +75,10 @@ TermLoan = _valuations.instruments.TermLoan
 TermLoanBuilder = _valuations.instruments.TermLoanBuilder
 Tranche = _valuations.instruments.Tranche
 TrancheBuilder = _valuations.instruments.TrancheBuilder
+TrancheCashflows = _valuations.instruments.TrancheCashflows
 TrancheMetrics = _valuations.instruments.TrancheMetrics
 TrancheStructure = _valuations.instruments.TrancheStructure
+Waterfall = _valuations.instruments.Waterfall
 validate_instrument_json = _valuations.instruments.validate_instrument_json
 validate_typed_instrument_json = _valuations.instruments.validate_typed_instrument_json
 pretty_instrument_json = _valuations.instruments.pretty_instrument_json
@@ -88,6 +98,8 @@ structured_credit_tranche_metrics = _valuations.instruments.structured_credit_tr
 structured_credit_tranche_scenario_table = _valuations.instruments.structured_credit_tranche_scenario_table
 
 __all__: list[str] = [
+    "AssetBackedFacility",
+    "AssetBackedFacilityBuilder",
     "AssetPool",
     "BarrierCrossing",
     "Bond",
@@ -99,23 +111,28 @@ __all__: list[str] = [
     "CDSTranche",
     "CDSTrancheBuilder",
     "CDSTrancheParams",
+    "CallAssumption",
     "CallPutSchedule",
     "CapFloor",
     "CapFloorBuilder",
     "ConversionSpec",
     "ConvertibleBond",
     "ConvertibleBondBuilder",
+    "CoverageRules",
     "CreditDefaultSwap",
     "CreditDefaultSwapBuilder",
     "EnhancedMonteCarloResult",
+    "EquityMetrics",
     "EquityOption",
     "EquityOptionBuilder",
+    "FacilityProjection",
     "FixedLegSpec",
     "FloatLegSpec",
     "FxForward",
     "FxForwardBuilder",
     "FxOption",
     "FxOptionBuilder",
+    "HedgeSwap",
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "MarketHistory",
@@ -126,6 +143,7 @@ __all__: list[str] = [
     "PathStatistics",
     "PikMode",
     "PikSchedule",
+    "PoolAsset",
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
@@ -142,8 +160,10 @@ __all__: list[str] = [
     "TermLoanBuilder",
     "Tranche",
     "TrancheBuilder",
+    "TrancheCashflows",
     "TrancheMetrics",
     "TrancheStructure",
+    "Waterfall",
     "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_models",

@@ -176,7 +176,7 @@ fn structured_credit_tranche_breakeven_cdr(
 /// tranche_id : str
 ///     Identifier of the tranche.
 /// market_price_pct : float
-///     Clean settlement price as a percentage of original balance (100.0 = par).
+///     Clean settlement price as a percentage of current balance (100.0 = par).
 ///     Accrued interest is added once at the deal's ``quote_settlement_date``
 ///     (valuation date when omitted).
 /// market : MarketContext
@@ -245,7 +245,7 @@ fn structured_credit_tranche_oas(
 ///     Valuation date, either a date-like object (``datetime.date``,
 ///     ``pandas.Timestamp``) or an ISO 8601 string.
 /// market_price_pct : float, optional
-///     Clean settlement price as a percentage of original balance. When omitted,
+///     Clean settlement price as a percentage of current balance. When omitted,
 ///     the deal's market quote is used, or its model clean settlement price
 ///     if no quote is supplied. PV remains measured at valuation.
 ///
@@ -421,13 +421,13 @@ impl PyOasResult {
         self.inner.oas
     }
 
-    /// Model price at the solved OAS, as a percentage of original balance.
+    /// Model price at the solved OAS, as a percentage of current balance.
     #[getter]
     fn model_price(&self) -> f64 {
         self.inner.model_price
     }
 
-    /// Target market price, as a percentage of original balance.
+    /// Target market price, as a percentage of current balance.
     #[getter]
     fn market_price(&self) -> f64 {
         self.inner.market_price
@@ -440,7 +440,7 @@ impl PyOasResult {
     }
 
     /// Monte-Carlo standard error of the mean price, as a percentage of
-    /// original balance.
+    /// current balance.
     #[getter]
     fn price_std_error(&self) -> f64 {
         self.inner.price_std_error
@@ -449,8 +449,8 @@ impl PyOasResult {
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``oas`` (annual decimal), ``model_price`` and ``market_price``
-    /// (percentage of original balance), ``num_paths``, ``price_std_error``
-    /// (percentage of original balance).
+    /// (percentage of current balance), ``num_paths``, ``price_std_error``
+    /// (percentage of current balance).
     ///
     /// One row, so a book of tranches stacks with
     /// ``pd.concat([r.to_dataframe() for r in results])``.
@@ -531,7 +531,7 @@ impl PyTrancheMetrics {
     /// >>> from finstack_quant.valuations.instruments import TrancheMetrics
     /// >>> payload = json.dumps({
     /// ...     "tranche_id": "A", "currency": "USD", "pv": 1000.0,
-    /// ...     "price_pct": 100.0, "wal": 3.0, "z_spread_bp": 0.0,
+    /// ...     "price_pct": 100.0, "factor": 1.0, "wal": 3.0, "z_spread_bp": 0.0,
     /// ...     "cs01": -1.0, "spread_duration": 3.0, "modified_duration": 3.0,
     /// ...     "convexity": 12.0, "target_price_pct": 100.0,
     /// ... })
@@ -574,10 +574,18 @@ impl PyTrancheMetrics {
         self.inner.pv
     }
 
-    /// Model price, as a percentage of original balance.
+    /// Model clean price, as a percentage of the tranche's current balance
+    /// (the factor-adjusted secondary-market quote basis).
     #[getter]
     fn price_pct(&self) -> f64 {
         self.inner.price_pct
+    }
+
+    /// Pool factor of the note: current balance over original balance, so a
+    /// price on original face is ``price_pct * factor``.
+    #[getter]
+    fn factor(&self) -> f64 {
+        self.inner.factor
     }
 
     /// Weighted-average life, in years.
@@ -618,18 +626,41 @@ impl PyTrancheMetrics {
     }
 
     /// Price the z-spread/CS01 were solved against, as a percentage of
-    /// original balance.
+    /// current balance.
     #[getter]
     fn target_price_pct(&self) -> f64 {
         self.inner.target_price_pct
     }
 
+    /// Weighted-average life to the assumed call, in years, or ``None`` when
+    /// the deal carries no call covering this tranche.
+    #[getter]
+    fn wal_to_call(&self) -> Option<f64> {
+        self.inner.wal_to_call
+    }
+
+    /// Z-spread of the to-call flows to ``target_price_pct``, in basis
+    /// points, or ``None`` without a call.
+    #[getter]
+    fn z_spread_to_call_bp(&self) -> Option<f64> {
+        self.inner.z_spread_to_call_bp
+    }
+
+    /// Discount margin to call for a floating-rate tranche, in basis points,
+    /// or ``None`` for fixed-rate tranches or without a call.
+    #[getter]
+    fn dm_to_call_bp(&self) -> Option<f64> {
+        self.inner.dm_to_call_bp
+    }
+
     /// Export as a single-row pandas ``DataFrame``.
     ///
-    /// Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``, ``wal``,
-    /// ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
-    /// ``convexity``, ``target_price_pct`` — the same fields and units as the
-    /// getters of the same name.
+    /// Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``,
+    /// ``factor``, ``wal``, ``z_spread_bp``, ``cs01``, ``spread_duration``,
+    /// ``modified_duration``, ``convexity``, ``target_price_pct``,
+    /// ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp`` — the same
+    /// fields and units as the getters of the same name (the ``*_to_call``
+    /// columns are ``NaN`` without a call).
     ///
     /// One row per tranche, so a capital structure stacks with
     /// ``pd.concat([m.to_dataframe() for m in metrics])``. ``pv`` and ``cs01``
@@ -645,6 +676,7 @@ impl PyTrancheMetrics {
                 "currency",
                 "pv",
                 "price_pct",
+                "factor",
                 "wal",
                 "z_spread_bp",
                 "cs01",
@@ -652,6 +684,9 @@ impl PyTrancheMetrics {
                 "modified_duration",
                 "convexity",
                 "target_price_pct",
+                "wal_to_call",
+                "z_spread_to_call_bp",
+                "dm_to_call_bp",
             ],
         )
     }
@@ -781,7 +816,7 @@ impl PyScenarioTable {
     ///
     /// Columns: ``tranche_id``, ``cpr``, ``cdr``, ``severity`` (all annual
     /// decimals except ``severity``, which is a plain decimal), ``price``
-    /// (percentage of original balance), ``wal`` (years), ``writedown``
+    /// (percentage of current balance), ``wal`` (years), ``writedown``
     /// (currency units).
     ///
     /// One row per cell of the grid, in CPR-major then CDR then severity

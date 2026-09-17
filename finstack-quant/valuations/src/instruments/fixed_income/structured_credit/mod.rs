@@ -29,25 +29,25 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
-/// Waterfall-specific public types.
-pub mod waterfall {
-    pub use super::types::waterfall::CoverageTrigger;
-}
-
 pub use types::{
-    calculate_pool_stats, AfcSpec, AllocationMode, AssetPool, AssetType, CallExercisePolicy,
-    CollateralInstrument, ConcentrationCheckResult, ConcentrationViolation,
-    ControlledAccumulationSpec, CoverageTestConfig, CoverageTestType, CoverageTrigger,
-    CreditModelConfig, DealConfig, DealDates, DealFees, DealType, DefaultAssumptions,
-    EarlyAmortizationSpec, ExcessSpreadSpec, InstrumentCollateral, InstrumentExerciseOverride,
-    ManagementFeeType, Metadata, Overrides, PaymentCalculation, PaymentMode, PaymentRecord,
-    PaymentType, PoolAsset, PoolStats, PutExercisePolicy, Recipient, RecipientType,
-    ReinvestmentCriteria, ReinvestmentPeriod, RepLine, ReserveInterestDestination,
-    RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
-    StructuredCredit, StructuredCreditBuilder, Tranche, TrancheAccrualPeriod, TrancheBehaviorType,
-    TrancheBuilder, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution,
-    WaterfallRules, WaterfallTier, WaterfallWorkspace,
+    calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
+    AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
+    CallExercisePolicy, CallScope, CardPortfolioSpec, CccBucketRule, CollateralInstrument,
+    ConcentrationCheckResult, ConcentrationLimit, ConcentrationScope, ConcentrationViolation,
+    ControlledAccumulationSpec, CoverageRules, CoverageTestAction, CoverageTestSpec,
+    CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType, DefaultedValuation,
+    DelinquencyModel, DiscountObligationRule, EarlyAmortizationSpec, EligibilityRule,
+    EquityHistory, ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec,
+    InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec, LossAllocationPolicy,
+    ManagementFeeType, Metadata, ModificationSpec, Overrides, PaymentCalculation, PaymentMode,
+    PaymentRecord, PaymentType, PoolAsset, PoolStats, PrepaymentPenalty, PutExercisePolicy,
+    Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
+    RepLine, ReserveInterestDestination, RoundingConvention, ShiftingInterestSpec,
+    ShiftingInterestStep, SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit,
+    StructuredCreditBuilder, SwapNotional, SwapPriority, TemplateFees, Tranche,
+    TrancheAccrualPeriod, TrancheBehaviorType, TrancheBuilder, TrancheCashflows, TrancheCoupon,
+    TrancheSeniority, TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall,
+    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier, WaterfallWorkspace,
 };
 
 pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
@@ -70,9 +70,13 @@ pub use pricing::stochastic::PricingMode;
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;
 pub use pricing::waterfall::WaterfallContext;
-pub use pricing::{run_simulation_with_diagnostics, SimulationDiagnostics, SimulationRun};
+pub use pricing::{
+    run_simulation_with_diagnostics, CoverageTestDiagnostic, PeriodDiagnostics,
+    SimulationDiagnostics, SimulationRun,
+};
 
 pub use metrics::{
+    calculate_equity_metrics,
     calculate_tranche_breakeven_cdr,
     calculate_tranche_convexity,
     calculate_tranche_cs01,
@@ -91,6 +95,9 @@ pub use metrics::{
     // Deal-specific metrics
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,
+    AbsDelinquencyCalculator,
+    AbsExcessSpreadCalculator,
+    AbsPaymentRateCalculator,
     // Pricing metrics
     AccruedCalculator,
     CdrCalculator,
@@ -102,6 +109,7 @@ pub use metrics::{
     CprCalculator,
     Cs01Calculator,
     DirtyPriceCalculator,
+    EquityMetrics,
     // Risk metrics
     MacaulayDurationCalculator,
     ModifiedDurationCalculator,
@@ -125,14 +133,12 @@ pub use types::constants::{
     clo_senior_mgmt_fee_bp, clo_standard_cdr, clo_standard_cpr, clo_standard_recovery,
     clo_subordinated_mgmt_fee_bp, clo_trustee_fee_annual, cmbs_master_servicer_fee_bp,
     cmbs_special_servicer_fee_bp, cmbs_standard_cdr, cmbs_standard_cpr, cmbs_standard_recovery,
-    cmbs_trustee_fee_annual, credit_card_seasonality, default_auto_abs_speed,
-    default_auto_ramp_months, default_burnout_threshold_months, default_max_cov_lite,
+    cmbs_trustee_fee_annual, default_burnout_threshold_months, default_max_cov_lite,
     default_max_dip, default_max_obligor_concentration, default_max_second_lien,
     default_max_top10_concentration, default_max_top5_concentration, default_resolution_lag_months,
-    mortgage_seasonality, pool_balance_cleanup_threshold, psa_ramp_months, psa_terminal_cpr,
-    rmbs_servicing_fee_bp, rmbs_standard_cdr, rmbs_standard_cpr, rmbs_standard_psa,
-    rmbs_standard_recovery, rmbs_standard_sda, rmbs_trustee_fee_annual, sda_peak_cdr,
-    sda_peak_month, sda_terminal_cdr, standard_cdr_rates, standard_psa_speeds,
+    pool_balance_cleanup_threshold, psa_ramp_months, psa_terminal_cpr, rmbs_servicing_fee_bp,
+    rmbs_standard_cdr, rmbs_standard_psa, rmbs_standard_recovery, rmbs_trustee_fee_annual,
+    sda_peak_cdr, sda_peak_month, sda_terminal_cdr, standard_cdr_rates, standard_psa_speeds,
     standard_severity_rates, AVERAGE_DAYS_PER_YEAR, BASIS_POINTS_DIVISOR, MIN_PREPAYMENT_RATE,
     MONTHS_PER_YEAR, PERCENTAGE_MULTIPLIER, QUARTERLY_PERIODS_PER_YEAR,
 };

@@ -15,8 +15,8 @@ use std::collections::VecDeque;
 /// released based on the configured recovery lag.
 #[derive(Debug, Default)]
 pub(crate) struct RecoveryQueue {
-    /// Queue of pending recoveries: (origination_date, recovery_amount)
-    pending: VecDeque<(Date, Money)>,
+    /// Queue of pending claims: (default date, recovery amount, defaulted par).
+    pending: VecDeque<(Date, Money, Money)>,
 }
 
 impl RecoveryQueue {
@@ -27,13 +27,18 @@ impl RecoveryQueue {
         }
     }
 
-    /// Add a new recovery to the queue.
-    pub(crate) fn add_recovery(&mut self, origination_date: Date, amount: Money) {
+    /// Add a new recovery claim to the queue.
+    ///
+    /// `origination_date` is the default date the recovery lag runs from,
+    /// `amount` the recovery cash expected on the claim (zero claims are
+    /// dropped) and `par` the defaulted par the claim stands for, which the
+    /// market-value coverage rule carries instead of the recovery.
+    pub(crate) fn add_recovery(&mut self, origination_date: Date, amount: Money, par: Money) {
         if amount.amount() > 0.0 {
             let index = self
                 .pending
-                .partition_point(|(date, _)| *date <= origination_date);
-            self.pending.insert(index, (origination_date, amount));
+                .partition_point(|(date, _, _)| *date <= origination_date);
+            self.pending.insert(index, (origination_date, amount, par));
         }
     }
 
@@ -41,8 +46,17 @@ impl RecoveryQueue {
     pub(crate) fn pending_amount(&self, base_currency: Currency) -> Money {
         self.pending
             .iter()
-            .fold(Money::from((0_i64, base_currency)), |acc, (_, amt)| {
+            .fold(Money::from((0_i64, base_currency)), |acc, (_, amt, _)| {
                 acc.checked_add(*amt).unwrap_or(acc)
+            })
+    }
+
+    /// Total defaulted par behind the pending (unreleased) claims.
+    pub(crate) fn pending_par(&self, base_currency: Currency) -> Money {
+        self.pending
+            .iter()
+            .fold(Money::from((0_i64, base_currency)), |acc, (_, _, par)| {
+                acc.checked_add(*par).unwrap_or(acc)
             })
     }
 
@@ -52,7 +66,10 @@ impl RecoveryQueue {
     /// lag window of the final payment date never mature inside the period
     /// loop and must be drained explicitly rather than silently dropped.
     pub(crate) fn drain_pending(&mut self) -> Vec<(Date, Money)> {
-        self.pending.drain(..).collect()
+        self.pending
+            .drain(..)
+            .map(|(date, amount, _)| (date, amount))
+            .collect()
     }
 
     /// Release all recoveries that have matured based on the lag period.
@@ -66,14 +83,14 @@ impl RecoveryQueue {
     ) -> finstack_quant_core::Result<Money> {
         let mut released = Money::from((0_i64, base_currency));
 
-        while let Some((orig_date, _)) = self.pending.front() {
+        while let Some((orig_date, _, _)) = self.pending.front() {
             let months = i32::try_from(recovery_lag_months).map_err(|_| {
                 finstack_quant_core::Error::Validation(
                     "recovery lag exceeds supported calendar range".into(),
                 )
             })?;
             if orig_date.add_months(months) <= current_date {
-                if let Some((_, amount)) = self.pending.pop_front() {
+                if let Some((_, amount, _)) = self.pending.pop_front() {
                     released = released.checked_add(amount)?;
                 }
             } else {
@@ -96,10 +113,12 @@ mod tests {
         queue.add_recovery(
             date!(2024 - 02 - 29),
             Money::new(20.0, Currency::USD).expect("second claim"),
+            Money::new(50.0, Currency::USD).expect("second par"),
         );
         queue.add_recovery(
             date!(2024 - 01 - 31),
             Money::new(10.0, Currency::USD).expect("first claim"),
+            Money::new(25.0, Currency::USD).expect("first par"),
         );
         assert_eq!(
             queue

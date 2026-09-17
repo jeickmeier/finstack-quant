@@ -10,6 +10,7 @@
 mod amortization;
 mod conventions;
 mod credit_models;
+mod curve_shapes;
 mod floating_rate;
 mod overnight_replay;
 mod principal_events;

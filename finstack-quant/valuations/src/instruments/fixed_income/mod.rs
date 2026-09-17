@@ -51,6 +51,8 @@
 //! - [`AgencyMbsPassthrough`] for mortgage pass-throughs
 //! - [`crate::cashflow`] for cashflow generation
 
+/// Revolving credit facility module.
+pub mod asset_backed_facility;
 /// Bond module - Fixed and floating rate bonds.
 pub mod bond;
 /// Bond future module - Bond futures contracts.
@@ -67,7 +69,6 @@ pub mod fi_trs;
 pub mod inflation_linked_bond;
 /// MBS passthrough module - Agency MBS pass-throughs (renamed from agency_mbs_passthrough).
 pub mod mbs_passthrough;
-/// Revolving credit facility module.
 pub mod revolving_credit;
 /// Structured credit module - ABS, RMBS, CMBS, CLO.
 pub mod structured_credit;
@@ -76,6 +77,7 @@ pub mod tba;
 /// Term loan module.
 pub mod term_loan;
 
+pub use asset_backed_facility::AssetBackedFacility;
 pub use bond::{Bond, BondSettlementConvention};
 pub use bond_future::{BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond};
 pub use cmo::{AgencyCmo, CmoTranche, CmoTrancheType, CmoWaterfall};

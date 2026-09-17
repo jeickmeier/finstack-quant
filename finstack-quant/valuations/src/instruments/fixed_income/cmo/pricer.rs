@@ -60,8 +60,13 @@ pub(crate) fn resolve_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyM
 fn actual_psa_from_model(model: &PrepaymentModelSpec) -> f64 {
     match &model.curve {
         Some(PrepaymentCurve::Psa { speed_multiplier }) => *speed_multiplier,
-        // Constant / lockout: map CPR to a PSA-equivalent multiple (100% PSA
-        // terminal CPR = 6%). Clamped non-negative for safety.
+        // Explicit vectors: the held terminal CPR is the pool's long-run speed.
+        Some(PrepaymentCurve::Vector { monthly_cpr }) => {
+            (monthly_cpr.last().copied().unwrap_or(model.cpr) / 0.06).max(0.0)
+        }
+        // Constant / lockout / ABS (annualized month-1 speed): map CPR to a
+        // PSA-equivalent multiple (100% PSA terminal CPR = 6%). Clamped
+        // non-negative for safety.
         _ => (model.cpr / 0.06).max(0.0),
     }
 }

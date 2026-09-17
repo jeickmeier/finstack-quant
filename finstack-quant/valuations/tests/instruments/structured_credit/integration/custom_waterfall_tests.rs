@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, AssetType, DealType, PaymentCalculation, PaymentType, PoolAsset, Recipient,
     RecipientType, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
@@ -65,6 +65,13 @@ fn create_test_pool() -> AssetPool {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         });
     }
     pool
@@ -431,8 +438,11 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
             deferred_interest: None,
             reserve_balance: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+            defaulted_collateral_value: Money::new(0.0, Currency::USD)
+                .expect("valid money fixture"),
             recovery_proceeds: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             floating_rate_shift: shift,
+            equity_history: None,
         };
         let dist = execute_waterfall(&waterfall, &tranches, &pool, ctx).expect("execute");
         dist.distributions
@@ -532,26 +542,54 @@ fn fees_attached_after_custom_waterfall_fail_at_pricing_time() {
 #[test]
 fn duplicate_coverage_trigger_across_waterfall_and_deal_is_rejected() {
     let mut waterfall = by_class_waterfall();
-    waterfall = waterfall.add_coverage_trigger(CoverageTrigger {
-        tranche_id: "SENIOR_A".to_string(),
-        oc_trigger: Some(1.2),
-        ic_trigger: None,
-    });
+    waterfall.insert_coverage_test(CoverageTestSpec::oc("SENIOR_A", 1.2));
 
     let deal = create_test_deal()
-        .with_coverage_triggers(vec![CoverageTrigger {
-            tranche_id: "SENIOR_A".to_string(),
-            oc_trigger: Some(1.25),
-            ic_trigger: None,
-        }])
+        .with_coverage_triggers(vec![CoverageTestSpec::oc("SENIOR_A", 1.25)])
         .expect("deal-level trigger");
 
     let err = deal
         .with_waterfall(waterfall)
-        .expect_err("duplicate trigger for one tranche must be rejected");
+        .expect_err("duplicate test for one tranche and kind must be rejected");
     assert!(
-        err.to_string().contains("duplicate coverage trigger"),
+        err.to_string().contains("duplicate"),
         "error should name the duplication, got: {err}"
+    );
+}
+
+/// A coverage test cannot sit ahead of the coupon it protects.
+#[test]
+fn coverage_test_ahead_of_its_tranche_interest_is_rejected() {
+    let waterfall = Waterfall::builder(Currency::USD)
+        .add_tier(WaterfallTier::coverage_tests(
+            "early_test",
+            1,
+            vec![CoverageTestSpec::oc("SENIOR_A", 1.2)],
+        ))
+        .add_tier(
+            WaterfallTier::new("a_interest", 2, PaymentType::Interest)
+                .add_recipient(Recipient::tranche_interest("A_int", "SENIOR_A")),
+        )
+        .add_tier(
+            WaterfallTier::new("principal", 3, PaymentType::Principal)
+                .add_recipient(Recipient::tranche_principal("A_prin", "SENIOR_A", None))
+                .add_recipient(Recipient::tranche_principal("B_prin", "SUB_B", None)),
+        )
+        .add_tier(
+            WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(Recipient::new(
+                "equity_distribution",
+                RecipientType::Equity,
+                PaymentCalculation::ResidualCash,
+            )),
+        )
+        .build()
+        .expect("waterfall");
+    let err = create_test_deal()
+        .with_waterfall(waterfall)
+        .expect_err("a test placed before its tranche's interest tier must be rejected");
+    assert!(
+        err.to_string().contains("sits before"),
+        "error should explain the ordering, got: {err}"
     );
 }
 

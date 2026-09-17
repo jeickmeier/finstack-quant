@@ -32,6 +32,33 @@ mod principal;
 mod recovery;
 mod schedule;
 
+/// Read a per-month vector at a seasoning month: month 0 and month 1 read
+/// the first entry, months past the end hold the last one.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when the vector is empty or the entry is not
+/// a finite decimal in `[0, 1]` (rates) — the caller names the field.
+pub(super) fn vector_at(
+    values: &[f64],
+    seasoning_months: u32,
+    name: &str,
+) -> finstack_quant_core::Result<f64> {
+    let Some(last) = values.len().checked_sub(1) else {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{name} must hold at least one value"
+        )));
+    };
+    let index = (seasoning_months.saturating_sub(1) as usize).min(last);
+    let value = values[index];
+    if !value.is_finite() || value < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{name}[{index}] ({value}) must be finite and non-negative"
+        )));
+    }
+    Ok(value)
+}
+
 pub use amortization::{AmortizationSpec, Notional};
 pub use coupon::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,

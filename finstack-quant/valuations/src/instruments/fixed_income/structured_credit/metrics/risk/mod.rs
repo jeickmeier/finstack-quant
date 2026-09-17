@@ -11,6 +11,18 @@ pub(crate) mod severity01;
 pub(crate) mod spreads;
 pub(crate) mod ytm;
 
+/// Recovery rate a bumped spec actually applies: the flat `rate`, or one
+/// minus the average of the severity vector when it is present. Used by the
+/// recovery/severity sensitivities to measure the achieved bump width.
+pub(super) fn effective_recovery(spec: &crate::cashflow::builder::RecoveryModelSpec) -> f64 {
+    match &spec.severity_vector {
+        Some(severities) if !severities.is_empty() => {
+            1.0 - severities.iter().sum::<f64>() / severities.len() as f64
+        }
+        _ => spec.rate,
+    }
+}
+
 pub use breakeven_cdr::calculate_tranche_breakeven_cdr;
 pub use convexity::{calculate_tranche_convexity, ConvexityCalculator};
 pub use duration::{

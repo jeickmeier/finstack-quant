@@ -11,8 +11,10 @@ use finstack_quant_core::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::cmbs::{BalloonSpec, PrepaymentPenalty, SpecialServicingSpec};
 use super::collateral::{InstrumentCollateral, ReserveInterestDestination};
 use super::enums::{AssetType, DealType};
+use super::npl::LiquidationSpec;
 use super::tranches::TrancheStructure;
 use crate::instruments::fixed_income::structured_credit::types::constants::BASIS_POINTS_DIVISOR;
 use finstack_quant_core::types::CreditRating;
@@ -92,6 +94,39 @@ pub struct PoolAsset {
     /// current state and remaining contractual periods.
     #[serde(default)]
     pub contractual_payment: Option<Money>,
+    /// Market price as percent of par (`60.0` = 60% of par). Read by the
+    /// excess-CCC coverage rule; an asset without a price is carried at par.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_price_pct: Option<f64>,
+    /// Delinquent balance per bucket (30, 60, 90 days past due, ...) at the
+    /// valuation date, in the pool's currency. Requires
+    /// `credit_model.delinquency` with the same number of buckets; the sum
+    /// must not exceed `balance`. `None` for a fully current asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delinquency_buckets: Option<Vec<Money>>,
+    /// Balloon maturity behavior (commercial mortgages): the share that does
+    /// not refinance at maturity is extended instead of paid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub balloon: Option<BalloonSpec>,
+    /// Prepayment penalty the borrower pays on voluntary prepayment; the
+    /// premium is collected as interest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prepayment_penalty: Option<PrepaymentPenalty>,
+    /// Special-servicing state: an appraisal reduction cuts the interest
+    /// advanced on the loan, and the special servicing fee accrues on it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_servicing: Option<SpecialServicingSpec>,
+    /// Annual net operating income of the property securing the loan, for
+    /// the pool debt-service coverage ratio.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub noi: Option<Money>,
+    /// Non-performing loan resolution: the loan pays nothing until the
+    /// resolution date, where a share liquidates (a default whose recovery
+    /// is the net proceeds) and the rest re-performs. The timeline replaces
+    /// the default flag: `is_defaulted` stays `false` and
+    /// `recovery_amount`/`default_date` stay unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liquidation: Option<LiquidationSpec>,
 }
 
 impl PoolAsset {
@@ -159,6 +194,13 @@ impl PoolAsset {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         })
     }
 
@@ -226,6 +268,13 @@ impl PoolAsset {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         }
     }
 
@@ -261,6 +310,13 @@ impl PoolAsset {
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            market_price_pct: None,
+            delinquency_buckets: None,
+            balloon: None,
+            prepayment_penalty: None,
+            special_servicing: None,
+            noi: None,
+            liquidation: None,
         }
     }
 
@@ -319,22 +375,64 @@ impl PoolAsset {
     }
 }
 
-/// Reinvestment period and rules
+/// Deal-level reinvestment period and rules.
+///
+/// While the period is active (`is_active` and the payment date is on or
+/// before `end_date`), principal proceeds are recycled into collateral
+/// instead of repaying the notes. Every note is held flat except those listed
+/// in `amortizing_tranches`, which are paid down first; only the principal
+/// left after their paydown is reinvested.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ReinvestmentPeriod {
-    /// End date of reinvestment period
+    /// Inclusive end date of the reinvestment period.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub end_date: Date,
-    /// Whether reinvestment is currently active
+    /// Whether reinvestment is currently active.
     pub is_active: bool,
-    /// Criteria for new investments
+    /// Eligibility criteria for purchases.
     pub criteria: ReinvestmentCriteria,
+    /// Notes paid down from principal proceeds during the period, in the
+    /// principal waterfall's order; every other note is held flat. Must name
+    /// non-equity tranches of the deal.
+    #[serde(default)]
+    pub amortizing_tranches: Vec<String>,
+    /// Terms of the replacement collateral. `None` clones the surviving pool
+    /// pro rata; `Some` books each period's purchases as a synthetic
+    /// `REINVEST-{n}` first-lien row with these terms.
+    #[serde(default)]
+    pub assumptions: Option<ReinvestmentAssumptions>,
+}
+
+/// Terms of the collateral bought with reinvested principal.
+///
+/// Each purchase creates a bullet first-lien row maturing `maturity_months`
+/// after the purchase date, accruing ACT/360 at `index_id` plus `spread_bp`
+/// (or at `spread_bp` as a fixed coupon when no index is given), bought at
+/// `price_pct` percent of par. A discount price builds par.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReinvestmentAssumptions {
+    /// Spread over the index in basis points (the whole coupon in basis
+    /// points when `index_id` is `None`).
+    pub spread_bp: f64,
+    /// Purchase price as percent of par (`99.0` buys `100/99` of par per unit
+    /// of cash); must not exceed `ReinvestmentCriteria::max_price`.
+    pub price_pct: f64,
+    /// Months from the purchase date to the bullet maturity.
+    pub maturity_months: u32,
+    /// Floating-rate index id (a forward curve in the market context), or
+    /// `None` for a fixed coupon.
+    pub index_id: Option<String>,
+    /// Minimum all-in annual coupon as a decimal (a floor on the resolved
+    /// index plus spread), if any.
+    pub coupon_floor: Option<f64>,
 }
 
 /// Criteria for reinvestment during revolving period
@@ -672,6 +770,13 @@ impl AssetPool {
                     recovery_rate: line.recovery_rate,
                     commitment: None,
                     contractual_payment: None,
+                    market_price_pct: None,
+                    delinquency_buckets: None,
+                    balloon: None,
+                    prepayment_penalty: None,
+                    special_servicing: None,
+                    noi: None,
+                    liquidation: None,
                 });
             }
         }
@@ -704,6 +809,13 @@ impl AssetPool {
             .instruments
             .as_ref()
             .is_some_and(|collateral| !collateral.is_empty());
+        if has_instruments && self.reinvestment_period.is_some() {
+            return Err(finstack_quant_core::Error::Validation(
+                "reinvestment_period is not supported for instrument collateral: recycled \
+                 principal cannot be placed into schedule-driven instruments"
+                    .into(),
+            ));
+        }
         if has_rep_lines && (has_assets || has_instruments) {
             return Err(finstack_quant_core::Error::Validation(
                 "asset pool must contain exactly one of assets, representative lines or \

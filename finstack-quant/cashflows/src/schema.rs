@@ -191,6 +191,7 @@ fn recovery_model_examples() -> finstack_quant_core::Result<Vec<serde_json::Valu
         &crate::builder::RecoveryModelSpec {
             rate: 0.40,
             recovery_lag: 3,
+            severity_vector: None,
         },
         "recovery model spec",
     )

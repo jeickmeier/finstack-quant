@@ -299,6 +299,10 @@ impl Money {
                 kind: NonFiniteKind::classify(amount),
             }));
         }
+        // IEEE negative zero would become the Decimal "-0", which serializes
+        // as "-0" and re-parses as "0"; normalize so wire round trips are
+        // identities.
+        let amount = if amount == 0.0 { 0.0 } else { amount };
         Self::try_new_finite(amount, currency, cfg)
     }
 

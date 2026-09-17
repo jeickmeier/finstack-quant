@@ -160,6 +160,36 @@ fn release_reserve_account(state: &mut SimulationState<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Realize every note's unpaid principal as a write-down at legal final.
+///
+/// After the last period and the terminal sweeps nothing further can reach
+/// the notes, so any balance still outstanding is a realized loss: under
+/// `ParPreserving` this is where collateral losses finally reach the notes;
+/// under `WriteDown` it catches the residual timing difference between the
+/// at-default allocation and the cash actually collected. Recorded on the
+/// final settlement date, junior first, so `total_principal + total_writedown`
+/// reconciles to the starting balance of every note.
+fn realize_principal_shortfall(state: &mut SimulationState<'_>, date: Date) -> Result<()> {
+    let mut order: Vec<_> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| std::cmp::Reverse(state.tranches.tranches[i].payment_priority));
+    for i in order {
+        let id = state.tranches.tranches[i].id.to_string();
+        let balance = state.tranche_balances[&id].amount();
+        if balance <= WRITEDOWN_DE_MINIMIS {
+            continue;
+        }
+        let shortfall = Money::new(balance, state.base_currency)?;
+        if let Some(res) = state.results.get_mut(&id) {
+            res.writedown_flows.push((date, shortfall));
+            res.total_writedown = res.total_writedown.checked_add(shortfall)?;
+        }
+        state
+            .tranche_balances
+            .insert(id, Money::from((0_i64, state.base_currency)));
+    }
+    Ok(())
+}
+
 /// Release undistributed and controlled-accumulation principal at termination.
 fn release_principal_funding_account(state: &mut SimulationState<'_>) -> Result<()> {
     let amount = state
@@ -264,10 +294,13 @@ pub(crate) fn prepare_deal_simulation(
     // amortization/prepayment/defaults rather than being frozen at closing.
     let waterfall = instrument.create_waterfall()?;
     for tranche in &tranches.tranches {
-        if waterfall.coverage_triggers.iter().any(|trigger| {
-            trigger.tranche_id == tranche.id.as_str()
-                && ((trigger.oc_trigger.is_some() && tranche.oc_trigger.is_some())
-                    || (trigger.ic_trigger.is_some() && tranche.ic_trigger.is_some()))
+        if waterfall.coverage_tests().any(|test| {
+            test.tranche_id == tranche.id.as_str()
+                && match test.kind {
+                    CoverageTestType::Oc => tranche.oc_trigger.is_some(),
+                    CoverageTestType::Ic => tranche.ic_trigger.is_some(),
+                    CoverageTestType::BorrowingBase => false,
+                }
         }) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "duplicate tranche/waterfall coverage configuration for {}",
@@ -389,6 +422,9 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         instrument.credit_model.recovery_spec.recovery_lag,
     );
 
+    // Hedge swaps depend on the market context, not on the path.
+    state.hedge_schedules = super::hedges::hedge_schedules(instrument, context, as_of)?;
+
     // Simulate period-by-period
     for contractual_period in &prepared.periods {
         let pay_date = contractual_period.payment_date;
@@ -397,45 +433,86 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
             break;
         }
 
-        // Clean-up call: if pool factor drops below threshold, redeem tranches.
-        //
-        // INTEX/Bloomberg convention: when pool factor (current / original total
-        // balance) drops below the cleanup threshold (typically 10%), the equity
-        // holder may exercise an optional redemption. Redemption pays tranches
-        // in seniority order (senior first), bounded by the remaining pool value.
-        //
-        // Cleanup-call redemption settles at full claim: par + accrued stub
-        // interest + deferred (PIK) interest (+ optional call premium). Interest
-        // is recorded as an interest flow and does not retire notional.
-        if let Some(cleanup_threshold) = instrument.cleanup_call_pct {
+        // Optional redemption: an assumed deal call on its date, or the
+        // clean-up call once the pool factor drops below the threshold. Both
+        // realize the collateral at `liquidation_price_pct` (par by default)
+        // together with pending recoveries and every cash account, and pay
+        // the notes in seniority order at the redemption price plus stub
+        // accrued and deferred interest. The clean-up call is optional: it is
+        // only exercised when those proceeds cover the debt notes' claims; a
+        // call assumption redeems regardless, bounded by the proceeds.
+        // Redemption settles the full claim: a premium over par is interest,
+        // a discount is a principal write-down. Only principal retires
+        // notional.
+        let deal_call = instrument
+            .call_assumption
+            .as_ref()
+            .filter(|call| matches!(call.scope, CallScope::Deal) && pay_date >= call.date);
+        let cleanup = instrument.cleanup_call_pct.is_some_and(|threshold| {
             let pool_factor = if state.total_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.total_pool_balance.amount()
             } else {
                 0.0
             };
-            if pool_factor < cleanup_threshold && pool_factor > 0.0 {
-                // Cleanup redemption realizes the remaining pool and its
-                // pending recovery rights. The lag queue therefore contributes
-                // cash in addition to current pool outstanding.
-                let pending_recoveries = state.recovery_queue.pending_amount(state.base_currency);
-                // The cleanup call realizes the pending recoveries immediately
-                // (they fund the redemption below); drain the queue so the
-                // end-of-simulation drain cannot release them a second time.
-                let _ = state.recovery_queue.drain_pending();
-                // Any controlled-accumulation funding account holds collected
-                // pool principal not yet released as a bullet. At the cleanup call
-                // it is real cash available to redeem the notes; fold it into the
-                // redemption and zero the account so the post-loop terminal sweep
-                // (`release_principal_funding_account`) cannot double-count or
-                // mis-allocate it across the (now-redeemed) balances.
-                let funding_balance = state.principal_funding_account.amount();
-                state.principal_funding_account = Money::from((0_i64, state.base_currency));
-                let mut available_for_redemption =
-                    state.pool_outstanding.amount() + pending_recoveries.amount() + funding_balance;
+            pool_factor < threshold && pool_factor > 0.0
+        });
+        if deal_call.is_some() || cleanup {
+            let redemption_price_pct = deal_call.map_or(100.0, |call| call.price_pct);
+            let liquidation = instrument.liquidation_price_pct.unwrap_or(100.0) / 100.0;
+            let zero = Money::from((0_i64, state.base_currency));
+            let pending_recoveries = state.recovery_queue.pending_amount(state.base_currency);
+            let proceeds = state.pool_outstanding.amount() * liquidation
+                + pending_recoveries.amount()
+                + state.principal_funding_account.amount()
+                + state.reserve_balance.amount()
+                + state.spread_account.amount()
+                + state.undistributed_interest.amount()
+                + state.undistributed_principal.amount();
 
-                // Stub-period start for accrued-interest calculation: the last
-                // payment date (or closing) up to this cleanup-call date.
-                let cleanup_period_start = state.prev_date.unwrap_or(state.closing_date);
+            // Stub-period start for accrued-interest calculation: the last
+            // payment date (or closing) up to this redemption date.
+            let redemption_period_start = state.prev_date.unwrap_or(state.closing_date);
+
+            // Each note's balance, coupon and stub accrued; the debt notes'
+            // claims at the redemption price decide an optional clean-up.
+            let mut claims = 0.0_f64;
+            let mut notes: Vec<(f64, f64, f64)> = Vec::with_capacity(state.tranches.tranches.len());
+            for tranche in &state.tranches.tranches {
+                let balance = state
+                    .tranche_balances
+                    .get(tranche.id.as_str())
+                    .map_or(0.0, |m| m.amount());
+                let coupon_rate =
+                    tranche
+                        .coupon
+                        .try_rate_for_period(redemption_period_start, as_of, context)?;
+                let accrual_factor = tranche.day_count.year_fraction(
+                    redemption_period_start,
+                    pay_date,
+                    DayCountContext::default(),
+                )?;
+                let accrued = balance * coupon_rate * accrual_factor;
+                let deferred = state
+                    .deferred_interest
+                    .get(tranche.id.as_str())
+                    .map_or(0.0, |m| m.amount());
+                if tranche.seniority != TrancheSeniority::Equity {
+                    claims += balance * redemption_price_pct / 100.0 + accrued + deferred;
+                }
+                notes.push((balance, coupon_rate, accrued));
+            }
+
+            if deal_call.is_some() || proceeds + WRITEDOWN_DE_MINIMIS >= claims {
+                // The redemption consumes the pending recoveries and every
+                // account; drain and zero them so the terminal sweeps cannot
+                // pay them a second time.
+                let _ = state.recovery_queue.drain_pending();
+                state.principal_funding_account = zero;
+                state.reserve_balance = zero;
+                state.spread_account = zero;
+                state.undistributed_interest = zero;
+                state.undistributed_principal = zero;
+                let mut available_for_redemption = proceeds;
 
                 // Pay tranches in seniority order (Senior=0 first, Equity=3 last)
                 let mut redemption_order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
@@ -447,52 +524,36 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                     }
                     let tranche = &state.tranches.tranches[idx];
                     let tranche_id_str = tranche.id.as_str();
-                    let balance = state
-                        .tranche_balances
-                        .get(tranche_id_str)
-                        .copied()
-                        .unwrap_or(Money::from((0_i64, state.base_currency)));
-
-                    if balance.amount() <= WRITEDOWN_DE_MINIMIS {
+                    let (balance_amt, coupon_rate, accrued) = notes[idx];
+                    if balance_amt <= WRITEDOWN_DE_MINIMIS {
                         continue;
                     }
-
-                    // Accrued interest for the stub period on the current
-                    // (post-writedown) balance, using the tranche coupon and
-                    // its own day-count convention.
-                    let coupon_rate =
-                        tranche
-                            .coupon
-                            .try_rate_for_period(cleanup_period_start, as_of, context)?;
-                    let accrual_factor = tranche.day_count.year_fraction(
-                        cleanup_period_start,
-                        pay_date,
-                        DayCountContext::default(),
-                    )?;
-                    let accrued = balance.amount() * coupon_rate * accrual_factor;
-
-                    // Deferred / PIK interest carried forward into this period.
+                    let balance = Money::new(balance_amt, state.base_currency)?;
                     let deferred = state
                         .deferred_interest
                         .get(tranche_id_str)
-                        .map(|m| m.amount())
-                        .unwrap_or(0.0);
+                        .map_or(0.0, |m| m.amount());
 
-                    // Cleanup calls currently redeem at par with no premium.
-                    let premium = cleanup_call_premium(instrument, balance.amount());
-
-                    // Full redemption claim, bounded by available cash.
-                    let total_claim = balance.amount() + accrued + deferred + premium;
+                    // Equity is the residual holder: it is paid its balance at
+                    // par from whatever is left, then the surplus below.
+                    let price = if tranche.seniority == TrancheSeniority::Equity {
+                        100.0
+                    } else {
+                        redemption_price_pct
+                    };
+                    let premium = balance_amt * (price / 100.0 - 1.0);
+                    let principal_claim = balance_amt + premium.min(0.0);
+                    let interest_claim = accrued + deferred + premium.max(0.0);
+                    let total_claim = principal_claim + interest_claim;
                     let redemption_amt = total_claim.min(available_for_redemption);
                     available_for_redemption -= redemption_amt;
 
-                    // Split the bounded redemption: interest (accrued +
-                    // deferred + premium) is satisfied first as the senior
-                    // claim within the redemption, the remainder retires
-                    // principal. Only the principal portion reduces notional.
-                    let interest_claim = accrued + deferred + premium;
+                    // Interest (accrued + deferred + premium) is the senior
+                    // claim within the redemption; the remainder retires
+                    // principal.
                     let interest_paid = redemption_amt.min(interest_claim).max(0.0);
                     let principal_paid = (redemption_amt - interest_paid).max(0.0);
+                    let haircut = (balance_amt - principal_claim).max(0.0);
 
                     let redemption = Money::new(redemption_amt, state.base_currency)?;
                     let interest_money = Money::new(interest_paid, state.base_currency)?;
@@ -519,6 +580,11 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                             res.total_principal =
                                 res.total_principal.checked_add(principal_money)?;
                         }
+                        if haircut > WRITEDOWN_DE_MINIMIS {
+                            let haircut_money = Money::new(haircut, state.base_currency)?;
+                            res.writedown_flows.push((pay_date, haircut_money));
+                            res.total_writedown = res.total_writedown.checked_add(haircut_money)?;
+                        }
                     }
                     // Deferred interest cured by this redemption is cleared.
                     if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
@@ -527,16 +593,16 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                             .checked_sub(Money::new(cured, state.base_currency)?)
                             .unwrap_or(Money::from((0_i64, state.base_currency)));
                     }
-                    // Only the principal portion retires notional.
+                    // Principal paid and any call discount retire notional.
                     if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
                         *bal = bal
-                            .checked_sub(principal_money)
+                            .checked_sub(Money::new(principal_paid + haircut, state.base_currency)?)
                             .unwrap_or(Money::from((0_i64, state.base_currency)));
                     }
                 }
 
                 // Residual after full redemption goes to equity / most-junior
-                // (cleanup calls normally leave pool value above note claim).
+                // (calls normally leave pool value above note claim).
                 // Mirrors `drain_pending_recoveries_at_end` and terminal sweeps.
                 if available_for_redemption > WRITEDOWN_DE_MINIMIS {
                     let residual_id = state
@@ -550,7 +616,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                         append_residual_principal(&mut state, &id, residual, pay_date)?;
                     }
                 }
-                break; // Terminate simulation after cleanup call
+                break; // Terminate simulation after the redemption
             }
         }
 
@@ -588,7 +654,12 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
 
     // Each remaining recovery claim settles at its contractual lagged date,
     // after current terminal distributions have updated outstanding note par.
-    drain_pending_recoveries_at_end(&mut state, prepared.calendar, prepared.convention)?;
+    let final_date =
+        drain_pending_recoveries_at_end(&mut state, prepared.calendar, prepared.convention)?;
+
+    // Whatever principal the notes never received is a realized loss on the
+    // final settlement date (see `realize_principal_shortfall`).
+    realize_principal_shortfall(&mut state, final_date)?;
 
     let (tranches, diagnostics) = state.finalize_with_diagnostics();
     Ok(SimulationRun {
@@ -640,6 +711,7 @@ pub(crate) fn simulate_instrument_pool(
         None => Ok(SimulationRun {
             tranches: HashMap::default(),
             diagnostics: SimulationDiagnostics {
+                periods: Vec::new(),
                 reserve_balance_path: Vec::new(),
                 reserve_interest_paid: Vec::new(),
                 draws_from_reserve: Money::from((0_i64, currency)),
@@ -668,6 +740,7 @@ pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
         None => Ok(SimulationRun {
             tranches: HashMap::default(),
             diagnostics: SimulationDiagnostics {
+                periods: Vec::new(),
                 reserve_balance_path: Vec::new(),
                 reserve_interest_paid: Vec::new(),
                 draws_from_reserve: Money::from((0_i64, currency)),
@@ -680,11 +753,14 @@ pub(crate) fn simulate_with_source<S: PoolFlowSource + ?Sized>(
 }
 
 /// Pay each outstanding recovery claim once, after its full contractual lag.
+///
+/// Returns the final settlement date of the simulation: the last recovery
+/// release date, or the last payment date when no claim was pending.
 fn drain_pending_recoveries_at_end(
     state: &mut SimulationState,
     calendar: &dyn HolidayCalendar,
     convention: BusinessDayConvention,
-) -> Result<()> {
+) -> Result<Date> {
     let mut pending = state.recovery_queue.drain_pending();
     pending.sort_by_key(|(date, _)| *date);
     let last_date = state.prev_date.unwrap_or(state.closing_date);
@@ -693,15 +769,17 @@ fn drain_pending_recoveries_at_end(
             "recovery lag exceeds supported calendar range".into(),
         )
     })?;
+    let mut final_date = last_date;
     for (default_date, amount) in pending {
         let release_date = adjust(
             default_date.add_months(lag_months).max(last_date),
             convention,
             calendar,
         )?;
+        final_date = final_date.max(release_date);
         distribute_terminal_principal(state, amount, release_date)?;
     }
-    Ok(())
+    Ok(final_date)
 }
 
 /// Aggregate tranche-level cashflows into one dated cashflow vector.

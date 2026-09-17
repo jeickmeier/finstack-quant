@@ -73,6 +73,7 @@ finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json
 finstack-quant/valuations/tests/instruments/json_examples/asian_option.json
+finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json
 finstack-quant/valuations/tests/instruments/json_examples/autocallable.json
 finstack-quant/valuations/tests/instruments/json_examples/barrier_option.json
 finstack-quant/valuations/tests/instruments/json_examples/basis_swap.json

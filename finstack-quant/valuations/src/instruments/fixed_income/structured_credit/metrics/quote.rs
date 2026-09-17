@@ -1,6 +1,6 @@
 //! Settlement and target amounts shared by structured-credit price and spread metrics.
 
-use super::pricing::{accrued::accrued_at, prices::get_original_notional};
+use super::pricing::{accrued::accrued_at, prices::quote_notional};
 use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::{StructuredCredit, TrancheCashflows};
 use crate::metrics::MetricContext;
@@ -18,7 +18,9 @@ pub(crate) fn settlement_date(deal: &StructuredCredit, as_of: Date) -> Result<Da
     Ok(settlement)
 }
 
-/// One buyer entitlement date and original-face clean/dirty conversion.
+/// One buyer entitlement date and clean/dirty conversion on the CURRENT-face
+/// quote basis (`notional` is the current balance the price is quoted
+/// against, never the original face).
 pub(crate) struct SettlementQuote {
     pub(crate) settlement: Date,
     pub(crate) notional: f64,
@@ -45,7 +47,7 @@ impl SettlementQuote {
     pub(crate) fn from_context(context: &mut MetricContext) -> Result<Self> {
         let settlement =
             settlement_date(context.instrument_as::<StructuredCredit>()?, context.as_of)?;
-        let notional = get_original_notional(context)?;
+        let notional = quote_notional(context)?;
         let accrued = accrued_at(context, settlement)?;
         Self::new(settlement, notional, accrued)
     }

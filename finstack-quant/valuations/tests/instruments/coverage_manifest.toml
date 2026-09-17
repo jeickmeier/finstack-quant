@@ -51,6 +51,15 @@ no_market_dependencies = false
 rationale = "RevolvingCredit.base_rate_spec: BaseRateSpec lacks PartialEq across index and fallback terms."
 
 [[instrument]]
+tag = "asset_backed_facility"
+fixture = "json_examples/asset_backed_facility.json"
+lossless = false
+partial_eq_blocker = "AssetBackedFacility.collateral: AssetPool"
+required_keys = ["id"]
+no_market_dependencies = false
+rationale = "AssetBackedFacility.collateral: AssetPool lacks PartialEq across instrument collateral and behavior specs."
+
+[[instrument]]
 tag = "bond_future"
 fixture = "json_examples/bond_future.json"
 lossless = false

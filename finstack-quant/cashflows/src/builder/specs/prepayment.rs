@@ -1,5 +1,7 @@
 //! Prepayment model specifications for credit instruments.
 
+use super::vector_at;
+
 /// Prepayment curve shape.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -21,6 +23,21 @@ pub enum PrepaymentCurve {
         /// Number of months with zero prepayment (e.g., 60 for 5-year lockout)
         lockout_months: u32,
     },
+    /// ABS speed: each month a constant share of the *original* balance
+    /// prepays, so the single-month mortality rises with seasoning,
+    /// `SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income
+    /// Securities*, auto-loan ABS convention). The `cpr` field is ignored.
+    Abs {
+        /// Monthly prepayment as a decimal fraction of the original balance
+        /// (`0.015` = 1.5% ABS).
+        speed: f64,
+    },
+    /// Explicit annual CPR for each month of seasoning; the last value is
+    /// held for later months. The `cpr` field is ignored.
+    Vector {
+        /// Annual CPR per month of seasoning as decimals, month 1 first.
+        monthly_cpr: Vec<f64>,
+    },
 }
 
 /// Prepayment model specification.
@@ -30,10 +47,10 @@ pub enum PrepaymentCurve {
 pub struct PrepaymentModelSpec {
     /// CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
     ///
-    /// This field is **ignored** when [`PrepaymentCurve::Psa`] is active: the
-    /// annual CPR is then derived entirely from the PSA seasoning ramp and
-    /// its `speed_multiplier`. It IS used by [`PrepaymentCurve::CmbsLockout`]
-    /// as the post-lockout CPR.
+    /// This field is **ignored** when [`PrepaymentCurve::Psa`],
+    /// [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
+    /// monthly rate is then derived entirely from the curve. It IS used by
+    /// [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
     pub cpr: f64,
     /// Optional curve shape (default: constant)
     #[serde(default)]
@@ -60,6 +77,12 @@ impl PrepaymentModelSpec {
     /// - months `<= lockout_months`: `CPR = 0`
     /// - months `> lockout_months`: `CPR = self.cpr`
     ///
+    /// For the ABS curve the SMM is `speed / (1 − speed·(t − 1))` with
+    /// `t = max(seasoning, 1)`, capped at 1.0 once the original balance is
+    /// exhausted. For the vector curve the annual CPR is the entry for the
+    /// seasoning month (month 0 reads the first entry, later months hold the
+    /// last one).
+    ///
     /// # Arguments
     ///
     /// * `seasoning_months` - Number of months since origination or pool start.
@@ -73,6 +96,8 @@ impl PrepaymentModelSpec {
     /// Returns `Error::Validation` if:
     /// - the PSA `speed_multiplier` is non-finite (NaN/∞) or negative
     /// - the scaled annual CPR exceeds 1.0 (e.g. an over-unity multiplier)
+    /// - the ABS `speed` is outside `[0, 1]`
+    /// - the vector curve is empty or holds a value outside `[0, 1]`
     ///
     /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
     /// constant `cpr` is negative or non-finite.
@@ -108,6 +133,12 @@ impl PrepaymentModelSpec {
                     self.cpr
                 }
             }
+            Some(PrepaymentCurve::Abs { speed }) => {
+                return super::super::credit_rates::abs_to_smm(*speed, seasoning_months);
+            }
+            Some(PrepaymentCurve::Vector { monthly_cpr }) => {
+                vector_at(monthly_cpr, seasoning_months, "monthly_cpr")?
+            }
         };
 
         if cpr > 1.0 {
@@ -119,6 +150,29 @@ impl PrepaymentModelSpec {
 
         use super::super::credit_rates::cpr_to_smm;
         cpr_to_smm(cpr)
+    }
+
+    /// Validate the curve parameters without evaluating a particular month.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` for a non-finite or negative constant CPR,
+    /// an invalid PSA multiplier, an ABS speed outside `[0, 1]`, or a vector
+    /// curve that is empty or holds a value outside `[0, 1]`.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if let Some(PrepaymentCurve::Vector { monthly_cpr }) = &self.curve {
+            for (index, cpr) in monthly_cpr.iter().enumerate() {
+                if !cpr.is_finite() || !(0.0..=1.0).contains(cpr) {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "monthly_cpr[{index}] ({cpr}) must be a decimal in [0, 1]"
+                    )));
+                }
+            }
+        }
+        // Month 1 and the PSA/SDA peak cover every branch of the piecewise curves.
+        self.smm(1)?;
+        self.smm(30)?;
+        Ok(())
     }
 
     /// Constant CPR (no curve).
@@ -232,6 +286,74 @@ impl PrepaymentModelSpec {
         Self {
             cpr: post_lockout_cpr,
             curve: Some(PrepaymentCurve::CmbsLockout { lockout_months }),
+        }
+    }
+
+    /// ABS speed curve (auto-loan and consumer ABS convention).
+    ///
+    /// Every month the same share `speed` of the *original* balance prepays,
+    /// so the single-month mortality on the remaining balance rises with
+    /// seasoning: `SMM_t = speed / (1 − speed·(t − 1))`. The stored `cpr`
+    /// is the annualized month-1 rate and is ignored by [`Self::smm`].
+    ///
+    /// # Arguments
+    ///
+    /// * `speed` - Monthly prepayment as a decimal fraction of the original
+    ///   balance (`0.015` = 1.5% ABS), in `[0, 1]`.
+    ///
+    /// # Returns
+    ///
+    /// Prepayment model using the ABS curve.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    ///
+    /// let spec = PrepaymentModelSpec::abs(0.015);
+    /// assert!((spec.smm(1)? - 0.015).abs() < 1e-15);
+    /// assert!(spec.smm(36)? > spec.smm(1)?);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    ///
+    /// # References
+    ///
+    /// - Fabozzi, F. J. (ed.), *The Handbook of Fixed Income Securities*,
+    ///   auto-loan ABS prepayment conventions.
+    pub fn abs(speed: f64) -> Self {
+        Self {
+            cpr: (1.0 - (1.0 - speed).powi(12)).clamp(0.0, 1.0),
+            curve: Some(PrepaymentCurve::Abs { speed }),
+        }
+    }
+
+    /// Explicit annual CPR per month of seasoning (the last value is held).
+    ///
+    /// The stored `cpr` is the first vector entry and is ignored by
+    /// [`Self::smm`].
+    ///
+    /// # Arguments
+    ///
+    /// * `monthly_cpr` - Annual CPR per seasoning month as decimals in
+    ///   `[0, 1]`, month 1 first; must be non-empty.
+    ///
+    /// # Returns
+    ///
+    /// Prepayment model using the vector curve.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+    ///
+    /// let spec = PrepaymentModelSpec::vector(vec![0.02, 0.04, 0.06]);
+    /// assert_eq!(spec.smm(3)?, spec.smm(12)?);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn vector(monthly_cpr: Vec<f64>) -> Self {
+        Self {
+            cpr: monthly_cpr.first().copied().unwrap_or(0.0),
+            curve: Some(PrepaymentCurve::Vector { monthly_cpr }),
         }
     }
 }

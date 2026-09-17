@@ -58,6 +58,18 @@ pub(super) fn period_averaged_monthly_rate(
     Ok(1.0 - survival.max(0.0).powf(1.0 / f64::from(k)))
 }
 
+/// Performing pool balance as a fraction of the pool balance at simulation
+/// start, the base against which cumulative-loss and timing default curves
+/// are stated. Exceeds 1.0 after par build; 1.0 for an empty starting pool.
+fn surviving_balance_fraction(state: &SimulationState) -> f64 {
+    let start = state.total_pool_balance.amount();
+    if start > 0.0 {
+        (state.pool_outstanding.amount() / start).max(0.0)
+    } else {
+        1.0
+    }
+}
+
 /// Deterministic pool-flow source using the instrument's base credit model.
 pub(crate) struct DeterministicPoolFlowSource;
 
@@ -75,11 +87,18 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
                     .smm(seasoning)
             },
         )?;
+        let survival = surviving_balance_fraction(request.state);
         let mdr = period_averaged_monthly_rate(
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |_, seasoning| request.instrument.credit_model.default_spec.mdr(seasoning),
+            |_, seasoning| {
+                request
+                    .instrument
+                    .credit_model
+                    .default_spec
+                    .mdr_with_survival(seasoning, survival)
+            },
         )?;
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
@@ -90,9 +109,15 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
             rates: PoolFlowRates {
                 smm,
                 mdr,
-                recovery_rate: request.instrument.credit_model.recovery_spec.rate,
+                recovery_rate: request
+                    .instrument
+                    .credit_model
+                    .recovery_spec
+                    .recovery_rate(request.seasoning_months),
             },
             copula_outcome: None,
+            delinquency: request.instrument.credit_model.delinquency.as_ref(),
+            card: request.instrument.credit_model.card.as_ref(),
         })
     }
 }
@@ -182,11 +207,18 @@ impl PeriodShockSource for OasPathFlowSource {
                     .smm(seasoning)
             },
         )?;
+        let survival = surviving_balance_fraction(request.state);
         let base_mdr = period_averaged_monthly_rate(
             request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |_, seasoning| request.instrument.credit_model.default_spec.mdr(seasoning),
+            |_, seasoning| {
+                request
+                    .instrument
+                    .credit_model
+                    .default_spec
+                    .mdr_with_survival(seasoning, survival)
+            },
         )?;
 
         let mut smm = base_smm;
@@ -215,7 +247,11 @@ impl PeriodShockSource for OasPathFlowSource {
         let mut shock = PeriodPoolShock::pool_wide(
             smm,
             mdr,
-            request.instrument.credit_model.recovery_spec.rate,
+            request
+                .instrument
+                .credit_model
+                .recovery_spec
+                .recovery_rate(request.seasoning_months),
         );
         shock.systematic_z = self.credit_z.unwrap_or(0.0);
         Ok(PeriodShock { shock, rate_shift })
@@ -238,6 +274,8 @@ impl PoolFlowSource for OasPathFlowSource {
                 recovery_rate: period.shock.recovery_rate,
             },
             copula_outcome: None,
+            delinquency: request.instrument.credit_model.delinquency.as_ref(),
+            card: request.instrument.credit_model.card.as_ref(),
         })
     }
 }
@@ -642,6 +680,8 @@ impl PoolFlowSource for StochasticPathFlowSource {
                 recovery_rate: shock.recovery_rate,
             },
             copula_outcome,
+            delinquency: request.instrument.credit_model.delinquency.as_ref(),
+            card: request.instrument.credit_model.card.as_ref(),
         })
     }
 }

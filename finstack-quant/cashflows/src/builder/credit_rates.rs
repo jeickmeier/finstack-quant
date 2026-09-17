@@ -146,6 +146,60 @@ pub fn mdr_to_cdr(mdr: f64) -> finstack_quant_core::Result<f64> {
     smm_to_cpr(mdr)
 }
 
+/// Convert an ABS speed to the single-month mortality for a seasoning month.
+///
+/// The ABS convention (auto-loan and consumer ABS) prepays a constant share
+/// `speed` of the *original* balance every month, so the mortality on the
+/// remaining balance rises with seasoning:
+///
+/// `SMM_t = speed / (1 − speed · (t − 1))`, `t ≥ 1`
+///
+/// Month 0 is treated as month 1. Once the original balance is exhausted
+/// (`1 − speed·(t − 1) ≤ speed`) the whole remaining balance prepays and
+/// the result is capped at 1.0.
+///
+/// # Arguments
+///
+/// * `speed` - Monthly prepayment as a decimal fraction of the original
+///   balance (`0.015` = 1.5% ABS), in `[0, 1]`.
+/// * `month` - Seasoning month of the prepayment, counted from origination.
+///
+/// # Returns
+///
+/// Single-month mortality as a decimal in `[0, 1]`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` if `speed` is non-finite or outside `[0, 1]`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_cashflows::builder::abs_to_smm;
+///
+/// assert!((abs_to_smm(0.015, 1)? - 0.015).abs() < 1e-15);
+/// // Month 36: 0.015 / (1 − 0.015 × 35) = 3.158%
+/// assert!((abs_to_smm(0.015, 36)? - 0.015 / 0.475).abs() < 1e-15);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+///
+/// # References
+///
+/// - Fabozzi, F. J. (ed.), *The Handbook of Fixed Income Securities*,
+///   auto-loan ABS prepayment conventions.
+pub fn abs_to_smm(speed: f64, month: u32) -> finstack_quant_core::Result<f64> {
+    check_unit_interval("abs speed", speed)?;
+    if speed == 0.0 {
+        return Ok(0.0);
+    }
+    let elapsed = f64::from(month.max(1) - 1);
+    let remaining = 1.0 - speed * elapsed;
+    if remaining <= speed * (1.0 + 1e-9) {
+        return Ok(1.0);
+    }
+    Ok((speed / remaining).clamp(0.0, 1.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

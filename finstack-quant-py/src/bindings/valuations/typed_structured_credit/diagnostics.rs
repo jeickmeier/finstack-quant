@@ -9,9 +9,10 @@ use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::SimulationDiagnostics;
 
-/// Reserve-account and draw-funding accounting of one deterministic
-/// simulation (``StructuredCredit.run_simulation_with_diagnostics``'s
-/// return value).
+/// Deal-level accounting of one deterministic simulation
+/// (``StructuredCredit.run_simulation_with_diagnostics``'s return value):
+/// the per-period pool, collections, cash-account and coverage-test record
+/// plus the reserve-account and draw-funding totals.
 ///
 /// Examples
 /// --------
@@ -60,8 +61,10 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sim
 /// >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)
 /// >>> diagnostics.unfunded_draws.amount
 /// 0.0
-/// >>> list(diagnostics.to_dataframe().columns)
-/// ['date', 'reserve_balance', 'reserve_interest']
+/// >>> list(diagnostics.to_dataframe().columns)[:3]
+/// ['date', 'pool_balance', 'pool_factor']
+/// >>> len(diagnostics.periods) == len(diagnostics.to_dataframe())
+/// True
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "SimulationDiagnostics",
@@ -199,16 +202,32 @@ impl PySimulationDiagnostics {
         money_to_py(self.inner.reserve_replenished)
     }
 
+    /// Per-period deal record as ``PeriodDiagnostics`` serde dicts:
+    /// ``payment_date``, ``pool_balance``, ``pool_factor``,
+    /// ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the
+    /// period's collections, defaults, recoveries, reinvested par, fees paid,
+    /// the cash-account balances, ``delinquent_balance``, ``excess_spread``
+    /// and the ``coverage_tests`` the executor evaluated.
+    #[getter]
+    fn periods<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.periods)
+    }
+
     /// One row per simulated period as a pandas ``DataFrame``.
     ///
-    /// Columns: ``date`` (ISO 8601 string), ``reserve_balance`` (end-of-period
-    /// balance) and ``reserve_interest`` (interest earned in the period),
-    /// both in currency units.
+    /// Columns: ``date`` (ISO 8601 string), ``pool_balance``,
+    /// ``pool_factor``, ``weighted_avg_coupon`` (decimal),
+    /// ``weighted_avg_spread_bp``, ``warf``, ``interest_collections``,
+    /// ``principal_collections``, ``defaults``, ``recoveries``,
+    /// ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
+    /// ``reserve_interest``, ``spread_account``, ``funding_account``,
+    /// ``delinquent_balance`` and ``excess_spread`` (annualized decimal);
+    /// amounts in currency units.
     ///
     /// Returns
     /// -------
     /// pandas.DataFrame
-    ///     The reserve path.
+    ///     The period record.
     ///
     /// Raises
     /// ------
@@ -218,19 +237,34 @@ impl PySimulationDiagnostics {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows: Vec<serde_json::Value> = self
             .inner
-            .reserve_balance_path
+            .periods
             .iter()
-            .map(|(date, balance)| {
-                let interest = self
+            .map(|period| {
+                let reserve_interest = self
                     .inner
                     .reserve_interest_paid
                     .iter()
-                    .find(|(paid, _)| paid == date)
+                    .find(|(paid, _)| *paid == period.payment_date)
                     .map_or(0.0, |(_, amount)| amount.amount());
                 serde_json::json!({
-                    "date": date.to_string(),
-                    "reserve_balance": balance.amount(),
-                    "reserve_interest": interest,
+                    "date": period.payment_date.to_string(),
+                    "pool_balance": period.pool_balance.amount(),
+                    "pool_factor": period.pool_factor,
+                    "weighted_avg_coupon": period.weighted_avg_coupon,
+                    "weighted_avg_spread_bp": period.weighted_avg_spread_bp,
+                    "warf": period.warf,
+                    "interest_collections": period.interest_collections.amount(),
+                    "principal_collections": period.principal_collections.amount(),
+                    "defaults": period.defaults.amount(),
+                    "recoveries": period.recoveries.amount(),
+                    "reinvested_par": period.reinvested_par.amount(),
+                    "fees_paid": period.fees_paid.amount(),
+                    "reserve_balance": period.reserve_balance.amount(),
+                    "reserve_interest": reserve_interest,
+                    "spread_account": period.spread_account.amount(),
+                    "funding_account": period.funding_account.amount(),
+                    "delinquent_balance": period.delinquent_balance.amount(),
+                    "excess_spread": period.excess_spread,
                 })
             })
             .collect();
@@ -239,8 +273,70 @@ impl PySimulationDiagnostics {
             &rows,
             &[
                 ("date", "str"),
+                ("pool_balance", "float64"),
+                ("pool_factor", "float64"),
+                ("weighted_avg_coupon", "float64"),
+                ("weighted_avg_spread_bp", "float64"),
+                ("warf", "float64"),
+                ("interest_collections", "float64"),
+                ("principal_collections", "float64"),
+                ("defaults", "float64"),
+                ("recoveries", "float64"),
+                ("reinvested_par", "float64"),
+                ("fees_paid", "float64"),
                 ("reserve_balance", "float64"),
                 ("reserve_interest", "float64"),
+                ("spread_account", "float64"),
+                ("funding_account", "float64"),
+                ("delinquent_balance", "float64"),
+                ("excess_spread", "float64"),
+            ],
+        )
+    }
+
+    /// Coverage-test evaluations as a long pandas ``DataFrame``.
+    ///
+    /// Columns: ``date`` (ISO 8601 string), ``test_id``, ``ratio``,
+    /// ``trigger_level``, ``cushion`` (ratio minus trigger) and ``passing``.
+    ///
+    /// Returns
+    /// -------
+    /// pandas.DataFrame
+    ///     One row per test per period.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the rows cannot be serialized.
+    #[pyo3(text_signature = "($self)")]
+    fn coverage_tests_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let rows: Vec<serde_json::Value> = self
+            .inner
+            .periods
+            .iter()
+            .flat_map(|period| {
+                period.coverage_tests.iter().map(|test| {
+                    serde_json::json!({
+                        "date": period.payment_date.to_string(),
+                        "test_id": test.test_id,
+                        "ratio": test.ratio,
+                        "trigger_level": test.trigger_level,
+                        "cushion": test.cushion,
+                        "passing": test.passing,
+                    })
+                })
+            })
+            .collect();
+        serde_rows_to_dataframe_with_schema(
+            py,
+            &rows,
+            &[
+                ("date", "str"),
+                ("test_id", "str"),
+                ("ratio", "float64"),
+                ("trigger_level", "float64"),
+                ("cushion", "float64"),
+                ("passing", "bool"),
             ],
         )
     }
@@ -249,7 +345,7 @@ impl PySimulationDiagnostics {
     fn __repr__(&self) -> String {
         format!(
             "SimulationDiagnostics(periods={}, draws_from_reserve={}, unfunded_draws={})",
-            self.inner.reserve_balance_path.len(),
+            self.inner.periods.len(),
             self.inner.draws_from_reserve.amount(),
             self.inner.unfunded_draws.amount()
         )

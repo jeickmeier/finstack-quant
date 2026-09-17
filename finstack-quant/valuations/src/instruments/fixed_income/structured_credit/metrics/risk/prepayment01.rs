@@ -55,6 +55,37 @@ fn bumped_prepayment_specs(
             let achieved = (mult_up - mult_down) * PSA_TERMINAL_CPR;
             (up, down, achieved)
         }
+        // ABS speed is a monthly share of the original balance: 1bp of annual
+        // CPR is roughly 1/12bp of ABS; the achieved width is reported in
+        // annual terms so the metric keeps its per-bp-CPR unit.
+        Some(PrepaymentCurve::Abs { speed }) => {
+            let monthly_bump = PREPAYMENT_BUMP_CPR / 12.0;
+            let speed_up = (speed + monthly_bump).min(1.0);
+            let speed_down = (speed - monthly_bump).max(0.0);
+            (
+                PrepaymentModelSpec::abs(speed_up),
+                PrepaymentModelSpec::abs(speed_down),
+                (speed_up - speed_down) * 12.0,
+            )
+        }
+        // Explicit vectors are bumped additively, entry by entry.
+        Some(PrepaymentCurve::Vector { monthly_cpr }) => {
+            let shifted = |delta: f64| -> Vec<f64> {
+                monthly_cpr
+                    .iter()
+                    .map(|cpr| (cpr + delta).clamp(0.0, 1.0))
+                    .collect()
+            };
+            let up_vec = shifted(PREPAYMENT_BUMP_CPR);
+            let down_vec = shifted(-PREPAYMENT_BUMP_CPR);
+            let achieved =
+                up_vec.first().copied().unwrap_or(0.0) - down_vec.first().copied().unwrap_or(0.0);
+            (
+                PrepaymentModelSpec::vector(up_vec),
+                PrepaymentModelSpec::vector(down_vec),
+                achieved,
+            )
+        }
         // Constant / CmbsLockout / no curve all read `cpr` directly.
         _ => {
             let cpr_up = (spec.cpr + PREPAYMENT_BUMP_CPR).max(0.0);

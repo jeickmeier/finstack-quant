@@ -105,3 +105,13 @@ on instruments.
 mise run rust-test-filter -- finstack-quant-valuations structured_credit
 mise run rust-test-crate -- finstack-quant-models
 ```
+
+## Deterministic-only inputs
+
+`validate_stochastic_tranches` rejects, with a named `Validation` error,
+deal inputs the path engines do not model: cumulative-loss and timing default
+curves (`DefaultCurve::{CumulativeLoss, Timing}`), month-of-default severity
+vectors (`RecoveryModelSpec.severity_vector`) and NPL resolution timelines
+(`PoolAsset.liquidation`). Price those deals deterministically; the
+deterministic engine and the stochastic one otherwise share `pool_flows`,
+the waterfall and every coverage test.

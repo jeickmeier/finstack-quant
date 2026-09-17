@@ -3,7 +3,6 @@
     "spec": {
       "attributes": {},
       "behavior_overrides": {
-        "abs_speed": null,
         "cdr_annual": null,
         "cpr_annual": null,
         "psa_speed_multiplier": null,
@@ -122,7 +121,6 @@
             "attachment_point": 0.0,
             "attributes": {},
             "behavior_type": "standard",
-            "can_reinvest": false,
             "coupon": {
               "fixed": {
                 "rate": 0.06
@@ -144,7 +142,6 @@
             },
             "ic_trigger": null,
             "id": "CLONOTES-A",
-            "is_revolving": false,
             "maturity": "2034-01-01",
             "oc_trigger": null,
             "original_balance": {
@@ -154,8 +151,7 @@
             "payment_priority": 1,
             "pik_enabled": false,
             "rating": null,
-            "seniority": "senior",
-            "target_balance": null
+            "seniority": "senior"
           }
         ]
       }

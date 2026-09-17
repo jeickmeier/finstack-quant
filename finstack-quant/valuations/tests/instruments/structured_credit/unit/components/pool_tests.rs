@@ -762,6 +762,13 @@ fn test_pool_asset_type_classification() {
         recovery_rate: None,
         commitment: None,
         contractual_payment: None,
+        market_price_pct: None,
+        delinquency_buckets: None,
+        balloon: None,
+        prepayment_penalty: None,
+        special_servicing: None,
+        noi: None,
+        liquidation: None,
     };
 
     // Assert

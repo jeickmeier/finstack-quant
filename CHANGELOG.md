@@ -2,6 +2,85 @@
 
 ## [Unreleased]
 
+### Structured credit: collateral-vertical coverage (2026-09-15 plan, Phases A–F)
+
+#### Added
+
+- Coverage tests are waterfall positions (`PaymentType::CoverageTest` tiers
+  carrying `CoverageTestSpec`s, default position after the tested class's own
+  coupon, `after_tranche` to move it); only the interest still undistributed
+  below the test is diverted, up to the binding cure.
+- `LossAllocationPolicy` (`WriteDown` / `ParPreserving`) on the deal, with
+  deal-type defaults; par-preserving notes realize shortfalls at legal final.
+- Deal-level reinvestment: `ReinvestmentPeriod { amortizing_tranches,
+  assumptions: ReinvestmentAssumptions }` books synthetic `REINVEST-{n}` rows
+  (spread, price, maturity, coupon floor); notes are held flat unless listed.
+- Waterfall funding sources (`WaterfallTier.funding`,
+  `StructuredCredit.principal_covers_senior_interest`), hedge swaps as
+  senior/junior fee recipients (`hedge_swaps: Vec<HedgeSwap>`), template
+  fees with a subordinated management fee and an equity-IRR incentive fee
+  (`TemplateFees`, `IncentiveFeeSpec`).
+- `CoverageRules { rating_haircuts, defaulted_valuation, ccc_bucket,
+  discount_obligation, borrowing_base }` for the OC numerator;
+  `CoverageRules::clo_standard()`; `PoolAsset.market_price_pct`.
+- Behavioral model library: `PrepaymentCurve::{Abs, Vector}`,
+  `DefaultCurve::{Vector, CumulativeLoss, Timing}`,
+  `RecoveryModelSpec.severity_vector`; roll-rate delinquency with servicer
+  advancing and modifications (`DelinquencyModel`,
+  `PoolAsset.delinquency_buckets`, `StepDownTrigger::MaxDelinquency`); card
+  master trusts (`CardPortfolioSpec`, `EarlyAmortizationSpec.min_excess_spread_3m`,
+  `abs_excess_spread`, `abs_payment_rate`, `abs_delinquency` metrics).
+- Deal terms and analytics: `CallAssumption` (deal or tranche scope) with
+  `liquidation_price_pct`, `TrancheMetrics.{wal_to_call, z_spread_to_call_bp,
+  dm_to_call_bp}`; `SimulationDiagnostics.periods` (per-period pool,
+  collections, accounts and coverage-test record); `calculate_equity_metrics`
+  (`EquityMetrics`); CMBS terms (`BalloonSpec`, `PrepaymentPenalty`,
+  `SpecialServicingSpec`, loan-level `noi` DSCR,
+  `PaymentCalculation::PercentageOfSpecialServiced`).
+- Attachment/detachment points are optional and derived from balances by
+  payment priority (`Tranche::from_balance`, `TrancheStructure::from_balances`).
+- `AssetBackedFacility` instrument (warehouse line: `BorrowingBaseRules`
+  advance rates, eligibility and concentration limits, borrowing-base
+  coverage test, unused fee, revolving period, early-amortization events,
+  term-out) with `abf_*` metrics, JSON tag `asset_backed_facility`, typed
+  Python (`AssetBackedFacility`, `FacilityProjection`) and WASM classes;
+  `CoverageTestType::BorrowingBase` for any deal.
+- NPL/RPL resolution timelines (`PoolAsset.liquidation: LiquidationSpec`).
+- Python typed structured-credit surface: `PoolAsset` keyword constructor,
+  `CallAssumption`, `CoverageRules`, `HedgeSwap`, `Waterfall`,
+  `EquityMetrics`, `TrancheCashflows`, one builder setter per deal field,
+  getters for every field, `SimulationDiagnostics.periods` /
+  `to_dataframe` / `coverage_tests_dataframe`; typed curve-shape
+  constructors on the cashflow specs.
+
+#### Changed (BREAKING)
+
+- Tranche prices and quotes are per CURRENT face (`price_pct`,
+  `market_price_pct`, `quoted_clean_price`, `OasResult`, `ScenarioCell`).
+- The two structured-credit regression goldens were re-blessed
+  (`expected_loss` under par-preserving notes; hedge swap and `abs_speed`
+  inputs replaced by their supported equivalents).
+- Python `AssetPool.assets(value)` renamed to `with_assets`; the `assets`
+  property now returns typed `PoolAsset` rows (`asset_records` keeps dicts).
+- `AssetBackedFacility::example` is fallible; `InstrumentJson::AssetBackedFacility`
+  is boxed.
+
+#### Removed
+
+- `Tranche.is_revolving`, `Tranche.can_reinvest`, `Tranche.target_balance`
+  (Rust, Python, `.pyi`, JSON fixtures, WASM facade).
+- `WaterfallTier.divertible`, `Waterfall.coverage_triggers`.
+- `CoverageTestRules` (replaced by `CoverageRules`).
+- `DealConfig`, `DealDates`, `CoverageTestConfig`, `DefaultAssumptions`.
+- `Overrides.abs_speed` (use `PrepaymentModelSpec::abs`); registry
+  `auto_abs` record, `default_auto_abs_speed`, `default_auto_ramp_months`,
+  `seasonality`, `asset_type_defaults`, per-profile `assumptions`,
+  `rmbs_standard_cpr`, `rmbs_standard_sda`, the seasonality constants.
+- `hedge_npv`, `price_with_hedges`, `price_with_metrics_standalone`.
+- `cleanup_call_premium`.
+- `CardPortfolioSpec.purchase_rate` / `seller_interest_pct` were never added
+  (the pool is the investor interest).
+
 ## [0.8.0] - 2026-09-06
 
 ### Changed (BREAKING) — post-RC tightening

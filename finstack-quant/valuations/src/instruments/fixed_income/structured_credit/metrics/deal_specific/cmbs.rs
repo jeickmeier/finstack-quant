@@ -28,6 +28,44 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
 
+        // Loan-level NOI drives the pool DSCR when the assets carry it: debt
+        // service is the contractual payment (level-pay) or the interest on
+        // an interest-only balance, annualized.
+        let mut pool_noi = 0.0_f64;
+        let mut pool_debt_service = 0.0_f64;
+        let mut currency = None;
+        for asset in &cmbs.pool.assets {
+            let Some(noi) = asset.noi else {
+                continue;
+            };
+            if asset.is_defaulted {
+                continue;
+            }
+            match currency {
+                None => currency = Some(noi.currency()),
+                Some(existing) if existing != noi.currency() => {
+                    return Err(finstack_quant_core::Error::CurrencyMismatch {
+                        expected: existing,
+                        actual: noi.currency(),
+                    });
+                }
+                Some(_) => {}
+            }
+            pool_noi += noi.amount();
+            pool_debt_service += match asset.contractual_payment {
+                Some(payment) => payment.amount() * 12.0,
+                None => asset.balance.amount() * asset.rate,
+            };
+        }
+        if currency.is_some() {
+            if !pool_debt_service.is_finite() || pool_debt_service <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CMBS DSCR requires positive loan debt service".to_string(),
+                ));
+            }
+            return Ok(pool_noi / pool_debt_service);
+        }
+
         let noi = required_money(cmbs.credit_factors.annual_noi, "annual_noi")?;
         let debt_service = required_money(
             cmbs.credit_factors.annual_debt_service,

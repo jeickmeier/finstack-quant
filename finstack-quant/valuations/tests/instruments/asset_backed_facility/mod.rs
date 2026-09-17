@@ -1,0 +1,4 @@
+//! Asset-backed facility (warehouse line) tests: borrowing base, mandatory
+//! repayment, unused fee, term-out and registry pricing.
+
+mod facility_tests;

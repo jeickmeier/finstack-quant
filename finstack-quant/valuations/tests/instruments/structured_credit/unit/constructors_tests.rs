@@ -1,5 +1,6 @@
 //! Tests for structured credit constructors and behavioral overrides.
 
+use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
@@ -107,11 +108,10 @@ fn test_prepayment_overrides_use_expected_priority() {
         "USD-OIS",
     );
 
-    sc.behavior_overrides.abs_speed = Some(0.02);
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02);
     let abs_rate = sc.calculate_prepayment_rate(test_date(), 1).unwrap();
     assert!((abs_rate - 0.02).abs() < 1e-12);
 
-    sc.behavior_overrides.abs_speed = None;
     sc.behavior_overrides.cpr_annual = Some(0.12);
     let cpr_rate = sc.calculate_prepayment_rate(test_date(), 1).unwrap();
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);

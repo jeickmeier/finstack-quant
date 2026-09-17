@@ -119,6 +119,7 @@ fn register_fixed_income_instrument_metrics(
         crate::instruments::fixed_income::structured_credit::metrics::register_structured_credit_metrics,
         crate::instruments::fixed_income::term_loan::metrics::register_term_loan_metrics,
         crate::instruments::fixed_income::revolving_credit::metrics::register_revolving_credit_metrics,
+        crate::instruments::fixed_income::asset_backed_facility::metrics::register_asset_backed_facility_metrics,
         crate::instruments::fixed_income::fi_trs::metrics::register_fi_trs_metrics,
     );
     Ok(())

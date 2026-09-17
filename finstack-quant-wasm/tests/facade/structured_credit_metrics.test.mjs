@@ -77,6 +77,35 @@ test('recovery sensitivity bumps the active override', () => {
   assert.ok(Math.abs(override) > 1);
 });
 
+test('a deal call adds the to-call twins next to the to-maturity metrics', () => {
+  const f = fixture();
+  const spec = f.instrument.instrument.spec;
+  const asOf = '2024-02-15';
+  const id = spec.tranches.tranches[0].id;
+  const toMaturity = valuations.instruments.structuredCreditTrancheMetrics(
+    JSON.stringify(f.instrument),
+    id,
+    JSON.stringify(f.market),
+    asOf
+  );
+  assert.equal(toMaturity.wal_to_call, undefined);
+  assert.equal(toMaturity.z_spread_to_call_bp, undefined);
+
+  spec.call_assumption = { date: '2026-02-15', price_pct: 100.0, scope: 'deal' };
+  const toCall = valuations.instruments.structuredCreditTrancheMetrics(
+    JSON.stringify(f.instrument),
+    id,
+    JSON.stringify(f.market),
+    asOf
+  );
+  // The to-maturity figures are projected without the call and stay put.
+  assert.ok(Math.abs(toCall.wal - toMaturity.wal) < 1e-9);
+  assert.equal(typeof toCall.wal_to_call, 'number');
+  assert.ok(toCall.wal_to_call < toCall.wal);
+  assert.equal(typeof toCall.z_spread_to_call_bp, 'number');
+  assert.ok(Number.isFinite(toCall.z_spread_to_call_bp));
+});
+
 test('clean and dirty targets share coupon-crossing settlement', () => {
   const f = fixture();
   const spec = f.instrument.instrument.spec;

@@ -252,6 +252,44 @@ pub enum PaymentMode {
 }
 
 impl AssetType {
+    /// Serde wire name of the variant (`"first_lien_loan"`, `"new_auto_loan"`
+    /// ...), the key advance rates and concentration limits are written on.
+    pub fn wire_name(&self) -> &'static str {
+        match self {
+            AssetType::FirstLienLoan { .. } => "first_lien_loan",
+            AssetType::SecondLienLoan { .. } => "second_lien_loan",
+            AssetType::RevolverLoan { .. } => "revolver_loan",
+            AssetType::BridgeLoan { .. } => "bridge_loan",
+            AssetType::MezzanineLoan { .. } => "mezzanine_loan",
+            AssetType::HighYieldBond { .. } => "high_yield_bond",
+            AssetType::InvestmentGradeBond { .. } => "investment_grade_bond",
+            AssetType::DistressedBond { .. } => "distressed_bond",
+            AssetType::EmergingMarketsBond { .. } => "emerging_markets_bond",
+            AssetType::SingleFamilyMortgage { .. } => "single_family_mortgage",
+            AssetType::MultifamilyMortgage { .. } => "multifamily_mortgage",
+            AssetType::CommercialMortgage { .. } => "commercial_mortgage",
+            AssetType::IndustrialMortgage { .. } => "industrial_mortgage",
+            AssetType::RetailMortgage { .. } => "retail_mortgage",
+            AssetType::OfficeMortgage { .. } => "office_mortgage",
+            AssetType::HotelMortgage { .. } => "hotel_mortgage",
+            AssetType::OtherMortgage { .. } => "other_mortgage",
+            AssetType::NewAutoLoan { .. } => "new_auto_loan",
+            AssetType::UsedAutoLoan { .. } => "used_auto_loan",
+            AssetType::LeaseAutoLoan { .. } => "lease_auto_loan",
+            AssetType::FleetAutoLoan { .. } => "fleet_auto_loan",
+            AssetType::PrimeCreditCard => "prime_credit_card",
+            AssetType::SubPrimeCreditCard => "sub_prime_credit_card",
+            AssetType::SuperPrimeCreditCard => "super_prime_credit_card",
+            AssetType::CommercialCreditCard => "commercial_credit_card",
+            AssetType::FederalStudentLoan => "federal_student_loan",
+            AssetType::PrivateStudentLoan => "private_student_loan",
+            AssetType::FfelpStudentLoan => "ffelp_student_loan",
+            AssetType::ConsolidationStudentLoan => "consolidation_student_loan",
+            AssetType::Equipment { .. } => "equipment",
+            AssetType::Generic { .. } => "generic",
+        }
+    }
+
     /// Returns `true` for asset types that amortize through level payments
     /// (mortgages, auto loans, student loans, equipment).
     ///
@@ -295,4 +333,49 @@ pub enum TriggerConsequence {
     AccelerateAmortization,
     /// Stop Reinvestment variant.
     StopReinvestment,
+}
+
+/// How collateral losses reach the note balances.
+///
+/// Realized net loss (`default × (1 − recovery)`) is always tracked for the
+/// cumulative-loss triggers; this policy decides whether it also reduces the
+/// notes' outstanding principal before legal final.
+///
+/// | Policy | Market | Note balances | Loss realized |
+/// |---|---|---|---|
+/// | `WriteDown` | RMBS, CMBS | reduced junior-first at each default | at default |
+/// | `ParPreserving` | CLO, CBO, ABS, cards | carried at par; OC tests and the residual absorb losses | unpaid principal at legal final / liquidation |
+///
+/// Under `ParPreserving` a subordinated note keeps accruing its full coupon
+/// ahead of the residual holder; the OC numerator carries each defaulted
+/// asset at its modeled recovery value until the recovery cash arrives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
+pub enum LossAllocationPolicy {
+    /// Allocate realized net loss to the notes junior-first when the
+    /// collateral defaults (realized-loss allocation).
+    WriteDown,
+    /// Keep note balances at par; losses surface through coverage tests and
+    /// as a principal shortfall at legal final.
+    ParPreserving,
+}
+
+impl LossAllocationPolicy {
+    /// Market-standard policy for a deal type: `WriteDown` for RMBS and CMBS,
+    /// `ParPreserving` for every other family.
+    ///
+    /// # Arguments
+    ///
+    /// * `deal_type` - Deal family whose indenture convention selects the policy.
+    pub fn default_for(deal_type: DealType) -> Self {
+        match deal_type {
+            DealType::Rmbs | DealType::Cmbs => Self::WriteDown,
+            DealType::Clo | DealType::Cbo | DealType::Abs | DealType::Auto | DealType::Card => {
+                Self::ParPreserving
+            }
+        }
+    }
 }

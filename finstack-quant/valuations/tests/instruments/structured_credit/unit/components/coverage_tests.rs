@@ -51,8 +51,7 @@ fn context_for_tranche<'a>(
         period_start: None,
         cash_balance,
         interest_collections,
-        haircuts: None,
-        par_value_threshold: None,
+        rules: None,
         market: None,
         tranche_balances: None,
         payable_principal_tranche_ids: None,
@@ -60,6 +59,7 @@ fn context_for_tranche<'a>(
         current_pool_balance: None,
         senior_fees: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        defaulted_collateral_value: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         interest_claim_caps: &UNCAPPED_CLAIMS,
         floating_rate_shift: 0.0,
         deferred_interest: None,
@@ -271,6 +271,66 @@ fn test_oc_test_with_cash_balance() {
 
     // Assert: (120M + 5M) / 100M = 1.25 (passing)
     assert!(result.is_passing);
+}
+
+/// Defaulted collateral is carried at its modeled recovery value until the
+/// recovery cash arrives (CLO par-OC convention), so the numerator rises by
+/// exactly the pending recovery claim and a default costs the test its
+/// expected loss rather than the whole defaulted par.
+#[test]
+fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
+    let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    pool.assets.push(PoolAsset::floating_rate_loan(
+        "L1",
+        Money::new(115_000_000.0, Currency::USD).expect("valid money fixture"),
+        "SOFR-3M",
+        400.0,
+        maturity_date(),
+        finstack_quant_core::dates::DayCount::Act360,
+    ));
+    let equity = Tranche::new(
+        "EQUITY",
+        0.0,
+        10.0,
+        TrancheSeniority::Equity,
+        Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
+        TrancheCoupon::Fixed { rate: 0.12 },
+        maturity_date(),
+    )
+    .unwrap();
+    let senior = Tranche::new(
+        "SENIOR",
+        10.0,
+        100.0,
+        TrancheSeniority::Senior,
+        Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
+        TrancheCoupon::Fixed { rate: 0.05 },
+        maturity_date(),
+    )
+    .unwrap();
+    let tranches = TrancheStructure::new(vec![equity, senior]).unwrap();
+    let zero = Money::new(0.0, Currency::USD).expect("valid money fixture");
+
+    // 115M performing par against 100M senior: 1.15, below the 1.20 trigger.
+    let without_claims = CoverageTest::new_oc(1.20)
+        .calculate(&context_for_tranche(&pool, &tranches, "SENIOR", zero, zero))
+        .expect("coverage calculation");
+    assert!(!without_claims.is_passing);
+    assert!((without_claims.current_ratio - 1.15).abs() < 1e-9);
+
+    // A 5M pending recovery claim (12.5M defaulted at 40%) is collateral.
+    let mut context = context_for_tranche(&pool, &tranches, "SENIOR", zero, zero);
+    context.defaulted_collateral_value =
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
+    let with_claims = CoverageTest::new_oc(1.20)
+        .calculate(&context)
+        .expect("coverage calculation");
+    assert!(
+        (with_claims.current_ratio - 1.20).abs() < 1e-9,
+        "pending recovery claims raise the OC numerator by their value: got {}",
+        with_claims.current_ratio
+    );
+    assert!(with_claims.is_passing);
 }
 
 #[test]

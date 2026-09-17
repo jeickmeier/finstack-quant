@@ -34,6 +34,84 @@
             "speed_multiplier"
           ],
           "type": "object"
+        },
+        {
+          "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "vector",
+              "type": "string"
+            },
+            "monthly_cdr": {
+              "description": "Annual CDR per month of seasoning as decimals, month 1 first.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "curve",
+            "monthly_cdr"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. The `cdr` field is ignored.",
+          "properties": {
+            "cumulative_net_loss_pct": {
+              "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "curve": {
+              "const": "cumulative_loss",
+              "type": "string"
+            },
+            "severity": {
+              "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_net_loss_pct",
+            "severity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored.",
+          "properties": {
+            "annual_pct": {
+              "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "cumulative_default_rate": {
+              "description": "Lifetime defaults as a decimal fraction of the original balance.",
+              "format": "double",
+              "type": "number"
+            },
+            "curve": {
+              "const": "timing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve",
+            "cumulative_default_rate",
+            "annual_pct"
+          ],
+          "type": "object"
         }
       ]
     }
@@ -50,7 +128,7 @@
   ],
   "properties": {
     "cdr": {
-      "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when [`DefaultCurve::Sda`] is active: the\nannual CDR is then derived entirely from the SDA seasoning curve and\nits `speed_multiplier`.",
+      "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
       "format": "double",
       "type": "number"
     },

@@ -1,78 +1,18 @@
 //! Usage examples for market-standard structured credit implementation.
 //!
 //! This module provides practical examples demonstrating:
-//! - DealConfig usage for eliminating hardcoded values
 //! - Proper spread tracking for WAS calculations
 //! - Cashflow-based WAL calculations
 //! - Rating factor consistency
 
 #[cfg(test)]
 mod tests {
-    use finstack_quant_core::{
-        currency::Currency,
-        dates::{Date, Tenor},
-        money::Money,
-        types::CreditRating,
-    };
+    use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::CreditRating};
     use finstack_quant_models::credit::moodys_warf_factor;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        AssetPool, DealConfig, DealDates, DealType, DefaultAssumptions, PoolAsset,
+        AssetPool, DealType, PoolAsset,
     };
     use time::Month;
-
-    #[test]
-    fn example_deal_config_usage() {
-        // Example: Creating a CLO with market-standard configuration
-        // instead of hardcoded values
-
-        // Step 1: Define deal-specific dates
-        let dates = DealDates::new(
-            Date::from_calendar_date(2024, Month::March, 15).unwrap(), // Actual closing
-            Date::from_calendar_date(2024, Month::June, 15).unwrap(),  // First payment
-            Date::from_calendar_date(2031, Month::March, 15).unwrap(), // Maturity (7yr)
-            Tenor::quarterly(),
-        );
-
-        // Step 2: Get standard CLO configuration
-        let config = DealConfig::clo_standard(dates, Currency::USD);
-
-        // Step 3: Customize as needed for this specific deal
-        let mut custom_config = config;
-        custom_config.fees.trustee_fee_annual =
-            Money::new(75_000.0, Currency::USD).expect("valid money fixture"); // Higher fee
-        custom_config.fees.senior_mgmt_fee_bp = 35.0; // 35bps instead of default 40bps
-        custom_config.default_assumptions.base_cdr_annual = 0.025; // 2.5% CDR assumption
-
-        // Add coverage test requirements
-        custom_config
-            .coverage_tests
-            .add_oc_test("CLASS_A", 1.25)
-            .expect("valid OC trigger");
-        custom_config
-            .coverage_tests
-            .add_oc_test("CLASS_B", 1.15)
-            .expect("valid OC trigger");
-        custom_config
-            .coverage_tests
-            .add_ic_test("CLASS_A", 1.20)
-            .expect("valid IC trigger");
-        custom_config
-            .coverage_tests
-            .add_ic_test("CLASS_B", 1.10)
-            .expect("valid IC trigger");
-
-        // Verify configuration
-        assert_eq!(
-            custom_config.dates.closing_date,
-            Date::from_calendar_date(2024, Month::March, 15).unwrap()
-        );
-        assert_eq!(custom_config.fees.trustee_fee_annual.amount(), 75_000.0);
-        assert_eq!(custom_config.fees.senior_mgmt_fee_bp, 35.0);
-        assert_eq!(custom_config.default_assumptions.base_recovery_rate, 0.40); // CLO standard
-
-        // This config can now be used in instrument construction
-        // (future enhancement: StructuredCredit::with_config(pool, tranches, custom_config))
-    }
 
     #[test]
     fn example_creating_pool_with_spreads() {
@@ -277,31 +217,6 @@ mod tests {
     }
 
     #[test]
-    fn example_auto_abs_with_updated_recovery() {
-        // Example: Auto ABS using updated 45% recovery rate
-
-        let assumptions = DefaultAssumptions::abs_auto_standard();
-
-        // Verify we're using market-standard recovery rate
-        assert_eq!(assumptions.base_recovery_rate, 0.45);
-        assert_eq!(assumptions.abs_speed_monthly, Some(0.015));
-        assert_eq!(assumptions.base_cdr_annual, 0.02);
-
-        // Calculate expected loss on $10M defaults
-        let default_amount = 10_000_000.0;
-        let expected_recovery = default_amount * assumptions.base_recovery_rate;
-        let expected_loss = default_amount - expected_recovery;
-
-        assert_eq!(expected_recovery, 4_500_000.0); // $4.5M recovery
-        assert_eq!(expected_loss, 5_500_000.0); // $5.5M loss
-
-        // Compare to old (incorrect) 35% recovery:
-        // Old recovery: $3.5M
-        // Old loss: $6.5M
-        // Difference: $1M ($2M total swing)
-    }
-
-    #[test]
     fn example_complete_clo_setup() {
         // Example: Complete CLO setup using all new market-standard features
 
@@ -353,36 +268,6 @@ mod tests {
             .with_obligor("CONSUMER_CORP_C"),
         );
 
-        // 2. Set up deal configuration
-        let dates = DealDates::new(
-            Date::from_calendar_date(2024, Month::March, 15).unwrap(),
-            Date::from_calendar_date(2024, Month::June, 15).unwrap(),
-            maturity,
-            Tenor::quarterly(),
-        );
-
-        let mut config = DealConfig::clo_standard(dates, Currency::USD);
-
-        // Customize for this specific deal
-        config.default_assumptions.base_cdr_annual = 0.025; // Custom CDR assumption
-
-        config
-            .coverage_tests
-            .add_oc_test("CLASS_A", 1.27)
-            .expect("valid OC trigger"); // AA rated tranche
-        config
-            .coverage_tests
-            .add_oc_test("CLASS_B", 1.17)
-            .expect("valid OC trigger"); // A rated tranche
-        config
-            .coverage_tests
-            .add_ic_test("CLASS_A", 1.22)
-            .expect("valid IC trigger");
-        config
-            .coverage_tests
-            .add_ic_test("CLASS_B", 1.12)
-            .expect("valid IC trigger");
-
         // 3. Calculate pool metrics using market-standard methods
 
         // WAS - now correctly uses spread only
@@ -420,11 +305,6 @@ mod tests {
         // WAM (not WAL)
         let _wam =
             pool.weighted_avg_maturity(Date::from_calendar_date(2025, Month::January, 1).unwrap());
-
-        // Verify configuration is ready for use
-        assert!(config.coverage_tests.oc_triggers.contains_key("CLASS_A"));
-        // Verify customized CDR assumption (was set to 2.5% above, default is 2%)
-        assert_eq!(config.default_assumptions.base_cdr_annual, 0.025);
     }
 
     #[test]
@@ -473,77 +353,5 @@ mod tests {
 
         // WAM would be 5 years (maturity date) - very different!
         // This shows why WAL is critical for prepaying/amortizing assets
-    }
-
-    #[test]
-    fn example_rmbs_deal_config() {
-        // Example: RMBS with PSA/SDA assumptions
-
-        let dates = DealDates::new(
-            Date::from_calendar_date(2024, Month::June, 1).unwrap(),
-            Date::from_calendar_date(2024, Month::July, 1).unwrap(),
-            Date::from_calendar_date(2054, Month::June, 1).unwrap(), // 30-year
-            Tenor::monthly(),
-        );
-
-        let config = DealConfig::rmbs_standard(dates, Currency::USD);
-
-        // Verify RMBS-specific assumptions
-        assert_eq!(config.default_assumptions.psa_speed, Some(1.0)); // 100% PSA
-        assert_eq!(config.default_assumptions.sda_speed, Some(1.0)); // 100% SDA
-        assert_eq!(config.default_assumptions.base_recovery_rate, 0.60); // 60% mortgage recovery
-        assert_eq!(config.default_assumptions.base_cpr_annual, 0.06); // 6% CPR at 100% PSA
-
-        // Monthly payment frequency for RMBS
-        assert_eq!(config.dates.frequency.months(), Some(1));
-
-        // Lower servicing fees than CLO
-        assert_eq!(config.fees.servicing_fee_bp, 25.0); // 25bps vs 50bps for ABS
-    }
-
-    #[test]
-    fn example_abs_deal_config() {
-        // Example: Auto ABS with updated recovery rate
-
-        let dates = DealDates::new(
-            Date::from_calendar_date(2024, Month::September, 1).unwrap(),
-            Date::from_calendar_date(2024, Month::October, 1).unwrap(),
-            Date::from_calendar_date(2029, Month::September, 1).unwrap(), // 5-year
-            Tenor::monthly(),
-        );
-
-        let config = DealConfig::abs_standard(dates, Currency::USD);
-
-        // Verify updated auto recovery rate
-        assert_eq!(config.default_assumptions.base_recovery_rate, 0.45); // Updated!
-        assert_eq!(config.default_assumptions.abs_speed_monthly, Some(0.015)); // 1.5% ABS
-
-        // ABS has higher servicing fees than RMBS
-        assert_eq!(config.fees.servicing_fee_bp, 50.0); // 50bps
-
-        // No management fees (unlike CLO)
-        assert_eq!(config.fees.senior_mgmt_fee_bp, 0.0);
-    }
-
-    #[test]
-    fn example_cmbs_deal_config() {
-        // Example: CMBS commercial mortgage setup
-
-        let dates = DealDates::new(
-            Date::from_calendar_date(2024, Month::November, 1).unwrap(),
-            Date::from_calendar_date(2024, Month::December, 1).unwrap(),
-            Date::from_calendar_date(2034, Month::November, 1).unwrap(), // 10-year
-            Tenor::monthly(),
-        );
-
-        let config = DealConfig::cmbs_standard(dates, Currency::USD);
-
-        // Verify CMBS-specific settings
-        assert_eq!(config.fees.master_servicer_fee_bp, Some(25.0)); // Master servicer
-        assert_eq!(config.fees.special_servicer_fee_bp, Some(25.0)); // Special servicer
-        assert_eq!(config.default_assumptions.base_recovery_rate, 0.65); // Higher CRE recovery
-
-        // Commercial properties have lower default rates
-        assert_eq!(config.default_assumptions.base_cdr_annual, 0.005); // 0.5% CDR
     }
 }

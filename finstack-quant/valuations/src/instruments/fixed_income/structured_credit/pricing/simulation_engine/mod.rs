@@ -8,8 +8,9 @@
 use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, PoolState, RecipientType, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheSeniority, TrancheStructure, Waterfall, WaterfallDistribution,
+    AdvancingPolicy, AssetPool, CallScope, CardPortfolioSpec, CoverageTestType, DelinquencyModel,
+    PoolState, RecipientType, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
+    TrancheStructure, Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -30,7 +31,9 @@ use finstack_quant_models::monte_carlo::traits::RandomStream;
 use std::sync::Arc;
 
 mod conservation;
+mod delinquency;
 mod exercise;
+mod hedges;
 mod instrument_flows;
 mod instrument_paths;
 mod orchestration;
@@ -53,10 +56,8 @@ use pool_flows::{
     RatedPoolFlowRequest,
 };
 use simulate_period::simulate_period;
-pub use state::SimulationDiagnostics;
-use state::{
-    cleanup_call_premium, step_down_metrics, SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS,
-};
+use state::{step_down_metrics, SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS};
+pub use state::{CoverageTestDiagnostic, PeriodDiagnostics, SimulationDiagnostics};
 
 #[cfg(test)]
 use conservation::par_acquired_at_price;

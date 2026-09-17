@@ -118,9 +118,10 @@ pub fn structured_credit_tranche_breakeven_cdr(
 ///
 /// * `deal` - Validated structured-credit deal.
 /// * `tranche_id` - Identifier of the tranche to solve.
-/// * `market_price_pct` - Clean settlement price as a percentage of original
-///   balance. Accrued interest is added once at `quote_settlement_date`,
-///   which defaults to the valuation date.
+/// * `market_price_pct` - Clean settlement price as a percentage of the
+///   tranche's CURRENT balance (the factor-adjusted quote basis). Accrued
+///   interest is added once at `quote_settlement_date`, which defaults to the
+///   valuation date.
 /// * `market` - Market context supplying discounting and stochastic inputs.
 /// * `as_of` - ISO-8601 valuation date.
 /// * `config_json` - Optional serialized [`OasConfig`]; `None` uses defaults.
@@ -164,8 +165,8 @@ pub fn structured_credit_tranche_oas(
 /// * `tranche_id` - Identifier of the tranche to measure.
 /// * `market` - Market context supplying discounting and projection inputs.
 /// * `as_of` - ISO-8601 valuation date.
-/// * `market_price_pct` - Optional clean settlement price as a percentage of original
-///   balance; `None` uses the model price.
+/// * `market_price_pct` - Optional clean settlement price as a percentage of
+///   the tranche's CURRENT balance; `None` uses the model price.
 ///
 /// # Errors
 ///
@@ -189,6 +190,7 @@ fn ensure_tranche_metrics_finite(metrics: &TrancheMetrics) -> Result<()> {
         &[
             ("pv", metrics.pv),
             ("price_pct", metrics.price_pct),
+            ("factor", metrics.factor),
             ("wal", metrics.wal),
             ("z_spread_bp", metrics.z_spread_bp),
             ("cs01", metrics.cs01),
@@ -307,6 +309,7 @@ mod tests {
                 currency: "USD".to_string(),
                 pv: 100.0,
                 price_pct: 100.0,
+                factor: 1.0,
                 wal: 3.0,
                 z_spread_bp: 150.0,
                 cs01: bad,
@@ -314,6 +317,9 @@ mod tests {
                 modified_duration: 3.5,
                 convexity: 12.0,
                 target_price_pct: 98.0,
+                wal_to_call: None,
+                z_spread_to_call_bp: None,
+                dm_to_call_bp: None,
             };
             let err = ensure_tranche_metrics_finite(&metrics)
                 .expect_err("a non-finite cs01 must be rejected");

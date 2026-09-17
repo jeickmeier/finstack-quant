@@ -147,6 +147,9 @@ pub(crate) fn instrument_summary(tag: &str) -> &'static str {
         "real_estate_asset" => "Direct property asset with rent roll and exit assumptions.",
         "repo" => "Repurchase agreement against posted collateral.",
         "revolving_credit" => "Committed revolver with drawn/undrawn balances and commitment fees.",
+        "asset_backed_facility" => {
+            "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base."
+        }
         "snowball" => "Path-dependent note whose coupon builds on the previous one.",
         "structured_credit" => "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
         "swaption" => "European option to enter an interest-rate swap.",
@@ -244,6 +247,7 @@ macro_rules! with_instrument_json_registry {
             boxed: CallableRangeAccrual(CallableRangeAccrual) => "callable_range_accrual" @ "exotics" = infallible_example(CallableRangeAccrual::example());
             boxed: BondFuture(BondFuture) => "bond_future" @ "fixed_income" = BondFuture::example();
             boxed: StructuredCredit(StructuredCredit) => "structured_credit" @ "fixed_income" = infallible_example(StructuredCredit::example());
+            boxed: AssetBackedFacility(AssetBackedFacility) => "asset_backed_facility" @ "fixed_income" = AssetBackedFacility::example();
             boxed: LeveredRealEstateEquity(crate::instruments::equity::real_estate::LeveredRealEstateEquity) => "levered_real_estate_equity" @ "equity" = crate::instruments::equity::real_estate::LeveredRealEstateEquity::example();
             boxed: Composite(CompositeInstrument) => "composite" @ "composite" = CompositeInstrument::example();
         }

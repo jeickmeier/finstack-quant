@@ -32,6 +32,15 @@ fn rate_shift_prepayment(model: &PrepaymentModelSpec, rate_shift: f64) -> Prepay
                 speed_multiplier: (speed_multiplier * multiplier).max(0.0),
             }),
         },
+        Some(PrepaymentCurve::Abs { speed }) => {
+            PrepaymentModelSpec::abs((speed * multiplier).clamp(0.0, 1.0))
+        }
+        Some(PrepaymentCurve::Vector { monthly_cpr }) => PrepaymentModelSpec::vector(
+            monthly_cpr
+                .iter()
+                .map(|cpr| (cpr * multiplier).clamp(0.0, 1.0))
+                .collect(),
+        ),
         _ => PrepaymentModelSpec {
             cpr: (model.cpr * multiplier).max(0.0),
             curve: model.curve.clone(),

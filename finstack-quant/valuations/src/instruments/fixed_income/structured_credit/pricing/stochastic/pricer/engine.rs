@@ -1343,8 +1343,8 @@ impl TrancheScenarioStats {
         Self {
             tranche_id: tranche.id.to_string(),
             seniority: tranche.seniority,
-            attachment: tranche.attachment_point / 100.0,
-            detachment: tranche.detachment_point / 100.0,
+            attachment: tranche.attachment_pct() / 100.0,
+            detachment: tranche.detachment_pct() / 100.0,
             pv_stats: OnlineStats::new(),
             loss_stats: OnlineStats::new(),
             losses: Vec::with_capacity(num_paths),

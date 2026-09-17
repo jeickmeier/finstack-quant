@@ -3,6 +3,7 @@
 //! Computes Recovery01 (recovery rate sensitivity) using finite differences.
 //! Recovery01 measures the change in PV for a 1% (100bp) change in recovery rate.
 
+use super::effective_recovery;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -22,22 +23,31 @@ impl MetricCalculator for Recovery01Calculator {
 
         use crate::cashflow::builder::RecoveryModelSpec;
 
-        // Get current recovery spec and create bumped versions
-        let recovery_up = RecoveryModelSpec {
-            rate: (instrument.credit_model.recovery_spec.rate + RECOVERY_BUMP).clamp(0.0, 1.0),
-            recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
+        // Get current recovery spec and create bumped versions; a severity
+        // vector by month of default is bumped entry by entry.
+        let base = &instrument.credit_model.recovery_spec;
+        let bumped = |delta: f64| -> RecoveryModelSpec {
+            let mut spec = base.clone();
+            spec.rate = (base.rate + delta).clamp(0.0, 1.0);
+            if let Some(severities) = &base.severity_vector {
+                spec.severity_vector = Some(
+                    severities
+                        .iter()
+                        .map(|severity| (severity - delta).clamp(0.0, 1.0))
+                        .collect(),
+                );
+            }
+            spec
         };
+        let recovery_up = bumped(RECOVERY_BUMP);
+        let recovery_down = bumped(-RECOVERY_BUMP);
 
-        let recovery_down = RecoveryModelSpec {
-            rate: (instrument.credit_model.recovery_spec.rate - RECOVERY_BUMP).clamp(0.0, 1.0),
-            recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
-        };
-
-        // Actual symmetric bump width after clamping to [0, 1]. Using the nominal
-        // 2·bump would halve/bias the sensitivity whenever the recovery rate sits
-        // within one bump of 0 or 1 (distressed-recovery or near-boundary deals),
-        // where one side clamps and the move becomes one-sided.
-        let achieved_bump = recovery_up.rate - recovery_down.rate;
+        // Actual symmetric bump width after clamping to [0, 1], measured on the
+        // effective (vector-averaged) recovery. Using the nominal 2·bump would
+        // halve/bias the sensitivity whenever the recovery rate sits within one
+        // bump of 0 or 1 (distressed-recovery or near-boundary deals), where
+        // one side clamps and the move becomes one-sided.
+        let achieved_bump = effective_recovery(&recovery_up) - effective_recovery(&recovery_down);
 
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;

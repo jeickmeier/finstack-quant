@@ -11,11 +11,7 @@ impl StructuredCredit {
     pub(crate) fn effective_credit_model(&self) -> CreditModelConfig {
         let mut model = self.credit_model.clone();
         let overrides = &self.behavior_overrides;
-        let prepayment = if let Some(smm) = overrides.abs_speed {
-            Some(PrepaymentModelSpec::constant_cpr(
-                1.0 - (1.0 - smm).powi(12),
-            ))
-        } else if let Some(cpr) = overrides.cpr_annual {
+        let prepayment = if let Some(cpr) = overrides.cpr_annual {
             Some(PrepaymentModelSpec::constant_cpr(cpr))
         } else {
             overrides.psa_speed_multiplier.map(PrepaymentModelSpec::psa)
@@ -45,9 +41,7 @@ impl StructuredCredit {
     /// Validate the effective model before it reaches a numerical engine.
     pub(crate) fn resolved_credit_model(&self) -> Result<CreditModelConfig> {
         let overrides = &self.behavior_overrides;
-        if let Some(smm) = overrides.abs_speed {
-            validate_f64_unit_interval(smm, "structured-credit monthly ABS override")?;
-        } else if let Some(cpr) = overrides.cpr_annual {
+        if let Some(cpr) = overrides.cpr_annual {
             validate_f64_unit_interval(cpr, "structured-credit annual CPR override")?;
         }
         if let Some(cdr) = overrides.cdr_annual {
@@ -57,8 +51,8 @@ impl StructuredCredit {
         // Include peak seasoning to validate an entire PSA/SDA curve, not just
         // the zero-time rate where a malformed multiplier can be hidden.
         validate_f64_unit_interval(model.prepayment_spec.cpr, "canonical CPR")?;
-        model.prepayment_spec.smm(30)?;
-        model.default_spec.mdr(30)?;
+        model.prepayment_spec.validate()?;
+        model.default_spec.validate()?;
         model.recovery_spec.validate()?;
         Ok(model)
     }
@@ -121,23 +115,39 @@ impl StructuredCredit {
                     "invalid reinvestment end date or price/current-yield criteria".into(),
                 ));
             }
-        }
-        for tranche in &deal.tranches.tranches {
-            if let Some(target) = tranche.target_balance {
-                if target.currency() != tranche.current_balance.currency()
-                    || target.amount() < 0.0
-                    || target.amount() > tranche.current_balance.amount()
-                    || !tranche.is_revolving
-                    || !tranche.can_reinvest
+            for id in &period.amortizing_tranches {
+                match deal.tranches.tranches.iter().find(|t| t.id.as_str() == id) {
+                    None => {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "amortizing tranche {id} is not a tranche of the deal"
+                        )));
+                    }
+                    Some(tranche) if tranche.seniority == super::TrancheSeniority::Equity => {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "amortizing tranche {id} is the equity class"
+                        )));
+                    }
+                    Some(_) => {}
+                }
+            }
+            if let Some(assumptions) = &period.assumptions {
+                if !assumptions.spread_bp.is_finite()
+                    || !assumptions.price_pct.is_finite()
+                    || assumptions.price_pct <= 0.0
+                    || assumptions.price_pct > period.criteria.max_price
+                    || assumptions.maturity_months == 0
+                    || assumptions
+                        .coupon_floor
+                        .is_some_and(|floor| !floor.is_finite())
                 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "invalid revolving target for {}",
-                        tranche.id
-                    )));
+                    return Err(finstack_quant_core::Error::Validation(
+                        "reinvestment assumptions need a finite spread, a positive price within \
+                         the eligibility maximum, a positive maturity and a finite floor"
+                            .into(),
+                    ));
                 }
             }
         }
-        deal.behavior_overrides.abs_speed = None;
         deal.behavior_overrides.cpr_annual = None;
         deal.behavior_overrides.psa_speed_multiplier = None;
         deal.behavior_overrides.cdr_annual = None;

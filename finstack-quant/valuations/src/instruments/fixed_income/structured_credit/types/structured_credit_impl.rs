@@ -1,8 +1,8 @@
-use super::waterfall;
 use super::{
-    CreditModelConfig, DealFees, DealType, DefaultModelSpec, MarketConditions, PaymentCalculation,
-    PrepaymentModelSpec, Recipient, RecipientType, RecoveryModelSpec, StructuredCredit,
-    TrancheSeniority, Waterfall,
+    CoverageTestSpec, CreditModelConfig, DealFees, DealType, DefaultModelSpec, HedgeSwap,
+    LossAllocationPolicy, MarketConditions, PaymentCalculation, PaymentType, PrepaymentModelSpec,
+    Recipient, RecipientType, RecoveryModelSpec, StructuredCredit, TemplateFees, TrancheSeniority,
+    Waterfall,
 };
 use crate::constants::DECIMAL_TO_PERCENT;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
@@ -26,6 +26,8 @@ impl Default for CreditModelConfig {
             stochastic_prepay_spec: None,
             stochastic_default_spec: None,
             correlation_structure: None,
+            delinquency: None,
+            card: None,
         }
     }
 }
@@ -101,15 +103,18 @@ impl StructuredCredit {
         Ok(self)
     }
 
-    /// Build the senior fee recipients for the waterfall's fee tier.
+    /// Build the template's fee recipients from the deal's [`DealFees`]:
+    /// senior fees (trustee, senior management, servicing) ahead of every
+    /// note, the subordinated management fee after the note coupons, and the
+    /// incentive fee ahead of the residual.
     ///
-    /// Returns an empty vector when no [`DealFees`] are attached (fee tier
-    /// skipped). Basis-point fees use [`PaymentCalculation::PercentageOfCollateral`]
+    /// Returns empty recipients when no fees are attached (fee tiers skipped).
+    /// Basis-point fees use [`PaymentCalculation::PercentageOfCollateral`]
     /// with `annualized: true`. The trustee fee is annual and is divided by
     /// payment periods per year.
-    fn fee_recipients(&self) -> finstack_quant_core::Result<Vec<Recipient>> {
+    fn template_fees(&self) -> finstack_quant_core::Result<TemplateFees> {
         let Some(fees) = self.fees.as_ref() else {
-            return Ok(Vec::new());
+            return Ok(TemplateFees::default());
         };
         let ccy = self.pool.get_base_currency();
         let mut recipients = Vec::new();
@@ -158,12 +163,54 @@ impl StructuredCredit {
             recipients.extend(bp_recipient("master_servicer_fee", "MasterServicer", bp));
         }
         if let Some(bp) = fees.special_servicer_fee_bp {
-            recipients.extend(bp_recipient("special_servicer_fee", "SpecialServicer", bp));
+            // Special servicing is paid on the specially serviced loans only.
+            if bp > 0.0 && bp.is_finite() {
+                recipients.push(Recipient::new(
+                    "special_servicer_fee",
+                    RecipientType::ServiceProvider("SpecialServicer".to_string()),
+                    PaymentCalculation::PercentageOfSpecialServiced {
+                        rate: bp / 10_000.0,
+                        annualized: true,
+                        day_count: None,
+                        rounding: None,
+                    },
+                ));
+            }
         }
-        // Subordinated management fees require a junior fee tier; including
-        // them here would incorrectly make them senior to the notes.
 
-        Ok(recipients)
+        // The subordinated management fee ranks after every note coupon.
+        let junior = (fees.subordinated_mgmt_fee_bp > 0.0
+            && fees.subordinated_mgmt_fee_bp.is_finite())
+        .then(|| {
+            Recipient::new(
+                "subordinated_mgmt_fee",
+                RecipientType::ManagerFee(super::ManagementFeeType::Subordinated),
+                PaymentCalculation::PercentageOfCollateral {
+                    rate: fees.subordinated_mgmt_fee_bp / 10_000.0,
+                    annualized: true,
+                    day_count: None,
+                    rounding: None,
+                },
+            )
+        })
+        .into_iter()
+        .collect();
+        let incentive = fees.incentive_fee.map(|spec| {
+            Recipient::new(
+                "incentive_fee",
+                RecipientType::ManagerFee(super::ManagementFeeType::Incentive),
+                PaymentCalculation::IncentiveFee {
+                    hurdle_irr: spec.hurdle_irr,
+                    share_pct: spec.share_pct,
+                },
+            )
+        });
+
+        Ok(TemplateFees {
+            senior: recipients,
+            junior,
+            incentive,
+        })
     }
 
     /// Attach the deal-type standard fee calibration.
@@ -191,6 +238,18 @@ impl StructuredCredit {
         self
     }
 
+    /// Attach a hedge swap that settles through the waterfall (chainable).
+    ///
+    /// # Arguments
+    ///
+    /// * `hedge` - Swap, tracked notional and fee-tier priority; validated
+    ///   against the deal currency and tranches when the deal is priced.
+    #[must_use]
+    pub fn with_hedge_swap(mut self, hedge: HedgeSwap) -> Self {
+        self.hedge_swaps.push(hedge);
+        self
+    }
+
     /// Attach explicit transaction fees.
     #[must_use]
     pub fn with_fees(mut self, fees: DealFees) -> Self {
@@ -198,71 +257,118 @@ impl StructuredCredit {
         self
     }
 
-    /// Attach overcollateralization / interest-coverage triggers to the deal.
+    /// Attach overcollateralization / interest-coverage tests to the deal.
     ///
-    /// Each trigger names a tranche and the OC and/or IC ratio that must be
-    /// maintained for it. When a test fails during simulation, the cure amount
-    /// is diverted from divertible tiers to redeem senior notes. CLO/CBO
-    /// templates also trap junior coupon; ABS/RMBS/CMBS keep coupons payable
-    /// and turbo only residual cash.
+    /// Each test names the tested class, its kind and level and what a
+    /// failure does with the diverted interest; the waterfall places it right
+    /// after the interest tier of its placement tranche, so a failure can only
+    /// divert cash ranked below that position (see
+    /// [`Self::coverage_triggers`]).
     ///
     /// # Arguments
     ///
-    /// * `triggers` - Coverage triggers to evaluate each payment period.
+    /// * `tests` - Coverage tests to evaluate each payment period.
     ///
     /// # Errors
     ///
-    /// Returns `Err` when a trigger level is not finite or not strictly
-    /// positive, or when it names a tranche that is not part of this deal —
-    /// a silently-ignored trigger would look like protection that is not there.
+    /// Returns `Err` when a level is not finite or not strictly positive, when
+    /// a test names a tranche that is not part of this deal or an equity
+    /// tranche, when two tests share a tranche and kind, or when an id is
+    /// duplicated — a silently-ignored test would look like protection that
+    /// is not there.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// # use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    /// #     StructuredCredit, waterfall::CoverageTrigger,
+    /// #     CoverageTestSpec, StructuredCredit,
     /// # };
     /// # fn example(deal: StructuredCredit) -> finstack_quant_core::Result<()> {
-    /// let deal = deal.with_coverage_triggers(vec![CoverageTrigger {
-    ///     tranche_id: "CLASS_A".to_string(),
-    ///     oc_trigger: Some(1.20),
-    ///     ic_trigger: Some(1.15),
-    /// }])?;
+    /// let deal = deal.with_coverage_triggers(vec![
+    ///     CoverageTestSpec::oc("CLASS_B", 1.20),
+    ///     CoverageTestSpec::ic("CLASS_B", 1.15),
+    /// ])?;
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_coverage_triggers(
         mut self,
-        triggers: Vec<waterfall::CoverageTrigger>,
+        tests: Vec<CoverageTestSpec>,
     ) -> finstack_quant_core::Result<Self> {
-        for trigger in &triggers {
-            if !self
-                .tranches
-                .tranches
-                .iter()
-                .any(|t| t.id.as_str() == trigger.tranche_id)
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "coverage trigger references tranche '{}', which is not part \
-                     of deal '{}'",
-                    trigger.tranche_id,
-                    self.id.as_str()
-                )));
-            }
-            for (label, level) in [("oc", trigger.oc_trigger), ("ic", trigger.ic_trigger)] {
-                if let Some(level) = level {
-                    if !level.is_finite() || level <= 0.0 {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "{label}_trigger for tranche '{}' must be finite and \
-                             positive, got {level}",
-                            trigger.tranche_id
-                        )));
+        self.validate_coverage_tests(tests.iter())?;
+        self.coverage_triggers = tests;
+        Ok(self)
+    }
+
+    /// Validate a set of coverage tests against this deal's tranches: known,
+    /// non-equity tranche ids (tested and placement), finite positive levels,
+    /// unique ids and at most one test per `(tranche, kind)`.
+    fn validate_coverage_tests<'a>(
+        &self,
+        tests: impl Iterator<Item = &'a CoverageTestSpec>,
+    ) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        let tranche = |id: &str| self.tranches.tranches.iter().find(|t| t.id.as_str() == id);
+        let mut seen_ids: finstack_quant_core::HashSet<&str> =
+            finstack_quant_core::HashSet::default();
+        let mut seen_keys: finstack_quant_core::HashSet<(&str, super::CoverageTestType)> =
+            finstack_quant_core::HashSet::default();
+        for test in tests {
+            for id in [test.tranche_id.as_str(), test.placement_tranche()] {
+                match tranche(id) {
+                    None => {
+                        return Err(invalid(format!(
+                            "coverage test '{}' references tranche '{id}', which is not \
+                             part of deal '{}'",
+                            test.id,
+                            self.id.as_str()
+                        )))
                     }
+                    Some(t) if t.seniority == TrancheSeniority::Equity => {
+                        return Err(invalid(format!(
+                            "coverage test '{}' references equity tranche '{id}'; coverage \
+                             tests apply to debt classes",
+                            test.id
+                        )))
+                    }
+                    Some(_) => {}
                 }
             }
+            if !test.trigger_level.is_finite() || test.trigger_level <= 0.0 {
+                return Err(invalid(format!(
+                    "coverage test '{}' level must be finite and positive, got {}",
+                    test.id, test.trigger_level
+                )));
+            }
+            if !seen_ids.insert(test.id.as_str()) {
+                return Err(invalid(format!("duplicate coverage test id '{}'", test.id)));
+            }
+            if !seen_keys.insert((test.tranche_id.as_str(), test.kind)) {
+                return Err(invalid(format!(
+                    "duplicate {} coverage test for tranche '{}'",
+                    test.kind.label(),
+                    test.tranche_id
+                )));
+            }
         }
-        self.coverage_triggers = triggers;
-        Ok(self)
+        Ok(())
+    }
+
+    /// Loss-allocation policy in force for pricing: the explicit
+    /// [`Self::loss_allocation`] when set, else the deal-type market
+    /// convention from [`LossAllocationPolicy::default_for`].
+    pub fn effective_loss_allocation(&self) -> LossAllocationPolicy {
+        self.loss_allocation
+            .unwrap_or_else(|| LossAllocationPolicy::default_for(self.deal_type))
+    }
+
+    /// Whether the template waterfall pays senior fees and senior note
+    /// interest from principal proceeds when interest proceeds fall short:
+    /// the explicit [`Self::principal_covers_senior_interest`] when set, else
+    /// `true` for CLO/CBO deals and `false` for every other deal type.
+    pub fn effective_principal_covers_senior_interest(&self) -> bool {
+        self.principal_covers_senior_interest
+            .unwrap_or(matches!(self.deal_type, DealType::Clo | DealType::Cbo))
     }
 
     /// Calculate current loss percentage of the pool.
@@ -296,23 +402,31 @@ impl StructuredCredit {
     ///
     /// Returns the deal's custom [`Self::waterfall`] when one is attached,
     /// otherwise synthesizes the canonical sequential template. In both cases
-    /// deal-level [`Self::coverage_triggers`] are appended for the coverage-test
-    /// loop.
+    /// deal-level [`Self::coverage_triggers`] are placed as coverage-test
+    /// tiers after the interest tier of their placement tranche.
     pub fn create_waterfall(&self) -> finstack_quant_core::Result<Waterfall> {
         let mut waterfall = match self.waterfall.as_ref() {
             Some(custom) => custom.clone(),
-            // Senior transaction fees, paid ahead of every note.
-            None => Waterfall::standard_sequential(
-                self.deal_type,
-                self.pool.get_base_currency(),
-                &self.tranches,
-                self.fee_recipients()?,
-            ),
+            None => {
+                // Senior transaction fees, paid ahead of every note.
+                let mut template = Waterfall::standard_sequential(
+                    self.pool.get_base_currency(),
+                    &self.tranches,
+                    self.template_fees()?,
+                    &[],
+                );
+                if self.effective_principal_covers_senior_interest() {
+                    template.fund_senior_interest_from_principal(&self.tranches);
+                }
+                template
+            }
         };
 
-        // Attach deal OC/IC triggers for the waterfall coverage-test loop.
-        for trigger in &self.coverage_triggers {
-            waterfall = waterfall.add_coverage_trigger(trigger.clone());
+        for test in &self.coverage_triggers {
+            waterfall.insert_coverage_test(test.clone());
+        }
+        if waterfall.coverage_rules.is_none() {
+            waterfall.coverage_rules = self.coverage_rules.clone();
         }
         Ok(waterfall)
     }
@@ -461,36 +575,64 @@ impl StructuredCredit {
             }
         }
 
-        // Coverage triggers from the waterfall itself plus deal-level triggers
-        // (appended by `create_waterfall`) must resolve, carry sane levels, and
-        // not double-test one tranche — a duplicated trigger would evaluate and
-        // cure the same test twice per period.
-        let mut seen: finstack_quant_core::HashSet<&str> = finstack_quant_core::HashSet::default();
-        for trigger in waterfall
-            .coverage_triggers
-            .iter()
-            .chain(self.coverage_triggers.iter())
-        {
-            if tranche(trigger.tranche_id.as_str()).is_none() {
+        // Coverage tests carried by the waterfall's test tiers plus the
+        // deal-level tests (placed by `create_waterfall`) must resolve, carry
+        // sane levels, and not double-test one (tranche, kind) — a duplicated
+        // test would evaluate and cure the same ratio twice per period.
+        self.validate_coverage_tests(
+            waterfall
+                .coverage_tests()
+                .chain(self.coverage_triggers.iter()),
+        )?;
+
+        // A test tier pays nobody and must sit after the tier that pays its
+        // tested tranche's interest: a test evaluated ahead of that coupon
+        // would divert the coupon it is meant to protect. Every test in one
+        // tier shares an action, since the tier diverts once.
+        let mut ordered: Vec<&super::WaterfallTier> = waterfall.tiers.iter().collect();
+        ordered.sort_by_key(|tier| tier.priority);
+        for (position, tier) in ordered.iter().enumerate() {
+            let is_test_tier = tier.payment_type == PaymentType::CoverageTest;
+            if is_test_tier && !tier.recipients.is_empty() {
                 return Err(invalid(format!(
-                    "custom waterfall coverage trigger references unknown tranche '{}'",
-                    trigger.tranche_id
+                    "coverage-test tier '{}' must not carry recipients",
+                    tier.id
                 )));
             }
-            if !seen.insert(trigger.tranche_id.as_str()) {
+            if !is_test_tier && !tier.tests.is_empty() {
                 return Err(invalid(format!(
-                    "duplicate coverage trigger for tranche '{}' across the custom waterfall \
-                     and deal-level coverage_triggers",
-                    trigger.tranche_id
+                    "tier '{}' carries coverage tests but is not a coverage-test tier",
+                    tier.id
                 )));
             }
-            for (label, level) in [("oc", trigger.oc_trigger), ("ic", trigger.ic_trigger)] {
-                if let Some(level) = level {
-                    if !level.is_finite() || level <= 0.0 {
+            if is_test_tier && tier.tests.is_empty() {
+                return Err(invalid(format!(
+                    "coverage-test tier '{}' must carry at least one test",
+                    tier.id
+                )));
+            }
+            if is_test_tier
+                && tier
+                    .tests
+                    .iter()
+                    .any(|test| test.action != tier.tests[0].action)
+            {
+                return Err(invalid(format!(
+                    "coverage-test tier '{}' mixes actions; every test in one tier must \
+                     share an action",
+                    tier.id
+                )));
+            }
+            for test in &tier.tests {
+                let interest_position = ordered
+                    .iter()
+                    .position(|t| t.interest_tranche_ids().any(|id| id == test.tranche_id));
+                if let Some(interest_position) = interest_position {
+                    if interest_position > position {
                         return Err(invalid(format!(
-                            "{label}_trigger for tranche '{}' must be finite and positive, \
-                             got {level}",
-                            trigger.tranche_id
+                            "coverage test '{}' sits before the tier that pays tranche '{}' \
+                             interest; place it after that tier",
+                            test.id, test.tranche_id
                         )));
                     }
                 }

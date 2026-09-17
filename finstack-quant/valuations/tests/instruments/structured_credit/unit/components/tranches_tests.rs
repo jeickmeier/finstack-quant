@@ -41,8 +41,8 @@ fn test_tranche_creation_basic() {
 
     // Assert
     assert_eq!(tranche.id.as_str(), "EQUITY");
-    assert_eq!(tranche.attachment_point, 0.0);
-    assert_eq!(tranche.detachment_point, 10.0);
+    assert_eq!(tranche.attachment_point, Some(0.0));
+    assert_eq!(tranche.detachment_point, Some(10.0));
     assert_eq!(tranche.seniority, TrancheSeniority::Equity);
     assert_eq!(tranche.original_balance.amount(), 10_000_000.0);
     assert_eq!(tranche.current_balance.amount(), 10_000_000.0);
@@ -181,8 +181,8 @@ fn test_tranche_builder_complete() {
 
     // Assert
     assert_eq!(tranche.id.as_str(), "MEZZANINE");
-    assert_eq!(tranche.attachment_point, 10.0);
-    assert_eq!(tranche.detachment_point, 15.0);
+    assert_eq!(tranche.attachment_point, Some(10.0));
+    assert_eq!(tranche.detachment_point, Some(15.0));
     assert_eq!(tranche.rating, Some(CreditRating::BBB));
 }
 
