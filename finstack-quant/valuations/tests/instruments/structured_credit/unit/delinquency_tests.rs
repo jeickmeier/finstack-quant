@@ -10,9 +10,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AdvancingPolicy, AssetPool, DealType, DelinquencyModel, PoolAsset,
-    StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon,
-    TrancheSeniority, TrancheStructure, WaterfallRules,
+    run_simulation, run_simulation_with_diagnostics, AdvancingPolicy, AssetPool, DealType,
+    DelinquencyModel, PeriodDiagnostics, PoolAsset, StepDownSpec, StepDownTrigger,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    WaterfallRules,
 };
 use time::Month;
 
@@ -162,7 +163,9 @@ fn roll_rates_reproduce_the_hand_computed_schedule() {
 }
 
 /// Half of every bucket cures and half rolls each month: the cured balance
-/// resumes paying, so interest follows the recursion, not the no-cure path.
+/// resumes paying and brings the loan current by repaying the interest it
+/// missed while delinquent, so collections follow the recursion plus the
+/// arrears the curing share repays.
 #[test]
 fn cures_return_balance_to_current_in_the_period_they_happen() {
     let deal = abs(DelinquencyModel::new(
@@ -174,10 +177,28 @@ fn cures_return_balance_to_current_in_the_period_they_happen() {
     let collected = collections(&results);
     let mut performing = 1_000_000.0_f64;
     let mut buckets = [0.0_f64; 3];
+    let mut arrears = 0.0_f64;
     let mut prev = close();
     for (month, (date, actual)) in collected.iter().take(12).enumerate() {
+        let accrual = accrual(prev, *date);
         let entry = performing * 0.01;
-        let expected = (performing - 0.5 * entry) * 0.06 * accrual(prev, *date);
+        let delinquent_bop: f64 = buckets.iter().sum();
+        let before = delinquent_bop + entry;
+        // Half of every bucket rolls and half cures; the last bucket's roll
+        // charges off (and takes its arrears with it).
+        let cured = 0.5 * delinquent_bop;
+        let charged = 0.5 * buckets[2];
+        let charged_share = if before > 0.0 { charged / before } else { 0.0 };
+        arrears *= 1.0 - charged_share;
+        arrears += delinquent_bop * 0.06 * accrual;
+        let cured_share = if before > 0.0 {
+            cured / before / (1.0 - charged_share)
+        } else {
+            0.0
+        };
+        let repaid = arrears * cured_share;
+        arrears -= repaid;
+        let expected = (performing - 0.5 * entry) * 0.06 * accrual + repaid;
         prev = *date;
         assert!(
             (actual - expected).abs() < 0.02,
@@ -186,13 +207,10 @@ fn cures_return_balance_to_current_in_the_period_they_happen() {
         );
         performing -= entry;
         let mut inflow = entry;
-        let mut cured = 0.0;
         let mut next = [0.0_f64; 3];
         for (bucket, opening) in buckets.iter().enumerate() {
-            let roll = opening * 0.5;
-            cured += opening * 0.5;
             next[bucket] = inflow;
-            inflow = roll;
+            inflow = opening * 0.5;
         }
         performing += cured;
         buckets = next;
@@ -216,6 +234,7 @@ fn servicer_advancing_keeps_senior_interest_current() {
         DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0]).with_advancing(
             AdvancingPolicy::PrincipalAndInterest {
                 recoverability_cap_pct: 100.0,
+                reimburse_from_collections: false,
             },
         ),
     );
@@ -223,6 +242,7 @@ fn servicer_advancing_keeps_senior_interest_current() {
         DelinquencyModel::new(vec![1.0, 1.0, 1.0], vec![0.0, 0.0, 0.0]).with_advancing(
             AdvancingPolicy::PrincipalAndInterest {
                 recoverability_cap_pct: 0.0,
+                reimburse_from_collections: false,
             },
         ),
     );
@@ -321,6 +341,8 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
                 shifting_interest: None,
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         deal
@@ -342,5 +364,116 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
     assert!(
         sequential < gated && gated < always,
         "trigger must fire while delinquency > 5% and revert afterwards: sequential {sequential}, gated {gated}, always {always}"
+    );
+}
+
+/// The `abs` deal with a one-off default in month 1 (12% CDR, then none)
+/// instead of the constant per-asset MDR, so the delinquency pipeline
+/// empties and advances can return to zero.
+fn abs_one_off(model: DelinquencyModel) -> StructuredCredit {
+    let mut deal = abs(model);
+    deal.pool.assets[0].mdr_override = None;
+    deal.credit_model.default_spec = DefaultModelSpec::vector(vec![0.12, 0.0]);
+    deal
+}
+
+fn periods(deal: &StructuredCredit) -> Vec<PeriodDiagnostics> {
+    run_simulation_with_diagnostics(deal, &market(), close())
+        .expect("simulation")
+        .diagnostics
+        .periods
+}
+
+fn advancing(reimburse_from_collections: bool) -> AdvancingPolicy {
+    AdvancingPolicy::PrincipalAndInterest {
+        recoverability_cap_pct: 100.0,
+        reimburse_from_collections,
+    }
+}
+
+/// A balance that turns delinquent in month 1 rolls once and cures in
+/// month 3. The servicer advances the interest it misses in month 2; the
+/// cure repays the arrears, which reimburses that advance first, so the
+/// advances outstanding return to zero and the trust collects the full
+/// coupon in every month.
+#[test]
+fn cures_repay_arrears_and_reimburse_the_servicer_first() {
+    let deal = abs_one_off(
+        DelinquencyModel::new(vec![1.0, 0.0], vec![0.0, 1.0]).with_advancing(advancing(false)),
+    );
+    let periods = periods(&deal);
+    let entry = periods[0].delinquent_balance.amount();
+    assert!(
+        entry > 9_000.0 && entry < 11_000.0,
+        "month-1 entry: {entry}"
+    );
+    let advanced = periods[1].servicer_advances_outstanding.amount();
+    let missed = entry * 0.06 * accrual(periods[0].payment_date, periods[1].payment_date);
+    assert!(
+        (advanced - missed).abs() < 0.01,
+        "month 2 advances the missed interest: {advanced} vs {missed}"
+    );
+    assert_eq!(
+        periods[2].servicer_advances_outstanding.amount(),
+        0.0,
+        "the cure repays the advance"
+    );
+    assert_eq!(periods[2].delinquent_balance.amount(), 0.0);
+    // Full coupon on the whole pool every month (the month-1 entry earns
+    // half a month, as any entering balance does): advanced in month 2,
+    // repaid by the borrower in month 3 (that month's missed interest goes
+    // to the trust; the arrears of month 2 reimburse the servicer).
+    let mut prev = close();
+    for (index, period) in periods.iter().take(4).enumerate() {
+        let base = if index == 0 {
+            1_000_000.0 - 0.5 * entry
+        } else {
+            1_000_000.0
+        };
+        let expected = base * 0.06 * accrual(prev, period.payment_date);
+        let actual = period.interest_collections.amount();
+        assert!(
+            (actual - expected).abs() < 0.02,
+            "{}: {actual} vs {expected}",
+            period.payment_date
+        );
+        prev = period.payment_date;
+    }
+}
+
+/// The same balance rolls to charge-off in month 3 with no recovery: the
+/// advance made on it is non-recoverable. By default the servicer absorbs
+/// it; with `reimburse_from_collections` it comes off the top of month 3's
+/// collections.
+#[test]
+fn non_recoverable_advances_come_off_the_top_of_collections_when_configured() {
+    let absorbed = abs_one_off(
+        DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0]).with_advancing(advancing(false)),
+    );
+    let reimbursed = abs_one_off(
+        DelinquencyModel::new(vec![1.0, 1.0], vec![0.0, 0.0]).with_advancing(advancing(true)),
+    );
+    let absorbed = periods(&absorbed);
+    let reimbursed = periods(&reimbursed);
+    let entry = absorbed[0].delinquent_balance.amount();
+    let advanced = absorbed[1].servicer_advances_outstanding.amount();
+    assert!(advanced > 0.0);
+    assert!(
+        (absorbed[2].defaults.amount() - entry).abs() < 1e-6,
+        "the delinquent balance charges off in month 3"
+    );
+    for run in [&absorbed, &reimbursed] {
+        assert_eq!(run[2].servicer_advances_outstanding.amount(), 0.0);
+    }
+    let difference =
+        absorbed[2].interest_collections.amount() - reimbursed[2].interest_collections.amount();
+    assert!(
+        (difference - advanced).abs() < 0.01,
+        "the trust repays the non-recoverable advance from collections: {difference} vs {advanced}"
+    );
+    assert!(
+        (absorbed[1].interest_collections.amount() - reimbursed[1].interest_collections.amount())
+            .abs()
+            < 1e-9
     );
 }

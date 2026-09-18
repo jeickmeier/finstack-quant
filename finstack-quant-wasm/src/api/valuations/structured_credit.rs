@@ -185,7 +185,8 @@ pub fn structured_credit_tranche_scenario_table(
 /// quote is used, or its model clean settlement price if no quote is supplied. Returns a typed `TrancheMetrics` object —
 /// a plain JavaScript object with the same snake_case fields (`tranche_id`,
 /// `currency`, `pv`, `price_pct`, `wal`, `z_spread_bp`, `cs01`,
-/// `spread_duration`, `modified_duration`, `convexity`, `target_price_pct`)
+/// `spread_duration`, `spread_convexity`, `modified_duration`, `convexity`,
+/// `target_price_pct`, `dm_bp` for floaters)
 /// Python exposes through its typed `TrancheMetrics` wrapper. Pass it to
 /// `JSON.stringify` if a wire string is needed.
 ///

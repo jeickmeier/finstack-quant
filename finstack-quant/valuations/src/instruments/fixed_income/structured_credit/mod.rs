@@ -34,25 +34,28 @@ pub use types::{
     AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
     CallExercisePolicy, CallScope, CardPortfolioSpec, CccBucketRule, CollateralInstrument,
     ConcentrationCheckResult, ConcentrationLimit, ConcentrationScope, ConcentrationViolation,
-    ControlledAccumulationSpec, CoverageRules, CoverageTestAction, CoverageTestSpec,
-    CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType, DefaultedValuation,
-    DelinquencyModel, DiscountObligationRule, EarlyAmortizationSpec, EligibilityRule,
-    EquityHistory, ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec,
-    InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec, LossAllocationPolicy,
-    ManagementFeeType, Metadata, ModificationSpec, Overrides, PaymentCalculation, PaymentMode,
-    PaymentRecord, PaymentType, PoolAsset, PoolStats, PrepaymentPenalty, PutExercisePolicy,
-    Recipient, RecipientType, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
-    RepLine, ReserveInterestDestination, RoundingConvention, ShiftingInterestSpec,
+    ControlledAccumulationSpec, CoveragePlacement, CoverageRules, CoverageTestAction,
+    CoverageTestSpec, CoverageTestType, CoverageTrigger, CreditModelConfig, DealFees, DealType,
+    DefaultedValuation, DelinquencyModel, DiscountObligationRule, EarlyAmortizationSpec,
+    EligibilityRule, EquityHistory, ExcessSpreadSpec, FundingSource, HedgeSwap, IncentiveFeeSpec,
+    InstrumentCollateral, InstrumentExerciseOverride, LiquidationSpec, LiveCollateral,
+    LossAllocationPolicy, LossRecognition, ManagementFeeType, Metadata, ModificationSpec,
+    Overrides, PaymentCalculation, PaymentMode, PaymentRecord, PaymentType, PenaltyStep, PoolAsset,
+    PoolStats, PrepaymentPenalty, PutExercisePolicy, Recipient, RecipientType,
+    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine, ReserveAccountSpec,
+    ReserveInterestDestination, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
     ShiftingInterestStep, SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit,
-    StructuredCreditBuilder, SwapNotional, SwapPriority, TemplateFees, Tranche,
+    StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
     TrancheAccrualPeriod, TrancheBehaviorType, TrancheBuilder, TrancheCashflows, TrancheCoupon,
-    TrancheSeniority, TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier, WaterfallWorkspace,
+    TrancheDraw, TrancheReadvance, TrancheSeniority, TrancheStructure, TrancheValuation,
+    TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier, WaterfallWorkspace,
 };
 
 pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
 pub use types::{
     CreditFactors, DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
+    StructuredCreditTranche,
 };
 
 pub use utils::{

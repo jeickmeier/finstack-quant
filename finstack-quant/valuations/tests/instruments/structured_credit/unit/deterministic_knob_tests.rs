@@ -23,15 +23,17 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AdvancingPolicy, AssetPool, CoverageRules, CoverageTestSpec, CoverageTrigger,
-    DealFees, DealType, DelinquencyModel, HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy,
-    ModificationSpec, PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    TriggerConsequence,
+    run_simulation, AdvanceRate, AdvancingPolicy, AssetPool, BorrowingBaseRules, CoverageRules,
+    CoverageTestSpec, CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule,
+    HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec,
+    PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
+    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    BalloonSpec, CallAssumption, CardPortfolioSpec, EarlyAmortizationSpec, LiquidationSpec,
-    PrepaymentPenalty, SpecialServicingSpec, WaterfallRules,
+    AfcSpec, AssetType, BalloonSpec, CallAssumption, CardPortfolioSpec, EarlyAmortizationSpec,
+    LiquidationSpec, PrepaymentPenalty, ReserveAccountSpec, ReserveTarget, ShiftMode,
+    ShiftingInterestSpec, ShiftingInterestStep, SpecialServicingSpec, StepDownTrigger,
+    TargetOcSpec, TrancheDraw, TrancheReadvance, WaterfallRules,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::Month;
@@ -195,6 +197,147 @@ struct Knob {
 
 fn none(_: &mut StructuredCredit) {}
 
+/// Shifting interest on the senior class: lockout for a year, then half the
+/// subordinates' share shifts.
+fn shifting_interest(deal: &mut StructuredCredit) {
+    let senior = deal.tranches.tranches[0].id.to_string();
+    deal.waterfall_rules = Some(WaterfallRules {
+        shifting_interest: Some(ShiftingInterestSpec::new(
+            senior,
+            vec![
+                ShiftingInterestStep {
+                    months_from_closing: 0,
+                    senior_pct: 1.0,
+                },
+                ShiftingInterestStep {
+                    months_from_closing: 12,
+                    senior_pct: 0.5,
+                },
+            ],
+        )),
+        ..Default::default()
+    });
+}
+
+/// Reserve rules with a fixed 200k target on a 1M opening reserve.
+fn reserve_rules(deal: &mut StructuredCredit) {
+    deal.pool.reserve_account = usd(1_000_000.0);
+    deal.waterfall_rules = Some(WaterfallRules {
+        reserve: Some(ReserveAccountSpec::new(ReserveTarget::Fixed(usd(
+            200_000.0,
+        )))),
+        ..Default::default()
+    });
+}
+
+/// A revolving deal with a borrowing base on every asset class at 80%.
+fn borrowing_base_window(deal: &mut StructuredCredit) {
+    open_window(deal);
+    deal.coverage_rules = Some(CoverageRules {
+        borrowing_base: Some(BorrowingBaseRules {
+            advance_rates: vec![AdvanceRate {
+                asset_class: "*".to_string(),
+                rate: 0.8,
+                eligibility: EligibilityRule::default(),
+            }],
+            concentration_limits: Vec::new(),
+        }),
+        ..CoverageRules::default()
+    });
+}
+
+/// First line matures in 2027 with a balloon workout: 20% defaults at 40%
+/// severity recovered after 18 months.
+fn balloon_workout(deal: &mut StructuredCredit) {
+    deal.pool.assets[0].maturity = ymd(2027, 1, 1);
+    deal.pool.assets[0].balloon = Some(BalloonSpec {
+        extension_prob: 0.0,
+        extension_months: 24,
+        extension_rate: None,
+        loss_prob: 0.2,
+        severity_pct: 40.0,
+        workout_months: 18,
+    });
+}
+
+fn balloon_spec(deal: &mut StructuredCredit) -> &mut BalloonSpec {
+    deal.pool.assets[0]
+        .balloon
+        .as_mut()
+        .expect("common setup configured a balloon")
+}
+
+/// First collateral line as a level-pay auto loan.
+fn amortizing_first_asset(deal: &mut StructuredCredit) {
+    deal.pool.assets[0].asset_type = AssetType::NewAutoLoan { ltv: None };
+}
+
+/// Prepayments on a 1.5% ABS curve, so a row's own age changes its speed.
+fn seasoned_prepayment_curve(deal: &mut StructuredCredit) {
+    deal.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.015);
+}
+
+/// First collateral line as a SOFR + 400 floating loan.
+fn floating_first_asset(deal: &mut StructuredCredit) {
+    let mut loating = PoolAsset::floating_rate_loan(
+        "L0",
+        usd(10_000_000.0),
+        "USD-SOFR-3M",
+        400.0,
+        maturity(),
+        DayCount::Act360,
+    );
+    loating.credit_quality = Some(CreditRating::BB);
+    deal.pool.assets[0] = loating;
+}
+
+/// Available-funds cap binding on the senior class (its coupon raised above
+/// the collateral WAC), carryover off.
+fn afc_binding(deal: &mut StructuredCredit) {
+    let senior = deal.tranches.tranches[0].id.to_string();
+    deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.20 };
+    deal.waterfall_rules = Some(WaterfallRules {
+        afc: Some(AfcSpec {
+            capped_tranches: vec![senior],
+            net_wac_fee_bp: None,
+            carryover: false,
+        }),
+        ..Default::default()
+    });
+}
+
+/// Targeted OC at 12% of current with a 1.5%-of-original floor.
+fn target_oc(deal: &mut StructuredCredit) {
+    deal.waterfall_rules = Some(WaterfallRules {
+        target_oc: Some(TargetOcSpec {
+            pct_of_current: 0.12,
+            floor_pct_of_original: 0.015,
+        }),
+        ..Default::default()
+    });
+}
+
+fn target_oc_spec(deal: &mut StructuredCredit) -> &mut TargetOcSpec {
+    deal.waterfall_rules
+        .as_mut()
+        .and_then(|rules| rules.target_oc.as_mut())
+        .expect("common setup configured target OC")
+}
+
+fn reserve_spec(deal: &mut StructuredCredit) -> &mut ReserveAccountSpec {
+    deal.waterfall_rules
+        .as_mut()
+        .and_then(|rules| rules.reserve.as_mut())
+        .expect("common setup configured reserve rules")
+}
+
+fn shifting_spec(deal: &mut StructuredCredit) -> &mut ShiftingInterestSpec {
+    deal.waterfall_rules
+        .as_mut()
+        .and_then(|rules| rules.shifting_interest.as_mut())
+        .expect("common setup configured shifting interest")
+}
+
 fn open_window(deal: &mut StructuredCredit) {
     deal.pool.reinvestment_period = Some(window());
 }
@@ -210,8 +353,40 @@ fn delinquency_model(deal: &mut StructuredCredit) {
     ));
 }
 
+/// Delinquency model with servicer advancing and charge-offs that recover
+/// nothing, so advances on charged-off balances are non-recoverable.
+fn advancing_without_recoveries(deal: &mut StructuredCredit) {
+    delinquency_model(deal);
+    deal.credit_model
+        .delinquency
+        .as_mut()
+        .expect("model")
+        .advancing = AdvancingPolicy::PrincipalAndInterest {
+        recoverability_cap_pct: 100.0,
+        reimburse_from_collections: false,
+    };
+    deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
+}
+
+/// First collateral line in special servicing from closing.
+fn specially_serviced_first_asset(deal: &mut StructuredCredit) {
+    deal.pool.assets[0].special_servicing = Some(SpecialServicingSpec {
+        appraisal_reduction_pct: 0.0,
+    });
+}
+
 fn card_portfolio(deal: &mut StructuredCredit) {
     deal.credit_model.card = Some(CardPortfolioSpec::new(0.15, 0.18, 0.05));
+}
+
+/// Card model with a seller interest and a fixed allocation, so either knob
+/// moves the investor flow base.
+fn card_with_seller(deal: &mut StructuredCredit) {
+    deal.credit_model.card = Some(
+        CardPortfolioSpec::new(0.15, 0.18, 0.05)
+            .with_seller_interest(usd(20_000_000.0))
+            .with_fixed_allocation_pct(0.9),
+    );
 }
 
 fn divert_from_b(deal: &mut StructuredCredit) {
@@ -303,6 +478,20 @@ fn knobs() -> Vec<Knob> {
             change: delinquency_model,
         },
         Knob {
+            name: "credit_model.delinquency.advancing.reimburse_from_collections",
+            common: advancing_without_recoveries,
+            change: |d| {
+                d.credit_model
+                    .delinquency
+                    .as_mut()
+                    .expect("model")
+                    .advancing = AdvancingPolicy::PrincipalAndInterest {
+                    recoverability_cap_pct: 100.0,
+                    reimburse_from_collections: true,
+                }
+            },
+        },
+        Knob {
             name: "credit_model.delinquency.advancing",
             common: delinquency_model,
             change: |d| {
@@ -312,6 +501,7 @@ fn knobs() -> Vec<Knob> {
                     .expect("model")
                     .advancing = AdvancingPolicy::PrincipalAndInterest {
                     recoverability_cap_pct: 100.0,
+                    reimburse_from_collections: false,
                 }
             },
         },
@@ -343,11 +533,50 @@ fn knobs() -> Vec<Knob> {
             common: |d| d.pool.assets[0].maturity = ymd(2027, 1, 1),
             change: |d| {
                 d.pool.assets[0].balloon = Some(BalloonSpec {
-                    default_prob: 0.3,
+                    extension_prob: 0.3,
                     extension_months: 24,
                     extension_rate: None,
+                    loss_prob: 0.0,
+                    severity_pct: 0.0,
+                    workout_months: 0,
                 })
             },
+        },
+        Knob {
+            name: "tranche_draws",
+            common: open_window,
+            change: |d| {
+                d.tranche_draws = vec![TrancheDraw {
+                    tranche_id: "A".to_string(),
+                    date: ymd(2025, 1, 1),
+                    amount: usd(5_000_000.0),
+                }]
+            },
+        },
+        Knob {
+            name: "tranche_readvance",
+            common: borrowing_base_window,
+            change: |d| {
+                d.tranche_readvance = Some(TrancheReadvance {
+                    tranche_id: "A".to_string(),
+                    commitment: usd(70_000_000.0),
+                })
+            },
+        },
+        Knob {
+            name: "pool.assets[0].balloon.loss_prob",
+            common: balloon_workout,
+            change: |d| balloon_spec(d).loss_prob = 0.4,
+        },
+        Knob {
+            name: "pool.assets[0].balloon.severity_pct",
+            common: balloon_workout,
+            change: |d| balloon_spec(d).severity_pct = 80.0,
+        },
+        Knob {
+            name: "pool.assets[0].balloon.workout_months",
+            common: balloon_workout,
+            change: |d| balloon_spec(d).workout_months = 6,
         },
         Knob {
             name: "pool.assets[0].prepayment_penalty",
@@ -465,12 +694,18 @@ fn knobs() -> Vec<Knob> {
         Knob {
             name: "fees.special_servicer_fee_bp",
             // The fee accrues on specially serviced balances only.
-            common: |d| {
-                d.pool.assets[0].special_servicing = Some(SpecialServicingSpec {
-                    appraisal_reduction_pct: 0.0,
-                })
-            },
+            common: specially_serviced_first_asset,
             change: |d| fees(d).special_servicer_fee_bp = Some(50.0),
+        },
+        Knob {
+            name: "fees.workout_fee_pct",
+            common: specially_serviced_first_asset,
+            change: |d| fees(d).workout_fee_pct = Some(1.0),
+        },
+        Knob {
+            name: "fees.liquidation_fee_pct",
+            common: none,
+            change: |d| fees(d).liquidation_fee_pct = Some(2.0),
         },
         Knob {
             name: "fees.incentive_fee",
@@ -498,6 +733,13 @@ fn knobs() -> Vec<Knob> {
             },
         },
         Knob {
+            // The clean-up factor is current / ORIGINAL: doubling the stated
+            // original balance halves the factor and moves the call.
+            name: "pool.original_balance",
+            common: |d| d.cleanup_call_pct = Some(0.6),
+            change: |d| d.pool.original_balance = Some(usd(200_000_000.0)),
+        },
+        Knob {
             name: "cleanup_call_pct",
             common: none,
             change: |d| d.cleanup_call_pct = Some(0.6),
@@ -506,6 +748,103 @@ fn knobs() -> Vec<Knob> {
             name: "loss_allocation",
             common: none,
             change: |d| d.loss_allocation = Some(LossAllocationPolicy::WriteDown),
+        },
+        Knob {
+            name: "pool.assets.amortization_term_months",
+            common: amortizing_first_asset,
+            change: |d| d.pool.assets[0].amortization_term_months = Some(360),
+        },
+        Knob {
+            name: "pool.assets.io_months",
+            common: amortizing_first_asset,
+            change: |d| d.pool.assets[0].io_months = Some(24),
+        },
+        Knob {
+            name: "pool.assets.index_floor",
+            common: floating_first_asset,
+            change: |d| d.pool.assets[0].index_floor = Some(0.10),
+        },
+        Knob {
+            name: "pool.assets.origination_date",
+            common: seasoned_prepayment_curve,
+            change: |d| d.pool.assets[0].origination_date = Some(ymd(2020, 1, 1)),
+        },
+        Knob {
+            name: "waterfall_rules.afc.carryover",
+            common: afc_binding,
+            change: |d| {
+                d.waterfall_rules
+                    .as_mut()
+                    .and_then(|rules| rules.afc.as_mut())
+                    .expect("common setup configured the cap")
+                    .carryover = true
+            },
+        },
+        Knob {
+            name: "waterfall_rules.target_oc",
+            common: none,
+            change: target_oc,
+        },
+        Knob {
+            name: "waterfall_rules.target_oc.pct_of_current",
+            common: target_oc,
+            change: |d| target_oc_spec(d).pct_of_current = 0.25,
+        },
+        Knob {
+            name: "waterfall_rules.target_oc.floor_pct_of_original",
+            common: target_oc,
+            change: |d| target_oc_spec(d).floor_pct_of_original = 0.5,
+        },
+        Knob {
+            name: "waterfall_rules.reserve",
+            common: none,
+            change: |d| {
+                d.waterfall_rules = Some(WaterfallRules {
+                    reserve: Some(ReserveAccountSpec::new(ReserveTarget::Fixed(usd(
+                        200_000.0,
+                    )))),
+                    ..Default::default()
+                })
+            },
+        },
+        Knob {
+            name: "waterfall_rules.reserve.target",
+            common: reserve_rules,
+            change: |d| reserve_spec(d).target = ReserveTarget::PctOfCurrent(0.05),
+        },
+        Knob {
+            name: "waterfall_rules.reserve.replenish",
+            common: |d| {
+                d.waterfall_rules = Some(WaterfallRules {
+                    reserve: Some(ReserveAccountSpec::new(ReserveTarget::Fixed(usd(
+                        200_000.0,
+                    )))),
+                    ..Default::default()
+                })
+            },
+            change: |d| reserve_spec(d).replenish = false,
+        },
+        Knob {
+            name: "waterfall_rules.reserve.release_excess",
+            common: reserve_rules,
+            change: |d| reserve_spec(d).release_excess = false,
+        },
+        Knob {
+            name: "waterfall_rules.shifting_interest.mode",
+            common: shifting_interest,
+            change: |d| shifting_spec(d).mode = ShiftMode::SeniorShare,
+        },
+        Knob {
+            name: "waterfall_rules.shifting_interest.triggers",
+            common: shifting_interest,
+            change: |d| {
+                shifting_spec(d).triggers = vec![StepDownTrigger::MinCreditEnhancement(0.99)]
+            },
+        },
+        Knob {
+            name: "loss_recognition",
+            common: |d| d.loss_allocation = Some(LossAllocationPolicy::WriteDown),
+            change: |d| d.loss_recognition = Some(LossRecognition::AtLiquidation),
         },
         Knob {
             name: "credit_model.card",
@@ -534,6 +873,25 @@ fn knobs() -> Vec<Knob> {
             change: |d| d.credit_model.card.as_mut().expect("card").charge_off_rate = 0.10,
         },
         Knob {
+            name: "credit_model.card.seller_interest",
+            common: card_with_seller,
+            change: |d| {
+                d.credit_model.card.as_mut().expect("card").seller_interest =
+                    Some(usd(50_000_000.0))
+            },
+        },
+        Knob {
+            name: "credit_model.card.fixed_allocation_pct",
+            common: card_with_seller,
+            change: |d| {
+                d.credit_model
+                    .card
+                    .as_mut()
+                    .expect("card")
+                    .fixed_allocation_pct = Some(0.7)
+            },
+        },
+        Knob {
             name: "waterfall_rules.early_amortization.min_excess_spread_3m",
             common: open_window,
             change: |d| {
@@ -543,10 +901,12 @@ fn knobs() -> Vec<Knob> {
                     step_down: None,
                     shifting_interest: None,
                     early_amortization: Some(EarlyAmortizationSpec {
-                        max_cumulative_loss_pct: 1.0,
+                        max_cumulative_loss: Some(1.0),
                         min_excess_spread_3m: Some(0.5),
                     }),
                     controlled_accumulation: None,
+                    reserve: None,
+                    target_oc: None,
                 })
             },
         },
@@ -684,6 +1044,11 @@ fn knobs() -> Vec<Knob> {
             name: "tranches.B.pik_enabled",
             common: divert_from_b,
             change: |d| tranche(d, "B").pik_enabled = true,
+        },
+        Knob {
+            name: "tranches.B.non_deferrable",
+            common: divert_from_b,
+            change: |d| tranche(d, "B").non_deferrable = Some(true),
         },
         Knob {
             name: "tranches.A.oc_trigger",

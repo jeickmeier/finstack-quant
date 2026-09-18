@@ -30,8 +30,6 @@ pub(super) struct SimulationState<'a> {
     /// Projected hedge-swap flows for this run, bucketed per period by
     /// `hedges::period_hedge_flows`.
     pub(super) hedge_schedules: Vec<super::hedges::HedgeSchedule>,
-    /// Servicer advances of missed P&I not yet reimbursed from recoveries.
-    pub(super) servicer_advances_outstanding: f64,
     /// Annualized excess spread realized in each simulated period, oldest
     /// first; the early-amortization excess-spread test reads the last three.
     pub(super) excess_spread_history: Vec<f64>,
@@ -40,6 +38,29 @@ pub(super) struct SimulationState<'a> {
     /// Whether an early-amortization event has occurred; once set the
     /// revolving period stays closed.
     pub(super) early_amortization_triggered: bool,
+    /// Card master trust: the per-asset investor flow base fixed at the end
+    /// of the revolving period (`CardPortfolioSpec::investor_flow_base`);
+    /// `None` while revolving or without a card model.
+    pub(super) card_flow_base: Option<Vec<f64>>,
+    /// Manager incentive fee applied to the terminal sweeps and the call
+    /// residual reaching equity (the waterfall carries its own recipients).
+    pub(super) incentive_fee: Option<IncentiveFeeSpec>,
+    /// When collateral losses are booked into `cumulative_realized_loss`.
+    pub(super) loss_recognition: LossRecognition,
+    /// Whether the reserve balance retires note principal at legal final
+    /// (`ReserveAccountSpec::covers_principal_at_final`); `false` releases
+    /// it to the residual holder.
+    pub(super) reserve_covers_principal_at_final: bool,
+    /// Net-WAC carryover outstanding per capped tranche: interest the
+    /// available-funds cap withheld and not yet repaid from excess.
+    pub(super) carryover_balance: HashMap<String, Money>,
+    /// Payment date of the early-amortization (or acceleration) event, once
+    /// one has fired.
+    pub(super) early_amortization_date: Option<Date>,
+    /// Index of the next scheduled `tranche_draws` entry not yet applied.
+    pub(super) next_tranche_draw: usize,
+    /// Every lender draw applied, as `(tranche id, payment date, amount)`.
+    pub(super) tranche_draws: Vec<(String, Date, Money)>,
     /// Cumulative net loss realized in this scenario
     /// (`default_amount * (1 - recovery_rate)`), accumulated period by period.
     ///
@@ -58,9 +79,11 @@ pub(super) struct SimulationState<'a> {
     /// silently dropped by the loss-allocation `min(...)` cap, so the
     /// per-period cash-conservation check can account for it.
     pub(super) cumulative_loss_unallocated: f64,
-    /// Total pool balance at simulation start (including defaulted assets).
-    /// Used for cleanup call pool factor calculation.
-    pub(super) total_pool_balance: Money,
+    /// Original (cut-off) pool balance, the base of every "fraction of the
+    /// original pool" quantity: cumulative-loss triggers, the clean-up call
+    /// factor and the cumulative-loss/timing default curves. See
+    /// `AssetPool::original_balance_or_reconstructed`.
+    pub(super) original_pool_balance: Money,
     /// Performing pool balance at simulation start (excluding pre-defaulted assets).
     /// Used as denominator for loss allocation percentage.
     pub(super) performing_pool_balance: Money,
@@ -140,7 +163,8 @@ pub struct PeriodDiagnostics {
     pub payment_date: Date,
     /// Collateral balance at period end.
     pub pool_balance: Money,
-    /// `pool_balance` divided by the pool balance at simulation start.
+    /// `pool_balance` divided by the original (cut-off) pool balance
+    /// (`AssetPool::original_balance_or_reconstructed`).
     pub pool_factor: f64,
     /// Balance-weighted coupon of the fixed-rate collateral (decimal).
     pub weighted_avg_coupon: f64,
@@ -168,6 +192,9 @@ pub struct PeriodDiagnostics {
     pub funding_account: Money,
     /// Delinquent collateral balance at period end (delinquency model).
     pub delinquent_balance: Money,
+    /// Servicer advances of missed principal and interest outstanding at
+    /// period end (not yet repaid by cures or liquidations).
+    pub servicer_advances_outstanding: Money,
     /// Annualized excess spread realized this period (decimal).
     pub excess_spread: f64,
     /// Every coverage test the executor evaluated this period.
@@ -192,6 +219,13 @@ pub struct SimulationDiagnostics {
     pub unfunded_draws: Money,
     /// Revolver repayments diverted to replenish the reserve over the simulation.
     pub reserve_replenished: Money,
+    /// Payment date on which an early-amortization event (or a coverage-test
+    /// acceleration) ended the revolving period, when one fired.
+    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    pub early_amortization_date: Option<Date>,
+    /// Lender draws applied to notes, as `(tranche id, payment date, amount)`.
+    #[serde(default)]
+    pub tranche_draws: Vec<(String, Date, Money)>,
 }
 
 /// Deal-health metrics for this period's step-down trigger evaluation.
@@ -222,8 +256,8 @@ pub(super) fn step_down_metrics(
     } else {
         0.0
     };
-    let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
-        state.cumulative_realized_loss / state.total_pool_balance.amount()
+    let cumulative_loss_fraction = if state.original_pool_balance.amount() > 0.0 {
+        state.cumulative_realized_loss / state.original_pool_balance.amount()
     } else {
         0.0
     };
@@ -282,6 +316,7 @@ pub(crate) struct StateTemplate {
     pool_wala_months: u32,
     base_currency: Currency,
     total_pool_balance: Money,
+    original_pool_balance: Money,
     performing_pool_balance: Money,
     pool_balance_cleanup_threshold: f64,
 }
@@ -354,6 +389,10 @@ impl StateTemplate {
         let total_pool_balance = pool
             .total_balance()
             .unwrap_or(Money::from((0_i64, base_currency)));
+        // The original (cut-off) balance every "fraction of the original pool"
+        // quantity is stated against; equals the current balance for a
+        // new-issue pool, the tallies' reconstruction for a seasoned one.
+        let original_pool_balance = pool.original_balance_or_reconstructed()?;
 
         // Performing balance excludes pre-defaulted assets. Used as denominator
         // for loss allocation — pre-defaulted assets are already priced into the
@@ -381,6 +420,7 @@ impl StateTemplate {
             pool_wala_months,
             base_currency,
             total_pool_balance,
+            original_pool_balance,
             performing_pool_balance,
             pool_balance_cleanup_threshold,
         })
@@ -441,14 +481,21 @@ impl<'a> SimulationState<'a> {
             tranche_recipient_keys: template.tranche_recipient_keys.clone(),
             tranche_triggers: super::triggers::initial_states(tranches),
             hedge_schedules: Vec::new(),
-            servicer_advances_outstanding: 0.0,
             excess_spread_history: Vec::new(),
             period_diagnostics: Vec::new(),
             early_amortization_triggered: false,
+            card_flow_base: None,
+            incentive_fee: None,
+            loss_recognition: LossRecognition::AtDefault,
+            reserve_covers_principal_at_final: true,
+            carryover_balance: HashMap::default(),
+            early_amortization_date: None,
+            next_tranche_draw: 0,
+            tranche_draws: Vec::new(),
             cumulative_realized_loss: initial_realized_loss,
             initial_realized_loss,
             cumulative_loss_unallocated: 0.0,
-            total_pool_balance: template.total_pool_balance,
+            original_pool_balance: template.original_pool_balance,
             performing_pool_balance: template.performing_pool_balance,
             loss_alloc_order: template.loss_alloc_order.clone(),
             pool_wala_months: template.pool_wala_months,
@@ -507,6 +554,8 @@ impl<'a> SimulationState<'a> {
             draws_from_principal: self.draws_from_principal,
             unfunded_draws: self.cumulative_unfunded_draws,
             reserve_replenished: self.reserve_replenished,
+            early_amortization_date: self.early_amortization_date,
+            tranche_draws: std::mem::take(&mut self.tranche_draws),
         };
         for (tranche_id, res) in self.results.iter_mut() {
             let mut final_balance = self
@@ -613,4 +662,61 @@ pub(super) fn pool_composition(state: &SimulationState) -> Result<(f64, f64, f64
         weighted(spread, floating_balance),
         weighted(factor, rated_balance),
     ))
+}
+
+impl SimulationState<'_> {
+    /// Equity's cash to date for the incentive-fee hurdle: capital at closing
+    /// against every recorded equity distribution (waterfall payments, reserve
+    /// interest routed straight to equity and terminal sweeps).
+    pub(super) fn equity_history(&self) -> Result<EquityHistory> {
+        let mut invested = Money::from((0_i64, self.base_currency));
+        let mut distributions: Vec<(Date, Money)> = Vec::new();
+        for tranche in self
+            .tranches
+            .tranches
+            .iter()
+            .filter(|tranche| tranche.seniority == TrancheSeniority::Equity)
+        {
+            invested = invested.checked_add(tranche.original_balance)?;
+            if let Some(result) = self.results.get(tranche.id.as_str()) {
+                distributions.extend(
+                    result
+                        .interest_flows
+                        .iter()
+                        .chain(result.principal_flows.iter())
+                        .copied(),
+                );
+            }
+        }
+        distributions.sort_by_key(|(date, _)| *date);
+        Ok(EquityHistory {
+            invested_on: self.closing_date,
+            invested,
+            distributions,
+        })
+    }
+}
+
+impl SimulationState<'_> {
+    /// `true` per asset while its NPL timeline has not resolved.
+    /// Servicer advances outstanding across the pool.
+    pub(super) fn servicer_advances_outstanding(&self) -> f64 {
+        self.pool_state.advances.iter().sum()
+    }
+
+    pub(super) fn unresolved_npl(&self) -> Vec<bool> {
+        self.pool_state
+            .liquidation
+            .iter()
+            .map(|spec| spec.is_some())
+            .collect()
+    }
+
+    /// Live delinquency buckets and NPL flags for the eligibility rules.
+    pub(super) fn live_collateral<'a>(&'a self, unresolved_npl: &'a [bool]) -> LiveCollateral<'a> {
+        LiveCollateral {
+            delinquent: &self.pool_state.delinquent,
+            unresolved_npl,
+        }
+    }
 }

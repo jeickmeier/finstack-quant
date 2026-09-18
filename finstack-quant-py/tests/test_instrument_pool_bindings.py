@@ -227,7 +227,7 @@ def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collater
     period = {
         "end_date": "2028-01-15",
         "is_active": True,
-        "criteria": {"max_price": 100.0, "min_yield": 0.0, "maintain_credit_quality": True, "maintain_wal": True},
+        "criteria": {"max_price": 100.0, "min_yield": 0.0},
         "amortizing_tranches": ["A"],
         "assumptions": None,
     }

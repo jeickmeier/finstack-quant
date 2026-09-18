@@ -6,6 +6,7 @@
 //! - Validation framework for waterfall specifications
 //! - Rate projection helpers for floating rate assets
 
+pub(crate) mod amortization;
 pub(crate) mod rate_helpers;
 pub(crate) mod rates;
 pub(crate) mod simulation;

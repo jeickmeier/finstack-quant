@@ -3,7 +3,7 @@
 //! This module provides OC and IC test calculations for waterfall diversion.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, CoverageRules, Tranche, TrancheStructure,
+    AssetPool, CoverageRules, LiveCollateral, PoolAsset, Tranche, TrancheStructure,
 };
 use crate::instruments::fixed_income::structured_credit::utils::frequency_periods_per_year;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -170,7 +170,11 @@ impl CoverageTest {
         // principal funding account and this period's principal collections
         // (both sit in the trust's accounts until reinvested or applied).
         let numerator = rules
-            .evaluate(context.pool, context.asset_balances)?
+            .evaluate_live(
+                context.pool,
+                context.asset_balances,
+                context.live_collateral,
+            )?
             .borrowing_base
             .checked_add(context.restricted_cash)?
             .checked_add(context.cash_balance)?;
@@ -295,30 +299,19 @@ impl CoverageTest {
 
         let is_passing = ratio >= required_ratio;
 
-        // Note paydown needed to restore OC. When cash is included in the
-        // numerator, diversion removes `X` from numerator and denominator:
-        //   (numerator - X) / (denominator - X) >= required_ratio
-        //   => X >= (numerator - required_ratio * denominator) / (1 - required_ratio)
-        // At required_ratio == 1 the diversion never changes the ratio, so the
-        // breach is uncurable by self-funding paydown; report a zero cure.
-        //
-        // Without cash in the numerator, paydown only shrinks the denominator:
+        // Note paydown needed to restore OC. The cure is paid from INTEREST
+        // proceeds (the executor diverts the interest ranked below the test
+        // position), which never enter the OC numerator, so the diversion
+        // only shrinks the denominator:
         //   numerator / (denominator - X) >= required_ratio
         //   => X >= denominator - numerator / required_ratio
+        // `include_cash` decides whether the period's principal collections
+        // count in the numerator; it does not change the cure algebra.
         //
         // A diversion cannot retire more than the OC stack, so cap the cure at
-        // the denominator; this also bounds the near-1.0 formula.
+        // the denominator.
         let cure_amount = if !is_passing && required_ratio > 0.0 {
-            let paydown_needed = if include_cash {
-                let denom = 1.0 - required_ratio;
-                if denom.abs() > f64::EPSILON {
-                    (numerator.amount() - required_ratio * denominator.amount()) / denom
-                } else {
-                    0.0
-                }
-            } else {
-                denominator.amount() - numerator.amount() / required_ratio
-            };
+            let paydown_needed = denominator.amount() - numerator.amount() / required_ratio;
             let capped = paydown_needed.max(0.0).min(denominator.amount());
             Some(Money::new(capped, denominator.currency())?)
         } else {
@@ -601,6 +594,8 @@ pub struct TestContext<'a> {
     pub payable_principal_tranche_ids: Option<&'a [&'a str]>,
     /// Current per-asset balances, aligned by index with `pool.assets`.
     pub asset_balances: Option<&'a [f64]>,
+    /// Live delinquency buckets and NPL flags for the eligibility rules.
+    pub live_collateral: Option<LiveCollateral<'a>>,
     /// Aggregate current pool balance fallback when asset-level balances are unavailable.
     pub current_pool_balance: Option<Money>,
     /// Senior fees payable ahead of every note and deducted from the IC numerator.
@@ -654,10 +649,18 @@ pub struct TestResult {
     pub current_ratio: f64,
     /// Whether test is currently passing.
     pub is_passing: bool,
-    /// Cure amount if failing. For OC tests this is the note paydown needed to
-    /// restore the OC ratio; for IC tests it is the senior principal paydown
-    /// needed to reduce the interest denominator enough for the test to clear.
+    /// Cure amount if failing. For OC tests this is the note paydown, funded
+    /// from the interest ranked below the test, that restores the ratio
+    /// (`denominator − numerator / required_ratio`); for IC tests it is the
+    /// senior principal paydown needed to reduce the interest denominator
+    /// enough for the test to clear.
     pub cure_amount: Option<Money>,
+}
+
+/// Whether an unrated row is unrated by construction rather than by credit:
+/// a synthetic reinvestment purchase or a materialized instrument row.
+fn unrated_by_construction(pool: &AssetPool, asset: &PoolAsset) -> bool {
+    pool.instruments.is_some() || asset.id.as_str().starts_with("REINVEST-")
 }
 
 /// Whether `rating` is CCC+ or lower.
@@ -728,15 +731,21 @@ fn collateral_value(
         performing_par += balance;
 
         // Carry each asset at the lowest of par, haircut par and the discount
-        // obligation's purchase price.
+        // obligation's purchase price. Haircuts key by rating bucket; the NR
+        // entry covers unrated rows the caller supplied, not rows that are
+        // unrated by construction (reinvestment purchases, instrument rows).
         let mut carried = balance;
         if let Some(map) = haircuts {
-            let haircut = asset
-                .credit_quality
-                .and_then(|rating| map.get(&rating).copied())
-                .or_else(|| map.get(&CreditRating::NR).copied())
-                .unwrap_or(0.0)
-                .clamp(0.0, 1.0);
+            let haircut = match asset.credit_quality {
+                Some(rating) => map
+                    .get(&rating.bucket())
+                    .or_else(|| map.get(&rating))
+                    .copied(),
+                None if unrated_by_construction(pool, asset) => None,
+                None => map.get(&CreditRating::NR).copied(),
+            }
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
             carried = carried.min(balance * (1.0 - haircut));
         }
         if let (Some(rule), Some(price)) = (discount, asset.purchase_price) {
@@ -833,6 +842,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -882,6 +892,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -936,6 +947,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -996,6 +1008,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1057,6 +1070,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: Some(
                 Money::new(collateral, Currency::USD).expect("valid money fixture"),
             ),
@@ -1086,9 +1100,10 @@ mod tests {
         // numerator = collateral + cash, denominator = 100k.
         let numerator = collateral + cash;
         let denominator = 100_000.0_f64;
-        // Diverting X removes cash from the numerator AND pays down the
-        // denominator. The cured ratio must equal the required ratio exactly.
-        let cured_ratio = (numerator - x) / (denominator - x);
+        // The cure is diverted interest, which is not in the numerator: it
+        // only pays down the denominator. The cured ratio must equal the
+        // required ratio exactly.
+        let cured_ratio = numerator / (denominator - x);
         assert!(
             (cured_ratio - required_ratio).abs() < 1e-6,
             "cured ratio {cured_ratio} should equal required {required_ratio}; cure X={x}"
@@ -1138,6 +1153,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: Some(
                 Money::new(collateral, Currency::USD).expect("valid money fixture"),
             ),
@@ -1305,6 +1321,7 @@ mod tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1424,6 +1441,7 @@ mod haircut_tests {
                 tranche_balances: Some(&balances),
                 payable_principal_tranche_ids: None,
                 asset_balances: None,
+                live_collateral: None,
                 current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
                 senior_fees: Money::new(fees, Currency::USD).expect("valid money fixture"),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1492,6 +1510,7 @@ mod haircut_tests {
             tranche_balances: Some(&balances),
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1578,6 +1597,7 @@ mod haircut_tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1682,6 +1702,7 @@ mod haircut_tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: None,
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1781,6 +1802,7 @@ mod haircut_tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: Some(current),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1834,6 +1856,7 @@ mod haircut_tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: Some(&live_asset_balances),
+            live_collateral: None,
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -1875,6 +1898,7 @@ mod haircut_tests {
             tranche_balances: None,
             payable_principal_tranche_ids: None,
             asset_balances: None,
+            live_collateral: None,
             current_pool_balance: Some(Money::from((400_000_i64, Currency::USD))),
             senior_fees: Money::from((0_i64, Currency::USD)),
             restricted_cash: Money::from((0_i64, Currency::USD)),

@@ -1,5 +1,8 @@
 //! Unit tests for structured credit components and metrics.
 
+pub mod afc_tests;
+pub mod amortization_term_tests;
+pub mod analyst_audit_2026_09_17_tests;
 pub mod attachment_derivation_tests;
 pub mod call_tests;
 pub mod card_master_trust_tests;
@@ -7,6 +10,7 @@ pub mod cmbs_tests;
 pub mod components;
 pub mod config_sensitivity_tests;
 pub mod constructors_tests;
+pub mod coupon_claim_tests;
 pub mod coverage_position_tests;
 pub mod coverage_rules_tests;
 pub mod curve_shape_tests;
@@ -16,6 +20,7 @@ pub mod diagnostics_tests;
 pub mod fee_tests;
 pub mod funding_tests;
 pub mod hedge_swap_tests;
+pub mod index_floor_tests;
 pub mod instrument_collateral_tests;
 pub mod instrument_pool_option_cost_tests;
 pub mod instrument_pool_stochastic_tests;
@@ -26,7 +31,12 @@ pub mod npl_tests;
 pub mod per_name_copula_tests;
 pub mod price_basis_tests;
 pub mod reinvestment_tests;
+pub mod reserve_rules_tests;
+pub mod seasoning_tests;
+pub mod shifting_interest_tests;
 pub mod stochastic_pricing_tests;
 pub mod stochastic_tranche_pv_tests;
+pub mod target_oc_tests;
+pub mod trigger_consistency_tests;
 pub mod utils_tests;
 pub mod validation_tests;

@@ -142,6 +142,8 @@ fn context<'a>(market: &'a MarketContext, interest: f64, principal: f64) -> Wate
         market,
         tranche_balances: None,
         asset_balances: None,
+        live_collateral: None,
+        special_serviced: None,
         deferred_interest: None,
         reserve_balance: usd(0.0),
         restricted_cash: usd(0.0),

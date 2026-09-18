@@ -15,6 +15,7 @@ pub(crate) mod cmbs;
 pub(crate) mod collateral;
 pub(crate) mod constants;
 pub(crate) mod delinquency;
+pub(crate) mod draws;
 pub(crate) mod enums;
 pub(crate) mod hedges;
 pub(crate) mod npl;
@@ -32,17 +33,21 @@ mod pricing_methods;
 mod resolved;
 mod stochastic;
 mod structured_credit_impl;
+mod tranche_view;
 
 pub use borrowing_base::{
     AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,
-    EligibilityRule,
+    EligibilityRule, LiveCollateral,
 };
 pub use call::{CallAssumption, CallScope};
 pub use card::CardPortfolioSpec;
-pub use cmbs::{BalloonSpec, PrepaymentPenalty, SpecialServicingSpec};
+pub use cmbs::{BalloonSpec, PenaltyStep, PrepaymentPenalty, SpecialServicingSpec};
 pub use delinquency::{AdvancingPolicy, DelinquencyModel, ModificationSpec};
+pub use draws::{TrancheDraw, TrancheReadvance};
 pub use enums::TrancheSeniority;
-pub use enums::{AssetType, DealType, LossAllocationPolicy, PaymentMode, TriggerConsequence};
+pub use enums::{
+    AssetType, DealType, LossAllocationPolicy, LossRecognition, PaymentMode, TriggerConsequence,
+};
 pub use hedges::{HedgeSwap, SwapNotional, SwapPriority};
 pub use npl::LiquidationSpec;
 
@@ -65,16 +70,17 @@ pub use setup::{DealFees, IncentiveFeeSpec};
 
 pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
-    AfcSpec, AllocationMode, CccBucketRule, ControlledAccumulationSpec, CoverageRules,
-    CoverageTestAction, CoverageTestSpec, CoverageTestType, DefaultedValuation,
+    AfcSpec, AllocationMode, CccBucketRule, ControlledAccumulationSpec, CoveragePlacement,
+    CoverageRules, CoverageTestAction, CoverageTestSpec, CoverageTestType, DefaultedValuation,
     DiscountObligationRule, EarlyAmortizationSpec, EquityHistory, ExcessSpreadSpec, FundingSource,
     ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType,
-    RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger,
-    TemplateFees, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
-    WaterfallTier, WaterfallWorkspace,
+    ReserveAccountSpec, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
+    ShiftingInterestStep, StepDownSpec, StepDownTrigger, TargetOcSpec, TemplateFees, Waterfall,
+    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier, WaterfallWorkspace,
 };
 
 pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
+pub use tranche_view::StructuredCreditTranche;
 
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
@@ -178,6 +184,13 @@ pub struct CreditModelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stochastic_default_spec: Option<StochasticDefaultSpec>,
 
+    /// Optional stochastic recovery model for `price_stochastic`:
+    /// `MarketCorrelated` recoveries move with the systematic factor (and
+    /// disperse per name), so a path with heavy defaults also recovers
+    /// less. `None` keeps recoveries constant at `recovery_spec.rate`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stochastic_recovery_spec: Option<finstack_quant_models::correlation::RecoverySpec>,
+
     /// Optional correlation structure for stochastic modeling.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correlation_structure: Option<CorrelationStructure>,
@@ -265,7 +278,8 @@ pub struct StructuredCredit {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_calendar_id: Option<String>,
 
-    /// Business day convention for tranche payments (defaults to Following).
+    /// Business day convention for tranche payments (defaults to
+    /// ModifiedFollowing).
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_business_day_convention: Option<BusinessDayConvention>,
@@ -388,6 +402,18 @@ pub struct StructuredCredit {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub call_assumption: Option<CallAssumption>,
 
+    /// Scheduled lender draws on notes after closing, ascending by date
+    /// ([`TrancheDraw`]); empty for a fully funded structure.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tranche_draws: Vec<TrancheDraw>,
+
+    /// Re-advance one note each revolving period up to its commitment and the
+    /// borrowing base ([`TrancheReadvance`]); `None` for no re-advances.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tranche_readvance: Option<TrancheReadvance>,
+
     /// Price at which the collateral is realized when the deal is called or
     /// cleaned up, as a percent of par (`None` = par). The clean-up call is
     /// only exercised when the liquidation proceeds, pending recoveries and
@@ -405,6 +431,17 @@ pub struct StructuredCredit {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loss_allocation: Option<LossAllocationPolicy>,
+
+    /// When a collateral loss is booked: at default or when the defaulted
+    /// loan liquidates after the recovery lag.
+    ///
+    /// `None` (the default) selects the market convention for the deal type
+    /// via [`LossRecognition::default_for`]: at liquidation for RMBS and
+    /// CMBS, at default for CLO/CBO/ABS/cards. Set explicitly to override;
+    /// see [`Self::effective_loss_recognition`].
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loss_recognition: Option<LossRecognition>,
 
     /// Whether the template waterfall pays senior fees and senior note
     /// interest shortfalls from principal proceeds before any note is

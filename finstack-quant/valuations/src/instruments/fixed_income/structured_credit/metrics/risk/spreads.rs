@@ -405,6 +405,56 @@ pub fn calculate_tranche_cs01(
     Ok(bumped_pv.total() - base_pv.total())
 }
 
+/// Spread convexity of a tranche's cashflows at `z_spread` (years²).
+///
+/// Central second difference of the spread-discounted PV,
+/// `(PV(z + 1bp) + PV(z − 1bp) − 2·PV(z)) / (PV(z) · 1bp²)`, with the same
+/// continuous-compounding spread kernel as the z-spread solver and CS01, so
+/// the spread duration and this convexity form one consistent second-order
+/// price expansion in the spread.
+///
+/// # Arguments
+///
+/// * `cashflows` - The dated cashflows for the tranche
+/// * `discount_curve` - The discount curve for PV calculation
+/// * `z_spread` - The Z-spread in decimal (not basis points)
+/// * `as_of` - The settlement date; flows on or before it are excluded
+///
+/// # Returns
+///
+/// Spread convexity in years²; `0.0` when the spread-discounted PV is not
+/// positive.
+///
+/// # Errors
+///
+/// Returns an error if a year fraction or discount factor cannot be computed.
+pub fn calculate_tranche_spread_convexity(
+    cashflows: &DatedFlows,
+    discount_curve: &DiscountCurve,
+    z_spread: f64,
+    as_of: Date,
+) -> Result<f64> {
+    let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
+    let mut base = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    let mut up = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    let mut down = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    for (date, amount) in cashflows {
+        if *date <= as_of {
+            continue;
+        }
+        let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+        let df = discount_curve.df_between_dates(as_of, *date)?;
+        base.add(amount.amount() * df * (-z_spread * t).exp());
+        up.add(amount.amount() * df * (-(z_spread + ONE_BASIS_POINT) * t).exp());
+        down.add(amount.amount() * df * (-(z_spread - ONE_BASIS_POINT) * t).exp());
+    }
+    let pv = base.total();
+    if pv <= 0.0 {
+        return Ok(0.0);
+    }
+    Ok((up.total() + down.total() - 2.0 * pv) / (pv * ONE_BASIS_POINT * ONE_BASIS_POINT))
+}
+
 /// Calculate the discount margin (curve DM) for a floating-rate tranche.
 ///
 /// Follows the workspace's canonical FRN discount-margin convention (see the

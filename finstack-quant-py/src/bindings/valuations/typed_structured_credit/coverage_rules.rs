@@ -98,8 +98,9 @@ impl PyCoverageRules {
     }
 
     /// Standard CLO rules (mirrors Rust ``CoverageRules::clo_standard``):
-    /// CCC/Caa haircuts, defaulted collateral at recovery, a 7.5% CCC bucket
-    /// at market value and discount obligations below 80.
+    /// performing collateral at par (no rating haircuts), defaulted
+    /// collateral at recovery, a 7.5% CCC bucket at market value and
+    /// discount obligations below 80.
     ///
     /// Returns
     /// -------

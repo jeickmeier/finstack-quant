@@ -16,8 +16,9 @@ use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_equity_metrics, run_simulation, run_simulation_with_diagnostics, CreditFactors,
-    CreditModelConfig, DealFees, DealType, LossAllocationPolicy, MarketConditions, Metadata,
-    Overrides, PricingMode, StructuredCredit, WaterfallRules,
+    CreditModelConfig, DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions,
+    Metadata, Overrides, PricingMode, StructuredCredit, TrancheDraw, TrancheReadvance,
+    WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -743,6 +744,24 @@ impl PyStructuredCredit {
             .transpose()
     }
 
+    /// Stochastic recovery specification (``RecoverySpec`` serde ``dict``:
+    /// ``{"type": "constant", "rate": ...}`` or ``{"type":
+    /// "market_correlated", "mean_recovery": ..., "recovery_volatility": ...,
+    /// "factor_correlation": ...}``), or ``None`` for constant recoveries at
+    /// the deterministic rate.
+    #[getter]
+    fn stochastic_recovery_spec<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .credit_model
+            .stochastic_recovery_spec
+            .as_ref()
+            .map(|spec| serde_to_py(py, spec))
+            .transpose()
+    }
+
     /// Default correlation structure as its serde ``dict``, or ``None``.
     #[getter]
     fn correlation_structure<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -856,6 +875,35 @@ impl PyStructuredCredit {
     fn loss_allocation(&self) -> PyResult<Option<String>> {
         self.inner
             .loss_allocation
+            .as_ref()
+            .map(enum_to_py_string)
+            .transpose()
+    }
+
+    /// Scheduled lender draws on notes as a list of ``TrancheDraw`` serde
+    /// dicts (``tranche_id``, ``date``, ``amount``).
+    #[getter]
+    fn tranche_draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.tranche_draws)
+    }
+
+    /// Per-period re-advance rule as its ``TrancheReadvance`` serde dict
+    /// (``tranche_id``, ``commitment``), or ``None``.
+    #[getter]
+    fn tranche_readvance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .tranche_readvance
+            .as_ref()
+            .map(|spec| serde_to_py(py, spec))
+            .transpose()
+    }
+
+    /// Explicit loss-recognition timing (``"at_default"`` /
+    /// ``"at_liquidation"``), or ``None`` for the deal-type default.
+    #[getter]
+    fn loss_recognition(&self) -> PyResult<Option<String>> {
+        self.inner
+            .loss_recognition
             .as_ref()
             .map(enum_to_py_string)
             .transpose()
@@ -1367,7 +1415,10 @@ impl PyStructuredCreditBuilder {
     /// value : dict | str
     ///     ``DealFees`` object as a dict or JSON string (trustee, senior management,
     ///     servicing, and optional master/special servicer fees), paid
-    ///     ahead of every note. Skipped (``None``) by default.
+    ///     ahead of every note. Optional ``workout_fee_pct`` (percent of the
+    ///     P&I collected on specially serviced loans) and
+    ///     ``liquidation_fee_pct`` (percent of liquidation proceeds) are taken
+    ///     inside the collateral flows. Skipped (``None``) by default.
     ///
     /// Returns
     /// -------
@@ -1609,6 +1660,45 @@ impl PyStructuredCreditBuilder {
         Ok(slf)
     }
 
+    /// Set the stochastic recovery specification used by
+    /// ``price_stochastic``.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     ``RecoverySpec`` serde object: ``{"type": "constant", "rate":
+    ///     0.4}`` or ``{"type": "market_correlated", "mean_recovery": 0.4,
+    ///     "recovery_volatility": 0.25, "factor_correlation": 0.4}`` (recovery
+    ///     falls with the systematic factor, so heavy-default paths recover
+    ///     less).
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``RecoverySpec`` shape or this
+    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn stochastic_recovery_spec<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let converted =
+            crate::bindings::module_utils::py_to_serde(py, value, "stochastic_recovery_spec")?;
+        if slf.inner.is_none() {
+            return Err(value_error("builder already consumed by build()"));
+        }
+        slf.credit_model
+            .get_or_insert_with(CreditModelConfig::default)
+            .stochastic_recovery_spec = Some(converted);
+        Ok(slf)
+    }
+
     /// Set the default correlation structure used by ``price_stochastic``.
     ///
     /// Parameters
@@ -1652,7 +1742,8 @@ impl PyStructuredCreditBuilder {
     ///     ``DelinquencyModel`` serde object: ``roll_rates`` (per bucket,
     ///     the last rolls to charge-off), ``cure_rates``, ``advancing``
     ///     (``{"policy": "none"}`` or ``{"policy": "principal_and_interest",
-    ///     "recoverability_cap_pct": ...}``) and optional ``modification``.
+    ///     "recoverability_cap_pct": ..., "reimburse_from_collections":
+    ///     false}``) and optional ``modification``.
     ///
     /// Returns
     /// -------
@@ -1687,7 +1778,11 @@ impl PyStructuredCreditBuilder {
     /// ----------
     /// value : dict | str
     ///     ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
-    ///     ``portfolio_yield`` and ``charge_off_rate`` (annual decimals).
+    ///     ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
+    ///     plus the optional ``seller_interest`` (``Money`` serde object in
+    ///     the pool currency) and ``fixed_allocation_pct`` (decimal in
+    ///     ``(0, 1]``) that fix the investor allocation of trust collections
+    ///     once the revolving period ends.
     ///
     /// Returns
     /// -------
@@ -1754,7 +1849,9 @@ impl PyStructuredCreditBuilder {
     /// ----------
     /// value : list[dict] | str
     ///     ``CoverageTestSpec`` objects (``id``, ``tranche_id``, ``kind`` (``"oc"`` / ``"ic"``),
-    ///     ``trigger_level`` ratio, ``action``, optional ``after_tranche`` and
+    ///     ``trigger_level`` ratio, ``action``, optional ``placement``
+    ///     (``{"kind": "after_tranche", "tranche_id": ...}`` or
+    ///     ``{"kind": "after_junior_fees"}``), optional ``divert_pct`` and
     ///     ``include_cash``).
     ///
     /// Returns
@@ -1997,6 +2094,105 @@ impl PyStructuredCreditBuilder {
         let policy: LossAllocationPolicy = enum_from_str(value, "loss_allocation")?;
         let b = take_sc(&mut slf)?;
         slf.inner = Some(b.loss_allocation(policy));
+        Ok(slf)
+    }
+
+    /// Set the scheduled lender draws on notes after closing.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : list[dict] | str
+    ///     ``TrancheDraw`` serde objects ``{"tranche_id": "A", "date":
+    ///     "2025-01-01", "amount": {"amount": 5000000.0, "currency":
+    ///     "USD"}}``, ascending by date; each is applied on the first payment
+    ///     date at or after its date, lifting the note's balance and adding
+    ///     the cash to principal proceeds.
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``TrancheDraw`` shape or this
+    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn tranche_draws<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let draws: Vec<TrancheDraw> =
+            crate::bindings::module_utils::py_to_serde(py, value, "tranche_draws")?;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.tranche_draws(draws));
+        Ok(slf)
+    }
+
+    /// Set the per-period re-advance of one note up to its commitment and
+    /// the borrowing base while the deal revolves.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     ``TrancheReadvance`` serde object ``{"tranche_id": "A",
+    ///     "commitment": {"amount": 70000000.0, "currency": "USD"}}``;
+    ///     requires ``coverage_rules.borrowing_base``.
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``TrancheReadvance`` shape or this
+    ///     builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn tranche_readvance<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec: TrancheReadvance =
+            crate::bindings::module_utils::py_to_serde(py, value, "tranche_readvance")?;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.tranche_readvance(spec));
+        Ok(slf)
+    }
+
+    /// Set when collateral losses are booked.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : {"at_default", "at_liquidation"}
+    ///     ``"at_default"`` books the expected net loss on the default date
+    ///     (CLO/ABS convention); ``"at_liquidation"`` books the realized
+    ///     loss when the claim settles after the recovery lag (RMBS/CMBS
+    ///     convention), which delays write-downs and every cumulative-loss
+    ///     trigger. The deal type's default applies when never set.
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the expected shape or this builder
+    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn loss_recognition<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let timing: LossRecognition = enum_from_str(value, "loss_recognition")?;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.loss_recognition(timing));
         Ok(slf)
     }
 

@@ -58,7 +58,8 @@ fn workout() -> LiquidationSpec {
 
 /// A 100M non-performing 6% bullet loan under `spec`, financed by a 50M
 /// par-preserving senior note and a 50M residual; no fees, no modeled
-/// prepayments or defaults, immediate recovery release.
+/// prepayments or defaults; the registry's RMBS recovery lag applies to
+/// modeled defaults, not to the resolution proceeds.
 fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
     let mut loan = PoolAsset::fixed_rate_bond(
         "NPL-1",
@@ -100,7 +101,6 @@ fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
     deal.loss_allocation = Some(LossAllocationPolicy::ParPreserving);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
-    deal.credit_model.recovery_spec.recovery_lag = 0;
     deal
 }
 
@@ -249,4 +249,45 @@ fn liquidation_terms_are_validated() {
         ..workout()
     });
     assert!(prob.validate_invariants().is_err());
+}
+
+/// The resolution proceeds reach the notes on the resolution date: class A
+/// is paid down on 2026-01-01 even though the deal's recovery lag (the RMBS
+/// registry default, 18 months) would otherwise push modeled recoveries to
+/// mid-2027; a seasoned loan's timeline runs from its acquisition date.
+#[test]
+fn resolution_proceeds_are_released_on_the_resolution_date_from_origination() {
+    let deal = npl_deal(workout());
+    assert!(
+        deal.credit_model.recovery_spec.recovery_lag >= 12,
+        "the fixture keeps the registry recovery lag"
+    );
+    let run = run_simulation_with_diagnostics(&deal, &market(), close()).expect("run");
+    let first_principal = run.tranches["A"]
+        .principal_flows
+        .iter()
+        .find(|(_, amount)| amount.amount() > 0.0)
+        .map(|(date, _)| *date)
+        .expect("A receives the liquidation proceeds");
+    assert!(
+        first_principal >= d(2026, 1, 1) && first_principal < d(2026, 2, 1),
+        "A is paid on the resolution date, not after the recovery lag: {first_principal}"
+    );
+
+    // Acquired twelve months before closing, the loan resolves twelve
+    // months earlier.
+    let mut seasoned = npl_deal(workout());
+    seasoned.pool.assets[0].acquisition_date = Some(d(2023, 1, 1));
+    let run = run_simulation_with_diagnostics(&seasoned, &market(), close()).expect("run");
+    let resolution = run
+        .diagnostics
+        .periods
+        .iter()
+        .find(|period| period.defaults.amount() > 0.0)
+        .map(|period| period.payment_date)
+        .expect("resolution");
+    assert!(
+        resolution >= d(2025, 1, 1) && resolution < d(2025, 2, 1),
+        "the timeline runs from the acquisition date: {resolution}"
+    );
 }

@@ -72,7 +72,7 @@ fn test_clo_default_prepayment_model() {
     );
 
     // Assert: CLO should use constant CPR
-    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.15); // 15% CPR standard
+    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.20); // 20% CPR standard
     assert!(
         clo.credit_model.prepayment_spec.curve.is_none()
             || matches!(
@@ -96,8 +96,8 @@ fn test_clo_default_assumptions() {
 
     // Assert: CLO standard assumptions
     assert_eq!(clo.credit_model.default_spec.cdr, 0.02); // 2% CDR
-    assert_eq!(clo.credit_model.recovery_spec.rate, 0.40); // 40% recovery
-    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.15); // 15% CPR
+    assert_eq!(clo.credit_model.recovery_spec.rate, 0.60); // 60% recovery
+    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.20); // 20% CPR
 }
 
 // ABS-specific Tests

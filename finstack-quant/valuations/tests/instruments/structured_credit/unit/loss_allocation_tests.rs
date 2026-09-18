@@ -11,8 +11,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AssetPool, DealType, LossAllocationPolicy, PoolAsset, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    run_simulation, AssetPool, DealType, LossAllocationPolicy, LossRecognition, PoolAsset,
+    StepDownSpec, StepDownTrigger, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+    TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -244,5 +245,140 @@ fn write_down_policy_allocates_losses_at_default() {
         "the policy must change D's coupon stream: par-preserving {} vs write-down {}",
         pp["D"].total_interest.amount(),
         d_note.total_interest.amount()
+    );
+}
+
+/// Two-class RMBS on a 100M bullet pool at 6%: A 90M / M 10M, CDR 3%,
+/// recovery 40% with a 24-month lag, write-down policy, and a step-down at
+/// month 37 gated on cumulative losses of 3% of the original pool.
+fn rmbs(recognition: Option<LossRecognition>) -> (StructuredCredit, Date) {
+    let close = d(2024, 1, 1);
+    let maturity = d(2034, 1, 1);
+    let mut pool = AssetPool::new("P", DealType::Rmbs, Currency::USD);
+    for i in 0..10 {
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            format!("L{i}"),
+            usd(10_000_000.0),
+            0.06,
+            maturity,
+            DayCount::Thirty360,
+        ));
+    }
+    let tr = |id: &str, a: f64, b: f64, sen: TrancheSeniority, bal: f64, cpn: f64| {
+        Tranche::new(
+            id,
+            a,
+            b,
+            sen,
+            usd(bal),
+            TrancheCoupon::Fixed { rate: cpn },
+            maturity,
+        )
+        .expect("tranche")
+    };
+    let tranches = TrancheStructure::new(vec![
+        tr("A", 0.0, 90.0, TrancheSeniority::Senior, 90_000_000.0, 0.05),
+        tr(
+            "M",
+            90.0,
+            100.0,
+            TrancheSeniority::Mezzanine,
+            10_000_000.0,
+            0.07,
+        ),
+    ])
+    .expect("structure");
+    let mut deal = StructuredCredit::new_rmbs(
+        "RMBS-LOSS-TIMING",
+        pool,
+        tranches,
+        close,
+        maturity,
+        "USD-OIS",
+    )
+    .with_payment_calendar("nyse");
+    deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+    deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
+    deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 24);
+    deal.loss_allocation = Some(LossAllocationPolicy::WriteDown);
+    deal.loss_recognition = recognition;
+    deal.waterfall_rules = Some(WaterfallRules {
+        step_down: Some(StepDownSpec {
+            step_down_date: d(2027, 2, 1),
+            triggers: vec![StepDownTrigger::MaxCumulativeLoss(0.03)],
+        }),
+        ..Default::default()
+    });
+    (deal, close)
+}
+
+/// RMBS/CMBS book the loss when the defaulted loan liquidates: with a
+/// 24-month recovery lag the mezzanine is first written down on the first
+/// settlement (month 25) and keeps its full coupon until then, and the
+/// month-37 step-down sees only the losses settled so far (about 1.9% of the
+/// pool) instead of every default booked at its expected loss (about 5.4%),
+/// so the step-down passes and the mezzanine shares in principal.
+#[test]
+fn at_liquidation_books_the_loss_when_the_claim_settles() {
+    let (deal, as_of) = rmbs(None);
+    assert_eq!(
+        deal.effective_loss_recognition(),
+        LossRecognition::AtLiquidation,
+        "RMBS defaults to at-liquidation recognition"
+    );
+    let market = market(as_of);
+    let at_liquidation = run_simulation(&deal, &market, as_of).expect("simulation");
+    let (at_default_deal, _) = rmbs(Some(LossRecognition::AtDefault));
+    let at_default = run_simulation(&at_default_deal, &market, as_of).expect("simulation");
+
+    let liquidation_first = at_liquidation["M"]
+        .writedown_flows
+        .first()
+        .map(|(date, _)| *date)
+        .expect("M is written down once claims settle");
+    let default_first = at_default["M"]
+        .writedown_flows
+        .first()
+        .map(|(date, _)| *date)
+        .expect("M is written down at default");
+    assert!(
+        default_first <= d(2024, 3, 1),
+        "at-default recognition writes M down from the first default: {default_first}"
+    );
+    assert!(
+        liquidation_first >= d(2026, 1, 1) && liquidation_first <= d(2026, 3, 1),
+        "at-liquidation recognition writes M down when the first claim settles after 24 months: {liquidation_first}"
+    );
+
+    // Full coupon on the undiminished 10M balance until the first settlement:
+    // 10M × 7% × 29/360 for the February 2024 accrual (Act/360 notes).
+    let coupons = &at_liquidation["M"].interest_flows;
+    assert!(
+        (coupons[1].1.amount() - 10_000_000.0 * 0.07 * 29.0 / 360.0).abs() < 1.0,
+        "month-2 coupon on par: {}",
+        coupons[1].1.amount()
+    );
+    assert!(
+        at_default["M"].interest_flows[1].1.amount() < coupons[1].1.amount() - 1.0,
+        "at-default recognition has already reduced the coupon base"
+    );
+
+    // Step-down at month 37: only the losses settled by then count.
+    let first_principal = |flows: &Vec<(Date, Money)>| {
+        flows
+            .iter()
+            .find(|(_, amount)| amount.amount() > 0.0)
+            .map(|(date, _)| *date)
+    };
+    let step_down = first_principal(&at_liquidation["M"].principal_flows)
+        .expect("M receives pro-rata principal once the step-down passes");
+    assert!(
+        step_down >= d(2027, 2, 1) && step_down <= d(2027, 4, 1),
+        "the step-down passes on the settled-loss basis: {step_down}"
+    );
+    let locked_out = first_principal(&at_default["M"].principal_flows);
+    assert!(
+        locked_out.is_none_or(|date| date > d(2030, 1, 1)),
+        "at-default recognition fails the 3% trigger at month 37: {locked_out:?}"
     );
 }

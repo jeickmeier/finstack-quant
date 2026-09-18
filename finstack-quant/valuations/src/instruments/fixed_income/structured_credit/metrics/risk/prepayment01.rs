@@ -118,11 +118,11 @@ impl MetricCalculator for Prepayment01Calculator {
 
         let mut inst_up = instrument.clone();
         inst_up.credit_model.prepayment_spec = prepayment_up;
-        let pv_up = context.reprice_instrument_raw(&inst_up, context.curves.as_ref(), as_of)?;
+        let pv_up = super::super::reprice_in_scope(context, &inst_up, as_of)?;
 
         let mut inst_down = instrument;
         inst_down.credit_model.prepayment_spec = prepayment_down;
-        let pv_down = context.reprice_instrument_raw(&inst_down, context.curves.as_ref(), as_of)?;
+        let pv_down = super::super::reprice_in_scope(context, &inst_down, as_of)?;
 
         // Near a 0 rate the down bump clamps and the move becomes one-sided,
         // so divide by the achieved width rather than the nominal 2·bump.

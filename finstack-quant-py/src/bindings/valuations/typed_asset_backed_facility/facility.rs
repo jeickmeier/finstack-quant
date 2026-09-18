@@ -29,9 +29,11 @@ use crate::errors::{core_to_py, display_to_py, serde_json_to_py, value_error};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
-    AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityProjection, TermOutSpec,
+    AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityDraw, FacilityProjection,
+    TermOutSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditModelConfig;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::DealFees;
 use finstack_quant_valuations::instruments::InstrumentJson;
 
 type FacilityBuilderInner =
@@ -536,6 +538,30 @@ impl PyAssetBackedFacility {
         self.inner.liquidation_price_pct
     }
 
+    /// Transaction fees paid ahead of the facility's interest as the
+    /// ``DealFees`` serde dict, or ``None``.
+    #[getter]
+    fn fees<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .fees
+            .as_ref()
+            .map(|fees| serde_to_py(py, fees))
+            .transpose()
+    }
+
+    /// Scheduled draws as a list of ``{"date": ..., "amount": Money}`` dicts.
+    #[getter]
+    fn draw_schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.draw_schedule)
+    }
+
+    /// Whether the line is re-advanced up to the borrowing base each
+    /// revolving period.
+    #[getter]
+    fn readvance_to_borrowing_base(&self) -> bool {
+        self.inner.readvance_to_borrowing_base
+    }
+
     /// Discount curve identifier.
     #[getter]
     fn discount_curve_id(&self) -> String {
@@ -739,8 +765,20 @@ impl PyFacilityProjection {
             .collect()
     }
 
-    /// Every cashflow to the lender (interest, principal and fees) per date,
-    /// as ``(datetime.date, Money)`` pairs.
+    /// Lender draws applied (scheduled draws and re-advances) per payment
+    /// date as ``(datetime.date, Money)`` pairs; outflows in the lender's
+    /// cashflows.
+    #[getter]
+    fn draws<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
+        self.inner
+            .draws
+            .iter()
+            .map(|(date, amount)| Ok((date_to_py(py, *date)?, money_to_py(*amount))))
+            .collect()
+    }
+
+    /// Every cashflow to the lender (interest, principal and fees, less
+    /// draws) per date, as ``(datetime.date, Money)`` pairs.
     #[getter]
     fn lender_cashflows<'py>(
         &self,
@@ -779,12 +817,13 @@ impl PyFacilityProjection {
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         use std::collections::BTreeMap;
-        let mut by_date: BTreeMap<finstack_quant_core::dates::Date, [f64; 4]> = BTreeMap::new();
+        let mut by_date: BTreeMap<finstack_quant_core::dates::Date, [f64; 5]> = BTreeMap::new();
         for (index, flows) in [
             &self.inner.facility.interest_flows,
             &self.inner.facility.principal_flows,
             &self.inner.unused_fees,
             &self.inner.residual.cashflows,
+            &self.inner.draws,
         ]
         .into_iter()
         .enumerate()
@@ -801,7 +840,8 @@ impl PyFacilityProjection {
                     "interest": values[0],
                     "principal": values[1],
                     "unused_fee": values[2],
-                    "lender_total": values[0] + values[1] + values[2],
+                    "draw": values[4],
+                    "lender_total": values[0] + values[1] + values[2] - values[4],
                     "residual": values[3],
                 })
             })
@@ -814,6 +854,7 @@ impl PyFacilityProjection {
                 ("interest", "float64"),
                 ("principal", "float64"),
                 ("unused_fee", "float64"),
+                ("draw", "float64"),
                 ("lender_total", "float64"),
                 ("residual", "float64"),
             ],
@@ -1301,6 +1342,99 @@ impl PyAssetBackedFacilityBuilder {
         let converted = TermOutSpec { months: value };
         let b = take_facility(&mut slf)?;
         slf.inner = Some(b.term_out(converted));
+        Ok(slf)
+    }
+
+    /// Set the transaction fees paid through the waterfall ahead of the
+    /// facility's interest.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict | str
+    ///     ``DealFees`` serde object (``trustee_fee_annual`` Money,
+    ///     ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
+    ///     ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
+    ///     ``special_servicer_fee_bp`` / ``incentive_fee``).
+    ///
+    /// Returns
+    /// -------
+    /// AssetBackedFacilityBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``DealFees`` shape or this builder
+    ///     was already consumed by ``build``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn fees<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let fees: DealFees = crate::bindings::module_utils::py_to_serde(py, value, "fees")?;
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.fees(fees));
+        Ok(slf)
+    }
+
+    /// Set the scheduled draws after closing.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : list[dict] | str
+    ///     ``FacilityDraw`` serde objects ``{"date": "2025-01-01", "amount":
+    ///     {"amount": 10000000.0, "currency": "USD"}}``, ascending by date;
+    ///     each is applied on the first payment date at or after its date.
+    ///
+    /// Returns
+    /// -------
+    /// AssetBackedFacilityBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` does not match the ``FacilityDraw`` shape or this
+    ///     builder was already consumed by ``build``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn draw_schedule<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let draws: Vec<FacilityDraw> =
+            crate::bindings::module_utils::py_to_serde(py, value, "draw_schedule")?;
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.draw_schedule(draws));
+        Ok(slf)
+    }
+
+    /// Set whether the line is re-advanced up to the borrowing base each
+    /// revolving period.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : bool
+    ///     ``True`` draws ``min(commitment, borrowing base) − balance`` every
+    ///     revolving period.
+    ///
+    /// Returns
+    /// -------
+    /// AssetBackedFacilityBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If this builder was already consumed by ``build``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn readvance_to_borrowing_base<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.readvance_to_borrowing_base(value));
         Ok(slf)
     }
 

@@ -188,6 +188,7 @@ impl StructuredCredit {
                 recovery_spec: config.recovery_spec,
                 stochastic_prepay_spec: None,
                 stochastic_default_spec: None,
+                stochastic_recovery_spec: None,
                 correlation_structure: None,
                 delinquency: None,
                 card: None,
@@ -201,11 +202,14 @@ impl StructuredCredit {
             cleanup_call_pct: None,
             // Deal-type market convention; see `LossAllocationPolicy::default_for`.
             loss_allocation: None,
+            loss_recognition: None,
             // Deal-type convention; see `effective_principal_covers_senior_interest`.
             principal_covers_senior_interest: None,
             // Par-OC unless rules are attached; see `CoverageRules::clo_standard`.
             coverage_rules: None,
             call_assumption: None,
+            tranche_draws: Vec::new(),
+            tranche_readvance: None,
             liquidation_price_pct: None,
             // No declarative waterfall rules by default.
             waterfall_rules: None,

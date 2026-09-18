@@ -30,11 +30,13 @@ impl RecoveryQueue {
     /// Add a new recovery claim to the queue.
     ///
     /// `origination_date` is the default date the recovery lag runs from,
-    /// `amount` the recovery cash expected on the claim (zero claims are
-    /// dropped) and `par` the defaulted par the claim stands for, which the
-    /// market-value coverage rule carries instead of the recovery.
+    /// `amount` the recovery cash expected on the claim and `par` the
+    /// defaulted par the claim stands for, which the market-value coverage
+    /// rule carries instead of the recovery and which the at-liquidation loss
+    /// recognition books against the recovery when the claim settles. Claims
+    /// with neither cash nor par are dropped.
     pub(crate) fn add_recovery(&mut self, origination_date: Date, amount: Money, par: Money) {
-        if amount.amount() > 0.0 {
+        if amount.amount() > 0.0 || par.amount() > 0.0 {
             let index = self
                 .pending
                 .partition_point(|(date, _, _)| *date <= origination_date);
@@ -65,23 +67,22 @@ impl RecoveryQueue {
     /// Used at simulation termination: recoveries from defaults within the
     /// lag window of the final payment date never mature inside the period
     /// loop and must be drained explicitly rather than silently dropped.
-    pub(crate) fn drain_pending(&mut self) -> Vec<(Date, Money)> {
-        self.pending
-            .drain(..)
-            .map(|(date, amount, _)| (date, amount))
-            .collect()
+    pub(crate) fn drain_pending(&mut self) -> Vec<(Date, Money, Money)> {
+        self.pending.drain(..).collect()
     }
 
     /// Release all recoveries that have matured based on the lag period.
     ///
-    /// Returns the total amount of recoveries released this period.
+    /// Returns the recovery cash released this period and the defaulted par
+    /// behind it.
     pub(crate) fn release_matured(
         &mut self,
         current_date: Date,
         recovery_lag_months: u32,
         base_currency: Currency,
-    ) -> finstack_quant_core::Result<Money> {
+    ) -> finstack_quant_core::Result<(Money, Money)> {
         let mut released = Money::from((0_i64, base_currency));
+        let mut released_par = Money::from((0_i64, base_currency));
 
         while let Some((orig_date, _, _)) = self.pending.front() {
             let months = i32::try_from(recovery_lag_months).map_err(|_| {
@@ -90,15 +91,16 @@ impl RecoveryQueue {
                 )
             })?;
             if orig_date.add_months(months) <= current_date {
-                if let Some((_, amount, _)) = self.pending.pop_front() {
+                if let Some((_, amount, par)) = self.pending.pop_front() {
                     released = released.checked_add(amount)?;
+                    released_par = released_par.checked_add(par)?;
                 }
             } else {
                 break;
             }
         }
 
-        Ok(released)
+        Ok((released, released_par))
     }
 }
 
@@ -124,6 +126,7 @@ mod tests {
             queue
                 .release_matured(date!(2024 - 03 - 01), 2, Currency::USD)
                 .expect("early")
+                .0
                 .amount(),
             0.0
         );
@@ -131,6 +134,7 @@ mod tests {
             queue
                 .release_matured(date!(2024 - 03 - 31), 2, Currency::USD)
                 .expect("first")
+                .0
                 .amount(),
             10.0
         );
@@ -138,6 +142,7 @@ mod tests {
             queue
                 .release_matured(date!(2024 - 04 - 29), 2, Currency::USD)
                 .expect("second")
+                .0
                 .amount(),
             20.0
         );
@@ -145,6 +150,7 @@ mod tests {
             queue
                 .release_matured(date!(2024 - 04 - 30), 2, Currency::USD)
                 .expect("repeat")
+                .0
                 .amount(),
             0.0
         );

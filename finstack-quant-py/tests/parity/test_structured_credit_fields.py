@@ -16,10 +16,18 @@ import pytest
 
 from finstack_quant import schema
 from finstack_quant.valuations.instruments import (
+    AdvanceRate,
     AssetPool,
+    BalloonSpec,
+    BorrowingBaseRules,
+    ConcentrationLimit,
+    EligibilityRule,
+    LiquidationSpec,
     PoolAsset,
+    SpecialServicingSpec,
     StructuredCredit,
     StructuredCreditBuilder,
+    TermOutSpec,
     Tranche,
     TrancheBuilder,
     Waterfall,
@@ -51,12 +59,13 @@ POOL_SETTERS = {
     "cumulative_scheduled_amortization": "with_accounts",
     "collection_account": "with_accounts",
     "excess_spread_account": "with_accounts",
+    "original_balance": "with_accounts",
 }
 POOL_CONSTRUCTOR_FIELDS = {"id", "deal_type", "base_currency"}
 
 
-def _fields(definition: str) -> set[str]:
-    document: dict[str, Any] = json.loads(schema.get("structured_credit.schema.json"))
+def _fields(definition: str, document_name: str = "structured_credit.schema.json") -> set[str]:
+    document: dict[str, Any] = json.loads(schema.get(document_name))
     return set(document["$defs"][definition]["properties"])
 
 
@@ -73,6 +82,13 @@ def _readable(cls: type, name: str) -> bool:
         ("AssetPool", AssetPool),
         ("PoolAsset", PoolAsset),
         ("Waterfall", Waterfall),
+        ("BalloonSpec", BalloonSpec),
+        ("SpecialServicingSpec", SpecialServicingSpec),
+        ("LiquidationSpec", LiquidationSpec),
+        ("BorrowingBaseRules", BorrowingBaseRules),
+        ("AdvanceRate", AdvanceRate),
+        ("EligibilityRule", EligibilityRule),
+        ("ConcentrationLimit", ConcentrationLimit),
     ],
 )
 def test_every_public_rust_field_is_readable(definition: str, cls: type) -> None:
@@ -117,3 +133,10 @@ def test_every_pool_asset_field_is_a_constructor_keyword() -> None:
     names = {part.split("=")[0].strip() for part in signature.strip("()").split(",") if part.strip() not in {"*", ""}}
     missing = sorted(_fields("PoolAsset") - names)
     assert missing == [], f"PoolAsset constructor keywords missing: {missing}"
+
+
+def test_every_term_out_field_is_readable() -> None:
+    """The facility's ``TermOutSpec`` fields are Python getters."""
+    expected = _fields("TermOutSpec", "asset_backed_facility.schema.json")
+    missing = sorted(name for name in expected if not _readable(TermOutSpec, name))
+    assert missing == [], f"TermOutSpec fields without a Python getter: {missing}"

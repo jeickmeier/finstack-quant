@@ -69,6 +69,8 @@ fn run_waterfall(
         market,
         tranche_balances: None,
         asset_balances: None,
+        live_collateral: None,
+        special_serviced: None,
         deferred_interest: None,
         reserve_balance: Money::new(0.0, available_cash.currency()).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),

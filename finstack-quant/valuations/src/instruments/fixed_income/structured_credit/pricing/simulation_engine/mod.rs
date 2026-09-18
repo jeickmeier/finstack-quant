@@ -8,9 +8,10 @@
 use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
 use crate::instruments::fixed_income::structured_credit::types::{
-    AdvancingPolicy, AssetPool, CallScope, CardPortfolioSpec, CoverageTestType, DelinquencyModel,
-    PoolState, RecipientType, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
-    TrancheStructure, Waterfall, WaterfallDistribution,
+    AdvancingPolicy, AssetPool, CallScope, CardPortfolioSpec, CoverageTestType, DealFees,
+    DelinquencyModel, EquityHistory, IncentiveFeeSpec, LiveCollateral, LossRecognition, PoolState,
+    RecipientType, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
+    Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -37,7 +38,7 @@ mod hedges;
 mod instrument_flows;
 mod instrument_paths;
 mod orchestration;
-mod period_helpers;
+pub(crate) mod period_helpers;
 mod pool_flow_source;
 mod pool_flows;
 mod reserve;
@@ -52,8 +53,8 @@ use period_helpers::{
 };
 use pool_flow_source::period_averaged_monthly_rate;
 use pool_flows::{
-    calculate_pool_flows_with_rates, PeriodDefaultOutcome, PoolFlowRates, PoolFlows,
-    RatedPoolFlowRequest,
+    calculate_pool_flows_with_rates, AssetSeasonedRates, PeriodDefaultOutcome, PoolFlowRates,
+    PoolFlows, RatedPoolFlowRequest, SpecialServicingFees,
 };
 use simulate_period::simulate_period;
 use state::{step_down_metrics, SimulationState, StateTemplate, WRITEDOWN_DE_MINIMIS};

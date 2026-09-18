@@ -56,6 +56,7 @@ fn context_for_tranche<'a>(
         tranche_balances: None,
         payable_principal_tranche_ids: None,
         asset_balances: None,
+        live_collateral: None,
         current_pool_balance: None,
         senior_fees: Money::new(0.0, Currency::USD).expect("valid money fixture"),
         restricted_cash: Money::new(0.0, Currency::USD).expect("valid money fixture"),
@@ -383,12 +384,12 @@ fn test_oc_test_cure_amount_calculation() {
     // Act
     let result = test.calculate(&context).expect("coverage calculation");
 
-    // Cure amount = diverted cash needed to restore OC ratio. Diverted cash
-    // leaves the OC numerator at the same time it pays down notes:
-    // (115M - X) / (100M - X) = 1.25 => X = 40M.
+    // Cure amount = interest diverted to pay down notes; interest is not in
+    // the OC numerator, so only the denominator moves:
+    // 115M / (100M - X) = 1.25 => X = 8M.
     assert!(!result.is_passing);
     assert!(result.cure_amount.is_some());
-    assert!((result.cure_amount.unwrap().amount() - 40_000_000.0).abs() < 1.0);
+    assert!((result.cure_amount.unwrap().amount() - 8_000_000.0).abs() < 1.0);
 }
 
 // IC Test Calculation Tests

@@ -157,9 +157,13 @@ pub(super) fn recycle_reinvestment_principal(
             &assumptions,
         );
     }
-    // Replacement collateral keeps the surviving pool's composition and
-    // contractual maturities. Requiring every component to be eligible avoids
-    // silently changing credit-quality weights or WAL by selective purchases.
+    // Replacement collateral replicates the surviving pool's composition and
+    // contractual maturities, restricted to the assets that satisfy the
+    // eligibility criteria: matured rows and rows whose current yield is
+    // below `min_yield` are skipped, the purchase spreads pro rata over the
+    // rest, and nothing is bought when no row is eligible.
+    let mut eligible = vec![false; state.pool_state.len()];
+    #[allow(clippy::needless_range_loop)] // parallel per-asset vectors are indexed together
     for i in 0..state.pool_state.len() {
         if state.pool_state.is_defaulted[i] || state.pool_state.balances[i] <= 0.0 {
             continue;
@@ -174,23 +178,19 @@ pub(super) fn recycle_reinvestment_principal(
                 state.pool_state.rates[i],
                 state.pool_state.spread_bp[i],
                 state.floating_rate_shift,
+                state.pool_state.index_floors[i],
             )?
         } else {
             state.pool_state.rates[i]
         };
         let coupon = state.pool_state.rate_floors[i].map_or(coupon, |floor| coupon.max(floor));
-        if state.pool_state.maturities[i] <= payment_date
-            || coupon / price_fraction < criteria.min_yield
-        {
-            return Ok(Money::from((0_i64, state.base_currency)));
-        }
+        eligible[i] = state.pool_state.maturities[i] > payment_date
+            && coupon / price_fraction >= criteria.min_yield;
     }
-    let performing_total: f64 = state
-        .pool_state
-        .is_defaulted
+    let performing_total: f64 = eligible
         .iter()
         .zip(state.pool_state.balances.iter())
-        .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)
+        .filter(|(eligible, _)| **eligible)
         .map(|(_, balance)| *balance)
         .sum();
 
@@ -203,14 +203,12 @@ pub(super) fn recycle_reinvestment_principal(
     let par_acquired = par_acquired_at_price(recyclable.amount(), price_fraction);
 
     let n = state.pool_state.len();
+    #[allow(clippy::needless_range_loop)] // parallel per-asset vectors are indexed together
     for i in 0..n {
-        if state.pool_state.is_defaulted[i] {
+        if !eligible[i] {
             continue;
         }
         let balance = state.pool_state.balances[i];
-        if balance <= 0.0 {
-            continue;
-        }
         let share = balance / performing_total;
         state.pool_state.balances[i] = balance + par_acquired * share;
         if let Some(payment) = &mut state.pool_state.level_payments[i] {
@@ -264,6 +262,7 @@ fn purchase_replacement_collateral(
             spread,
             Some(assumptions.spread_bp),
             state.floating_rate_shift,
+            None,
         )?,
         None => spread,
     };

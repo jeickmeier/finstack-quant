@@ -314,12 +314,14 @@ mod tests {
                 z_spread_bp: 150.0,
                 cs01: bad,
                 spread_duration: 4.0,
+                spread_convexity: 12.0,
                 modified_duration: 3.5,
                 convexity: 12.0,
                 target_price_pct: 98.0,
                 wal_to_call: None,
                 z_spread_to_call_bp: None,
                 dm_to_call_bp: None,
+                dm_bp: None,
             };
             let err = ensure_tranche_metrics_finite(&metrics)
                 .expect_err("a non-finite cs01 must be rejected");

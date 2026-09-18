@@ -53,8 +53,8 @@ impl SettlementQuote {
     }
 
     fn new(settlement: Date, notional: f64, accrued: f64) -> Result<Self> {
-        if !notional.is_finite() || notional <= 0.0 || !accrued.is_finite() {
-            return Err(Error::Validation("structured-credit quote requires positive original face and finite accrued interest".into()));
+        if !notional.is_finite() || notional < 0.0 || !accrued.is_finite() {
+            return Err(Error::Validation("structured-credit quote requires a finite non-negative current face and finite accrued interest".into()));
         }
         Ok(Self {
             settlement,
@@ -105,7 +105,12 @@ impl SettlementQuote {
             })
     }
 
+    /// Clean price (% of current face); `0.0` for a note with no current
+    /// face.
     pub(crate) fn clean_price(&self, dirty_currency: f64) -> f64 {
+        if self.notional <= 0.0 {
+            return 0.0;
+        }
         (dirty_currency - self.accrued) / self.notional * 100.0
     }
 }

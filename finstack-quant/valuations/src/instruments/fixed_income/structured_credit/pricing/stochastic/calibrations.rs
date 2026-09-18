@@ -90,9 +90,9 @@ pub(crate) struct CloCalibration {
 /// Standard CLO calibration (broadly syndicated loans).
 ///
 /// Based on historical CLO performance:
-/// - Higher default rates (3% annual CDR)
+/// - The registry base case: 2% annual CDR
 /// - Higher correlation (20-25%) for corporate exposures
-/// - Higher prepayment (15% CPR) due to refinancing
+/// - Higher prepayment (20% CPR, the CLO registry base case) due to refinancing
 pub(crate) fn clo_standard() -> CloCalibration {
     required_assumption(
         embedded_registry_or_panic().clo_stochastic_calibration("clo_standard"),
@@ -199,10 +199,12 @@ mod tests {
 
     #[test]
     fn test_clo_standard_values() {
+        // The stochastic profile shares the deterministic CLO registry
+        // record: 2% CDR and 20% CPR.
         let calibration = clo_standard();
-        assert!((calibration.base_cdr - 0.03).abs() < 1e-10);
+        assert!((calibration.base_cdr - 0.02).abs() < 1e-10);
         assert!((calibration.default_correlation - 0.20).abs() < 1e-10);
-        assert!((calibration.base_cpr - 0.15).abs() < 1e-10);
+        assert!((calibration.base_cpr - 0.20).abs() < 1e-10);
     }
 
     #[test]

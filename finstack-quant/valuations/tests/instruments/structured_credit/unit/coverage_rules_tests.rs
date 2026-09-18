@@ -89,6 +89,7 @@ fn oc_ratio(pool: &AssetPool, tranches: &TrancheStructure, rules: Option<&Covera
         tranche_balances: None,
         payable_principal_tranche_ids: None,
         asset_balances: None,
+        live_collateral: None,
         current_pool_balance: None,
         senior_fees: usd(0.0),
         restricted_cash: usd(0.0),
@@ -213,15 +214,19 @@ fn default_rules_value_collateral_at_par() {
     );
 }
 
-/// The registry CLO convention carries rating haircuts, a 7.5% CCC bucket at
-/// market value and an 80 discount-obligation threshold, and validates.
+/// The standard CLO convention carries performing collateral at par (no
+/// rating haircuts), a 7.5% CCC bucket at market value and an 80
+/// discount-obligation threshold, and validates.
 #[test]
 fn clo_standard_rules_are_populated_and_valid() {
     let rules = CoverageRules::clo_standard();
 
     assert!(!rules.is_empty());
     assert!(rules.adjusts_collateral());
-    assert!(!rules.rating_haircuts.is_empty());
+    assert!(
+        rules.rating_haircuts.is_empty(),
+        "the par-value test carries performing collateral at par"
+    );
     assert_eq!(rules.defaulted_valuation, DefaultedValuation::Recovery);
     let bucket = rules.ccc_bucket.expect("CCC bucket");
     assert_eq!(bucket.threshold_pct, 7.5);
@@ -368,9 +373,9 @@ fn principal_on(results: &HashMap<String, TrancheCashflows>, id: &str, date: Dat
 
 /// The pending 4M recovery counts in full under the recovery convention
 /// (94M / 60M = 1.567, passes 1.54) but only 20% of the 10M defaulted par
-/// under the market-value convention (92M / 60M = 1.533, fails). The test
-/// counts principal cash, so its cure X solves (N − X) / (D − X) = T:
-/// X = (1.54 × 60M − 92M) / 0.54 = 740,740.74, diverted into class A
+/// under the market-value convention (92M / 60M = 1.533, fails). The cure is
+/// paid from interest, which is not in the numerator, so X solves
+/// N / (D − X) = T: X = 60M − 92M / 1.54 = 259,740.26, diverted into class A
 /// principal on the first payment date (inside the ≈1.06M of interest ranking
 /// below the A coupon, so the diversion is the cure and not the cap). The
 /// passing deal pays no principal until the recovery cash itself arrives.
@@ -393,8 +398,8 @@ fn defaulted_collateral_at_market_value_fails_the_test_that_recovery_value_passe
     );
     assert_eq!(recovery_cure, 0.0, "recovery basis passes: no cure");
     assert!(
-        (market_value_cure - 740_740.74).abs() < 1.0,
-        "market-value basis cure: expected (1.54 × 60M − 92M) / 0.54 = 740,740.74, got {market_value_cure}"
+        (market_value_cure - 259_740.26).abs() < 1.0,
+        "market-value basis cure: expected 60M − 92M / 1.54 = 259,740.26, got {market_value_cure}"
     );
 }
 
@@ -427,11 +432,11 @@ fn bond_deal(rules: Option<CoverageRules>) -> StructuredCredit {
     deal
 }
 
-/// Materialized instrument rows are unrated, so the `NR` haircut applies to
-/// them: a 50% haircut drops the OC ratio to 0.56, fails the test and diverts
-/// the residual into senior principal long before the bond's bullet maturity.
+/// Materialized instrument rows are unrated by construction, not by credit,
+/// so an `NR` haircut leaves them at par: the OC test passes exactly as it
+/// does without rules and senior principal waits for the bullet maturity.
 #[test]
-fn rating_haircuts_apply_to_instrument_collateral() {
+fn nr_haircut_leaves_instrument_collateral_at_par() {
     let closing = date!(2024 - 01 - 15);
     let market = MarketContext::new().insert(flat_discount_curve(0.03, closing, "USD-OIS"));
     let first_principal = |deal: &StructuredCredit| -> Date {
@@ -451,8 +456,8 @@ fn rating_haircuts_apply_to_instrument_collateral() {
     })));
 
     assert!(at_par >= date!(2034 - 01 - 15), "bullet at par: {at_par}");
-    assert!(
-        haircut < date!(2025 - 01 - 15),
-        "the NR haircut must fail the OC test and divert principal early: {haircut}"
+    assert_eq!(
+        haircut, at_par,
+        "an NR haircut does not apply to unrated instrument rows: {haircut} vs {at_par}"
     );
 }

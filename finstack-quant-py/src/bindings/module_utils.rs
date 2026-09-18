@@ -175,7 +175,14 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     label: &str,
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
-    let json_str: String = json_mod.call_method1("dumps", (obj,))?.extract()?;
+    // Typed wrappers (anything carrying ``to_dict``) serialize through their
+    // canonical dict, standalone or nested inside lists and dicts.
+    let to_dict = py.eval(c"lambda o: o.to_dict()", None, None)?;
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("default", to_dict)?;
+    let json_str: String = json_mod
+        .call_method("dumps", (obj,), Some(&kwargs))?
+        .extract()?;
     py.detach(move || serde_json::from_str(&json_str))
         .map_err(|e| crate::errors::serde_json_to_py(e, &format!("invalid {label}")))
 }

@@ -758,12 +758,12 @@
       "description": "Stochastic pricing result for a structured credit deal.",
       "properties": {
         "clean_price": {
-          "description": "Clean price (percentage of notional), UNADJUSTED for accrued interest.\n\nSC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
+          "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nSC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
           "format": "double",
           "type": "number"
         },
         "dirty_price": {
-          "description": "Dirty price (percentage of notional), including accrued interest.\n\nThis is the authoritative price: it is the present value of all future\ncashflows from the valuation date, which by definition contains the\naccrued portion of the next coupon.",
+          "description": "Dirty price (percent of the sum of current tranche balances),\nincluding accrued interest.\n\nThis is the authoritative price: it is the present value of all future\ncashflows from the valuation date, which by definition contains the\naccrued portion of the next coupon. The face is the notes' current\nbalance, the same basis as the deterministic `dirty_price` metric,\nso a deal whose notes total less than the pool prices near par rather\nthan at the note-to-pool ratio.",
           "format": "double",
           "type": "number"
         },
@@ -1152,7 +1152,7 @@
           "type": "number"
         },
         "average_life": {
-          "description": "Average life (years)",
+          "description": "Average life (years) over the paths on which the tranche received\nprincipal; `0.0` when it never did.",
           "format": "double",
           "type": "number"
         },
@@ -1182,14 +1182,21 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Net present value"
         },
+        "paths_with_principal": {
+          "default": 0,
+          "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `average_life` averages over).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "price_pct": {
+          "description": "Mean present value as a percent of the tranche's current balance at\nthe valuation date (100 = par); `0.0` for a fully retired tranche.",
+          "format": "double",
+          "type": "number"
+        },
         "seniority": {
           "$ref": "#/$defs/TrancheSeniority",
           "description": "Tranche seniority level."
-        },
-        "spread": {
-          "description": "Weighted average spread to LIBOR/SOFR",
-          "format": "double",
-          "type": "number"
         },
         "tranche_id": {
           "description": "Tranche identifier",
@@ -1204,13 +1211,13 @@
         "tranche_id",
         "seniority",
         "npv",
+        "price_pct",
         "expected_loss",
         "unexpected_loss",
         "expected_shortfall",
         "attachment",
         "detachment",
         "average_life",
-        "spread",
         "credit_duration",
         "draw_option_cost"
       ],

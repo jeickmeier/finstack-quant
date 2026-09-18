@@ -205,9 +205,13 @@ impl StructuredCredit {
         let (prepay, default, _correlation) = self.effective_stochastic_specs()?;
         tree_config.prepay_spec = prepay;
         tree_config.default_spec = default;
-        tree_config.recovery_spec =
-            StochasticRecoverySpec::constant(self.resolved_credit_model()?.recovery_spec.rate)
-                .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+        tree_config.recovery_spec = match &self.credit_model.stochastic_recovery_spec {
+            Some(spec) => spec.clone(),
+            None => {
+                StochasticRecoverySpec::constant(self.resolved_credit_model()?.recovery_spec.rate)
+                    .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?
+            }
+        };
         // Explicit deal correlation overrides the copula spec's scalar.
         // The engine consumes only this scalar override; per-pair
         // Matrix/Sectored correlation in the copula is a deferred feature.
@@ -438,8 +442,13 @@ impl StructuredCredit {
     /// * `tranche_id` - Exact note identifier within this deal's capital structure.
     /// * `context` - Discount curves, forward curves and fixings used by projection.
     /// * `as_of` - Valuation date of the current collateral and note balances.
-    /// * `metrics` - Additional registered metrics. Mandatory result fields are
-    ///   calculated even when this list is empty; calculation failures propagate.
+    /// * `metrics` - Additional registered metrics, computed for THIS note:
+    ///   every registry reprice (DV01, theta, the Default01 / Prepayment01 /
+    ///   Recovery01 / Severity01 bumps) values the tranche through
+    ///   [`super::StructuredCreditTranche`], so the senior and the equity carry
+    ///   their own sensitivities that sum to the deal's. Mandatory result
+    ///   fields are calculated even when this list is empty; calculation
+    ///   failures propagate.
     ///
     /// Prices and yields use buyer settlement entitlement and are quoted per
     /// the tranche's CURRENT balance (the factor-adjusted secondary-market
@@ -483,11 +492,24 @@ impl StructuredCredit {
         };
         let disc = context.get_discount(&self.discount_curve_id)?;
         let model_dirty = quote.model_dirty(&cashflow_result.cashflows, &disc)?;
-        let target = quote.external_target(self)?.unwrap_or(model_dirty);
-        quote.dirty_target(target)?;
+        // An impaired note — no current face or no positive settlement value
+        // (fully written down in the projection) — prices at zero and carries
+        // no yield or spread instead of failing the solves.
+        let impaired = tranche.current_balance.amount() <= 0.0 || model_dirty <= 0.0;
+        let target = if impaired {
+            0.0
+        } else {
+            let target = quote.external_target(self)?.unwrap_or(model_dirty);
+            quote.dirty_target(target)?
+        };
 
+        // The priced instrument is the NOTE: every registry reprice (DV01,
+        // theta, the *01 bumps) then values this tranche, not the deal.
         let mut metric_context = MetricContext::new(
-            std::sync::Arc::new(self.clone()),
+            std::sync::Arc::new(super::StructuredCreditTranche::new(
+                self.clone(),
+                tranche_id,
+            )),
             std::sync::Arc::new(context.clone()),
             effective_as_of,
             pv,
@@ -510,15 +532,20 @@ impl StructuredCredit {
                 requested.push(required);
             }
         }
+        if impaired {
+            // No yield on a worthless note: the solver has no target.
+            requested.retain(|id| *id != MetricId::Ytm);
+        }
         let computed_metrics =
             crate::metrics::standard_registry().compute(&requested, &mut metric_context)?;
         let accrued = Money::new(computed_metrics[&MetricId::Accrued], pv.currency())?;
         let dirty_price = computed_metrics[&MetricId::DirtyPrice];
         let clean_price = computed_metrics[&MetricId::CleanPrice];
         let wal = computed_metrics[&MetricId::WAL];
-        let ytm = computed_metrics[&MetricId::Ytm];
+        let ytm = computed_metrics.get(&MetricId::Ytm).copied();
         let modified_duration = match computed_metrics.get(&MetricId::DurationMod) {
             Some(value) => *value,
+            None if impaired => 0.0,
             None => calculate_tranche_duration(
                 &cashflow_result.cashflows,
                 &disc,
@@ -528,6 +555,7 @@ impl StructuredCredit {
         };
         let z_spread = match computed_metrics.get(&MetricId::ZSpread) {
             Some(decimal) => decimal * 10_000.0,
+            None if impaired => 0.0,
             None => calculate_tranche_z_spread(
                 &cashflow_result.cashflows,
                 &disc,
@@ -537,6 +565,7 @@ impl StructuredCredit {
         };
         let cs01 = match computed_metrics.get(&MetricId::Cs01) {
             Some(value) => *value,
+            None if impaired => 0.0,
             None => calculate_tranche_cs01(
                 &cashflow_result.cashflows,
                 &disc,

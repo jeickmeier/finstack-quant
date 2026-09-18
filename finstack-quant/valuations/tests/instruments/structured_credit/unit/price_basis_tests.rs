@@ -173,12 +173,67 @@ fn scenario_table_price_is_per_current_face() {
     let model = calculate_tranche_metrics(&deal, "A", &market, as_of, None).expect("metrics");
     let cell = &table.cells[0];
     // The grid cell reprices at the deal's own assumptions here, so the cell
-    // price is the model PV on current face.
+    // quotes the model's clean settlement price on current face.
     assert!(
-        (cell.price - model.pv / 40_000_000.0 * 100.0).abs() < 1e-6,
-        "scenario price {} must be per current face",
-        cell.price
+        (cell.price - model.price_pct).abs() < 1e-6,
+        "scenario price {} must be the clean settlement price {}",
+        cell.price,
+        model.price_pct
     );
+    assert!(model.price_pct > 0.0);
+}
+
+/// A note that is fully written down in the projection has no settlement
+/// value: it prices at zero and carries no yield instead of failing the
+/// yield solve.
+#[test]
+fn fully_written_down_class_prices_at_zero_without_a_yield() {
+    let (mut deal, as_of) = fixture(false);
+    // Everything defaults at once with a 12-month recovery lag: the equity
+    // sees no cash at all.
+    deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(1.0);
+    let market = market(as_of);
+    let equity = deal
+        .value_tranche_with_metrics("EQ", &market, as_of, &[])
+        .expect("an impaired note still values");
+    assert_eq!(equity.pv.amount(), 0.0);
+    assert_eq!(equity.clean_price, 0.0);
+    assert_eq!(equity.dirty_price, 0.0);
+    assert!(equity.ytm.is_none(), "no yield on a worthless note");
+    assert_eq!(equity.z_spread_bp, 0.0);
+    assert_eq!(equity.cs01, 0.0);
+    let senior = deal
+        .value_tranche_with_metrics("A", &market, as_of, &[])
+        .expect("senior");
+    assert!(senior.ytm.is_some());
+}
+
+/// A 5% fixed note paying quarterly on a 30/360 basis quoted at par yields
+/// exactly 5.00%: the yield compounds at the note's own coupon frequency and
+/// measures time in the note's day count, so a par note yields its coupon.
+#[test]
+fn par_quarterly_note_yields_its_coupon() {
+    let (mut deal, as_of) = fixture(false);
+    deal.tranches.tranches[0].day_count = DayCount::Thirty360;
+    // Unadjusted payment dates keep every 30/360 coupon period at exactly a
+    // quarter; business-day rolls would move the yield by a few tenths of a
+    // basis point.
+    deal.payment_business_day_convention =
+        Some(finstack_quant_core::dates::BusinessDayConvention::Unadjusted);
+    deal.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(100.0);
+    let market = market(as_of);
+    let senior = deal
+        .value_tranche_with_metrics("A", &market, as_of, &[])
+        .expect("senior");
+    let ytm = senior.ytm.expect("yield");
+    assert!(
+        (ytm - 0.05).abs() < 1e-6,
+        "a par 5% quarterly note yields 5.00%, got {ytm}"
+    );
+    // `clean_price` stays the MODEL price; the quote only sets the yield's target.
+    assert!(senior.clean_price > 0.0);
 }
 
 #[test]

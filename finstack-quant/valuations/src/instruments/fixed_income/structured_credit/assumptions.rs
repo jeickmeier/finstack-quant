@@ -11,8 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::{Error, HashMap, Result};
+use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<StructuredCreditAssumptionRegistry> =
@@ -35,7 +34,6 @@ pub(crate) struct StructuredCreditAssumptionRegistry {
     prepayment_models: PrepaymentModelsRecord,
     default_models: DefaultModelsRecord,
     stochastic_calibrations: StochasticCalibrationsRecord,
-    coverage_haircuts: Vec<CoverageHaircutRecord>,
     deal_profiles: Vec<DealProfileRecord>,
 }
 
@@ -176,14 +174,6 @@ impl StructuredCreditAssumptionRegistry {
         })
     }
 
-    pub(crate) fn coverage_haircuts(&self) -> HashMap<CreditRating, f64> {
-        let mut haircuts = HashMap::default();
-        for record in &self.coverage_haircuts {
-            haircuts.insert(record.rating, record.haircut);
-        }
-        haircuts
-    }
-
     pub(crate) fn deal_fees(&self, id: &str, base_currency: Currency) -> Result<DealFees> {
         let fees = &self.deal_profile(id)?.fees;
         Ok(DealFees {
@@ -193,6 +183,8 @@ impl StructuredCreditAssumptionRegistry {
             servicing_fee_bp: fees.servicing_fee_bp,
             master_servicer_fee_bp: fees.master_servicer_fee_bp,
             special_servicer_fee_bp: fees.special_servicer_fee_bp,
+            workout_fee_pct: None,
+            liquidation_fee_pct: None,
             incentive_fee: fees.incentive_fee,
         })
     }
@@ -339,12 +331,6 @@ impl StructuredCreditAssumptionRegistry {
                 .map(|record| record.ids.as_slice()),
         )?;
 
-        for haircut in &self.coverage_haircuts {
-            finstack_quant_core::validation::validate_f64_unit_interval(
-                haircut.haircut,
-                "coverage haircut",
-            )?;
-        }
         for record in &self.stochastic_calibrations.rmbs_profiles {
             validate_rmbs_stochastic_record(record)?;
         }
@@ -550,13 +536,6 @@ struct CmbsStochasticRecord {
     base_cpr: f64,
     prepay_factor_loading: f64,
     cpr_volatility: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CoverageHaircutRecord {
-    rating: CreditRating,
-    haircut: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

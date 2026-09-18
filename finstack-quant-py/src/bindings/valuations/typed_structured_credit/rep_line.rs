@@ -47,6 +47,9 @@ impl PyRepLine {
     ///     points (e.g. ``150.0`` = 150bp), for floating-rate lines.
     /// index_id : str, optional
     ///     Reference index identifier, if floating.
+    /// index_floor : float, optional
+    ///     Floor on the floating index as an annual decimal, applied before
+    ///     ``spread_bp``; ignored on fixed-rate lines.
     /// cpr : float, optional
     ///     Constant prepayment rate override, as an annual decimal (e.g.
     ///     ``0.10`` = 10% CPR).
@@ -56,6 +59,14 @@ impl PyRepLine {
     /// recovery_rate : float, optional
     ///     Recovery rate override, as a decimal fraction (e.g. ``0.45`` =
     ///     45%).
+    /// contractual_payment : Money, optional
+    ///     Contractual periodic payment for level-pay lines; inferred from
+    ///     the balance and remaining schedule when ``None``.
+    /// amortization_term_months : int, optional
+    ///     Schedule length in months from origination; with
+    ///     ``seasoning_months`` the line amortizes over ``term − seasoning``.
+    /// io_months : int, optional
+    ///     Interest-only window in months from origination.
     ///
     /// Returns
     /// -------
@@ -86,11 +97,12 @@ impl PyRepLine {
     /// True
     #[new]
     #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
-                        spread_bp = None, index_id = None, cpr = None, cdr = None,
-                        recovery_rate = None))]
+                        spread_bp = None, index_id = None, index_floor = None, cpr = None,
+                        cdr = None, recovery_rate = None, contractual_payment = None,
+                        amortization_term_months = None, io_months = None))]
     #[pyo3(
         text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, asset_type, \
-spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
+spread_bp=None, index_id=None, index_floor=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -104,9 +116,13 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
         asset_type: &Bound<'_, PyAny>,
         spread_bp: Option<&Bound<'_, PyAny>>,
         index_id: Option<String>,
+        index_floor: Option<f64>,
         cpr: Option<f64>,
         cdr: Option<f64>,
         recovery_rate: Option<f64>,
+        contractual_payment: Option<PyRef<'_, PyMoney>>,
+        amortization_term_months: Option<u32>,
+        io_months: Option<u32>,
     ) -> PyResult<Self> {
         let maturity = extract_date(maturity)?;
         let balance = money_from_py(balance, None, "balance")?;
@@ -124,6 +140,7 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
         );
         inner.spread_bp = spread_bp;
         inner.index_id = index_id;
+        inner.index_floor = index_floor;
         inner.seasoning_months = seasoning_months;
         if let Some(cpr) = cpr {
             inner = inner.with_cpr(cpr);
@@ -134,6 +151,9 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
         if let Some(recovery_rate) = recovery_rate {
             inner = inner.with_recovery_rate(recovery_rate);
         }
+        inner.contractual_payment = contractual_payment.map(|money| money.inner);
+        inner.amortization_term_months = amortization_term_months;
+        inner.io_months = io_months;
         Ok(Self { inner })
     }
 
@@ -208,6 +228,31 @@ spread_bp=None, index_id=None, cpr=None, cdr=None, recovery_rate=None)"
     #[getter]
     fn index_id(&self) -> Option<String> {
         self.inner.index_id.clone()
+    }
+
+    /// Floor on the floating index (annual decimal) applied before the
+    /// spread, or ``None``.
+    #[getter]
+    fn index_floor(&self) -> Option<f64> {
+        self.inner.index_floor
+    }
+
+    /// Contractual periodic payment, or ``None`` when inferred.
+    #[getter]
+    fn contractual_payment(&self) -> Option<PyMoney> {
+        self.inner.contractual_payment.map(money_to_py)
+    }
+
+    /// Amortization schedule length in months from origination, or ``None``.
+    #[getter]
+    fn amortization_term_months(&self) -> Option<u32> {
+        self.inner.amortization_term_months
+    }
+
+    /// Interest-only window in months from origination, or ``None``.
+    #[getter]
+    fn io_months(&self) -> Option<u32> {
+        self.inner.io_months
     }
 
     /// Weighted average maturity as ``datetime.date``.

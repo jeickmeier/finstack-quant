@@ -8,7 +8,7 @@
 
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::structured_credit::metrics::{
-    calculate_tranche_convexity, calculate_tranche_cs01, calculate_tranche_duration,
+    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_spread_convexity,
     calculate_tranche_wal, calculate_tranche_z_spread,
 };
 use crate::instruments::fixed_income::structured_credit::{
@@ -17,7 +17,10 @@ use crate::instruments::fixed_income::structured_credit::{
 };
 use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::bumps::{
+    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+};
+use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use serde::{Deserialize, Serialize};
@@ -51,9 +54,17 @@ pub struct TrancheMetrics {
     pub cs01: f64,
     /// Spread duration (years): `-CS01 / (dirty settlement target · 1bp)`.
     pub spread_duration: f64,
-    /// Modified (rate) duration of the projected cashflows (years).
+    /// Spread convexity (years²): second-order z-spread sensitivity of the
+    /// projected cashflows at the solved z-spread, on the same kernel as
+    /// `spread_duration`.
+    pub spread_convexity: f64,
+    /// Effective (rate) duration (years): the tranche is re-projected with
+    /// every rate curve in the market (discount and forward) bumped ±1 bp in
+    /// parallel and the dirty settlement values differenced, so a floater's
+    /// coupon resets move with the curve and its duration is short, while a
+    /// fixed-coupon note's equals its modified duration.
     pub modified_duration: f64,
-    /// Modified convexity of the projected cashflows (years²).
+    /// Effective convexity (years²) from the same ±1 bp re-projection.
     pub convexity: f64,
     /// Price the z-spread/CS01 were solved against (% of current balance) —
     /// the supplied market price, or the model price when none was given.
@@ -69,6 +80,64 @@ pub struct TrancheMetrics {
     /// tranches only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dm_to_call_bp: Option<f64>,
+    /// Discount margin to maturity at `target_price_pct` (basis points): the
+    /// constant spread over the deal discount curve that reprices the
+    /// floater's projected cashflows; `None` for fixed-rate tranches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dm_bp: Option<f64>,
+}
+
+/// Every discount and forward curve in `market` bumped `bp` basis points in
+/// parallel (hazard, price, vol and other curves untouched).
+fn bump_rate_curves(market: &MarketContext, bp: f64) -> Result<MarketContext> {
+    let bumps: Vec<MarketBump> = market
+        .iter_curves()
+        .filter(|(_, storage)| {
+            matches!(
+                storage,
+                CurveStorage::Discount(_) | CurveStorage::Forward(_)
+            )
+        })
+        .map(|(id, _)| MarketBump::Curve {
+            id: id.clone(),
+            spec: BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::RateBp,
+                value: bp,
+                bump_type: BumpType::Parallel,
+            },
+        })
+        .collect();
+    market.bump(bumps)
+}
+
+/// Effective duration and convexity of one tranche: its cashflows are
+/// re-projected with every rate curve bumped ±1 bp and the dirty settlement
+/// values (`quote`'s settlement and accrued) differenced against
+/// `base_dirty`. Both are `0.0` when the base value is not positive.
+fn effective_rate_sensitivities(
+    deal: &StructuredCredit,
+    tranche_id: &str,
+    market: &MarketContext,
+    as_of: Date,
+    quote: &super::quote::SettlementQuote,
+    base_dirty: f64,
+) -> Result<(f64, f64)> {
+    if base_dirty <= 0.0 {
+        return Ok((0.0, 0.0));
+    }
+    let dirty_under = |bp: f64| -> Result<f64> {
+        let bumped = bump_rate_curves(market, bp)?;
+        let flows = deal.get_tranche_cashflows(tranche_id, &bumped, as_of)?;
+        let disc = bumped.get_discount(deal.discount_curve_id.as_str())?;
+        quote.model_dirty(&flows.cashflows, disc.as_ref())
+    };
+    let up = dirty_under(1.0)?;
+    let down = dirty_under(-1.0)?;
+    let duration = (down - up) / (2.0 * base_dirty * ONE_BASIS_POINT);
+    let convexity =
+        (up + down - 2.0 * base_dirty) / (base_dirty * ONE_BASIS_POINT * ONE_BASIS_POINT);
+    Ok((duration, convexity))
 }
 
 /// One class's cashflows truncated at its assumed call: every flow before
@@ -145,9 +214,11 @@ fn truncate_at_call(
 /// Compute the per-tranche metrics bundle ([`TrancheMetrics`]).
 ///
 /// All figures derive from the named tranche's own waterfall cashflows: PV and
-/// price, WAL, the credit z-spread and CS01, spread duration, modified duration
-/// and convexity. This is the meaningful per-note alternative to the deal-level
-/// metric registry, which aggregates every tranche's flows into one stream.
+/// price, WAL, the credit z-spread and CS01, spread duration and convexity,
+/// effective duration and convexity (re-projected under ±1 bp rate bumps) and,
+/// for floaters, the discount margin. This is the meaningful per-note
+/// alternative to the deal-level metric registry, which aggregates every
+/// tranche's flows into one stream.
 ///
 /// # Arguments
 ///
@@ -206,10 +277,8 @@ pub fn calculate_tranche_metrics(
         deal.call_assumption = None;
         deal
     });
-    let cashflows = to_maturity
-        .as_ref()
-        .unwrap_or(deal)
-        .get_tranche_cashflows(tranche_id, market, as_of)?;
+    let projection_deal = to_maturity.as_ref().unwrap_or(deal);
+    let cashflows = projection_deal.get_tranche_cashflows(tranche_id, market, as_of)?;
     let disc = market.get_discount(deal.discount_curve_id.as_str())?;
     let curve = disc.as_ref();
 
@@ -229,13 +298,14 @@ pub fn calculate_tranche_metrics(
     let price_pct = quote.clean_price(model_dirty);
 
     let wal = calculate_tranche_wal(&cashflows, as_of)?;
-    let modified_duration = calculate_tranche_duration(
-        &cashflows.cashflows,
-        curve,
-        quote.settlement,
-        Money::new(model_dirty, pv_money.currency())?,
+    let (modified_duration, convexity) = effective_rate_sensitivities(
+        projection_deal,
+        tranche_id,
+        market,
+        as_of,
+        &quote,
+        model_dirty,
     )?;
-    let convexity = calculate_tranche_convexity(&cashflows.cashflows, curve, quote.settlement)?;
 
     // Z-spread (and the CS01 measured at it) are solved against the supplied
     // market price, or the tranche's own model price when none is given.
@@ -255,6 +325,25 @@ pub fn calculate_tranche_metrics(
     )?;
     quote.dirty_target(target_value)?;
     let spread_duration = -cs01 / (target_value * ONE_BASIS_POINT);
+    let spread_convexity = calculate_tranche_spread_convexity(
+        &cashflows.cashflows,
+        curve,
+        z_spread_bp * 1e-4,
+        quote.settlement,
+    )?;
+    let dm_bp = if matches!(tranche.coupon, TrancheCoupon::Floating(_)) {
+        Some(
+            calculate_tranche_discount_margin(
+                projection_deal,
+                tranche_id,
+                market,
+                as_of,
+                target_pv,
+            )? / ONE_BASIS_POINT,
+        )
+    } else {
+        None
+    };
 
     let call_flows = match deal
         .call_assumption
@@ -289,12 +378,14 @@ pub fn calculate_tranche_metrics(
         z_spread_bp,
         cs01,
         spread_duration,
+        spread_convexity,
         modified_duration,
         convexity,
         target_price_pct,
         wal_to_call,
         z_spread_to_call_bp,
         dm_to_call_bp,
+        dm_bp,
     })
 }
 
@@ -315,12 +406,14 @@ mod currency_stamp_tests {
             z_spread_bp: 0.0,
             cs01: -1.0,
             spread_duration: 3.0,
+            spread_convexity: 12.0,
             modified_duration: 3.0,
             convexity: 12.0,
             target_price_pct: 100.0,
             wal_to_call: None,
             z_spread_to_call_bp: None,
             dm_to_call_bp: None,
+            dm_bp: None,
         };
         let json = serde_json::to_string(&metrics).expect("serialize");
         assert!(
@@ -343,6 +436,7 @@ mod currency_stamp_tests {
             "z_spread_bp": 0.0,
             "cs01": -1.0,
             "spread_duration": 3.0,
+            "spread_convexity": 12.0,
             "modified_duration": 3.0,
             "convexity": 12.0,
             "target_price_pct": 100.0

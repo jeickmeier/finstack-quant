@@ -179,6 +179,20 @@ impl PyTranche {
         self.inner.pik_enabled
     }
 
+    /// Explicit non-deferrable flag, or ``None`` for the seniority
+    /// convention (senior notes non-deferrable, every other class defers).
+    #[getter]
+    fn non_deferrable(&self) -> Option<bool> {
+        self.inner.non_deferrable
+    }
+
+    /// Whether the coupon is a non-deferrable claim the template pays from
+    /// principal proceeds when interest falls short.
+    #[getter]
+    fn is_non_deferrable(&self) -> bool {
+        self.inner.is_non_deferrable()
+    }
+
     /// Legal final maturity as ``datetime.date``.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -625,6 +639,36 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_tranche(&mut slf)?;
         slf.inner = Some(b.pik_enabled(value));
+        Ok(slf)
+    }
+
+    /// Mark the coupon non-deferrable or deferrable, overriding the
+    /// seniority convention.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : bool
+    ///     ``True`` for a coupon the template pays from principal proceeds
+    ///     when interest falls short (the senior default); ``False`` for one
+    ///     that defers (the default for every other class).
+    ///
+    /// Returns
+    /// -------
+    /// TrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If this builder was already consumed by a prior call to
+    ///     :meth:`TrancheBuilder.build`.
+    #[pyo3(text_signature = "($self, value)")]
+    fn non_deferrable<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.non_deferrable(value));
         Ok(slf)
     }
 

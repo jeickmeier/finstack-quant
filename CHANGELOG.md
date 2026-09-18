@@ -2,6 +2,73 @@
 
 ## [Unreleased]
 
+### Structured credit: analyst remediation (2026-09-17 plan, Phases A–E)
+
+#### Fixed
+
+- Deal and cleanup calls realize the stub period's collateral flows; every
+  "original balance" quantity (cumulative-loss triggers, cleanup-call factor,
+  charge-off curves) uses `AssetPool.original_balance`; OC cures are sized for
+  an interest-funded diversion (`max(0, D − N/r)`); `CoverageRules::clo_standard`
+  carries performing collateral at par; Default01 / Prepayment01 / Recovery01 /
+  Severity01 and DV01 reprice per tranche through `StructuredCreditTranche`;
+  stochastic prices are per current tranche face (`TranchePricingResult.price_pct`).
+- Card master trusts allocate collections on a fixed investor share
+  (`CardPortfolioSpec.{seller_interest, fixed_allocation_pct}`); the CLO registry
+  profile is the single source of CLO defaults (15/35 bp fees, 20% CPR, 2% CDR,
+  60% recovery); the incentive fee shares principal proceeds above the hurdle;
+  shifting interest keeps the equity residual out of pro-rata principal.
+- Servicer advances are per loan: cures repay arrears (reimbursing advances
+  first) and amortize the repaid principal, charge-offs write off pro rata and
+  reimburse from their own proceeds; the coverage-test evaluation that gates
+  reinvestment runs on the executor's cash and hedge-adjusted waterfall.
+- `Tranche.frequency` sets the yield's compounding and its day count the time
+  basis (a par 5% quarterly 30/360 note yields 5.00%); impaired notes price at
+  zero with `TrancheValuation.ytm: None`; scenario cells quote the clean
+  settlement price from one projection; the payment business-day default is
+  documented as ModifiedFollowing.
+
+#### Added
+
+- Collateral terms: `PoolAsset.{origination_date, amortization_term_months,
+  io_months, index_floor}` (per-asset seasoning on PSA/ABS/vector/SDA curves,
+  level payment over the amortization term, IO windows, index floors),
+  `BalloonSpec.{extension_prob, loss_prob, severity_pct, workout_months}` with
+  workout claims, NPL timelines anchored on `acquisition_date`, DSCR on the live
+  floating coupon and schedule.
+- Deal mechanics: `LossRecognition::{AtDefault, AtLiquidation}`,
+  `ShiftingInterestSpec::{mode, triggers}`, `WaterfallRules::{reserve, target_oc}`
+  (`ReserveAccountSpec`, `ReserveTarget`, `TargetOcSpec`), `AfcSpec.carryover`,
+  `CoverageTestSpec::{placement, divert_pct}` (`CoveragePlacement`),
+  `Tranche.non_deferrable`, `AdvancingPolicy::PrincipalAndInterest.reimburse_from_collections`,
+  `DealFees::{workout_fee_pct, liquidation_fee_pct}` with dynamic special
+  servicing, `PrepaymentPenalty::{Lockout, StepDown, YieldMaintenance {
+  discount_curve_id, floor_pct }}`, `CreditModelConfig.stochastic_recovery_spec`.
+- Facilities: `EarlyAmortizationSpec.max_cumulative_loss`,
+  `CallAssumption.after_early_amortization_months`, `StructuredCredit::{tranche_draws,
+  tranche_readvance}`, `EligibilityRule::{max_days_past_due, exclude_non_performing}`
+  on live collateral, `AssetBackedFacility::{fees, draw_schedule,
+  readvance_to_borrowing_base}`, `FacilityProjection.draws`,
+  `SimulationDiagnostics::{early_amortization_date, tranche_draws}`,
+  `PeriodDiagnostics.servicer_advances_outstanding`.
+- Analytics: `TrancheMetrics::{spread_convexity, dm_bp}` and effective
+  `modified_duration` / `convexity` from ±1 bp re-projection;
+  `calculate_tranche_spread_convexity`; `TranchePricingResult.paths_with_principal`
+  (average life over paths that return principal).
+- Python: typed `BalloonSpec`, `PrepaymentPenalty`, `SpecialServicingSpec`,
+  `LiquidationSpec`, `BorrowingBaseRules`, `AdvanceRate`, `EligibilityRule`,
+  `ConcentrationLimit`, `TermOutSpec`, `AmortizationEvent` (accepted wherever
+  the dict form was), `TrancheCashflows.{total_deferred, total_writedown}`,
+  `TrancheBuilder.non_deferrable`, `StructuredCreditBuilder.stochastic_recovery_spec`.
+
+#### Removed
+
+- `ReinvestmentCriteria.{maintain_credit_quality, maintain_wal}` (inert);
+  `TranchePricingResult.spread` (never computed); `CoverageTestSpec.after_tranche`
+  wire field (now `placement`); `BalloonSpec.default_prob` (now
+  `extension_prob`); `EarlyAmortizationSpec.max_cumulative_loss_pct` (now the
+  decimal `max_cumulative_loss`).
+
 ### Structured credit: collateral-vertical coverage (2026-09-15 plan, Phases A–F)
 
 #### Added

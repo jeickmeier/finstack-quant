@@ -10,8 +10,9 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_tranche_wal, run_simulation, AssetPool, AssetType, DealType, PoolAsset,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    calculate_tranche_wal, run_simulation, AssetPool, AssetType, DealType, DelinquencyModel,
+    PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -190,4 +191,37 @@ fn stochastic_pricing_rejects_lifetime_curves_and_severity_vectors() {
     assert!(severity
         .price_stochastic_with_mode(&market(), close(), mode)
         .is_err());
+}
+
+/// A charge-off curve through a delinquency model: the entries are sized
+/// from the curve three months ahead grossed up by the roll probabilities
+/// (`0.5³`), so the charge-offs still reproduce the 3% lifetime net loss
+/// (300k on 10M) instead of the curve being read as an entry rate that
+/// mostly cures.
+#[test]
+fn cumulative_loss_curve_is_reproduced_through_a_delinquency_model() {
+    let mut deal = auto_abs(true);
+    let curve: Vec<f64> = (1..=36).map(|m| 3.0 * f64::from(m) / 36.0).collect();
+    deal.credit_model.default_spec = DefaultModelSpec::cumulative_loss(curve, 0.5);
+    deal.credit_model.delinquency = Some(DelinquencyModel::new(
+        vec![0.5, 0.5, 0.5],
+        vec![0.5, 0.5, 0.5],
+    ));
+
+    let loss = realized_loss(&simulate(&deal));
+
+    assert!(
+        (loss - 300_000.0).abs() < 3_000.0,
+        "lifetime loss should be the curve's 3% of 10M within 1%, got {loss}"
+    );
+
+    // A bucket that never rolls cannot be inverted.
+    let mut stuck = auto_abs(true);
+    stuck.credit_model.default_spec =
+        DefaultModelSpec::timing(0.04, vec![15.0, 30.0, 30.0, 15.0, 10.0]);
+    stuck.credit_model.delinquency = Some(DelinquencyModel::new(vec![0.5, 0.0], vec![0.5, 0.5]));
+    assert!(
+        run_simulation(&stuck, &market(), close()).is_err(),
+        "a zero roll rate under a charge-off curve is rejected"
+    );
 }

@@ -1279,6 +1279,8 @@ struct PathTrancheMetrics {
     pv: f64,
     loss: f64,
     wal: f64,
+    /// Principal the tranche received on the path after the valuation date.
+    principal: f64,
     duration: f64,
     /// Present value less the counterfactual (fair draw interest) present value.
     option_cost: f64,
@@ -1310,11 +1312,18 @@ impl PathTrancheMetrics {
 
         let wal =
             weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)?;
+        let principal: f64 = cashflows
+            .principal_flows
+            .iter()
+            .filter(|(date, _)| *date > as_of)
+            .map(|(_, amount)| amount.amount())
+            .sum();
 
         Ok(Self {
             pv,
             loss: cashflows.total_writedown.amount(),
             wal,
+            principal,
             duration: if positive_pv > f64::EPSILON {
                 weighted_duration / positive_pv
             } else {
@@ -1330,10 +1339,17 @@ struct TrancheScenarioStats {
     seniority: TrancheSeniority,
     attachment: f64,
     detachment: f64,
+    /// Current note balance at the valuation date: the face the tranche
+    /// price is quoted on.
+    current_balance: f64,
     pv_stats: OnlineStats,
     loss_stats: OnlineStats,
     losses: Vec<f64>,
+    /// Sum of path WALs over the paths that returned principal.
     wal_sum: f64,
+    /// Paths on which the tranche received any principal: a wiped-out path
+    /// has no WAL and must not pull the average toward zero.
+    paths_with_principal: usize,
     duration_sum: f64,
     option_cost_stats: OnlineStats,
 }
@@ -1345,10 +1361,12 @@ impl TrancheScenarioStats {
             seniority: tranche.seniority,
             attachment: tranche.attachment_pct() / 100.0,
             detachment: tranche.detachment_pct() / 100.0,
+            current_balance: tranche.current_balance.amount(),
             pv_stats: OnlineStats::new(),
             loss_stats: OnlineStats::new(),
             losses: Vec::with_capacity(num_paths),
             wal_sum: 0.0,
+            paths_with_principal: 0,
             duration_sum: 0.0,
             option_cost_stats: OnlineStats::new(),
         }
@@ -1358,7 +1376,10 @@ impl TrancheScenarioStats {
         self.pv_stats.update(metrics.pv);
         self.loss_stats.update(metrics.loss);
         self.losses.push(metrics.loss);
-        self.wal_sum += metrics.wal;
+        if metrics.principal > 0.0 {
+            self.wal_sum += metrics.wal;
+            self.paths_with_principal += 1;
+        }
         self.duration_sum += metrics.duration;
         self.option_cost_stats.update(metrics.option_cost);
     }
@@ -1377,18 +1398,30 @@ impl TrancheScenarioStats {
         let loss_std = self.loss_stats.population_variance().sqrt();
         let es = expected_shortfall(&mut self.losses, es_confidence);
 
+        let price_pct = if self.current_balance > f64::EPSILON {
+            mean_pv / self.current_balance * 100.0
+        } else {
+            0.0
+        };
+
         Ok(TranchePricingResult::new(
             self.tranche_id,
             self.seniority,
             Money::new(mean_pv, currency)?,
         )
+        .with_price_pct(price_pct)
         .with_subordination(self.attachment, self.detachment)
         .with_risk_metrics(
             Money::new(mean_loss, currency)?,
             Money::new(loss_std, currency)?,
             Money::new(es, currency)?,
         )
-        .with_average_life(self.wal_sum / paths)
+        .with_average_life(if self.paths_with_principal > 0 {
+            self.wal_sum / self.paths_with_principal as f64
+        } else {
+            0.0
+        })
+        .with_paths_with_principal(self.paths_with_principal)
         .with_credit_duration(self.duration_sum / paths)
         .with_draw_option_cost(Money::new(self.option_cost_stats.mean(), currency)?))
     }
@@ -1506,7 +1539,14 @@ impl ScenarioCollector {
         .with_unexpected_loss(Money::new(loss_pop_var.sqrt(), self.currency)?)
         .with_expected_shortfall(Money::new(es, self.currency)?, pricer.config.es_confidence);
 
-        let notional = pricer.config.tree_config.initial_balance;
+        // Prices are quoted per CURRENT note balance, the same face the
+        // deterministic `dirty_price` metric uses, not per pool balance: a
+        // deal whose notes total 60M against a 100M pool prices at 100, not 60.
+        let notional: f64 = self
+            .tranche_stats
+            .iter()
+            .map(|stats| stats.current_balance)
+            .sum();
         if notional > f64::EPSILON {
             // SC-m29: `mean_pv` is the present value of all FUTURE cashflows
             // from the valuation date, which is by definition the DIRTY price —

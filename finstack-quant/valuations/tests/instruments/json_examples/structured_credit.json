@@ -61,6 +61,7 @@
             "maturity": "2034-01-01",
             "mdr_override": null,
             "obligor_id": null,
+            "origination_date": null,
             "purchase_price": null,
             "rate": 0.07,
             "recovery_amount": null,
@@ -104,12 +105,12 @@
         }
       },
       "prepayment_spec": {
-        "cpr": 0.15,
+        "cpr": 0.2,
         "curve": null
       },
       "recovery_spec": {
-        "rate": 0.4,
-        "recovery_lag": 18
+        "rate": 0.6,
+        "recovery_lag": 12
       },
       "tranches": {
         "total_size": {

@@ -133,6 +133,7 @@ mod cases {
                     accrual_end: date,
                     payment: date,
                     valuation: deal.closing_date,
+                    redemption: false,
                 },
                 &MarketContext::new(),
                 3.0,
@@ -193,6 +194,7 @@ mod cases {
                     accrual_end: deal.first_payment_date,
                     payment: deal.first_payment_date,
                     valuation: deal.closing_date,
+                    redemption: false,
                 },
                 &MarketContext::new(),
                 3.0,
@@ -250,6 +252,7 @@ mod cases {
                 accrual_end: first,
                 payment: first,
                 valuation: deal.closing_date,
+                redemption: false,
             },
             &MarketContext::new(),
             3.0,
@@ -268,6 +271,7 @@ mod cases {
                 accrual_end: first.add_months(3),
                 payment: first.add_months(3),
                 valuation: deal.closing_date,
+                redemption: false,
             },
             &MarketContext::new(),
             3.0,
@@ -320,6 +324,7 @@ mod cases {
                 accrual_end: deal.first_payment_date,
                 payment: deal.first_payment_date,
                 valuation: deal.closing_date,
+                redemption: false,
             },
             &MarketContext::new(),
             3.0,
@@ -451,6 +456,7 @@ mod cases {
                 accrual_end: deal.first_payment_date,
                 payment: deal.first_payment_date,
                 valuation: deal.closing_date,
+                redemption: false,
             },
             &MarketContext::new(),
             3.0,
@@ -505,6 +511,7 @@ mod cases {
                 accrual_end: deal.first_payment_date,
                 payment: deal.first_payment_date,
                 valuation: deal.closing_date,
+                redemption: false,
             },
             &MarketContext::new(),
             3.0,
@@ -554,6 +561,7 @@ mod cases {
             0.05,
             Some(100.0),
             0.0,
+            None,
         )
         .expect("unshifted rate");
         let shifted = collateral_asset_rate_for_period(
@@ -563,6 +571,7 @@ mod cases {
             0.05,
             Some(100.0),
             0.01,
+            None,
         )
         .expect("shifted rate");
 
@@ -570,6 +579,23 @@ mod cases {
             (shifted - unshifted - 0.01).abs() < 1e-12,
             "a +100bp path shift must raise the projected floating coupon by \
              exactly that: {unshifted:.6} -> {shifted:.6} (SC-M13)"
+        );
+
+        // An index floor binds before the spread: SOFR+400 with a 1% floor on
+        // a path that pushes the index to −1% pays 1% + 4% = 5%.
+        let index_floored = collateral_asset_rate_for_period(
+            &curve,
+            &market,
+            accrual_start,
+            0.05,
+            Some(400.0),
+            -0.05,
+            Some(0.01),
+        )
+        .expect("index-floored rate");
+        assert!(
+            (index_floored - 0.05).abs() < 1e-12,
+            "max(4% − 5%, 1%) + 4% = 5%, got {index_floored}"
         );
 
         // A deeply negative path must not manufacture a negative coupon.
@@ -580,6 +606,7 @@ mod cases {
             0.05,
             Some(100.0),
             -0.50,
+            None,
         )
         .expect("floored rate");
         assert!(
@@ -670,7 +697,8 @@ mod cases {
             accrual_start,
             0.071,
             Some(125.0),
-            0.0, // no OAS rate shift in this unit test
+            0.0, // no OAS rate shift in this unit test,
+            None,
         )
         .expect("stored current coupon is authoritative for an already-reset period");
 
@@ -1269,6 +1297,7 @@ mod cases {
             rate,
             spread_bp: None,
             index_id: None,
+            index_floor: None,
             maturity,
             credit_quality: None,
             industry: None,
@@ -1278,11 +1307,14 @@ mod cases {
             default_date: None,
             purchase_price: None,
             acquisition_date: None,
+            origination_date: None,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -1321,8 +1353,10 @@ mod cases {
             months_per_period,
             context: &market,
             rates,
+            asset_rates: AssetSeasonedRates::default(),
             copula_outcome: None,
             delinquency: None,
+            special_servicing: SpecialServicingFees::default(),
             card: None,
         })
         .expect("period 1 flows");
@@ -1346,8 +1380,10 @@ mod cases {
             months_per_period,
             context: &market,
             rates,
+            asset_rates: AssetSeasonedRates::default(),
             copula_outcome: None,
             delinquency: None,
+            special_servicing: SpecialServicingFees::default(),
             card: None,
         })
         .expect("period 2 flows");
@@ -1404,6 +1440,7 @@ mod cases {
             rate,
             spread_bp: None,
             index_id: None,
+            index_floor: None,
             maturity,
             credit_quality: None,
             industry: None,
@@ -1413,11 +1450,14 @@ mod cases {
             default_date: None,
             purchase_price: None,
             acquisition_date: None,
+            origination_date: None,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -1470,8 +1510,10 @@ mod cases {
                 months_per_period: 1.0,
                 context: &market,
                 rates,
+                asset_rates: AssetSeasonedRates::default(),
                 copula_outcome: None,
                 delinquency: None,
+                special_servicing: SpecialServicingFees::default(),
                 card: None,
             })
             .expect("pool flows");
@@ -1577,8 +1619,10 @@ mod cases {
                 months_per_period: 1.0,
                 context: &market,
                 rates,
+                asset_rates: AssetSeasonedRates::default(),
                 copula_outcome: None,
                 delinquency: None,
+                special_servicing: SpecialServicingFees::default(),
                 card: None,
             })
             .expect("pool flows");
@@ -2169,6 +2213,8 @@ mod cases {
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
+                live_collateral: None,
+                special_serviced: None,
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -2222,6 +2268,8 @@ mod cases {
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
+                live_collateral: None,
+                special_serviced: None,
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -2322,6 +2370,8 @@ mod cases {
                     market: &market,
                     tranche_balances: None,
                     asset_balances: None,
+                    live_collateral: None,
+                    special_serviced: None,
                     deferred_interest: None,
                     reserve_balance: Money::from((0_i64, ccy)),
                     restricted_cash: Money::from((0_i64, Currency::USD)),
@@ -2537,6 +2587,7 @@ mod cases {
                 rate,
                 spread_bp: None,
                 index_id: None,
+                index_floor: None,
                 maturity,
                 credit_quality: None,
                 industry: None,
@@ -2546,11 +2597,14 @@ mod cases {
                 default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
+                origination_date: None,
                 smm_override: None,
                 mdr_override,
                 recovery_rate: None,
                 commitment: None,
                 contractual_payment: None,
+                amortization_term_months: None,
+                io_months: None,
                 market_price_pct: None,
                 delinquency_buckets: None,
                 balloon: None,
@@ -2589,8 +2643,10 @@ mod cases {
                     mdr: 0.0,
                     recovery_rate: 0.40,
                 },
+                asset_rates: AssetSeasonedRates::default(),
                 copula_outcome: None,
                 delinquency: None,
+                special_servicing: SpecialServicingFees::default(),
                 card: None,
             })
             .expect("flows");

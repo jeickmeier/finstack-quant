@@ -6,7 +6,7 @@
   "credit_model_defaults": {
     "prepayment_cpr_annual": 0.2,
     "default_cdr_annual": 0.02,
-    "recovery_rate": 0.5,
+    "recovery_rate": 0.6,
     "recovery_lag_months": 12
   },
   "cmo_collateral_defaults": {
@@ -102,9 +102,9 @@
           "clo_standard",
           "clo_bsl_standard"
         ],
-        "base_cdr": 0.03,
+        "base_cdr": 0.02,
         "default_correlation": 0.2,
-        "base_cpr": 0.15,
+        "base_cpr": 0.2,
         "prepay_factor_loading": 0.25,
         "cpr_volatility": 0.15,
         "default_factor_sensitivity": 0.8,
@@ -126,52 +126,6 @@
       }
     ]
   },
-  "coverage_haircuts": [
-    {
-      "rating": "AAA",
-      "haircut": 0.0
-    },
-    {
-      "rating": "AA",
-      "haircut": 0.0
-    },
-    {
-      "rating": "A",
-      "haircut": 0.01
-    },
-    {
-      "rating": "BBB",
-      "haircut": 0.02
-    },
-    {
-      "rating": "BB",
-      "haircut": 0.05
-    },
-    {
-      "rating": "B",
-      "haircut": 0.1
-    },
-    {
-      "rating": "CCC",
-      "haircut": 0.2
-    },
-    {
-      "rating": "CC",
-      "haircut": 0.3
-    },
-    {
-      "rating": "C",
-      "haircut": 0.4
-    },
-    {
-      "rating": "D",
-      "haircut": 0.5
-    },
-    {
-      "rating": "NR",
-      "haircut": 0.15
-    }
-  ],
   "deal_profiles": [
     {
       "ids": [
@@ -181,8 +135,8 @@
       "deal_type": "clo",
       "fees": {
         "trustee_fee_annual": 50000.0,
-        "senior_mgmt_fee_bp": 40.0,
-        "subordinated_mgmt_fee_bp": 20.0,
+        "senior_mgmt_fee_bp": 15.0,
+        "subordinated_mgmt_fee_bp": 35.0,
         "servicing_fee_bp": 0.0,
         "master_servicer_fee_bp": null,
         "special_servicer_fee_bp": null,
@@ -195,11 +149,11 @@
         "frequency": "quarterly",
         "prepayment": {
           "kind": "constant_cpr",
-          "rate": 0.15
+          "rate": 0.2
         },
         "default_cdr_annual": 0.02,
-        "recovery_rate": 0.4,
-        "recovery_lag_months": 18
+        "recovery_rate": 0.6,
+        "recovery_lag_months": 12
       }
     },
     {

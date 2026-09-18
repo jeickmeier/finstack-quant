@@ -6032,11 +6032,17 @@ export interface TrancheMetrics {
    */
   spread_duration: number;
   /**
-   * Modified (rate) duration of the projected cashflows, in years.
+   * Spread convexity at the solved z-spread, in years squared.
+   */
+  spread_convexity: number;
+  /**
+   * Effective (rate) duration, in years: the cashflows are re-projected with
+   * every rate curve bumped ±1 bp, so a floater's coupon resets move with the
+   * curve and its duration is short.
    */
   modified_duration: number;
   /**
-   * Modified convexity of the projected cashflows, in years squared.
+   * Effective convexity from the same ±1 bp re-projection, in years squared.
    */
   convexity: number;
   /**
@@ -6059,6 +6065,11 @@ export interface TrancheMetrics {
    * Absent for fixed-rate tranches or without a call.
    */
   dm_to_call_bp?: number;
+  /**
+   * Discount margin to maturity at `target_price_pct` for a floating-rate
+   * tranche, in basis points. Absent for fixed-rate tranches.
+   */
+  dm_bp?: number;
 }
 
 /**

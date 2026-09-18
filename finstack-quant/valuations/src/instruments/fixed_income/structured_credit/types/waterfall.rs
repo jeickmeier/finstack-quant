@@ -153,11 +153,27 @@ pub enum PaymentCalculation {
         /// Rounding convention.
         rounding: Option<RoundingConvention>,
     },
+    /// Net-WAC carryover repayment: the tranche's carryover balance brought
+    /// into the period (`amount`, set by the engine each period from the
+    /// interest its available-funds cap withheld in earlier periods), paid
+    /// from the cash reaching this recipient and recorded as interest on the
+    /// tranche outside its capped claim.
+    NetWacCarryover {
+        /// Tranche id.
+        tranche_id: String,
+        /// Carryover balance outstanding at the period's opening.
+        amount: Money,
+    },
     /// Manager incentive fee: `share_pct` of the cash reaching this recipient
-    /// once the equity IRR to date (the [`EquityHistory`] in the
-    /// `WaterfallContext`, plus this cash on the payment date) reaches
-    /// `hurdle_irr`; nothing before that, and nothing when no equity history
-    /// is supplied.
+    /// that lies above the equity hurdle. The hurdle is tested on the
+    /// [`EquityHistory`] in the `WaterfallContext` plus every equity
+    /// distribution earlier in the same waterfall run plus this cash; the
+    /// cash that lifts the equity IRR exactly to `hurdle_irr`
+    /// ([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and
+    /// the manager shares only in the excess. Nothing is paid while the
+    /// hurdle is unreachable, or when no equity history is supplied. The
+    /// standard template places one recipient in the principal tier ahead of
+    /// `equity_principal` and one ahead of the residual.
     IncentiveFee {
         /// Equity IRR hurdle as an annual decimal.
         hurdle_irr: f64,
@@ -203,6 +219,48 @@ impl EquityHistory {
             .ok()
             .filter(|irr| irr.is_finite())
     }
+
+    /// Cash on `payment_date` that lifts the equity IRR to `hurdle_irr`,
+    /// capped at `candidate`: zero when the hurdle is already earned, all of
+    /// `candidate` when even that much leaves the IRR below the hurdle (or no
+    /// IRR exists). The manager's incentive share applies to
+    /// `candidate − shortfall`.
+    ///
+    /// # Arguments
+    ///
+    /// * `payment_date` - Date the candidate distribution would be paid.
+    /// * `candidate` - Total cash that could reach equity on `payment_date`.
+    /// * `hurdle_irr` - Equity IRR hurdle as an annual decimal.
+    #[must_use]
+    pub fn hurdle_shortfall(&self, payment_date: Date, candidate: Money, hurdle_irr: f64) -> Money {
+        let currency = candidate.currency();
+        let total = candidate.amount().max(0.0);
+        let irr_at = |cash: f64| {
+            Money::new(cash, currency)
+                .ok()
+                .and_then(|money| self.irr_with(payment_date, money))
+        };
+        if irr_at(0.0).is_some_and(|irr| irr >= hurdle_irr) {
+            return Money::from((0_i64, currency));
+        }
+        if !irr_at(total).is_some_and(|irr| irr >= hurdle_irr) {
+            return candidate;
+        }
+        // IRR is monotone in the candidate cash: bisect for the crossing.
+        let (mut low, mut high) = (0.0_f64, total);
+        for _ in 0..64 {
+            let mid = 0.5 * (low + high);
+            if irr_at(mid).is_some_and(|irr| irr >= hurdle_irr) {
+                high = mid;
+            } else {
+                low = mid;
+            }
+            if high - low <= 0.005 {
+                break;
+            }
+        }
+        Money::new(high, currency).unwrap_or(candidate)
+    }
 }
 
 /// Declarative, additively-applied waterfall rules layered onto a deal's base
@@ -238,6 +296,15 @@ pub struct WaterfallRules {
     /// repay the investor as a bullet at the accumulation end.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub controlled_accumulation: Option<ControlledAccumulationSpec>,
+    /// Reserve account target, replenishment, excess release and final
+    /// principal cover.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserve: Option<ReserveAccountSpec>,
+    /// Targeted-overcollateralization amortization: notes are paid down each
+    /// period to the amount that holds the pool's overcollateralization at
+    /// the target, with the excess released to the residual holder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_oc: Option<TargetOcSpec>,
 }
 
 impl WaterfallRules {
@@ -253,7 +320,7 @@ impl WaterfallRules {
     ///   tranches; `afc.net_wac_fee_bp` is finite and non-negative.
     /// - Loss/enhancement/share fractions (`trap_loss_pct`,
     ///   `MaxCumulativeLoss`, `MinCreditEnhancement`, `senior_pct`,
-    ///   `max_cumulative_loss_pct`) lie in `[0, 1]`; `MinOcRatio` is finite and
+    ///   `max_cumulative_loss`) lie in `[0, 1]`; `MinOcRatio` is finite and
     ///   non-negative (a ratio, so it may exceed 1).
     /// - `excess_spread.target_balance` is non-negative.
     /// - The shifting-interest schedule is non-empty and strictly ascending in
@@ -267,6 +334,7 @@ impl WaterfallRules {
     pub(crate) fn validate(
         &self,
         tranches: &super::tranches::TrancheStructure,
+        currency: Currency,
     ) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
         let has_tranche = |id: &str| tranches.tranches.iter().any(|t| t.id.as_str() == id);
@@ -308,26 +376,33 @@ impl WaterfallRules {
             }
         }
 
+        let validate_trigger = |trigger: &StepDownTrigger,
+                                rule: &str|
+         -> finstack_quant_core::Result<()> {
+            match trigger {
+                StepDownTrigger::MaxCumulativeLoss(v) => {
+                    unit(*v, &format!("{rule} trigger MaxCumulativeLoss"))
+                }
+                StepDownTrigger::MinCreditEnhancement(v) => {
+                    unit(*v, &format!("{rule} trigger MinCreditEnhancement"))
+                }
+                StepDownTrigger::MaxDelinquency(v) => {
+                    unit(*v, &format!("{rule} trigger MaxDelinquency"))
+                }
+                StepDownTrigger::MinOcRatio(v) => {
+                    if !v.is_finite() || *v < 0.0 {
+                        return Err(invalid(format!(
+                            "waterfall_rules: {rule} trigger MinOcRatio must be finite and non-negative, got {v}"
+                        )));
+                    }
+                    Ok(())
+                }
+            }
+        };
+
         if let Some(sd) = &self.step_down {
             for trigger in &sd.triggers {
-                match trigger {
-                    StepDownTrigger::MaxCumulativeLoss(v) => {
-                        unit(*v, "step_down trigger MaxCumulativeLoss")?;
-                    }
-                    StepDownTrigger::MinCreditEnhancement(v) => {
-                        unit(*v, "step_down trigger MinCreditEnhancement")?;
-                    }
-                    StepDownTrigger::MaxDelinquency(v) => {
-                        unit(*v, "step_down trigger MaxDelinquency")?;
-                    }
-                    StepDownTrigger::MinOcRatio(v) => {
-                        if !v.is_finite() || *v < 0.0 {
-                            return Err(invalid(format!(
-                                "waterfall_rules: step_down trigger MinOcRatio must be finite and non-negative, got {v}"
-                            )));
-                        }
-                    }
-                }
+                validate_trigger(trigger, "step_down")?;
             }
         }
 
@@ -343,6 +418,9 @@ impl WaterfallRules {
                     "waterfall_rules: shifting_interest.schedule must have at least one step"
                         .to_string(),
                 ));
+            }
+            for trigger in &si.triggers {
+                validate_trigger(trigger, "shifting_interest")?;
             }
             let mut prev: Option<u32> = None;
             for step in &si.schedule {
@@ -360,11 +438,17 @@ impl WaterfallRules {
             }
         }
 
+        if let Some(reserve) = &self.reserve {
+            reserve.target.validate(currency)?;
+        }
+        if let Some(target_oc) = &self.target_oc {
+            target_oc.validate()?;
+        }
+
         if let Some(ea) = &self.early_amortization {
-            unit(
-                ea.max_cumulative_loss_pct,
-                "early_amortization.max_cumulative_loss_pct",
-            )?;
+            if let Some(max_loss) = ea.max_cumulative_loss {
+                unit(max_loss, "early_amortization.max_cumulative_loss")?;
+            }
             if let Some(floor) = ea.min_excess_spread_3m {
                 if !floor.is_finite() {
                     return Err(invalid(format!(
@@ -402,6 +486,187 @@ pub struct AfcSpec {
     /// the gross collateral WAC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub net_wac_fee_bp: Option<f64>,
+    /// Net-WAC carryover: the interest the cap withholds from each capped
+    /// tranche accrues as a carryover balance (no interest on it) repaid from
+    /// excess interest through a `net_wac_carryover` tier ahead of the
+    /// incentive fee and the residual. Off by default: the capped-off coupon
+    /// is then simply never owed.
+    #[serde(default)]
+    pub carryover: bool,
+}
+
+/// Target balance of the deal reserve account, re-evaluated every period.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
+pub enum ReserveTarget {
+    /// A fixed amount in the deal currency.
+    Fixed(Money),
+    /// A decimal fraction of the current pool balance (performing collateral
+    /// plus any accumulation funding account), so the target amortizes with
+    /// the pool.
+    PctOfCurrent(f64),
+    /// A decimal fraction of the original (cut-off) pool balance: a floor
+    /// that does not amortize.
+    PctOfOriginal(f64),
+    /// The larger of two targets, typically `PctOfCurrent` with a
+    /// `PctOfOriginal` floor.
+    Max(Box<ReserveTarget>, Box<ReserveTarget>),
+}
+
+impl ReserveTarget {
+    /// The target for one period.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_pool` - Current pool balance in currency units (performing
+    ///   collateral plus the accumulation funding account).
+    /// * `original_pool` - Original (cut-off) pool balance in currency units.
+    #[must_use]
+    pub fn resolve(&self, current_pool: f64, original_pool: f64) -> f64 {
+        match self {
+            Self::Fixed(amount) => amount.amount().max(0.0),
+            Self::PctOfCurrent(pct) => (pct * current_pool).max(0.0),
+            Self::PctOfOriginal(pct) => (pct * original_pool).max(0.0),
+            Self::Max(a, b) => a
+                .resolve(current_pool, original_pool)
+                .max(b.resolve(current_pool, original_pool)),
+        }
+    }
+
+    fn validate(&self, currency: Currency) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        match self {
+            Self::Fixed(amount) => {
+                if amount.currency() != currency || amount.amount() < 0.0 {
+                    return Err(invalid(format!(
+                        "waterfall_rules: reserve.target must be a non-negative {currency} amount, got {amount}"
+                    )));
+                }
+            }
+            Self::PctOfCurrent(pct) | Self::PctOfOriginal(pct) => {
+                if !pct.is_finite() || !(0.0..=1.0).contains(pct) {
+                    return Err(invalid(format!(
+                        "waterfall_rules: reserve.target fraction must be in [0, 1], got {pct}"
+                    )));
+                }
+            }
+            Self::Max(a, b) => {
+                a.validate(currency)?;
+                b.validate(currency)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Targeted overcollateralization amortization (auto and consumer ABS).
+///
+/// Each period the notes are paid down to the amount that leaves the pool's
+/// overcollateralization (`pool − notes`) at the target: the larger of
+/// `pct_of_current` of the pool balance after the period's collections and
+/// `floor_pct_of_original` of the cut-off balance. The required principal
+/// distribution is `max(0, notes − max(pool − target, 0))`, paid to the
+/// notes by priority from interest proceeds first and principal proceeds
+/// for the rest; the collections above it are released to the residual
+/// holder.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TargetOcSpec {
+    /// Target overcollateralization as a decimal fraction of the current
+    /// pool balance (after the period's collections).
+    pub pct_of_current: f64,
+    /// Floor on the target as a decimal fraction of the original (cut-off)
+    /// pool balance; `0.0` for no floor.
+    #[serde(default)]
+    pub floor_pct_of_original: f64,
+}
+
+impl TargetOcSpec {
+    /// Target overcollateralization for one period, in currency units.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_pool` - Pool balance after the period's collections.
+    /// * `original_pool` - Original (cut-off) pool balance.
+    #[must_use]
+    pub fn target(&self, current_pool: f64, original_pool: f64) -> f64 {
+        (self.pct_of_current * current_pool)
+            .max(self.floor_pct_of_original * original_pool)
+            .max(0.0)
+    }
+
+    fn validate(&self) -> finstack_quant_core::Result<()> {
+        for (value, what) in [
+            (self.pct_of_current, "target_oc.pct_of_current"),
+            (
+                self.floor_pct_of_original,
+                "target_oc.floor_pct_of_original",
+            ),
+        ] {
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "waterfall_rules: {what} must be a fraction in [0, 1], got {value}"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Deal reserve account rules for the template waterfall.
+///
+/// The account starts at `AssetPool::reserve_account`. Every period the
+/// target is resolved from the live pool; a `ReserveReplenishment` recipient
+/// after the last note coupon and the junior fees tops the account up from
+/// interest proceeds (`replenish`), the balance above the target is released
+/// into the waterfall's interest proceeds (`release_excess`), and the account
+/// covers senior fees and note coupons whenever interest proceeds fall short.
+/// At legal final the balance retires note principal by priority
+/// (`covers_principal_at_final`) or goes straight to the residual holder.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ReserveAccountSpec {
+    /// Required balance, re-evaluated every period.
+    pub target: ReserveTarget,
+    /// Top the account up from interest proceeds after the note coupons and
+    /// junior fees. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub replenish: bool,
+    /// Release any balance above the target into the period's interest
+    /// proceeds. Defaults to `true`.
+    #[serde(default = "default_true")]
+    pub release_excess: bool,
+    /// At legal final, apply the balance to unpaid note principal by
+    /// priority before the residual holder. Defaults to `true`; `false`
+    /// releases it to the residual holder.
+    #[serde(default = "default_true")]
+    pub covers_principal_at_final: bool,
+}
+
+impl ReserveAccountSpec {
+    /// Reserve rules with replenishment, excess release and final principal
+    /// cover all on.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - Required balance, re-evaluated every period.
+    pub fn new(target: ReserveTarget) -> Self {
+        Self {
+            target,
+            replenish: true,
+            release_excess: true,
+            covers_principal_at_final: true,
+        }
+    }
 }
 
 /// Excess-spread / spread-account specification.
@@ -499,29 +764,98 @@ pub struct ShiftingInterestStep {
     pub senior_pct: f64,
 }
 
+/// How a shifting-interest schedule value is read.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
+pub enum ShiftMode {
+    /// Prospectus form: the schedule value is the share of the subordinates'
+    /// pro-rata unscheduled principal that shifts to the senior, so the
+    /// senior's unscheduled share is `senior_pct + value × (1 − senior_pct)`
+    /// on live balances (`1.0` = full lockout, `0.0` = pro-rata).
+    #[default]
+    ShiftOfSubordinate,
+    /// The schedule value is the senior's share of unscheduled principal
+    /// itself.
+    SeniorShare,
+}
+
 /// Shifting-interest principal allocation (non-agency senior/sub RMBS).
 ///
-/// The senior tranche receives `senior_pct` of principal (the rest split across
-/// the remaining debt tranches), where `senior_pct` follows a declining
-/// schedule by deal age. A `1.0` lockout early routes all principal to the
-/// senior; later steps release principal to the subordinates. Modelled as a
-/// per-period weighted pro-rata of *all* principal (a first-order treatment;
-/// agency-style scheduled-vs-prepayment splitting is a refinement).
+/// Scheduled principal is always paid pro-rata by current balance; the
+/// schedule governs *unscheduled* principal (prepayments and recoveries).
+/// Under [`ShiftMode::ShiftOfSubordinate`] (the default) each step is the
+/// fraction of the subordinates' pro-rata share that shifts to the senior:
+/// `1.0` is the full lockout, later steps (`0.7`, `0.6`, ...) release the
+/// subordinates' share progressively, `0.0` is pro-rata. Under
+/// [`ShiftMode::SeniorShare`] each step is the senior's share of unscheduled
+/// principal directly. While any of `triggers` fails the shift reverts to the
+/// full lockout regardless of the schedule.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ShiftingInterestSpec {
-    /// Id of the senior tranche that receives the scheduled principal share.
+    /// Id of the senior tranche that receives the shifted principal.
     pub senior_id: String,
-    /// Declining senior-share schedule, ascending by `months_from_closing`.
+    /// Schedule ascending by `months_from_closing`; each step's `senior_pct`
+    /// is read per `mode`.
     pub schedule: Vec<ShiftingInterestStep>,
+    /// How the schedule values are read; `ShiftOfSubordinate` by default.
+    #[serde(default)]
+    pub mode: ShiftMode,
+    /// Performance tests that must all pass for the schedule to apply; while
+    /// any fails the senior takes every unscheduled dollar (lockout).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub triggers: Vec<StepDownTrigger>,
+}
+
+impl ShiftingInterestSpec {
+    /// Shifting interest with the prospectus reading of the schedule and no
+    /// performance gating.
+    ///
+    /// # Arguments
+    ///
+    /// * `senior_id` - Id of the senior tranche the shift favours.
+    /// * `schedule` - Steps ascending by `months_from_closing`, each a decimal
+    ///   in `[0, 1]` read per [`ShiftMode::ShiftOfSubordinate`].
+    pub fn new(senior_id: impl Into<String>, schedule: Vec<ShiftingInterestStep>) -> Self {
+        Self {
+            senior_id: senior_id.into(),
+            schedule,
+            mode: ShiftMode::default(),
+            triggers: Vec::new(),
+        }
+    }
+
+    /// Set how the schedule values are read.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - [`ShiftMode`] applied to every step.
+    pub fn with_mode(mut self, mode: ShiftMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// Set the performance tests gating the shift.
+    ///
+    /// # Arguments
+    ///
+    /// * `triggers` - Tests that must all pass for the schedule to apply.
+    pub fn with_triggers(mut self, triggers: Vec<StepDownTrigger>) -> Self {
+        self.triggers = triggers;
+        self
+    }
 }
 
 /// Early-amortization specification for revolving (master-trust) deals.
 ///
 /// While a deal's reinvestment/revolving period is active, principal is recycled
 /// and the investor (tranche) balances are held flat. If cumulative losses reach
-/// `max_cumulative_loss_pct`, an early-amortization event is triggered: the
+/// `max_cumulative_loss` or the trailing excess spread falls below
+/// `min_excess_spread_3m`, an early-amortization event is triggered: the
 /// revolving period ends immediately and the deal begins paying principal down
 /// (amortizing) even before its scheduled revolving-period end.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -530,7 +864,9 @@ pub struct ShiftingInterestSpec {
 pub struct EarlyAmortizationSpec {
     /// Cumulative-loss fraction (decimal, of the original pool balance) at or
     /// above which the revolving period ends early and amortization begins.
-    pub max_cumulative_loss_pct: f64,
+    /// `None` disables the loss test.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_cumulative_loss: Option<f64>,
     /// Annualized excess spread (decimal of the opening pool balance: pool
     /// interest less debt coupons due, fees paid and net charge-offs) whose
     /// three-period trailing average, once it falls below this floor, ends the
@@ -975,9 +1311,13 @@ pub struct PaymentRecord {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CoverageRules {
-    /// Haircut applied to the par of performing collateral by rating, as a
-    /// decimal fraction (`0.5` carries the asset at half par); unrated assets
-    /// use the `NR` entry when present.
+    /// Haircut applied to the par of performing collateral by rating bucket,
+    /// as a decimal fraction (`0.5` carries the asset at half par). Ratings
+    /// are looked up by their letter bucket (`B+`, `B` and `B-` all read the
+    /// `B` entry, see `CreditRating::bucket`). An `NR` entry applies to
+    /// unrated asset rows supplied by the caller; reinvestment purchases and
+    /// materialized instrument collateral are unrated by construction and
+    /// stay at par. Empty (the indenture par-value convention) by default.
     #[serde(default)]
     pub rating_haircuts: BTreeMap<CreditRating, f64>,
     /// Value carried for defaulted collateral whose recovery cash has not yet
@@ -1040,15 +1380,13 @@ pub struct DiscountObligationRule {
 }
 
 impl CoverageRules {
-    /// Standard CLO rules from the embedded assumption registry: its rating
-    /// haircuts, defaulted collateral at recovery, a 7.5% CCC bucket carried
-    /// at market value and an 80% discount-obligation threshold.
+    /// Standard CLO par-value test rules: performing collateral at par (no
+    /// rating haircuts), defaulted collateral at recovery, a 7.5% CCC bucket
+    /// carried at market value and an 80% discount-obligation threshold.
     #[must_use]
     pub fn clo_standard() -> Self {
-        let registry =
-            crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic();
         Self {
-            rating_haircuts: registry.coverage_haircuts().into_iter().collect(),
+            rating_haircuts: BTreeMap::new(),
             defaulted_valuation: DefaultedValuation::Recovery,
             ccc_bucket: Some(CccBucketRule {
                 threshold_pct: 7.5,
@@ -1165,12 +1503,33 @@ pub struct CoverageTestSpec {
     /// What a failure does with the diverted interest.
     #[serde(default)]
     pub action: CoverageTestAction,
-    /// Template placement: the test tier follows the interest tier of this
-    /// tranche instead of the tested tranche's own. Used only when the deal
+    /// Template placement of the test tier; `None` places it after the
+    /// tested tranche's own interest tier. Used only when the deal
     /// synthesizes its waterfall; a custom waterfall places test tiers
     /// explicitly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub after_tranche: Option<String>,
+    pub placement: Option<CoveragePlacement>,
+    /// Cap on what a failure diverts, as a percent of the interest remaining
+    /// at the test tier (`50.0` diverts at most half); `None` diverts up to
+    /// the cure amount.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub divert_pct: Option<f64>,
+}
+
+/// Where the template places a coverage test tier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CoveragePlacement {
+    /// After the interest tier of this tranche (a test on class B placed
+    /// after class A's coupon diverts ahead of B's coupon).
+    AfterTranche {
+        /// Tranche whose interest tier the test follows.
+        tranche_id: String,
+    },
+    /// After the junior (subordinated management) fee tier, ahead of the
+    /// residual: the test diverts only what would otherwise reach equity.
+    AfterJuniorFees,
 }
 
 impl CoverageTestSpec {
@@ -1182,7 +1541,8 @@ impl CoverageTestSpec {
             kind,
             trigger_level,
             action: CoverageTestAction::default(),
-            after_tranche: None,
+            placement: None,
+            divert_pct: None,
         }
     }
 
@@ -1243,13 +1603,40 @@ impl CoverageTestSpec {
     /// * `tranche_id` - Class whose interest tier the test follows.
     #[must_use]
     pub fn after_tranche(mut self, tranche_id: impl Into<String>) -> Self {
-        self.after_tranche = Some(tranche_id.into());
+        self.placement = Some(CoveragePlacement::AfterTranche {
+            tranche_id: tranche_id.into(),
+        });
         self
     }
 
-    /// Tranche whose interest tier the template places this test after.
-    pub fn placement_tranche(&self) -> &str {
-        self.after_tranche.as_deref().unwrap_or(&self.tranche_id)
+    /// Place the test after the junior fee tier, ahead of the residual.
+    #[must_use]
+    pub fn after_junior_fees(mut self) -> Self {
+        self.placement = Some(CoveragePlacement::AfterJuniorFees);
+        self
+    }
+
+    /// Cap what a failure diverts at `pct` percent of the interest remaining
+    /// at the test tier.
+    ///
+    /// # Arguments
+    ///
+    /// * `pct` - Percent of the remaining interest in `(0, 100]`.
+    #[must_use]
+    pub fn with_divert_pct(mut self, pct: f64) -> Self {
+        self.divert_pct = Some(pct);
+        self
+    }
+
+    /// Tranche whose interest tier the template places this test after
+    /// (the tested tranche unless placed after another one); `None` when
+    /// placed after the junior fees.
+    pub fn placement_tranche(&self) -> Option<&str> {
+        match &self.placement {
+            None => Some(&self.tranche_id),
+            Some(CoveragePlacement::AfterTranche { tranche_id }) => Some(tranche_id),
+            Some(CoveragePlacement::AfterJuniorFees) => None,
+        }
     }
 }
 
@@ -1406,16 +1793,43 @@ impl Waterfall {
     /// * `test` - Coverage test to place.
     pub fn insert_coverage_test(&mut self, test: CoverageTestSpec) {
         self.tiers.sort_by_key(|tier| tier.priority);
-        let placement = test.placement_tranche().to_string();
-        let anchor = self
-            .tiers
-            .iter()
-            .position(|tier| tier.interest_tranche_ids().any(|id| id == placement))
-            .or_else(|| {
+        let (placement, anchor) = match test.placement_tranche() {
+            Some(tranche_id) => (
+                tranche_id.to_string(),
+                self.tiers
+                    .iter()
+                    .position(|tier| tier.interest_tranche_ids().any(|id| id == tranche_id)),
+            ),
+            // After the junior fees: the last fee tier that follows the
+            // coupons (the template's `junior_fees`), else the last coupon.
+            None => (
+                "junior_fees".to_string(),
                 self.tiers
                     .iter()
                     .rposition(|tier| tier.payment_type == PaymentType::Interest)
-            });
+                    .map(|last_interest| {
+                        self.tiers
+                            .iter()
+                            .enumerate()
+                            .skip(last_interest + 1)
+                            .take_while(|(_, tier)| {
+                                matches!(
+                                    tier.payment_type,
+                                    PaymentType::Fee | PaymentType::CoverageTest
+                                )
+                            })
+                            .filter(|(_, tier)| tier.payment_type == PaymentType::Fee)
+                            .map(|(index, _)| index)
+                            .last()
+                            .unwrap_or(last_interest)
+                    }),
+            ),
+        };
+        let anchor = anchor.or_else(|| {
+            self.tiers
+                .iter()
+                .rposition(|tier| tier.payment_type == PaymentType::Interest)
+        });
         let insert_at = anchor.map_or(0, |i| i + 1);
         match self.tiers.get_mut(insert_at) {
             Some(existing)
@@ -1461,8 +1875,10 @@ impl Waterfall {
     ///   principal recipients.
     /// * `fees` - Senior fee recipients (a tier ahead of every note), junior
     ///   fee recipients (a tier after every note coupon, ahead of principal)
-    ///   and the incentive-fee recipient (a tier ahead of the residual); empty
-    ///   lists omit their tiers.
+    ///   the incentive-fee recipient (ahead of `equity_principal` in the
+    ///   principal tier and a tier ahead of the residual) and the net-WAC
+    ///   carryover recipients (a tier after principal); empty lists omit
+    ///   their tiers.
     /// * `coverage_tests` - Deal-level coverage tests, each placed after the
     ///   interest tier of its [`CoverageTestSpec::placement_tranche`].
     pub fn standard_sequential(
@@ -1534,6 +1950,13 @@ impl Waterfall {
             }
         }
 
+        // The manager's incentive fee shares in principal proceeds reaching
+        // equity above the hurdle, ahead of the equity principal recipient.
+        if let Some(incentive) = fees.incentive.as_ref() {
+            let mut principal_incentive = incentive.clone();
+            principal_incentive.id = "incentive_fee_principal".to_string();
+            principal_recipients.push(principal_incentive);
+        }
         principal_recipients.push(Recipient::new(
             "equity_principal",
             RecipientType::Equity,
@@ -1548,6 +1971,22 @@ impl Waterfall {
             });
         engine.tiers.push(principal_tier);
         priority += 1;
+
+        // Net-WAC carryover repayments come out of excess interest ahead of
+        // the incentive fee and the residual.
+        if !fees.carryover.is_empty() {
+            let carryover_tier =
+                WaterfallTier::new("net_wac_carryover", priority, PaymentType::Fee)
+                    .allocation_mode(AllocationMode::Sequential);
+            let carryover_tier = fees
+                .carryover
+                .into_iter()
+                .fold(carryover_tier, |tier, recipient| {
+                    tier.add_recipient(recipient)
+                });
+            engine.tiers.push(carryover_tier);
+            priority += 1;
+        }
 
         // The manager's incentive fee takes its share of the residual ahead
         // of equity once the equity IRR hurdle is met.
@@ -1643,10 +2082,10 @@ impl Waterfall {
     ///
     /// Sets [`FundingSource::InterestThenPrincipal`] on every `Fee` tier ranked
     /// ahead of the first interest tier and on every `Interest` tier whose
-    /// interest recipients are all
-    /// [`TrancheSeniority::Senior`](super::TrancheSeniority::Senior) notes
-    /// of `tranches`. Tiers paying any mezzanine or subordinated coupon are
-    /// left on interest proceeds.
+    /// interest recipients are all non-deferrable claims of `tranches`
+    /// ([`Tranche::is_non_deferrable`](super::Tranche::is_non_deferrable):
+    /// senior notes unless a class says otherwise). Tiers paying any
+    /// deferrable coupon are left on interest proceeds.
     ///
     /// # Arguments
     ///
@@ -1657,7 +2096,7 @@ impl Waterfall {
             tranches
                 .tranches
                 .iter()
-                .any(|t| t.id.as_str() == id && t.seniority == super::TrancheSeniority::Senior)
+                .any(|t| t.id.as_str() == id && t.is_non_deferrable())
         };
         let first_interest = self
             .tiers
@@ -1691,9 +2130,14 @@ pub struct TemplateFees {
     /// Junior fees paid after every note coupon and ahead of principal (the
     /// subordinated management fee); an empty list omits the tier.
     pub junior: Vec<Recipient>,
-    /// Manager incentive fee paid from the residual ahead of equity once the
-    /// equity IRR hurdle is met ([`PaymentCalculation::IncentiveFee`]).
+    /// Manager incentive fee on the cash reaching equity above its IRR
+    /// hurdle ([`PaymentCalculation::IncentiveFee`]): placed in the principal
+    /// tier ahead of `equity_principal` and in a tier ahead of the residual.
     pub incentive: Option<Recipient>,
+    /// Net-WAC carryover recipients ([`PaymentCalculation::NetWacCarryover`]),
+    /// one per capped tranche, in a tier after principal and ahead of the
+    /// incentive fee; empty omits the tier.
+    pub carryover: Vec<Recipient>,
 }
 
 /// Builder for waterfall engine

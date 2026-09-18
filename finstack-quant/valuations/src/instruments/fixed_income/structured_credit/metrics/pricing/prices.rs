@@ -31,6 +31,9 @@ impl MetricCalculator for DirtyPriceCalculator {
         let curve = context
             .curves
             .get_discount(deal.discount_curve_id.as_str())?;
+        if quote.notional <= 0.0 {
+            return Ok(0.0);
+        }
         Ok(quote.model_dirty(flows, &curve)? / quote.notional * 100.0)
     }
 }

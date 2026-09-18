@@ -8,6 +8,7 @@
             "asset_class": "*",
             "eligibility": {
               "exclude_defaulted": true,
+              "exclude_non_performing": true,
               "max_maturity": null
             },
             "rate": 0.8
@@ -44,6 +45,7 @@
             "maturity": "2034-01-01",
             "mdr_override": null,
             "obligor_id": null,
+            "origination_date": null,
             "purchase_price": null,
             "rate": 0.07,
             "recovery_amount": null,
@@ -114,12 +116,13 @@
       },
       "payment_calendar_id": "nyse",
       "prepayment_spec": {
-        "cpr": 0.15,
+        "cpr": 0.2,
         "curve": null
       },
+      "readvance_to_borrowing_base": false,
       "recovery_spec": {
-        "rate": 0.4,
-        "recovery_lag": 18
+        "rate": 0.6,
+        "recovery_lag": 12
       },
       "revolving_end": "2026-01-15",
       "scenario_pricing_overrides": {},

@@ -663,8 +663,6 @@ for (const [endDate, periodDays] of [
         criteria: {
           max_price: maxPrice,
           min_yield: minYield,
-          maintain_credit_quality: true,
-          maintain_wal: true,
         },
       };
       fixture.market.curves[0].base = fixture.as_of;

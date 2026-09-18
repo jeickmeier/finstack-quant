@@ -25,6 +25,7 @@ impl Default for CreditModelConfig {
             recovery_spec: Self::default_recovery_spec(),
             stochastic_prepay_spec: None,
             stochastic_default_spec: None,
+            stochastic_recovery_spec: None,
             correlation_structure: None,
             delinquency: None,
             card: None,
@@ -72,7 +73,7 @@ impl StructuredCredit {
 
     /// Set the business day convention for payment date adjustments.
     ///
-    /// If not specified, defaults to `BusinessDayConvention::Following`.
+    /// If not specified, defaults to `BusinessDayConvention::ModifiedFollowing`.
     #[must_use]
     pub fn with_payment_business_day_convention(
         mut self,
@@ -113,10 +114,53 @@ impl StructuredCredit {
     /// with `annualized: true`. The trustee fee is annual and is divided by
     /// payment periods per year.
     fn template_fees(&self) -> finstack_quant_core::Result<TemplateFees> {
-        let Some(fees) = self.fees.as_ref() else {
-            return Ok(TemplateFees::default());
-        };
         let ccy = self.pool.get_base_currency();
+        // Reserve replenishment ranks with the junior fees: after every note
+        // coupon, ahead of principal. Its target is set per period by the
+        // engine from the live pool (`ReserveTarget::resolve`).
+        let reserve_replenishment = self
+            .waterfall_rules
+            .as_ref()
+            .and_then(|rules| rules.reserve.as_ref())
+            .filter(|spec| spec.replenish)
+            .map(|_| {
+                Recipient::new(
+                    "reserve_replenishment",
+                    RecipientType::ReserveAccount("reserve".to_string()),
+                    PaymentCalculation::ReserveReplenishment {
+                        target_balance: Money::from((0_i64, ccy)),
+                    },
+                )
+            });
+        // Net-WAC carryover recipients, one per capped tranche.
+        let carryover: Vec<Recipient> = self
+            .waterfall_rules
+            .as_ref()
+            .and_then(|rules| rules.afc.as_ref())
+            .filter(|afc| afc.carryover)
+            .map(|afc| {
+                afc.capped_tranches
+                    .iter()
+                    .map(|id| {
+                        Recipient::new(
+                            format!("net_wac_carryover_{id}"),
+                            RecipientType::Tranche(id.clone()),
+                            PaymentCalculation::NetWacCarryover {
+                                tranche_id: id.clone(),
+                                amount: Money::from((0_i64, ccy)),
+                            },
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let Some(fees) = self.fees.as_ref() else {
+            return Ok(TemplateFees {
+                junior: reserve_replenishment.into_iter().collect(),
+                carryover,
+                ..TemplateFees::default()
+            });
+        };
         let mut recipients = Vec::new();
 
         fn bp_recipient(id: &str, name: &str, bp: f64) -> Option<Recipient> {
@@ -194,6 +238,7 @@ impl StructuredCredit {
             )
         })
         .into_iter()
+        .chain(reserve_replenishment)
         .collect();
         let incentive = fees.incentive_fee.map(|spec| {
             Recipient::new(
@@ -210,6 +255,7 @@ impl StructuredCredit {
             senior: recipients,
             junior,
             incentive,
+            carryover,
         })
     }
 
@@ -314,7 +360,16 @@ impl StructuredCredit {
         let mut seen_keys: finstack_quant_core::HashSet<(&str, super::CoverageTestType)> =
             finstack_quant_core::HashSet::default();
         for test in tests {
-            for id in [test.tranche_id.as_str(), test.placement_tranche()] {
+            if let Some(pct) = test.divert_pct {
+                if !pct.is_finite() || pct <= 0.0 || pct > 100.0 {
+                    return Err(invalid(format!(
+                        "coverage test '{}' divert_pct ({pct}) must be a percent in (0, 100]",
+                        test.id
+                    )));
+                }
+            }
+            let placement = test.placement_tranche().unwrap_or(test.tranche_id.as_str());
+            for id in [test.tranche_id.as_str(), placement] {
                 match tranche(id) {
                     None => {
                         return Err(invalid(format!(
@@ -360,6 +415,14 @@ impl StructuredCredit {
     pub fn effective_loss_allocation(&self) -> LossAllocationPolicy {
         self.loss_allocation
             .unwrap_or_else(|| LossAllocationPolicy::default_for(self.deal_type))
+    }
+
+    /// Loss-recognition timing in force: [`Self::loss_recognition`] when
+    /// set, else the deal-type market convention
+    /// ([`LossRecognition::default_for`]).
+    pub fn effective_loss_recognition(&self) -> super::LossRecognition {
+        self.loss_recognition
+            .unwrap_or_else(|| super::LossRecognition::default_for(self.deal_type))
     }
 
     /// Whether the template waterfall pays senior fees and senior note

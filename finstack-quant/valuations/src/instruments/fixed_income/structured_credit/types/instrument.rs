@@ -90,6 +90,7 @@ impl Instrument for StructuredCredit {
             }
         }
         self.validate_custom_waterfall()?;
+        self.pool.validate_original_balance()?;
         let base_currency = self.pool.get_base_currency();
         for hedge in &self.hedge_swaps {
             hedge.validate(base_currency, &self.tranches)?;
@@ -122,6 +123,7 @@ impl Instrument for StructuredCredit {
                 )));
             }
         }
+        self.validate_tranche_draws()?;
         if let Some(card) = &self.credit_model.card {
             card.validate()?;
             if self.pool.instruments.is_some() {
@@ -227,10 +229,38 @@ impl StructuredCredit {
     /// property NOI must be a finite amount in the asset's currency.
     fn validate_cmbs_terms(&self) -> finstack_quant_core::Result<()> {
         for asset in &self.pool.assets {
+            let origination = asset.acquisition_date.unwrap_or(self.closing_date);
+            let months_to_maturity = if origination < asset.maturity {
+                origination.months_until(asset.maturity)
+            } else {
+                0
+            };
+            if let Some(term) = asset.amortization_term_months {
+                if term == 0 || term < months_to_maturity {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "asset {} amortization_term_months ({term}) must be positive and at least the \
+                         {months_to_maturity} months from origination to maturity",
+                        asset.id
+                    )));
+                }
+            }
+            if let Some(io) = asset.io_months {
+                if io > months_to_maturity
+                    || asset
+                        .amortization_term_months
+                        .is_some_and(|term| io >= term)
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "asset {} io_months ({io}) must not exceed the {months_to_maturity} months to \
+                         maturity or reach the amortization term",
+                        asset.id
+                    )));
+                }
+            }
             if let Some(balloon) = asset.balloon {
                 balloon.validate()?;
             }
-            if let Some(penalty) = asset.prepayment_penalty {
+            if let Some(penalty) = &asset.prepayment_penalty {
                 penalty.validate()?;
             }
             if let Some(special) = asset.special_servicing {
@@ -279,11 +309,85 @@ impl StructuredCredit {
                     asset.id
                 ))
             })?;
-            if self.closing_date.add_months(months) > self.maturity {
+            // The timeline runs from the loan's origination (acquisition
+            // date, else closing).
+            let anchor = asset.acquisition_date.unwrap_or(self.closing_date);
+            if anchor.add_months(months) > self.maturity {
                 return Err(invalid(format!(
-                    "asset {} resolves {} months after closing, past the deal maturity {}",
+                    "asset {} resolves {} months after its origination {anchor}, past the deal \
+                     maturity {}",
                     asset.id, spec.months_to_resolution, self.maturity
                 )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Scheduled draws and re-advances name debt notes, carry positive
+    /// deal-currency amounts, fall inside the deal's life and are ascending
+    /// by date.
+    fn validate_tranche_draws(&self) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        let currency = self.pool.get_base_currency();
+        let debt_note = |id: &str| {
+            self.tranches
+                .tranches
+                .iter()
+                .find(|t| t.id.as_str() == id)
+                .filter(|t| t.seniority != TrancheSeniority::Equity)
+        };
+        let mut previous: Option<Date> = None;
+        for draw in &self.tranche_draws {
+            if debt_note(&draw.tranche_id).is_none() {
+                return Err(invalid(format!(
+                    "tranche_draws names unknown or equity tranche '{}'",
+                    draw.tranche_id
+                )));
+            }
+            if draw.amount.currency() != currency || draw.amount.amount() <= 0.0 {
+                return Err(invalid(format!(
+                    "tranche_draws amount for '{}' must be a positive {currency} amount, got {}",
+                    draw.tranche_id, draw.amount
+                )));
+            }
+            if draw.date <= self.closing_date || draw.date > self.maturity {
+                return Err(invalid(format!(
+                    "tranche_draws date {} must lie inside (closing, maturity]",
+                    draw.date
+                )));
+            }
+            if previous.is_some_and(|prev| draw.date < prev) {
+                return Err(invalid(
+                    "tranche_draws must be ascending by date".to_string(),
+                ));
+            }
+            previous = Some(draw.date);
+        }
+        if let Some(readvance) = &self.tranche_readvance {
+            let Some(note) = debt_note(&readvance.tranche_id) else {
+                return Err(invalid(format!(
+                    "tranche_readvance names unknown or equity tranche '{}'",
+                    readvance.tranche_id
+                )));
+            };
+            if readvance.commitment.currency() != currency
+                || readvance.commitment.amount() < note.current_balance.amount()
+            {
+                return Err(invalid(format!(
+                    "tranche_readvance commitment {} must be a {currency} amount at least the \
+                     note's balance {}",
+                    readvance.commitment, note.current_balance
+                )));
+            }
+            if self
+                .coverage_rules
+                .as_ref()
+                .and_then(|r| r.borrowing_base.as_ref())
+                .is_none()
+            {
+                return Err(invalid(
+                    "tranche_readvance requires coverage_rules.borrowing_base".to_string(),
+                ));
             }
         }
         Ok(())
@@ -298,6 +402,21 @@ impl StructuredCredit {
             if self.pool.instruments.is_some() {
                 return Err(invalid(
                     "credit_model.delinquency applies to asset and rep-line pools, not instrument collateral"
+                        .to_string(),
+                ));
+            }
+            // A charge-off curve is inverted through the roll rates to size
+            // the bucket entries; a bucket that never rolls cannot be.
+            let charge_off_curve = matches!(
+                self.credit_model.default_spec.curve,
+                Some(crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. })
+                    | Some(crate::cashflow::builder::DefaultCurve::Timing { .. })
+            );
+            if charge_off_curve && model.roll_rates.iter().any(|roll| *roll <= 0.0) {
+                return Err(invalid(
+                    "credit_model.delinquency: every roll_rate must be positive when the default \
+                     model is a cumulative-loss or timing curve (the curve's charge-offs are \
+                     inverted through the roll rates to size the delinquency entries)"
                         .to_string(),
                 ));
             }

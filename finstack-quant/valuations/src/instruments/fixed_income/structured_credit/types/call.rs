@@ -60,6 +60,12 @@ pub struct CallAssumption {
     pub price_pct: f64,
     /// Whole deal or a single class.
     pub scope: CallScope,
+    /// For a deal-scope call: also redeem on the first payment date at or
+    /// after this many months past an early-amortization event, when that
+    /// comes before `date` (a facility's term-out clock starting at the
+    /// trigger). `None` keeps the scheduled date only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_early_amortization_months: Option<u32>,
 }
 
 impl CallAssumption {
@@ -78,7 +84,20 @@ impl CallAssumption {
             date,
             price_pct,
             scope: CallScope::Deal,
+            after_early_amortization_months: None,
         }
+    }
+
+    /// Also redeem `months` after an early-amortization event when that is
+    /// earlier than the scheduled date.
+    ///
+    /// # Arguments
+    ///
+    /// * `months` - Months from the event's payment date to the redemption.
+    #[must_use]
+    pub fn with_after_early_amortization(mut self, months: u32) -> Self {
+        self.after_early_amortization_months = Some(months);
+        self
     }
 
     /// Tranche-scope call on `date` at `price_pct`.
@@ -97,6 +116,7 @@ impl CallAssumption {
             date,
             price_pct,
             scope: CallScope::Tranche(tranche_id.into()),
+            after_early_amortization_months: None,
         }
     }
 
