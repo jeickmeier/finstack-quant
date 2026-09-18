@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 979902,
+      "bytes": 1012135,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 978869,
+      "bytes": 1011102,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -426,7 +426,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 251600,
+      "bytes": 270178,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -482,7 +482,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 368129,
+      "bytes": 398287,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1068779,
+      "bytes": 1101192,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -746,7 +746,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 58146,
+      "bytes": 58875,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

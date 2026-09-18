@@ -81,6 +81,7 @@ macro_rules! sc_wire_methods {
 }
 
 mod asset_pool;
+mod borrowing_base;
 mod call_assumption;
 mod coverage_rules;
 mod diagnostics;
@@ -88,6 +89,7 @@ mod equity_metrics;
 mod hedge_swap;
 mod pool_asset;
 mod rep_line;
+mod specs;
 mod stochastic_result;
 mod structured_credit;
 mod tranche;
@@ -96,6 +98,9 @@ mod tranche_structure;
 mod waterfall;
 
 pub(crate) use asset_pool::PyAssetPool;
+pub(crate) use borrowing_base::{
+    PyAdvanceRate, PyBorrowingBaseRules, PyConcentrationLimit, PyEligibilityRule,
+};
 pub(crate) use call_assumption::PyCallAssumption;
 pub(crate) use coverage_rules::PyCoverageRules;
 pub(crate) use diagnostics::PySimulationDiagnostics;
@@ -103,6 +108,9 @@ pub(crate) use equity_metrics::PyEquityMetrics;
 pub(crate) use hedge_swap::PyHedgeSwap;
 pub(crate) use pool_asset::PyPoolAsset;
 pub(crate) use rep_line::PyRepLine;
+pub(crate) use specs::{
+    PyBalloonSpec, PyLiquidationSpec, PyPrepaymentPenalty, PySpecialServicingSpec,
+};
 pub(crate) use stochastic_result::PyStochasticPricingResult;
 pub(crate) use structured_credit::{PyStructuredCredit, PyStructuredCreditBuilder};
 pub(crate) use tranche::{PyTranche, PyTrancheBuilder};
@@ -129,6 +137,14 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySimulationDiagnostics>()?;
     m.add_class::<PyTrancheCashflows>()?;
     m.add_class::<PyEquityMetrics>()?;
+    m.add_class::<PyBalloonSpec>()?;
+    m.add_class::<PyPrepaymentPenalty>()?;
+    m.add_class::<PySpecialServicingSpec>()?;
+    m.add_class::<PyLiquidationSpec>()?;
+    m.add_class::<PyEligibilityRule>()?;
+    m.add_class::<PyAdvanceRate>()?;
+    m.add_class::<PyConcentrationLimit>()?;
+    m.add_class::<PyBorrowingBaseRules>()?;
     Ok(())
 }
 
@@ -137,12 +153,20 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
 pub(crate) const EXPORTS: &[&str] = &[
+    "AdvanceRate",
+    "BalloonSpec",
+    "BorrowingBaseRules",
     "CallAssumption",
+    "ConcentrationLimit",
     "CoverageRules",
+    "EligibilityRule",
     "EquityMetrics",
     "HedgeSwap",
+    "LiquidationSpec",
     "PoolAsset",
+    "PrepaymentPenalty",
     "SimulationDiagnostics",
+    "SpecialServicingSpec",
     "StochasticPricingResult",
     "TrancheCashflows",
     "Waterfall",

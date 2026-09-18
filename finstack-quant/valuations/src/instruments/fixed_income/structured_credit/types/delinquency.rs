@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 /// let model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])
 ///     .with_advancing(AdvancingPolicy::PrincipalAndInterest {
 ///         recoverability_cap_pct: 100.0,
+///         reimburse_from_collections: false,
 ///     });
 /// assert_eq!(model.buckets(), 3);
 /// ```
@@ -65,14 +66,21 @@ pub enum AdvancingPolicy {
     #[default]
     None,
     /// The servicer advances the interest and scheduled principal that
-    /// delinquent balances miss, as long as the advances outstanding stay
-    /// within `recoverability_cap_pct` percent of the delinquent balance.
-    /// Advances are reimbursed from the recovery proceeds of charge-offs
-    /// before that cash reaches the waterfall.
+    /// delinquent balances miss, as long as the advances outstanding on the
+    /// loan stay within `recoverability_cap_pct` percent of its delinquent
+    /// balance. Advances are reimbursed from the loan's own collections
+    /// first: the arrears a curing balance repays, then the liquidation
+    /// proceeds of a charge-off. What a charge-off's proceeds do not cover
+    /// is non-recoverable.
     PrincipalAndInterest {
         /// Cap on advances outstanding as a percent of the delinquent
         /// balance (`100.0` = advance up to the full delinquent balance).
         recoverability_cap_pct: f64,
+        /// `true` reimburses non-recoverable advances from all pool
+        /// collections at the top of the waterfall (the trust bears the
+        /// shortfall); `false` (default) leaves them with the servicer.
+        #[serde(default)]
+        reimburse_from_collections: bool,
     },
 }
 
@@ -197,6 +205,7 @@ impl DelinquencyModel {
         }
         if let AdvancingPolicy::PrincipalAndInterest {
             recoverability_cap_pct,
+            ..
         } = self.advancing
         {
             if !recoverability_cap_pct.is_finite() || recoverability_cap_pct < 0.0 {

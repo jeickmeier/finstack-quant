@@ -498,12 +498,14 @@ fn test_recovery_rate_golden_industry_standards() {
         rmbs_standard_recovery,
     };
 
-    // CLO (Senior Secured Loans): ~40% recovery
-    // Source: Moody's "Annual Default Study"
+    // CLO (Senior Secured Loans): 60% recovery — the rating-agency and
+    // desk base case for first-lien senior secured loans (Moody's ultimate
+    // recovery data for senior secured loans averages 60-70%; the CLO
+    // registry used 40% until 2026-09-17, the senior unsecured bond figure).
     assert_eq!(
         clo_standard_recovery(),
-        0.40,
-        "CLO standard recovery should be 40%"
+        0.60,
+        "CLO standard recovery should be 60%"
     );
 
     // RMBS (Residential Mortgages): ~60% recovery

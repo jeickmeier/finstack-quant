@@ -143,8 +143,10 @@ pub struct TrancheValuation {
     pub z_spread_bp: f64,
     /// CS01 (credit DV01).
     pub cs01: f64,
-    /// Decimal yield reproducing the dirty settlement target (annual by default).
-    pub ytm: f64,
+    /// Decimal yield reproducing the dirty settlement target, compounded at
+    /// the note's coupon frequency; `None` for an impaired note (no positive
+    /// settlement value).
+    pub ytm: Option<f64>,
     /// Additional metrics.
     pub metrics: BTreeMap<MetricId, f64>,
 }

@@ -54,12 +54,16 @@ struct StructuredCreditYtmConfigV1 {
 ///
 /// # Compounding Convention
 ///
-/// Uses **annual compounding** by default: discount factor = `(1 + y)^(-t)`.
-/// Market-specific conventions may differ:
-/// - **ABS**: Often semi-annual (bond-equivalent yield)
-/// - **RMBS**: Often monthly (mortgage-equivalent yield)
-/// - **CLO**: Often quarterly (matching coupon frequency)
-/// - **CMBS**: Often semi-annual
+/// When the context values one tranche (the usual per-note path), the yield
+/// compounds at that note's coupon frequency — quarterly for a quarterly
+/// note, `(1 + y/4)^(-4t)` — and measures `t` in the note's own day count,
+/// so a par note yields its coupon. The
+/// `valuations.structured_credit.ytm.v1` extension's `compounding`
+/// (`annual`, `semi_annual`, `quarterly`, `monthly`) overrides the frequency;
+/// deal-level contexts without a tranche in scope compound annually in
+/// Act/365F. Market conventions differ by sector (ABS and CMBS often quote a
+/// semi-annual bond-equivalent yield, RMBS a monthly mortgage yield): set
+/// the extension when a quote must follow one of them.
 ///
 /// # Typical Yield Ranges
 ///
@@ -78,7 +82,7 @@ pub struct YtmCalculator;
 impl YtmCalculator {
     fn compounding_from_config(
         context: &MetricContext,
-    ) -> finstack_quant_core::Result<YtmCompounding> {
+    ) -> finstack_quant_core::Result<Option<YtmCompounding>> {
         if let Some(raw) = context
             .get_config()
             .extensions
@@ -94,9 +98,39 @@ impl YtmCalculator {
                         category: "config".to_string(),
                     }
                 })?;
-            return Ok(cfg.compounding.unwrap_or_default());
+            return Ok(cfg.compounding);
         }
-        Ok(YtmCompounding::default())
+        Ok(None)
+    }
+
+    /// Compounding periods per year and the time basis for the yield: the
+    /// configured compounding when set, else the in-scope note's coupon
+    /// frequency (annual when no note is in scope), with time measured in
+    /// the note's day count (Act/365F without a note).
+    fn compounding_basis(
+        context: &MetricContext,
+        deal: &crate::instruments::fixed_income::structured_credit::StructuredCredit,
+    ) -> finstack_quant_core::Result<(f64, finstack_quant_core::dates::DayCount)> {
+        let tranche = context
+            .detailed_tranche_cashflows
+            .as_ref()
+            .and_then(|flows| {
+                deal.tranches
+                    .tranches
+                    .iter()
+                    .find(|t| t.id.as_str() == flows.tranche_id)
+            });
+        let day_count = tranche.map_or(finstack_quant_core::dates::DayCount::Act365F, |t| {
+            t.day_count
+        });
+        let periods_per_year = match Self::compounding_from_config(context)? {
+            Some(compounding) => compounding.periods_per_year(),
+            None => tranche
+                .and_then(|t| t.frequency.months())
+                .filter(|months| *months > 0)
+                .map_or(1.0, |months| 12.0 / f64::from(months)),
+        };
+        Ok((periods_per_year, day_count))
     }
 }
 
@@ -136,9 +170,10 @@ impl MetricCalculator for YtmCalculator {
         }
 
         // Day count for year fractions
-        let day_count = finstack_quant_core::dates::DayCount::Act365F;
-        let compounding = Self::compounding_from_config(context)?;
-        let periods_per_year = compounding.periods_per_year();
+        let (periods_per_year, day_count) = Self::compounding_basis(
+            context,
+            context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?,
+        )?;
 
         // Objective function: PV(y) - target = 0
         let objective = |y: f64| -> f64 {

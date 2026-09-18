@@ -40,7 +40,7 @@ use super::super::instruments::enum_from_str;
 /// ...     0.08,
 /// ...     datetime.date(2031, 1, 15),
 /// ...     credit_quality="B",
-/// ...     balloon={"default_prob": 0.3, "extension_months": 24},
+/// ...     balloon={"extension_prob": 0.3, "extension_months": 24},
 /// ... )
 /// >>> loan.credit_quality, loan.balloon["extension_months"]
 /// ('B', 24)
@@ -107,6 +107,9 @@ impl PyPoolAsset {
     /// index_id : str, optional
     ///     Forward-curve identifier of the floating index; ``None`` for a
     ///     fixed-rate row.
+    /// index_floor : float, optional
+    ///     Floor on the floating index as an annual decimal (``0.01`` = 1%),
+    ///     applied before ``spread_bp`` is added; ignored on fixed-rate rows.
     /// credit_quality : str, optional
     ///     Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
     ///     coverage-test haircuts and the CCC bucket.
@@ -124,7 +127,13 @@ impl PyPoolAsset {
     /// purchase_price : Money, optional
     ///     Price paid for the row (discount-obligation test).
     /// acquisition_date : datetime.date, optional
-    ///     Date the row entered the pool.
+    ///     Date the row entered the pool (anchors non-performing-loan
+    ///     timelines).
+    /// origination_date : datetime.date, optional
+    ///     Date the loan was originated; anchors the seasoning-dependent
+    ///     prepayment/default curves (PSA, SDA, ABS, vector) and the
+    ///     amortization schedule. Falls back to ``acquisition_date``, then to
+    ///     the deal closing date.
     /// smm_override : float, optional
     ///     Row-level single-month mortality (decimal) overriding the deal
     ///     prepayment model.
@@ -139,18 +148,32 @@ impl PyPoolAsset {
     /// contractual_payment : Money, optional
     ///     Monthly level payment of an amortizing row; derived from the
     ///     terms when omitted.
+    /// amortization_term_months : int, optional
+    ///     Schedule length in months from origination (``origination_date``,
+    ///     else ``acquisition_date``, else closing) for level-pay rows; the unamortized balance pays as
+    ///     the balloon at maturity. ``None`` amortizes fully by maturity.
+    /// io_months : int, optional
+    ///     Interest-only window in months from origination: no scheduled
+    ///     principal while the loan is younger than this.
     /// market_price_pct : float, optional
     ///     Market price in percent of par for market-value coverage rules.
     /// delinquency_buckets : list[Money], optional
     ///     Seeded delinquent balances per bucket (30/60/90 ...); requires
     ///     a ``credit_model.delinquency`` model on the deal.
     /// balloon : dict | str, optional
-    ///     ``BalloonSpec`` (``default_prob`` decimal, ``extension_months``,
-    ///     optional ``extension_rate`` decimal) for balloon extension.
+    ///     ``BalloonSpec`` (``extension_prob`` decimal, ``extension_months``,
+    ///     optional ``extension_rate`` decimal, and ``loss_prob`` decimal,
+    ///     ``severity_pct`` percent, ``workout_months`` for the share that
+    ///     defaults at maturity) for balloon extension and workout.
     /// prepayment_penalty : dict | str, optional
-    ///     ``PrepaymentPenalty``: ``{"kind": "fixed", "pct": 3.0,
-    ///     "through": "2026-01-01"}`` or ``{"kind": "yield_maintenance",
-    ///     "reinvestment_rate": 0.05, "through": None}``.
+    ///     ``PrepaymentPenalty``: ``{"kind": "lockout", "through":
+    ///     "2025-12-31"}`` (no voluntary prepayment inside the window),
+    ///     ``{"kind": "fixed", "pct": 3.0, "through": "2026-01-01"}``,
+    ///     ``{"kind": "step_down", "schedule": [{"through": "2025-12-31",
+    ///     "pct": 5.0}, ...]}`` or ``{"kind": "yield_maintenance",
+    ///     "reinvestment_rate": 0.05, "discount_curve_id": "USD-OIS",
+    ///     "floor_pct": 1.0, "through": None}`` (the curve discounts the lost
+    ///     coupons and supplies the reinvestment rate when it is omitted).
     /// special_servicing : dict | str, optional
     ///     ``SpecialServicingSpec`` (``appraisal_reduction_pct`` percent).
     /// noi : Money, optional
@@ -169,14 +192,15 @@ impl PyPoolAsset {
     #[new]
     #[pyo3(signature = (
         id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, index_id=None,
-        credit_quality=None, industry=None, obligor_id=None, is_defaulted=false,
+        index_floor=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=false,
         recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None,
-        smm_override=None, mdr_override=None, recovery_rate=None, commitment=None,
-        contractual_payment=None, market_price_pct=None, delinquency_buckets=None, balloon=None,
+        origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None,
+        contractual_payment=None, amortization_term_months=None, io_months=None,
+        market_price_pct=None, delinquency_buckets=None, balloon=None,
         prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None
     ))]
     #[pyo3(
-        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, index_id=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
+        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, index_id=None, index_floor=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
     )]
     // PyO3 binding: one keyword per public Rust field.
     #[allow(clippy::too_many_arguments)]
@@ -190,6 +214,7 @@ impl PyPoolAsset {
         day_count: Option<PyRef<'_, PyDayCount>>,
         spread_bp: Option<f64>,
         index_id: Option<String>,
+        index_floor: Option<f64>,
         credit_quality: Option<&str>,
         industry: Option<String>,
         obligor_id: Option<String>,
@@ -198,11 +223,14 @@ impl PyPoolAsset {
         default_date: Option<&Bound<'_, PyAny>>,
         purchase_price: Option<PyRef<'_, PyMoney>>,
         acquisition_date: Option<&Bound<'_, PyAny>>,
+        origination_date: Option<&Bound<'_, PyAny>>,
         smm_override: Option<f64>,
         mdr_override: Option<f64>,
         recovery_rate: Option<f64>,
         commitment: Option<PyRef<'_, PyMoney>>,
         contractual_payment: Option<PyRef<'_, PyMoney>>,
+        amortization_term_months: Option<u32>,
+        io_months: Option<u32>,
         market_price_pct: Option<f64>,
         delinquency_buckets: Option<Vec<PyRef<'_, PyMoney>>>,
         balloon: Option<&Bound<'_, PyAny>>,
@@ -229,6 +257,7 @@ impl PyPoolAsset {
             rate,
             spread_bp,
             index_id,
+            index_floor,
             maturity: extract_date(maturity)?,
             credit_quality,
             industry,
@@ -238,12 +267,15 @@ impl PyPoolAsset {
             default_date: opt_date(default_date)?,
             purchase_price: opt_money(purchase_price),
             acquisition_date: opt_date(acquisition_date)?,
+            origination_date: opt_date(origination_date)?,
             day_count: day_count.map_or(DayCount::Act360, |value| value.inner),
             smm_override,
             mdr_override,
             recovery_rate,
             commitment: opt_money(commitment),
             contractual_payment: opt_money(contractual_payment),
+            amortization_term_months,
+            io_months,
             market_price_pct,
             delinquency_buckets: delinquency_buckets
                 .map(|buckets| buckets.into_iter().map(|m| m.inner).collect()),
@@ -408,6 +440,13 @@ impl PyPoolAsset {
         self.inner.index_id.clone()
     }
 
+    /// Floor on the floating index (annual decimal) applied before the
+    /// spread, or ``None``.
+    #[getter]
+    fn index_floor(&self) -> Option<f64> {
+        self.inner.index_floor
+    }
+
     /// Contractual maturity as ``datetime.date``.
     #[getter]
     fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -472,6 +511,16 @@ impl PyPoolAsset {
             .transpose()
     }
 
+    /// Origination date as ``datetime.date``, or ``None`` (the row then ages
+    /// from ``acquisition_date``, else the closing date).
+    #[getter]
+    fn origination_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .origination_date
+            .map(|date| date_to_py(py, date))
+            .transpose()
+    }
+
     /// Accrual day count.
     #[getter]
     fn day_count(&self) -> PyDayCount {
@@ -508,6 +557,18 @@ impl PyPoolAsset {
     #[getter]
     fn contractual_payment(&self) -> Option<PyMoney> {
         self.inner.contractual_payment.map(money_to_py)
+    }
+
+    /// Amortization schedule length in months from origination, or ``None``.
+    #[getter]
+    fn amortization_term_months(&self) -> Option<u32> {
+        self.inner.amortization_term_months
+    }
+
+    /// Interest-only window in months from origination, or ``None``.
+    #[getter]
+    fn io_months(&self) -> Option<u32> {
+        self.inner.io_months
     }
 
     /// Market price in percent of par, or ``None``.

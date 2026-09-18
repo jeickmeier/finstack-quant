@@ -510,9 +510,7 @@
             "amortizing_tranches": ["SENIOR"],
             "criteria": {
               "max_price": 102.5,
-              "min_yield": 0.04,
-              "maintain_credit_quality": true,
-              "maintain_wal": false
+              "min_yield": 0.04
             }
           },
           "collection_account": {

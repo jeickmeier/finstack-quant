@@ -9,8 +9,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::structured_credit::{
-    AssetPool, BorrowingBaseReport, BorrowingBaseRules, CreditModelConfig,
+    AssetPool, BorrowingBaseReport, BorrowingBaseRules, CreditModelConfig, DealFees,
 };
+
+/// A scheduled draw on the facility: the lender advances `amount` on the
+/// first payment date at or after `date`, lifting the facility balance and
+/// funding collateral purchases (or repaying, once the line has turned out).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FacilityDraw {
+    /// Earliest draw date; applied on the first payment date at or after it.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Amount advanced, in the facility currency.
+    pub amount: Money,
+}
 
 /// Event that ends the revolving period early and turns the facility out
 /// (principal collections then repay the lender sequentially).
@@ -151,6 +169,20 @@ pub struct AssetBackedFacility {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub term_out: Option<TermOutSpec>,
+    /// Transaction fees paid through the synthetic deal's waterfall ahead of
+    /// the facility's interest (trustee, servicing, ...); `None` for none.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fees: Option<DealFees>,
+    /// Scheduled draws after closing, ascending by date.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub draw_schedule: Vec<FacilityDraw>,
+    /// Re-advance the facility each revolving period up to the commitment
+    /// and the borrowing base.
+    #[builder(default)]
+    #[serde(default)]
+    pub readvance_to_borrowing_base: bool,
     /// Price the collateral realizes when the term-out ends and the
     /// remaining collateral is liquidated to repay the facility, as a percent
     /// of par (`None` = par).
@@ -342,6 +374,27 @@ impl AssetBackedFacility {
                     "liquidation_price_pct ({price}) must be a finite positive percent of par"
                 )));
             }
+        }
+        let mut previous_draw: Option<Date> = None;
+        for draw in &self.draw_schedule {
+            if draw.amount.currency() != currency || draw.amount.amount() <= 0.0 {
+                return Err(invalid(format!(
+                    "draw_schedule amounts must be positive {currency} amounts, got {}",
+                    draw.amount
+                )));
+            }
+            if draw.date <= self.closing_date || draw.date > self.maturity {
+                return Err(invalid(format!(
+                    "draw_schedule date {} must lie inside (closing, maturity]",
+                    draw.date
+                )));
+            }
+            if previous_draw.is_some_and(|prev| draw.date < prev) {
+                return Err(invalid(
+                    "draw_schedule must be ascending by date".to_string(),
+                ));
+            }
+            previous_draw = Some(draw.date);
         }
         for event in &self.amortization_events {
             match event {

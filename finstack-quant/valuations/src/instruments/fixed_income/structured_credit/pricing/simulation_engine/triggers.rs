@@ -184,9 +184,11 @@ pub(super) fn advance(
         .map(|(i, tranche)| (tranche.id.as_str(), i))
         .collect();
     let pool_balance = Money::new(state.pool_state.balances.iter().sum(), state.base_currency)?;
+    let unresolved_npl = state.unresolved_npl();
     let special_serviced_balance = special_serviced_balance(
         &state.pool,
         Some(&state.pool_state.balances),
+        Some(&state.pool_state.special_serviced),
         state.base_currency,
     )?;
     let fees = senior_fee_accrual(
@@ -234,6 +236,7 @@ pub(super) fn advance(
         market,
         Some(&state.tranche_balances),
         Some(&state.pool_state.balances),
+        Some(state.live_collateral(&unresolved_npl)),
         &payable,
         fees,
         state.principal_funding_account,

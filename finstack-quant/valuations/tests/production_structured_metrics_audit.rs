@@ -53,12 +53,54 @@ fn production_structured_metrics_unrequested_yield_reprices_the_cashflows() {
             &[],
         )
         .expect("tranche result");
-    // Annual-compounded yield matching a flat 3% continuous discount curve.
-    assert!(
-        (result.ytm - (0.03_f64.exp() - 1.0)).abs() < 1e-7,
-        "{}",
-        result.ytm
-    );
+    // The yield compounds at the note's quarterly coupon frequency and
+    // measures time in its Act/360 day count: an independent bisection on
+    // the same flows reproduces the model dirty value.
+    let ytm = result.ytm.expect("a performing note carries a yield");
+    let expected = quarterly_yield(&deal, &market, deal.closing_date, result.dirty_price);
+    assert!((ytm - expected).abs() < 1e-7, "{ytm} vs {expected}");
+}
+
+/// Quarterly-compounded yield of `deal`'s first tranche reproducing
+/// `dirty_price_pct` of its current balance at buyer settlement, with time in
+/// the note's own day count (Act/360 here): solved by bisection.
+fn quarterly_yield(
+    deal: &StructuredCredit,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+    dirty_price_pct: f64,
+) -> f64 {
+    use finstack_quant_core::dates::DayCountContext;
+    let tranche = &deal.tranches.tranches[0];
+    let flows = deal
+        .get_tranche_cashflows(tranche.id.as_str(), market, as_of)
+        .expect("flows");
+    let settlement = deal.quote_settlement_date.unwrap_or(as_of);
+    let target = dirty_price_pct / 100.0 * tranche.current_balance.amount();
+    let pv_at = |y: f64| -> f64 {
+        flows
+            .cashflows
+            .iter()
+            .filter(|(date, _)| *date > settlement)
+            .map(|(date, amount)| {
+                let t = tranche
+                    .day_count
+                    .year_fraction(settlement, *date, DayCountContext::default())
+                    .expect("year fraction");
+                amount.amount() * (1.0 + y / 4.0).powf(-4.0 * t)
+            })
+            .sum::<f64>()
+    };
+    let (mut lo, mut hi) = (-0.5_f64, 1.0_f64);
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if pv_at(mid) > target {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
 }
 
 #[test]
@@ -166,7 +208,9 @@ fn production_structured_metrics_settlement_crosses_coupon_once() {
         .value_tranche_with_metrics(tranche_id, &market, as_of, &[])
         .expect("mandatory metrics");
     assert!((result.accrued.amount() - accrued).abs() < 1e-6);
-    assert!((result.ytm - (0.03_f64.exp() - 1.0)).abs() < 1e-7);
+    let ytm = result.ytm.expect("a performing note carries a yield");
+    let expected = quarterly_yield(&deal, &market, as_of, result.dirty_price);
+    assert!((ytm - expected).abs() < 1e-7, "{ytm} vs {expected}");
     assert!((result.clean_price - clean).abs() < 1e-9);
     let oas = calculate_tranche_oas(
         &deal,
@@ -382,14 +426,17 @@ fn production_structured_metrics_deferred_coupon_is_not_current_accrual() {
         )
         .expect("metrics");
     assert!((result.accrued.amount() - 750_000.0).abs() < 1e-6);
-    assert!(
-        deal.value_tranche_with_metrics(
+    let matured = deal
+        .value_tranche_with_metrics(
             deal.tranches.tranches[0].id.as_str(),
             &market,
             deal.maturity + time::Duration::days(10),
-            &[]
+            &[],
         )
-        .is_err(),
+        .expect("a matured note values at zero");
+    assert!(
+        matured.ytm.is_none(),
         "matured notes have no meaningful yield and must not fabricate one"
     );
+    assert_eq!(matured.dirty_price, 0.0);
 }

@@ -30,7 +30,8 @@ pub use duration::{
 };
 pub use oas::{calculate_tranche_oas, OasConfig, OasResult};
 pub use spreads::{
-    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_z_spread,
-    BucketedCs01Calculator, Cs01Calculator, SpreadDurationCalculator, ZSpreadCalculator,
+    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_spread_convexity,
+    calculate_tranche_z_spread, BucketedCs01Calculator, Cs01Calculator, SpreadDurationCalculator,
+    ZSpreadCalculator,
 };
 pub use ytm::YtmCalculator;

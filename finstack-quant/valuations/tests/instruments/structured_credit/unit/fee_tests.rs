@@ -182,11 +182,12 @@ fn subordinated_fee_reduces_the_residual_by_its_accrual_each_period() {
         .filter(|((date, _), _)| *date < legal_final)
     {
         assert_eq!(*date, other_date);
-        // 20 bp per annum on the flat 100M pool, ACT/360 over the period.
+        // 35 bp per annum (the registry's subordinated fee) on the flat
+        // 100M pool, ACT/360 over the period.
         let accrual = DayCount::Act360
             .year_fraction(prior, *date, DayCountContext::default())
             .expect("accrual");
-        let expected_fee = 100_000_000.0 * 0.002 * accrual;
+        let expected_fee = 100_000_000.0 * 0.0035 * accrual;
         assert!(
             (unfeed - paid - expected_fee).abs() < 1.0,
             "on {date} the residual must fall by the accrued subordinated fee {expected_fee}, \
@@ -239,11 +240,35 @@ fn incentive_fee_starts_once_equity_earns_the_hurdle() {
             "no incentive fee before the hurdle is met, got {a} vs {b} on {date}"
         );
     }
+    // Crossing period: the cash that lifts the equity IRR exactly to the
+    // hurdle passes untouched and the manager takes 20% of the excess only.
     let (date, a) = paid[first_fee];
     let (_, b) = unfeed[first_fee];
+    let history_before =
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::EquityHistory {
+            invested_on: d(CLOSE.0, CLOSE.1, CLOSE.2),
+            invested: usd(10_000_000.0),
+            distributions: unfeed[..first_fee]
+                .iter()
+                .map(|(date, amount)| (*date, usd(*amount)))
+                .collect(),
+        };
+    let shortfall = history_before
+        .hurdle_shortfall(date, usd(b), hurdle)
+        .amount();
     assert!(
-        (a - 0.8 * b).abs() < 1.0,
-        "once the hurdle is met the manager takes 20% of the residual: {a} vs 0.8 × {b} on {date}"
+        shortfall > 1.0 && shortfall < b - 1.0,
+        "the hurdle is crossed inside the period: shortfall {shortfall} of {b}"
+    );
+    assert!(
+        (a - (b - 0.2 * (b - shortfall))).abs() < 1.0,
+        "the manager shares only the excess over the hurdle: {a} vs {b} − 0.2 × ({b} − {shortfall}) on {date}"
+    );
+    let (next_date, next_a) = paid[first_fee + 1];
+    let (_, next_b) = unfeed[first_fee + 1];
+    assert!(
+        (next_a - 0.8 * next_b).abs() < 1.0,
+        "after the crossing the manager takes 20% of the whole residual: {next_a} vs 0.8 × {next_b} on {next_date}"
     );
     assert!(
         with_incentive["E"].total_interest.amount()
@@ -284,4 +309,78 @@ fn incentive_fee_starts_once_equity_earns_the_hurdle() {
         prev_irr.is_none_or(|irr| irr < hurdle),
         "the period before must be below the hurdle, got {prev_irr:?}"
     );
+}
+
+/// Principal proceeds reaching equity share the incentive fee too: at
+/// maturity the 100M pool pays down through the principal tier, the notes
+/// take 90M and the manager (whose hurdle equity earned years earlier) takes
+/// 20% of the 10M reaching equity.
+#[test]
+fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
+    let deal = clo(|fees| {
+        fees.subordinated_mgmt_fee_bp = 0.0;
+        fees.incentive_fee = Some(IncentiveFeeSpec {
+            hurdle_irr: 0.04,
+            share_pct: 0.20,
+        });
+    });
+    let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
+        &deal,
+        &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
+        d(CLOSE.0, CLOSE.1, CLOSE.2),
+    )
+    .expect("simulation");
+    let equity_principal = run.tranches["E"].total_principal.amount();
+    assert!(
+        (equity_principal - 8_000_000.0).abs() < 1.0,
+        "equity keeps 80% of its 10M principal: {equity_principal}"
+    );
+    let notes_principal: f64 = ["A", "B", "C", "D"]
+        .iter()
+        .map(|id| run.tranches[*id].total_principal.amount())
+        .sum();
+    assert!((notes_principal - 90_000_000.0).abs() < 1.0);
+    let last = run.diagnostics.periods.last().expect("periods");
+    assert!(
+        last.fees_paid.amount() >= 2_000_000.0 - 1.0,
+        "the manager's 2M share of principal is booked as a fee in the final period: {}",
+        last.fees_paid.amount()
+    );
+
+    // During a revolving period principal is recycled, not shared.
+    let mut revolving = clo(|fees| {
+        fees.subordinated_mgmt_fee_bp = 0.0;
+        fees.incentive_fee = Some(IncentiveFeeSpec {
+            hurdle_irr: 0.0,
+            share_pct: 0.20,
+        });
+    });
+    revolving.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+    revolving.pool.reinvestment_period = Some(
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::ReinvestmentPeriod {
+            end_date: d(2028, 1, 1),
+            is_active: true,
+            criteria: Default::default(),
+            amortizing_tranches: Vec::new(),
+            assumptions: None,
+        },
+    );
+    let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
+        &revolving,
+        &market(d(CLOSE.0, CLOSE.1, CLOSE.2)),
+        d(CLOSE.0, CLOSE.1, CLOSE.2),
+    )
+    .expect("simulation");
+    for period in run
+        .diagnostics
+        .periods
+        .iter()
+        .filter(|period| period.payment_date <= d(2028, 1, 1))
+    {
+        assert!(
+            period.reinvested_par.amount() > 0.0,
+            "principal is recycled while revolving on {}",
+            period.payment_date
+        );
+    }
 }

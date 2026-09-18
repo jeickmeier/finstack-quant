@@ -42,8 +42,10 @@ pub struct ScenarioCell {
     pub cdr: f64,
     /// Loss severity (decimal) for this cell.
     pub severity: f64,
-    /// Tranche price as a percentage of the tranche's CURRENT balance (the
-    /// factor-adjusted quote basis).
+    /// Clean settlement price as a percentage of the tranche's CURRENT
+    /// balance (the factor-adjusted quote basis): the model dirty value at
+    /// buyer settlement less accrued, the same figure as
+    /// `TrancheMetrics::price_pct`.
     pub price: f64,
     /// Weighted-average life in years.
     pub wal: f64,
@@ -64,8 +66,9 @@ pub struct ScenarioTable {
 /// Build a scenario table for one tranche across a CPR × CDR × severity grid.
 ///
 /// Each cell clones the deal, overrides the deterministic prepayment, default
-/// and recovery assumptions, reprices the tranche, and records its price (as a
-/// percentage of current balance), WAL and principal writedown.
+/// and recovery assumptions, projects the tranche once, and records its clean
+/// settlement price (as a percentage of current balance), WAL and principal
+/// writedown.
 ///
 /// # Arguments
 ///
@@ -133,6 +136,7 @@ pub fn scenario_table(
             finstack_quant_core::validation::validate_f64_unit_interval(value, name)?;
         }
     }
+    let disc = context.get_discount(deal.discount_curve_id.as_str())?;
     let mut cells = Vec::with_capacity(cell_count);
     for &cpr in &grid.cprs {
         for &cdr in &grid.cdrs {
@@ -148,9 +152,14 @@ pub fn scenario_table(
                     RecoveryModelSpec::with_lag(1.0 - severity, lag);
 
                 let cashflows = scenario.get_tranche_cashflows(tranche_id, context, as_of)?;
-                let pv = scenario.value_tranche(tranche_id, context, as_of)?;
                 let price = if current_balance > 0.0 {
-                    pv.amount() / current_balance * 100.0
+                    let quote = super::quote::SettlementQuote::for_tranche(
+                        &scenario,
+                        as_of,
+                        current_balance,
+                        &cashflows,
+                    )?;
+                    quote.clean_price(quote.model_dirty(&cashflows.cashflows, disc.as_ref())?)
                 } else {
                     0.0
                 };

@@ -12,7 +12,8 @@ pub struct StochasticPricingResult {
     /// Net present value of the deal
     pub npv: Money,
 
-    /// Clean price (percentage of notional), UNADJUSTED for accrued interest.
+    /// Clean price (percent of the sum of current tranche balances),
+    /// UNADJUSTED for accrued interest.
     ///
     /// SC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic
     /// result carries no per-tranche interest flows, so accrued cannot be
@@ -23,11 +24,15 @@ pub struct StochasticPricingResult {
     /// required.
     pub clean_price: f64,
 
-    /// Dirty price (percentage of notional), including accrued interest.
+    /// Dirty price (percent of the sum of current tranche balances),
+    /// including accrued interest.
     ///
     /// This is the authoritative price: it is the present value of all future
     /// cashflows from the valuation date, which by definition contains the
-    /// accrued portion of the next coupon.
+    /// accrued portion of the next coupon. The face is the notes' current
+    /// balance, the same basis as the deterministic `dirty_price` metric,
+    /// so a deal whose notes total less than the pool prices near par rather
+    /// than at the note-to-pool ratio.
     pub dirty_price: f64,
 
     /// Expected loss (probability-weighted average loss)
@@ -145,6 +150,10 @@ pub struct TranchePricingResult {
     /// Net present value
     pub npv: Money,
 
+    /// Mean present value as a percent of the tranche's current balance at
+    /// the valuation date (100 = par); `0.0` for a fully retired tranche.
+    pub price_pct: f64,
+
     /// Expected loss
     pub expected_loss: Money,
 
@@ -160,11 +169,14 @@ pub struct TranchePricingResult {
     /// Detachment point (percentage)
     pub detachment: f64,
 
-    /// Average life (years)
+    /// Average life (years) over the paths on which the tranche received
+    /// principal; `0.0` when it never did.
     pub average_life: f64,
 
-    /// Weighted average spread to LIBOR/SOFR
-    pub spread: f64,
+    /// Number of simulated paths on which the tranche received any
+    /// principal (the paths `average_life` averages over).
+    #[serde(default)]
+    pub paths_with_principal: usize,
 
     /// Credit duration (price sensitivity to credit spread)
     pub credit_duration: f64,
@@ -190,16 +202,27 @@ impl TranchePricingResult {
             tranche_id,
             seniority,
             npv,
+            price_pct: 0.0,
             expected_loss: Money::from((0_i64, currency)),
             unexpected_loss: Money::from((0_i64, currency)),
             expected_shortfall: Money::from((0_i64, currency)),
             attachment: 0.0,
             detachment: 1.0,
             average_life: 0.0,
-            spread: 0.0,
+            paths_with_principal: 0,
             credit_duration: 0.0,
             draw_option_cost: Money::from((0_i64, currency)),
         }
+    }
+
+    /// Set the price as a percent of the tranche's current balance.
+    ///
+    /// # Arguments
+    ///
+    /// * `price_pct` - Mean present value over the current balance, times 100.
+    pub fn with_price_pct(mut self, price_pct: f64) -> Self {
+        self.price_pct = price_pct;
+        self
     }
 
     /// Set the tranche's share of the deal draw option cost.
@@ -231,6 +254,17 @@ impl TranchePricingResult {
     /// Set average life.
     pub fn with_average_life(mut self, wal: f64) -> Self {
         self.average_life = wal;
+        self
+    }
+
+    /// Set the number of paths on which the tranche received principal.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - Count of paths with any principal to the tranche.
+    #[must_use]
+    pub fn with_paths_with_principal(mut self, paths: usize) -> Self {
+        self.paths_with_principal = paths;
         self
     }
 

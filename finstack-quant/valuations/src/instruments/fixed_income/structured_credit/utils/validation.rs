@@ -198,7 +198,10 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
             // `calculate_payment_amount` and panics there. Validation is the
             // right place to reject it, with the tier and recipient named.
             let bad_amount = match &recipient.calculation {
-                PaymentCalculation::FixedAmount { amount, .. } => !amount.amount().is_finite(),
+                PaymentCalculation::FixedAmount { amount, .. }
+                | PaymentCalculation::NetWacCarryover { amount, .. } => {
+                    !amount.amount().is_finite()
+                }
                 PaymentCalculation::PercentageOfCollateral { rate, .. }
                 | PaymentCalculation::PercentageOfSpecialServiced { rate, .. } => !rate.is_finite(),
                 PaymentCalculation::CappedTrancheInterest { cap_rate, .. } => !cap_rate.is_finite(),

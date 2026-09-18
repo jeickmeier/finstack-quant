@@ -7,9 +7,14 @@
 //! `CoverageTestType::BorrowingBase` test enforces the borrowing base every
 //! period, whose reinvestment period is the revolving period, and whose
 //! early-amortization rules carry the loss / excess-spread amortization
-//! events. [`AssetBackedFacility::project`] returns the note's flows, the
-//! unused-commitment fee and the residual; the `Instrument` impl prices the
-//! lender's flows on the discount curve.
+//! events (`CumulativeLoss { max_pct }` is a percent here and a fraction in
+//! the engine). A loss or excess-spread event starts the term-out clock on
+//! its payment date, `fees` reach the waterfall ahead of the facility's
+//! interest, `draw_schedule` and `readvance_to_borrowing_base` lift the
+//! facility balance after closing, and the unused-commitment fee accrues only
+//! while the line revolves. [`AssetBackedFacility::project`] returns the
+//! note's flows, the unused-commitment fee, the draws and the residual; the
+//! `Instrument` impl prices the lender's flows on the discount curve.
 //!
 //! # Quick example
 //!
@@ -31,7 +36,9 @@ pub use metrics::{
     AbfBorrowingBaseCushionCalculator, AbfFacilityIrrCalculator, AbfResidualIrrCalculator,
 };
 pub use pricing::{FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID};
-pub use types::{AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, TermOutSpec};
+pub use types::{
+    AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, FacilityDraw, TermOutSpec,
+};
 
 pub use crate::instruments::fixed_income::structured_credit::{
     AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,

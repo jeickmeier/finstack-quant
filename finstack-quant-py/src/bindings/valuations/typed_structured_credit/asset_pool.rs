@@ -345,7 +345,7 @@ impl PyAssetPool {
     ///     ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
     ///     string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
     ///     (``max_price`` percent of par, ``min_yield`` annual decimal current
-    ///     yield, ``maintain_credit_quality``, ``maintain_wal``), optional
+    ///     yield below which a surviving asset is skipped), optional
     ///     ``amortizing_tranches`` (note ids paid down inside the window) and
     ///     optional ``assumptions`` (``spread_bp``, ``price_pct``,
     ///     ``maturity_months``, ``index_id``, ``coupon_floor``) describing the
@@ -371,8 +371,7 @@ impl PyAssetPool {
     /// >>> from finstack_quant.valuations.instruments import AssetPool
     /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reinvestment_period({
     /// ...     "end_date": "2028-01-01", "is_active": True,
-    /// ...     "criteria": {"max_price": 100.0, "min_yield": 0.0,
-    /// ...                  "maintain_credit_quality": True, "maintain_wal": True},
+    /// ...     "criteria": {"max_price": 100.0, "min_yield": 0.0},
     /// ...     "amortizing_tranches": ["A"],
     /// ... })
     /// >>> pool.reinvestment_period["amortizing_tranches"]
@@ -407,14 +406,19 @@ impl PyAssetPool {
     ///     Undistributed collections held at closing; unchanged when omitted.
     /// excess_spread_account : Money, optional
     ///     Trapped excess spread held at closing; unchanged when omitted.
+    /// original_balance : Money, optional
+    ///     Original (cut-off) pool balance the cumulative-loss triggers,
+    ///     clean-up call factor and loss curves are stated against; when
+    ///     omitted the engine reconstructs it from the current balance plus
+    ///     the cumulative tallies. Must be at least the current balance.
     ///
     /// Returns
     /// -------
     /// AssetPool
     ///     A new pool with the supplied balances (the original is unchanged).
-    #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None))]
+    #[pyo3(signature = (*, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None))]
     #[pyo3(
-        text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None)"
+        text_signature = "($self, *, cumulative_defaults=None, cumulative_recoveries=None, cumulative_prepayments=None, cumulative_scheduled_amortization=None, collection_account=None, excess_spread_account=None, original_balance=None)"
     )]
     // PyO3 binding: one keyword per pool account field.
     #[allow(clippy::too_many_arguments)]
@@ -426,8 +430,12 @@ impl PyAssetPool {
         cumulative_scheduled_amortization: Option<PyRef<'_, PyMoney>>,
         collection_account: Option<PyRef<'_, PyMoney>>,
         excess_spread_account: Option<PyRef<'_, PyMoney>>,
+        original_balance: Option<PyRef<'_, PyMoney>>,
     ) -> Self {
         let mut inner = self.inner.clone();
+        if let Some(value) = original_balance {
+            inner.original_balance = Some(value.inner);
+        }
         if let Some(value) = cumulative_defaults {
             inner.cumulative_defaults = value.inner;
         }
@@ -558,6 +566,14 @@ impl PyAssetPool {
     #[getter]
     fn cumulative_scheduled_amortization(&self) -> PyMoney {
         money_to_py(self.inner.cumulative_scheduled_amortization)
+    }
+
+    /// Original (cut-off) pool balance when supplied, else ``None`` (the
+    /// engine then reconstructs it from the current balance and the
+    /// cumulative tallies).
+    #[getter]
+    fn original_balance(&self) -> Option<PyMoney> {
+        self.inner.original_balance.map(money_to_py)
     }
 
     /// Collection account balance.

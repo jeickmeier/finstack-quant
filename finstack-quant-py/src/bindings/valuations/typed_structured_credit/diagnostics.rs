@@ -202,11 +202,38 @@ impl PySimulationDiagnostics {
         money_to_py(self.inner.reserve_replenished)
     }
 
+    /// Payment date of the early-amortization event (or coverage-test
+    /// acceleration) that ended the revolving period, or ``None``.
+    #[getter]
+    fn early_amortization_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .early_amortization_date
+            .map(|date| date_to_py(py, date))
+            .transpose()
+    }
+
+    /// Lender draws applied to notes as ``(tranche_id, datetime.date, Money)``
+    /// triples.
+    #[getter]
+    fn tranche_draws<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Vec<(String, Bound<'py, PyAny>, PyMoney)>> {
+        self.inner
+            .tranche_draws
+            .iter()
+            .map(|(id, date, amount)| {
+                Ok((id.clone(), date_to_py(py, *date)?, money_to_py(*amount)))
+            })
+            .collect()
+    }
+
     /// Per-period deal record as ``PeriodDiagnostics`` serde dicts:
     /// ``payment_date``, ``pool_balance``, ``pool_factor``,
     /// ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the
     /// period's collections, defaults, recoveries, reinvested par, fees paid,
-    /// the cash-account balances, ``delinquent_balance``, ``excess_spread``
+    /// the cash-account balances, ``delinquent_balance``,
+    /// ``servicer_advances_outstanding``, ``excess_spread``
     /// and the ``coverage_tests`` the executor evaluated.
     #[getter]
     fn periods<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -221,7 +248,8 @@ impl PySimulationDiagnostics {
     /// ``principal_collections``, ``defaults``, ``recoveries``,
     /// ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
     /// ``reserve_interest``, ``spread_account``, ``funding_account``,
-    /// ``delinquent_balance`` and ``excess_spread`` (annualized decimal);
+    /// ``delinquent_balance``, ``servicer_advances_outstanding`` and
+    /// ``excess_spread`` (annualized decimal);
     /// amounts in currency units.
     ///
     /// Returns
@@ -264,6 +292,7 @@ impl PySimulationDiagnostics {
                     "spread_account": period.spread_account.amount(),
                     "funding_account": period.funding_account.amount(),
                     "delinquent_balance": period.delinquent_balance.amount(),
+                    "servicer_advances_outstanding": period.servicer_advances_outstanding.amount(),
                     "excess_spread": period.excess_spread,
                 })
             })
@@ -289,6 +318,7 @@ impl PySimulationDiagnostics {
                 ("spread_account", "float64"),
                 ("funding_account", "float64"),
                 ("delinquent_balance", "float64"),
+                ("servicer_advances_outstanding", "float64"),
                 ("excess_spread", "float64"),
             ],
         )

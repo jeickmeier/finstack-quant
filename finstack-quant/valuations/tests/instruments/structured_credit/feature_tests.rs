@@ -62,6 +62,7 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             rate: 0.08,
             spread_bp: None,
             index_id: None,
+            index_floor: None,
             maturity: maturity_5y(),
             credit_quality: Some(CreditRating::BB),
             industry: Some("Technology".to_string()),
@@ -71,11 +72,14 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             default_date: None,
             purchase_price: None,
             acquisition_date: Some(as_of()),
+            origination_date: None,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -450,12 +454,15 @@ mod afc_tests {
                 afc: Some(AfcSpec {
                     capped_tranches: vec!["SR".to_string()],
                     net_wac_fee_bp: None,
+                    carryover: false,
                 }),
                 excess_spread: None,
                 step_down: None,
                 shifting_interest: None,
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -549,6 +556,7 @@ mod afc_tests {
             afc: Some(AfcSpec {
                 capped_tranches: vec!["SR".to_string()],
                 net_wac_fee_bp,
+                carryover: false,
             }),
             ..Default::default()
         });
@@ -660,6 +668,8 @@ mod excess_spread_tests {
                 shifting_interest: None,
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -818,6 +828,8 @@ mod excess_spread_tests {
                 shifting_interest: None,
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -958,6 +970,8 @@ mod step_down_tests {
                 shifting_interest: None,
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -1202,6 +1216,8 @@ mod shifting_interest_tests {
                 shifting_interest: Some(si),
                 early_amortization: None,
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -1220,9 +1236,9 @@ mod shifting_interest_tests {
     #[test]
     fn shifting_interest_locks_out_sub_then_releases() {
         // 100% senior share for the first 24 months (full lockout), then 50%.
-        let sc = deal(Some(ShiftingInterestSpec {
-            senior_id: "SR".to_string(),
-            schedule: vec![
+        let sc = deal(Some(ShiftingInterestSpec::new(
+            "SR",
+            vec![
                 ShiftingInterestStep {
                     months_from_closing: 0,
                     senior_pct: 1.0,
@@ -1232,7 +1248,7 @@ mod shifting_interest_tests {
                     senior_pct: 0.5,
                 },
             ],
-        }));
+        )));
         let before = sub_principal(&sc, true, release_date());
         let after = sub_principal(&sc, false, release_date());
         assert!(
@@ -1256,6 +1272,7 @@ mod shifting_interest_tests {
             rate: 0.06,
             spread_bp: None,
             index_id: None,
+            index_floor: None,
             maturity: maturity(),
             credit_quality: None,
             industry: None,
@@ -1265,12 +1282,15 @@ mod shifting_interest_tests {
             default_date: None,
             purchase_price: None,
             acquisition_date: Some(closing()),
+            origination_date: None,
             day_count: DayCount::Thirty360,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -1343,13 +1363,13 @@ mod shifting_interest_tests {
         // shift applies only to *prepayments*; the sub still receives its
         // pro-rata share of *scheduled* amortization, so on an amortizing pool
         // it gets a positive principal amount even under a 100% lockout.
-        let locked = amortizing_deal(Some(ShiftingInterestSpec {
-            senior_id: "SR".to_string(),
-            schedule: vec![ShiftingInterestStep {
+        let locked = amortizing_deal(Some(ShiftingInterestSpec::new(
+            "SR",
+            vec![ShiftingInterestStep {
                 months_from_closing: 0,
                 senior_pct: 1.0,
             }],
-        }));
+        )));
         let sub_scheduled = sub_principal_amortizing(&locked, release_date());
         assert!(
             sub_scheduled > 5_000.0,
@@ -1418,13 +1438,13 @@ mod shifting_interest_tests {
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
         sc.waterfall_rules = Some(WaterfallRules {
-            shifting_interest: Some(ShiftingInterestSpec {
-                senior_id: "SR".to_string(),
-                schedule: vec![ShiftingInterestStep {
+            shifting_interest: Some(ShiftingInterestSpec::new(
+                "SR",
+                vec![ShiftingInterestStep {
                     months_from_closing: 0,
                     senior_pct: 0.4,
                 }],
-            }),
+            )),
             ..Default::default()
         });
         sc
@@ -1556,10 +1576,12 @@ mod early_amortization_tests {
                 step_down: None,
                 shifting_interest: None,
                 early_amortization: Some(EarlyAmortizationSpec {
-                    max_cumulative_loss_pct: threshold,
+                    max_cumulative_loss: Some(threshold),
                     min_excess_spread_3m: None,
                 }),
                 controlled_accumulation: None,
+                reserve: None,
+                target_oc: None,
             });
         }
         sc
@@ -1790,7 +1812,7 @@ mod controlled_accumulation_tests {
             }));
             if let Some(rules) = sc.waterfall_rules.as_mut() {
                 rules.early_amortization = Some(EarlyAmortizationSpec {
-                    max_cumulative_loss_pct: max_loss,
+                    max_cumulative_loss: Some(max_loss),
                     min_excess_spread_3m: None,
                 });
             }

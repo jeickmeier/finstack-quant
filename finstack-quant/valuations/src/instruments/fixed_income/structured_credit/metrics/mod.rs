@@ -44,6 +44,31 @@ pub(crate) mod scenario;
 pub(crate) mod summary;
 mod tranche_analytics;
 
+/// Reprice a (bumped) deal on the scope of the metric context: the named
+/// tranche when the context carries one tranche's cashflows (set by
+/// `StructuredCredit::value_tranche_with_metrics`), else the whole deal
+/// through the context's pricing dispatch. Keeps the bump metrics
+/// (Default01, Prepayment01, Recovery01, Severity01) per tranche.
+///
+/// # Arguments
+///
+/// * `context` - Metric context; its `detailed_tranche_cashflows` names the
+///   tranche in scope.
+/// * `deal` - The (bumped) deal to price.
+/// * `as_of` - Valuation date of the reprice.
+pub(crate) fn reprice_in_scope(
+    context: &crate::metrics::MetricContext,
+    deal: &crate::instruments::fixed_income::structured_credit::StructuredCredit,
+    as_of: finstack_quant_core::dates::Date,
+) -> finstack_quant_core::Result<f64> {
+    match context.detailed_tranche_cashflows.as_ref() {
+        Some(flows) => Ok(deal
+            .value_tranche(&flows.tranche_id, context.curves.as_ref(), as_of)?
+            .amount()),
+        None => context.reprice_instrument_raw(deal, context.curves.as_ref(), as_of),
+    }
+}
+
 pub use deal_specific::{
     AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsDelinquencyCalculator,
     AbsExcessSpreadCalculator, AbsPaymentRateCalculator, CmbsDscrCalculator,
@@ -56,9 +81,9 @@ pub use pricing::{
 pub use risk::{
     calculate_tranche_breakeven_cdr, calculate_tranche_convexity, calculate_tranche_cs01,
     calculate_tranche_discount_margin, calculate_tranche_duration, calculate_tranche_oas,
-    calculate_tranche_z_spread, ConvexityCalculator, Cs01Calculator, MacaulayDurationCalculator,
-    ModifiedDurationCalculator, OasConfig, OasResult, SpreadDurationCalculator, YtmCalculator,
-    ZSpreadCalculator,
+    calculate_tranche_spread_convexity, calculate_tranche_z_spread, ConvexityCalculator,
+    Cs01Calculator, MacaulayDurationCalculator, ModifiedDurationCalculator, OasConfig, OasResult,
+    SpreadDurationCalculator, YtmCalculator, ZSpreadCalculator,
 };
 pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
 pub use summary::{

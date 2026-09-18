@@ -41,6 +41,12 @@ pub struct PoolAsset {
     pub spread_bp: Option<f64>,
     /// Reference index identifier for floating-rate assets, such as SOFR-3M.
     pub index_id: Option<String>,
+    /// Floor on the floating index (annual decimal, e.g. `0.01` = 1%)
+    /// applied before `spread_bp` is added, matching
+    /// `FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on
+    /// fixed-rate rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_floor: Option<f64>,
     /// Contractual maturity date of the asset.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -74,6 +80,16 @@ pub struct PoolAsset {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub acquisition_date: Option<Date>,
+    /// Origination date of the loan or receivable, if known: the anchor for
+    /// the seasoning-dependent prepayment/default curves (PSA, SDA, ABS,
+    /// vector) and the amortization schedule. Falls back to
+    /// `acquisition_date`, then to the deal closing date (new collateral).
+    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub origination_date: Option<Date>,
     /// Day-count convention used for coupon and accrual calculations.
     pub day_count: DayCount,
     /// Optional decimal Single Monthly Mortality override.
@@ -91,9 +107,23 @@ pub struct PoolAsset {
     pub commitment: Option<Money>,
     /// Contractual periodic payment for level-pay assets. Required for exact
     /// seasoned-loan amortization; when absent it is inferred once from the
-    /// current state and remaining contractual periods.
+    /// current state and the amortization term (or the remaining contractual
+    /// periods to maturity).
     #[serde(default)]
     pub contractual_payment: Option<Money>,
+    /// Amortization schedule length in months from origination
+    /// (`acquisition_date`, else the deal closing) for level-pay assets, e.g.
+    /// `360` for a 30-year schedule on a 10-year loan: the level payment is
+    /// sized over `term − age` and the unamortized balance pays as a balloon
+    /// at maturity. `None` amortizes fully by maturity. Ignored when
+    /// `contractual_payment` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amortization_term_months: Option<u32>,
+    /// Interest-only period in months from origination: no scheduled
+    /// principal while the loan is younger than this, then the level payment
+    /// over the remaining schedule. `None` for no interest-only period.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub io_months: Option<u32>,
     /// Market price as percent of par (`60.0` = 60% of par). Read by the
     /// excess-CCC coverage rule; an asset without a price is carried at par.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -130,6 +160,13 @@ pub struct PoolAsset {
 }
 
 impl PoolAsset {
+    /// Date the asset's seasoning is measured from: `origination_date`, else
+    /// `acquisition_date`; `None` when the row is undated (new at closing).
+    #[must_use]
+    pub fn seasoning_anchor(&self) -> Option<Date> {
+        self.origination_date.or(self.acquisition_date)
+    }
+
     /// Create new pool asset from existing bond
     pub fn from_bond(bond: &Bond, industry: Option<String>) -> finstack_quant_core::Result<Self> {
         fn economics(
@@ -175,6 +212,7 @@ impl PoolAsset {
             spread_bp,
             index_id,
             maturity: bond.maturity,
+            index_floor: None,
             credit_quality: None,
             industry,
             obligor_id: None,
@@ -187,13 +225,16 @@ impl PoolAsset {
                 .quoted_clean_price
                 .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency()))
                 .transpose()?,
-            acquisition_date: Some(bond.issue_date),
+            acquisition_date: None,
+            origination_date: Some(bond.issue_date),
             day_count,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -254,6 +295,7 @@ impl PoolAsset {
             spread_bp: Some(spread_bp),
             index_id: Some(index_id.into()),
             maturity,
+            index_floor: None,
             credit_quality: None,
             industry: None,
             obligor_id: None,
@@ -262,12 +304,15 @@ impl PoolAsset {
             default_date: None,
             purchase_price: None,
             acquisition_date: None,
+            origination_date: None,
             day_count,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -296,6 +341,7 @@ impl PoolAsset {
             spread_bp: None, // Fixed rate - no separate spread
             index_id: None,
             maturity,
+            index_floor: None,
             credit_quality: None,
             industry: None,
             obligor_id: None,
@@ -304,12 +350,15 @@ impl PoolAsset {
             default_date: None,
             purchase_price: None,
             acquisition_date: None,
+            origination_date: None,
             day_count,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -442,12 +491,11 @@ pub struct ReinvestmentAssumptions {
 pub struct ReinvestmentCriteria {
     /// Maximum purchase price (% of par)
     pub max_price: f64,
-    /// Minimum annual decimal current yield: replacement coupon divided by purchase-price fraction.
+    /// Minimum annual decimal current yield: replacement coupon divided by
+    /// purchase-price fraction. Surviving assets below it are skipped when
+    /// the pool is replicated pro rata; a synthetic purchase below it is not
+    /// made.
     pub min_yield: f64,
-    /// Require the surviving credit-quality distribution; pro-rata replacement always preserves it.
-    pub maintain_credit_quality: bool,
-    /// Require the surviving principal-payment profile; pro-rata replacement always preserves it.
-    pub maintain_wal: bool,
 }
 
 impl Default for ReinvestmentCriteria {
@@ -455,8 +503,6 @@ impl Default for ReinvestmentCriteria {
         Self {
             max_price: 100.0, // 100% of par
             min_yield: 0.0,
-            maintain_credit_quality: true,
-            maintain_wal: true,
         }
     }
 }
@@ -527,6 +573,16 @@ pub struct AssetPool {
     /// overstates the reported loss rate.
     pub cumulative_scheduled_amortization: Money,
 
+    /// Original (cut-off) pool balance the deal's cumulative-loss triggers,
+    /// clean-up call factor and cumulative-loss/timing default curves are
+    /// stated against. `None` reconstructs it as the current balance plus
+    /// `cumulative_defaults`, `cumulative_prepayments` and
+    /// `cumulative_scheduled_amortization` (see
+    /// [`Self::original_balance_or_reconstructed`]); supply it when those
+    /// tallies are incomplete. Must be at least the current total balance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_balance: Option<Money>,
+
     /// Reinvestment management
     /// Reinvestment period configuration (if applicable)
     pub reinvestment_period: Option<ReinvestmentPeriod>,
@@ -591,6 +647,10 @@ pub struct RepLine {
     pub spread_bp: Option<f64>,
     /// Reference index (if floating)
     pub index_id: Option<String>,
+    /// Floor on the floating index (annual decimal) applied before
+    /// `spread_bp`; `None` for no floor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_floor: Option<f64>,
     /// Weighted average maturity date
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -608,6 +668,18 @@ pub struct RepLine {
     pub cdr: Option<f64>,
     /// Optional recovery rate override
     pub recovery_rate: Option<f64>,
+    /// Contractual periodic payment for level-pay lines (see
+    /// `PoolAsset::contractual_payment`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contractual_payment: Option<Money>,
+    /// Amortization schedule length in months from origination (see
+    /// `PoolAsset::amortization_term_months`); with `seasoning_months` the
+    /// line amortizes over `term − seasoning`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amortization_term_months: Option<u32>,
+    /// Interest-only months from origination (see `PoolAsset::io_months`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub io_months: Option<u32>,
 }
 
 impl RepLine {
@@ -635,12 +707,16 @@ impl RepLine {
             rate,
             spread_bp: None,
             index_id: None,
+            index_floor: None,
             maturity,
             seasoning_months: 0,
             day_count,
             cpr: None,
             cdr: None,
             recovery_rate: None,
+            contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
         }
     }
 
@@ -681,6 +757,7 @@ impl AssetPool {
             cumulative_recoveries: zero_money,
             cumulative_prepayments: zero_money,
             cumulative_scheduled_amortization: zero_money,
+            original_balance: None,
             reinvestment_period: None,
             collection_account: zero_money,
             reserve_account: zero_money,
@@ -747,7 +824,7 @@ impl AssetPool {
                         "representative seasoning exceeds the supported date range".into(),
                     )
                 })?;
-                let acquisition = closing_date.add_months(-months);
+                let origination = closing_date.add_months(-months);
                 pool.assets.push(PoolAsset {
                     id: line.id.into(),
                     asset_type: line.asset_type,
@@ -755,6 +832,7 @@ impl AssetPool {
                     rate: line.rate,
                     spread_bp: line.spread_bp,
                     index_id: line.index_id,
+                    index_floor: line.index_floor,
                     maturity: line.maturity,
                     credit_quality: None,
                     industry: None,
@@ -763,13 +841,16 @@ impl AssetPool {
                     recovery_amount: None,
                     default_date: None,
                     purchase_price: None,
-                    acquisition_date: Some(acquisition),
+                    acquisition_date: None,
+                    origination_date: Some(origination),
                     day_count: line.day_count,
                     smm_override: line.cpr.map(|cpr| 1.0 - (1.0 - cpr).powf(1.0 / 12.0)),
                     mdr_override: line.cdr.map(|cdr| 1.0 - (1.0 - cdr).powf(1.0 / 12.0)),
                     recovery_rate: line.recovery_rate,
                     commitment: None,
-                    contractual_payment: None,
+                    contractual_payment: line.contractual_payment,
+                    amortization_term_months: line.amortization_term_months,
+                    io_months: line.io_months,
                     market_price_pct: None,
                     delinquency_buckets: None,
                     balloon: None,
@@ -883,14 +964,15 @@ impl AssetPool {
         Ok(())
     }
 
-    /// Balance-weighted collateral age, using acquisition as the supplied
-    /// origination proxy; undated assets are new at closing.
+    /// Balance-weighted collateral age from each asset's origination date
+    /// (acquisition when origination is unknown); undated assets are new at
+    /// closing.
     pub(crate) fn weighted_average_seasoning(&self, date: Date, closing_date: Date) -> u32 {
         let mut weighted = 0.0;
         let mut total = 0.0;
         for asset in &self.assets {
             let weight = asset.balance.amount().max(0.0);
-            let start = asset.acquisition_date.unwrap_or(closing_date);
+            let start = asset.seasoning_anchor().unwrap_or(closing_date);
             let age = if start < date {
                 start.months_until(date)
             } else {
@@ -929,6 +1011,56 @@ impl AssetPool {
                 self.validate_asset_currency(asset)?;
                 acc.checked_add(asset.balance)
             })
+    }
+
+    /// Original (cut-off) pool balance: the explicit [`Self::original_balance`]
+    /// when supplied, else the current total balance plus the cumulative
+    /// defaults, prepayments and scheduled amortization received to date.
+    ///
+    /// This is the base of every "fraction of the original pool" quantity
+    /// (cumulative-loss triggers, the clean-up call factor, cumulative-loss
+    /// and timing default curves). For a new-issue pool it equals the current
+    /// balance; for a seasoned pool it is the balance the tallies reconstruct.
+    ///
+    /// # Errors
+    ///
+    /// Returns the currency-mismatch or representation errors of
+    /// [`Self::total_balance`].
+    pub fn original_balance_or_reconstructed(&self) -> finstack_quant_core::Result<Money> {
+        if let Some(original) = self.original_balance {
+            return Ok(original);
+        }
+        self.total_balance()?
+            .checked_add(self.cumulative_defaults)?
+            .checked_add(self.cumulative_prepayments)?
+            .checked_add(self.cumulative_scheduled_amortization)
+    }
+
+    /// An explicit original balance must be a finite amount in the pool
+    /// currency and at least the current total balance.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` (or `CurrencyMismatch`) when it is not.
+    pub fn validate_original_balance(&self) -> finstack_quant_core::Result<()> {
+        let Some(original) = self.original_balance else {
+            return Ok(());
+        };
+        if original.currency() != self.base_currency {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: self.base_currency,
+                actual: original.currency(),
+            });
+        }
+        let current = self.total_balance()?;
+        if !original.amount().is_finite() || original.amount() + 1e-6 < current.amount() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "pool original_balance {} must be finite and at least the current balance {}",
+                original.amount(),
+                current.amount()
+            )));
+        }
+        Ok(())
     }
 
     /// Total pool balance excluding defaulted assets

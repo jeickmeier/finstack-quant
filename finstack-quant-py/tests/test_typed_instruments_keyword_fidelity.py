@@ -416,6 +416,7 @@ def test_tranche_metrics_from_json_uses_json_keyword() -> None:
         "z_spread_bp": 150.0,
         "cs01": -380.0,
         "spread_duration": 4.0,
+        "spread_convexity": 20.0,
         "modified_duration": 3.8,
         "convexity": 0.2,
         "target_price_pct": 95.0,

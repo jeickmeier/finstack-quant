@@ -70,7 +70,7 @@ def test_structured_credit_inactive_reinvestment_matches_no_reinvestment() -> No
     spec["pool"]["reinvestment_period"] = {
         "end_date": "2030-01-01",
         "is_active": False,
-        "criteria": {"max_price": 100.0, "min_yield": 0.0, "maintain_credit_quality": True, "maintain_wal": True},
+        "criteria": {"max_price": 100.0, "min_yield": 0.0},
     }
     assert value() == pytest.approx(expected, abs=1e-6)
 
@@ -100,8 +100,6 @@ def test_structured_credit_ineligible_reinvestment_conserves_cash(
         "criteria": {
             "max_price": max_price,
             "min_yield": min_yield,
-            "maintain_credit_quality": True,
-            "maintain_wal": True,
         },
     }
     # A zero discount curve makes the independent comparison a cash identity.

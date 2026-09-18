@@ -13,10 +13,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
     AdvanceRate, AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, ConcentrationLimit,
-    ConcentrationScope, EligibilityRule, TermOutSpec,
+    ConcentrationScope, EligibilityRule, FacilityDraw, TermOutSpec,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset,
+    AssetPool, DealType, LiquidationSpec, PoolAsset,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope, InstrumentJson};
 use finstack_quant_valuations::metrics::MetricId;
@@ -148,6 +148,8 @@ fn borrowing_base_excludes_concentration_excess_and_ineligible_collateral() {
         eligibility: EligibilityRule {
             exclude_defaulted: true,
             max_maturity: Some(d(2030, 1, 1)),
+            max_days_past_due: None,
+            exclude_non_performing: true,
         },
     });
     assert_eq!(
@@ -267,10 +269,16 @@ fn unused_fee_accrues_on_the_undrawn_commitment() {
         "{} vs {expected}",
         fee.amount()
     );
-    assert_eq!(
-        projection.unused_fees.len(),
-        projection.facility.accrual_periods.len()
-    );
+    // The commitment ends with the revolving period: only accrual periods
+    // starting before 2026-01-01 carry a fee.
+    let revolving_periods = projection
+        .facility
+        .accrual_periods
+        .iter()
+        .filter(|period| period.start < d(2026, 1, 1))
+        .count();
+    assert_eq!(projection.unused_fees.len(), revolving_periods);
+    assert!(revolving_periods < projection.facility.accrual_periods.len());
 
     let lender: Vec<_> = projection.lender_cashflows();
     let interest_plus_fee = projection.facility.interest_flows[0].1.amount() + fee.amount();
@@ -427,4 +435,224 @@ fn facility_prices_and_reports_metrics_through_the_registry() {
     let example = AssetBackedFacility::example().expect("example facility builds");
     example.validate_invariants().expect("example validates");
     assert_eq!(example.closing_date.add_months(24), example.revolving_end);
+}
+
+/// A dated amortization event ends the commitment with the revolving
+/// period: no unused fee accrues on accrual periods starting after it.
+#[test]
+fn unused_fee_stops_at_a_dated_amortization_event() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    facility.amortization_events = vec![AmortizationEvent::Date {
+        date: d(2025, 1, 1),
+    }];
+    let projection = facility.project(&market(), close()).expect("projection");
+    assert!(
+        projection
+            .unused_fees
+            .iter()
+            .all(|(date, _)| *date <= d(2025, 1, 15)),
+        "fees after the event: {:?}",
+        projection.unused_fees
+    );
+    assert_eq!(
+        projection.unused_fees.len(),
+        4,
+        "four quarterly accruals before the event"
+    );
+}
+
+/// A non-performing loan (an unresolved liquidation timeline) is ineligible
+/// like a defaulted one: with the 15M loan in workout the base is 52.8M.
+#[test]
+fn a_non_performing_loan_is_ineligible_until_it_resolves() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    facility.collateral.assets[4].liquidation = Some(LiquidationSpec {
+        months_to_resolution: 12,
+        proceeds_pct: 60.0,
+        carry_cost_pct: 5.0,
+        reperformance_prob: 0.0,
+        modified_rate: None,
+    });
+    let report = facility.borrowing_base().expect("report");
+    assert!((report.eligible_collateral.amount() - 85_000_000.0).abs() < 1e-6);
+    assert!((report.borrowing_base.amount() - 52_800_000.0).abs() < 1e-6);
+
+    let mut lenient = facility.clone();
+    lenient.borrowing_base_rules.advance_rates[0]
+        .eligibility
+        .exclude_non_performing = false;
+    assert!(
+        (lenient
+            .borrowing_base()
+            .expect("report")
+            .eligible_collateral
+            .amount()
+            - 100_000_000.0)
+            .abs()
+            < 1e-6
+    );
+}
+
+/// An excess-spread event (three recorded periods below the floor, so the
+/// fourth payment date, month 12) starts the 24-month term-out clock there:
+/// the facility is repaid by month 36, well before the scheduled 2028
+/// term-out end.
+#[test]
+fn an_amortization_event_starts_the_term_out_clock() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    // A floor no deal can meet fails after three periods.
+    facility.amortization_events = vec![AmortizationEvent::ExcessSpread { min_3m: 1.0 }];
+    facility.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
+    let projection = facility.project(&market(), close()).expect("projection");
+    let event = projection
+        .diagnostics
+        .early_amortization_date
+        .expect("the excess-spread event fires");
+    assert!(
+        event >= d(2025, 1, 1) && event < d(2025, 2, 1),
+        "fourth payment date: {event}"
+    );
+    let repaid_on = projection
+        .facility
+        .principal_flows
+        .iter()
+        .filter(|(_, amount)| amount.amount() > 0.0)
+        .map(|(date, _)| *date)
+        .max()
+        .expect("repayment dates");
+    assert!(
+        repaid_on >= event.add_months(24) && repaid_on < event.add_months(25),
+        "the term-out ends 24 months after the event: {repaid_on}"
+    );
+    assert!(
+        repaid_on < d(2028, 1, 1),
+        "before the scheduled term-out end"
+    );
+    assert!(projection.facility.final_balance.amount().abs() < 1e-6);
+    let total_principal: f64 = projection
+        .facility
+        .principal_flows
+        .iter()
+        .map(|(_, amount)| amount.amount())
+        .sum();
+    assert!((total_principal - 60_000_000.0).abs() < 1e-6);
+}
+
+/// A scheduled 10M draw lifts the facility balance and its interest, and
+/// shows up as a lender outflow.
+#[test]
+fn a_scheduled_draw_lifts_the_facility_balance_and_interest() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    facility.draw_schedule = vec![FacilityDraw {
+        date: d(2025, 1, 1),
+        amount: usd(10_000_000.0),
+    }];
+    let projection = facility.project(&market(), close()).expect("projection");
+    assert_eq!(projection.draws.len(), 1);
+    let (draw_date, draw_amount) = projection.draws[0];
+    assert!(draw_date >= d(2025, 1, 1) && draw_date < d(2025, 2, 1));
+    assert!((draw_amount.amount() - 10_000_000.0).abs() < 1e-6);
+    let lender: Vec<_> = projection.lender_cashflows();
+    let on_draw_date = lender
+        .iter()
+        .find(|(date, _)| *date == draw_date)
+        .map(|(_, amount)| amount.amount())
+        .expect("lender flow on the draw date");
+    assert!(
+        on_draw_date < 0.0,
+        "the draw is a lender outflow net of the coupon: {on_draw_date}"
+    );
+    // Interest after the draw accrues on 70M.
+    let after = projection
+        .facility
+        .accrual_periods
+        .iter()
+        .find(|period| period.start >= draw_date)
+        .expect("period after the draw");
+    assert!((after.opening_balance.amount() - 70_000_000.0).abs() < 1e-6);
+    let baseline = facility_baseline_interest(&facility, draw_date);
+    let interest_after = projection
+        .facility
+        .interest_flows
+        .iter()
+        .find(|(date, _)| *date == after.payment_date)
+        .map(|(_, amount)| amount.amount())
+        .expect("interest after the draw");
+    assert!(
+        (interest_after / baseline - 70.0 / 60.0).abs() < 1e-6,
+        "interest scales with the drawn balance: {interest_after} vs {baseline}"
+    );
+    let total_principal: f64 = projection
+        .facility
+        .principal_flows
+        .iter()
+        .map(|(_, amount)| amount.amount())
+        .sum();
+    assert!(
+        (total_principal - 70_000_000.0).abs() < 1e-6,
+        "{total_principal}"
+    );
+}
+
+/// Interest the undrawn facility pays on the first payment date after `date`.
+fn facility_baseline_interest(facility: &AssetBackedFacility, date: Date) -> f64 {
+    let mut undrawn = facility.clone();
+    undrawn.draw_schedule.clear();
+    let projection = undrawn.project(&market(), close()).expect("projection");
+    let period = projection
+        .facility
+        .accrual_periods
+        .iter()
+        .find(|period| period.start >= date)
+        .expect("period");
+    projection
+        .facility
+        .interest_flows
+        .iter()
+        .find(|(flow_date, _)| *flow_date == period.payment_date)
+        .map(|(_, amount)| amount.amount())
+        .expect("interest")
+}
+
+/// Re-advancing to the borrowing base draws the line up to
+/// `min(commitment, borrowing base)` each revolving period: 72M on the
+/// first payment date, so 12M is drawn and the residual is unchanged.
+#[test]
+fn readvance_draws_up_to_the_borrowing_base_while_revolving() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    facility.readvance_to_borrowing_base = true;
+    let projection = facility.project(&market(), close()).expect("projection");
+    let (first_date, first_draw) = projection.draws[0];
+    assert!(
+        first_date < d(2024, 5, 1),
+        "first payment date: {first_date}"
+    );
+    assert!(
+        (first_draw.amount() - 12_000_000.0).abs() < 1e-6,
+        "drawn to the 72M borrowing base: {}",
+        first_draw.amount()
+    );
+    assert!(
+        projection
+            .draws
+            .iter()
+            .all(|(date, _)| *date <= d(2026, 1, 15)),
+        "no re-advances after the revolving period: {:?}",
+        projection.draws
+    );
+    let total_principal: f64 = projection
+        .facility
+        .principal_flows
+        .iter()
+        .map(|(_, amount)| amount.amount())
+        .sum();
+    let total_draws: f64 = projection
+        .draws
+        .iter()
+        .map(|(_, amount)| amount.amount())
+        .sum();
+    assert!(
+        (total_principal - 60_000_000.0 - total_draws).abs() < 1e-6,
+        "every draw is repaid: {total_principal} vs 60M + {total_draws}"
+    );
 }

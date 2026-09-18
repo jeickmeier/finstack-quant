@@ -44,6 +44,30 @@ pub struct EligibilityRule {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub max_maturity: Option<Date>,
+    /// Delinquent balance more than this many days past due is ineligible
+    /// (delinquency buckets are 30 days each, so `60` keeps the 30- and
+    /// 60-day buckets and drops the rest). `None` keeps every delinquent
+    /// balance eligible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_days_past_due: Option<u32>,
+    /// Non-performing rows (an unresolved `liquidation` timeline) are
+    /// ineligible (the default); the re-performing share becomes eligible
+    /// once the timeline resolves.
+    #[serde(default = "default_true")]
+    pub exclude_non_performing: bool,
+}
+
+/// Live collateral state the eligibility rules read during a simulation:
+/// per-asset delinquency buckets and whether each row's NPL timeline is
+/// still unresolved. Without it the rules read the pool's static
+/// `delinquency_buckets` and `liquidation` fields.
+#[derive(Debug, Clone, Copy)]
+pub struct LiveCollateral<'a> {
+    /// Delinquent balance per 30-day bucket for each asset (may be empty
+    /// for an asset with no buckets sized yet).
+    pub delinquent: &'a [Vec<f64>],
+    /// `true` while the asset's liquidation timeline has not resolved.
+    pub unresolved_npl: &'a [bool],
 }
 
 fn default_true() -> bool {
@@ -55,6 +79,8 @@ impl Default for EligibilityRule {
         Self {
             exclude_defaulted: true,
             max_maturity: None,
+            max_days_past_due: None,
+            exclude_non_performing: true,
         }
     }
 }
@@ -182,6 +208,28 @@ impl BorrowingBaseRules {
         pool: &AssetPool,
         balances: Option<&[f64]>,
     ) -> finstack_quant_core::Result<BorrowingBaseReport> {
+        self.evaluate_live(pool, balances, None)
+    }
+
+    /// Borrowing base on live balances and live delinquency / NPL state.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - Collateral pool (asset terms, classes, groups).
+    /// * `balances` - Live per-asset balances aligned with `pool.assets`, or
+    ///   `None` for the closing balances.
+    /// * `live` - Live delinquency buckets and NPL resolution flags, or
+    ///   `None` to read the pool's static fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `balances` does not match the pool.
+    pub fn evaluate_live(
+        &self,
+        pool: &AssetPool,
+        balances: Option<&[f64]>,
+        live: Option<LiveCollateral<'_>>,
+    ) -> finstack_quant_core::Result<BorrowingBaseReport> {
         let currency = pool.get_base_currency();
         if let Some(balances) = balances {
             if balances.len() != pool.assets.len() {
@@ -202,14 +250,44 @@ impl BorrowingBaseRules {
                 .unwrap_or_else(|| asset.balance.amount())
                 .max(0.0);
             let advance = self.advance_rate_for(asset);
+            let unresolved_npl = live
+                .and_then(|live| live.unresolved_npl.get(index).copied())
+                .unwrap_or(asset.liquidation.is_some());
             let is_eligible = advance.is_some_and(|advance| {
                 let rule = &advance.eligibility;
-                !(rule.exclude_defaulted && asset.is_defaulted)
+                !((rule.exclude_defaulted && asset.is_defaulted)
+                    || (rule.exclude_non_performing && unresolved_npl))
                     && rule
                         .max_maturity
                         .is_none_or(|max_maturity| asset.maturity <= max_maturity)
             });
-            eligible.push(if is_eligible { balance } else { 0.0 });
+            // Delinquent balance past the days-past-due limit drops out.
+            let too_delinquent = advance
+                .and_then(|advance| advance.eligibility.max_days_past_due)
+                .map_or(0.0, |max_days| {
+                    let buckets: Vec<f64> = match live {
+                        Some(live) => live.delinquent.get(index).cloned().unwrap_or_default(),
+                        None => asset
+                            .delinquency_buckets
+                            .as_ref()
+                            .map(|buckets| buckets.iter().map(|m| m.amount()).collect())
+                            .unwrap_or_default(),
+                    };
+                    buckets
+                        .iter()
+                        .enumerate()
+                        .filter(|(bucket, _)| {
+                            30 * u32::try_from(*bucket).unwrap_or(u32::MAX).saturating_add(1)
+                                > max_days
+                        })
+                        .map(|(_, amount)| amount.max(0.0))
+                        .sum()
+                });
+            eligible.push(if is_eligible {
+                (balance - too_delinquent).max(0.0)
+            } else {
+                0.0
+            });
             rates.push(advance.map_or(0.0, |advance| advance.rate));
         }
         let eligible_total: f64 = eligible.iter().sum();

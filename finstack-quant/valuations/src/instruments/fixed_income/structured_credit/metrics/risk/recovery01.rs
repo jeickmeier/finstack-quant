@@ -51,11 +51,11 @@ impl MetricCalculator for Recovery01Calculator {
 
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;
-        let pv_up = context.reprice_instrument_raw(&inst_up, context.curves.as_ref(), as_of)?;
+        let pv_up = super::super::reprice_in_scope(context, &inst_up, as_of)?;
 
         let mut inst_down = instrument;
         inst_down.credit_model.recovery_spec = recovery_down;
-        let pv_down = context.reprice_instrument_raw(&inst_down, context.curves.as_ref(), as_of)?;
+        let pv_down = super::super::reprice_in_scope(context, &inst_down, as_of)?;
 
         // RECOVERY01 = slope × 1% — dollars per 1% (0.01) recovery move,
         // matching the documented convention AND the CDS-side Recovery01

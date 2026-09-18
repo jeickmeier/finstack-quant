@@ -115,6 +115,8 @@ fn fees(servicing_fee_bp: f64) -> DealFees {
         servicing_fee_bp,
         master_servicer_fee_bp: None,
         special_servicer_fee_bp: None,
+        workout_fee_pct: None,
+        liquidation_fee_pct: None,
         incentive_fee: None,
     }
 }
@@ -132,6 +134,8 @@ fn no_rules() -> WaterfallRules {
         shifting_interest: None,
         early_amortization: None,
         controlled_accumulation: None,
+        reserve: None,
+        target_oc: None,
     }
 }
 
@@ -194,7 +198,7 @@ fn static_excess_spread_and_payment_rate_metrics_match_the_hand_computation() {
 fn three_periods_of_negative_excess_spread_trigger_early_amortization() {
     let rules = |floor: Option<f64>| WaterfallRules {
         early_amortization: Some(EarlyAmortizationSpec {
-            max_cumulative_loss_pct: 1.0,
+            max_cumulative_loss: Some(1.0),
             min_excess_spread_3m: floor,
         }),
         ..no_rules()
@@ -240,14 +244,17 @@ fn three_periods_of_negative_excess_spread_trigger_early_amortization() {
     );
 }
 
-/// Controlled accumulation is unchanged by the card model: nothing is paid
-/// between the revolving end and the bullet date, then the accumulated
-/// payment-rate principal is released at once. Without charge-offs the
-/// revolving period keeps the receivables at 100M; the seven payment dates
-/// from the revolving end (inclusive) through the bullet date accumulate
-/// `100M × (1 − 0.85^7)`.
+/// Once the revolving period ends the investor allocation is fixed on the
+/// receivables held at that point (100M, no seller interest), so every
+/// accumulation date collects `15% × 100M = 15M` of investor principal
+/// regardless of how far the investor interest has amortized. With the NYSE
+/// calendar the 2026-01-01 date rolls to 2026-01-02, past the revolving end,
+/// so seven dates accumulate before the bullet: 105M capped at the 100M
+/// investor interest, of which Class A takes its full 90M as one bullet on
+/// the bullet date and the equity the rest. Charge-offs reduce the investor
+/// interest on the fixed base and therefore only the equity's principal.
 #[test]
-fn controlled_accumulation_releases_the_accumulated_payment_rate_principal_as_a_bullet() {
+fn controlled_accumulation_releases_the_fixed_allocation_principal_as_a_bullet() {
     let revolving_end = d(2026, 1, 1);
     let bullet_date = d(2026, 7, 1);
     let accumulating = |charge_off: f64| {
@@ -262,43 +269,210 @@ fn controlled_accumulation_releases_the_accumulated_payment_rate_principal_as_a_
             },
         )
     };
+    let positive = |flows: &[(Date, Money)]| -> Vec<(Date, f64)> {
+        flows
+            .iter()
+            .filter(|(_, amount)| amount.amount() > 0.0)
+            .map(|(date, amount)| (*date, amount.amount()))
+            .collect()
+    };
 
     let results = simulate(&accumulating(0.0));
-    let flows: Vec<(Date, f64)> = results["A"]
+    let a_flows = positive(&results["A"].principal_flows);
+    assert_eq!(a_flows.len(), 1, "one bullet: {a_flows:?}");
+    assert!(
+        a_flows[0].0 >= bullet_date && a_flows[0].0 < d(2026, 8, 1),
+        "the bullet is released on the first payment date at or after the bullet date: {:?}",
+        a_flows[0]
+    );
+    assert!(
+        (a_flows[0].1 - 90_000_000.0).abs() < 1.0,
+        "the fixed 15M monthly allocation funds the whole 90M class: {}",
+        a_flows[0].1
+    );
+    let e_total: f64 = positive(&results["E"].principal_flows)
+        .iter()
+        .map(|(_, amount)| amount)
+        .sum();
+    assert!(
+        (e_total - 10_000_000.0).abs() < 1.0,
+        "the equity receives the remaining investor interest: {e_total}"
+    );
+
+    // Two years of revolving charge-offs leave the investor interest below
+    // the 90M class at the freeze, and the accumulation months keep charging
+    // off the fixed base, so the bullet is short by the unreimbursed
+    // charge-offs (no excess-spread reimbursement in this trust): the class
+    // takes a loss and the equity receives no principal.
+    let with_charge_offs = simulate(&accumulating(0.05));
+    let a_flows = positive(&with_charge_offs["A"].principal_flows);
+    assert_eq!(a_flows.len(), 1, "one short bullet: {a_flows:?}");
+    assert!(
+        a_flows[0].1 < 90_000_000.0 && a_flows[0].1 > 85_000_000.0,
+        "the bullet is the investor interest net of charge-offs: {}",
+        a_flows[0].1
+    );
+    let e_with_charge_offs: f64 = positive(&with_charge_offs["E"].principal_flows)
+        .iter()
+        .map(|(_, amount)| amount)
+        .sum();
+    assert!(
+        e_with_charge_offs < 1.0,
+        "the equity is wiped out before the senior completes: {e_with_charge_offs}"
+    );
+}
+
+/// Early amortization pays the investor interest down at the fixed
+/// allocation of the payment rate on the receivables held when the event
+/// fires: after the trigger period every paydown is `15% × opening balance
+/// of the trigger period` until the investor interest is retired within
+/// `⌈1 / MPR⌉ = 7` payment dates of the trigger.
+#[test]
+fn early_amortization_pays_down_at_the_fixed_allocation_of_the_payment_rate() {
+    let deal = with_rules(
+        trust(card(0.25), d(2027, 1, 1)),
+        WaterfallRules {
+            early_amortization: Some(EarlyAmortizationSpec {
+                max_cumulative_loss: Some(1.0),
+                min_excess_spread_3m: Some(0.0),
+            }),
+            ..no_rules()
+        },
+    );
+    let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
+        &deal,
+        &market(),
+        close(),
+    )
+    .expect("simulation");
+    let a_flows: Vec<(Date, f64)> = run.tranches["A"]
         .principal_flows
         .iter()
         .filter(|(_, amount)| amount.amount() > 0.0)
         .map(|(date, amount)| (*date, amount.amount()))
         .collect();
-
-    assert!(!flows.is_empty());
+    assert_eq!(
+        a_flows[0].0,
+        d(2024, 5, 1),
+        "early amortization starts at the fourth date"
+    );
+    // The event fires after the trigger period's flows, which ran on the
+    // live balance (payment rate on the post-charge-off balance); the base
+    // is then fixed at that period's opening balance for every later date.
+    let opening = run.diagnostics.periods[2].pool_balance.amount();
+    let trigger_period_defaults = run.diagnostics.periods[3].defaults.amount();
     assert!(
-        flows[0].0 >= bullet_date,
-        "no principal before the bullet date: {:?}",
-        flows[0]
+        (a_flows[0].1 - 0.15 * (opening - trigger_period_defaults)).abs() < 1.0,
+        "trigger-period paydown is the payment rate on the live balance ({opening} less {trigger_period_defaults}): {}",
+        a_flows[0].1
+    );
+    for flow in &a_flows[1..a_flows.len() - 1] {
+        assert!(
+            (flow.1 - 0.15 * opening).abs() < 1.0,
+            "the fixed base repeats the payment rate on the trigger period's opening balance {opening}: {flow:?}"
+        );
+    }
+    assert!(
+        a_flows.len() <= 7,
+        "the investor interest is retired within ⌈1 / MPR⌉ dates: {a_flows:?}"
+    );
+    // 25% charge-offs on the fixed base keep eroding the investor interest
+    // while it pays down, and nothing reimburses them in this trust: the
+    // class collects the opening balance less every later charge-off and
+    // takes the rest as a loss; the equity receives nothing.
+    let later_charge_offs: f64 = run.diagnostics.periods[3..]
+        .iter()
+        .map(|period| period.defaults.amount())
+        .sum();
+    let total_a: f64 = a_flows.iter().map(|(_, amount)| amount).sum();
+    assert!(
+        (total_a - (opening - later_charge_offs)).abs() < 1.0,
+        "A collects the investor interest net of charge-offs {}: {total_a}",
+        opening - later_charge_offs
     );
     assert!(
-        flows[0].0 < d(2026, 8, 1),
-        "the bullet is released on the first payment date at or after the bullet date: {:?}",
-        flows[0]
+        total_a < 90_000_000.0,
+        "A takes the unreimbursed charge-offs as a loss"
     );
-    let accumulated = 100_000_000.0 * (1.0 - 0.85_f64.powi(7));
-    assert!(
-        (flows[0].1 - accumulated).abs() < 1.0,
-        "bullet {} should be the accumulated payment-rate principal {accumulated}",
-        flows[0].1
-    );
-
-    // Charge-offs shrink the receivables and therefore the bullet.
-    let with_charge_offs = simulate(&accumulating(0.05));
-    let bullet = with_charge_offs["A"]
+    let e_principal: f64 = run.tranches["E"]
         .principal_flows
         .iter()
-        .find(|(_, amount)| amount.amount() > 0.0)
         .map(|(_, amount)| amount.amount())
-        .expect("bullet");
+        .sum();
+    assert!(e_principal < 1.0, "the equity is wiped out: {e_principal}");
+}
+
+/// With a seller interest and a supplied allocation the investor base is
+/// the allocation of the level trust receivables: 100M investor + 50M seller
+/// at a fixed 80% gives a 120M base, so accumulation collects 18M a month and
+/// the investor interest is retired in six dates instead of seven.
+#[test]
+fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
+    let revolving_end = d(2026, 1, 1);
+    let bullet_date = d(2026, 7, 1);
+    let spec = card(0.0)
+        .with_seller_interest(usd(50_000_000.0))
+        .with_fixed_allocation_pct(0.80);
+    let deal = with_rules(
+        trust(spec, revolving_end),
+        WaterfallRules {
+            controlled_accumulation: Some(ControlledAccumulationSpec {
+                start_date: revolving_end,
+                bullet_date,
+            }),
+            ..no_rules()
+        },
+    );
+    let diagnostics = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
+        &deal,
+        &market(),
+        close(),
+    )
+    .expect("simulation");
+    let first_accumulating = diagnostics
+        .diagnostics
+        .periods
+        .iter()
+        .find(|period| period.payment_date > revolving_end)
+        .expect("accumulation period");
+    let principal = first_accumulating.principal_collections.amount();
     assert!(
-        bullet < accumulated,
-        "charge-offs must reduce the bullet: {bullet}"
+        (principal - 0.80 * 0.15 * 150_000_000.0).abs() < 1.0,
+        "investor principal is 80% of the payment rate on 150M of receivables: {principal}"
+    );
+
+    // Without a supplied allocation the floating share (100 / 150) applies and
+    // the seller interest changes nothing: the base is the investor interest.
+    let floating = trust(
+        card(0.0).with_seller_interest(usd(50_000_000.0)),
+        revolving_end,
+    );
+    let floating = with_rules(
+        floating,
+        WaterfallRules {
+            controlled_accumulation: Some(ControlledAccumulationSpec {
+                start_date: revolving_end,
+                bullet_date,
+            }),
+            ..no_rules()
+        },
+    );
+    let floating = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
+        &floating,
+        &market(),
+        close(),
+    )
+    .expect("simulation");
+    let principal = floating
+        .diagnostics
+        .periods
+        .iter()
+        .find(|period| period.payment_date > revolving_end)
+        .expect("accumulation period")
+        .principal_collections
+        .amount();
+    assert!(
+        (principal - 0.15 * 100_000_000.0).abs() < 1.0,
+        "floating share × level receivables = payment rate on the investor interest: {principal}"
     );
 }

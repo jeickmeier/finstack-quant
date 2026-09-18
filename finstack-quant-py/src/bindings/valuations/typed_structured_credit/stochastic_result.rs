@@ -157,7 +157,8 @@ impl PyStochasticPricingResult {
         money_to_py(self.inner.npv)
     }
 
-    /// Dirty price as a percentage of the pool notional.
+    /// Dirty price as a percent of the sum of current tranche balances
+    /// (the same face as the deterministic ``dirty_price`` metric).
     #[getter]
     fn dirty_price(&self) -> f64 {
         self.inner.dirty_price
@@ -251,7 +252,8 @@ impl PyStochasticPricingResult {
     ///
     /// Columns: ``tranche_id``, ``seniority``, ``npv``, ``expected_loss``,
     /// ``unexpected_loss``, ``expected_shortfall`` (currency units),
-    /// ``attachment``, ``detachment`` (decimal), ``average_life`` (years),
+    /// ``attachment``, ``detachment`` (decimal), ``average_life`` (years, over
+    /// the paths that returned principal), ``paths_with_principal``,
     /// ``credit_duration`` and ``draw_option_cost`` (currency units).
     ///
     /// Returns
@@ -274,12 +276,14 @@ impl PyStochasticPricingResult {
                     "tranche_id": tranche.tranche_id,
                     "seniority": serde_json::to_value(tranche.seniority).unwrap_or_default(),
                     "npv": tranche.npv.amount(),
+                    "price_pct": tranche.price_pct,
                     "expected_loss": tranche.expected_loss.amount(),
                     "unexpected_loss": tranche.unexpected_loss.amount(),
                     "expected_shortfall": tranche.expected_shortfall.amount(),
                     "attachment": tranche.attachment,
                     "detachment": tranche.detachment,
                     "average_life": tranche.average_life,
+                    "paths_with_principal": tranche.paths_with_principal,
                     "credit_duration": tranche.credit_duration,
                     "draw_option_cost": tranche.draw_option_cost.amount(),
                 })
@@ -292,12 +296,14 @@ impl PyStochasticPricingResult {
                 ("tranche_id", "str"),
                 ("seniority", "str"),
                 ("npv", "float64"),
+                ("price_pct", "float64"),
                 ("expected_loss", "float64"),
                 ("unexpected_loss", "float64"),
                 ("expected_shortfall", "float64"),
                 ("attachment", "float64"),
                 ("detachment", "float64"),
                 ("average_life", "float64"),
+                ("paths_with_principal", "int64"),
                 ("credit_duration", "float64"),
                 ("draw_option_cost", "float64"),
             ],

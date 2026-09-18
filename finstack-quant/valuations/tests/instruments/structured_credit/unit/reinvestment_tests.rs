@@ -319,8 +319,9 @@ fn reinvest_action_routes_the_cure_into_the_window_budget() {
         "Reinvest keeps the trapped residual in the reinvestment budget, got {}",
         principal_through(&reinvest, "A", window_end())
     );
-    // Both actions trap the residual on the breach date; the recycled cure
-    // rebuilds par, so the test can cure and the residual resume later.
+    // Both actions trap the same cure out of the residual on the breach
+    // date; the recycled cure rebuilds par, so the test can cure and the
+    // residual resume later.
     let breach = pay_down["A"]
         .principal_flows
         .iter()
@@ -331,18 +332,25 @@ fn reinvest_action_routes_the_cure_into_the_window_budget() {
         breach <= window_end(),
         "the breach happens inside the window"
     );
-    for run in [&pay_down, &reinvest] {
-        let residual: f64 = run["E"]
+    let residual_on = |run: &HashMap<String, TrancheCashflows>| -> f64 {
+        run["E"]
             .interest_flows
             .iter()
             .filter(|(date, _)| *date == breach)
             .map(|(_, amount)| amount.amount())
-            .sum();
-        assert!(
-            residual < 1.0,
-            "equity receives nothing on the breach date {breach}, got {residual}"
-        );
-    }
+            .sum()
+    };
+    let control = simulate(Some(window(&[], None)), 0.05, vec![]);
+    assert!(
+        residual_on(&pay_down) < residual_on(&control) - 1.0,
+        "the cure is trapped out of the residual on {breach}: {} vs untested {}",
+        residual_on(&pay_down),
+        residual_on(&control)
+    );
+    assert!(
+        (residual_on(&reinvest) - residual_on(&pay_down)).abs() < 1.0,
+        "the action changes where the cure goes, not how much is trapped on {breach}"
+    );
     assert!(
         reinvest["A"].total_interest.amount() > pay_down["A"].total_interest.amount(),
         "the recycled cure keeps A outstanding longer and earning its coupon"

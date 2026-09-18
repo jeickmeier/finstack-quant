@@ -387,3 +387,81 @@ fn non_pik_deferred_interest_cannot_consume_principal() {
         senior.npv.amount()
     );
 }
+
+/// Market-correlated recoveries move with the same factor as defaults, so
+/// the equity value under a dispersed recovery differs from the constant
+/// recovery at the same mean.
+#[test]
+fn market_correlated_recovery_moves_equity_pv() {
+    let mut constant = structured_credit(false);
+    constant.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.20);
+    constant.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+    constant
+        .enable_stochastic_defaults()
+        .expect("stochastic defaults");
+    let mut dispersed = constant.clone();
+    dispersed.credit_model.stochastic_recovery_spec = Some(
+        finstack_quant_models::correlation::RecoverySpec::market_correlated(0.40, 0.30, 0.80)
+            .expect("recovery spec"),
+    );
+    let market = fixed_market();
+    let mode = PricingMode::MonteCarlo {
+        num_paths: 64,
+        antithetic: true,
+    };
+    let price = |deal: &StructuredCredit| {
+        deal.price_stochastic_with_mode(&market, as_of(), mode.clone())
+            .expect("stochastic pricing")
+            .tranche_results
+            .into_iter()
+            .find(|t| t.tranche_id == "EQ")
+            .expect("equity")
+    };
+    let constant_equity = price(&constant);
+    let dispersed_equity = price(&dispersed);
+    assert!(
+        (constant_equity.npv.amount() - dispersed_equity.npv.amount()).abs() > 1.0,
+        "dispersed recovery must change the equity PV: {} vs {}",
+        constant_equity.npv.amount(),
+        dispersed_equity.npv.amount()
+    );
+}
+
+/// The average life averages over the paths that returned principal: a
+/// class wiped out on every path reports no WAL and no such path, and a
+/// class repaid on every path reports every path.
+#[test]
+fn average_life_counts_only_paths_that_return_principal() {
+    let mut sc = structured_credit(false);
+    sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.95);
+    sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+        sc.credit_model.default_spec.clone(),
+    ));
+    let result = sc
+        .price_stochastic_with_mode(
+            &fixed_market(),
+            as_of(),
+            PricingMode::MonteCarlo {
+                num_paths: 4,
+                antithetic: false,
+            },
+        )
+        .expect("stochastic pricing");
+    let by_id = |id: &str| {
+        result
+            .tranche_results
+            .iter()
+            .find(|t| t.tranche_id == id)
+            .expect("tranche")
+    };
+    let senior = by_id("SR");
+    let equity = by_id("EQ");
+    assert_eq!(senior.paths_with_principal, 4);
+    assert!(senior.average_life > 0.0);
+    assert_eq!(
+        equity.paths_with_principal, 0,
+        "the equity is wiped out on every path"
+    );
+    assert_eq!(equity.average_life, 0.0);
+}

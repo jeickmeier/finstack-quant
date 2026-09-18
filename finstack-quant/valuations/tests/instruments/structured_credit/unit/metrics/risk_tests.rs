@@ -178,9 +178,9 @@ mod discount_margin_tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        calculate_tranche_discount_margin, calculate_tranche_z_spread, generate_tranche_cashflows,
-        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-        TrancheStructure,
+        calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
+        generate_tranche_cashflows, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -374,6 +374,51 @@ mod discount_margin_tests {
             structured_credit_tranche_discount_margin(&sc, "SR", &mkt, "2024-01-01", pv.amount())
                 .unwrap();
         assert!((direct - from_boundary).abs() < 1e-12);
+    }
+    /// A floater's coupon resets with the curve, so re-projecting it under a
+    /// ±1 bp parallel bump of every rate curve barely moves its value:
+    /// effective duration is a fraction of a year while spread duration stays
+    /// the note's spread-DV01 life and the discount margin at the model price
+    /// is zero. A fixed-coupon note on a fixed-rate pool has cashflows that
+    /// do not depend on rates, so its effective duration and convexity are
+    /// its spread duration and convexity on the same flows.
+    #[test]
+    fn effective_duration_of_a_floater_is_short_while_spread_duration_is_not() {
+        let mkt = market();
+        let floater = calculate_tranche_metrics(&deal(true), "SR", &mkt, closing(), None)
+            .expect("floater metrics");
+        assert!(
+            floater.modified_duration < 0.5,
+            "a quarterly floater resets with the curve: {}",
+            floater.modified_duration
+        );
+        assert!(
+            floater.spread_duration > 1.0,
+            "spread duration is the note's life: {}",
+            floater.spread_duration
+        );
+        let dm = floater
+            .dm_bp
+            .expect("floating tranches carry a discount margin");
+        assert!(dm.abs() < 1e-3, "zero margin at the model price: {dm}");
+
+        let fixed = calculate_tranche_metrics(&deal(false), "SR", &mkt, closing(), None)
+            .expect("fixed metrics");
+        assert!(fixed.dm_bp.is_none());
+        assert!(
+            (fixed.modified_duration - fixed.spread_duration).abs() < 0.02,
+            "rate-independent flows: effective {} vs spread {}",
+            fixed.modified_duration,
+            fixed.spread_duration
+        );
+        assert!(fixed.convexity > 0.0 && fixed.spread_convexity > 0.0);
+        assert!(
+            (fixed.convexity - fixed.spread_convexity).abs() < 0.05 * fixed.spread_convexity,
+            "effective convexity {} vs spread convexity {}",
+            fixed.convexity,
+            fixed.spread_convexity
+        );
+        assert!(fixed.modified_duration > floater.modified_duration + 1.0);
     }
 }
 

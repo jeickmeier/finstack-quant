@@ -273,8 +273,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         criteria: ReinvestmentCriteria {
             max_price: 102.5,
             min_yield: 0.04,
-            maintain_credit_quality: true,
-            maintain_wal: false,
         },
     });
     pool.collection_account = Money::new(250_000.0, Currency::USD).expect("valid money fixture");
@@ -617,12 +615,15 @@ fn waterfall_rules_round_trip_and_price_through_json() {
         afc: Some(AfcSpec {
             capped_tranches: vec!["SR".to_string()],
             net_wac_fee_bp: None,
+            carryover: false,
         }),
         excess_spread: None,
         step_down: None,
         shifting_interest: None,
         early_amortization: None,
         controlled_accumulation: None,
+        reserve: None,
+        target_oc: None,
     });
 
     // Round-trip through the canonical envelope the bindings serialize.

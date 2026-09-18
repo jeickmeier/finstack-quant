@@ -11,8 +11,8 @@
 //! revolving phases) will call this per period with the evolving deal state.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, PaymentCalculation, PaymentType, Recipient, ShiftingInterestStep, StepDownSpec,
-    StepDownTrigger, Waterfall, WaterfallRules,
+    AllocationMode, FundingSource, PaymentCalculation, PaymentType, Recipient, ShiftMode,
+    ShiftingInterestStep, StepDownSpec, StepDownTrigger, Waterfall, WaterfallRules,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -210,6 +210,13 @@ fn tranche_id_of(recipient: &Recipient, scope: TrancheRecipientScope) -> Option<
 /// paying scheduled and unscheduled in two buckets when the junior remainder
 /// is pro-rata by current balance. Prospectus forms that allocate juniors
 /// other than pro-rata need a custom waterfall.
+///
+/// `schedule_senior_pct` depends on the spec's [`ShiftMode`]: under
+/// `ShiftOfSubordinate` the schedule value `s` is the shifted share of the
+/// subordinates' pro-rata, so
+/// `schedule_senior_pct = senior_prorata_share + s · (1 − senior_prorata_share)`;
+/// under `SeniorShare` it is `s` itself. While any of the spec's triggers
+/// fails on `metrics`, `s` is `1.0` (full lockout).
 pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
@@ -217,12 +224,26 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
     senior_prorata_share: f64,
     unscheduled_fraction: f64,
     tranche_balances: &HashMap<String, Money, S>,
+    metrics: &StepDownMetrics,
 ) -> Cow<'w, Waterfall> {
     let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) else {
         return Cow::Borrowed(base);
     };
 
-    let schedule_senior_pct = senior_share(&si.schedule, months_from_closing);
+    let locked_out = si
+        .triggers
+        .iter()
+        .any(|trigger| !trigger_passes(trigger, metrics));
+    let step = if locked_out {
+        1.0
+    } else {
+        senior_share(&si.schedule, months_from_closing)
+    };
+    let senior_prorata_share = senior_prorata_share.clamp(0.0, 1.0);
+    let schedule_senior_pct = match si.mode {
+        ShiftMode::ShiftOfSubordinate => senior_prorata_share + step * (1.0 - senior_prorata_share),
+        ShiftMode::SeniorShare => step,
+    };
     let u = unscheduled_fraction.clamp(0.0, 1.0);
     let senior_pct = (senior_prorata_share * (1.0 - u) + schedule_senior_pct * u).clamp(0.0, 1.0);
 
@@ -261,6 +282,129 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
                     0.0
                 };
                 recipient.weight = Some(weight);
+            } else {
+                // Residual and fee recipients take only what the notes leave:
+                // a `None` weight would count as 1.0 in the pro-rata split and
+                // hand equity a share of principal during the lockout.
+                recipient.weight = Some(0.0);
+            }
+        }
+        if tier
+            .recipients
+            .iter()
+            .all(|r| r.weight.unwrap_or(0.0) <= 0.0)
+        {
+            for recipient in &mut tier.recipients {
+                recipient.weight = None;
+            }
+        }
+    }
+    Cow::Owned(waterfall)
+}
+
+/// Apply targeted-overcollateralization amortization to the principal tiers.
+///
+/// The notes' aggregate principal this period is capped at
+/// `required = max(0, notes − max(pool − target_oc, 0))`, allocated by
+/// recipient order through each note's `target_balance`; the tiers draw on
+/// interest proceeds first so a required amount above the period's principal
+/// collections turbos from excess interest. The equity residual recipient is
+/// removed from the principal tiers and the residual tier sweeps interest
+/// then principal, so the collections above the requirement are released to
+/// the residual holder rather than carried forward.
+///
+/// # Arguments
+///
+/// * `base` - Period waterfall (already carrying any step-down or
+///   shifting-interest weights).
+/// * `spec` - Target rule.
+/// * `current_pool` - Pool balance after this period's collections.
+/// * `original_pool` - Original (cut-off) pool balance.
+/// * `tranche_balances` - Live note balances.
+pub(crate) fn apply_target_oc<'w, S: std::hash::BuildHasher>(
+    base: &'w Waterfall,
+    spec: &super::super::types::TargetOcSpec,
+    current_pool: f64,
+    original_pool: f64,
+    tranche_balances: &HashMap<String, Money, S>,
+) -> Cow<'w, Waterfall> {
+    let target_oc = spec.target(current_pool, original_pool);
+    let mut waterfall = base.clone();
+    let notes: f64 = waterfall
+        .tiers
+        .iter()
+        .filter(|tier| tier.payment_type == PaymentType::Principal)
+        .flat_map(|tier| tier.recipients.iter())
+        .filter_map(|recipient| tranche_id_of(recipient, TrancheRecipientScope::PrincipalOnly))
+        .map(|id| tranche_balances.get(id).map_or(0.0, |m| m.amount()))
+        .sum();
+    let mut required = (notes - (current_pool - target_oc).max(0.0)).max(0.0);
+    for tier in &mut waterfall.tiers {
+        match tier.payment_type {
+            PaymentType::Principal => {
+                tier.funding = Some(FundingSource::InterestThenPrincipal);
+                tier.recipients.retain(|recipient| {
+                    !matches!(recipient.calculation, PaymentCalculation::ResidualCash)
+                });
+                for recipient in &mut tier.recipients {
+                    if let PaymentCalculation::TranchePrincipal {
+                        tranche_id,
+                        target_balance,
+                        ..
+                    } = &mut recipient.calculation
+                    {
+                        let balance = tranche_balances
+                            .get(tranche_id.as_str())
+                            .copied()
+                            .unwrap_or(Money::from((0_i64, waterfall.base_currency)));
+                        let pay = balance.amount().max(0.0).min(required);
+                        required -= pay;
+                        *target_balance = Money::new(balance.amount() - pay, balance.currency())
+                            .ok()
+                            .or(Some(balance));
+                    }
+                }
+            }
+            PaymentType::Residual => {
+                tier.funding = Some(FundingSource::InterestThenPrincipal);
+            }
+            _ => {}
+        }
+    }
+    Cow::Owned(waterfall)
+}
+
+/// Point every `NetWacCarryover` recipient at its tranche's carryover
+/// balance brought into the period.
+pub(crate) fn apply_net_wac_carryover<'w, S: std::hash::BuildHasher>(
+    base: &'w Waterfall,
+    carryover: &HashMap<String, Money, S>,
+) -> Cow<'w, Waterfall> {
+    let mut waterfall = base.clone();
+    for tier in &mut waterfall.tiers {
+        for recipient in &mut tier.recipients {
+            if let PaymentCalculation::NetWacCarryover { tranche_id, amount } =
+                &mut recipient.calculation
+            {
+                if let Some(balance) = carryover.get(tranche_id.as_str()) {
+                    *amount = *balance;
+                }
+            }
+        }
+    }
+    Cow::Owned(waterfall)
+}
+
+/// Point every `ReserveReplenishment` recipient at this period's reserve
+/// target (the template inserts the recipient with a placeholder target).
+pub(crate) fn apply_reserve_target(base: &Waterfall, target: Money) -> Cow<'_, Waterfall> {
+    let mut waterfall = base.clone();
+    for tier in &mut waterfall.tiers {
+        for recipient in &mut tier.recipients {
+            if let PaymentCalculation::ReserveReplenishment { target_balance } =
+                &mut recipient.calculation
+            {
+                *target_balance = target;
             }
         }
     }

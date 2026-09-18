@@ -27,7 +27,12 @@ pub(crate) struct Severity01Calculator;
 
 impl MetricCalculator for Severity01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context.instrument_as::<StructuredCredit>()?.clone();
+        // Resolve the behaviour overrides first: the reprice re-resolves the
+        // deal, and an unresolved `behavior_overrides.recovery_rate` would
+        // overwrite both bumps (the audit's Severity01 == 0 defect).
+        let instrument = context
+            .instrument_as::<StructuredCredit>()?
+            .resolved_for_pricing()?;
         let as_of = context.as_of;
 
         use crate::cashflow::builder::RecoveryModelSpec;
@@ -62,12 +67,12 @@ impl MetricCalculator for Severity01Calculator {
         // Calculate up scenario (lower recovery = higher severity)
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;
-        let pv_up = context.reprice_instrument_raw(&inst_up, context.curves.as_ref(), as_of)?;
+        let pv_up = super::super::reprice_in_scope(context, &inst_up, as_of)?;
 
         // Calculate down scenario (higher recovery = lower severity)
         let mut inst_down = instrument;
         inst_down.credit_model.recovery_spec = recovery_down;
-        let pv_down = context.reprice_instrument_raw(&inst_down, context.curves.as_ref(), as_of)?;
+        let pv_down = super::super::reprice_in_scope(context, &inst_down, as_of)?;
 
         // Severity01 = (PV_up - PV_down) / achieved_bump
         // PV_up is with lower recovery (higher severity)

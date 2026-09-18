@@ -149,6 +149,18 @@ impl PyTrancheCashflows {
         money_to_py(self.inner.total_pik)
     }
 
+    /// Total interest deferred as a claim over the projection.
+    #[getter]
+    fn total_deferred(&self) -> PyMoney {
+        money_to_py(self.inner.total_deferred)
+    }
+
+    /// Total principal written down over the projection.
+    #[getter]
+    fn total_writedown(&self) -> PyMoney {
+        money_to_py(self.inner.total_writedown)
+    }
+
     /// One row per payment date as a pandas ``DataFrame``.
     ///
     /// Columns: ``date`` (ISO 8601 string), ``cashflow`` (total paid),

@@ -27,8 +27,20 @@ pub struct DealFees {
     pub servicing_fee_bp: f64,
     /// Master servicer fee (for CMBS/RMBS, basis points)
     pub master_servicer_fee_bp: Option<f64>,
-    /// Special servicer fee (for CMBS, basis points)
+    /// Special servicer fee (for CMBS, basis points per annum on the
+    /// specially serviced balance: loans flagged at closing plus every loan
+    /// that has since defaulted or taken a balloon loss).
     pub special_servicer_fee_bp: Option<f64>,
+    /// Special servicer workout fee as a percent of the principal and
+    /// interest collected on specially serviced loans (`1.0` = 1%), taken
+    /// off the top of those collections; `None` for no workout fee.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workout_fee_pct: Option<f64>,
+    /// Special servicer liquidation fee as a percent of the liquidation
+    /// proceeds of defaulted loans (`1.0` = 1%), taken before the recovery
+    /// reaches the waterfall; `None` for no liquidation fee.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liquidation_fee_pct: Option<f64>,
     /// Manager incentive fee paid from the residual once equity has earned
     /// its hurdle IRR; `None` for deals without one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -99,8 +111,11 @@ mod tests {
         let fees = DealFees::clo_standard(Currency::USD);
 
         assert_eq!(fees.trustee_fee_annual.amount(), 50_000.0);
-        assert_eq!(fees.senior_mgmt_fee_bp, 40.0);
-        assert_eq!(fees.subordinated_mgmt_fee_bp, 20.0);
+        // BSL CLO convention: a small senior fee ahead of the notes and the
+        // larger subordinated fee behind them.
+        assert_eq!(fees.senior_mgmt_fee_bp, 15.0);
+        assert_eq!(fees.subordinated_mgmt_fee_bp, 35.0);
+        assert!(fees.senior_mgmt_fee_bp < fees.subordinated_mgmt_fee_bp);
         let incentive = fees.incentive_fee.expect("standard CLO incentive fee");
         assert_eq!(incentive.hurdle_irr, 0.12);
         assert_eq!(incentive.share_pct, 0.2);

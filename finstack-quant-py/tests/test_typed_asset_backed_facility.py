@@ -153,7 +153,7 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     projection = facility.project(_market(), CLOSE)
     assert isinstance(projection, FacilityProjection)
     frame = projection.to_dataframe()
-    assert list(frame.columns) == ["date", "interest", "principal", "unused_fee", "lender_total", "residual"]
+    assert list(frame.columns) == ["date", "interest", "principal", "unused_fee", "draw", "lender_total", "residual"]
     lender = projection.lender_cashflows
     assert frame["lender_total"].sum() == pytest.approx(sum(amount.amount for _, amount in lender))
     assert frame["principal"].sum() == pytest.approx(60_000_000.0, rel=1e-9)
@@ -194,3 +194,75 @@ def test_facility_metrics_are_registered() -> None:
         "abf_facility_irr",
         "abf_residual_irr",
     } <= metrics
+
+
+def test_every_amortization_event_kind_projects_with_documented_units() -> None:
+    """Percent loss thresholds, an excess-spread floor and a dated event all project."""
+    base = _facility()
+    for events in (
+        [{"kind": "cumulative_loss", "max_pct": 4.0}],
+        [{"kind": "excess_spread", "min_3m": 0.01}],
+        [{"kind": "date", "date": "2025-01-15"}],
+    ):
+        facility = (
+            AssetBackedFacility
+            .builder()
+            .id("WH-EVT")
+            .collateral(base.collateral)
+            .borrowing_base_rules(base.borrowing_base_rules)
+            .commitment(base.commitment)
+            .drawn(base.drawn)
+            .margin_bp(600.0)
+            .unused_fee_bp(50.0)
+            .closing_date(CLOSE)
+            .revolving_end(datetime.date(2026, 1, 15))
+            .maturity(datetime.date(2030, 1, 15))
+            .frequency("3M")
+            .payment_calendar_id("nyse")
+            .term_out(24)
+            .amortization_events(events)
+            .discount_curve_id("USD-OIS")
+            .build()
+        )
+        projection = facility.project(_market(), CLOSE)
+        assert projection.facility.total_principal.amount > 0.0
+    dated = facility
+    assert dated.effective_revolving_end == datetime.date(2025, 1, 15)
+    assert all(date <= datetime.date(2025, 4, 30) for date, _ in projection.unused_fees)
+
+
+def test_draws_fees_and_readvance_round_trip_and_project() -> None:
+    """Scheduled draws lift the facility balance; the projection reports them."""
+    base = _facility()
+    facility = (
+        AssetBackedFacility
+        .builder()
+        .id("WH-DRAW")
+        .collateral(base.collateral)
+        .borrowing_base_rules(base.borrowing_base_rules)
+        .commitment(base.commitment)
+        .drawn(base.drawn)
+        .margin_bp(600.0)
+        .closing_date(CLOSE)
+        .revolving_end(datetime.date(2026, 1, 15))
+        .maturity(datetime.date(2030, 1, 15))
+        .frequency("3M")
+        .payment_calendar_id("nyse")
+        .term_out(24)
+        .draw_schedule([{"date": "2025-01-15", "amount": {"amount": "5000000", "currency": "USD"}}])
+        .readvance_to_borrowing_base(False)
+        .discount_curve_id("USD-OIS")
+        .build()
+    )
+    assert facility.draw_schedule[0]["amount"] == {"amount": "5000000", "currency": "USD"}
+    assert facility.readvance_to_borrowing_base is False
+    assert facility.fees is None
+    again = AssetBackedFacility.from_json(facility.to_json())
+    assert again.to_dict() == facility.to_dict()
+    projection = facility.project(_market(), CLOSE)
+    assert len(projection.draws) == 1
+    assert projection.draws[0][1].amount == 5_000_000.0
+    frame = projection.to_dataframe()
+    assert "draw" in frame.columns
+    assert projection.diagnostics.early_amortization_date is None
+    assert [amount.amount for _, _, amount in projection.diagnostics.tranche_draws] == [5_000_000.0]

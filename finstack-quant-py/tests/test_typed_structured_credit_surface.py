@@ -134,7 +134,7 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
         obligor_id="OBL-1",
         purchase_price=usd(9_800_000.0),
         market_price_pct=98.0,
-        balloon={"default_prob": 0.3, "extension_months": 24, "extension_rate": 0.07},
+        balloon={"extension_prob": 0.3, "extension_months": 24, "extension_rate": 0.07},
         prepayment_penalty={"kind": "fixed", "pct": 3.0, "through": "2026-01-01"},
         special_servicing={"appraisal_reduction_pct": 40.0},
         noi=usd(1_200_000.0),
@@ -153,7 +153,14 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
         "reperformance_prob": 0.2,
     }
     assert loan.day_count == DayCount.THIRTY_360
-    assert loan.balloon == {"default_prob": 0.3, "extension_months": 24, "extension_rate": 0.07}
+    assert loan.balloon == {
+        "extension_prob": 0.3,
+        "extension_months": 24,
+        "extension_rate": 0.07,
+        "loss_prob": 0.0,
+        "severity_pct": 0.0,
+        "workout_months": 0,
+    }
     assert loan.prepayment_penalty["through"] == "2026-01-01"
     assert loan.special_servicing == {"appraisal_reduction_pct": 40.0}
     assert loan.noi == usd(1_200_000.0)
@@ -406,11 +413,21 @@ def test_tranche_metrics_report_the_to_call_twins() -> None:
     assert metrics.z_spread_to_call_bp is not None
     assert metrics.dm_to_call_bp is None
     frame = metrics.to_dataframe()
-    assert list(frame.columns)[-3:] == ["wal_to_call", "z_spread_to_call_bp", "dm_to_call_bp"]
+    assert list(frame.columns)[-4:] == [
+        "wal_to_call",
+        "z_spread_to_call_bp",
+        "dm_to_call_bp",
+        "dm_bp",
+    ]
     assert math.isnan(frame["dm_to_call_bp"].iloc[0])
+    assert metrics.dm_bp is None
+    assert math.isnan(frame["dm_bp"].iloc[0])
+    assert metrics.spread_convexity > 0.0
+    assert frame["spread_convexity"].iloc[0] == metrics.spread_convexity
     payload = json.loads(metrics.to_json())
     assert "wal_to_call" in payload
     assert "dm_to_call_bp" not in payload
+    assert "dm_bp" not in payload
 
 
 def test_hedge_swaps_and_call_assumptions_are_typed_and_round_trip() -> None:

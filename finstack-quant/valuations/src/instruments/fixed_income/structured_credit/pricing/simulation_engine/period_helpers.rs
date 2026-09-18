@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn term_rate_for_period(
+pub(crate) fn term_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
@@ -33,17 +33,21 @@ pub(super) fn term_rate_for_period(
 /// period. The pool's stored `rate` is the contractual current coupon and is
 /// therefore the authoritative fallback when no historical fixing series is
 /// supplied for a reset before the curve base date.
-pub(super) fn collateral_asset_rate_for_period(
+pub(crate) fn collateral_asset_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
     fallback_all_in_rate: f64,
     spread_bp: Option<f64>,
     rate_shift: f64,
+    index_floor: Option<f64>,
 ) -> Result<f64> {
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
     let spread = spread_bp.unwrap_or(0.0) / 10_000.0;
+    // The floor applies to the index before the spread (`FloatingRateSpec`
+    // convention), so a floored loan pays `max(index, floor) + spread`.
+    let floored = |index: f64| index_floor.map_or(index, |floor| index.max(floor));
 
     if fixing_date < fwd.base_date() {
         if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {
@@ -55,7 +59,7 @@ pub(super) fn collateral_asset_rate_for_period(
             )?;
             // A PAST fixing is observed, not projected: the simulated path
             // cannot retroactively change it, so no shift applies.
-            return Ok(fixing + spread);
+            return Ok(floored(fixing) + spread);
         }
         return Ok(fallback_all_in_rate);
     }
@@ -63,7 +67,10 @@ pub(super) fn collateral_asset_rate_for_period(
     // SC-M13: shift the PROJECTED forward, so a floating asset's coupon follows
     // the simulated rate path. Floored at zero — a deeply negative shift must
     // not manufacture a negative all-in coupon.
-    Ok((term_rate_for_period(fwd, context, accrual_start)? + spread + rate_shift).max(0.0))
+    Ok(
+        (floored(term_rate_for_period(fwd, context, accrual_start)? + rate_shift) + spread)
+            .max(0.0),
+    )
 }
 
 /// Live collateral weighted-average coupon from the *current* pool state:
@@ -97,6 +104,7 @@ pub(super) fn current_collateral_wac(
                 state.pool_state.rates[i],
                 state.pool_state.spread_bp[i],
                 state.floating_rate_shift,
+                state.pool_state.index_floors[i],
             )?
         } else {
             state.pool_state.rates[i]
@@ -186,4 +194,8 @@ pub(super) struct SimulationPeriod {
     pub(super) accrual_end: Date,
     pub(super) payment: Date,
     pub(super) valuation: Date,
+    /// The deal is called or cleaned up on this payment date: reinvestment is
+    /// suspended and the equity residual is withheld so it joins the
+    /// redemption proceeds.
+    pub(super) redemption: bool,
 }

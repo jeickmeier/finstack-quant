@@ -15409,9 +15409,13 @@ class RepLine:
         asset_type: dict[str, Any],
         spread_bp: float | Bps | None = None,
         index_id: str | None = None,
+        index_floor: float | None = None,
         cpr: float | None = None,
         cdr: float | None = None,
         recovery_rate: float | None = None,
+        contractual_payment: Money | None = None,
+        amortization_term_months: int | None = None,
+        io_months: int | None = None,
     ) -> None:
         """
         Aggregated representative line for pool modeling.
@@ -15438,6 +15442,9 @@ class RepLine:
             points (e.g. ``150.0`` = 150bp), for floating-rate lines.
         index_id : str, optional
             Reference index identifier, if floating.
+        index_floor : float, optional
+            Floor on the floating index as an annual decimal, applied before
+            ``spread_bp``; ignored on fixed-rate lines.
         cpr : float, optional
             Constant prepayment rate override, as an annual decimal (e.g.
             ``0.10`` = 10% CPR).
@@ -15447,6 +15454,14 @@ class RepLine:
         recovery_rate : float, optional
             Recovery rate override, as a decimal fraction (e.g. ``0.45`` =
             45%).
+        contractual_payment : Money, optional
+            Contractual periodic payment for level-pay lines; inferred from the
+            balance and remaining schedule when ``None``.
+        amortization_term_months : int, optional
+            Schedule length in months from origination; with
+            ``seasoning_months`` the line amortizes over ``term − seasoning``.
+        io_months : int, optional
+            Interest-only window in months from origination.
 
         Returns
         -------
@@ -15673,6 +15688,70 @@ class RepLine:
         -------
         str | None
             Index id, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def index_floor(self) -> float | None:
+        """
+        Floor on the floating index (annual decimal) applied before the spread.
+
+        Returns
+        -------
+        float | None
+            ``None`` when the row is unfloored or fixed-rate.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def contractual_payment(self) -> Money | None:
+        """
+        Contractual periodic payment for level-pay lines.
+
+        Returns
+        -------
+        Money | None
+            ``None`` when the payment is inferred.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def amortization_term_months(self) -> int | None:
+        """
+        Amortization schedule length in months from origination.
+
+        Returns
+        -------
+        int | None
+            ``None`` when unset.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def io_months(self) -> int | None:
+        """
+        Interest-only window in months from origination.
+
+        Returns
+        -------
+        int | None
+            ``None`` when unset.
 
         Notes
         -----
@@ -16032,7 +16111,7 @@ class AssetPool:
             ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
             string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
             (``max_price`` percent of par, ``min_yield`` annual decimal current
-            yield, ``maintain_credit_quality``, ``maintain_wal``), optional
+            yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and
             optional ``assumptions`` (``spread_bp``, ``price_pct``,
             ``maturity_months``, ``index_id``, ``coupon_floor``) describing the
@@ -16062,8 +16141,6 @@ class AssetPool:
         ...     "criteria": {
         ...         "max_price": 100.0,
         ...         "min_yield": 0.0,
-        ...         "maintain_credit_quality": True,
-        ...         "maintain_wal": True,
         ...     },
         ...     "amortizing_tranches": ["A"],
         ... })
@@ -16081,6 +16158,7 @@ class AssetPool:
         cumulative_scheduled_amortization: Money | None = None,
         collection_account: Money | None = None,
         excess_spread_account: Money | None = None,
+        original_balance: Money | None = None,
     ) -> AssetPool:
         """
         Set the pool's historical tallies and cash accounts, returning a new
@@ -16100,6 +16178,12 @@ class AssetPool:
             Undistributed collections held at closing; unchanged when omitted.
         excess_spread_account : Money, optional
             Trapped excess spread held at closing; unchanged when omitted.
+        original_balance : Money, optional
+            Original (cut-off) pool balance the cumulative-loss triggers,
+            clean-up call factor and loss curves are stated against; when
+            omitted the engine reconstructs it as the current balance plus
+            the cumulative defaults, prepayments and scheduled amortization.
+            Must be at least the current balance (``ValueError`` at pricing).
 
         Returns
         -------
@@ -16358,6 +16442,23 @@ class AssetPool:
         -------
         Money
             Currency-tagged amount.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def original_balance(self) -> Money | None:
+        """
+        Original (cut-off) pool balance when supplied.
+
+        Returns
+        -------
+        Money or None
+            The explicit original balance, or ``None`` when the engine
+            reconstructs it from the current balance and cumulative tallies.
 
         Notes
         -----
@@ -16862,6 +16963,40 @@ class Tranche:
         ...
 
     @property
+    def non_deferrable(self) -> bool | None:
+        """
+        Explicit non-deferrable flag on the coupon.
+
+        Returns
+        -------
+        bool | None
+            ``None`` for the seniority convention (senior notes are
+            non-deferrable, every other class defers).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def is_non_deferrable(self) -> bool:
+        """
+        Whether the coupon is a non-deferrable claim the template pays from
+        principal proceeds when interest falls short.
+
+        Returns
+        -------
+        bool
+            The explicit flag when set, else ``True`` for senior notes only.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the resolved convention.
+        """
+        ...
+
+    @property
     def maturity(self) -> datetime.date:
         """
         Legal final maturity date.
@@ -17218,6 +17353,31 @@ class TrancheBuilder:
         ValueError
             If ``value`` is invalid or this builder was already consumed by a
             prior call to :meth:`TrancheBuilder.build`.
+        """
+        ...
+
+    def non_deferrable(self, value: bool) -> TrancheBuilder:
+        """
+        Mark the coupon non-deferrable or deferrable, overriding the seniority
+        convention.
+
+        Parameters
+        ----------
+        value : bool
+            ``True`` for a coupon the template pays from principal proceeds when
+            interest falls short (the senior default); ``False`` for one that
+            defers (the default for every other class).
+
+        Returns
+        -------
+        TrancheBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If this builder was already consumed by a prior call to
+            :meth:`TrancheBuilder.build`.
         """
         ...
 
@@ -17665,7 +17825,7 @@ class PoolAsset:
     ...     0.08,
     ...     datetime.date(2031, 1, 15),
     ...     credit_quality="B",
-    ...     balloon={"default_prob": 0.3, "extension_months": 24},
+    ...     balloon={"extension_prob": 0.3, "extension_months": 24},
     ... )
     >>> loan.credit_quality, loan.balloon["extension_months"]
     ('B', 24)
@@ -17682,6 +17842,7 @@ class PoolAsset:
         day_count: DayCount | None = None,
         spread_bp: float | None = None,
         index_id: str | None = None,
+        index_floor: float | None = None,
         credit_quality: str | None = None,
         industry: str | None = None,
         obligor_id: str | None = None,
@@ -17690,11 +17851,14 @@ class PoolAsset:
         default_date: datetime.date | None = None,
         purchase_price: Money | None = None,
         acquisition_date: datetime.date | None = None,
+        origination_date: datetime.date | None = None,
         smm_override: float | None = None,
         mdr_override: float | None = None,
         recovery_rate: float | None = None,
         commitment: Money | None = None,
         contractual_payment: Money | None = None,
+        amortization_term_months: int | None = None,
+        io_months: int | None = None,
         market_price_pct: float | None = None,
         delinquency_buckets: list[Money] | None = None,
         balloon: dict[str, Any] | str | None = None,
@@ -17728,6 +17892,9 @@ class PoolAsset:
         index_id : str, optional
             Forward-curve identifier of the floating index; ``None`` for a
             fixed-rate row.
+        index_floor : float, optional
+            Floor on the floating index as an annual decimal (``0.01`` = 1%),
+            applied before ``spread_bp`` is added; ignored on fixed-rate rows.
         credit_quality : str, optional
             Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
             coverage-test haircuts and the CCC bucket.
@@ -17745,7 +17912,13 @@ class PoolAsset:
         purchase_price : Money, optional
             Price paid for the row (discount-obligation test).
         acquisition_date : datetime.date, optional
-            Date the row entered the pool.
+            Date the row entered the pool (anchors non-performing-loan
+            timelines).
+        origination_date : datetime.date, optional
+            Date the loan was originated; anchors the seasoning-dependent
+            prepayment/default curves (PSA, SDA, ABS, vector) and the
+            amortization schedule. Falls back to ``acquisition_date``, then
+            to the deal closing date.
         smm_override : float, optional
             Row-level single-month mortality (decimal) overriding the deal
             prepayment model.
@@ -17759,18 +17932,32 @@ class PoolAsset:
         contractual_payment : Money, optional
             Monthly level payment of an amortizing row; derived from the terms
             when omitted.
+        amortization_term_months : int, optional
+            Schedule length in months from origination (``origination_date``,
+            else ``acquisition_date``, else closing) for level-pay rows; the unamortized balance pays as
+            the balloon at maturity. ``None`` amortizes fully by maturity.
+        io_months : int, optional
+            Interest-only window in months from origination: no scheduled
+            principal while the loan is younger than this.
         market_price_pct : float, optional
             Market price in percent of par for market-value coverage rules.
         delinquency_buckets : list[Money], optional
             Seeded delinquent balances per bucket (30/60/90 ...); requires a
             ``credit_model.delinquency`` model on the deal.
         balloon : dict[str, Any] | str, optional
-            ``BalloonSpec`` (``default_prob`` decimal, ``extension_months``,
-            optional ``extension_rate`` decimal) for balloon extension.
+            ``BalloonSpec`` (``extension_prob`` decimal, ``extension_months``,
+            optional ``extension_rate`` decimal, and ``loss_prob`` decimal,
+            ``severity_pct`` percent, ``workout_months`` for the share that
+            defaults at maturity) for balloon extension and workout.
         prepayment_penalty : dict[str, Any] | str, optional
-            ``PrepaymentPenalty``: ``{"kind": "fixed", "pct": 3.0, "through":
-            "2026-01-01"}`` or ``{"kind": "yield_maintenance",
-            "reinvestment_rate": 0.05, "through": None}``.
+            ``PrepaymentPenalty``: ``{"kind": "lockout", "through":
+            "2025-12-31"}`` (no voluntary prepayment inside the window),
+            ``{"kind": "fixed", "pct": 3.0, "through": "2026-01-01"}``,
+            ``{"kind": "step_down", "schedule": [{"through": "2025-12-31",
+            "pct": 5.0}, ...]}`` or ``{"kind": "yield_maintenance",
+            "reinvestment_rate": 0.05, "discount_curve_id": "USD-OIS",
+            "floor_pct": 1.0, "through": None}`` (the curve discounts the lost
+            coupons and supplies the reinvestment rate when it is omitted).
         special_servicing : dict[str, Any] | str, optional
             ``SpecialServicingSpec`` (``appraisal_reduction_pct`` percent).
         noi : Money, optional
@@ -18074,6 +18261,22 @@ class PoolAsset:
         ...
 
     @property
+    def index_floor(self) -> float | None:
+        """
+        Floor on the floating index (annual decimal) applied before the spread.
+
+        Returns
+        -------
+        float | None
+            ``None`` when the row is unfloored or fixed-rate.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def maturity(self) -> datetime.date:
         """
         Contractual maturity.
@@ -18222,6 +18425,24 @@ class PoolAsset:
         ...
 
     @property
+    def origination_date(self) -> datetime.date | None:
+        """
+        Origination date anchoring the row's seasoning.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` when unset (the row then ages from ``acquisition_date``,
+            else the closing date).
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
     def day_count(self) -> DayCount:
         """
         Accrual day count.
@@ -18310,6 +18531,38 @@ class PoolAsset:
         -------
         Money | None
             ``None`` when derived from the terms.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def amortization_term_months(self) -> int | None:
+        """
+        Amortization schedule length in months from origination.
+
+        Returns
+        -------
+        int | None
+            ``None`` when unset.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def io_months(self) -> int | None:
+        """
+        Interest-only window in months from origination.
+
+        Returns
+        -------
+        int | None
+            ``None`` when unset.
 
         Notes
         -----
@@ -18648,6 +18901,1676 @@ class CallAssumption:
         """
         ...
 
+class BalloonSpec:
+    """
+    Balloon terms of a commercial mortgage at maturity.
+
+    At the loan's maturity a share ``extension_prob`` of the performing
+    balance is extended ``extension_months`` at ``extension_rate`` (the
+    original coupon when ``None``), a share ``loss_prob`` defaults into a
+    workout that recovers ``1 − severity_pct / 100`` after ``workout_months``,
+    and the rest pays as the balloon.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import BalloonSpec
+    >>> spec = BalloonSpec(0.3, 24, extension_rate=0.07, loss_prob=0.1, severity_pct=40.0, workout_months=18)
+    >>> spec.extension_prob, spec.workout_months
+    (0.3, 18)
+    """
+
+    def __init__(
+        self,
+        extension_prob: float,
+        extension_months: int,
+        *,
+        extension_rate: float | None = None,
+        loss_prob: float = 0.0,
+        severity_pct: float = 0.0,
+        workout_months: int = 0,
+    ) -> None:
+        """
+        Construct balloon terms.
+
+        Parameters
+        ----------
+        extension_prob : float
+            Share of the performing balance extended at maturity, decimal in
+            ``[0, 1]``.
+        extension_months : int
+            Length of the extension in months.
+        extension_rate : float, optional
+            Annual coupon (decimal) on the extended balance; ``None`` keeps the
+            loan's coupon (spread and index for a floater).
+        loss_prob : float, optional
+            Share of the performing balance that defaults into a workout at
+            maturity, decimal in ``[0, 1]``; ``0.0`` by default.
+        severity_pct : float, optional
+            Loss severity on the workout share in percent (``40.0`` = 40%);
+            ``0.0`` by default.
+        workout_months : int, optional
+            Months after maturity until the workout recovery is received;
+            ``0`` by default (the deal's recovery lag).
+
+        Raises
+        ------
+        ValueError
+            If a share is outside ``[0, 1]``, the severity is outside
+            ``[0, 100]`` or the rate is not finite.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> BalloonSpec:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``BalloonSpec`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        BalloonSpec
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import BalloonSpec
+        >>> try:
+        ...     BalloonSpec.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(BalloonSpec.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def extension_prob(self) -> float:
+        """
+        Share of the performing balance extended at maturity.
+
+        Returns
+        -------
+        float
+            Decimal in ``[0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def extension_months(self) -> int:
+        """
+        Length of the balloon extension.
+
+        Returns
+        -------
+        int
+            Number of months the extended share is carried past maturity.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def extension_rate(self) -> float | None:
+        """
+        Coupon on the extended balance.
+
+        Returns
+        -------
+        float | None
+            Annual decimal, or ``None`` to keep the loan's coupon.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def loss_prob(self) -> float:
+        """
+        Share of the performing balance that defaults into a workout.
+
+        Returns
+        -------
+        float
+            Decimal in ``[0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def severity_pct(self) -> float:
+        """
+        Loss severity on the workout share.
+
+        Returns
+        -------
+        float
+            Percent of the workout balance.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def workout_months(self) -> int:
+        """
+        Months after maturity until the workout recovery is received.
+
+        Returns
+        -------
+        int
+            Months; ``0`` uses the deal's recovery lag.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class PrepaymentPenalty:
+    """
+    Prepayment protection on a commercial mortgage.
+
+    Built through one of the four constructors: :meth:`lockout` blocks
+    voluntary prepayment, :meth:`fixed` charges a percent of the prepaid
+    balance, :meth:`step_down` charges the step in force from a declining
+    schedule and :meth:`yield_maintenance` charges the coupon lost over the
+    remaining term. Premiums are collected by the trust as interest.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+    >>> PrepaymentPenalty.fixed(3.0, through=datetime.date(2026, 1, 1)).kind
+    'fixed'
+    >>> PrepaymentPenalty.lockout(datetime.date(2025, 12, 31)).through
+    datetime.date(2025, 12, 31)
+    """
+
+    @staticmethod
+    def lockout(through: datetime.date | None = None) -> PrepaymentPenalty:
+        """
+        A lockout: no voluntary prepayment on or before ``through``.
+
+        Parameters
+        ----------
+        through : datetime.date, optional
+            Last date of the lockout; ``None`` locks the loan out to maturity.
+
+        Returns
+        -------
+        PrepaymentPenalty
+            The lockout.
+
+        Raises
+        ------
+        ValueError
+            If ``through`` is not a valid date.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+        >>> PrepaymentPenalty.lockout().kind
+        'lockout'
+        """
+        ...
+
+    @staticmethod
+    def fixed(pct: float, through: datetime.date | None = None) -> PrepaymentPenalty:
+        """
+        A fixed percent of the prepaid balance.
+
+        Parameters
+        ----------
+        pct : float
+            Premium in percent of the prepaid balance (``3.0`` = 3%).
+        through : datetime.date, optional
+            Last date the penalty applies; ``None`` applies it to maturity.
+
+        Returns
+        -------
+        PrepaymentPenalty
+            The fixed penalty.
+
+        Raises
+        ------
+        ValueError
+            If ``pct`` is negative or ``through`` is not a valid date.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+        >>> PrepaymentPenalty.fixed(3.0).pct
+        3.0
+        """
+        ...
+
+    @staticmethod
+    def step_down(schedule: list[tuple[datetime.date, float]]) -> PrepaymentPenalty:
+        """
+        A declining schedule of percents (5-4-3-2-1).
+
+        Parameters
+        ----------
+        schedule : list[tuple[datetime.date, float]]
+            ``(through, pct)`` steps in ascending date order; the first step
+            whose date is on or after the prepayment applies, nothing after the
+            last.
+
+        Returns
+        -------
+        PrepaymentPenalty
+            The step-down penalty.
+
+        Raises
+        ------
+        ValueError
+            If the schedule is empty, not ascending, or a percent is negative.
+
+        Examples
+        --------
+        >>> import datetime
+        >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+        >>> steps = [(datetime.date(2025, 12, 31), 5.0), (datetime.date(2026, 12, 31), 3.0)]
+        >>> len(PrepaymentPenalty.step_down(steps).schedule)
+        2
+        """
+        ...
+
+    @staticmethod
+    def yield_maintenance(
+        *,
+        reinvestment_rate: float | None = None,
+        discount_curve_id: str | None = None,
+        floor_pct: float | None = None,
+        through: datetime.date | None = None,
+    ) -> PrepaymentPenalty:
+        """
+        Yield maintenance: the coupon lost over the remaining term.
+
+        Parameters
+        ----------
+        reinvestment_rate : float, optional
+            Annual reinvestment rate as a decimal; ``None`` uses the curve's
+            zero rate to maturity (then ``discount_curve_id`` is required).
+        discount_curve_id : str, optional
+            Market-context discount curve the annual lost coupons are
+            discounted on; ``None`` leaves the premium undiscounted.
+        floor_pct : float, optional
+            Minimum premium in percent of the prepaid balance (the common
+            ``1.0``); ``None`` for no floor.
+        through : datetime.date, optional
+            Last date the penalty applies; ``None`` applies it to maturity.
+
+        Returns
+        -------
+        PrepaymentPenalty
+            The yield-maintenance penalty.
+
+        Raises
+        ------
+        ValueError
+            If neither a rate nor a curve is given, a rate or floor is
+            negative, or ``through`` is not a valid date.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+        >>> ym = PrepaymentPenalty.yield_maintenance(discount_curve_id="USD-OIS", floor_pct=1.0)
+        >>> ym.kind, ym.floor_pct
+        ('yield_maintenance', 1.0)
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> PrepaymentPenalty:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``PrepaymentPenalty`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        PrepaymentPenalty
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import PrepaymentPenalty
+        >>> try:
+        ...     PrepaymentPenalty.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(PrepaymentPenalty.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def kind(self) -> str:
+        """
+        Kind of protection.
+
+        Returns
+        -------
+        str
+            ``"lockout"``, ``"fixed"``, ``"step_down"`` or ``"yield_maintenance"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def through(self) -> datetime.date | None:
+        """
+        Last date the penalty or lockout applies.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` to maturity, or for a step-down schedule.
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
+    def pct(self) -> float | None:
+        """
+        Fixed premium percent.
+
+        Returns
+        -------
+        float | None
+            ``None`` for the other kinds.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def schedule(self) -> list[tuple[datetime.date, float]] | None:
+        """
+        Step-down schedule.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]] | None
+            ``(through, pct)`` pairs, or ``None`` for the other kinds.
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
+    def reinvestment_rate(self) -> float | None:
+        """
+        Yield-maintenance reinvestment rate.
+
+        Returns
+        -------
+        float | None
+            Annual decimal, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def discount_curve_id(self) -> str | None:
+        """
+        Yield-maintenance discount curve identifier.
+
+        Returns
+        -------
+        str | None
+            Curve id, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def floor_pct(self) -> float | None:
+        """
+        Yield-maintenance floor.
+
+        Returns
+        -------
+        float | None
+            Percent of the prepaid balance, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class SpecialServicingSpec:
+    """
+    Special-servicing state of a commercial mortgage at closing.
+
+    The appraisal reduction (ASER) cuts the interest advanced on the loan to
+    ``1 − appraisal_reduction_pct / 100`` of its balance; the loan is
+    specially serviced from closing, so the deal's special servicer fee,
+    workout fee and liquidation fee apply to it.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import SpecialServicingSpec
+    >>> SpecialServicingSpec(40.0).appraisal_reduction_pct
+    40.0
+    """
+
+    def __init__(self, appraisal_reduction_pct: float = 0.0) -> None:
+        """
+        Construct the special-servicing state.
+
+        Parameters
+        ----------
+        appraisal_reduction_pct : float, optional
+            Appraisal reduction in percent of the loan balance (``40.0`` =
+            40%); ``0.0`` by default (specially serviced, full advancing).
+
+        Raises
+        ------
+        ValueError
+            If the percent is outside ``[0, 100]``.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> SpecialServicingSpec:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``SpecialServicingSpec`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        SpecialServicingSpec
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import SpecialServicingSpec
+        >>> try:
+        ...     SpecialServicingSpec.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(SpecialServicingSpec.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def appraisal_reduction_pct(self) -> float:
+        """
+        Appraisal reduction.
+
+        Returns
+        -------
+        float
+            Percent of the loan balance.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class LiquidationSpec:
+    """
+    Resolution timeline of a non-performing or re-performing loan.
+
+    The loan pays nothing until ``months_to_resolution`` months from its
+    origination (acquisition date, else closing); then the share
+    ``1 − reperformance_prob`` liquidates at ``proceeds_pct − carry_cost_pct``
+    percent of its balance and the rest re-performs at ``modified_rate``.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import LiquidationSpec
+    >>> spec = LiquidationSpec(18, 65.0, carry_cost_pct=5.0, reperformance_prob=0.2, modified_rate=0.04)
+    >>> spec.months_to_resolution, spec.net_proceeds_fraction
+    (18, 0.6)
+    """
+
+    def __init__(
+        self,
+        months_to_resolution: int,
+        proceeds_pct: float,
+        *,
+        carry_cost_pct: float = 0.0,
+        reperformance_prob: float = 0.0,
+        modified_rate: float | None = None,
+    ) -> None:
+        """
+        Construct the resolution terms.
+
+        Parameters
+        ----------
+        months_to_resolution : int
+            Months from origination until the loan resolves.
+        proceeds_pct : float
+            Gross liquidation proceeds in percent of the balance.
+        carry_cost_pct : float, optional
+            Carry and disposition costs in percent of the balance, netted from
+            the proceeds; ``0.0`` by default.
+        reperformance_prob : float, optional
+            Share of the balance that re-performs instead of liquidating,
+            decimal in ``[0, 1]``; ``0.0`` by default.
+        modified_rate : float, optional
+            Annual coupon (decimal) of the re-performing share; ``None`` keeps
+            the loan's coupon.
+
+        Raises
+        ------
+        ValueError
+            If a percent is outside ``[0, 100]``, the share is outside
+            ``[0, 1]`` or the rate is not finite.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> LiquidationSpec:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``LiquidationSpec`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        LiquidationSpec
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import LiquidationSpec
+        >>> try:
+        ...     LiquidationSpec.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(LiquidationSpec.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def months_to_resolution(self) -> int:
+        """
+        Months from origination until the loan resolves.
+
+        Returns
+        -------
+        int
+            Number of months after origination on which the liquidation and
+            re-performing shares are booked.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def proceeds_pct(self) -> float:
+        """
+        Gross liquidation proceeds.
+
+        Returns
+        -------
+        float
+            Percent of the balance.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def carry_cost_pct(self) -> float:
+        """
+        Carry and disposition costs.
+
+        Returns
+        -------
+        float
+            Percent of the balance.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reperformance_prob(self) -> float:
+        """
+        Share of the balance that re-performs.
+
+        Returns
+        -------
+        float
+            Decimal in ``[0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def modified_rate(self) -> float | None:
+        """
+        Coupon of the re-performing share.
+
+        Returns
+        -------
+        float | None
+            Annual decimal, or ``None`` to keep the loan's coupon.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def net_proceeds_fraction(self) -> float:
+        """
+        Net liquidation proceeds as a fraction of the balance.
+
+        Returns
+        -------
+        float
+            ``(proceeds_pct − carry_cost_pct) / 100``, floored at zero.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class EligibilityRule:
+    """
+    Which collateral an advance rate applies to.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.valuations.instruments import EligibilityRule
+    >>> rule = EligibilityRule(max_days_past_due=60, max_maturity=datetime.date(2030, 1, 1))
+    >>> rule.exclude_defaulted, rule.max_days_past_due
+    (True, 60)
+    """
+
+    def __init__(
+        self,
+        *,
+        exclude_defaulted: bool = True,
+        max_maturity: datetime.date | None = None,
+        max_days_past_due: int | None = None,
+        exclude_non_performing: bool = True,
+    ) -> None:
+        """
+        Construct an eligibility rule.
+
+        Parameters
+        ----------
+        exclude_defaulted : bool, optional
+            Exclude defaulted rows; ``True`` by default.
+        max_maturity : datetime.date, optional
+            Exclude rows maturing after this date; ``None`` for no limit.
+        max_days_past_due : int, optional
+            Exclude balances more than this many days delinquent (delinquency
+            buckets are 30 days each); ``None`` for no limit.
+        exclude_non_performing : bool, optional
+            Exclude unresolved non-performing loans; ``True`` by default.
+
+        Raises
+        ------
+        ValueError
+            If ``max_maturity`` is not a valid date.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> EligibilityRule:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``EligibilityRule`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        EligibilityRule
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import EligibilityRule
+        >>> try:
+        ...     EligibilityRule.from_json('{"unknown": 1}')
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(EligibilityRule.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def exclude_defaulted(self) -> bool:
+        """
+        Whether defaulted rows are excluded.
+
+        Returns
+        -------
+        bool
+            ``True`` when excluded.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def max_maturity(self) -> datetime.date | None:
+        """
+        Latest eligible maturity.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` for no limit.
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
+    def max_days_past_due(self) -> int | None:
+        """
+        Maximum days past due of an eligible balance.
+
+        Returns
+        -------
+        int | None
+            ``None`` for no limit.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def exclude_non_performing(self) -> bool:
+        """
+        Whether unresolved non-performing loans are excluded.
+
+        Returns
+        -------
+        bool
+            ``True`` when excluded.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class AdvanceRate:
+    """
+    Advance rate on one asset class of the collateral.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import AdvanceRate, EligibilityRule
+    >>> rate = AdvanceRate("commercial_mortgage", 0.8, eligibility=EligibilityRule(max_days_past_due=60))
+    >>> rate.asset_class, rate.rate
+    ('commercial_mortgage', 0.8)
+    """
+
+    def __init__(self, asset_class: str, rate: float, *, eligibility: EligibilityRule | None = None) -> None:
+        """
+        Construct an advance rate.
+
+        Parameters
+        ----------
+        asset_class : str
+            ``AssetType`` wire name the rate applies to (for example
+            ``"commercial_mortgage"`` or ``"leveraged_loan"``).
+        rate : float
+            Advance rate as a decimal in ``[0, 1]`` (``0.8`` lends 80% of
+            eligible balance).
+        eligibility : EligibilityRule, optional
+            Which rows of the class are eligible; the default rule excludes
+            defaulted and non-performing rows.
+
+        Raises
+        ------
+        ValueError
+            If ``rate`` is outside ``[0, 1]`` or not finite.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> AdvanceRate:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``AdvanceRate`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        AdvanceRate
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import AdvanceRate
+        >>> try:
+        ...     AdvanceRate.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(AdvanceRate.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def asset_class(self) -> str:
+        """
+        Asset class the rate applies to.
+
+        Returns
+        -------
+        str
+            ``AssetType`` wire name.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def rate(self) -> float:
+        """
+        Advance rate lent against the eligible balance of the class.
+
+        Returns
+        -------
+        float
+            Decimal in ``[0, 1]`` (``0.8`` lends 80% of eligible balance).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def eligibility(self) -> EligibilityRule:
+        """
+        Eligibility rule of the class.
+
+        Returns
+        -------
+        EligibilityRule
+            The rule.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class ConcentrationLimit:
+    """
+    Cap on the eligible collateral one obligor, industry or asset class may
+    contribute; balance above the cap is excluded from the borrowing base.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import ConcentrationLimit
+    >>> ConcentrationLimit("obligor", 5.0).scope
+    'obligor'
+    """
+
+    def __init__(self, scope: str, max_pct: float) -> None:
+        """
+        Construct a concentration limit.
+
+        Parameters
+        ----------
+        scope : str
+            ``"obligor"`` (per ``obligor_id``), ``"industry"`` (per
+            ``industry``) or ``"asset_class"`` (per asset type).
+        max_pct : float
+            Maximum share of the eligible collateral in percent (``20.0`` =
+            20%).
+
+        Raises
+        ------
+        ValueError
+            If ``scope`` is not one of the three names or ``max_pct`` is
+            outside ``[0, 100]``.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> ConcentrationLimit:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``ConcentrationLimit`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        ConcentrationLimit
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import ConcentrationLimit
+        >>> try:
+        ...     ConcentrationLimit.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(ConcentrationLimit.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def scope(self) -> str:
+        """
+        Dimension the cap is measured on.
+
+        Returns
+        -------
+        str
+            ``"obligor"``, ``"industry"`` or ``"asset_class"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def max_pct(self) -> float:
+        """
+        Maximum share of the eligible collateral one bucket may contribute.
+
+        Returns
+        -------
+        float
+            Percent of the eligible collateral (``20.0`` = 20%).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class BorrowingBaseRules:
+    """
+    Advance rates and concentration limits that size a borrowing base.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import AdvanceRate, BorrowingBaseRules, ConcentrationLimit
+    >>> rules = BorrowingBaseRules(
+    ...     [AdvanceRate("commercial_mortgage", 0.8)],
+    ...     concentration_limits=[ConcentrationLimit("obligor", 20.0)],
+    ... )
+    >>> len(rules.advance_rates), rules.concentration_limits[0].max_pct
+    (1, 20.0)
+    """
+
+    def __init__(
+        self,
+        advance_rates: list[AdvanceRate],
+        *,
+        concentration_limits: list[ConcentrationLimit] | None = None,
+    ) -> None:
+        """
+        Construct borrowing-base rules.
+
+        Parameters
+        ----------
+        advance_rates : list[AdvanceRate]
+            One advance rate per eligible asset class (at least one).
+        concentration_limits : list[ConcentrationLimit], optional
+            Caps on obligor, industry or asset-class shares; none by default.
+
+        Raises
+        ------
+        ValueError
+            If no advance rate is given, a class is repeated or a rate or
+            limit is invalid.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> BorrowingBaseRules:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``BorrowingBaseRules`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        BorrowingBaseRules
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import BorrowingBaseRules
+        >>> try:
+        ...     BorrowingBaseRules.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(BorrowingBaseRules.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def advance_rates(self) -> list[AdvanceRate]:
+        """
+        Advance rates by asset class.
+
+        Returns
+        -------
+        list[AdvanceRate]
+            One entry per class.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def concentration_limits(self) -> list[ConcentrationLimit]:
+        """
+        Concentration limits.
+
+        Returns
+        -------
+        list[ConcentrationLimit]
+            Possibly empty.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class CoverageRules:
     """
     Collateral valuation rules for the OC tests: rating haircuts, the value
@@ -18702,7 +20625,8 @@ class CoverageRules:
     @staticmethod
     def clo_standard() -> CoverageRules:
         """
-        Standard CLO rules: CCC/Caa haircuts, defaulted collateral at recovery,
+        Standard CLO rules: performing collateral at par (no rating haircuts),
+        defaulted collateral at recovery,
         a 7.5% CCC bucket at market value and discount obligations below 80.
 
         Returns
@@ -19647,6 +21571,38 @@ class TrancheCashflows:
         -------
         Money
             The PIK total.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def total_deferred(self) -> Money:
+        """
+        Total interest deferred as a claim over the projection.
+
+        Returns
+        -------
+        Money
+            The deferred total.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def total_writedown(self) -> Money:
+        """
+        Total principal written down over the projection.
+
+        Returns
+        -------
+        Money
+            The write-down total.
 
         Notes
         -----
@@ -20826,6 +22782,58 @@ class StructuredCredit:
         ...
 
     @property
+    def loss_recognition(self) -> str | None:
+        """
+        Explicit loss-recognition timing (``"at_default"`` / ``"at_liquidation"``).
+
+        Returns
+        -------
+        str | None
+            ``None`` for the deal-type default (at liquidation for RMBS/CMBS,
+            at default otherwise).
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def tranche_draws(self) -> list[dict[str, Any]]:
+        """
+        Scheduled lender draws on notes as ``TrancheDraw`` serde dicts (``tranche_id``, ``date``, ``amount``).
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Empty for a fully funded structure.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def tranche_readvance(self) -> dict[str, Any] | None:
+        """
+        Per-period re-advance rule as its ``TrancheReadvance`` serde dict (``tranche_id``, ``commitment``).
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` for no re-advances.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
     def principal_covers_senior_interest(self) -> bool | None:
         """
         Explicit principal-covers-senior-interest flag.
@@ -20980,6 +22988,26 @@ class StructuredCredit:
         -------
         dict[str, Any] | None
             ``None`` until set or enabled.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def stochastic_recovery_spec(self) -> dict[str, Any] | None:
+        """
+        Stochastic recovery specification as its ``RecoverySpec`` serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``{"type": "constant", "rate": ...}`` or ``{"type":
+            "market_correlated", "mean_recovery": ..., "recovery_volatility":
+            ..., "factor_correlation": ...}``; ``None`` for constant recoveries
+            at the deterministic rate.
 
         Raises
         ------
@@ -21488,7 +23516,10 @@ class StructuredCreditBuilder:
         value : dict[str, Any] | str
             JSON-encoded ``DealFees`` object (trustee, senior management,
             servicing, and optional master/special servicer fees), paid
-            ahead of every note. Skipped (``None``) by default.
+            ahead of every note. Optional ``workout_fee_pct`` (percent of the
+            P&I collected on specially serviced loans) and
+            ``liquidation_fee_pct`` (percent of liquidation proceeds) are
+            taken inside the collateral flows. Skipped (``None``) by default.
 
         Returns
         -------
@@ -21635,6 +23666,33 @@ class StructuredCreditBuilder:
         """
         ...
 
+    def stochastic_recovery_spec(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+        """
+        Set the stochastic recovery specification used by
+        :meth:`StructuredCredit.price_stochastic`.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str
+            ``RecoverySpec`` serde object: ``{"type": "constant", "rate": 0.4}``
+            or ``{"type": "market_correlated", "mean_recovery": 0.4,
+            "recovery_volatility": 0.25, "factor_correlation": 0.4}`` (recovery
+            falls with the systematic factor, so heavy-default paths recover
+            less).
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the ``RecoverySpec`` shape or this
+            builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+        """
+        ...
+
     def correlation_structure(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
         """
         Set the default correlation structure used by
@@ -21668,7 +23726,8 @@ class StructuredCreditBuilder:
             ``DelinquencyModel`` serde object: ``roll_rates`` (per bucket, the
             last rolls to charge-off), ``cure_rates``, ``advancing``
             (``{"policy": "none"}`` or ``{"policy": "principal_and_interest",
-            "recoverability_cap_pct": ...}``) and optional ``modification``.
+            "recoverability_cap_pct": ..., "reimburse_from_collections":
+            false}``) and optional ``modification``.
         Returns
         -------
         StructuredCreditBuilder
@@ -21690,7 +23749,11 @@ class StructuredCreditBuilder:
         ----------
         value : dict[str, Any] | str
             ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
-            ``portfolio_yield`` and ``charge_off_rate`` (annual decimals).
+            ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
+            plus the optional ``seller_interest`` (``Money`` serde object in
+            the pool currency) and ``fixed_allocation_pct`` (decimal in
+            ``(0, 1]``) that fix the investor allocation of trust collections
+            once the revolving period ends.
         Returns
         -------
         StructuredCreditBuilder
@@ -21736,7 +23799,8 @@ class StructuredCreditBuilder:
         value : list[dict[str, Any]] | str
             ``CoverageTestSpec`` objects (``id``, ``tranche_id``, ``kind``
             (``"oc"`` / ``"ic"``), ``trigger_level`` ratio, ``action``, optional
-            ``after_tranche``).
+            ``placement`` (``{"kind": "after_tranche", "tranche_id": ...}`` or
+            ``{"kind": "after_junior_fees"}``) and ``divert_pct``).
         Returns
         -------
         StructuredCreditBuilder
@@ -21902,6 +23966,82 @@ class StructuredCreditBuilder:
         ValueError
             If ``value`` does not match the expected shape or this builder
             was already consumed by :meth:`StructuredCreditBuilder.build`.
+        """
+        ...
+
+    def loss_recognition(self, value: Literal["at_default", "at_liquidation"]) -> StructuredCreditBuilder:
+        """
+        Set when collateral losses are booked.
+
+        Parameters
+        ----------
+        value : {"at_default", "at_liquidation"}
+            ``"at_default"`` books the expected net loss on the default date
+            (CLO/ABS convention); ``"at_liquidation"`` books the realized loss
+            when the claim settles after the recovery lag (RMBS/CMBS
+            convention), which delays write-downs and every cumulative-loss
+            trigger. The deal type's default applies when never set.
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the expected shape or this builder
+            was already consumed by :meth:`StructuredCreditBuilder.build`.
+        """
+        ...
+
+    def tranche_draws(self, value: list[dict[str, Any]] | str) -> StructuredCreditBuilder:
+        """
+        Set the scheduled lender draws on notes after closing.
+
+        Parameters
+        ----------
+        value : list[dict[str, Any]] | str
+            ``TrancheDraw`` serde objects ``{"tranche_id": "A", "date":
+            "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}``,
+            ascending by date; each is applied on the first payment date at or
+            after its date, lifting the note's balance and adding the cash to
+            principal proceeds.
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the ``TrancheDraw`` shape or this
+            builder was already consumed by :meth:`StructuredCreditBuilder.build`.
+        """
+        ...
+
+    def tranche_readvance(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
+        """
+        Set the per-period re-advance of one note up to its commitment and the
+        borrowing base while the deal revolves.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str
+            ``TrancheReadvance`` serde object ``{"tranche_id": "A",
+            "commitment": {"amount": "70000000", "currency": "USD"}}``; requires
+            ``coverage_rules.borrowing_base``.
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the ``TrancheReadvance`` shape or this
+            builder was already consumed by :meth:`StructuredCreditBuilder.build`.
         """
         ...
 
@@ -22446,6 +24586,402 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     (True, True)
     """
     ...
+
+class TermOutSpec:
+    """
+    Term-out: months after the revolving period ends over which the drawn
+    balance is repaid.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import TermOutSpec
+    >>> TermOutSpec(24).months
+    24
+    """
+
+    def __init__(self, months: int) -> None:
+        """
+        Construct a term-out.
+
+        Parameters
+        ----------
+        months : int
+            Months after the revolving period (or an earlier amortization
+            event) by which the line is repaid.
+
+        Notes
+        -----
+        This constructor does not raise; any non-negative month count is
+        accepted.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> TermOutSpec:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``TermOutSpec`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        TermOutSpec
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import TermOutSpec
+        >>> try:
+        ...     TermOutSpec.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(TermOutSpec.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def months(self) -> int:
+        """
+        Term-out length after the revolving period.
+
+        Returns
+        -------
+        int
+            Number of months over which the drawn balance is repaid.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class AmortizationEvent:
+    """
+    An event that ends a facility's revolving period early.
+
+    Built through :meth:`date` (a fixed date), :meth:`cumulative_loss` (a
+    cumulative-loss threshold in percent of the original collateral) or
+    :meth:`excess_spread` (a trailing three-month excess-spread floor).
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.valuations.instruments import AmortizationEvent
+    >>> AmortizationEvent.cumulative_loss(4.0).max_pct
+    4.0
+    >>> AmortizationEvent.date(datetime.date(2025, 1, 15)).kind
+    'date'
+    """
+
+    @staticmethod
+    def date(date: datetime.date) -> AmortizationEvent:
+        """
+        The revolving period ends on a fixed date.
+
+        Parameters
+        ----------
+        date : datetime.date
+            Date the event fires (the first payment date at or after it).
+
+        Returns
+        -------
+        AmortizationEvent
+            The dated event.
+
+        Raises
+        ------
+        ValueError
+            If ``date`` is not a valid date.
+
+        Examples
+        --------
+        >>> import datetime
+        >>> from finstack_quant.valuations.instruments import AmortizationEvent
+        >>> AmortizationEvent.date(datetime.date(2025, 1, 15)).date_value
+        datetime.date(2025, 1, 15)
+        """
+        ...
+
+    @staticmethod
+    def cumulative_loss(max_pct: float) -> AmortizationEvent:
+        """
+        The revolving period ends once cumulative losses reach a threshold.
+
+        Parameters
+        ----------
+        max_pct : float
+            Cumulative net loss as a percent of the original collateral
+            balance (``4.0`` = 4%).
+
+        Returns
+        -------
+        AmortizationEvent
+            The loss event.
+
+        Raises
+        ------
+        ValueError
+            If ``max_pct`` is negative or not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import AmortizationEvent
+        >>> AmortizationEvent.cumulative_loss(4.0).kind
+        'cumulative_loss'
+        """
+        ...
+
+    @staticmethod
+    def excess_spread(min_3m: float) -> AmortizationEvent:
+        """
+        The revolving period ends once trailing excess spread falls below a
+        floor.
+
+        Parameters
+        ----------
+        min_3m : float
+            Minimum trailing three-month annualized excess spread as a decimal
+            (``0.01`` = 1%).
+
+        Returns
+        -------
+        AmortizationEvent
+            The excess-spread event.
+
+        Raises
+        ------
+        ValueError
+            If ``min_3m`` is not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import AmortizationEvent
+        >>> AmortizationEvent.excess_spread(0.01).min_3m
+        0.01
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> AmortizationEvent:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``AmortizationEvent`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        AmortizationEvent
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import AmortizationEvent
+        >>> try:
+        ...     AmortizationEvent.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            Canonical JSON.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(AmortizationEvent.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    @property
+    def kind(self) -> str:
+        """
+        Which early-amortization event this is.
+
+        Returns
+        -------
+        str
+            ``"date"``, ``"cumulative_loss"`` or ``"excess_spread"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def date_value(self) -> datetime.date | None:
+        """
+        Event date of a dated event.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` for the other kinds.
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
+    def max_pct(self) -> float | None:
+        """
+        Cumulative-loss threshold.
+
+        Returns
+        -------
+        float | None
+            Percent, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def min_3m(self) -> float | None:
+        """
+        Excess-spread floor.
+
+        Returns
+        -------
+        float | None
+            Decimal, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
 
 class AssetBackedFacility:
     """
@@ -23099,6 +25635,56 @@ class AssetBackedFacility:
         This accessor does not raise; it returns the stored value.
         """
         ...
+
+    @property
+    def fees(self) -> dict[str, Any] | None:
+        """
+        Transaction fees paid ahead of the facility's interest as the ``DealFees`` serde dict.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` when the facility carries no fees.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def draw_schedule(self) -> list[dict[str, Any]]:
+        """
+        Scheduled draws after closing as ``FacilityDraw`` serde dicts (``date``, ``amount``).
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Empty when the line is fully funded at closing.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def readvance_to_borrowing_base(self) -> bool:
+        """
+        Whether the line is re-advanced up to the borrowing base each revolving period.
+
+        Returns
+        -------
+        bool
+            ``True`` when re-advances apply.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
     @property
     def discount_curve_id(self) -> str:
         """
@@ -23594,6 +26180,80 @@ class AssetBackedFacilityBuilder:
             If the builder was already consumed.
         """
         ...
+
+    def fees(self, value: dict[str, Any] | str) -> AssetBackedFacilityBuilder:
+        """
+        Set the transaction fees paid through the waterfall ahead of the
+        facility's interest.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str
+            ``DealFees`` serde object (``trustee_fee_annual`` Money,
+            ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
+            ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
+            ``workout_fee_pct`` / ``liquidation_fee_pct`` /
+            ``special_servicer_fee_bp`` / ``incentive_fee``).
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the ``DealFees`` shape or this builder
+            was already consumed by ``build``.
+        """
+        ...
+
+    def draw_schedule(self, value: list[dict[str, Any]] | str) -> AssetBackedFacilityBuilder:
+        """
+        Set the scheduled draws after closing.
+
+        Parameters
+        ----------
+        value : list[dict[str, Any]] | str
+            ``FacilityDraw`` serde objects ``{"date": "2025-01-01", "amount":
+            {"amount": "10000000", "currency": "USD"}}``, ascending by date;
+            each is applied on the first payment date at or after its date.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` does not match the ``FacilityDraw`` shape or this
+            builder was already consumed by ``build``.
+        """
+        ...
+
+    def readvance_to_borrowing_base(self, value: bool) -> AssetBackedFacilityBuilder:
+        """
+        Set whether the line is re-advanced up to the borrowing base each
+        revolving period.
+
+        Parameters
+        ----------
+        value : bool
+            ``True`` draws ``min(commitment, borrowing base) − balance`` every
+            revolving period.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If this builder was already consumed by ``build``.
+        """
+        ...
     def liquidation_price_pct(self, value: float) -> AssetBackedFacilityBuilder:
         """
         Set the collateral liquidation price at the term-out end.
@@ -23773,7 +26433,7 @@ class FacilityProjection:
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
     >>> projection = facility.project(market, as_of)
     >>> list(projection.to_dataframe().columns)
-    ['date', 'interest', 'principal', 'unused_fee', 'lender_total', 'residual']
+    ['date', 'interest', 'principal', 'unused_fee', 'draw', 'lender_total', 'residual']
     """
 
     @staticmethod
@@ -23897,6 +26557,23 @@ class FacilityProjection:
             If a date cannot be converted.
         """
         ...
+
+    @property
+    def draws(self) -> list[tuple[datetime.date, Money]]:
+        """
+        Lender draws applied (scheduled draws and re-advances) per payment date.
+
+        Returns
+        -------
+        list[tuple[datetime.date, Money]]
+            ``(date, amount)`` pairs; outflows in :attr:`lender_cashflows`.
+
+        Raises
+        ------
+        ValueError
+            If a date cannot be converted.
+        """
+        ...
     @property
     def lender_cashflows(self) -> list[tuple[datetime.date, Money]]:
         """
@@ -23933,8 +26610,9 @@ class FacilityProjection:
         One row per payment date as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-        ``unused_fee``, ``lender_total`` (the three summed) and ``residual``
-        (cash to the residual class), all in currency units.
+        ``unused_fee``, ``draw`` (lender advances), ``lender_total`` (the
+        first three summed less draws) and ``residual`` (cash to the residual
+        class), all in currency units.
 
         Returns
         -------
@@ -25452,9 +28130,12 @@ class StochasticPricingResult:
         """
         One row per tranche as a pandas ``DataFrame``.
 
-        Columns: ``tranche_id``, ``seniority``, ``npv``, ``expected_loss``,
-        ``unexpected_loss``, ``expected_shortfall`` (currency units),
-        ``attachment``, ``detachment`` (decimal), ``average_life`` (years),
+        Columns: ``tranche_id``, ``seniority``, ``npv`` (currency units),
+        ``price_pct`` (percent of the tranche's current balance),
+        ``expected_loss``, ``unexpected_loss``, ``expected_shortfall``
+        (currency units),
+        ``attachment``, ``detachment`` (decimal), ``average_life`` (years, over
+        the paths that returned principal), ``paths_with_principal``,
         ``credit_duration`` and ``draw_option_cost`` (currency units).
 
         Returns
@@ -25504,7 +28185,8 @@ class StochasticPricingResult:
     @property
     def dirty_price(self) -> float:
         """
-        Dirty price as a percentage of the pool notional.
+        Dirty price as a percent of the sum of current tranche balances
+        (the same face as the deterministic ``dirty_price`` metric).
 
         Returns
         -------
@@ -25857,7 +28539,7 @@ class SimulationDiagnostics:
         Returns
         -------
         list[dict[str, Any]]
-            ``payment_date``, ``pool_balance``, ``pool_factor``, ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
+            ``payment_date``, ``pool_balance``, ``pool_factor``, ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
 
         Raises
         ------
@@ -25875,7 +28557,8 @@ class SimulationDiagnostics:
         ``interest_collections``, ``principal_collections``, ``defaults``,
         ``recoveries``, ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
         ``reserve_interest``, ``spread_account``, ``funding_account``,
-        ``delinquent_balance`` and ``excess_spread`` (annualized decimal);
+        ``delinquent_balance``, ``servicer_advances_outstanding`` and
+        ``excess_spread`` (annualized decimal);
         amounts in currency units.
 
         Returns
@@ -25998,6 +28681,41 @@ class SimulationDiagnostics:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def early_amortization_date(self) -> datetime.date | None:
+        """
+        Payment date of the early-amortization event (or coverage-test
+        acceleration) that ended the revolving period.
+
+        Returns
+        -------
+        datetime.date | None
+            ``None`` when no event fired.
+
+        Raises
+        ------
+        ValueError
+            If the date cannot be converted.
+        """
+        ...
+
+    @property
+    def tranche_draws(self) -> list[tuple[str, datetime.date, Money]]:
+        """
+        Lender draws applied to notes.
+
+        Returns
+        -------
+        list[tuple[str, datetime.date, Money]]
+            ``(tranche_id, payment date, amount)`` triples in date order.
+
+        Raises
+        ------
+        ValueError
+            If a date cannot be converted.
         """
         ...
 
@@ -26198,6 +28916,7 @@ class TrancheMetrics:
     ...     "z_spread_bp": 0.0,
     ...     "cs01": -1.0,
     ...     "spread_duration": 3.0,
+    ...     "spread_convexity": 12.0,
     ...     "modified_duration": 3.0,
     ...     "convexity": 12.0,
     ...     "target_price_pct": 100.0,
@@ -26241,6 +28960,7 @@ class TrancheMetrics:
         ...     "z_spread_bp": 0.0,
         ...     "cs01": -1.0,
         ...     "spread_duration": 3.0,
+        ...     "spread_convexity": 12.0,
         ...     "modified_duration": 3.0,
         ...     "convexity": 12.0,
         ...     "target_price_pct": 100.0,
@@ -26418,14 +29138,34 @@ class TrancheMetrics:
         ...
 
     @property
-    def modified_duration(self) -> float:
+    def spread_convexity(self) -> float:
         """
-        Modified (rate) duration of the projected cashflows, in years.
+        Spread convexity at the solved z-spread.
 
         Returns
         -------
         float
-            The modified duration.
+            Second-order z-spread sensitivity of the projected cashflows, in
+            years squared, on the same kernel as ``spread_duration``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def modified_duration(self) -> float:
+        """
+        Effective (rate) duration of the tranche.
+
+        Returns
+        -------
+        float
+            Years. The cashflows are re-projected with every rate curve
+            (discount and forward) bumped ±1 bp in parallel, so a floater's
+            coupon resets move with the curve and its duration is short; a
+            fixed-coupon note's equals its modified duration.
 
         Notes
         -----
@@ -26436,12 +29176,13 @@ class TrancheMetrics:
     @property
     def convexity(self) -> float:
         """
-        Modified convexity of the projected cashflows, in years squared.
+        Effective convexity of the tranche.
 
         Returns
         -------
         float
-            The modified convexity.
+            Years squared, from the same ±1 bp re-projection as
+            ``modified_duration``.
 
         Notes
         -----
@@ -26514,16 +29255,34 @@ class TrancheMetrics:
         """
         ...
 
+    @property
+    def dm_bp(self) -> float | None:
+        """
+        Discount margin to maturity at ``target_price_pct``.
+
+        Returns
+        -------
+        float | None
+            Basis points of constant spread over the deal discount curve that
+            reprices the floater's projected cashflows; ``None`` for
+            fixed-rate tranches.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export as a single-row pandas DataFrame.
 
         Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``, ``factor``, ``wal``,
-        ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
-        ``convexity``, ``target_price_pct``, ``wal_to_call``,
-        ``z_spread_to_call_bp``, ``dm_to_call_bp`` -- the same fields and units
-        as the properties of the same name (the ``*_to_call`` columns are
-        ``NaN`` without a call).
+        ``z_spread_bp``, ``cs01``, ``spread_duration``, ``spread_convexity``,
+        ``modified_duration``, ``convexity``, ``target_price_pct``, ``wal_to_call``,
+        ``z_spread_to_call_bp``, ``dm_to_call_bp``, ``dm_bp`` -- the same fields and
+        units as the properties of the same name (the ``*_to_call`` columns are
+        ``NaN`` without a call, ``dm_bp`` for fixed-rate tranches).
 
         Returns
         -------

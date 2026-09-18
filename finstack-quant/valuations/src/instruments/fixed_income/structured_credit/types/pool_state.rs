@@ -45,10 +45,24 @@ pub(crate) struct PoolState {
     /// period off the (shrinking) remaining balance understates scheduled
     /// principal after every prepayment.
     pub(crate) level_payments: Vec<Option<f64>>,
+    /// Acquisition date per asset (the anchor for non-performing-loan
+    /// timelines); `None` means the deal closing date.
+    pub(crate) acquisition_dates: Vec<Option<Date>>,
+    /// Seasoning anchor per asset (origination, else acquisition): the base
+    /// for seasoning-dependent curves and the amortization schedule; `None`
+    /// means the deal closing date.
+    pub(crate) origination_dates: Vec<Option<Date>>,
+    /// Amortization schedule length in months from origination per asset.
+    pub(crate) amortization_term_months: Vec<Option<u32>>,
+    /// Interest-only months from origination per asset.
+    pub(crate) io_months: Vec<Option<u32>>,
     /// Minimum all-in coupon per asset (a floor on the resolved floating
     /// rate); `None` for every asset except reinvestment purchases with a
     /// `coupon_floor`.
     pub(crate) rate_floors: Vec<Option<f64>>,
+    /// Floor on the floating index per asset (annual decimal), applied
+    /// before the spread; `None` for unfloored or fixed-rate rows.
+    pub(crate) index_floors: Vec<Option<f64>>,
     /// Delinquent balance per bucket for each asset (empty until a
     /// delinquency model sizes it); the asset's `balances` entry includes
     /// these amounts.
@@ -60,6 +74,17 @@ pub(crate) struct PoolState {
     /// Appraisal reduction per asset as a decimal fraction (0 when not
     /// specially serviced).
     pub(crate) appraisal_reduction: Vec<f64>,
+    /// Whether the asset is in special servicing: flagged at closing by its
+    /// `special_servicing` spec, or from the period it defaults or takes a
+    /// balloon loss.
+    pub(crate) special_serviced: Vec<bool>,
+    /// Interest the asset's delinquent balances have missed and still owe.
+    pub(crate) arrears_interest: Vec<f64>,
+    /// Scheduled principal the asset's delinquent balances have missed and
+    /// still owe.
+    pub(crate) arrears_principal: Vec<f64>,
+    /// Servicer advances outstanding on the asset (a share of its arrears).
+    pub(crate) advances: Vec<f64>,
     /// Pending NPL resolution per asset, taken when the loan resolves.
     pub(crate) liquidation: Vec<Option<LiquidationSpec>>,
 }
@@ -87,17 +112,29 @@ impl PoolState {
         self.recovery_rates.push(asset.recovery_rate);
         self.level_payments
             .push(asset.contractual_payment.map(|m| m.amount()));
+        self.acquisition_dates.push(asset.acquisition_date);
+        self.origination_dates.push(asset.seasoning_anchor());
+        self.amortization_term_months
+            .push(asset.amortization_term_months);
+        self.io_months.push(asset.io_months);
         self.is_amortizing.push(asset.asset_type.is_amortizing());
         self.delinquent.push(Vec::new());
         self.balloon.push(asset.balloon);
-        self.prepayment_penalty.push(asset.prepayment_penalty);
+        self.prepayment_penalty
+            .push(asset.prepayment_penalty.clone());
         self.appraisal_reduction.push(
             asset
                 .special_servicing
                 .map_or(0.0, |spec| spec.appraisal_reduction_pct / 100.0),
         );
+        self.special_serviced
+            .push(asset.special_servicing.is_some());
+        self.arrears_interest.push(0.0);
+        self.arrears_principal.push(0.0);
+        self.advances.push(0.0);
         self.liquidation.push(asset.liquidation);
         self.rate_floors.push(rate_floor);
+        self.index_floors.push(asset.index_floor);
         let curve_index = asset.index_id.as_ref().map(|id| {
             self.unique_curves
                 .iter()
@@ -125,6 +162,10 @@ impl PoolState {
         let mut mdr_overrides = Vec::with_capacity(n);
         let mut recovery_rates = Vec::with_capacity(n);
         let mut level_payments = Vec::with_capacity(n);
+        let mut acquisition_dates = Vec::with_capacity(n);
+        let mut origination_dates = Vec::with_capacity(n);
+        let mut amortization_term_months = Vec::with_capacity(n);
+        let mut io_months = Vec::with_capacity(n);
 
         let mut is_amortizing = Vec::with_capacity(n);
         let mut delinquent = Vec::with_capacity(n);
@@ -150,6 +191,10 @@ impl PoolState {
             mdr_overrides.push(asset.mdr_override);
             recovery_rates.push(asset.recovery_rate);
             level_payments.push(asset.contractual_payment.map(|m| m.amount()));
+            acquisition_dates.push(asset.acquisition_date);
+            origination_dates.push(asset.seasoning_anchor());
+            amortization_term_months.push(asset.amortization_term_months);
+            io_months.push(asset.io_months);
             is_amortizing.push(asset.asset_type.is_amortizing());
             delinquent.push(
                 asset
@@ -159,7 +204,7 @@ impl PoolState {
                     .unwrap_or_default(),
             );
             balloon.push(asset.balloon);
-            prepayment_penalty.push(asset.prepayment_penalty);
+            prepayment_penalty.push(asset.prepayment_penalty.clone());
             appraisal_reduction.push(
                 asset
                     .special_servicing
@@ -199,11 +244,24 @@ impl PoolState {
             unique_curves,
             is_amortizing,
             level_payments,
+            acquisition_dates,
+            origination_dates,
+            amortization_term_months,
+            io_months,
             rate_floors: vec![None; n],
+            index_floors: pool.assets.iter().map(|asset| asset.index_floor).collect(),
             delinquent,
             balloon,
             prepayment_penalty,
             appraisal_reduction,
+            special_serviced: pool
+                .assets
+                .iter()
+                .map(|asset| asset.special_servicing.is_some())
+                .collect(),
+            arrears_interest: vec![0.0; n],
+            arrears_principal: vec![0.0; n],
+            advances: vec![0.0; n],
             liquidation,
         }
     }

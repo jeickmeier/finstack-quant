@@ -79,7 +79,45 @@ pub(super) fn simulate_period(
             live_afc_cap,
         );
 
+    // Card master trust: the first period outside the revolving period (its
+    // scheduled end, an early-amortization event, a trigger that stops
+    // reinvestment, or redemption) fixes the investor allocation on the
+    // receivables held at the period's opening. When the period opens already
+    // outside the window the base is fixed before the pool flows; when this
+    // period's own event closes the window the flows have run on the live
+    // (equal) opening balance and the base is fixed from it afterwards.
+    let card_opening_balances = instrument
+        .credit_model
+        .card
+        .as_ref()
+        .filter(|_| state.card_flow_base.is_none())
+        .map(|card| -> Result<Vec<f64>> {
+            card.investor_flow_base(&state.pool_state.balances, state.base_currency)
+        })
+        .transpose()?;
+    if let Some(base) = card_opening_balances.as_ref() {
+        let revolving = !state.early_amortization_triggered
+            && !period.redemption
+            && state
+                .pool
+                .reinvestment_period
+                .as_ref()
+                .is_some_and(|window| window.is_active && pay_date <= window.end_date);
+        if !revolving {
+            state.card_flow_base = Some(base.clone());
+        }
+    }
+
+    // Lender draws: scheduled draws due by this payment date and, while the
+    // deal revolves, a re-advance up to the note's commitment and the
+    // borrowing base. The cash joins principal proceeds (recycled while
+    // revolving) and the note's balance rises by the same amount.
+    apply_tranche_draws(state, instrument, &period, pay_date)?;
+
     // ── Step 1: Calculate pool cashflows for the period ──────────────
+    // Special-servicing flags at the period's opening: a loan defaulting
+    // this period is specially serviced (and pays the fee) from the next.
+    let special_serviced_open = state.pool_state.special_serviced.clone();
     let pool_flows = source.calculate_pool_flows(PoolFlowRequest {
         state,
         instrument,
@@ -168,12 +206,25 @@ pub(super) fn simulate_period(
     state.prev_date = Some(pay_date);
 
     // Add new recoveries to the lag queue
-    state
-        .recovery_queue
-        .add_recovery(pay_date, pool_flows.recovery, pool_flows.default);
+    {
+        // Balloon workouts carry their own settlement date; the rest of the
+        // period's defaults settle after the deal's recovery lag.
+        let mut workout_recovery = Money::from((0_i64, state.base_currency));
+        let mut workout_par = Money::from((0_i64, state.base_currency));
+        for (date, recovery, par) in &pool_flows.workout_claims {
+            state.recovery_queue.add_recovery(*date, *recovery, *par);
+            workout_recovery = workout_recovery.checked_add(*recovery)?;
+            workout_par = workout_par.checked_add(*par)?;
+        }
+        state.recovery_queue.add_recovery(
+            pay_date,
+            pool_flows.recovery.checked_sub(workout_recovery)?,
+            pool_flows.default.checked_sub(workout_par)?,
+        );
+    }
 
     // Release matured recoveries (these become cash for waterfall distribution)
-    let released_recoveries = state.recovery_queue.release_matured(
+    let (released_recoveries, released_par) = state.recovery_queue.release_matured(
         pay_date,
         state.recovery_lag_months,
         state.base_currency,
@@ -204,8 +255,17 @@ pub(super) fn simulate_period(
     // A writeup mechanism would be required under the alternative convention
     // where writedowns are taken GROSS at default and recoveries restore
     // notional as they arrive. This engine does not use that convention.
-    let period_expected_loss =
-        (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0);
+    // Under at-liquidation recognition (RMBS/CMBS servicing convention) the
+    // loss is booked when the claim settles after the recovery lag instead:
+    // the released claims' defaulted par less the recovery cash they return.
+    let period_expected_loss = match state.loss_recognition {
+        LossRecognition::AtDefault => {
+            (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0)
+        }
+        LossRecognition::AtLiquidation => {
+            (released_par.amount() - released_recoveries.amount()).max(0.0)
+        }
+    };
     state.cumulative_realized_loss += period_expected_loss;
 
     // Recovery value of defaulted collateral whose cash has not yet arrived:
@@ -333,14 +393,36 @@ pub(super) fn simulate_period(
         }
     }
 
+    // The tests are evaluated on what the executor will see: the waterfall
+    // with this period's hedge payments ranked as fees, and interest proceeds
+    // including call premia, reserve interest and hedge receipts.
+    let trigger_waterfall = if hedge_flows.payments.is_empty() {
+        std::borrow::Cow::Borrowed(waterfall)
+    } else {
+        let mut resolved = waterfall.clone();
+        for (id, amount, priority) in &hedge_flows.payments {
+            resolved.insert_hedge_payment(
+                crate::instruments::fixed_income::structured_credit::types::Recipient::fixed_fee(
+                    id.clone(),
+                    "SwapCounterparty",
+                    *amount,
+                ),
+                *priority,
+            );
+        }
+        std::borrow::Cow::Owned(resolved)
+    };
     let trigger_actions = super::triggers::advance(
         state,
-        waterfall,
+        &trigger_waterfall,
         period,
         period_start,
         super::triggers::TriggerCashInputs {
             interest: pool_flows
                 .interest
+                .checked_add(pool_flows.call_premium)?
+                .checked_add(reserve_interest.to_waterfall)?
+                .checked_add(hedge_flows.receipts)?
                 .checked_add(state.undistributed_interest)?,
             principal: pool_principal
                 .checked_add(released_recoveries)?
@@ -361,7 +443,7 @@ pub(super) fn simulate_period(
         .as_ref()
         .and_then(|rules| rules.early_amortization.as_ref())
         .is_some_and(|spec| {
-            let denom = state.total_pool_balance.amount();
+            let denom = state.original_pool_balance.amount();
             let loss_fraction = if denom > 0.0 {
                 state.cumulative_realized_loss / denom
             } else {
@@ -371,21 +453,35 @@ pub(super) fn simulate_period(
                 let history = &state.excess_spread_history;
                 history.len() >= 3 && history[history.len() - 3..].iter().sum::<f64>() / 3.0 < floor
             });
-            loss_fraction >= spec.max_cumulative_loss_pct || spread_breached
+            spec.max_cumulative_loss
+                .is_some_and(|max_loss| loss_fraction >= max_loss)
+                || spread_breached
         });
     if early_amortization_event {
         state.early_amortization_triggered = true;
     }
     let early_amortization = trigger_actions.accelerate || state.early_amortization_triggered;
+    if early_amortization && state.early_amortization_date.is_none() {
+        state.early_amortization_date = Some(pay_date);
+    }
 
     // Apply current-period trigger outcomes before buying replacement collateral.
     let is_reinvestment_active = !early_amortization
+        && !period.redemption
         && !trigger_actions.stop_reinvestment
         && state
             .pool
             .reinvestment_period
             .as_ref()
             .is_some_and(|period| period.is_active && pay_date <= period.end_date);
+
+    if let (Some(base), false, true) = (
+        card_opening_balances,
+        is_reinvestment_active,
+        state.card_flow_base.is_none(),
+    ) {
+        state.card_flow_base = Some(base);
+    }
 
     // Controlled accumulation (master-trust style): after any revolving period
     // and before the bullet date, collected pool principal is held in a funding
@@ -541,6 +637,7 @@ pub(super) fn simulate_period(
                     crate::instruments::fixed_income::structured_credit::pricing::waterfall::special_serviced_balance(
                         &state.pool,
                         Some(&state.pool_state.balances),
+                        Some(&special_serviced_open),
                         state.base_currency,
                     )?,
                 period_start,
@@ -650,10 +747,34 @@ pub(super) fn simulate_period(
         );
     }
 
+    // Reserve rules: this period's target from the live pool; any balance
+    // above it is released into interest proceeds when the rules say so.
+    let reserve_rules = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.reserve.as_ref());
+    let reserve_target = reserve_rules.map(|spec| {
+        spec.target.resolve(
+            state.pool_outstanding.amount() + state.principal_funding_account.amount(),
+            state.original_pool_balance.amount(),
+        )
+    });
+    let mut reserve_net_capture = 0.0_f64;
+    if let (Some(spec), Some(target)) = (reserve_rules, reserve_target) {
+        let excess = state.reserve_balance.amount() - target;
+        if spec.release_excess && excess > WRITEDOWN_DE_MINIMIS {
+            let release = Money::new(excess, state.base_currency)?;
+            state.reserve_balance = state.reserve_balance.checked_sub(release)?;
+            total_cash_for_waterfall = total_cash_for_waterfall.checked_add(release)?;
+            interest_available_for_waterfall =
+                interest_available_for_waterfall.checked_add(release)?;
+            reserve_net_capture -= excess;
+        }
+    }
+
     // Reserve draw: credit enhancement drawn after excess-spread capture to
     // cover remaining debt-interest shortfall. Bounded by shortfall and
     // balance; `reserve_net_capture` (negative on draw) feeds cash conservation.
-    let mut reserve_net_capture = 0.0_f64;
     if state.reserve_balance.amount() > 0.0 {
         // A funded reserve covers the interest account's remaining fee/coupon
         // shortfall. Principal collections remain restricted to capital uses.
@@ -665,7 +786,7 @@ pub(super) fn simulate_period(
             total_cash_for_waterfall = total_cash_for_waterfall.checked_add(draw_money)?;
             interest_available_for_waterfall =
                 interest_available_for_waterfall.checked_add(draw_money)?;
-            reserve_net_capture = -draw;
+            reserve_net_capture -= draw;
         }
     }
 
@@ -752,6 +873,7 @@ pub(super) fn simulate_period(
         } else {
             1.0
         };
+        let metrics = step_down_metrics(state);
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
             waterfall,
             rules,
@@ -759,6 +881,7 @@ pub(super) fn simulate_period(
             senior_prorata_share,
             unscheduled_fraction,
             &state.tranche_balances,
+            &metrics,
         )
     } else {
         let metrics = step_down_metrics(state);
@@ -787,6 +910,51 @@ pub(super) fn simulate_period(
         period_waterfall
     };
 
+    // Targeted OC amortization caps the notes' principal at the amount that
+    // holds overcollateralization at the target on the post-collection pool.
+    let period_waterfall = match rules.and_then(|r| r.target_oc.as_ref()) {
+        Some(spec) if !is_accumulating => std::borrow::Cow::Owned(
+            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_target_oc(
+                &period_waterfall,
+                spec,
+                state.pool_state.balances.iter().sum::<f64>()
+                    + state.principal_funding_account.amount(),
+                state.original_pool_balance.amount(),
+                &state.tranche_balances,
+            )
+            .into_owned(),
+        ),
+        _ => period_waterfall,
+    };
+
+    // Net-WAC carryover: each capped tranche's recipient asks for the
+    // balance brought into the period.
+    let afc_carryover = rules
+        .and_then(|r| r.afc.as_ref())
+        .is_some_and(|afc| afc.carryover);
+    let period_waterfall = if afc_carryover {
+        std::borrow::Cow::Owned(
+            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_net_wac_carryover(
+                &period_waterfall,
+                &state.carryover_balance,
+            )
+            .into_owned(),
+        )
+    } else {
+        period_waterfall
+    };
+
+    let period_waterfall = match reserve_target {
+        Some(target) => std::borrow::Cow::Owned(
+            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_reserve_target(
+                &period_waterfall,
+                Money::new(target, state.base_currency)?,
+            )
+            .into_owned(),
+        ),
+        None => period_waterfall,
+    };
+
     let period_waterfall = if is_reinvestment_active {
         let mut resolved = period_waterfall.into_owned();
         let amortizing: &[String] = state
@@ -799,9 +967,15 @@ pub(super) fn simulate_period(
                 continue;
             }
             // Principal that cannot be placed remains in the capital account
-            // during revolving periods instead of leaking to equity.
-            tier.recipients
-                .retain(|recipient| recipient.recipient_type != RecipientType::Equity);
+            // during revolving periods instead of leaking to equity, so the
+            // manager's principal-tier incentive share has nothing to take.
+            tier.recipients.retain(|recipient| {
+                recipient.recipient_type != RecipientType::Equity
+                    && !matches!(
+                        recipient.calculation,
+                        PaymentCalculation::IncentiveFee { .. }
+                    )
+            });
             // Every note not listed as amortizing is held flat: its regular
             // principal target is its current balance for this period.
             for recipient in &mut tier.recipients {
@@ -830,6 +1004,19 @@ pub(super) fn simulate_period(
         std::borrow::Cow::Owned(resolved)
     };
 
+    // On a redemption date the equity residual is withheld: it carries as
+    // undistributed interest into the redemption proceeds, which the
+    // orchestration distributes after the notes are redeemed.
+    let period_waterfall = if period.redemption {
+        let mut resolved = period_waterfall.into_owned();
+        resolved
+            .tiers
+            .retain(|tier| tier.payment_type != PaymentType::Residual);
+        std::borrow::Cow::Owned(resolved)
+    } else {
+        period_waterfall
+    };
+
     let period_waterfall = if hedge_flows.payments.is_empty() {
         period_waterfall
     } else {
@@ -855,7 +1042,8 @@ pub(super) fn simulate_period(
     // Equity's cash to date for the incentive-fee hurdle: capital at closing
     // against every recorded equity distribution (waterfall payments and
     // reserve interest routed straight to equity).
-    let equity_history = equity_history(state)?;
+    let equity_history = state.equity_history()?;
+    let unresolved_npl = state.unresolved_npl();
 
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
@@ -869,6 +1057,8 @@ pub(super) fn simulate_period(
             market: context,
             tranche_balances: Some(&state.tranche_balances),
             asset_balances: Some(&state.pool_state.balances),
+            live_collateral: Some(state.live_collateral(&unresolved_npl)),
+            special_serviced: Some(&special_serviced_open),
             deferred_interest: Some(&state.deferred_interest),
             reserve_balance: state.reserve_balance,
             // N2: funding-account principal is still collateral for the notes.
@@ -952,11 +1142,28 @@ pub(super) fn simulate_period(
             }
         };
         debt_interest_due += current_interest_due.amount();
+        // Carryover repaid this period sits outside the capped claim; it is
+        // recorded as interest and taken off the carryover balance below.
+        let carryover_paid = Money::new(
+            waterfall_result
+                .payment_records
+                .iter()
+                .filter(|record| {
+                    matches!(
+                        &record.recipient,
+                        RecipientType::Tranche(id) if id == tranche_id_str
+                    ) && record.recipient_id == format!("net_wac_carryover_{tranche_id_str}")
+                })
+                .map(|record| record.paid_amount.amount())
+                .sum::<f64>(),
+            state.base_currency,
+        )?;
         let total_interest_claim = if tranche.pik_enabled {
             current_interest_due
         } else {
             existing_deferred.checked_add(current_interest_due)?
-        };
+        }
+        .checked_add(carryover_paid)?;
 
         let payment_received = waterfall_result
             .distributions
@@ -1032,6 +1239,36 @@ pub(super) fn simulate_period(
 
         // Only explicitly classified principal retires loss-absorbing capital.
         let principal_payment = principal_classified;
+
+        // Net-WAC carryover: settle what this period repaid, then accrue the
+        // interest the cap withheld this period for repayment from later
+        // excess (no interest accrues on the carryover itself).
+        if afc_carryover && tranche.seniority != TrancheSeniority::Equity {
+            if let Some(Some(_)) = claim_caps.get(tranche_id_str) {
+                let uncapped_due = tranche_period_interest_due(
+                    tranche,
+                    current_balance.amount(),
+                    TrancheAccrualDates {
+                        start: period_start,
+                        payment: pay_date,
+                        valuation: as_of,
+                    },
+                    context,
+                    0.0,
+                    false,
+                    state.floating_rate_shift,
+                )?;
+                let withheld = (uncapped_due - current_interest_due.amount()).max(0.0);
+                let entry = state
+                    .carryover_balance
+                    .entry(tranche_id_str.to_string())
+                    .or_insert(Money::from((0_i64, state.base_currency)));
+                *entry = Money::new(
+                    (entry.amount() - carryover_paid.amount() + withheld).max(0.0),
+                    state.base_currency,
+                )?;
+            }
+        }
 
         if let Some(res) = state.results.get_mut(tranche_id_str) {
             if payment_received.amount() > 0.0 {
@@ -1113,7 +1350,7 @@ pub(super) fn simulate_period(
     // Realized excess spread this period, annualized on the opening pool
     // balance: interest collections less the debt coupons due, the fees paid
     // and the net charge-off. Feeds the early-amortization excess-spread test.
-    let fees_paid: f64 = waterfall_result
+    let waterfall_fees: f64 = waterfall_result
         .distributions
         .iter()
         .filter(|(recipient, _)| {
@@ -1124,8 +1361,11 @@ pub(super) fn simulate_period(
         })
         .map(|(_, amount)| amount.amount())
         .sum();
+    // Special-servicing workout and liquidation fees were taken inside the
+    // pool flows, so the collections above are already net of them.
+    let fees_paid = waterfall_fees + pool_flows.special_servicing_fees.amount();
     let net_charge_off = (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0);
-    let excess = pool_flows.interest.amount() - debt_interest_due - fees_paid - net_charge_off;
+    let excess = pool_flows.interest.amount() - debt_interest_due - waterfall_fees - net_charge_off;
     state
         .excess_spread_history
         .push(if opening_pool_balance > 0.0 {
@@ -1160,8 +1400,8 @@ pub(super) fn simulate_period(
     // Per-period deal accounting: end-of-period balances, the cash that moved
     // and the coverage tests exactly as the executor evaluated them (single
     // source: the waterfall's own results).
-    let pool_factor = if state.total_pool_balance.amount() > 0.0 {
-        state.pool_outstanding.amount() / state.total_pool_balance.amount()
+    let pool_factor = if state.original_pool_balance.amount() > 0.0 {
+        state.pool_outstanding.amount() / state.original_pool_balance.amount()
     } else {
         0.0
     };
@@ -1215,6 +1455,10 @@ pub(super) fn simulate_period(
             spread_account: state.spread_account,
             funding_account: state.principal_funding_account,
             delinquent_balance: Money::new(delinquent, state.base_currency)?,
+            servicer_advances_outstanding: Money::new(
+                state.servicer_advances_outstanding(),
+                state.base_currency,
+            )?,
             excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
             coverage_tests,
         });
@@ -1226,37 +1470,65 @@ pub(super) fn simulate_period(
     Ok(())
 }
 
-/// Equity's cash to date: the equity notes' original par invested at closing
-/// against every distribution recorded for them so far (waterfall interest
-/// and principal, plus reserve interest routed straight to equity).
-fn equity_history(
-    state: &SimulationState,
-) -> Result<crate::instruments::fixed_income::structured_credit::types::EquityHistory> {
-    let mut invested = Money::from((0_i64, state.base_currency));
-    let mut distributions: Vec<(Date, Money)> = Vec::new();
-    for tranche in state
-        .tranches
-        .tranches
-        .iter()
-        .filter(|tranche| tranche.seniority == TrancheSeniority::Equity)
-    {
-        invested = invested.checked_add(tranche.original_balance)?;
-        if let Some(result) = state.results.get(tranche.id.as_str()) {
-            distributions.extend(
-                result
-                    .interest_flows
-                    .iter()
-                    .chain(result.principal_flows.iter())
-                    .copied(),
-            );
+/// Apply the scheduled draws due on `pay_date` and, while revolving, the
+/// borrowing-base re-advance, to the note balances and the period's cash.
+fn apply_tranche_draws(
+    state: &mut SimulationState,
+    instrument: &StructuredCredit,
+    period: &SimulationPeriod,
+    pay_date: Date,
+) -> Result<()> {
+    let mut draws: Vec<(String, Money)> = Vec::new();
+    while let Some(draw) = instrument.tranche_draws.get(state.next_tranche_draw) {
+        if draw.date > pay_date {
+            break;
+        }
+        draws.push((draw.tranche_id.clone(), draw.amount));
+        state.next_tranche_draw += 1;
+    }
+    if let Some(readvance) = instrument.tranche_readvance.as_ref() {
+        let revolving = !state.early_amortization_triggered
+            && !period.redemption
+            && state
+                .pool
+                .reinvestment_period
+                .as_ref()
+                .is_some_and(|window| window.is_active && pay_date <= window.end_date);
+        if revolving {
+            if let Some(rules) = instrument
+                .coverage_rules
+                .as_ref()
+                .and_then(|rules| rules.borrowing_base.as_ref())
+            {
+                let unresolved_npl = state.unresolved_npl();
+                let base = rules
+                    .evaluate_live(
+                        &state.pool,
+                        Some(&state.pool_state.balances),
+                        Some(state.live_collateral(&unresolved_npl)),
+                    )?
+                    .borrowing_base
+                    .amount();
+                let balance = state
+                    .tranche_balances
+                    .get(readvance.tranche_id.as_str())
+                    .map_or(0.0, Money::amount);
+                let headroom = readvance.commitment.amount().min(base) - balance;
+                if headroom > 1.0 {
+                    draws.push((
+                        readvance.tranche_id.clone(),
+                        Money::new(headroom, state.base_currency)?,
+                    ));
+                }
+            }
         }
     }
-    distributions.sort_by_key(|(date, _)| *date);
-    Ok(
-        crate::instruments::fixed_income::structured_credit::types::EquityHistory {
-            invested_on: state.closing_date,
-            invested,
-            distributions,
-        },
-    )
+    for (tranche_id, amount) in draws {
+        if let Some(balance) = state.tranche_balances.get_mut(&tranche_id) {
+            *balance = balance.checked_add(amount)?;
+        }
+        state.undistributed_principal = state.undistributed_principal.checked_add(amount)?;
+        state.tranche_draws.push((tranche_id, pay_date, amount));
+    }
+    Ok(())
 }

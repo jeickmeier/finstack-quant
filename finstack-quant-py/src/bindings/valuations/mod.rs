@@ -13,14 +13,16 @@ mod merton_mc;
 mod pricing;
 mod schema;
 mod structured_credit;
-pub(crate) mod typed_asset_backed_facility;
 pub(crate) mod typed_credit;
 pub(crate) mod typed_equity;
 pub(crate) mod typed_fx;
 mod typed_legs;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
+#[macro_use]
 pub(crate) mod typed_structured_credit;
+// Declared after `typed_structured_credit` so its `sc_wire_methods!` macro is in scope.
+pub(crate) mod typed_asset_backed_facility;
 
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,

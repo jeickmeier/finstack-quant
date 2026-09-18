@@ -285,6 +285,14 @@ pub struct Tranche {
     #[serde(default)]
     pub pik_enabled: bool,
 
+    /// Whether the coupon is a non-deferrable claim the template pays from
+    /// principal proceeds when interest proceeds fall short (and the deal's
+    /// `principal_covers_senior_interest` allows it). `None` follows the
+    /// seniority convention: senior notes are non-deferrable, every other
+    /// class defers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub non_deferrable: Option<bool>,
+
     /// Legal final maturity date
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -309,6 +317,14 @@ pub struct Tranche {
 }
 
 impl Tranche {
+    /// Whether the coupon is a non-deferrable claim: the explicit
+    /// `non_deferrable` when set, else `true` for senior notes only.
+    #[must_use]
+    pub fn is_non_deferrable(&self) -> bool {
+        self.non_deferrable
+            .unwrap_or(self.seniority == TrancheSeniority::Senior)
+    }
+
     /// Create a new tranche with required fields
     pub fn new(
         id: impl Into<String>,
@@ -342,6 +358,7 @@ impl Tranche {
             day_count: DayCount::Act360,
             deferred_interest: Money::from((0_i64, original_balance.currency())),
             pik_enabled: false,
+            non_deferrable: None,
             maturity,
             // Provisional: overwritten by `TrancheStructure::new` /
             // `TrancheStructure` deserialization, which assigns a structurally
@@ -516,6 +533,7 @@ pub struct TrancheBuilder {
     frequency: Tenor,
     day_count: DayCount,
     pik_enabled: bool,
+    non_deferrable: Option<bool>,
     current_balance: Option<Money>,
     deferred_interest: Option<Money>,
     oc_trigger: Option<CoverageTrigger>,
@@ -538,6 +556,7 @@ impl TrancheBuilder {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             pik_enabled: false,
+            non_deferrable: None,
             current_balance: None,
             deferred_interest: None,
             oc_trigger: None,
@@ -614,6 +633,20 @@ impl TrancheBuilder {
     #[must_use]
     pub fn pik_enabled(mut self, enabled: bool) -> Self {
         self.pik_enabled = enabled;
+        self
+    }
+
+    /// Mark the coupon non-deferrable (paid from principal proceeds when
+    /// interest falls short) or deferrable, overriding the seniority
+    /// convention.
+    ///
+    /// # Arguments
+    ///
+    /// * `non_deferrable` - `true` for a coupon the trust must pay in full
+    ///   every period, `false` for one that defers.
+    #[must_use]
+    pub fn non_deferrable(mut self, non_deferrable: bool) -> Self {
+        self.non_deferrable = Some(non_deferrable);
         self
     }
 
@@ -726,6 +759,7 @@ impl TrancheBuilder {
         tranche.frequency = self.frequency;
         tranche.day_count = self.day_count;
         tranche.pik_enabled = self.pik_enabled;
+        tranche.non_deferrable = self.non_deferrable;
         if let Some(balance) = self.current_balance {
             tranche.current_balance = balance;
         }

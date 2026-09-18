@@ -7,12 +7,13 @@ use serde::{Deserialize, Serialize};
 
 /// Resolution timeline of a non-performing loan.
 ///
-/// The loan pays no interest or principal from closing until the first
-/// payment date at or after `months_to_resolution` months. On that date the
-/// share `1 − reperformance_prob` of the balance liquidates: it is booked as
-/// a default whose recovery is `(proceeds_pct − carry_cost_pct)%` of the
-/// liquidated balance, released after the deal's recovery lag like any other
-/// recovery. The share `reperformance_prob` re-performs: it becomes a
+/// The loan pays no interest or principal until the first payment date at
+/// or after `months_to_resolution` months from its origination (the asset's
+/// `acquisition_date`, else the deal closing). On that date the share
+/// `1 − reperformance_prob` of the balance liquidates: it is booked as a
+/// default whose recovery is `(proceeds_pct − carry_cost_pct)%` of the
+/// liquidated balance, released on the resolution date itself (the workout
+/// is the timeline). The share `reperformance_prob` re-performs: it becomes a
 /// performing loan on its original amortization terms at `modified_rate`
 /// (the loan's coupon when `None`) from the following period on, with the
 /// level payment recast on the re-performing balance.
@@ -37,7 +38,8 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LiquidationSpec {
-    /// Months from the deal closing date to the resolution date.
+    /// Months from the loan's origination (`acquisition_date`, else the deal
+    /// closing) to the resolution date.
     pub months_to_resolution: u32,
     /// Gross liquidation proceeds as a percent of the liquidated balance.
     pub proceeds_pct: f64,

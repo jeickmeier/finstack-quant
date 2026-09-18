@@ -6,9 +6,10 @@
 use super::coverage_tests::{CoverageTest, TestContext};
 use crate::instruments::fixed_income::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageTestAction, CoverageTestSpec, CoverageTestType,
-    DiversionRecord, EquityHistory, FundingSource, PaymentCalculation, PaymentRecord, PaymentType,
-    Recipient, RecipientType, RoundingConvention, Tranche, TrancheCoupon, TrancheStructure,
-    Waterfall, WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
+    DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
+    PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
+    TrancheCoupon, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
+    WaterfallWorkspace,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -81,6 +82,13 @@ pub struct WaterfallContext<'a> {
     pub tranche_balances: Option<&'a HashMap<String, Money>>,
     /// Current per-asset balances, aligned by index with `pool.assets`.
     pub asset_balances: Option<&'a [f64]>,
+    /// Live delinquency buckets and NPL flags for the borrowing-base
+    /// eligibility rules.
+    pub live_collateral: Option<LiveCollateral<'a>>,
+    /// Live special-servicing flags aligned with `pool.assets` (loans that
+    /// defaulted or took a balloon loss during the simulation); `None` uses
+    /// the closing `special_servicing` specs.
+    pub special_serviced: Option<&'a [bool]>,
     /// Deferred interest claims carried from prior periods.
     pub deferred_interest: Option<&'a HashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period).
@@ -116,17 +124,25 @@ pub struct WaterfallContext<'a> {
 ///   `special_servicing` spec count.
 /// * `asset_balances` - Current per-asset balances aligned with
 ///   `pool.assets`, or `None` to use the closing balances.
+/// * `special_serviced` - Live special-servicing flags aligned with
+///   `pool.assets` (loans that defaulted or took a balloon loss during the
+///   simulation), or `None` to use the closing `special_servicing` specs.
 /// * `currency` - Currency of the returned balance.
 pub(crate) fn special_serviced_balance(
     pool: &AssetPool,
     asset_balances: Option<&[f64]>,
+    special_serviced: Option<&[bool]>,
     currency: Currency,
 ) -> Result<Money> {
     Money::new(
         pool.assets
             .iter()
             .enumerate()
-            .filter(|(_, asset)| asset.special_servicing.is_some() && !asset.is_defaulted)
+            .filter(|(index, asset)| {
+                special_serviced.map_or(asset.special_servicing.is_some(), |flags| {
+                    flags.get(*index).copied().unwrap_or(false)
+                }) && !asset.is_defaulted
+            })
             .map(|(index, asset)| {
                 asset_balances
                     .and_then(|balances| balances.get(index).copied())
@@ -205,8 +221,12 @@ fn execute_waterfall_core(
         tranche_index.insert(t.id.as_str(), i);
     }
 
-    let special_serviced_balance =
-        special_serviced_balance(pool, context.asset_balances, waterfall.base_currency)?;
+    let special_serviced_balance = special_serviced_balance(
+        pool,
+        context.asset_balances,
+        context.special_serviced,
+        waterfall.base_currency,
+    )?;
 
     let allocation_ctx = AllocationContext {
         base_currency: waterfall.base_currency,
@@ -279,6 +299,7 @@ fn execute_waterfall_core(
         context.market,
         context.tranche_balances,
         context.asset_balances,
+        context.live_collateral,
         &payable_principal_tranche_ids,
         senior_fees,
         context.restricted_cash,
@@ -365,6 +386,12 @@ fn execute_waterfall_core(
             had_diversions = true;
             diversion_reason = Some(format!("coverage test failed: {}", failing.join(", ")));
             let divertible = interest_remaining.amount().min(binding_cure).max(0.0);
+            // A `divert_pct` caps the diversion at that share of the interest
+            // remaining at the test tier.
+            let divertible = match tier.tests.first().and_then(|test| test.divert_pct) {
+                Some(pct) => divertible.min(interest_remaining.amount().max(0.0) * pct / 100.0),
+                None => divertible,
+            };
             let divertible = Money::new(divertible, waterfall.base_currency)?;
             let action = tier
                 .tests
@@ -468,8 +495,12 @@ fn execute_waterfall_core(
                 let from_principal = tier_cash.checked_sub(from_interest)?;
                 interest_remaining = interest_remaining.checked_sub(from_interest)?;
                 principal_remaining = principal_remaining.checked_sub(from_principal)?;
-                principal_used_for_interest =
-                    principal_used_for_interest.checked_add(from_principal)?;
+                // A principal tier drawing on principal is not principal
+                // used for interest (targeted-OC amortization).
+                if tier.payment_type != PaymentType::Principal {
+                    principal_used_for_interest =
+                        principal_used_for_interest.checked_add(from_principal)?;
+                }
             }
         }
     }
@@ -667,6 +698,11 @@ fn allocate_sequential(
             diverted,
             ctx.floating_rate_shift,
             ctx.equity_history,
+            output
+                .distributions
+                .get(&RecipientType::Equity)
+                .copied()
+                .unwrap_or(Money::from((0_i64, base_currency))),
         )?;
 
         let paid = if requested.amount() <= available.amount() {
@@ -800,6 +836,11 @@ fn allocate_pro_rata(
             diverted,
             ctx.floating_rate_shift,
             ctx.equity_history,
+            output
+                .distributions
+                .get(&RecipientType::Equity)
+                .copied()
+                .unwrap_or(Money::from((0_i64, base_currency))),
         )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
@@ -1229,6 +1270,7 @@ pub(crate) fn senior_fee_accrual(
                 false,
                 inputs.floating_rate_shift,
                 None,
+                Money::from((0_i64, waterfall.base_currency)),
             )?;
             total = total.checked_add(amount)?;
         }
@@ -1256,6 +1298,7 @@ pub(super) fn evaluate_coverage_tests(
     market: &MarketContext,
     tranche_balances: Option<&HashMap<String, Money>>,
     asset_balances: Option<&[f64]>,
+    live_collateral: Option<LiveCollateral<'_>>,
     payable_principal_tranche_ids: &[&str],
     senior_fees: Money,
     restricted_cash: Money,
@@ -1292,6 +1335,7 @@ pub(super) fn evaluate_coverage_tests(
             tranche_balances,
             payable_principal_tranche_ids: Some(payable_principal_tranche_ids),
             asset_balances,
+            live_collateral,
             current_pool_balance: Some(current_pool_balance),
             senior_fees,
             restricted_cash,
@@ -1369,6 +1413,7 @@ fn calculate_payment_amount(
     diverted: bool,
     floating_rate_shift: f64,
     equity_history: Option<&EquityHistory>,
+    equity_paid_in_period: Money,
 ) -> Result<Money> {
     let (raw_amount, rounding) = match calculation {
         PaymentCalculation::FixedAmount { amount, rounding } => (amount.amount(), *rounding),
@@ -1530,20 +1575,27 @@ fn calculate_payment_amount(
 
         PaymentCalculation::ResidualCash => (available.amount(), None),
 
+        PaymentCalculation::NetWacCarryover { amount, .. } => (amount.amount().max(0.0), None),
+
         PaymentCalculation::IncentiveFee {
             hurdle_irr,
             share_pct,
         } => {
-            // The hurdle is tested with this tier's cash counted as an equity
-            // distribution on the payment date; before it is met the manager
-            // takes nothing and the cash flows on to the residual.
-            let earned = equity_history
-                .and_then(|history| history.irr_with(payment_date, available))
-                .is_some_and(|irr| irr >= *hurdle_irr);
-            let fee = if earned {
-                available.amount() * share_pct
-            } else {
-                0.0
+            // The hurdle is tested on equity's cash to date plus what it has
+            // already received earlier in this run plus this cash; the share
+            // applies only to the part of this cash above the hurdle, so the
+            // crossing period is split rather than all-or-nothing.
+            let fee = match equity_history {
+                Some(history) => {
+                    let total = equity_paid_in_period.checked_add(available)?;
+                    let shortfall = history
+                        .hurdle_shortfall(payment_date, total, *hurdle_irr)
+                        .amount();
+                    let excess = (total.amount() - shortfall.max(equity_paid_in_period.amount()))
+                        .clamp(0.0, available.amount());
+                    excess * share_pct
+                }
+                None => 0.0,
             };
             (fee, None)
         }
@@ -1662,6 +1714,7 @@ mod coverage_position_tests {
             rate: 0.08,
             spread_bp: Some(400.0),
             index_id: None,
+            index_floor: None,
             maturity: maturity(),
             credit_quality: Some(CreditRating::BB),
             industry: Some("Technology".into()),
@@ -1671,11 +1724,14 @@ mod coverage_position_tests {
             default_date: None,
             purchase_price: None,
             acquisition_date: None,
+            origination_date: None,
             smm_override: None,
             mdr_override: None,
             recovery_rate: None,
             commitment: None,
             contractual_payment: None,
+            amortization_term_months: None,
+            io_months: None,
             market_price_pct: None,
             delinquency_buckets: None,
             balloon: None,
@@ -1719,6 +1775,8 @@ mod coverage_position_tests {
             market,
             tranche_balances: None,
             asset_balances: None,
+            live_collateral: None,
+            special_serviced: None,
             deferred_interest: None,
             reserve_balance: usd(0.0),
             restricted_cash: usd(0.0),
@@ -2049,10 +2107,10 @@ mod coverage_position_tests {
             result.coverage_tests
         );
 
-        // Diverting X removes X from the numerator's cash and pays down X of
-        // the shared senior denominator: X = (num − r·den) / (1 − r).
+        // Diverting X of interest pays down X of the shared senior
+        // denominator and leaves the numerator untouched: X = den − num / r.
         let numerator = 118_000_000.0_f64 + 20_000_000.0;
-        let cure = |ratio: f64, denom: f64| (numerator - ratio * denom) / (1.0 - ratio);
+        let cure = |ratio: f64, denom: f64| denom - numerator / ratio;
         let cure_a = cure(1.39, 100_000_000.0);
         let cure_b = cure(1.07, 130_000_000.0);
         let binding = cure_a.max(cure_b);
@@ -2377,6 +2435,8 @@ mod water_fill_tests {
                 market: &market,
                 tranche_balances: None,
                 asset_balances: None,
+                live_collateral: None,
+                special_serviced: None,
                 deferred_interest: None,
                 reserve_balance: Money::from((0_i64, ccy)),
                 restricted_cash: Money::from((0_i64, ccy)),

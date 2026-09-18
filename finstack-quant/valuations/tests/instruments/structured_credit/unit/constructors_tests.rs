@@ -5,9 +5,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    abs_auto_standard_cdr, clo_standard_cdr, cmbs_standard_cdr, psa_ramp_months, psa_terminal_cpr,
-    rmbs_standard_cdr, sda_peak_cdr, sda_peak_month, sda_terminal_cdr, AssetPool, DealType,
-    PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+    abs_auto_standard_cdr, clo_standard_cdr, clo_standard_recovery, cmbs_standard_cdr,
+    psa_ramp_months, psa_terminal_cpr, rmbs_standard_cdr, sda_peak_cdr, sda_peak_month,
+    sda_terminal_cdr, AssetPool, CreditModelConfig, DealFees, DealType, PoolAsset,
+    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     clamped_cdr_to_mdr, clamped_cpr_to_smm,
@@ -81,6 +82,46 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
         assert_eq!(sc.frequency, expected_frequency);
         assert!((sc.credit_model.default_spec.cdr - expected_cdr).abs() < 1e-12);
     }
+}
+
+/// One CLO profile in the registry: the BSL fee convention (small senior
+/// fee, larger subordinated fee), a senior-secured-loan recovery, and the
+/// serde credit-model defaults equal to what `new_clo` applies.
+#[test]
+fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
+    let fees = DealFees::clo_standard(Currency::USD);
+    assert!(
+        fees.senior_mgmt_fee_bp < fees.subordinated_mgmt_fee_bp,
+        "senior {} bp must be below subordinated {} bp",
+        fees.senior_mgmt_fee_bp,
+        fees.subordinated_mgmt_fee_bp
+    );
+    assert!(
+        clo_standard_recovery() >= 0.55,
+        "senior secured loans recover at least 55%: {}",
+        clo_standard_recovery()
+    );
+    let clo = StructuredCredit::new_clo(
+        "CLO",
+        create_pool_with_balance(100_000_000.0),
+        create_single_tranche(),
+        test_date(),
+        maturity_date(),
+        "USD-OIS",
+    );
+    let defaults = CreditModelConfig::default();
+    assert_eq!(
+        format!("{:?}", clo.credit_model.prepayment_spec),
+        format!("{:?}", defaults.prepayment_spec)
+    );
+    assert_eq!(
+        format!("{:?}", clo.credit_model.default_spec),
+        format!("{:?}", defaults.default_spec)
+    );
+    assert_eq!(
+        format!("{:?}", clo.credit_model.recovery_spec),
+        format!("{:?}", defaults.recovery_spec)
+    );
 }
 
 #[test]

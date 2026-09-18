@@ -22,6 +22,7 @@ use crate::instruments::fixed_income::structured_credit::{
     Overrides, ReinvestmentCriteria, ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit,
     Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
 };
+use crate::instruments::fixed_income::structured_credit::{TrancheDraw, TrancheReadvance};
 
 /// Identifier of the synthetic facility note.
 pub const FACILITY_TRANCHE_ID: &str = "FACILITY";
@@ -37,8 +38,13 @@ pub struct FacilityProjection {
     /// Cash paid to the residual class.
     pub residual: TrancheCashflows,
     /// Unused-commitment fee accrued on `commitment − opening facility
-    /// balance` per accrual period, paid on the period's payment date.
+    /// balance` per accrual period while the line revolves, paid on the
+    /// period's payment date.
     pub unused_fees: Vec<(Date, Money)>,
+    /// Lender draws applied (scheduled draws and re-advances) per payment
+    /// date: cash the lender advances, an outflow in the lender's IRR.
+    #[serde(default)]
+    pub draws: Vec<(Date, Money)>,
     /// Per-period deal record of the synthetic deal.
     pub diagnostics: SimulationDiagnostics,
 }
@@ -49,15 +55,26 @@ impl FacilityProjection {
     pub fn lender_cashflows(&self) -> Vec<(Date, Money)> {
         let mut by_date: std::collections::BTreeMap<Date, Money> =
             std::collections::BTreeMap::new();
-        for (date, amount) in self.facility.cashflows.iter().chain(&self.unused_fees) {
+        let draws = self
+            .draws
+            .iter()
+            .map(|(date, amount)| (*date, amount.checked_neg()));
+        for (date, amount) in self
+            .facility
+            .cashflows
+            .iter()
+            .chain(&self.unused_fees)
+            .map(|(date, amount)| (*date, *amount))
+            .chain(draws)
+        {
             by_date
-                .entry(*date)
+                .entry(date)
                 .and_modify(|total| {
-                    if let Ok(sum) = total.checked_add(*amount) {
+                    if let Ok(sum) = total.checked_add(amount) {
                         *total = sum;
                     }
                 })
-                .or_insert(*amount);
+                .or_insert(amount);
         }
         by_date.into_iter().collect()
     }
@@ -175,7 +192,8 @@ impl AssetBackedFacility {
         let waterfall_rules =
             (max_loss.is_some() || min_excess_spread.is_some()).then(|| WaterfallRules {
                 early_amortization: Some(EarlyAmortizationSpec {
-                    max_cumulative_loss_pct: max_loss.unwrap_or(100.0),
+                    // Percent at the facility boundary, fraction in the engine.
+                    max_cumulative_loss: max_loss.map(|pct| pct / 100.0),
                     min_excess_spread_3m: min_excess_spread,
                 }),
                 ..WaterfallRules::default()
@@ -215,11 +233,38 @@ impl AssetBackedFacility {
         if let Some(rules) = waterfall_rules {
             builder = builder.waterfall_rules(rules);
         }
-        if repayment_date < self.maturity {
-            builder = builder.call_assumption(CallAssumption::new(repayment_date, 100.0));
+        if repayment_date < self.maturity || self.term_out.is_some() {
+            // The scheduled term-out end, or the same window from an
+            // early-amortization event when that comes first.
+            let mut call = CallAssumption::new(repayment_date, 100.0);
+            if let Some(term_out) = self.term_out {
+                call = call.with_after_early_amortization(term_out.months);
+            }
+            builder = builder.call_assumption(call);
         }
         if let Some(price) = self.liquidation_price_pct {
             builder = builder.liquidation_price_pct(price);
+        }
+        if let Some(fees) = &self.fees {
+            builder = builder.fees(fees.clone());
+        }
+        if !self.draw_schedule.is_empty() {
+            builder = builder.tranche_draws(
+                self.draw_schedule
+                    .iter()
+                    .map(|draw| TrancheDraw {
+                        tranche_id: FACILITY_TRANCHE_ID.to_string(),
+                        date: draw.date,
+                        amount: draw.amount,
+                    })
+                    .collect(),
+            );
+        }
+        if self.readvance_to_borrowing_base {
+            builder = builder.tranche_readvance(TrancheReadvance {
+                tranche_id: FACILITY_TRANCHE_ID.to_string(),
+                commitment: self.commitment,
+            });
         }
         let _ = currency;
         builder.build()
@@ -251,20 +296,40 @@ impl AssetBackedFacility {
         let residual = run.tranches.remove(RESIDUAL_TRANCHE_ID).ok_or_else(|| {
             finstack_quant_core::Error::Validation("engine reported no residual class".to_string())
         })?;
-        let unused_fees = self.unused_fees(&facility)?;
+        // The commitment ends with the revolving period: its scheduled end,
+        // an earlier scheduled amortization date, or the early-amortization
+        // event the engine reports.
+        let commitment_end = run
+            .diagnostics
+            .early_amortization_date
+            .map_or(self.effective_revolving_end(), |event| {
+                event.min(self.effective_revolving_end())
+            });
+        let unused_fees = self.unused_fees(&facility, commitment_end)?;
+        let draws = run
+            .diagnostics
+            .tranche_draws
+            .iter()
+            .filter(|(id, _, _)| id == FACILITY_TRANCHE_ID)
+            .map(|(_, date, amount)| (*date, *amount))
+            .collect();
         Ok(FacilityProjection {
             facility,
             residual,
             unused_fees,
+            draws,
             diagnostics: run.diagnostics,
         })
     }
 
-    /// Unused-commitment fee per accrual period of the note:
-    /// `(commitment − opening balance) × unused_fee_bp × accrual`.
+    /// Unused-commitment fee per accrual period of the note that starts
+    /// before the commitment ends (`commitment_end`) with a positive
+    /// opening balance: `(commitment − opening balance) × unused_fee_bp ×
+    /// accrual`.
     fn unused_fees(
         &self,
         facility: &TrancheCashflows,
+        commitment_end: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         if self.unused_fee_bp <= 0.0 {
             return Ok(Vec::new());
@@ -272,6 +337,9 @@ impl AssetBackedFacility {
         let currency = self.commitment.currency();
         let mut fees = Vec::with_capacity(facility.accrual_periods.len());
         for period in &facility.accrual_periods {
+            if period.start >= commitment_end || period.opening_balance.amount() <= 0.0 {
+                continue;
+            }
             let undrawn = (self.commitment.amount() - period.opening_balance.amount()).max(0.0);
             if undrawn <= 0.0 {
                 continue;

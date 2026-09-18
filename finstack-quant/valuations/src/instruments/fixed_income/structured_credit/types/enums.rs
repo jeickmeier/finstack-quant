@@ -379,3 +379,42 @@ impl LossAllocationPolicy {
         }
     }
 }
+
+/// When a collateral loss is booked: at default (expected net loss, the
+/// INTEX/Moody's Analytics convention for corporate collateral) or when the
+/// defaulted loan liquidates and its recovery settles (mortgage servicing
+/// convention, where the realized loss is known only at liquidation).
+///
+/// The timing drives every cumulative-loss quantity: note write-downs under
+/// [`LossAllocationPolicy::WriteDown`], the step-down and early-amortization
+/// loss triggers and the excess-spread trap. The OC tests carry defaulted
+/// collateral at its recovery value from the default date under both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[non_exhaustive]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "snake_case")]
+pub enum LossRecognition {
+    /// Book `defaulted par − expected recovery` on the default date.
+    AtDefault,
+    /// Book `defaulted par − recovery` when the claim settles after the
+    /// recovery lag (or at the simulation's end for claims still pending).
+    AtLiquidation,
+}
+
+impl LossRecognition {
+    /// Market-standard timing for a deal type: `AtLiquidation` for RMBS and
+    /// CMBS, `AtDefault` for every other family.
+    ///
+    /// # Arguments
+    ///
+    /// * `deal_type` - Deal family whose servicing convention selects the timing.
+    pub fn default_for(deal_type: DealType) -> Self {
+        match deal_type {
+            DealType::Rmbs | DealType::Cmbs => Self::AtLiquidation,
+            DealType::Clo | DealType::Cbo | DealType::Abs | DealType::Auto | DealType::Card => {
+                Self::AtDefault
+            }
+        }
+    }
+}

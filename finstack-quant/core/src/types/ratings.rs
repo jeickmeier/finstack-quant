@@ -135,6 +135,30 @@ pub enum CreditRating {
 }
 
 impl CreditRating {
+    /// Letter bucket of the rating with the `+`/`-` modifier folded away:
+    /// `BPlus`, `B` and `BMinus` all map to `B`; unmodified ratings map to
+    /// themselves.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::types::CreditRating;
+    ///
+    /// assert_eq!(CreditRating::BMinus.bucket(), CreditRating::B);
+    /// assert_eq!(CreditRating::AAA.bucket(), CreditRating::AAA);
+    /// ```
+    pub fn bucket(self) -> Self {
+        match self {
+            Self::AAPlus | Self::AA | Self::AAMinus => Self::AA,
+            Self::APlus | Self::A | Self::AMinus => Self::A,
+            Self::BBBPlus | Self::BBB | Self::BBBMinus => Self::BBB,
+            Self::BBPlus | Self::BB | Self::BBMinus => Self::BB,
+            Self::BPlus | Self::B | Self::BMinus => Self::B,
+            Self::CCCPlus | Self::CCC | Self::CCCMinus => Self::CCC,
+            other => other,
+        }
+    }
+
     /// Numeric ordinal for ordering. Lower values indicate higher credit quality.
     /// NR is placed between C and D in the ordering.
     fn ordinal(self) -> u8 {

@@ -532,8 +532,8 @@ impl PyTrancheMetrics {
     /// >>> payload = json.dumps({
     /// ...     "tranche_id": "A", "currency": "USD", "pv": 1000.0,
     /// ...     "price_pct": 100.0, "factor": 1.0, "wal": 3.0, "z_spread_bp": 0.0,
-    /// ...     "cs01": -1.0, "spread_duration": 3.0, "modified_duration": 3.0,
-    /// ...     "convexity": 12.0, "target_price_pct": 100.0,
+    /// ...     "cs01": -1.0, "spread_duration": 3.0, "spread_convexity": 12.0,
+    /// ...     "modified_duration": 3.0, "convexity": 12.0, "target_price_pct": 100.0,
     /// ... })
     /// >>> metrics = TrancheMetrics.from_json(payload)
     /// >>> metrics.tranche_id
@@ -613,16 +613,33 @@ impl PyTrancheMetrics {
         self.inner.spread_duration
     }
 
-    /// Modified (rate) duration of the projected cashflows, in years.
+    /// Spread convexity at the solved z-spread, in years squared.
+    #[getter]
+    fn spread_convexity(&self) -> f64 {
+        self.inner.spread_convexity
+    }
+
+    /// Effective (rate) duration, in years: the cashflows are re-projected
+    /// with every rate curve bumped ±1 bp, so a floater's coupon resets move
+    /// with the curve and its duration is short.
     #[getter]
     fn modified_duration(&self) -> f64 {
         self.inner.modified_duration
     }
 
-    /// Modified convexity of the projected cashflows, in years squared.
+    /// Effective convexity from the same ±1 bp re-projection, in years
+    /// squared.
     #[getter]
     fn convexity(&self) -> f64 {
         self.inner.convexity
+    }
+
+    /// Discount margin to maturity at ``target_price_pct`` for a
+    /// floating-rate tranche, in basis points; ``None`` for fixed-rate
+    /// tranches.
+    #[getter]
+    fn dm_bp(&self) -> Option<f64> {
+        self.inner.dm_bp
     }
 
     /// Price the z-spread/CS01 were solved against, as a percentage of
@@ -657,10 +674,11 @@ impl PyTrancheMetrics {
     ///
     /// Columns: ``tranche_id``, ``currency``, ``pv``, ``price_pct``,
     /// ``factor``, ``wal``, ``z_spread_bp``, ``cs01``, ``spread_duration``,
-    /// ``modified_duration``, ``convexity``, ``target_price_pct``,
-    /// ``wal_to_call``, ``z_spread_to_call_bp``, ``dm_to_call_bp`` — the same
-    /// fields and units as the getters of the same name (the ``*_to_call``
-    /// columns are ``NaN`` without a call).
+    /// ``spread_convexity``, ``modified_duration``, ``convexity``,
+    /// ``target_price_pct``, ``wal_to_call``, ``z_spread_to_call_bp``,
+    /// ``dm_to_call_bp``, ``dm_bp`` — the same fields and units as the
+    /// getters of the same name (the ``*_to_call`` columns are ``NaN``
+    /// without a call, ``dm_bp`` for fixed-rate tranches).
     ///
     /// One row per tranche, so a capital structure stacks with
     /// ``pd.concat([m.to_dataframe() for m in metrics])``. ``pv`` and ``cs01``
@@ -681,12 +699,14 @@ impl PyTrancheMetrics {
                 "z_spread_bp",
                 "cs01",
                 "spread_duration",
+                "spread_convexity",
                 "modified_duration",
                 "convexity",
                 "target_price_pct",
                 "wal_to_call",
                 "z_spread_to_call_bp",
                 "dm_to_call_bp",
+                "dm_bp",
             ],
         )
     }
