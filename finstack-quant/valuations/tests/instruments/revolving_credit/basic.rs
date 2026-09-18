@@ -6,6 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
@@ -45,8 +46,9 @@ fn test_revolving_credit_basic_pricing() {
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap();
-            fees.upfront_fee =
-                Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture"));
+            fees.upfront_fee = Some(UpfrontFee::Amount(
+                Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+            ));
             fees
         })
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -745,7 +747,6 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
     // Create stochastic facility with near-zero volatility and same hazard curve
     let mc_config = McConfig {
         correlation_matrix: None,
-        recovery_rate: 0.40,
         credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
             credit_curve_id: "BORROWER-A".into(),
             kappa: 0.3,

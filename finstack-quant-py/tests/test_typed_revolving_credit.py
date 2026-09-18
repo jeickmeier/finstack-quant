@@ -65,7 +65,6 @@ def stochastic_spec(volatility: float, spread: dict[str, object], *, credit: boo
             "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
-                "recovery_rate": 0.4,
                 "credit_spread_process": spread,
                 "interest_rate_process": None,
                 "util_credit_corr": 0.5 if credit else None,
@@ -91,7 +90,7 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .draw_repay_spec(draw_repay_spec if draw_repay_spec is not None else {"deterministic": []})
         .discount_curve_id("USD-OIS")
         .recovery_rate(0.4)
-        .leq(0.5)
+        .leq(0.5 if credit else 0.0)
     )
     if credit:
         b = b.credit_curve_id(HAZARD_ID)
@@ -133,7 +132,7 @@ def test_from_json_rejects_other_instrument_types() -> None:
 
 
 def test_builder_sets_every_field_and_getters_read_them_back() -> None:
-    facility = builder().build()
+    facility = builder(credit=True).build()
     assert facility.id == "RCF-PY"
     assert facility.commitment_amount == Money(50_000_000.0, Currency("USD"))
     assert facility.drawn_amount == Money(10_000_000.0, Currency("USD"))
@@ -145,7 +144,7 @@ def test_builder_sets_every_field_and_getters_read_them_back() -> None:
     assert facility.fees["facility_fee_bp"] == 5.0
     assert facility.draw_repay_spec == {"deterministic": []}
     assert facility.discount_curve_id == "USD-OIS"
-    assert facility.credit_curve_id is None
+    assert facility.credit_curve_id == HAZARD_ID
     assert facility.recovery_rate == 0.4
     assert facility.leq == 0.5
     assert str(facility.stub) == "short_front"
@@ -241,3 +240,81 @@ def test_typed_instance_is_accepted_by_price_instrument() -> None:
     facility = RevolvingCredit.example()
     result = price_instrument(facility, market(), AS_OF, "default")
     assert result.value.amount == pytest.approx(facility.price(market(), AS_OF).value.amount)
+
+
+def test_builder_accepts_dated_commitment_margin_and_fee_steps() -> None:
+    fees = {
+        "upfront_fee": None,
+        "commitment_fee_tiers": [{"threshold": "0", "bp": "50"}],
+        "usage_fee_tiers": [],
+        "facility_fee_bp": 0.0,
+        "steps": [{"date": "2026-01-15", "commitment_delta_bp": 25.0, "usage_delta_bp": 0.0, "facility_delta_bp": 0.0}],
+    }
+    facility = (
+        builder()
+        .fees(fees)
+        .commitment_schedule([
+            {"date": "2026-07-15", "amount": {"amount": "30000000", "currency": "USD"}, "fee_bp": 25.0}
+        ])
+        .margin_steps([{"date": "2026-01-15", "delta_bp": 100}])
+        .build()
+    )
+    assert facility.commitment_schedule[0]["amount"]["amount"] == "30000000"
+    assert facility.margin_steps == [{"date": "2026-01-15", "delta_bp": 100}]
+    assert facility.fees["steps"][0]["commitment_delta_bp"] == 25.0
+    round_trip = RevolvingCredit.from_json(facility.to_json())
+    assert round_trip.commitment_schedule == facility.commitment_schedule
+    # A step below the drawn balance is a build-time error naming the step.
+    with pytest.raises(ValueError, match="below the drawn balance"):
+        builder().commitment_schedule([
+            {"date": "2026-07-15", "amount": {"amount": "5000000", "currency": "USD"}, "fee_bp": 0.0}
+        ]).build()
+
+
+def test_builder_accepts_a_letter_of_credit_sublimit() -> None:
+    lc = {
+        "sublimit": {"amount": "4000000", "currency": "USD"},
+        "outstanding": {"amount": "2000000", "currency": "USD"},
+        "events": [{"date": "2026-01-15", "amount": {"amount": "1000000", "currency": "USD"}, "is_issue": True}],
+        "fee_bp": None,
+        "fronting_fee_bp": 12.5,
+        "leq": 0.5,
+    }
+    facility = builder().lc(lc).build()
+    assert facility.lc["fronting_fee_bp"] == 12.5
+    assert facility.lc["events"][0]["is_issue"] is True
+    assert builder().lc(None).build().lc is None
+    with pytest.raises(ValueError, match="sublimit"):
+        builder().lc({**lc, "outstanding": {"amount": "5000000", "currency": "USD"}}).build()
+
+
+def test_builder_accepts_percentage_upfront_scheduled_fees_and_oid_switch() -> None:
+    fees = {
+        "upfront_fee": {"pct_of_commitment": 0.02},
+        "commitment_fee_tiers": [{"threshold": "0", "bp": "50"}],
+        "usage_fee_tiers": [],
+        "facility_fee_bp": 0.0,
+        "steps": [],
+    }
+    facility = (
+        builder()
+        .fees(fees)
+        .scheduled_fees([{"date": "2026-03-01", "amount": {"amount": "100000", "currency": "USD"}}])
+        .oid_eir({"include_fees": False})
+        .build()
+    )
+    assert facility.fees["upfront_fee"] == {"pct_of_commitment": 0.02}
+    assert facility.scheduled_fees[0]["amount"]["amount"] == "100000"
+    assert facility.oid_eir == {"include_fees": False}
+    assert builder().oid_eir(None).build().oid_eir is None
+    without_fees = facility.price(market(), AS_OF, metrics=["oid_eir_amortization"]).metrics["oid_eir_rate"]
+    with_fees = (
+        builder()
+        .fees(fees)
+        .oid_eir({"include_fees": True})
+        .build()
+        .price(market(), AS_OF, metrics=["oid_eir_amortization"])
+        .metrics["oid_eir_rate"]
+    )
+    # The 2% upfront fee and the running fees lift the origination effective rate.
+    assert with_fees > without_fees

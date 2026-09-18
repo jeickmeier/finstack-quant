@@ -86,10 +86,9 @@ fn drifting_stochastic(target: f64, mc_config: Option<McConfig>) -> DrawRepaySpe
     stochastic(target, 0.0, 2, mc_config)
 }
 
-fn no_credit_config(recovery_rate: f64) -> McConfig {
+fn no_credit_config() -> McConfig {
     McConfig {
         correlation_matrix: None,
-        recovery_rate,
         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
         interest_rate_process: None,
         util_credit_corr: None,
@@ -152,7 +151,7 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
             "RC-SEASONED",
             drawn,
             BaseRateSpec::Fixed { rate: 0.05 },
-            stochastic(0.6, 0.25, 8, Some(no_credit_config(0.4))),
+            stochastic(0.6, 0.25, 8, Some(no_credit_config())),
             0.4,
         );
         let result = RevolvingCreditPricer::price_with_paths(&f, &market, as_of)
@@ -187,7 +186,7 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
         "RC-SEASONED-THETA",
         drawn,
         BaseRateSpec::Fixed { rate: 0.05 },
-        drifting_stochastic(0.6, Some(no_credit_config(0.4))),
+        drifting_stochastic(0.6, Some(no_credit_config())),
         0.4,
     );
     let priced = f
@@ -208,7 +207,6 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
 fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
     let explicit_cir = McConfig {
         correlation_matrix: None,
-        recovery_rate: 0.4,
         credit_spread_process: CreditSpreadProcessSpec::Cir {
             kappa: 0.5,
             theta: 0.02,
@@ -241,7 +239,6 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
 
     let other_curve = McConfig {
         correlation_matrix: None,
-        recovery_rate: 0.4,
         credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
             credit_curve_id: "OTHER-HZ".into(),
             kappa: 0.1,
@@ -345,7 +342,7 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
-        .draw_repay_spec(drifting_stochastic(1.0, Some(no_credit_config(0.0))))
+        .draw_repay_spec(drifting_stochastic(1.0, Some(no_credit_config())))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.0)
         .build()
@@ -397,7 +394,6 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
         .insert(fwd);
     let hull_white = McConfig {
         correlation_matrix: None,
-        recovery_rate: 0.0,
         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
         interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
             kappa: 0.05,
@@ -412,7 +408,7 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
         "RC-BASIS-FWD",
         3_000_000.0,
         BaseRateSpec::Floating(term_spec(Tenor::quarterly())),
-        drifting_stochastic(0.6, Some(no_credit_config(0.0))),
+        drifting_stochastic(0.6, Some(no_credit_config())),
         0.0,
     );
     let hw_mode = facility(

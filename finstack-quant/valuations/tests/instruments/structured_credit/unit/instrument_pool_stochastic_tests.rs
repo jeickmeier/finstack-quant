@@ -30,7 +30,6 @@ const HAZARD_ID: &str = "BORROWER-HZ";
 fn stochastic_revolver(volatility: f64, spread_sensitivity: f64, credit: bool) -> RevolvingCredit {
     let mc_config = credit.then(|| McConfig {
         correlation_matrix: None,
-        recovery_rate: 0.4,
         credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
             credit_curve_id: HAZARD_ID.into(),
             kappa: 0.5,

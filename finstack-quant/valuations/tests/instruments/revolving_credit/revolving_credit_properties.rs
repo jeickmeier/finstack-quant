@@ -191,7 +191,8 @@ proptest! {
 
         // Calculate balance after draw
         use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date;
-        let balance_after = calculate_drawn_balance_at_date(&facility, draw_date).unwrap();
+        let balance_after =
+            calculate_drawn_balance_at_date(&facility, facility.commitment_date, draw_date).unwrap();
 
         let expected_balance = initial_drawn + draw_amount;
 

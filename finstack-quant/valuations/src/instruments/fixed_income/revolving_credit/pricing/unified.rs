@@ -83,6 +83,41 @@ impl Default for RevolvingCreditPricer {
 }
 
 impl RevolvingCreditPricer {
+    /// A positive `leq` (or LC `leq`) is contingent exposure at default: with
+    /// no default model it is silently inert, so a standalone valuation
+    /// requires a hazard curve or a stochastic credit-spread process that
+    /// actually moves. Inside a structured-credit pool the deal model supplies
+    /// default probabilities, so this guard applies to the standalone pricer
+    /// only.
+    pub(crate) fn require_default_model_for_contingent_exposure(
+        facility: &RevolvingCredit,
+    ) -> Result<()> {
+        use crate::instruments::fixed_income::revolving_credit::types::CreditSpreadProcessSpec;
+        let contingent = facility.leq > 0.0 || facility.lc.as_ref().is_some_and(|lc| lc.leq > 0.0);
+        if !contingent || facility.credit_curve_id.is_some() {
+            return Ok(());
+        }
+        if let DrawRepaySpec::Stochastic(spec) = &facility.draw_repay_spec {
+            let has_default_model =
+                spec.mc_config
+                    .as_ref()
+                    .is_some_and(|config| match &config.credit_spread_process {
+                        CreditSpreadProcessSpec::Cir { .. }
+                        | CreditSpreadProcessSpec::MarketAnchored { .. } => true,
+                        CreditSpreadProcessSpec::Constant(spread) => *spread > 0.0,
+                    });
+            if has_default_model {
+                return Ok(());
+            }
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "RevolvingCredit {}: leq or lc.leq is positive but the facility has no default \
+             model (no credit_curve_id and no stochastic credit-spread process); the draw at \
+             default would be silently inert. Add a credit_curve_id or set leq to 0",
+            facility.id
+        )))
+    }
+
     /// Create a pricer for the given registered model key.
     ///
     /// # Arguments
@@ -111,6 +146,7 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        Self::require_default_model_for_contingent_exposure(facility)?;
         match &facility.draw_repay_spec {
             DrawRepaySpec::Deterministic(_) => Self::price_deterministic(facility, market, as_of),
             DrawRepaySpec::Stochastic(_) => {
@@ -164,13 +200,11 @@ impl Pricer for RevolvingCreditPricer {
             }
         };
 
-        // Wrap in ValuationResult
-        let mut result = ValuationResult::stamped(facility.id.as_str(), as_of, result_pv);
-        result.measures.insert(
-            crate::metrics::MetricId::custom("model"),
-            self.model.to_string().parse().unwrap_or(0.0),
-        ); // Just tagging
-        Ok(result)
+        Ok(ValuationResult::stamped(
+            facility.id.as_str(),
+            as_of,
+            result_pv,
+        ))
     }
 }
 
@@ -414,7 +448,6 @@ mod tests {
                     antithetic: false,
                     use_sobol_qmc: true,
                     mc_config: Some(McConfig {
-                        recovery_rate: 0.4,
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
                         interest_rate_process: None,
                         correlation_matrix: None,
@@ -601,7 +634,6 @@ mod tests {
                     antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
-                        recovery_rate: 0.4,
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
                         interest_rate_process: None,
                         correlation_matrix: None,
@@ -714,7 +746,6 @@ mod tests {
                     antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
-                        recovery_rate: 0.4,
                         // Genuinely stochastic credit spread.
                         credit_spread_process: CreditSpreadProcessSpec::Cir {
                             kappa: 0.5,
@@ -836,7 +867,6 @@ mod tests {
                         antithetic: true,
                         use_sobol_qmc: false,
                         mc_config: Some(McConfig {
-                            recovery_rate: 0.4,
                             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
                             interest_rate_process: None,
                             correlation_matrix: None,
@@ -945,7 +975,6 @@ mod tests {
         // except adverse selection is disabled (util_credit_corr = 0.0).
         let zero_corr_config = McConfig {
             correlation_matrix: None,
-            recovery_rate: 0.4,
             credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                 credit_curve_id: "BORROWER-HZ".into(),
                 kappa: 0.1,

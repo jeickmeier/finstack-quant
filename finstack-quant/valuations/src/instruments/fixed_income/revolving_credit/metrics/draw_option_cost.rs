@@ -7,7 +7,8 @@ use crate::metrics::{MetricCalculator, MetricContext};
 
 /// Calculator for the Monte Carlo mean draw option cost: the value to the
 /// lender of the facility's simulated draws having been made at the
-/// contractual margin instead of each path's fair spread (negative when
+/// contractual margin instead of each path's fair spread, anchored to the
+/// margin at the valuation date so only spread changes count (negative when
 /// spreads widen). Deterministic facilities have no simulated draws and
 /// report `0.0`.
 #[derive(Debug, Default, Clone, Copy)]

@@ -748,7 +748,7 @@ impl TermLoan {
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
-            commitment_step_downs: vec![super::spec::CommitmentStepDown {
+            commitment_step_downs: vec![super::super::loan_terms::CommitmentStepDown {
                 date: date!(2024 - 10 - 15),
                 new_limit: Money::from((15_000_000_i64, Currency::USD)),
             }],

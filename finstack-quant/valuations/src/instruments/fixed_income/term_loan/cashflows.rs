@@ -11,9 +11,7 @@ use crate::cashflow::builder::specs::{
 use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::term_loan::types::TermLoan;
-use finstack_quant_core::cashflow::xirr_with_daycount;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::DayCountContext;
+use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
@@ -575,8 +573,6 @@ fn build_commitment_fee_flows(
     draw_stop: Option<Date>,
     schedule: &CashFlowSchedule,
 ) -> finstack_quant_core::Result<Vec<CashFlow>> {
-    use finstack_quant_core::dates::DayCountContext;
-
     let fee_start = ddtl.availability_start;
     let mut fee_end = ddtl.availability_end;
     if let Some(ds) = draw_stop {
@@ -705,25 +701,7 @@ fn cumulative_drawn_at(ddtl: &super::spec::DdtlSpec, draw_stop: Option<Date>, da
     total
 }
 
-/// Period-level EIR amortization outputs for reporting.
-#[derive(Debug, Clone)]
-pub(crate) struct OidEirPeriod {
-    /// Period end date.
-    pub(crate) date: Date,
-    /// OID amortization for the period.
-    pub(crate) oid_amortization: Money,
-    /// Closing balance for the period.
-    pub(crate) closing_balance: Money,
-}
-
-/// EIR amortization schedule output.
-#[derive(Debug, Clone)]
-pub(crate) struct OidEirSchedule {
-    /// Effective interest rate.
-    pub(crate) effective_rate: f64,
-    /// Period-by-period amortization details.
-    pub(crate) periods: Vec<OidEirPeriod>,
-}
+pub(crate) use crate::instruments::fixed_income::loan_quotes::OidEirSchedule;
 
 /// Build an effective interest rate (EIR) amortization schedule from cashflows.
 pub(crate) fn build_oid_eir_schedule(
@@ -733,107 +711,12 @@ pub(crate) fn build_oid_eir_schedule(
 ) -> finstack_quant_core::Result<OidEirSchedule> {
     let schedule = generate_cashflows(loan, market, as_of)?;
     let spec = loan.oid_eir.clone().unwrap_or_default();
-
-    let mut buckets: BTreeMap<Date, CashBuckets> = BTreeMap::new();
-    for cf in schedule.get_flows() {
-        match cf.kind {
-            CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => {
-                buckets
-                    .entry(cf.date)
-                    .or_default()
-                    .add_interest(cf.amount.amount());
-            }
-            CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee
-                if spec.include_fees =>
-            {
-                buckets
-                    .entry(cf.date)
-                    .or_default()
-                    .add_interest(cf.amount.amount());
-            }
-            CFKind::Amortization => {
-                buckets
-                    .entry(cf.date)
-                    .or_default()
-                    .add_principal(cf.amount.amount());
-            }
-            CFKind::Notional => {
-                buckets
-                    .entry(cf.date)
-                    .or_default()
-                    .add_notional(cf.amount.amount());
-            }
-            _ => {}
-        }
-    }
-
-    let flows: Vec<(Date, f64)> = buckets
-        .iter()
-        .map(|(d, b)| (*d, b.total))
-        .filter(|(_, amt)| amt.abs() > 0.0)
-        .collect();
-
-    let effective_rate = xirr_with_daycount(flows.as_slice(), loan.day_count, None)?;
-
-    let mut periods = Vec::new();
-    let mut iter = buckets.iter();
-    let (start_date, start_bucket) = iter
-        .next()
-        .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
-    // Initialize opening balance from notional (funding) flows only.
-    // Using -total would incorrectly include fees or interest in the
-    // first bucket, overstating the initial carrying amount.
-    let mut opening_balance = -start_bucket.notional;
-    let mut prev = *start_date;
-
-    for (date, bucket) in iter {
-        let yf = loan
-            .day_count
-            .year_fraction(prev, *date, DayCountContext::default())?;
-        let interest_income = opening_balance * effective_rate * yf;
-        let cash_interest = bucket.interest;
-        let closing_balance = opening_balance + interest_income - bucket.total;
-        let oid_amortization = interest_income - cash_interest;
-
-        periods.push(OidEirPeriod {
-            date: *date,
-            oid_amortization: Money::new(oid_amortization, loan.currency)?,
-            closing_balance: Money::new(closing_balance, loan.currency)?,
-        });
-
-        opening_balance = closing_balance;
-        prev = *date;
-    }
-
-    Ok(OidEirSchedule {
-        effective_rate,
-        periods,
-    })
-}
-
-#[derive(Default)]
-struct CashBuckets {
-    total: f64,
-    interest: f64,
-    principal: f64,
-    /// Notional (funding) flows only, separated from amortization.
-    notional: f64,
-}
-
-impl CashBuckets {
-    fn add_interest(&mut self, amount: f64) {
-        self.total += amount;
-        self.interest += amount;
-    }
-
-    fn add_principal(&mut self, amount: f64) {
-        self.total += amount;
-        self.principal += amount;
-    }
-
-    fn add_notional(&mut self, amount: f64) {
-        self.total += amount;
-        self.principal += amount;
-        self.notional += amount;
-    }
+    crate::instruments::fixed_income::loan_quotes::oid_eir_schedule_from_flows(
+        &schedule,
+        &[],
+        None,
+        loan.day_count,
+        loan.currency,
+        spec.include_fees,
+    )
 }

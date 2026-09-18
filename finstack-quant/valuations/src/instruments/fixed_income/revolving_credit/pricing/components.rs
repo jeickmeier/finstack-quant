@@ -14,26 +14,29 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-/// Helper to compute upfront fee present value.
+/// Present value of the upfront fee at `as_of`.
 ///
-/// Only includes the upfront fee when the commitment date is strictly after the
+/// Only includes the fee when the commitment date is strictly after the
 /// valuation date, consistent with "PV of remaining cashflows" semantics.
-/// When `commitment_date <= as_of` the fee has already been paid and is excluded
-/// from the mark-to-market valuation.
+/// When `commitment_date <= as_of` the fee has already been paid and is
+/// excluded from the mark-to-market valuation.
+///
+/// # Arguments
+///
+/// * `upfront_fee` - Fee amount in the facility currency (the percentage
+///   form already resolved against the opening commitment).
+/// * `commitment_date` - Date the fee is paid.
+/// * `as_of` - Valuation date.
+/// * `disc_curve` - Curve discounting the fee from the commitment date.
 pub(crate) fn compute_upfront_fee_pv(
-    upfront_fee_opt: Option<Money>,
+    upfront_fee: Money,
     commitment_date: Date,
     as_of: Date,
     disc_curve: &dyn Discounting,
 ) -> Result<f64> {
-    let Some(upfront_fee) = upfront_fee_opt else {
+    if upfront_fee.amount() == 0.0 || commitment_date <= as_of {
         return Ok(0.0);
-    };
-
-    if commitment_date > as_of {
-        let df = disc_curve.df_between_dates(as_of, commitment_date)?;
-        Ok(upfront_fee.amount() * df)
-    } else {
-        Ok(0.0)
     }
+    let df = disc_curve.df_between_dates(as_of, commitment_date)?;
+    Ok(upfront_fee.amount() * df)
 }

@@ -1517,6 +1517,16 @@
           "type": "string"
         },
         {
+          "const": "lc_fee",
+          "description": "Letter-of-credit fee.\n\nPeriodic fee on the face of letters of credit issued under a revolving\nfacility's LC sublimit, typically at the drawn margin.",
+          "type": "string"
+        },
+        {
+          "const": "fronting_fee",
+          "description": "Fronting fee.\n\nPeriodic fee paid to the issuing bank on the face of letters of credit\noutstanding under a revolving facility.",
+          "type": "string"
+        },
+        {
           "const": "notional",
           "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption.",
           "type": "string"
@@ -2125,6 +2135,31 @@
           "type": "string"
         }
       ]
+    },
+    "CommitmentStep": {
+      "additionalProperties": false,
+      "description": "A scheduled change of a revolving facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic facility books the\nimplied principal change at the step.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Commitment in force from `date`, in the facility currency (zero ends\navailability, as at a term-out). The drawn balance plus outstanding\nletters of credit must not exceed it."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date the new commitment takes effect (strictly after the commitment\ndate, on or before maturity)."
+        },
+        "fee_bp": {
+          "default": 0.0,
+          "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date",
+        "amount"
+      ],
+      "type": "object"
     },
     "CommitmentStepDown": {
       "additionalProperties": false,
@@ -2977,6 +3012,38 @@
       },
       "type": "object"
     },
+    "FeeStep": {
+      "additionalProperties": false,
+      "description": "A dated change of a revolving facility's running fees.\n\nEach delta shifts every tier of the corresponding fee, in basis points per\nannum, from `date` forward. A leverage or ratings grid the analyst has\nforecast is entered as one step per grid change.",
+      "properties": {
+        "commitment_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the commitment fee on the undrawn commitment, in basis\npoints per annum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date the deltas take effect (strictly inside the facility life)."
+        },
+        "facility_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the facility fee on the total commitment, in basis points\nper annum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "usage_delta_bp": {
+          "default": 0.0,
+          "description": "Change to the usage fee on the drawn balance, in basis points per\nannum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "type": "object"
+    },
     "FeeTier": {
       "additionalProperties": false,
       "description": "Fee tier for utilization-based fee structures.\n\nTiers are evaluated in order: the first tier where utilization >= threshold applies.\nTiers must be sorted by threshold (ascending); [`evaluate_fee_tiers`]\nrejects unordered tiers.",
@@ -3398,6 +3465,78 @@
         }
       ]
     },
+    "LcEvent": {
+      "additionalProperties": false,
+      "description": "Issuance or expiry of a letter of credit under a facility's LC sublimit.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Face amount issued or expiring, in the facility currency (positive)."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date the letter of credit is issued or expires (strictly after the\nsimulation anchor, on or before maturity)."
+        },
+        "is_issue": {
+          "description": "`true` for an issuance (LC outstanding rises), `false` for an expiry\nor cancellation.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "date",
+        "amount",
+        "is_issue"
+      ],
+      "type": "object"
+    },
+    "LetterOfCreditSpec": {
+      "additionalProperties": false,
+      "description": "Letter-of-credit sub-facility of a revolving credit facility.\n\nOutstanding letters of credit reduce availability and the commitment-fee\nbase, count as usage for fee tiers, accrue an LC fee plus a fronting fee,\nand are contingent exposure at default. LC usage is deterministic in both\npricing modes; a stochastic utilization process is capped at\n`1 − LC(t) / C(t)`.",
+      "properties": {
+        "events": {
+          "default": [],
+          "description": "Future issuances and expiries, replayed on top of `outstanding`.",
+          "items": {
+            "$ref": "#/$defs/LcEvent"
+          },
+          "type": "array"
+        },
+        "fee_bp": {
+          "default": null,
+          "description": "LC fee on the outstanding face, in basis points per annum. `None`\naccrues the facility's floating margin (the market convention for\nstandby letters of credit); a fixed-rate facility must supply it.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fronting_fee_bp": {
+          "default": 0.0,
+          "description": "Fronting fee paid to the issuing bank on the outstanding face, in\nbasis points per annum. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "leq": {
+          "default": 0.0,
+          "description": "Fraction of the outstanding face assumed drawn at default (credit\nconversion factor), as a decimal in `[0, 1]`; funded at par and\nrecovered at the facility recovery rate. Defaults to `0.0`.",
+          "format": "double",
+          "type": "number"
+        },
+        "outstanding": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "LC face outstanding at the simulation anchor, in the facility currency."
+        },
+        "sublimit": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Maximum LC face outstanding at any time, in the facility currency."
+        }
+      },
+      "required": [
+        "sublimit",
+        "outstanding"
+      ],
+      "type": "object"
+    },
     "LiquidationSpec": {
       "additionalProperties": false,
       "description": "Resolution timeline of a non-performing loan.\n\nThe loan pays no interest or principal from closing until the first\npayment date at or after `months_to_resolution` months. On that date the\nshare `1 − reperformance_prob` of the balance liquidates: it is booked as\na default whose recovery is `(proceeds_pct − carry_cost_pct)%` of the\nliquidated balance, released after the deal's recovery lag like any other\nrecovery. The share `reperformance_prob` re-performs: it becomes a\nperforming loan on its original amortization terms at `modified_rate`\n(the loan's coupon when `None`) from the following period on, with the\nlevel payment recast on the re-performing balance.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::LiquidationSpec;\n\n// Two-year workout: 55% gross proceeds less 5% carry, 20% re-performs at 4%.\nlet spec = LiquidationSpec {\n    months_to_resolution: 24,\n    proceeds_pct: 55.0,\n    carry_cost_pct: 5.0,\n    reperformance_prob: 0.2,\n    modified_rate: Some(0.04),\n};\nassert!(spec.validate().is_ok());\nassert!((spec.net_proceeds_fraction() - 0.5).abs() < 1e-12);\n```",
@@ -3543,7 +3682,7 @@
     },
     "MarginStepUp": {
       "additionalProperties": false,
-      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration.",
+      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement).",
       "properties": {
         "date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -3585,7 +3724,7 @@
         },
         "credit_spread_process": {
           "$ref": "#/$defs/CreditSpreadProcessSpec",
-          "description": "Credit spread process specification."
+          "description": "Credit spread process specification. Recovery on default is the\nfacility's `recovery_rate`; the hazard-to-spread mapping reads it there."
         },
         "interest_rate_process": {
           "anyOf": [
@@ -3598,11 +3737,6 @@
           ],
           "description": "Interest rate process specification (for floating rates).\n\nIf None, assumes fixed rate (no stochastic dynamics)."
         },
-        "recovery_rate": {
-          "description": "Recovery rate on default (e.g., 0.4 for 40% recovery).\n\nUsed when propagating credit risk from market-anchored stochastic specs to\nthe deterministic fallback in `value()`. The path generator itself uses\n`RevolvingCredit::recovery_rate` for hazard-to-spread mapping, so these\nvalues should be kept consistent. When constructing `McConfig`, set this\nto the same value as `RevolvingCredit::recovery_rate`.",
-          "format": "double",
-          "type": "number"
-        },
         "util_credit_corr": {
           "default": null,
           "description": "Optional utilization–credit correlation used when `correlation_matrix` is None.\n\nIf provided, builds a 3×3 matrix with:\n  [ [1, 0, rho], [0, 1, 0], [rho, 0, 1] ]\nrepresenting correlation between utilization and credit, with the rate\nfactor uncorrelated (kept fixed in 2‑factor mode).",
@@ -3614,7 +3748,6 @@
         }
       },
       "required": [
-        "recovery_rate",
         "credit_spread_process"
       ],
       "type": "object"
@@ -4789,13 +4922,34 @@
           "$ref": "#/$defs/BaseRateSpec",
           "description": "Base rate specification (fixed or floating)."
         },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business-day convention applied to payment dates (interest, fees and\nprincipal) and to the fixing-date roll. Accrual boundaries stay\nunadjusted. Defaults to `ModifiedFollowing`."
+        },
+        "calendar_id": {
+          "default": null,
+          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "commitment_amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Total committed amount for the facility."
+          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_schedule`."
         },
         "commitment_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Date when the facility becomes available."
+        },
+        "commitment_schedule": {
+          "default": [],
+          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
+          "items": {
+            "$ref": "#/$defs/CommitmentStep"
+          },
+          "type": "array"
         },
         "credit_curve_id": {
           "anyOf": [
@@ -4823,7 +4977,7 @@
         },
         "drawn_amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Current drawn amount (initial utilization)."
+          "description": "Drawn balance at the simulation anchor, the later of `commitment_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
         "fees": {
           "$ref": "#/$defs/RevolvingCreditFees",
@@ -4841,11 +4995,31 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
+        "lc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LetterOfCreditSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Letter-of-credit sub-facility. Outstanding letters of credit reduce\navailability and the commitment-fee base, count as usage for fee\ntiers, accrue the LC fee (the floating margin unless `fee_bp` is set)\nplus the fronting fee, and are contingent exposure at default through\ntheir own `leq`. `None` (the default) means no LC sublimit."
+        },
         "leq": {
           "default": 0.0,
           "description": "Loan-equivalent exposure: the fraction of the undrawn commitment assumed\nto be drawn at default (Basel credit conversion factor), as a decimal in\n`[0, 1]`.\n\nEnters the default leg as additional exposure that the lender funds at\npar and recovers at `recovery_rate`, so each unit of LEQ draw costs\n`(1 − recovery_rate)` at default. Typical values are 0.3–0.75 depending\non rating and covenant protection. Defaults to `0.0` (no draw at\ndefault), which reproduces the plain recovery leg.",
           "format": "double",
           "type": "number"
+        },
+        "margin_steps": {
+          "default": [],
+          "description": "Dated margin changes, cumulative from their dates: a leverage or\nratings grid the analyst has forecast, a scheduled step-up or a\ndefault-rate margin. `delta_bp` shifts the floating spread or the fixed\nrate. Dates must be strictly increasing and strictly inside the\nfacility life. Empty by default.",
+          "items": {
+            "$ref": "#/$defs/MarginStepUp"
+          },
+          "type": "array"
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -4855,6 +5029,25 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
+        "oid_eir": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OidEirSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Effective-interest-rate reporting switch for the\n`oid_eir_amortization` metric. `None` (the default) reports with fees\nincluded, the same as `Some(OidEirSpec::default())`."
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Business days between an accrual end and its payment date, on\n`calendar_id`. `0` (the default) pays on the adjusted accrual end.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "recovery_rate": {
           "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
           "format": "double",
@@ -4863,6 +5056,21 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "scheduled_fees": {
+          "default": [],
+          "description": "Dated fixed fees (amendment, waiver, extension, consent), each paid on\nits date and emitted as a generic fee flow. Dates must lie after the\ncommitment date and on or before maturity. Empty by default.",
+          "items": {
+            "$ref": "#/$defs/ScheduledFee"
+          },
+          "type": "array"
+        },
+        "settlement_days": {
+          "default": 0,
+          "description": "Business days from the valuation date to the settlement date used by\nquote metrics (discount margin, yield, accrued interest). `0` (the\ndefault) settles on the valuation date. The base present value is\nalways anchored at the valuation date.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -4904,16 +5112,25 @@
           "format": "double",
           "type": "number"
         },
+        "steps": {
+          "default": [],
+          "description": "Dated fee changes, cumulative from their dates, each shifting every\ntier of the corresponding fee in basis points per annum. Dates must be\nstrictly increasing and strictly inside the facility life. Empty by\ndefault.",
+          "items": {
+            "$ref": "#/$defs/FeeStep"
+          },
+          "type": "array"
+        },
         "upfront_fee": {
           "anyOf": [
             {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              "$ref": "#/$defs/UpfrontFee"
             },
             {
               "type": "null"
             }
           ],
-          "description": "One-time upfront fee paid by borrower to lender at commitment."
+          "default": null,
+          "description": "One-time upfront (arrangement or OID) fee paid by the borrower to the\nlender on the commitment date, as an absolute amount or a fraction of\nthe opening commitment. Enters the present value only while the\ncommitment date lies after the valuation date, and the effective-rate\nmetrics always."
         },
         "usage_fee_tiers": {
           "default": [],
@@ -4948,6 +5165,25 @@
           "type": "string"
         }
       ]
+    },
+    "ScheduledFee": {
+      "additionalProperties": false,
+      "description": "A dated fixed fee under a facility: amendment, waiver, extension or\nconsent fees the borrower pays on a known date.",
+      "properties": {
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Fee amount in the facility currency (non-negative)."
+        },
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Payment date (strictly after the commitment date, on or before\nmaturity)."
+        }
+      },
+      "required": [
+        "date",
+        "amount"
+      ],
+      "type": "object"
     },
     "SpecialServicingSpec": {
       "additionalProperties": false,
@@ -5776,6 +6012,38 @@
         "months"
       ],
       "type": "object"
+    },
+    "UpfrontFee": {
+      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Absolute amount in the facility currency.",
+          "properties": {
+            "amount": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%).",
+          "properties": {
+            "pct_of_commitment": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "pct_of_commitment"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "UtilizationProcess": {
       "additionalProperties": false,

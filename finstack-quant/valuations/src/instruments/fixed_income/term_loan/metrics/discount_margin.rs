@@ -24,12 +24,11 @@
 //!   curve), any basis between the discount curve and the projection index
 //!   curve is included in the solved DM.
 
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
+use crate::instruments::fixed_income::loan_quotes::{
+    compounding_frequency, pv_with_discount_margin, solve_discount_margin,
+};
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::dates::DayCountContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
-use finstack_quant_core::math::summation::NeumaierAccumulator;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Discount margin calculator for floating rate term loans.
@@ -67,35 +66,17 @@ impl DiscountMarginCalculator {
         let (settlement_date, flows) =
             TermLoanDiscountingPricer::pricing_flows(loan, curves, as_of)?;
         let disc = curves.get_discount(loan.discount_curve_id.as_str())?;
-        let compounds_per_year = loan_compounding_frequency(loan);
-
-        let mut pv = NeumaierAccumulator::new();
-        for (date, amount) in &flows {
-            if *date <= settlement_date {
-                continue;
-            }
-            let t = disc.day_count().year_fraction(
-                settlement_date,
-                *date,
-                DayCountContext::default(),
-            )?;
-            let df = disc.df_between_dates(settlement_date, *date)?;
-            let df_dm = z_spread_discount_factor(df, t, dm, compounds_per_year)?;
-            pv.add(amount.amount() * df_dm);
-        }
-        Ok(pv.total())
-    }
-}
-
-/// Periodic compounding frequency for the DM zero-rate shift, from the loan's
-/// contractual coupon frequency (e.g. quarterly → 4). Mirrors the FRN
-/// `bond_z_spread_compounding_frequency` helper.
-fn loan_compounding_frequency(loan: &TermLoan) -> f64 {
-    let years = loan.frequency.to_years();
-    if years > 0.0 && years.is_finite() {
-        (1.0 / years).round().max(1.0)
-    } else {
-        1.0
+        let flows: Vec<(finstack_quant_core::dates::Date, f64)> = flows
+            .iter()
+            .map(|(date, amount)| (*date, amount.amount()))
+            .collect();
+        pv_with_discount_margin(
+            &flows,
+            settlement_date,
+            disc.as_ref(),
+            compounding_frequency(loan.frequency),
+            dm,
+        )
     }
 }
 
@@ -147,36 +128,13 @@ impl MetricCalculator for DiscountMarginCalculator {
         };
         let loan: &TermLoan = context.instrument_as()?;
 
-        // Objective function: PV(dm) - target_price. PV is strictly decreasing
-        // in dm (higher discount spread → lower PV).
-        // Return NAN on pricing errors so the solver does not converge to a
-        // wrong root based on artificial large values.
-        let objective = |dm: f64| -> f64 {
-            match Self::pv_given_dm(loan, &context.curves, context.as_of, dm) {
-                Ok(pv) => pv - target,
-                Err(_) => f64::NAN,
-            }
-        };
-
-        // Solve for DM on the decimal spread axis. Tolerance 1e-10 (~0.001 bp)
-        // matches the bond DM/Z-spread solvers; the initial guess is the
-        // contractual margin (the exact solution for a par-quoted loan on a
-        // flat consistent curve) with a ±500 bp starting bracket.
-        let solver = BrentSolver::new()
-            .tolerance(1e-10)
-            .initial_bracket_size(Some(0.05));
-
-        let dm = solver.solve(objective, contractual_margin)?;
-
-        // Validate DM is within sanity bounds (±5000 bp). Distressed loans in
-        // the 60s-70s legitimately solve to DMs well above 2000 bp; the bound
-        // only guards against solver divergence, not stressed-but-real levels.
-        if dm.abs() > 0.50 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Discount margin {} bp exceeds sanity bounds (±5000 bp)",
-                dm * 1e4
-            )));
-        }
+        // PV is strictly decreasing in dm; the contractual margin is the
+        // exact solution for a par-quoted loan on a flat consistent curve.
+        let dm = solve_discount_margin(
+            |dm| Self::pv_given_dm(loan, &context.curves, context.as_of, dm),
+            target,
+            contractual_margin,
+        )?;
 
         // DM as decimal (e.g. 0.025 = 250 bp), directly comparable to the
         // contractual margin.

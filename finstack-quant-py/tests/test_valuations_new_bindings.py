@@ -170,15 +170,29 @@ def test_revolving_credit_binding_validates_floating_rate_spec() -> None:
 
 
 def test_revolving_credit_custom_metrics_use_as_of_balance() -> None:
+    # ``drawn_amount`` (10M of 50M) is the balance at the valuation date; the
+    # fixture's 5M draw on 2024-06-01 lies in the future of 2024-03-01 and
+    # must not enter the as-of metrics.
     result = price_instrument(
         _revolving_credit_json(),
         _revolving_credit_market().to_json(),
-        "2024-07-01",
+        "2024-03-01",
         "discounting",
         ["utilization_rate", "available_capacity"],
     )
-    assert result.get_metric("utilization_rate") == pytest.approx(0.30)
-    assert result.get_metric("available_capacity") == pytest.approx(35_000_000.0)
+    assert result.get_metric("utilization_rate") == pytest.approx(0.20)
+    assert result.get_metric("available_capacity") == pytest.approx(40_000_000.0)
+
+
+def test_revolving_credit_rejects_events_on_or_before_the_valuation_date() -> None:
+    with pytest.raises(ValueError, match="simulation anchor"):
+        price_instrument(
+            _revolving_credit_json(),
+            _revolving_credit_market().to_json(),
+            "2024-07-01",
+            "discounting",
+            ["utilization_rate"],
+        )
 
 
 def test_revolving_credit_credit_cashflows_fail_closed() -> None:

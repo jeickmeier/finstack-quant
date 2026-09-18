@@ -393,7 +393,9 @@ impl TermLoanValuator {
                 | CFKind::Fee
                 | CFKind::CommitmentFee
                 | CFKind::UsageFee
-                | CFKind::FacilityFee => {
+                | CFKind::FacilityFee
+                | CFKind::LcFee
+                | CFKind::FrontingFee => {
                     book(
                         &mut coupon_fee_vec,
                         &mut coupon_fee_components,

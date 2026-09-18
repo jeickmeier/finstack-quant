@@ -134,7 +134,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
-                    recovery_rate: 0.40,
                     credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                         credit_curve_id: "BORROWER-HZD".into(),
                         kappa: 0.5,
@@ -179,7 +178,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
-                    recovery_rate: 0.40,
                     credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                         credit_curve_id: "BORROWER-HZD".into(),
                         kappa: 0.5,
@@ -619,7 +617,6 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         correlation_matrix: None,
-                        recovery_rate: 0.40,
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.01),
                         interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
                             kappa: 0.03,

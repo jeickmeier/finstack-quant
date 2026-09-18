@@ -164,6 +164,8 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
                     | CFKind::CommitmentFee
                     | CFKind::UsageFee
                     | CFKind::FacilityFee
+                    | CFKind::LcFee
+                    | CFKind::FrontingFee
             )
         })
         .map(|cf| cf.amount.amount())
@@ -597,5 +599,146 @@ fn principal_funds_the_draw_first_and_then_the_senior_coupon_shortfall() {
     assert!(
         (separate_cash - (on(&separate.tranches["A"].interest_flows) + 3_000_000.0)).abs() < 1.0,
         "the period's principal proceeds are the repayment net of the draw"
+    );
+}
+
+/// Dated terms flow through the pool seam: a revolver with a commitment step
+/// (reduction fee included) and a margin step distributes exactly its own
+/// standalone interest and fees when held alone in a pass-through pool.
+#[test]
+fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+        CommitmentStep, MarginStepUp,
+    };
+    let closing = date!(2024 - 01 - 01);
+    let maturity = date!(2027 - 01 - 01);
+    let mut facility = fixed_revolver(closing, maturity);
+    facility.commitment_schedule = vec![CommitmentStep {
+        date: date!(2025 - 07 - 01),
+        amount: usd(30_000_000.0),
+        fee_bp: 25.0,
+    }];
+    facility.margin_steps = vec![MarginStepUp {
+        date: date!(2026 - 01 - 01),
+        delta_bp: 100,
+    }];
+    facility.validate().expect("stepped facility");
+    let market = MarketContext::new();
+
+    let standalone = facility
+        .raw_cashflow_schedule(&market, closing)
+        .expect("standalone schedule");
+    let expected_interest: f64 = standalone
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > closing)
+        .filter(|cf| {
+            matches!(
+                cf.kind,
+                CFKind::Fixed
+                    | CFKind::FloatReset
+                    | CFKind::Fee
+                    | CFKind::CommitmentFee
+                    | CFKind::UsageFee
+                    | CFKind::FacilityFee
+                    | CFKind::LcFee
+                    | CFKind::FrontingFee
+            )
+        })
+        .map(|cf| cf.amount.amount())
+        .sum();
+    let flat = fixed_revolver(closing, maturity)
+        .raw_cashflow_schedule(&market, closing)
+        .expect("flat schedule")
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > closing && !matches!(cf.kind, CFKind::Notional))
+        .map(|cf| cf.amount.amount())
+        .sum::<f64>();
+    assert!(
+        (expected_interest - flat).abs() > 1.0,
+        "the steps must change the facility's cash: stepped {expected_interest} vs flat {flat}"
+    );
+
+    let deal = deal_with(DealSpec {
+        collateral: InstrumentCollateral {
+            revolvers: vec![facility],
+            ..Default::default()
+        },
+        reserve: 50_000_000.0,
+        reserve_target: None,
+        closing,
+        maturity,
+        senior: 9_000_000.0,
+        equity: 1_000_000.0,
+    });
+    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let (interest, principal) = totals(&run);
+    let expected_total = expected_interest + 10_000_000.0 + 50_000_000.0;
+    assert!(
+        (interest + principal - expected_total).abs() < 1.0,
+        "tranche cash {} vs facility cash {expected_total}",
+        interest + principal
+    );
+}
+
+/// Letters of credit flow through the pool seam: the LC and fronting fees are
+/// bucketed as fee components, so a single-revolver pass-through pool with an
+/// LC sublimit distributes exactly the facility's own interest and fees.
+#[test]
+fn revolver_with_letters_of_credit_pool_reproduces_the_standalone_schedule() {
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec;
+    let closing = date!(2024 - 01 - 01);
+    let maturity = date!(2027 - 01 - 01);
+    let mut facility = fixed_revolver(closing, maturity);
+    facility.lc = Some(LetterOfCreditSpec {
+        sublimit: usd(10_000_000.0),
+        outstanding: usd(4_000_000.0),
+        events: Vec::new(),
+        fee_bp: Some(200.0),
+        fronting_fee_bp: 12.5,
+        leq: 0.0,
+    });
+    facility
+        .validate()
+        .expect("facility with letters of credit");
+    let market = MarketContext::new();
+
+    let standalone = facility
+        .raw_cashflow_schedule(&market, closing)
+        .expect("standalone schedule");
+    let lc_fees: f64 = standalone
+        .get_flows()
+        .iter()
+        .filter(|cf| matches!(cf.kind, CFKind::LcFee | CFKind::FrontingFee))
+        .map(|cf| cf.amount.amount())
+        .sum();
+    assert!(lc_fees > 0.0, "the LC sublimit must generate fees");
+    let expected_interest: f64 = standalone
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.date > closing && !matches!(cf.kind, CFKind::Notional))
+        .map(|cf| cf.amount.amount())
+        .sum();
+
+    let deal = deal_with(DealSpec {
+        collateral: InstrumentCollateral {
+            revolvers: vec![facility],
+            ..Default::default()
+        },
+        reserve: 50_000_000.0,
+        reserve_target: None,
+        closing,
+        maturity,
+        senior: 9_000_000.0,
+        equity: 1_000_000.0,
+    });
+    let run = run_simulation_with_diagnostics(&deal, &market, closing).expect("pool run");
+    let (interest, principal) = totals(&run);
+    let expected_total = expected_interest + 10_000_000.0 + 50_000_000.0;
+    assert!(
+        (interest + principal - expected_total).abs() < 1.0,
+        "tranche cash {} vs facility cash {expected_total}",
+        interest + principal
     );
 }

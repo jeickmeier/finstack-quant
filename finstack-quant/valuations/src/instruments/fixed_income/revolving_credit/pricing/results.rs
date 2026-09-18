@@ -17,13 +17,14 @@ pub struct PathResult {
     /// Cashflow schedule for this path
     pub cashflows: CashFlowSchedule,
     /// Value to the lender of the path's draws having been made at the
-    /// contractual margin instead of the path's fair spread: each draw is a
-    /// forward loan to maturity, `ΔD · (s_K − s_fair) · risky annuity`,
-    /// summed over the path's draws. Negative when the fair spread exceeds
-    /// the margin (the option the borrower holds has been exercised against
-    /// the lender); zero for deterministic schedules and for a constant
-    /// spread equal to the margin. Loan-equivalent draws at default belong
-    /// to the default leg and are excluded.
+    /// contractual margin instead of the path's fair spread. The fair spread
+    /// is anchored to the margin at the valuation date, so each draw is a
+    /// forward loan to maturity worth `−ΔD · (s − s₀) · risky annuity`,
+    /// summed over the path's draws. Negative when the spread has widened
+    /// since the valuation date (the option the borrower holds has been
+    /// exercised against the lender); zero for deterministic schedules and
+    /// for any constant spread process. Loan-equivalent draws at default
+    /// belong to the default leg and are excluded.
     pub draw_option_cost: Money,
 }
 

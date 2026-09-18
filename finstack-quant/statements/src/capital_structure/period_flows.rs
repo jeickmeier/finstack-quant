@@ -312,9 +312,12 @@ pub fn calculate_period_flows(
                 CFKind::Notional if cf.amount.amount() > 0.0 => {
                     breakdown.principal_payment += scaled_abs_value;
                 }
-                CFKind::CommitmentFee | CFKind::FacilityFee => {
-                    // Commitment / facility fees accrue on the undrawn
-                    // commitment or the total facility size, NOT on the drawn
+                CFKind::CommitmentFee
+                | CFKind::FacilityFee
+                | CFKind::LcFee
+                | CFKind::FrontingFee => {
+                    // Commitment, facility and letter-of-credit fees accrue on the
+                    // undrawn commitment, the facility size or the LC face, NOT on the drawn
                     // balance — they must not be scaled by the drawn-balance
                     // ratio. Pass them through at the scheduled amount.
                     breakdown.fees += Money::new(cf.amount.amount().abs(), cf.amount.currency())?;

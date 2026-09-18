@@ -91,7 +91,8 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
-        let enhanced = Self::price_with_paths(facility, market, as_of)?;
+        facility.validate()?;
+        let enhanced = Self::price_monte_carlo(facility, market, as_of)?;
         let num_paths = enhanced.path_results.len() as f64;
         let ccy = facility.commitment_amount.currency();
 
@@ -165,6 +166,7 @@ impl RevolvingCreditPricer {
         as_of: Date,
     ) -> Result<EnhancedMonteCarloResult> {
         facility.validate()?;
+        Self::require_default_model_for_contingent_exposure(facility)?;
         match &facility.draw_repay_spec {
             DrawRepaySpec::Stochastic(_) => Self::price_monte_carlo(facility, market, as_of),
             DrawRepaySpec::Deterministic(_) => Err(finstack_quant_core::Error::Validation(
@@ -232,7 +234,6 @@ impl RevolvingCreditPricer {
 
             mc_config_to_use = McConfig {
                 correlation_matrix: None,
-                recovery_rate: facility.recovery_rate,
                 credit_spread_process: credit_process,
                 interest_rate_process: None,
                 util_credit_corr,

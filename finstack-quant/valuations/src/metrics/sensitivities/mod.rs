@@ -5,6 +5,7 @@ pub(crate) mod carry_decomposition;
 pub(crate) mod config;
 pub(crate) mod cross_factor;
 pub(crate) mod cs01;
+pub(crate) mod cs01_direct_hazard;
 pub(crate) mod cs01_z_spread;
 pub(crate) mod dv01;
 pub(crate) mod fd_greeks;

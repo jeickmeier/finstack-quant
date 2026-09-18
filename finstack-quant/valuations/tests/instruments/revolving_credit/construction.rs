@@ -123,6 +123,7 @@ fn test_builder_with_tiered_fees() {
                 bp: Decimal::try_from(25.0).expect("valid literal"),
             }],
             facility_fee_bp: 5.0,
+            steps: Vec::new(),
         })
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())

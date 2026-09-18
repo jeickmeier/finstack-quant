@@ -28,7 +28,12 @@ use super::compiler::{FixedSchedule, FloatSchedule};
 pub(crate) fn kind_rank(kind: CFKind) -> u8 {
     match kind {
         CFKind::Fixed | CFKind::Stub | CFKind::FloatReset | CFKind::InflationCoupon => 0,
-        CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee => 1,
+        CFKind::Fee
+        | CFKind::CommitmentFee
+        | CFKind::UsageFee
+        | CFKind::FacilityFee
+        | CFKind::LcFee
+        | CFKind::FrontingFee => 1,
         CFKind::Amortization => 2,
         CFKind::PrePayment => 3,
         CFKind::DefaultedNotional => 4,

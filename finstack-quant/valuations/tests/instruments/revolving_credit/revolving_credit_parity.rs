@@ -15,6 +15,7 @@ mod tests {
     };
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
     use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer;
     use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
         BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
@@ -353,7 +354,9 @@ mod tests {
 
         // Create tiered fee structure
         let fees = RevolvingCreditFees {
-            upfront_fee: Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture")),
+            upfront_fee: Some(UpfrontFee::Amount(
+                Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+            )),
             commitment_fee_tiers: vec![
                 FeeTier {
                     threshold: rust_decimal::Decimal::try_from(0.0).expect("valid"),
@@ -387,6 +390,7 @@ mod tests {
                 },
             ],
             facility_fee_bp: 5.0,
+            steps: Vec::new(),
         };
 
         // Test at different utilization levels

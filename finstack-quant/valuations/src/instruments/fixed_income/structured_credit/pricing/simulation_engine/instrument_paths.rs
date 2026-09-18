@@ -28,10 +28,10 @@
 //! spread-linked target `clamp(θ + β(s/s₀ − 1), 0, 1)`. Zero utilization
 //! volatility freezes the utilization, as in the standalone path generator.
 
-use super::exercise::{par_forward_rate, RateView};
+use super::exercise::RateView;
 use super::instrument_flows::{
-    hazard_period_default, run_period, MarginTerms, NamePeriod, NameState, PeriodDefaultSource,
-    PeriodModel, PreparedInstrumentSchedules, SpreadTerms, FROZEN_UTILIZATION_VOL,
+    hazard_period_default, run_period, NamePeriod, NameState, PeriodDefaultSource, PeriodModel,
+    PreparedInstrumentSchedules, SpreadTerms, FROZEN_UTILIZATION_VOL,
 };
 use super::pool_flow_source::{PerNameResolution, PeriodShockSource};
 use super::*;
@@ -192,14 +192,11 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
         Ok(())
     }
 
-    /// Record the draws funded this period on the actual run, valued at the
-    /// name's post-step spread against its contractual margin.
-    fn record_draws(
-        &mut self,
-        k: usize,
-        pay_date: Date,
-        curve: Option<&dyn Discounting>,
-    ) -> Result<()> {
+    /// Record the draws funded this period on the actual run. The fair spread
+    /// is anchored to the contractual margin at the valuation date, so only
+    /// the spread change since then (`spread − initial spread`) is the excess
+    /// the draw was made at, whatever the margin.
+    fn record_draws(&mut self, k: usize) -> Result<()> {
         if self.counterfactual.is_some() {
             return Ok(());
         }
@@ -208,30 +205,18 @@ impl<'a, S: PeriodShockSource> InstrumentPathFlowSource<'a, S> {
             if name.period_draw <= 0.0 {
                 continue;
             }
-            let Some(terms) = schedule
+            let Some(utilization) = schedule
                 .revolver
                 .as_ref()
-                .filter(|r| r.utilization.is_some())
+                .and_then(|r| r.utilization.as_ref())
             else {
                 continue;
-            };
-            let margin = match terms.margin {
-                MarginTerms::Spread(spread) => spread,
-                MarginTerms::FixedRate(rate) => {
-                    let curve = curve.ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "valuing draws of a fixed-rate revolver requires the deal discount curve"
-                                .into(),
-                        )
-                    })?;
-                    rate - par_forward_rate(curve, pay_date, schedule.maturity)?
-                }
             };
             self.records.push(DrawRecord {
                 name: i,
                 period: k,
                 amount: name.period_draw,
-                spread_excess: name.spread.max(0.0) - margin,
+                spread_excess: name.spread.max(0.0) - utilization.spread.initial(),
                 scale_at_draw: name.scale,
             });
         }
@@ -419,7 +404,7 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
                 names: &self.inputs,
             },
         )?;
-        self.record_draws(k, pay_date, curve)?;
+        self.record_draws(k)?;
         Ok(flows)
     }
 }

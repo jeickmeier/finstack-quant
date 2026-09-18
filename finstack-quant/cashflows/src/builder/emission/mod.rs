@@ -23,5 +23,3 @@ pub(super) use fees::emit_fees_on;
 pub(super) use helpers::compute_reset_date;
 
 pub use coupons::emit_inflation_coupons;
-
-pub use fees::{emit_revolving_credit_fees, RevolvingFeeEmissionConfig};

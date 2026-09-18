@@ -6,6 +6,7 @@
 
 pub mod mc;
 
+mod analyst_coverage;
 mod basic;
 mod cashflows;
 mod construction;

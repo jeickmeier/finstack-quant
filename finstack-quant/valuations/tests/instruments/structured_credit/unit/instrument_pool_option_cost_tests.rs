@@ -83,12 +83,12 @@ fn constant_spread_at_the_margin_has_zero_deal_option_cost() {
 }
 
 /// A single-revolver pass-through pool bears the same option cost the
-/// standalone facility reports. The facility carries no credit risk (a zero
-/// constant spread, no hazard curve), so both engines value the same
-/// near-deterministic draws as forward loans at the full contractual margin
-/// with unit survival; with credit risk the two engines apply different
-/// default models to the annuity (the standalone its path hazard, the pool
-/// the name's hazard curve or the deal model) and agree only in expectation.
+/// standalone facility reports. The fair spread is anchored to the margin at
+/// the valuation date in both engines, so a facility on a constant spread
+/// (here zero, no hazard curve) carries exactly no option cost in either;
+/// with credit risk the two engines apply different default models to the
+/// annuity (the standalone its path hazard, the pool the name's hazard curve
+/// or the deal model) and agree only in expectation.
 #[test]
 fn single_revolver_pool_matches_the_standalone_option_cost() {
     let spread = CreditSpreadProcessSpec::Constant(0.0);
@@ -99,9 +99,9 @@ fn single_revolver_pool_matches_the_standalone_option_cost() {
         .draw_option_cost
         .mean
         .amount();
-    assert!(
-        standalone > 0.0,
-        "draws above a zero fair spread are worth the margin: {standalone}"
+    assert_eq!(
+        standalone, 0.0,
+        "a constant spread is anchored to the margin: {standalone}"
     );
 
     // A senior coupon the revolver's interest always covers, so every period's
@@ -118,12 +118,12 @@ fn single_revolver_pool_matches_the_standalone_option_cost() {
         .expect("pool pricing");
     let deal_cost = pooled.draw_option_cost.amount();
     assert!(
-        (deal_cost - standalone).abs() <= 0.01 * standalone.abs(),
+        (deal_cost - standalone).abs() <= 1e-9,
         "deal {deal_cost} vs standalone {standalone}"
     );
     // Pass-through: the tranche shares add up to the deal cost.
     let shares = tranche_cost(&pooled, "A") + tranche_cost(&pooled, "EQ");
-    assert!((shares - deal_cost).abs() <= 1e-6 * deal_cost.abs());
+    assert!((shares - deal_cost).abs() <= 1e-9);
 }
 
 /// Market-anchored widening with genuine utilization volatility: the deal

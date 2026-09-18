@@ -4,7 +4,9 @@
 //! stochastic cashflow modeling. Supports standard fee structures (upfront,
 //! commitment, usage, and facility fees) and both fixed and floating rate bases.
 
-use finstack_quant_core::dates::{Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
 use rust_decimal::Decimal;
@@ -13,6 +15,9 @@ use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
+use crate::instruments::fixed_income::loan_terms::{
+    CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStepUp, OidEirSpec, ScheduledFee, UpfrontFee,
+};
 use rust_decimal::prelude::ToPrimitive;
 
 /// Revolving credit facility instrument.
@@ -35,10 +40,62 @@ pub struct RevolvingCredit {
     /// Unique identifier for the facility.
     pub id: InstrumentId,
 
-    /// Total committed amount for the facility.
+    /// Opening commitment of the facility, in force from `commitment_date`
+    /// until the first entry of `commitment_schedule`.
     pub commitment_amount: Money,
 
-    /// Current drawn amount (initial utilization).
+    /// Scheduled commitment changes (amortizing commitments, availability
+    /// expiries, accordions), each in force from its date until the next.
+    /// Dates must be strictly increasing, after `commitment_date` and on or
+    /// before `maturity`; the drawn balance plus outstanding letters of
+    /// credit must never exceed the commitment in force. A step down pays its
+    /// `fee_bp` on the reduced amount. Empty by default.
+    #[builder(default)]
+    #[serde(default)]
+    pub commitment_schedule: Vec<CommitmentStep>,
+
+    /// Dated margin changes, cumulative from their dates: a leverage or
+    /// ratings grid the analyst has forecast, a scheduled step-up or a
+    /// default-rate margin. `delta_bp` shifts the floating spread or the fixed
+    /// rate. Dates must be strictly increasing and strictly inside the
+    /// facility life. Empty by default.
+    #[builder(default)]
+    #[serde(default)]
+    pub margin_steps: Vec<MarginStepUp>,
+
+    /// Letter-of-credit sub-facility. Outstanding letters of credit reduce
+    /// availability and the commitment-fee base, count as usage for fee
+    /// tiers, accrue the LC fee (the floating margin unless `fee_bp` is set)
+    /// plus the fronting fee, and are contingent exposure at default through
+    /// their own `leq`. `None` (the default) means no LC sublimit.
+    #[builder(default)]
+    #[serde(default)]
+    pub lc: Option<LetterOfCreditSpec>,
+
+    /// Dated fixed fees (amendment, waiver, extension, consent), each paid on
+    /// its date and emitted as a generic fee flow. Dates must lie after the
+    /// commitment date and on or before maturity. Empty by default.
+    #[builder(default)]
+    #[serde(default)]
+    pub scheduled_fees: Vec<ScheduledFee>,
+
+    /// Effective-interest-rate reporting switch for the
+    /// `oid_eir_amortization` metric. `None` (the default) reports with fees
+    /// included, the same as `Some(OidEirSpec::default())`.
+    #[builder(default)]
+    #[serde(default)]
+    pub oid_eir: Option<OidEirSpec>,
+
+    /// Drawn balance at the simulation anchor, the later of `commitment_date`
+    /// and the valuation date, in both deterministic and stochastic mode.
+    ///
+    /// For a new facility this is the balance funded at commitment; for a
+    /// seasoned facility it is the balance observed on the valuation date.
+    /// Deterministic draw/repay events describe the future only: an event
+    /// dated on or before the valuation date is rejected by the cashflow
+    /// engine, because the position at the anchor is defined by this field
+    /// alone. The accrual period containing the valuation date accrues on
+    /// this balance from its accrual start.
     pub drawn_amount: Money,
 
     /// Date when the facility becomes available.
@@ -116,6 +173,36 @@ pub struct RevolvingCredit {
     #[serde(default = "default_stub_kind")]
     pub stub: StubKind,
 
+    /// Business-day convention applied to payment dates (interest, fees and
+    /// principal) and to the fixing-date roll. Accrual boundaries stay
+    /// unadjusted. Defaults to `ModifiedFollowing`.
+    #[builder(default = BusinessDayConvention::ModifiedFollowing)]
+    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
+    pub business_day_convention: BusinessDayConvention,
+
+    /// Holiday calendar identifier (for example `"usny"`) used to adjust
+    /// payment dates, roll fixing dates and count settlement days. `None`
+    /// adjusts for weekends only. Validation rejects an unknown identifier.
+    /// `FloatingRateSpec::fixing_calendar_id` overrides it for the fixing
+    /// date alone.
+    #[builder(default)]
+    #[serde(default)]
+    pub calendar_id: Option<String>,
+
+    /// Business days between an accrual end and its payment date, on
+    /// `calendar_id`. `0` (the default) pays on the adjusted accrual end.
+    #[builder(default)]
+    #[serde(default)]
+    pub payment_lag_days: u32,
+
+    /// Business days from the valuation date to the settlement date used by
+    /// quote metrics (discount margin, yield, accrued interest). `0` (the
+    /// default) settles on the valuation date. The base present value is
+    /// always anchored at the valuation date.
+    #[builder(default)]
+    #[serde(default)]
+    pub settlement_days: u32,
+
     /// Attributes for scenario selection and tagging.
     #[builder(default)]
     /// Instrument-owned pricing inputs.
@@ -145,6 +232,48 @@ pub struct RevolvingCredit {
 /// Default stub kind for revolving credit facilities.
 fn default_stub_kind() -> StubKind {
     StubKind::ShortFront
+}
+
+/// Validate a dated step schedule: strictly increasing, after the commitment
+/// date and, depending on `allow_maturity`, on or strictly before maturity.
+fn validate_step_dates(
+    dates: impl Iterator<Item = Date>,
+    context: &str,
+    commitment_date: Date,
+    maturity: Date,
+    allow_maturity: bool,
+) -> finstack_quant_core::Result<()> {
+    let mut previous: Option<Date> = None;
+    for (index, date) in dates.enumerate() {
+        let inside = date > commitment_date
+            && if allow_maturity {
+                date <= maturity
+            } else {
+                date < maturity
+            };
+        validation::require_with(inside, || {
+            format!(
+                "RevolvingCredit {context}[{index}] dated {date} must lie after the commitment \
+                 date {commitment_date} and {} maturity {maturity}",
+                if allow_maturity {
+                    "on or before"
+                } else {
+                    "before"
+                }
+            )
+        })?;
+        if let Some(prev) = previous {
+            validation::require_with(date > prev, || {
+                format!(
+                    "RevolvingCredit {context} dates must be strictly increasing: [{index}] \
+                     {date} <= [{}] {prev}",
+                    index - 1
+                )
+            })?;
+        }
+        previous = Some(date);
+    }
+    Ok(())
 }
 
 /// Validate that fee tiers are sorted by threshold in strictly ascending order.
@@ -239,6 +368,7 @@ impl RevolvingCredit {
             .credit_curve_id_opt(None)
             .recovery_rate(0.0)
             .stub(StubKind::ShortFront)
+            .calendar_id("usny".to_string())
             .attributes(Attributes::new())
             .build()
     }
@@ -288,8 +418,13 @@ impl BaseRateSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RevolvingCreditFees {
-    /// One-time upfront fee paid by borrower to lender at commitment.
-    pub upfront_fee: Option<Money>,
+    /// One-time upfront (arrangement or OID) fee paid by the borrower to the
+    /// lender on the commitment date, as an absolute amount or a fraction of
+    /// the opening commitment. Enters the present value only while the
+    /// commitment date lies after the valuation date, and the effective-rate
+    /// metrics always.
+    #[serde(default)]
+    pub upfront_fee: Option<UpfrontFee>,
 
     /// Commitment fee tiers (utilization-based). Empty vector means no commitment fee.
     /// Tiers should be sorted by threshold ascending.
@@ -304,6 +439,13 @@ pub struct RevolvingCreditFees {
     /// Annual facility fee rate on total commitment (basis points).
     /// Facility fee is not tiered (applies to total commitment regardless of utilization).
     pub facility_fee_bp: f64,
+
+    /// Dated fee changes, cumulative from their dates, each shifting every
+    /// tier of the corresponding fee in basis points per annum. Dates must be
+    /// strictly increasing and strictly inside the facility life. Empty by
+    /// default.
+    #[serde(default)]
+    pub steps: Vec<FeeStep>,
 }
 
 impl Default for RevolvingCreditFees {
@@ -313,8 +455,20 @@ impl Default for RevolvingCreditFees {
             commitment_fee_tiers: Vec::new(),
             usage_fee_tiers: Vec::new(),
             facility_fee_bp: 0.0,
+            steps: Vec::new(),
         }
     }
+}
+
+/// Cumulative fee deltas in force on a date, in basis points per annum.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct FeeDeltas {
+    /// Shift of every commitment-fee tier.
+    pub commitment_bp: f64,
+    /// Shift of every usage-fee tier.
+    pub usage_bp: f64,
+    /// Shift of the facility fee.
+    pub facility_bp: f64,
 }
 
 impl RevolvingCreditFees {
@@ -369,7 +523,59 @@ impl RevolvingCreditFees {
             commitment_fee_tiers: make_tier(commitment_fee_bp),
             usage_fee_tiers: make_tier(usage_fee_bp),
             facility_fee_bp,
+            steps: Vec::new(),
         })
+    }
+
+    /// Cumulative fee deltas in force on `date`: the sum of every step dated
+    /// on or before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Accrual date the running fees are wanted for.
+    pub fn deltas_at(&self, date: Date) -> FeeDeltas {
+        self.steps.iter().filter(|step| step.date <= date).fold(
+            FeeDeltas::default(),
+            |acc, step| FeeDeltas {
+                commitment_bp: acc.commitment_bp + step.commitment_delta_bp,
+                usage_bp: acc.usage_bp + step.usage_delta_bp,
+                facility_bp: acc.facility_bp + step.facility_delta_bp,
+            },
+        )
+    }
+
+    /// Commitment fee in force on `date` for the given utilization: the tier
+    /// rate plus the cumulative step delta, floored at zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `utilization` - Drawn plus LC usage over the commitment in force, as a
+    ///   decimal in `[0, 1]`, used to select the tier.
+    /// * `date` - Accrual date the steps are evaluated on.
+    pub fn commitment_fee_bp_at(&self, utilization: f64, date: Date) -> f64 {
+        (self.commitment_fee_bp(utilization) + self.deltas_at(date).commitment_bp).max(0.0)
+    }
+
+    /// Usage fee in force on `date` for the given utilization (tier rate plus
+    /// cumulative step delta, floored at zero).
+    ///
+    /// # Arguments
+    ///
+    /// * `utilization` - Drawn plus LC usage over the commitment in force, as a
+    ///   decimal in `[0, 1]`, used to select the tier.
+    /// * `date` - Accrual date the steps are evaluated on.
+    pub fn usage_fee_bp_at(&self, utilization: f64, date: Date) -> f64 {
+        (self.usage_fee_bp(utilization) + self.deltas_at(date).usage_bp).max(0.0)
+    }
+
+    /// Facility fee in force on `date` (flat rate plus cumulative step delta,
+    /// floored at zero).
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Accrual date the steps are evaluated on.
+    pub fn facility_fee_bp_at(&self, date: Date) -> f64 {
+        (self.facility_fee_bp + self.deltas_at(date).facility_bp).max(0.0)
     }
 
     /// Create fees with flat (non-tiered) commitment and usage fees using typed bp.
@@ -390,6 +596,7 @@ impl RevolvingCreditFees {
             commitment_fee_tiers: make_tier(commitment_fee_bp),
             usage_fee_tiers: make_tier(usage_fee_bp),
             facility_fee_bp: facility_fee_bp.as_bp() as f64,
+            steps: Vec::new(),
         }
     }
 
@@ -524,16 +731,8 @@ pub struct McConfig {
     /// If None, factors are assumed independent.
     pub correlation_matrix: Option<[[f64; 3]; 3]>,
 
-    /// Recovery rate on default (e.g., 0.4 for 40% recovery).
-    ///
-    /// Used when propagating credit risk from market-anchored stochastic specs to
-    /// the deterministic fallback in `value()`. The path generator itself uses
-    /// `RevolvingCredit::recovery_rate` for hazard-to-spread mapping, so these
-    /// values should be kept consistent. When constructing `McConfig`, set this
-    /// to the same value as `RevolvingCredit::recovery_rate`.
-    pub recovery_rate: f64,
-
-    /// Credit spread process specification.
+    /// Credit spread process specification. Recovery on default is the
+    /// facility's `recovery_rate`; the hazard-to-spread mapping reads it there.
     pub credit_spread_process: CreditSpreadProcessSpec,
 
     /// Interest rate process specification (for floating rates).
@@ -556,7 +755,6 @@ impl McConfig {
     ///
     /// Checks that:
     /// - Correlation matrix (if provided) is positive semi-definite
-    /// - Recovery rate is in [0, 1]
     /// - CIR parameters satisfy Feller condition if applicable
     /// - Credit spread parameters are valid
     ///
@@ -565,21 +763,7 @@ impl McConfig {
     /// `Ok(())` if all parameters are valid, otherwise returns an error
     /// describing the validation failure.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use super::MAX_RECOVERY_RATE;
         use finstack_quant_core::InputError;
-
-        // Validate the explicit decimal recovery input, including both bounds.
-        validation::require_with(
-            self.recovery_rate.is_finite()
-                && self.recovery_rate >= 0.0
-                && self.recovery_rate <= MAX_RECOVERY_RATE,
-            || {
-                format!(
-                    "Recovery rate must be a finite decimal in [0, {}], got {}",
-                    MAX_RECOVERY_RATE, self.recovery_rate
-                )
-            },
-        )?;
 
         // Validate correlation matrix if provided
         if let Some(corr) = self.correlation_matrix {
@@ -877,21 +1061,225 @@ impl RevolvingCredit {
             },
         )?;
 
+        if let Some(calendar_id) = self.calendar_id.as_deref() {
+            validation::require_with(calendar_by_id(calendar_id).is_some(), || {
+                format!(
+                    "RevolvingCredit {} unknown calendar_id '{calendar_id}'",
+                    self.id
+                )
+            })?;
+        }
+
+        validate_step_dates(
+            self.commitment_schedule.iter().map(|step| step.date),
+            "commitment_schedule",
+            self.commitment_date,
+            self.maturity,
+            true,
+        )?;
+        for (index, step) in self.commitment_schedule.iter().enumerate() {
+            validation::validate_money_finite(
+                step.amount,
+                &format!("RevolvingCredit commitment_schedule[{index}].amount"),
+            )?;
+            validation::require_with(step.amount.amount() >= 0.0, || {
+                format!(
+                    "RevolvingCredit commitment_schedule[{index}].amount must be non-negative \
+                     (zero ends availability), got {}",
+                    step.amount
+                )
+            })?;
+            validation::validate_money_currency(
+                step.amount,
+                self.commitment_amount.currency(),
+                "RevolvingCredit commitment_schedule amount currency",
+            )?;
+            validation::validate_f64_non_negative(
+                step.fee_bp,
+                &format!("RevolvingCredit commitment_schedule[{index}].fee_bp"),
+            )?;
+        }
+        if let Some(lc) = &self.lc {
+            validation::validate_money_gt(lc.sublimit, 0.0, "RevolvingCredit lc.sublimit")?;
+            validation::validate_money_currency(
+                lc.sublimit,
+                self.commitment_amount.currency(),
+                "RevolvingCredit lc.sublimit currency",
+            )?;
+            validation::validate_money_finite(lc.outstanding, "RevolvingCredit lc.outstanding")?;
+            validation::validate_money_currency(
+                lc.outstanding,
+                self.commitment_amount.currency(),
+                "RevolvingCredit lc.outstanding currency",
+            )?;
+            validation::require_with(
+                lc.outstanding.amount() >= 0.0 && lc.outstanding.amount() <= lc.sublimit.amount(),
+                || {
+                    format!(
+                        "RevolvingCredit lc.outstanding ({}) must lie in [0, sublimit {}]",
+                        lc.outstanding, lc.sublimit
+                    )
+                },
+            )?;
+            validation::require_with(
+                self.drawn_amount.amount() + lc.outstanding.amount()
+                    <= self.commitment_amount.amount() + 1e-9,
+                || {
+                    format!(
+                        "RevolvingCredit drawn_amount ({}) plus lc.outstanding ({}) must not \
+                         exceed commitment_amount ({})",
+                        self.drawn_amount, lc.outstanding, self.commitment_amount
+                    )
+                },
+            )?;
+            validation::require_with(lc.leq.is_finite() && (0.0..=1.0).contains(&lc.leq), || {
+                format!(
+                    "RevolvingCredit lc.leq must be a finite decimal in [0, 1], got {}",
+                    lc.leq
+                )
+            })?;
+            validation::validate_f64_non_negative(
+                lc.fronting_fee_bp,
+                "RevolvingCredit lc.fronting_fee_bp",
+            )?;
+            match (lc.fee_bp, &self.base_rate_spec) {
+                (Some(fee_bp), _) => {
+                    validation::validate_f64_non_negative(fee_bp, "RevolvingCredit lc.fee_bp")?;
+                }
+                (None, BaseRateSpec::Fixed { .. }) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RevolvingCredit {}: lc.fee_bp is required on a fixed-rate facility (no \
+                         floating margin to default to)",
+                        self.id
+                    )));
+                }
+                (None, BaseRateSpec::Floating(_)) => {}
+            }
+            let mut outstanding = lc.outstanding.amount();
+            let mut previous: Option<Date> = None;
+            for (index, event) in lc.events.iter().enumerate() {
+                validation::require_with(
+                    event.date > self.commitment_date && event.date <= self.maturity,
+                    || {
+                        format!(
+                            "RevolvingCredit lc.events[{index}] dated {} must be after the \
+                             commitment date and on or before maturity",
+                            event.date
+                        )
+                    },
+                )?;
+                if let Some(prev) = previous {
+                    validation::require_with(event.date >= prev, || {
+                        format!("RevolvingCredit lc.events must be sorted by date: [{index}] {} < {prev}", event.date)
+                    })?;
+                }
+                previous = Some(event.date);
+                validation::validate_money_gt(
+                    event.amount,
+                    0.0,
+                    "RevolvingCredit lc.events amount",
+                )?;
+                validation::validate_money_currency(
+                    event.amount,
+                    self.commitment_amount.currency(),
+                    "RevolvingCredit lc.events amount currency",
+                )?;
+                outstanding += if event.is_issue {
+                    event.amount.amount()
+                } else {
+                    -event.amount.amount()
+                };
+                validation::require_with(
+                    outstanding >= -1e-9 && outstanding <= lc.sublimit.amount() + 1e-9,
+                    || {
+                        format!(
+                            "RevolvingCredit lc.events[{index}] on {} takes the LC outstanding to {}, \
+                             outside [0, sublimit {}]",
+                            event.date, outstanding, lc.sublimit
+                        )
+                    },
+                )?;
+            }
+        }
+
+        validate_step_dates(
+            self.margin_steps.iter().map(|step| step.date),
+            "margin_steps",
+            self.commitment_date,
+            self.maturity,
+            false,
+        )?;
+        validate_step_dates(
+            self.fees.steps.iter().map(|step| step.date),
+            "fees.steps",
+            self.commitment_date,
+            self.maturity,
+            false,
+        )?;
+        for (index, step) in self.fees.steps.iter().enumerate() {
+            for (name, value) in [
+                ("commitment_delta_bp", step.commitment_delta_bp),
+                ("usage_delta_bp", step.usage_delta_bp),
+                ("facility_delta_bp", step.facility_delta_bp),
+            ] {
+                validation::validate_f64_finite(
+                    value,
+                    &format!("RevolvingCredit fees.steps[{index}].{name}"),
+                )?;
+            }
+        }
+
         // Validate fee tier ordering: thresholds must be strictly ascending
         validate_fee_tier_ordering(&self.fees.commitment_fee_tiers, "commitment_fee_tiers")?;
         validate_fee_tier_ordering(&self.fees.usage_fee_tiers, "usage_fee_tiers")?;
 
-        if let Some(upfront_fee) = self.fees.upfront_fee {
-            validation::validate_money_finite(upfront_fee, "RevolvingCredit upfront_fee")?;
-            validation::validate_money_currency(
-                upfront_fee,
-                self.commitment_amount.currency(),
-                "RevolvingCredit upfront_fee currency",
+        match &self.fees.upfront_fee {
+            Some(UpfrontFee::Amount(upfront_fee)) => {
+                validation::validate_money_finite(*upfront_fee, "RevolvingCredit upfront_fee")?;
+                validation::validate_money_currency(
+                    *upfront_fee,
+                    self.commitment_amount.currency(),
+                    "RevolvingCredit upfront_fee currency",
+                )?;
+                validation::require_with(upfront_fee.amount() >= 0.0, || {
+                    format!(
+                        "RevolvingCredit upfront_fee must be non-negative, got {}",
+                        upfront_fee
+                    )
+                })?;
+            }
+            Some(UpfrontFee::PctOfCommitment(pct)) => {
+                validation::require_with(pct.is_finite() && (0.0..=1.0).contains(pct), || {
+                    format!(
+                        "RevolvingCredit upfront_fee percentage must be a finite decimal in \
+                         [0, 1], got {pct}"
+                    )
+                })?;
+            }
+            None => {}
+        }
+
+        for (index, fee) in self.scheduled_fees.iter().enumerate() {
+            validation::require_with(
+                fee.date > self.commitment_date && fee.date <= self.maturity,
+                || {
+                    format!(
+                        "RevolvingCredit scheduled_fees[{index}] dated {} must lie after the \
+                         commitment date and on or before maturity",
+                        fee.date
+                    )
+                },
             )?;
-            validation::require_with(upfront_fee.amount() >= 0.0, || {
+            validation::validate_money_finite(fee.amount, "RevolvingCredit scheduled_fees amount")?;
+            validation::validate_money_currency(
+                fee.amount,
+                self.commitment_amount.currency(),
+                "RevolvingCredit scheduled_fees amount currency",
+            )?;
+            validation::require_with(fee.amount.amount() >= 0.0, || {
                 format!(
-                    "RevolvingCredit upfront_fee must be non-negative, got {}",
-                    upfront_fee
+                    "RevolvingCredit scheduled_fees[{index}] must be non-negative, got {}",
+                    fee.amount
                 )
             })?;
         }
@@ -944,6 +1332,27 @@ impl RevolvingCredit {
                 let mut events = events.iter().collect::<Vec<_>>();
                 events.sort_by_key(|event| event.date);
                 let mut balance = self.drawn_amount.amount();
+                // A step down must not leave the balance above the new
+                // commitment: the analyst dates the repayment.
+                for step in &self.commitment_schedule {
+                    let balance_at_step = events
+                        .iter()
+                        .filter(|event| event.date <= step.date)
+                        .fold(self.drawn_amount.amount(), |b, event| {
+                            if event.is_draw {
+                                b + event.amount.amount()
+                            } else {
+                                b - event.amount.amount()
+                            }
+                        });
+                    validation::require_with(balance_at_step <= step.amount.amount(), || {
+                        format!(
+                            "RevolvingCredit commitment step on {} to {} is below the drawn \
+                             balance {} on that date; schedule a repayment on or before it",
+                            step.date, step.amount, balance_at_step
+                        )
+                    })?;
+                }
                 for event in events {
                     validation::require_with(
                         event.date > self.commitment_date && event.date <= self.maturity,
@@ -971,16 +1380,14 @@ impl RevolvingCredit {
                     )?;
                     if event.is_draw {
                         balance += event.amount.amount();
-                        validation::require_with(
-                            balance <= self.commitment_amount.amount(),
-                            || {
-                                format!(
-                                    "RevolvingCredit draw on {} would increase balance to {}, \
-                                     above commitment {}",
-                                    event.date, balance, self.commitment_amount
-                                )
-                            },
-                        )?;
+                        let commitment = self.commitment_at(event.date);
+                        validation::require_with(balance <= commitment.amount(), || {
+                            format!(
+                                "RevolvingCredit draw on {} would increase balance to {}, \
+                                 above commitment {}",
+                                event.date, balance, commitment
+                            )
+                        })?;
                     } else {
                         validation::require_with(event.amount.amount() <= balance, || {
                             format!(
@@ -1042,16 +1449,6 @@ impl RevolvingCredit {
                 }
                 if let Some(mc_config) = &spec.mc_config {
                     mc_config.validate()?;
-                    validation::require_with(
-                        (mc_config.recovery_rate - self.recovery_rate).abs() <= 1e-12,
-                        || {
-                            format!(
-                                "RevolvingCredit McConfig recovery_rate ({}) must equal the \
-                                 facility recovery_rate ({})",
-                                mc_config.recovery_rate, self.recovery_rate
-                            )
-                        },
-                    )?;
                     // A hazard curve on the facility is both the CS01 bump
                     // target and the anchor for pathwise survival. Any other
                     // spread process ignores the curve, so a hazard bump would
@@ -1091,6 +1488,34 @@ impl RevolvingCredit {
         Ok(())
     }
 
+    /// Settlement date of a quote on `as_of`: `settlement_days` business days
+    /// forward on `calendar_id`, or weekdays when no calendar is set.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date the settlement lag is counted from.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `calendar_id` names an unknown calendar or the
+    /// business-day roll fails.
+    pub fn settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
+        if self.settlement_days == 0 {
+            return Ok(as_of);
+        }
+        match self.calendar_id.as_deref() {
+            Some(calendar_id) => {
+                let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
+                    finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                        id: format!("calendar:{calendar_id}"),
+                    })
+                })?;
+                as_of.add_business_days(self.settlement_days as i32, calendar)
+            }
+            None => Ok(as_of.add_weekdays(self.settlement_days as i32)),
+        }
+    }
+
     /// Get the current undrawn amount.
     pub fn undrawn_amount(&self) -> finstack_quant_core::Result<Money> {
         self.commitment_amount.checked_sub(self.drawn_amount)
@@ -1103,6 +1528,186 @@ impl RevolvingCredit {
         } else {
             self.drawn_amount.amount() / self.commitment_amount.amount()
         }
+    }
+
+    /// Commitment in force on `date`: the last `commitment_schedule` entry
+    /// dated on or before it, else the opening `commitment_amount`.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the commitment is wanted for.
+    pub fn commitment_at(&self, date: Date) -> Money {
+        self.commitment_schedule
+            .iter()
+            .rev()
+            .find(|step| step.date <= date)
+            .map_or(self.commitment_amount, |step| step.amount)
+    }
+
+    /// Drawn balance at the simulation anchor over the commitment in force on
+    /// `date`, as a decimal in `[0, 1]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the commitment is read on, normally the simulation
+    ///   anchor.
+    pub fn utilization_at(&self, date: Date) -> f64 {
+        let commitment = self.commitment_at(date).amount();
+        if commitment <= 0.0 {
+            0.0
+        } else {
+            (self.drawn_amount.amount() / commitment).clamp(0.0, 1.0)
+        }
+    }
+
+    /// Cumulative margin change in force on `date`, in basis points: the sum
+    /// of every `margin_steps` entry dated on or before it.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Accrual date the margin is wanted for.
+    pub fn margin_delta_bp_at(&self, date: Date) -> f64 {
+        self.margin_steps
+            .iter()
+            .filter(|step| step.date <= date)
+            .map(|step| f64::from(step.delta_bp))
+            .sum()
+    }
+
+    /// Every date on which a commitment, margin or fee step takes effect,
+    /// sorted and deduplicated. Both cashflow engines slice accrual on them.
+    pub fn step_dates(&self) -> Vec<Date> {
+        let mut dates: Vec<Date> = self
+            .commitment_schedule
+            .iter()
+            .map(|step| step.date)
+            .chain(self.margin_steps.iter().map(|step| step.date))
+            .chain(self.fees.steps.iter().map(|step| step.date))
+            .chain(
+                self.lc
+                    .iter()
+                    .flat_map(|lc| lc.events.iter().map(|event| event.date)),
+            )
+            .collect();
+        dates.sort_unstable();
+        dates.dedup();
+        dates
+    }
+
+    /// Letter-of-credit face outstanding on `date`: the anchor `outstanding`
+    /// plus every issuance, less every expiry, dated on or before it. Zero
+    /// without an LC sub-facility.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the LC outstanding is wanted for.
+    pub fn lc_outstanding_at(&self, date: Date) -> Money {
+        let ccy = self.commitment_amount.currency();
+        let Some(lc) = &self.lc else {
+            return Money::from((0_i64, ccy));
+        };
+        let amount = lc
+            .events
+            .iter()
+            .filter(|event| event.date <= date)
+            .fold(lc.outstanding.amount(), |acc, event| {
+                if event.is_issue {
+                    acc + event.amount.amount()
+                } else {
+                    acc - event.amount.amount()
+                }
+            })
+            .max(0.0);
+        Money::new(amount, ccy).unwrap_or(Money::from((0_i64, ccy)))
+    }
+
+    /// Letter-of-credit fee in force on `date`, in basis points per annum:
+    /// `lc.fee_bp` when set, else the floating spread plus the cumulative
+    /// margin step delta. Zero without an LC sub-facility.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Accrual date the fee is evaluated on.
+    pub fn lc_fee_bp_at(&self, date: Date) -> f64 {
+        let Some(lc) = &self.lc else { return 0.0 };
+        match (lc.fee_bp, &self.base_rate_spec) {
+            (Some(fee_bp), _) => fee_bp,
+            (None, BaseRateSpec::Floating(spec)) => {
+                spec.spread_bp.to_f64().unwrap_or(0.0) + self.margin_delta_bp_at(date)
+            }
+            (None, BaseRateSpec::Fixed { .. }) => 0.0,
+        }
+        .max(0.0)
+    }
+
+    /// Fronting fee in force, in basis points per annum (zero without an LC
+    /// sub-facility).
+    pub fn fronting_fee_bp(&self) -> f64 {
+        self.lc.as_ref().map_or(0.0, |lc| lc.fronting_fee_bp)
+    }
+
+    /// Letter-of-credit face assumed drawn at default on `date`:
+    /// `lc.leq × LC outstanding`, in the facility currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the contingent exposure is wanted for.
+    pub fn lc_exposure_at_default(&self, date: Date) -> f64 {
+        self.lc
+            .as_ref()
+            .map_or(0.0, |lc| lc.leq * self.lc_outstanding_at(date).amount())
+    }
+
+    /// Upfront fee amount in the facility currency (zero when none), resolved
+    /// against the opening commitment.
+    pub fn upfront_fee_amount(&self) -> Money {
+        self.fees.upfront_fee.as_ref().map_or(
+            Money::from((0_i64, self.commitment_amount.currency())),
+            |fee| fee.amount(self.commitment_amount),
+        )
+    }
+
+    /// Scheduled fixed fees dated after `as_of`, as `(date, amount)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; fees dated on or before it are history.
+    pub fn scheduled_fees_after(&self, as_of: Date) -> Vec<(Date, Money)> {
+        self.scheduled_fees
+            .iter()
+            .filter(|fee| fee.date > as_of && fee.amount.amount() > 0.0)
+            .map(|fee| (fee.date, fee.amount))
+            .collect()
+    }
+
+    /// Reduction fees payable on commitment step-downs dated after `as_of`:
+    /// `(previous commitment − new commitment) × fee_bp`, one entry per step
+    /// that lowers the commitment and carries a positive fee.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; steps dated on or before it are history.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a fee amount is not representable as `Money`.
+    pub fn commitment_step_fees(
+        &self,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+        let mut previous = self.commitment_amount;
+        let mut fees = Vec::new();
+        for step in &self.commitment_schedule {
+            let reduction = previous.amount() - step.amount.amount();
+            if step.date > as_of && reduction > 0.0 && step.fee_bp > 0.0 {
+                fees.push((
+                    step.date,
+                    Money::new(reduction * step.fee_bp * 1e-4, previous.currency())?,
+                ));
+            }
+            previous = step.amount;
+        }
+        Ok(fees)
     }
 
     /// Check if the facility uses deterministic cashflows.
@@ -1303,6 +1908,7 @@ mod dependency_tests {
             .expect("chronologically valid events must not depend on input order");
         let balance = super::super::cashflow_engine::calculate_drawn_balance_at_date(
             &facility,
+            facility.commitment_date,
             date!(2025 - 12 - 31),
         )
         .expect("balance");
@@ -1310,7 +1916,7 @@ mod dependency_tests {
     }
 
     #[test]
-    fn validation_rejects_events_outside_life_and_mismatched_mc_recovery() {
+    fn validation_rejects_events_outside_life() {
         let mut facility = RevolvingCredit::example().expect("example");
         facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
             date: date!(2028 - 01 - 01),
@@ -1322,32 +1928,6 @@ mod dependency_tests {
             .expect_err("post-maturity draw must fail")
             .to_string()
             .contains("maturity"));
-
-        facility.recovery_rate = 0.4;
-        facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
-            utilization_process: UtilizationProcess::MeanReverting {
-                target_rate: 0.5,
-                speed: 1.0,
-                volatility: 0.1,
-                spread_sensitivity: 0.0,
-            },
-            num_paths: 100,
-            seed: Some(7),
-            antithetic: false,
-            use_sobol_qmc: false,
-            mc_config: Some(McConfig {
-                correlation_matrix: None,
-                recovery_rate: 0.35,
-                credit_spread_process: CreditSpreadProcessSpec::Constant(0.01),
-                interest_rate_process: None,
-                util_credit_corr: None,
-            }),
-        }));
-        assert!(facility
-            .validate()
-            .expect_err("mismatched recovery assumptions must fail")
-            .to_string()
-            .contains("must equal"));
     }
 
     #[test]

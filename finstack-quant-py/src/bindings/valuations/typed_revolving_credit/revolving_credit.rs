@@ -12,8 +12,8 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
-    attributes_from_py, attributes_to_py, builder_repr, day_count_from_py, money_from_py,
-    money_repr, money_to_py, tenor_from_py,
+    attributes_from_py, attributes_to_py, bdc_from_py, builder_repr, day_count_from_py,
+    enum_to_py_string, money_from_py, money_repr, money_to_py, tenor_from_py,
 };
 use crate::bindings::valuations::instruments::{
     instrument_default_model, instrument_expiry, instrument_market_dependencies,
@@ -404,8 +404,8 @@ impl PyRevolvingCredit {
         money_to_py(self.inner.commitment_amount)
     }
 
-    /// Drawn amount at the commitment date (deterministic schedules) or at
-    /// the valuation anchor (stochastic facilities).
+    /// Drawn balance at the simulation anchor (the later of the commitment
+    /// and valuation dates), in both deterministic and stochastic mode.
     #[getter]
     fn drawn_amount(&self) -> PyMoney {
         money_to_py(self.inner.drawn_amount)
@@ -442,10 +442,55 @@ impl PyRevolvingCredit {
         PyTenor::from_inner(self.inner.frequency)
     }
 
-    /// Fee structure as its serde ``dict``.
+    /// Fee structure as its serde ``dict`` (including dated ``steps``).
     #[getter]
     fn fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.fees)
+    }
+
+    /// Scheduled commitment changes as a ``list`` of serde ``dict`` rows
+    /// (``date``, ``amount``, ``fee_bp``), empty when the commitment is flat.
+    #[getter]
+    fn commitment_schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.commitment_schedule)
+    }
+
+    /// Dated margin steps as a ``list`` of serde ``dict`` rows (``date``,
+    /// ``delta_bp``), empty when the margin is flat.
+    #[getter]
+    fn margin_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.margin_steps)
+    }
+
+    /// Dated fixed fees as a ``list`` of serde ``dict`` rows (``date``,
+    /// ``amount``), empty when none are scheduled.
+    #[getter]
+    fn scheduled_fees<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.scheduled_fees)
+    }
+
+    /// Effective-interest-rate reporting switch as its serde ``dict``
+    /// (``{"include_fees": bool}``), or ``None`` for the default (fees
+    /// included).
+    #[getter]
+    fn oid_eir<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .oid_eir
+            .as_ref()
+            .map(|spec| serde_to_py(py, spec))
+            .transpose()
+    }
+
+    /// Letter-of-credit sub-facility as its serde ``dict`` (``sublimit``,
+    /// ``outstanding``, ``events``, ``fee_bp``, ``fronting_fee_bp``,
+    /// ``leq``), or ``None`` when the facility has no LC sublimit.
+    #[getter]
+    fn lc<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .lc
+            .as_ref()
+            .map(|lc| serde_to_py(py, lc))
+            .transpose()
     }
 
     /// Draw/repay specification as its serde ``dict`` (``{"deterministic":
@@ -490,6 +535,33 @@ impl PyRevolvingCredit {
     #[getter]
     fn stub(&self) -> PyStubKind {
         PyStubKind::from_inner(self.inner.stub)
+    }
+
+    /// Business-day convention applied to payment dates (serde string, e.g.
+    /// ``"modified_following"``).
+    #[getter]
+    fn business_day_convention(&self) -> PyResult<String> {
+        enum_to_py_string(&self.inner.business_day_convention)
+    }
+
+    /// Holiday calendar identifier used for payment, fixing and settlement
+    /// rolls, or ``None`` for weekends only.
+    #[getter]
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id.clone()
+    }
+
+    /// Business days between an accrual end and its payment date.
+    #[getter]
+    fn payment_lag_days(&self) -> u32 {
+        self.inner.payment_lag_days
+    }
+
+    /// Business days from the valuation date to the settlement date used by
+    /// quote metrics.
+    #[getter]
+    fn settlement_days(&self) -> u32 {
+        self.inner.settlement_days
     }
 
     /// Scenario-selection attributes.
@@ -649,8 +721,9 @@ impl PyRevolvingCreditBuilder {
         Ok(slf)
     }
 
-    /// Set the drawn amount at the commitment date (or the valuation anchor
-    /// for stochastic facilities).
+    /// Set the drawn balance at the simulation anchor, the later of the
+    /// commitment date and the valuation date, in both modes. Deterministic
+    /// draw/repay events must be dated after that anchor.
     ///
     /// Parameters
     /// ----------
@@ -845,8 +918,11 @@ impl PyRevolvingCreditBuilder {
     /// ----------
     /// value : dict | str
     ///     ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
-    ///     (``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers``,
-    ///     ``facility_fee_bp``).
+    ///     (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
+    ///     ``{"pct_of_commitment": 0.02}``; ``commitment_fee_tiers``,
+    ///     ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
+    ///     ``{"date", "commitment_delta_bp", "usage_delta_bp",
+    ///     "facility_delta_bp"}`` rows).
     ///
     /// Returns
     /// -------
@@ -868,6 +944,186 @@ impl PyRevolvingCreditBuilder {
         let b = take_builder(&mut slf)?;
         slf.inner = Some(b.fees(fees));
         slf.fields.push(("fees", "{..}".to_string()));
+        Ok(slf)
+    }
+
+    /// Set the scheduled commitment changes.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : list[dict[str, Any]] | str
+    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict, "fee_bp":
+    ///     float}`` (a ``list`` of dicts or a JSON ``str``), each the
+    ///     commitment in force from its date; ``fee_bp`` is the reduction fee
+    ///     on a step down, in basis points of the reduced amount. Dates must
+    ///     be strictly increasing, after the commitment date and on or before
+    ///     maturity.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a row does not match the serde shape or the builder was
+    ///     already consumed; ordering and feasibility fail at ``build()``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn commitment_schedule<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let steps: Vec<
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::CommitmentStep,
+        > = spec_from_py(py, value, "commitment_schedule")?;
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.commitment_schedule(steps));
+        slf.fields.push(("commitment_schedule", "[..]".to_string()));
+        Ok(slf)
+    }
+
+    /// Set the dated fixed fees (amendment, waiver, extension, consent).
+    ///
+    /// Parameters
+    /// ----------
+    /// value : list[dict[str, Any]] | str
+    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict}`` (a
+    ///     ``list`` of dicts or a JSON ``str``), each paid on its date. Dates
+    ///     must lie after the commitment date and on or before maturity.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a row does not match the serde shape or the builder was
+    ///     already consumed; date and sign checks fail at ``build()``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn scheduled_fees<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let fees: Vec<
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::ScheduledFee,
+        > = spec_from_py(py, value, "scheduled_fees")?;
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.scheduled_fees(fees));
+        slf.fields.push(("scheduled_fees", "[..]".to_string()));
+        Ok(slf)
+    }
+
+    /// Set the effective-interest-rate reporting switch.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict[str, Any] | str | None
+    ///     ``{"include_fees": bool}`` as a ``dict`` or JSON ``str``; ``None``
+    ///     (the default) includes fees in the effective yield.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the spec does not match the serde shape or the builder was
+    ///     already consumed.
+    #[pyo3(signature = (value))]
+    #[pyo3(text_signature = "($self, value)")]
+    fn oid_eir<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec: Option<
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::OidEirSpec,
+        > = value.map(|v| spec_from_py(py, v, "oid_eir")).transpose()?;
+        let repr = if spec.is_some() { "{..}" } else { "None" };
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.oid_eir_opt(spec));
+        slf.fields.push(("oid_eir", repr.to_string()));
+        Ok(slf)
+    }
+
+    /// Set the letter-of-credit sub-facility.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : dict[str, Any] | str | None
+    ///     ``LetterOfCreditSpec`` as a ``dict`` or JSON ``str`` with
+    ///     ``sublimit`` and ``outstanding`` (Money dicts), ``events`` (rows
+    ///     of ``{"date", "amount", "is_issue"}``), ``fee_bp`` (``None``
+    ///     accrues the floating margin), ``fronting_fee_bp`` and ``leq`` (the
+    ///     fraction of the LC face drawn at default). ``None`` removes the
+    ///     sublimit.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the spec does not match the serde shape or the builder was
+    ///     already consumed; sublimit and capacity checks fail at ``build()``.
+    #[pyo3(signature = (value))]
+    #[pyo3(text_signature = "($self, value)")]
+    fn lc<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let lc: Option<
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::LetterOfCreditSpec,
+        > = value.map(|v| spec_from_py(py, v, "lc")).transpose()?;
+        let repr = if lc.is_some() { "{..}" } else { "None" };
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.lc_opt(lc));
+        slf.fields.push(("lc", repr.to_string()));
+        Ok(slf)
+    }
+
+    /// Set the dated margin steps.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : list[dict[str, Any]] | str
+    ///     Rows of ``{"date": "YYYY-MM-DD", "delta_bp": int}`` (a ``list`` of
+    ///     dicts or a JSON ``str``); each delta shifts the floating spread or
+    ///     the fixed rate from its date, cumulatively. Dates must be strictly
+    ///     increasing and strictly inside the facility life.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a row does not match the serde shape or the builder was
+    ///     already consumed; ordering fails at ``build()``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn margin_steps<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let steps: Vec<
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStepUp,
+        > = spec_from_py(py, value, "margin_steps")?;
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.margin_steps(steps));
+        slf.fields.push(("margin_steps", "[..]".to_string()));
         Ok(slf)
     }
 
@@ -1085,6 +1341,126 @@ impl PyRevolvingCreditBuilder {
         let b = take_builder(&mut slf)?;
         slf.inner = Some(b.stub(stub));
         slf.fields.push(("stub", format!("{stub:?}")));
+        Ok(slf)
+    }
+
+    /// Set the business-day convention for payment dates.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : BusinessDayConvention | str
+    ///     Convention object or serde name (``"modified_following"``,
+    ///     ``"following"``, ``"preceding"``, ...); default
+    ///     ``"modified_following"``. Accrual boundaries stay unadjusted.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the name is unknown or the builder was already consumed.
+    /// TypeError
+    ///     If ``value`` is neither ``BusinessDayConvention`` nor ``str``.
+    #[pyo3(text_signature = "($self, value)")]
+    fn business_day_convention<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let convention = bdc_from_py(value, "business_day_convention")?;
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.business_day_convention(convention));
+        slf.fields
+            .push(("business_day_convention", format!("{convention:?}")));
+        Ok(slf)
+    }
+
+    /// Set the holiday calendar used for payment, fixing and settlement rolls.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : str | None
+    ///     Calendar identifier such as ``"usny"``; ``None`` (the default)
+    ///     adjusts for weekends only. An unknown identifier fails at
+    ///     ``build()``.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed.
+    #[pyo3(signature = (value))]
+    #[pyo3(text_signature = "($self, value)")]
+    fn calendar_id<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: Option<String>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.calendar_id_opt(value.clone()));
+        slf.fields.push(("calendar_id", format!("{value:?}")));
+        Ok(slf)
+    }
+
+    /// Set the payment lag in business days after each accrual end.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : int
+    ///     Business days on the facility calendar; ``0`` (the default) pays
+    ///     on the adjusted accrual end.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed.
+    #[pyo3(text_signature = "($self, value)")]
+    fn payment_lag_days<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: u32,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.payment_lag_days(value));
+        slf.fields.push(("payment_lag_days", value.to_string()));
+        Ok(slf)
+    }
+
+    /// Set the settlement lag used by quote metrics.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : int
+    ///     Business days from the valuation date to settlement; ``0`` (the
+    ///     default) settles on the valuation date. The base present value is
+    ///     always anchored at the valuation date.
+    ///
+    /// Returns
+    /// -------
+    /// RevolvingCreditBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder was already consumed.
+    #[pyo3(text_signature = "($self, value)")]
+    fn settlement_days<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: u32,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = take_builder(&mut slf)?;
+        slf.inner = Some(b.settlement_days(value));
+        slf.fields.push(("settlement_days", value.to_string()));
         Ok(slf)
     }
 

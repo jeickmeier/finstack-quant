@@ -436,7 +436,7 @@
     },
     "MarginStepUp": {
       "additionalProperties": false,
-      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration.",
+      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement).",
       "properties": {
         "date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

@@ -15,6 +15,7 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
@@ -63,8 +64,9 @@ fn test_upfront_fee_sign() {
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
-            fees.upfront_fee =
-                Some(Money::new(50_000.0, Currency::USD).expect("valid money fixture"));
+            fees.upfront_fee = Some(UpfrontFee::Amount(
+                Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+            ));
             fees
         })
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

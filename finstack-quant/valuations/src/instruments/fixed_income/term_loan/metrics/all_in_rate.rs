@@ -25,8 +25,6 @@
 
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::DayCountContext;
 
 use super::irr_helpers::cached_full_schedule;
 
@@ -55,64 +53,8 @@ impl MetricCalculator for AllInRateCalculator {
         // loan to avoid repeated rebuilds in multi-metric requests.
         let schedule = cached_full_schedule(context)?;
 
-        // Sum cash interest and fee flows from the schedule (exclude PIK).
-        // Only include flows after as_of to match the time-weighted denominator.
-        let cash_cost: f64 = schedule
-            .get_flows()
-            .iter()
-            .filter(|cf| cf.date > as_of)
-            .filter_map(|cf| match cf.kind {
-                CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => Some(cf.amount.amount()),
-                CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee => {
-                    Some(cf.amount.amount())
-                }
-                _ => None,
-            })
-            .sum();
-
-        // Compute time-weighted outstanding from the outstanding path.
-        // The outstanding path gives balances after all events on each date.
-        // We integrate outstanding × year_fraction between consecutive dates.
-        let out_path = schedule.outstanding_by_date()?;
-
-        let mut time_weighted_outstanding = 0.0;
-
-        // Integrate piecewise-constant outstanding over the loan life after as_of.
-        let mut prev_date = as_of;
-        let mut prev_outstanding = {
-            // Look up outstanding at as_of (last entry <= as_of)
-            let mut last = 0.0_f64;
-            for (d, amt) in &out_path {
-                if *d <= as_of {
-                    last = amt.amount();
-                } else {
-                    break;
-                }
-            }
-            last
-        };
-
-        // Walk through outstanding path entries after as_of
-        for (d, amt) in &out_path {
-            if *d <= as_of {
-                continue;
-            }
-            let target = (*d).min(maturity);
-            let yf = day_count.year_fraction(prev_date, target, DayCountContext::default())?;
-            time_weighted_outstanding += prev_outstanding * yf;
-            prev_date = target;
-            prev_outstanding = amt.amount();
-        }
-
-        // Extend to maturity if the last outstanding entry is before maturity
-        if prev_date < maturity {
-            let yf = day_count.year_fraction(prev_date, maturity, DayCountContext::default())?;
-            time_weighted_outstanding += prev_outstanding * yf;
-        }
-
-        if time_weighted_outstanding <= 0.0 {
-            return Ok(0.0);
-        }
-        Ok(cash_cost / time_weighted_outstanding)
+        crate::instruments::fixed_income::loan_quotes::all_in_rate_from_schedule(
+            &schedule, as_of, day_count, maturity,
+        )
     }
 }

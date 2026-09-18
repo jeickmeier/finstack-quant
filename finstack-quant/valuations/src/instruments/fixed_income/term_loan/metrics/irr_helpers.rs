@@ -207,7 +207,9 @@ pub(super) fn solve_irr_to_exercise(
             | CFKind::Fee
             | CFKind::CommitmentFee
             | CFKind::UsageFee
-            | CFKind::FacilityFee => {
+            | CFKind::FacilityFee
+            | CFKind::LcFee
+            | CFKind::FrontingFee => {
                 flows.push((cf.date, cf.amount.amount()));
             }
             // Principal flows strictly BEFORE the exercise date:

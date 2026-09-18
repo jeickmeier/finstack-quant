@@ -104,7 +104,6 @@ pub(crate) fn revolver(
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
-                    recovery_rate: 0.4,
                     credit_spread_process: spread,
                     interest_rate_process: None,
                     util_credit_corr: Some(0.5),
@@ -119,15 +118,15 @@ pub(crate) fn revolver(
     builder.build().expect("stochastic revolver")
 }
 
-/// A constant spread equal to the contractual margin prices every draw at
-/// fair value: the option cost is exactly zero on every path, and so is the
-/// metric.
+/// A constant spread process, at any level, prices every draw at fair value:
+/// the fair spread is anchored to the margin, so the option cost is exactly
+/// zero on every path, and so is the metric.
 #[test]
-fn constant_spread_at_the_margin_has_zero_option_cost_on_every_path() {
+fn constant_spread_at_any_level_has_zero_option_cost_on_every_path() {
     let facility = revolver(
         "RCF-FAIR",
         0.25,
-        CreditSpreadProcessSpec::Constant(f64::from(MARGIN_BP as i32) / 10_000.0),
+        CreditSpreadProcessSpec::Constant(0.045),
         16,
     );
     let market = market();
@@ -203,4 +202,34 @@ fn widening_market_anchored_spread_gives_a_negative_option_cost() {
         (metric - cost).abs() < 1e-9,
         "metric {metric} vs result {cost}"
     );
+}
+
+/// The option cost depends on spread changes since the valuation date, not
+/// on the margin level: two facilities differing only in their margin carry
+/// identical draw option costs on every path.
+#[test]
+fn draw_option_cost_is_independent_of_the_margin_level() {
+    let market = market().insert(widening_hazard_curve());
+    let spread = || CreditSpreadProcessSpec::MarketAnchored {
+        credit_curve_id: HAZARD_ID.into(),
+        kappa: 0.5,
+        implied_vol: 0.4,
+        tenor_years: None,
+    };
+    let tight = revolver("RCF-TIGHT", 0.25, spread(), 32);
+    let mut wide = revolver("RCF-WIDE", 0.25, spread(), 32);
+    if let BaseRateSpec::Floating(spec) = &mut wide.base_rate_spec {
+        spec.spread_bp = rust_decimal::Decimal::from(MARGIN_BP + 400);
+    }
+    let a = RevolvingCreditPricer::price_with_paths(&tight, &market, AS_OF).expect("tight");
+    let b = RevolvingCreditPricer::price_with_paths(&wide, &market, AS_OF).expect("wide");
+    for (pa, pb) in a.path_results.iter().zip(&b.path_results) {
+        assert!(
+            (pa.draw_option_cost.amount() - pb.draw_option_cost.amount()).abs() < 1e-6,
+            "{} vs {}",
+            pa.draw_option_cost,
+            pb.draw_option_cost
+        );
+    }
+    assert!(a.draw_option_cost.mean.amount() < 0.0);
 }

@@ -181,7 +181,7 @@ test('RevolvingCredit.priceWithPaths keeps every simulated path of a stochastic 
       utilization_process: { mean_reverting: { target_rate: 0.6, speed: 1.0, volatility: 0.25 } },
       num_paths: 8,
       seed: 42,
-      mc_config: { recovery_rate: spec.recovery_rate, credit_spread_process: { constant: 0.025 } },
+      mc_config: { credit_spread_process: { constant: 0.025 } },
     },
   };
   const facility = valuations.instruments.RevolvingCredit.fromJson(JSON.stringify(envelope));

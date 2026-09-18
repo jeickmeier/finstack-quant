@@ -1027,12 +1027,15 @@ mod tests {
 
     #[test]
     fn revolving_credit_metrics_and_cashflow_fail_closed_cross_wasm_context() {
+        // `drawn_amount` (10M of 50M) is the balance at the valuation date;
+        // the example's 5M draw on 2024-03-01 lies in the future of
+        // 2024-02-01 and must not enter the as-of metrics.
         let instrument = revolving_credit_json(false, false);
         let market = revolving_credit_market(false);
         let result = price_instrument_with_context(
             &instrument,
             &market,
-            "2024-07-01",
+            "2024-02-01",
             "discounting",
             vec![
                 "utilization_rate".to_string(),
@@ -1043,8 +1046,8 @@ mod tests {
         )
         .expect("metrics");
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("result");
-        assert_eq!(parsed["measures"]["utilization_rate"], 0.30);
-        assert_eq!(parsed["measures"]["available_capacity"], 35_000_000.0);
+        assert_eq!(parsed["measures"]["utilization_rate"], 0.20);
+        assert_eq!(parsed["measures"]["available_capacity"], 40_000_000.0);
 
         let credit_instrument = revolving_credit_json(false, true);
         let credit_market_json =

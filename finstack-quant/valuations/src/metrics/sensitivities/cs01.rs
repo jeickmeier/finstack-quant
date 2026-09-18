@@ -468,7 +468,7 @@ fn missing_credit_curve_error<I: Instrument>(
     ))
 }
 
-fn resolve_optional_cs01_curves<I: Instrument>(
+pub(crate) fn resolve_optional_cs01_curves<I: Instrument>(
     instrument: &I,
     empty_credit_curve_zero: bool,
     metric_name: &str,

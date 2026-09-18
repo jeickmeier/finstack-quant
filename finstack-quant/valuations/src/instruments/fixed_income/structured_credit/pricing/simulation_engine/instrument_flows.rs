@@ -302,32 +302,85 @@ pub(super) struct UtilizationTerms {
     pub(super) spread: SpreadTerms,
 }
 
-/// Contractual credit margin of a revolver, the rate a simulated draw is
-/// valued against the path's fair spread.
+/// Contractual rate basis of a revolver. The draw option cost is anchored to
+/// the margin at the valuation date, so only the fixed all-in rate is read
+/// (to accrue a simulated balance when no coupon was projected).
 #[derive(Debug, Clone, Copy)]
 pub(super) enum MarginTerms {
-    /// Spread over the floating index (decimal).
-    Spread(f64),
-    /// Fixed all-in rate; the margin is the rate less the discount curve's
-    /// par forward to maturity at the draw date.
+    /// Spread over the floating index.
+    Spread,
+    /// Fixed all-in rate (decimal), margin steps included.
     FixedRate(f64),
 }
 
 /// Revolver terms the engines need beyond the bucketed schedule.
+///
+/// Dated terms are resolved once per legal period at the period start, so a
+/// commitment, margin or LC step dated inside a deal period takes effect
+/// from the next period; the facility's own engines slice on the step date.
 #[derive(Debug, Clone)]
 pub(super) struct RevolverTerms {
-    /// Total commitment.
-    pub(super) commitment: f64,
+    /// Commitment in force during each legal period (the facility's
+    /// `commitment_schedule` read at the period start), aligned with the
+    /// prepared periods.
+    pub(super) commitments: Vec<f64>,
     /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at
     /// default.
     pub(super) leq: f64,
+    /// Letter-of-credit face assumed drawn at default in each legal period
+    /// (`lc.leq × LC outstanding` at the period start), aligned with the
+    /// periods.
+    pub(super) lc_exposure: Vec<f64>,
+    /// Letter-of-credit face outstanding in each legal period, aligned with
+    /// the periods; it consumes availability.
+    pub(super) lc_outstanding: Vec<f64>,
     /// Interest accrual day count.
     pub(super) day_count: DayCount,
-    /// Contractual margin.
-    pub(super) margin: MarginTerms,
+    /// Contractual margin in force during each legal period (the facility's
+    /// `margin_steps` read at the period start), aligned with the periods.
+    pub(super) margins: Vec<MarginTerms>,
     /// Utilization process for stochastic facilities; `None` keeps the
     /// contractual (or expected) draw schedule.
     pub(super) utilization: Option<UtilizationTerms>,
+}
+
+impl RevolverTerms {
+    /// Commitment in force during period `k` (the last known value past the
+    /// end of the schedule).
+    pub(super) fn commitment_at(&self, k: usize) -> f64 {
+        self.commitments
+            .get(k)
+            .or(self.commitments.last())
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    /// Letter-of-credit face drawn at default in period `k`.
+    pub(super) fn lc_exposure_at(&self, k: usize) -> f64 {
+        self.lc_exposure
+            .get(k)
+            .or(self.lc_exposure.last())
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    /// Letter-of-credit face outstanding in period `k`.
+    pub(super) fn lc_outstanding_at(&self, k: usize) -> f64 {
+        self.lc_outstanding
+            .get(k)
+            .or(self.lc_outstanding.last())
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    /// Contractual margin in force during period `k`.
+    pub(super) fn margin_at(&self, k: usize) -> MarginTerms {
+        self.margins
+            .get(k)
+            .or(self.margins.last())
+            .copied()
+            .unwrap_or(MarginTerms::Spread)
+    }
 }
 
 /// One instrument's bucketed schedule and resolved terms.
@@ -373,7 +426,7 @@ impl InstrumentSchedule {
                 }
             }
         }
-        match self.revolver.as_ref().map(|r| r.margin) {
+        match self.revolver.as_ref().map(|r| r.margin_at(k)) {
             Some(MarginTerms::FixedRate(rate)) => rate,
             _ => 0.0,
         }
@@ -456,7 +509,10 @@ impl PreparedInstrumentSchedules {
                 s.exercise.put_policy,
                 PutExercisePolicy::ReinvestmentIncentive { .. }
             ) || s.revolver.as_ref().is_some_and(|r| {
-                r.utilization.is_some() && matches!(r.margin, MarginTerms::FixedRate(_))
+                r.utilization.is_some()
+                    && r.margins
+                        .iter()
+                        .any(|m| matches!(m, MarginTerms::FixedRate(_)))
             })
         });
         Ok(Self {
@@ -481,8 +537,8 @@ impl PreparedInstrumentSchedules {
             .map(|schedule| {
                 let (utilization, spread) = match &schedule.revolver {
                     Some(terms) => (
-                        if terms.commitment > 0.0 {
-                            (schedule.opening_balance / terms.commitment).clamp(0.0, 1.0)
+                        if terms.commitment_at(0) > 0.0 {
+                            (schedule.opening_balance / terms.commitment_at(0)).clamp(0.0, 1.0)
                         } else {
                             0.0
                         },
@@ -741,7 +797,7 @@ pub(super) fn run_period(
         let params = schedule.floating_params.as_ref();
         let carry = match simulated {
             Some((terms, _)) => {
-                let commitment = terms.commitment * scale_bop;
+                let commitment = terms.commitment_at(k) * scale_bop;
                 let interest = if bucket.interest.is_empty() {
                     // The expected schedule carried no balance this period;
                     // accrue the simulated balance at the nearest recorded rate.
@@ -763,9 +819,12 @@ pub(super) fn run_period(
         // Loan-equivalent exposure: the defaulting fraction draws part of its
         // undrawn commitment, funded through the reserve and lost at once.
         if let Some(terms) = &schedule.revolver {
-            if terms.leq > 0.0 && pd > 0.0 {
-                let undrawn = (terms.commitment * scale_bop - balance).max(0.0);
-                let leq_draw = undrawn * terms.leq * pd;
+            if (terms.leq > 0.0 || terms.lc_exposure_at(k) > 0.0) && pd > 0.0 {
+                let undrawn = (terms.commitment_at(k) * scale_bop
+                    - terms.lc_outstanding_at(k) * scale_bop
+                    - balance)
+                    .max(0.0);
+                let leq_draw = (undrawn * terms.leq + terms.lc_exposure_at(k) * scale_bop) * pd;
                 if leq_draw > 0.0 {
                     requests.push(DrawRequest {
                         index: i,
@@ -791,7 +850,7 @@ pub(super) fn run_period(
         let after_default = balance - default_amt;
         let (repayment, draw_req, pik) = match simulated {
             Some((terms, utilization)) => {
-                let target = utilization.clamp(0.0, 1.0) * terms.commitment * scale_after;
+                let target = utilization.clamp(0.0, 1.0) * terms.commitment_at(k) * scale_after;
                 (
                     (after_default - target).max(0.0),
                     (target - after_default).max(0.0),
@@ -1059,11 +1118,9 @@ fn build_schedule(
         }
         CollateralInstrument::Revolver(facility) => {
             let schedule = facility.raw_cashflow_schedule(context, as_of)?;
-            let opening = if facility.is_deterministic() {
-                crate::instruments::fixed_income::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of)?.amount()
-            } else {
-                facility.drawn_amount.amount()
-            };
+            // `drawn_amount` is the balance at the simulation anchor in both
+            // modes; deterministic events are future-only.
+            let opening = facility.drawn_amount.amount();
             (
                 CollateralKind::Revolver,
                 schedule,
@@ -1207,23 +1264,36 @@ fn build_schedule(
     };
     let revolver = match held {
         CollateralInstrument::Revolver(facility) => Some(RevolverTerms {
-            commitment: facility.commitment_amount.amount(),
+            commitments: (0..period_dates.len())
+                .map(|k| {
+                    let start = if k == 0 { as_of } else { period_dates[k - 1] };
+                    facility.commitment_at(start).amount()
+                })
+                .collect(),
             leq: facility.leq,
+            lc_exposure: (0..period_dates.len())
+                .map(|k| {
+                    let start = if k == 0 { as_of } else { period_dates[k - 1] };
+                    facility.lc_exposure_at_default(start)
+                })
+                .collect(),
+            lc_outstanding: (0..period_dates.len())
+                .map(|k| {
+                    let start = if k == 0 { as_of } else { period_dates[k - 1] };
+                    facility.lc_outstanding_at(start).amount()
+                })
+                .collect(),
             day_count: facility.day_count,
-            margin: match &facility.base_rate_spec {
-                BaseRateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate),
-                BaseRateSpec::Floating(spec) => MarginTerms::Spread(
-                    spec.spread_bp
-                        .to_f64()
-                        .map(|bp| bp / 10_000.0)
-                        .ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(format!(
-                                "spread {} of '{id}' cannot be represented as f64",
-                                spec.spread_bp
-                            ))
-                        })?,
-                ),
-            },
+            margins: (0..period_dates.len())
+                .map(|k| {
+                    let start = if k == 0 { as_of } else { period_dates[k - 1] };
+                    let delta = facility.margin_delta_bp_at(start) / 10_000.0;
+                    match &facility.base_rate_spec {
+                        BaseRateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate + delta),
+                        BaseRateSpec::Floating(_) => MarginTerms::Spread,
+                    }
+                })
+                .collect(),
             utilization: match &facility.draw_repay_spec {
                 DrawRepaySpec::Deterministic(_) => None,
                 DrawRepaySpec::Stochastic(spec) => {
@@ -1283,7 +1353,6 @@ fn utilization_terms(
             };
             synthesized = McConfig {
                 correlation_matrix: None,
-                recovery_rate: facility.recovery_rate,
                 credit_spread_process,
                 interest_rate_process: None,
                 util_credit_corr,
@@ -1406,7 +1475,12 @@ fn bucket_flows(
                     rate: cf.rate,
                 });
             }
-            CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee => {
+            CFKind::Fee
+            | CFKind::CommitmentFee
+            | CFKind::UsageFee
+            | CFKind::FacilityFee
+            | CFKind::LcFee
+            | CFKind::FrontingFee => {
                 let kind = match cf.kind {
                     CFKind::CommitmentFee => FeeKind::Commitment,
                     CFKind::UsageFee => FeeKind::Usage,

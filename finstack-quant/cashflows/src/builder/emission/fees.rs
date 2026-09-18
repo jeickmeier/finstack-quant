@@ -1,4 +1,4 @@
-//! Fee cashflow emission (periodic, commitment, usage, facility).
+//! Fee cashflow emission (periodic and fixed fees on the builder pipeline).
 
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
@@ -14,44 +14,6 @@ use super::{decimal_to_f64, f64_to_decimal};
 
 /// Conversion factor from basis points to rate (1 bp = 0.0001).
 const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);
-
-/// Emit a single revolving-credit fee cashflow.
-///
-/// Creates a single fee cashflow with the specified kind if the computed fee
-/// amount is non-zero (negative quotes — rebates — emit negative cashflows);
-/// returns `None` for a zero amount.
-///
-/// Uses `Decimal` arithmetic throughout for consistency with the periodic fee
-/// emission path, avoiding f64 precision differences for large notionals.
-fn emit_revolving_fee_on(
-    d: Date,
-    base_amount: f64,
-    fee_bp: f64,
-    year_fraction: f64,
-    ccy: Currency,
-    kind: CFKind,
-) -> finstack_quant_core::Result<Option<CashFlow>> {
-    let base_dec = f64_to_decimal(base_amount)?;
-    let fee_bp_dec = f64_to_decimal(fee_bp)?;
-    let yf_dec = f64_to_decimal(year_fraction)?;
-
-    let fee_amt_dec = base_dec * fee_bp_dec * BP_TO_RATE * yf_dec;
-    let fee_amt = decimal_to_f64(fee_amt_dec)?;
-    let rate = decimal_to_f64(fee_bp_dec * BP_TO_RATE)?;
-
-    if fee_amt != 0.0 {
-        Ok(Some(CashFlow::new(
-            d,
-            None,
-            Money::new(fee_amt, ccy)?,
-            kind,
-            year_fraction,
-            Some(rate),
-        )))
-    } else {
-        Ok(None)
-    }
-}
 
 /// Emit fee cashflows on a specific date.
 ///
@@ -169,89 +131,6 @@ pub(in crate::builder) fn emit_fees_on(
         if *fd == d && amt.amount() != 0.0 {
             new_flows.push(CashFlow::new(d, None, *amt, CFKind::Fee, 0.0, None));
         }
-    }
-    Ok(())
-}
-
-/// Parameters for emitting revolving-credit fee cashflows for one accrual period.
-#[derive(Debug, Clone, Copy)]
-pub struct RevolvingFeeEmissionConfig {
-    /// Payment date for all emitted fee cashflows.
-    pub payment_date: Date,
-    /// Drawn balance used as the base for usage fees.
-    pub drawn_balance: f64,
-    /// Undrawn balance used as the base for commitment fees.
-    pub undrawn_balance: f64,
-    /// Total commitment amount used as the base for facility fees.
-    pub commitment_amount: f64,
-    /// Commitment fee quote in basis points.
-    pub commitment_fee_bp: f64,
-    /// Usage fee quote in basis points.
-    pub usage_fee_bp: f64,
-    /// Facility fee quote in basis points.
-    pub facility_fee_bp: f64,
-    /// Accrual factor for the period, expressed in years.
-    pub year_fraction: f64,
-    /// Currency applied to all emitted fee cashflows.
-    pub currency: Currency,
-}
-
-/// Emit all revolving-credit fee cashflows for a single accrual period.
-///
-/// Emits positive commitment, usage, and facility fee flows when their
-/// calculated amounts are nonzero. Balances are scalar currency amounts,
-/// fee quotes are annual basis points, and `year_fraction` is the accrual
-/// period in years, so each fee is `balance * bp * 1e-4 * year_fraction`.
-/// Flows are appended in commitment, usage, then facility order.
-///
-/// # Arguments
-///
-/// * `flows` - Mutable output flow list; successful fees append settlement
-///   cashflows in commitment, usage, then facility order.
-/// * `cfg` - Period balances, annual basis-point fee quotes, payment date,
-///   year fraction, and currency used to calculate the fee cashflows.
-///
-/// # Errors
-///
-/// Returns an error when a fee input cannot produce a valid cashflow, such as
-/// a non-finite rate, balance, or accrual factor. Earlier fee flows may already
-/// have been appended when a later fee fails; use a temporary vector when an
-/// atomic update is required.
-pub fn emit_revolving_credit_fees(
-    flows: &mut Vec<CashFlow>,
-    cfg: &RevolvingFeeEmissionConfig,
-) -> finstack_quant_core::Result<()> {
-    if let Some(cf) = emit_revolving_fee_on(
-        cfg.payment_date,
-        cfg.undrawn_balance,
-        cfg.commitment_fee_bp,
-        cfg.year_fraction,
-        cfg.currency,
-        CFKind::CommitmentFee,
-    )? {
-        flows.push(cf);
-    }
-
-    if let Some(cf) = emit_revolving_fee_on(
-        cfg.payment_date,
-        cfg.drawn_balance,
-        cfg.usage_fee_bp,
-        cfg.year_fraction,
-        cfg.currency,
-        CFKind::UsageFee,
-    )? {
-        flows.push(cf);
-    }
-
-    if let Some(cf) = emit_revolving_fee_on(
-        cfg.payment_date,
-        cfg.commitment_amount,
-        cfg.facility_fee_bp,
-        cfg.year_fraction,
-        cfg.currency,
-        CFKind::FacilityFee,
-    )? {
-        flows.push(cf);
     }
     Ok(())
 }
@@ -599,32 +478,5 @@ mod tests {
             (fee + 1250.0).abs() < 0.01,
             "Expected -1250.0 rebate, got {fee}"
         );
-    }
-
-    #[test]
-    fn emits_all_non_zero_revolving_fee_kinds() {
-        let payment_date = Date::from_calendar_date(2025, Month::March, 31).expect("valid date");
-        let mut flows = Vec::new();
-
-        emit_revolving_credit_fees(
-            &mut flows,
-            &RevolvingFeeEmissionConfig {
-                payment_date,
-                drawn_balance: 400_000.0,
-                undrawn_balance: 600_000.0,
-                commitment_amount: 1_000_000.0,
-                commitment_fee_bp: 25.0,
-                usage_fee_bp: 15.0,
-                facility_fee_bp: 10.0,
-                year_fraction: 0.25,
-                currency: Currency::USD,
-            },
-        )
-        .expect("finite fee inputs");
-
-        assert_eq!(flows.len(), 3);
-        assert_eq!(flows[0].kind, CFKind::CommitmentFee);
-        assert_eq!(flows[1].kind, CFKind::UsageFee);
-        assert_eq!(flows[2].kind, CFKind::FacilityFee);
     }
 }

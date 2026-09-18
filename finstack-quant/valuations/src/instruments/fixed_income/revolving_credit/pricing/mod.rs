@@ -90,7 +90,6 @@ mod tests {
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
 
         let mc_config = McConfig {
-            recovery_rate: 0.4,
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
             interest_rate_process: None,
             correlation_matrix: None,

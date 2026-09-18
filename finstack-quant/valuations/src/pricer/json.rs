@@ -1222,13 +1222,16 @@ mod tests {
     fn revolving_credit_custom_metrics_use_as_of_drawn_balance() {
         use crate::instruments::fixed_income::revolving_credit::BaseRateSpec;
 
+        // `drawn_amount` (10M of 50M) is the balance at the valuation date;
+        // the example's 5M draw on 2024-03-01 lies in the future and must not
+        // enter the as-of metrics.
         let mut facility = RevolvingCredit::example().expect("revolving credit");
         facility.base_rate_spec = BaseRateSpec::Fixed { rate: 0.05 };
         let json = envelope_json(InstrumentJson::RevolvingCredit(facility));
         let result = price_instrument_from_json(
             &json,
             &market_context(),
-            "2024-07-01",
+            "2024-02-01",
             "discounting",
             &[
                 "utilization_rate".to_string(),
@@ -1239,8 +1242,8 @@ mod tests {
         )
         .expect("registered revolving-credit metrics must cross the JSON boundary");
 
-        assert_eq!(result.metric_str("utilization_rate"), Some(0.30));
-        assert_eq!(result.metric_str("available_capacity"), Some(35_000_000.0));
+        assert_eq!(result.metric_str("utilization_rate"), Some(0.20));
+        assert_eq!(result.metric_str("available_capacity"), Some(40_000_000.0));
     }
 
     #[test]

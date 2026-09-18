@@ -32,7 +32,6 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::Enha
 /// ...         "num_paths": 16,
 /// ...         "seed": 42,
 /// ...         "mc_config": {
-/// ...             "recovery_rate": spec["recovery_rate"],
 /// ...             "credit_spread_process": {"constant": 0.025},
 /// ...         },
 /// ...     }

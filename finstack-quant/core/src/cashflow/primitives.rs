@@ -95,6 +95,18 @@ pub enum CFKind {
     /// covering the lender's cost of keeping the facility available.
     FacilityFee,
 
+    /// Letter-of-credit fee.
+    ///
+    /// Periodic fee on the face of letters of credit issued under a revolving
+    /// facility's LC sublimit, typically at the drawn margin.
+    LcFee,
+
+    /// Fronting fee.
+    ///
+    /// Periodic fee paid to the issuing bank on the face of letters of credit
+    /// outstanding under a revolving facility.
+    FrontingFee,
+
     /// Principal exchange or notional flow.
     ///
     /// Used for initial notional payment (at inception), final notional repayment
@@ -216,6 +228,8 @@ impl std::fmt::Display for CFKind {
             CFKind::CommitmentFee => "commitment_fee",
             CFKind::UsageFee => "usage_fee",
             CFKind::FacilityFee => "facility_fee",
+            CFKind::LcFee => "lc_fee",
+            CFKind::FrontingFee => "fronting_fee",
             CFKind::Notional => "notional",
             CFKind::Pik => "pik",
             CFKind::Amortization => "amortization",
@@ -251,6 +265,8 @@ impl std::str::FromStr for CFKind {
             "commitment_fee" => Ok(Self::CommitmentFee),
             "usage_fee" => Ok(Self::UsageFee),
             "facility_fee" => Ok(Self::FacilityFee),
+            "lc_fee" => Ok(Self::LcFee),
+            "fronting_fee" => Ok(Self::FrontingFee),
             "notional" => Ok(Self::Notional),
             "pik" => Ok(Self::Pik),
             "amortization" => Ok(Self::Amortization),
@@ -947,6 +963,8 @@ mod tests {
             CFKind::CommitmentFee,
             CFKind::UsageFee,
             CFKind::FacilityFee,
+            CFKind::LcFee,
+            CFKind::FrontingFee,
             CFKind::Notional,
             CFKind::Pik,
             CFKind::Amortization,

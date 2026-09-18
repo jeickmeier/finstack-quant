@@ -294,17 +294,32 @@ pub fn generate_three_factor_paths(
     let num_paths = stoch_spec.num_paths;
     let num_steps = time_grid.num_steps();
     let num_factors = process.num_factors();
+    // Utilization is drawn over the commitment in force at the anchor.
+    let initial_utilization = facility.utilization_at(simulation_anchor);
     let initial_state = if sim_start == 0.0 {
-        process
-            .get_params()
-            .initial_state(facility.utilization_rate())
+        process.get_params().initial_state(initial_utilization)
     } else {
         process
             .get_params()
-            .initial_state_at(facility.utilization_rate(), sim_start)
+            .initial_state_at(initial_utilization, sim_start)
     };
     let num_payment_dates = payment_dates.len();
     let obs_rates: Option<&[f64]> = obs_forward_rates.as_deref();
+    // Letters of credit consume availability: utilization on each observation
+    // date is capped at `1 − LC(t) / C(t)` (the cap is 1 without an LC
+    // sub-facility), and the capped value carries into the next step.
+    let utilization_caps: Vec<f64> = payment_dates
+        .iter()
+        .map(|&date| {
+            let commitment = facility.commitment_at(date).amount();
+            if commitment > 0.0 {
+                (1.0 - facility.lc_outstanding_at(date).amount() / commitment).clamp(0.0, 1.0)
+            } else {
+                1.0
+            }
+        })
+        .collect();
+    let caps: &[f64] = &utilization_caps;
 
     let mut paths = Vec::with_capacity(num_paths);
     let seed = stoch_spec.seed.unwrap_or(42);
@@ -350,7 +365,10 @@ pub fn generate_three_factor_paths(
             // (at least the first).
             for _ in 0..num_initial {
                 let idx = utilization_path.len();
-                utilization_path.push(state[0].clamp(0.0, 1.0));
+                // Pre-anchor observations record the t₀ state; cap it at the
+                // anchor's availability, not a commitment-date-era one.
+                state[0] = state[0].clamp(0.0, 1.0).min(caps[num_initial - 1]);
+                utilization_path.push(state[0]);
                 short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                 credit_spread_path.push(state[2].max(0.0));
             }
@@ -386,7 +404,8 @@ pub fn generate_three_factor_paths(
                     && utilization_path.len() < num_payment_dates
                 {
                     let idx = utilization_path.len();
-                    utilization_path.push(state[0].clamp(0.0, 1.0));
+                    state[0] = state[0].clamp(0.0, 1.0).min(caps[idx]);
+                    utilization_path.push(state[0]);
                     short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                     credit_spread_path.push(state[2].max(0.0));
                     next_payment_idx += 1;
@@ -455,7 +474,10 @@ pub fn generate_three_factor_paths(
                 // as_of (at least the first).
                 for _ in 0..num_initial {
                     let idx = utilization_path.len();
-                    utilization_path.push(state[0].clamp(0.0, 1.0));
+                    // Pre-anchor observations record the t₀ state; cap it at the
+                    // anchor's availability, not a commitment-date-era one.
+                    state[0] = state[0].clamp(0.0, 1.0).min(caps[num_initial - 1]);
+                    utilization_path.push(state[0]);
                     short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                     credit_spread_path.push(state[2].max(0.0));
                 }
@@ -490,7 +512,8 @@ pub fn generate_three_factor_paths(
                         && utilization_path.len() < num_payment_dates
                     {
                         let idx = utilization_path.len();
-                        utilization_path.push(state[0].clamp(0.0, 1.0));
+                        state[0] = state[0].clamp(0.0, 1.0).min(caps[idx]);
+                        utilization_path.push(state[0]);
                         short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
                         credit_spread_path.push(state[2].max(0.0));
                         next_payment_idx += 1;
@@ -807,7 +830,6 @@ mod tests {
                 .expect("hazard curve"),
         );
         let config = McConfig {
-            recovery_rate: 0.4,
             credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                 credit_curve_id: "RC-HZ".into(),
                 kappa: 0.5,
@@ -854,7 +876,6 @@ mod tests {
         let market = MarketContext::new().insert(hazard.clone());
         let (kappa, implied_vol) = (0.5_f64, 0.2_f64);
         let config = McConfig {
-            recovery_rate: 0.4,
             credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
                 credit_curve_id: "RC-HZ".into(),
                 kappa,
@@ -933,7 +954,6 @@ mod tests {
                 .expect("discount curve"),
         );
         let config = McConfig {
-            recovery_rate: facility.recovery_rate,
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
             interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
                 kappa: 0.1,

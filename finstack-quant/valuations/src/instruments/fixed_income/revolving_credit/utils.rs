@@ -9,7 +9,6 @@ use crate::instruments::common_impl::pricing::overnight::{
     OvernightProjectionCurve,
 };
 use crate::instruments::common_impl::pricing::overnight_conventions;
-use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
@@ -20,29 +19,25 @@ use finstack_quant_core::Result;
 
 /// Build the canonical accrual/payment periods for a revolving credit facility.
 ///
-/// Accrual boundaries remain unadjusted while payment dates follow Modified
-/// Following on the configured facility calendar. Keeping the complete period
-/// objects prevents payment-date adjustment from changing contractual accrual.
+/// Accrual boundaries remain unadjusted while payment dates follow the
+/// facility's `business_day_convention`, `calendar_id` and
+/// `payment_lag_days`. Keeping the complete period objects prevents
+/// payment-date adjustment from changing contractual accrual.
 pub(super) fn build_payment_periods(
     facility: &RevolvingCredit,
 ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
     use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
-    let calendar_id = facility
-        .attributes
-        .get_meta("calendar_id")
-        .or_else(|| facility.attributes.get_meta("calendar"))
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
     let periods = build_periods(BuildPeriodsParams {
         start: facility.commitment_date,
         end: facility.maturity,
         frequency: facility.frequency,
         stub: facility.stub,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id,
+        business_day_convention: facility.business_day_convention,
+        calendar_id: schedule_calendar_id(facility),
         end_of_month: false,
         day_count: facility.day_count,
-        payment_lag_days: 0,
+        payment_lag_days: facility.payment_lag_days as i32,
         reset_lag_days: None,
         adjust_accrual_dates: false,
         roll_rule: crate::cashflow::builder::specs::RollRule::None,
@@ -123,9 +118,47 @@ pub(super) fn build_observation_dates(facility: &RevolvingCredit) -> Result<Vec<
                 .filter(|&reset| reset > facility.commitment_date && reset < facility.maturity),
         );
     }
+    // Commitment, margin and fee steps slice accrual in both engines, so the
+    // path is observed on them too.
+    dates.extend(
+        facility
+            .step_dates()
+            .into_iter()
+            .filter(|&step| step > facility.commitment_date && step < facility.maturity),
+    );
     dates.sort_unstable();
     dates.dedup();
     Ok(dates)
+}
+
+/// Floating-rate parameters in force on `date`: the facility spec with the
+/// cumulative margin step delta applied to the spread.
+///
+/// # Arguments
+///
+/// * `facility` - Facility carrying `margin_steps`.
+/// * `spec` - The facility's floating-rate specification.
+/// * `date` - Accrual date the margin is evaluated on.
+pub(super) fn floating_params_at(
+    facility: &RevolvingCredit,
+    spec: &crate::cashflow::builder::FloatingRateSpec,
+    date: Date,
+) -> Result<crate::cashflow::builder::FloatingRateParams> {
+    let mut params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+    params.spread_bp += facility.margin_delta_bp_at(date);
+    Ok(params)
+}
+
+/// Fixed all-in rate in force on `date`: the contractual rate plus the
+/// cumulative margin step delta.
+///
+/// # Arguments
+///
+/// * `facility` - Facility carrying `margin_steps`.
+/// * `rate` - Contractual fixed rate, decimal.
+/// * `date` - Accrual date the margin is evaluated on.
+pub(super) fn fixed_rate_at(facility: &RevolvingCredit, rate: f64, date: Date) -> f64 {
+    rate + facility.margin_delta_bp_at(date) * 1e-4
 }
 
 /// Deterministic index-over-OIS basis at `date`: the term index forward minus
@@ -183,18 +216,13 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
         BaseRateSpec::Floating(spec) => {
             use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
-            let calendar_id = facility
-                .attributes
-                .get_meta("calendar_id")
-                .or_else(|| facility.attributes.get_meta("calendar"))
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
             let periods = build_periods(BuildPeriodsParams {
                 start: facility.commitment_date,
                 end: facility.maturity,
                 frequency: spec.reset_frequency,
                 stub: facility.stub,
-                business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id,
+                business_day_convention: facility.business_day_convention,
+                calendar_id: schedule_calendar_id(facility),
                 end_of_month: false,
                 day_count: facility.day_count,
                 payment_lag_days: 0,
@@ -213,11 +241,28 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
     }
 }
 
+/// Calendar identifier the payment and reset schedules are built on: the
+/// facility's `calendar_id`, or weekends only when unset.
+pub(super) fn schedule_calendar_id(facility: &RevolvingCredit) -> &str {
+    facility
+        .calendar_id
+        .as_deref()
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+}
+
 /// Convert a reset-effective date to its contractual fixing observation date.
+///
+/// # Arguments
+///
+/// * `spec` - Floating-rate specification; `reset_lag_days` and an optional
+///   `fixing_calendar_id` drive the roll.
+/// * `reset_effective_date` - Unadjusted date the fixing takes effect.
+/// * `facility_calendar_id` - The facility's `calendar_id`, used when the
+///   spec carries no fixing calendar; `None` rolls on weekends only.
 pub(super) fn floating_fixing_date(
     spec: &crate::cashflow::builder::FloatingRateSpec,
     reset_effective_date: Date,
-    attrs: &Attributes,
+    facility_calendar_id: Option<&str>,
 ) -> Result<Date> {
     if spec.reset_lag_days < 0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -228,9 +273,8 @@ pub(super) fn floating_fixing_date(
     let calendar_id = spec
         .fixing_calendar_id
         .as_deref()
-        .or_else(|| attrs.get_meta("calendar_id"))
-        .or_else(|| attrs.get_meta("calendar"))
-        .unwrap_or("weekends_only");
+        .or(facility_calendar_id)
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
 }
@@ -253,8 +297,11 @@ pub(super) struct RevolverFloatingProjection<'a> {
     pub coupon_frequency: Tenor,
     /// Facility currency, used to pick a default overnight calendar.
     pub currency: Currency,
-    /// Facility attributes (calendar metadata).
-    pub attributes: &'a Attributes,
+    /// The facility's `calendar_id`, when set.
+    pub calendar_id: Option<&'a str>,
+    /// Cumulative margin step delta in force for the window, in basis points,
+    /// added to the spec's spread.
+    pub margin_delta_bp: f64,
     /// Optional historical overnight/term fixings.
     pub fixings: Option<&'a ScalarTimeSeries>,
 }
@@ -289,7 +336,8 @@ pub(super) fn project_revolver_floating_rate(
     input: RevolverFloatingProjection<'_>,
     projected_fixings: Option<&mut Vec<crate::cashflow::fixings::ProjectedFixing>>,
 ) -> Result<f64> {
-    let params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
+    let mut params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
+    params.spread_bp += input.margin_delta_bp;
     let Some(compounding) = resolved_overnight_compounding(input.spec)? else {
         return crate::cashflow::builder::project_floating_rate(
             input.accrual_start,
@@ -302,8 +350,7 @@ pub(super) fn project_revolver_floating_rate(
         .spec
         .fixing_calendar_id
         .as_deref()
-        .or_else(|| input.attributes.get_meta("calendar_id"))
-        .or_else(|| input.attributes.get_meta("calendar"));
+        .or(input.calendar_id);
     let calendar =
         crate::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
             calendar_id,
@@ -445,11 +492,6 @@ mod tests {
     ) -> RevolvingCredit {
         use finstack_quant_core::dates::StubKind;
 
-        let mut attrs = Attributes::new();
-        if let Some(cal_id) = calendar_id {
-            attrs = attrs.with_meta("calendar_id", cal_id);
-        }
-
         RevolvingCredit {
             id: "TEST-RC".into(),
             commitment_amount: Money::from((10_000_000_i64, Currency::USD)),
@@ -459,6 +501,11 @@ mod tests {
             base_rate_spec,
             day_count: DayCount::Act360,
             frequency: payment_frequency,
+            commitment_schedule: Vec::new(),
+            margin_steps: Vec::new(),
+            lc: None,
+            scheduled_fees: Vec::new(),
+            oid_eir: None,
             fees: super::super::types::RevolvingCreditFees::default(),
             draw_repay_spec: super::super::types::DrawRepaySpec::Deterministic(vec![]),
             discount_curve_id: "USD-OIS".into(),
@@ -466,10 +513,15 @@ mod tests {
             recovery_rate: 0.0,
             leq: 0.0,
             stub: StubKind::ShortFront,
+            business_day_convention:
+                finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+            calendar_id: calendar_id.map(str::to_string),
+            payment_lag_days: 0,
+            settlement_days: 0,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            attributes: attrs,
+            attributes: Attributes::new(),
         }
     }
 
@@ -670,7 +722,6 @@ mod tests {
             .knots(vec![(0.0, 0.04), (1.0, 0.04)])
             .build()
             .expect("forward curve");
-        let attrs = Attributes::new();
         let revolver_rate = project_revolver_floating_rate(
             RevolverFloatingProjection {
                 accrual_start: start,
@@ -681,7 +732,8 @@ mod tests {
                 day_count: DayCount::Act360,
                 coupon_frequency: Tenor::quarterly(),
                 currency: Currency::USD,
-                attributes: &attrs,
+                calendar_id: None,
+                margin_delta_bp: 0.0,
                 fixings: None,
             },
             None,

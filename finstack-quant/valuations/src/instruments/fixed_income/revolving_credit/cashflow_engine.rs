@@ -23,10 +23,7 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
-use crate::cashflow::builder::{
-    emit_revolving_credit_fees, periods::SchedulePeriod, CashFlowSchedule,
-    RevolvingFeeEmissionConfig,
-};
+use crate::cashflow::builder::{periods::SchedulePeriod, CashFlowSchedule};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 use super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit};
@@ -255,27 +252,23 @@ impl<'a> CashflowEngine<'a> {
         };
         draw_repay_events.sort_by_key(|event| event.date);
 
-        // Events dated on the commitment date are rejected outright: the
-        // initial position on the commitment date is defined by
-        // `drawn_amount` alone. The previous "dedup" special case skipped
-        // the initial-draw outflow when a commitment-date draw event existed,
-        // but the period balance replay and the terminal repayment still
-        // added the event on top of `drawn_amount` — interest accrued on 2X
-        // and 2X was repaid at maturity. One canonical semantic: encode the
-        // initial draw in `drawn_amount`, date all events strictly after the
-        // commitment date.
-        if let Some(event) = draw_repay_events
-            .iter()
-            .find(|e| e.date <= self.facility.commitment_date)
-        {
+        // `drawn_amount` is the balance at the simulation anchor (the later of
+        // the commitment and valuation dates) in both engines, so events are
+        // future-only. An event dated on or before the anchor would be
+        // replayed on top of a balance that already includes it: interest
+        // accrued on 2X and 2X repaid at maturity.
+        let anchor = self.facility.commitment_date.max(self.as_of);
+        if let Some(event) = draw_repay_events.iter().find(|e| e.date <= anchor) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "RevolvingCredit draw/repay event dated {} is on or before the commitment date \
-                 ({}); the position at commitment is defined by drawn_amount — date events \
-                 strictly after the commitment date",
-                event.date, self.facility.commitment_date
+                "RevolvingCredit draw/repay event dated {} is on or before the simulation anchor \
+                 {} (the later of the commitment date {} and the valuation date {}); the drawn \
+                 balance at the anchor is defined by drawn_amount, so date events strictly after it",
+                event.date, anchor, self.facility.commitment_date, self.as_of
             )));
         }
 
+        self.check_anchor_capacity(anchor)?;
+        let step_dates = self.facility.step_dates();
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
         let ccy = self.facility.commitment_amount.currency();
@@ -351,6 +344,13 @@ impl<'a> CashflowEngine<'a> {
                     );
                 }
             }
+            // Commitment, margin and fee steps change the accrual inputs.
+            timeline.extend(
+                step_dates
+                    .iter()
+                    .copied()
+                    .filter(|&step| step > period_start && step < period_end),
+            );
             timeline.push(period_end);
             timeline.sort();
             timeline.dedup();
@@ -371,7 +371,7 @@ impl<'a> CashflowEngine<'a> {
                         balance = super::utils::apply_draw_repay_event(
                             balance,
                             event,
-                            self.facility.commitment_amount,
+                            self.facility.commitment_at(event.date),
                         )?;
                     }
                 }
@@ -383,6 +383,10 @@ impl<'a> CashflowEngine<'a> {
             let mut total_commitment_fee = Money::from((0_i64, ccy));
             let mut total_usage_fee = Money::from((0_i64, ccy));
             let mut total_facility_fee = Money::from((0_i64, ccy));
+            let mut total_lc_fee = Money::from((0_i64, ccy));
+            let mut total_fronting_fee = Money::from((0_i64, ccy));
+            let mut weighted_lc_fee_rate = 0.0;
+            let mut weighted_fronting_fee_rate = 0.0;
             let mut total_accrual = 0.0;
             let mut reset_date_opt: Option<Date> = None;
 
@@ -390,6 +394,7 @@ impl<'a> CashflowEngine<'a> {
             let mut weighted_interest_rate = 0.0;
             let mut weighted_commitment_fee_rate = 0.0;
             let mut weighted_usage_fee_rate = 0.0;
+            let mut weighted_facility_fee_rate = 0.0;
 
             for window in timeline.windows(2) {
                 let sub_start = window[0];
@@ -400,12 +405,22 @@ impl<'a> CashflowEngine<'a> {
                         .year_fraction(sub_start, sub_end, DayCountContext::default())?;
                 total_accrual += dt;
 
-                let current_undrawn = self
-                    .facility
-                    .commitment_amount
-                    .checked_sub(current_balance)?;
-                let utilization = if self.facility.commitment_amount.amount() > 0.0 {
-                    current_balance.amount() / self.facility.commitment_amount.amount()
+                let commitment = self.facility.commitment_at(sub_start);
+                let lc_outstanding = self.facility.lc_outstanding_at(sub_start);
+                if current_balance.amount() + lc_outstanding.amount() > commitment.amount() + 1e-9 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RevolvingCredit drawn balance {} plus letters of credit {} exceeds the \
+                         commitment {} in force on {sub_start}; schedule a repayment on or \
+                         before the commitment step",
+                        current_balance, lc_outstanding, commitment
+                    )));
+                }
+                // Letters of credit consume availability and count as usage.
+                let current_undrawn = commitment
+                    .checked_sub(current_balance)?
+                    .checked_sub(lc_outstanding)?;
+                let utilization = if commitment.amount() > 0.0 {
+                    (current_balance.amount() + lc_outstanding.amount()) / commitment.amount()
                 } else {
                     0.0
                 };
@@ -434,7 +449,7 @@ impl<'a> CashflowEngine<'a> {
                             Some(super::utils::floating_fixing_date(
                                 spec,
                                 date,
-                                &self.facility.attributes,
+                                self.facility.calendar_id.as_deref(),
                             )?)
                         }
                         _ => None,
@@ -443,17 +458,19 @@ impl<'a> CashflowEngine<'a> {
 
                 let interest_rate = match &self.facility.base_rate_spec {
                     BaseRateSpec::Fixed { rate } => {
-                        let interest = current_balance * (*rate * dt);
+                        let rate = super::utils::fixed_rate_at(self.facility, *rate, sub_start);
+                        let interest = current_balance * (rate * dt);
                         total_interest = total_interest.checked_add(interest)?;
-                        *rate
+                        rate
                     }
                     BaseRateSpec::Floating(spec) => {
-                        let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                        let params =
+                            super::utils::floating_params_at(self.facility, spec, sub_start)?;
                         let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
                         let fixing_date = super::utils::floating_fixing_date(
                             spec,
                             reset_effective,
-                            &self.facility.attributes,
+                            self.facility.calendar_id.as_deref(),
                         )?;
                         let overnight = super::utils::resolved_overnight_compounding(spec)?;
 
@@ -473,7 +490,8 @@ impl<'a> CashflowEngine<'a> {
                                     day_count: self.day_count,
                                     coupon_frequency: self.facility.frequency,
                                     currency: ccy,
-                                    attributes: &self.facility.attributes,
+                                    calendar_id: self.facility.calendar_id.as_deref(),
+                                    margin_delta_bp: self.facility.margin_delta_bp_at(sub_start),
                                     fixings: self.fixing_series,
                                 },
                                 Some(&mut projected_fixings),
@@ -523,24 +541,43 @@ impl<'a> CashflowEngine<'a> {
                 };
                 weighted_interest_rate += interest_rate * dt;
 
-                let commitment_fee_bp = self.facility.fees.commitment_fee_bp(utilization);
+                let commitment_fee_bp = self
+                    .facility
+                    .fees
+                    .commitment_fee_bp_at(utilization, sub_start);
                 if commitment_fee_bp > 0.0 {
                     let commitment_fee = current_undrawn * (commitment_fee_bp * 1e-4 * dt);
                     total_commitment_fee = total_commitment_fee.checked_add(commitment_fee)?;
                     weighted_commitment_fee_rate += (commitment_fee_bp * 1e-4) * dt;
                 }
 
-                let usage_fee_bp = self.facility.fees.usage_fee_bp(utilization);
+                let usage_fee_bp = self.facility.fees.usage_fee_bp_at(utilization, sub_start);
                 if usage_fee_bp > 0.0 {
                     let usage_fee = current_balance * (usage_fee_bp * 1e-4 * dt);
                     total_usage_fee = total_usage_fee.checked_add(usage_fee)?;
                     weighted_usage_fee_rate += (usage_fee_bp * 1e-4) * dt;
                 }
 
-                if self.facility.fees.facility_fee_bp > 0.0 {
-                    let facility_fee = self.facility.commitment_amount
-                        * (self.facility.fees.facility_fee_bp * 1e-4 * dt);
+                let facility_fee_bp = self.facility.fees.facility_fee_bp_at(sub_start);
+                if facility_fee_bp > 0.0 {
+                    let facility_fee = commitment * (facility_fee_bp * 1e-4 * dt);
                     total_facility_fee = total_facility_fee.checked_add(facility_fee)?;
+                    weighted_facility_fee_rate += (facility_fee_bp * 1e-4) * dt;
+                }
+
+                if lc_outstanding.amount() > 0.0 {
+                    let lc_fee_bp = self.facility.lc_fee_bp_at(sub_start);
+                    if lc_fee_bp > 0.0 {
+                        total_lc_fee =
+                            total_lc_fee.checked_add(lc_outstanding * (lc_fee_bp * 1e-4 * dt))?;
+                        weighted_lc_fee_rate += lc_fee_bp * 1e-4 * dt;
+                    }
+                    let fronting_bp = self.facility.fronting_fee_bp();
+                    if fronting_bp > 0.0 {
+                        total_fronting_fee = total_fronting_fee
+                            .checked_add(lc_outstanding * (fronting_bp * 1e-4 * dt))?;
+                        weighted_fronting_fee_rate += fronting_bp * 1e-4 * dt;
+                    }
                 }
 
                 // Apply events at sub_end (but not at period_end - those happen after interest)
@@ -550,7 +587,7 @@ impl<'a> CashflowEngine<'a> {
                             current_balance = super::utils::apply_draw_repay_event(
                                 current_balance,
                                 event,
-                                self.facility.commitment_amount,
+                                self.facility.commitment_at(event.date),
                             )?;
                         }
                     }
@@ -574,6 +611,11 @@ impl<'a> CashflowEngine<'a> {
                 };
             let avg_usage_fee_rate = if total_accrual > 0.0 && weighted_usage_fee_rate > 0.0 {
                 Some(weighted_usage_fee_rate / total_accrual)
+            } else {
+                None
+            };
+            let avg_facility_fee_rate = if total_accrual > 0.0 && weighted_facility_fee_rate > 0.0 {
+                Some(weighted_facility_fee_rate / total_accrual)
             } else {
                 None
             };
@@ -621,8 +663,29 @@ impl<'a> CashflowEngine<'a> {
                     total_facility_fee,
                     CFKind::FacilityFee,
                     total_accrual,
-                    Some(self.facility.fees.facility_fee_bp * 1e-4),
+                    avg_facility_fee_rate,
                 ));
+            }
+
+            for (amount, kind, weighted) in [
+                (total_lc_fee, CFKind::LcFee, weighted_lc_fee_rate),
+                (
+                    total_fronting_fee,
+                    CFKind::FrontingFee,
+                    weighted_fronting_fee_rate,
+                ),
+            ] {
+                if !rc.is_effectively_zero_money(amount.amount(), ccy) {
+                    let rate = (total_accrual > 0.0).then(|| weighted / total_accrual);
+                    flows.push(CashFlow::new(
+                        payment_date,
+                        None,
+                        amount,
+                        kind,
+                        total_accrual,
+                        rate,
+                    ));
+                }
             }
         }
 
@@ -644,6 +707,15 @@ impl<'a> CashflowEngine<'a> {
             }
         }
 
+        // Commitment reduction fees on step-downs and scheduled fixed fees
+        // (amendment, waiver, extension) after the valuation date.
+        for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+        }
+        for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+        }
+
         // Add terminal repayment. Same validated replay as the period
         // balances — maturity-dated events are boundary events too.
         let mut final_balance = self.facility.drawn_amount;
@@ -652,7 +724,7 @@ impl<'a> CashflowEngine<'a> {
                 final_balance = super::utils::apply_draw_repay_event(
                     final_balance,
                     event,
-                    self.facility.commitment_amount,
+                    self.facility.commitment_at(event.date),
                 )?;
             }
         }
@@ -663,7 +735,7 @@ impl<'a> CashflowEngine<'a> {
                 final_balance_for_terminal = super::utils::apply_draw_repay_event(
                     final_balance_for_terminal,
                     event,
-                    self.facility.commitment_amount,
+                    self.facility.commitment_at(event.date),
                 )?;
             }
         }
@@ -700,6 +772,34 @@ impl<'a> CashflowEngine<'a> {
                 },
             },
         ))
+    }
+
+    /// The drawn balance at the anchor must fit the commitment in force there.
+    fn check_anchor_capacity(&self, anchor: Date) -> Result<()> {
+        let commitment = self.facility.commitment_at(anchor);
+        let lc = self.facility.lc_outstanding_at(anchor);
+        if self.facility.drawn_amount.amount() + lc.amount() > commitment.amount() + 1e-9 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit drawn_amount {} plus letters of credit {} exceeds the \
+                 commitment {} in force on the simulation anchor {anchor}",
+                self.facility.drawn_amount, lc, commitment
+            )));
+        }
+        if let Some(event) = self
+            .facility
+            .lc
+            .iter()
+            .flat_map(|lc| lc.events.iter())
+            .find(|event| event.date <= anchor)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit LC event dated {} is on or before the simulation anchor \
+                 {anchor}; the LC outstanding at the anchor is defined by lc.outstanding, so \
+                 date events strictly after it",
+                event.date
+            )));
+        }
+        Ok(())
     }
 
     /// Last reset-effective date at or before `date` (falls back to `date`
@@ -777,16 +877,26 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        // Track previous utilization for principal flows
-        let mut prev_utilization = if path.payment_dates[0] <= self.as_of {
-            path.utilization_path[0].clamp(0.0, 1.0)
+        let anchor = self.facility.commitment_date.max(self.as_of);
+        self.check_anchor_capacity(anchor)?;
+
+        // Running drawn balance at the last observation, for the principal
+        // leg: `C(t) · u(t)` where `C` is the commitment in force. The first
+        // observation on or before the valuation date records the t₀ state,
+        // which the path generator seeds from `drawn_amount`.
+        let mut prev_balance = if path.payment_dates[0] <= self.as_of {
+            self.facility.commitment_at(anchor).amount() * path.utilization_path[0].clamp(0.0, 1.0)
         } else {
-            self.facility.utilization_rate()
+            self.facility.drawn_amount.amount()
         };
 
-        // Process each contractual accrual period using path data observed on
-        // its unadjusted boundaries. Payment adjustment changes settlement,
-        // never the accrual interval.
+        // Process each contractual accrual period. Interest and fees accrue
+        // per observation sub-interval (accrual boundaries, term-index reset
+        // dates and commitment/margin/fee step dates) on the average of the
+        // start and end utilization of that sub-interval, so every reset and
+        // every dated step inside a period is honoured; the aggregates post
+        // on the adjusted payment date. Payment adjustment changes
+        // settlement, never the accrual interval.
         for period in self.payment_periods.iter() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
@@ -794,77 +904,108 @@ impl<'a> CashflowEngine<'a> {
             let idx_start = observation_index(period_start)?;
             let idx_end = observation_index(period_end)?;
 
-            let utilization_start = path.utilization_path[idx_start].clamp(0.0, 1.0);
-            let utilization_end = path.utilization_path[idx_end].clamp(0.0, 1.0);
+            let mut interest = Money::from((0_i64, ccy));
+            let mut commitment_fee = Money::from((0_i64, ccy));
+            let mut usage_fee = Money::from((0_i64, ccy));
+            let mut facility_fee = Money::from((0_i64, ccy));
+            let mut lc_fee = Money::from((0_i64, ccy));
+            let mut fronting_fee = Money::from((0_i64, ccy));
+            let mut accrual = 0.0;
+            let mut weighted_rate = 0.0;
+            let mut weighted_commitment_bp = 0.0;
+            let mut weighted_usage_bp = 0.0;
+            let mut weighted_facility_bp = 0.0;
+            let mut weighted_lc_bp = 0.0;
+            let mut weighted_fronting_bp = 0.0;
+            let mut first_fixing: Option<Date> = None;
 
-            // Use average utilization for interest calculation (time-weighted approximation).
-            // This better captures the balance evolution within each period when utilization
-            // changes between period start and end, avoiding systematic underestimation of
-            // interest when utilization is rising.
-            let avg_utilization = (utilization_start + utilization_end) / 2.0;
-            let drawn_balance = self.facility.commitment_amount * avg_utilization;
-            let undrawn_balance = self.facility.commitment_amount * (1.0 - avg_utilization);
+            // Commitment steps inside the period move the balance on their own
+            // date (they are observation dates); only the utilization-driven
+            // change is booked at the period midpoint below.
+            let mut step_legs = 0.0;
+            for k in idx_start..idx_end {
+                let sub_start = path.payment_dates[k];
+                let sub_end = path.payment_dates[k + 1];
+                let sub_dt =
+                    self.day_count
+                        .year_fraction(sub_start, sub_end, DayCountContext::default())?;
+                let utilization_start = path.utilization_path[k].clamp(0.0, 1.0);
+                let utilization_end = path.utilization_path[k + 1].clamp(0.0, 1.0);
+                let commitment_change = self.facility.commitment_at(sub_end).amount()
+                    - self.facility.commitment_at(sub_start).amount();
+                if commitment_change != 0.0 && sub_end > self.as_of {
+                    let leg = commitment_change * utilization_end;
+                    if leg.abs() > 0.0 {
+                        // Draw (increase) is negative for lender, repay (decrease) is positive
+                        flows.push(CashFlow::new(
+                            sub_end,
+                            None,
+                            Money::new(-leg, ccy)?,
+                            CFKind::Notional,
+                            0.0,
+                            None,
+                        ));
+                        step_legs += leg;
+                    }
+                }
+                // Average utilization over the sub-interval: the unbiased
+                // accrual base for a change occurring uniformly within it.
+                let avg_utilization = (utilization_start + utilization_end) / 2.0;
+                let commitment = self.facility.commitment_at(sub_start);
+                let lc_outstanding = self.facility.lc_outstanding_at(sub_start);
+                let drawn_balance = commitment * avg_utilization;
+                // Letters of credit consume availability; the utilization
+                // process is capped so this stays non-negative.
+                let undrawn_balance = Money::new(
+                    (commitment.amount() * (1.0 - avg_utilization) - lc_outstanding.amount())
+                        .max(0.0),
+                    ccy,
+                )?;
+                // Fee tiers see letters of credit as usage.
+                let tier_utilization = if commitment.amount() > 0.0 {
+                    (avg_utilization + lc_outstanding.amount() / commitment.amount()).min(1.0)
+                } else {
+                    avg_utilization
+                };
 
-            let dt = self.day_count.year_fraction(
-                period_start,
-                period_end,
-                DayCountContext::default(),
-            )?;
-
-            // Contractual fixings override the simulated short rate once the
-            // fixing date has passed. Future reset dates remain stochastic.
-            let (interest, accrual, interest_rate, fixing_date) = match &self
-                .facility
-                .base_rate_spec
-            {
-                BaseRateSpec::Fixed { rate } => (drawn_balance * (*rate * dt), dt, *rate, None),
-                BaseRateSpec::Floating(spec) => {
-                    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-                    if let Some(fwd) = overnight_fwd.as_ref() {
-                        let reset_effective = self.reset_effective_at(period_start);
+                // Contractual fixings override the simulated short rate once
+                // the fixing date has passed. Future reset dates remain
+                // stochastic.
+                let coupon_rate = match &self.facility.base_rate_spec {
+                    BaseRateSpec::Fixed { rate } => {
+                        super::utils::fixed_rate_at(self.facility, *rate, sub_start)
+                    }
+                    BaseRateSpec::Floating(spec) => {
+                        let reset_effective = self.reset_effective_at(sub_start);
                         let fixing_date = super::utils::floating_fixing_date(
                             spec,
                             reset_effective,
-                            &self.facility.attributes,
+                            self.facility.calendar_id.as_deref(),
                         )?;
-                        let coupon_rate = super::utils::project_revolver_floating_rate(
-                            super::utils::RevolverFloatingProjection {
-                                accrual_start: period_start,
-                                accrual_end: period_end,
-                                as_of: self.as_of,
-                                spec,
-                                fwd: fwd.as_ref(),
-                                day_count: self.day_count,
-                                coupon_frequency: self.facility.frequency,
-                                currency: ccy,
-                                attributes: &self.facility.attributes,
-                                fixings: self.fixing_series,
-                            },
-                            None,
-                        )?;
-                        (
-                            drawn_balance * (coupon_rate * dt),
-                            dt,
-                            coupon_rate,
-                            Some(fixing_date),
-                        )
-                    } else {
-                        // Term index: slice the period on the observation grid
-                        // so every reset inside it re-fixes the coupon.
-                        let mut interest = Money::from((0_i64, ccy));
-                        let mut weighted_rate = 0.0;
-                        let mut accrual = 0.0;
-                        let mut first_fixing = None;
-                        for k in idx_start..idx_end {
-                            let sub_start = path.payment_dates[k];
-                            let sub_end = path.payment_dates[k + 1];
-                            let reset_effective = self.reset_effective_at(sub_start);
-                            let fixing_date = super::utils::floating_fixing_date(
-                                spec,
-                                reset_effective,
-                                &self.facility.attributes,
-                            )?;
-                            first_fixing.get_or_insert(fixing_date);
+                        first_fixing.get_or_insert(fixing_date);
+                        if let Some(fwd) = overnight_fwd.as_ref() {
+                            // Overnight index: compound the forward over the
+                            // whole accrual period; only the margin in force
+                            // differs between sub-intervals.
+                            super::utils::project_revolver_floating_rate(
+                                super::utils::RevolverFloatingProjection {
+                                    accrual_start: period_start,
+                                    accrual_end: period_end,
+                                    as_of: self.as_of,
+                                    spec,
+                                    fwd: fwd.as_ref(),
+                                    day_count: self.day_count,
+                                    coupon_frequency: self.facility.frequency,
+                                    currency: ccy,
+                                    calendar_id: self.facility.calendar_id.as_deref(),
+                                    margin_delta_bp: self.facility.margin_delta_bp_at(sub_start),
+                                    fixings: self.fixing_series,
+                                },
+                                None,
+                            )?
+                        } else {
+                            let params =
+                                super::utils::floating_params_at(self.facility, spec, sub_start)?;
                             let base_rate = if fixing_date < self.as_of {
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
@@ -880,7 +1021,7 @@ impl<'a> CashflowEngine<'a> {
                                         simulated
                                             + super::utils::index_basis_at(
                                                 reset_effective,
-                                                self.facility.commitment_date.max(self.as_of),
+                                                anchor,
                                                 fwd.as_ref(),
                                                 disc.as_ref(),
                                             )?
@@ -888,114 +1029,148 @@ impl<'a> CashflowEngine<'a> {
                                     None => simulated,
                                 }
                             };
-                            let coupon_rate =
-                                crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                                    base_rate, &params,
-                                );
-                            let sub_dt = self.day_count.year_fraction(
-                                sub_start,
-                                sub_end,
-                                DayCountContext::default(),
-                            )?;
-                            interest =
-                                interest.checked_add(drawn_balance * (coupon_rate * sub_dt))?;
-                            weighted_rate += coupon_rate * sub_dt;
-                            accrual += sub_dt;
+                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                                base_rate, &params,
+                            )
                         }
-                        let avg_rate = if accrual > 0.0 {
-                            weighted_rate / accrual
-                        } else {
-                            0.0
-                        };
-                        (interest, accrual, avg_rate, first_fixing)
+                    }
+                };
+
+                interest = interest.checked_add(drawn_balance * (coupon_rate * sub_dt))?;
+                weighted_rate += coupon_rate * sub_dt;
+                accrual += sub_dt;
+
+                // Fees on the same average balances; tiers evaluated on the
+                // sub-interval's average utilization to avoid boundary
+                // artifacts.
+                let commitment_bp = self
+                    .facility
+                    .fees
+                    .commitment_fee_bp_at(tier_utilization, sub_start);
+                if commitment_bp > 0.0 {
+                    commitment_fee = commitment_fee
+                        .checked_add(undrawn_balance * (commitment_bp * 1e-4 * sub_dt))?;
+                    weighted_commitment_bp += commitment_bp * 1e-4 * sub_dt;
+                }
+                let usage_bp = self
+                    .facility
+                    .fees
+                    .usage_fee_bp_at(tier_utilization, sub_start);
+                if usage_bp > 0.0 {
+                    usage_fee =
+                        usage_fee.checked_add(drawn_balance * (usage_bp * 1e-4 * sub_dt))?;
+                    weighted_usage_bp += usage_bp * 1e-4 * sub_dt;
+                }
+                let facility_bp = self.facility.fees.facility_fee_bp_at(sub_start);
+                if facility_bp > 0.0 {
+                    facility_fee =
+                        facility_fee.checked_add(commitment * (facility_bp * 1e-4 * sub_dt))?;
+                    weighted_facility_bp += facility_bp * 1e-4 * sub_dt;
+                }
+                if lc_outstanding.amount() > 0.0 {
+                    let lc_bp = self.facility.lc_fee_bp_at(sub_start);
+                    if lc_bp > 0.0 {
+                        lc_fee = lc_fee.checked_add(lc_outstanding * (lc_bp * 1e-4 * sub_dt))?;
+                        weighted_lc_bp += lc_bp * 1e-4 * sub_dt;
+                    }
+                    let fronting_bp = self.facility.fronting_fee_bp();
+                    if fronting_bp > 0.0 {
+                        fronting_fee = fronting_fee
+                            .checked_add(lc_outstanding * (fronting_bp * 1e-4 * sub_dt))?;
+                        weighted_fronting_bp += fronting_bp * 1e-4 * sub_dt;
                     }
                 }
-            };
-
-            if payment_date > self.as_of && !rc.is_effectively_zero_money(interest.amount(), ccy) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    fixing_date,
-                    interest,
-                    match &self.facility.base_rate_spec {
-                        BaseRateSpec::Fixed { .. } => CFKind::Fixed,
-                        BaseRateSpec::Floating(_) => CFKind::FloatReset,
-                    },
-                    accrual,
-                    Some(interest_rate),
-                ));
             }
 
-            // Calculate and emit fee cashflows using centralized functions.
-            // Use average utilization for fee tier determination to match the interest
-            // calculation above and avoid tier-boundary artifacts.
+            let avg = |weighted: f64| (accrual > 0.0 && weighted > 0.0).then(|| weighted / accrual);
+
             if payment_date > self.as_of {
-                emit_revolving_credit_fees(
-                    &mut flows,
-                    &RevolvingFeeEmissionConfig {
+                if !rc.is_effectively_zero_money(interest.amount(), ccy) {
+                    flows.push(CashFlow::new(
                         payment_date,
-                        drawn_balance: drawn_balance.amount(),
-                        undrawn_balance: undrawn_balance.amount(),
-                        commitment_amount: self.facility.commitment_amount.amount(),
-                        commitment_fee_bp: self.facility.fees.commitment_fee_bp(avg_utilization),
-                        usage_fee_bp: self.facility.fees.usage_fee_bp(avg_utilization),
-                        facility_fee_bp: self.facility.fees.facility_fee_bp,
-                        year_fraction: dt,
-                        currency: ccy,
-                    },
-                )?;
+                        first_fixing,
+                        interest,
+                        match &self.facility.base_rate_spec {
+                            BaseRateSpec::Fixed { .. } => CFKind::Fixed,
+                            BaseRateSpec::Floating(_) => CFKind::FloatReset,
+                        },
+                        accrual,
+                        (accrual > 0.0).then(|| weighted_rate / accrual),
+                    ));
+                }
+                for (amount, kind, rate) in [
+                    (
+                        commitment_fee,
+                        CFKind::CommitmentFee,
+                        avg(weighted_commitment_bp),
+                    ),
+                    (usage_fee, CFKind::UsageFee, avg(weighted_usage_bp)),
+                    (facility_fee, CFKind::FacilityFee, avg(weighted_facility_bp)),
+                    (lc_fee, CFKind::LcFee, avg(weighted_lc_bp)),
+                    (fronting_fee, CFKind::FrontingFee, avg(weighted_fronting_bp)),
+                ] {
+                    if !rc.is_effectively_zero_money(amount.amount(), ccy) {
+                        flows.push(CashFlow::new(
+                            payment_date,
+                            None,
+                            amount,
+                            kind,
+                            accrual,
+                            rate,
+                        ));
+                    }
+                }
             }
 
-            // Handle principal flows from utilization changes. Interest uses
-            // average start/end utilization, so book the matching funding leg
-            // at the midpoint of the simulated interval rather than deferring
-            // it to period end.
-            //
-            // Convention: the simulated path only observes utilization at
-            // period boundaries, so the exact timing of the change within the
-            // period is unknown. Midpoint booking is the unbiased choice for
-            // a change occurring uniformly within the period and keeps the
-            // funding leg aligned with the average-utilization interest
-            // accrual above. This intentionally differs from the
-            // deterministic engine, which posts principal exactly on
-            // contractual draw/repay event dates.
-            //
-            // For the period containing the valuation date the simulated
-            // interval starts at `as_of` (the utilization there is the known
-            // t₀ state), so the midpoint is taken over `[as_of, period_end]`;
-            // taking it over the full period would drop the funding leg for
-            // a valuation past the period midpoint while keeping its interest
-            // and terminal repayment.
-            let utilization_change = utilization_end - prev_utilization;
+            // Principal leg: the change of the drawn balance `C(t) · u(t)`
+            // over the period, booked at the midpoint of the simulated
+            // interval (`[period start, period end]`, or `[as_of, period end]`
+            // for the period containing the valuation date). Interest uses
+            // average utilization, so the midpoint is the matching, unbiased
+            // funding date for a change occurring uniformly within the
+            // period; a commitment step inside the period moves the balance
+            // through the same leg. This intentionally differs from the
+            // deterministic engine, which posts principal on contractual
+            // event dates.
+            let end_balance = self.facility.commitment_at(period_end).amount()
+                * path.utilization_path[idx_end].clamp(0.0, 1.0);
+            if period_end <= self.as_of {
+                // History: the anchor balance is the known state, nothing to book.
+                prev_balance = self.facility.drawn_amount.amount();
+                continue;
+            }
+            let balance_change = end_balance - prev_balance - step_legs;
             let simulated_from = period_start.max(self.as_of);
             let half_days = ((period_end - simulated_from).whole_days() / 2).max(1);
             let principal_date = simulated_from + time::Duration::days(half_days);
+            let commitment_now = self.facility.commitment_at(period_end).amount().max(1.0);
             if principal_date > self.as_of
-                && utilization_change.abs() > super::UTILIZATION_CHANGE_THRESHOLD
+                && (balance_change / commitment_now).abs() > super::UTILIZATION_CHANGE_THRESHOLD
             {
-                let principal_change = self.facility.commitment_amount * utilization_change;
                 // Draw (increase) is negative for lender, repay (decrease) is positive
                 flows.push(CashFlow::new(
                     principal_date,
                     None,
-                    principal_change * -1.0,
+                    Money::new(-balance_change, ccy)?,
                     CFKind::Notional,
                     0.0,
                     None,
                 ));
             }
+            prev_balance = end_balance;
+        }
 
-            prev_utilization = utilization_end;
+        // Commitment reduction fees on step-downs and scheduled fixed fees
+        // (amendment, waiver, extension) after the valuation date.
+        for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+        }
+        for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
+            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
         }
 
         // Terminal repayment of outstanding balance
-        let final_utilization = path
-            .utilization_path
-            .last()
-            .copied()
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0);
-        let final_balance = self.facility.commitment_amount * final_utilization;
+        let final_balance = Money::new(prev_balance, ccy)?;
 
         let terminal_payment_date = self
             .payment_periods
@@ -1029,21 +1204,29 @@ impl<'a> CashflowEngine<'a> {
     }
 }
 
-/// Calculate the outstanding drawn balance at a given date considering draw/repay events.
+/// Drawn balance of a deterministic facility on `target_date`.
 ///
-/// This helper function simulates the drawn balance evolution based on the
-/// deterministic schedule of draws and repayments.
-///
-/// **Note**: This is primarily intended for testing and property-based validation.
+/// Starts from `drawn_amount`, the balance at the simulation anchor, and
+/// replays the draw/repay events dated after `as_of` up to and including
+/// `target_date`. Dates on or before the anchor return `drawn_amount`.
 ///
 /// # Arguments
-/// * `facility` - The revolving credit facility
-/// * `target_date` - The date at which to calculate the balance
 ///
-/// # Returns
-/// The outstanding drawn balance at the target date
+/// * `facility` - Facility with a `DrawRepaySpec::Deterministic` schedule;
+///   a stochastic facility is a validation error.
+/// * `as_of` - Valuation date; with the commitment date it defines the
+///   anchor `drawn_amount` refers to. Events dated on or before `as_of` are
+///   not replayed (the cashflow engine rejects them).
+/// * `target_date` - Date the balance is wanted for; events dated on it are
+///   applied.
+///
+/// # Errors
+///
+/// Returns a validation error for a stochastic facility, or when a replayed
+/// event would breach the commitment or repay more than the balance.
 pub fn calculate_drawn_balance_at_date(
     facility: &RevolvingCredit,
+    as_of: Date,
     target_date: Date,
 ) -> Result<Money> {
     let mut draw_repay_events = match &facility.draw_repay_spec {
@@ -1056,13 +1239,15 @@ pub fn calculate_drawn_balance_at_date(
     };
     draw_repay_events.sort_by_key(|event| event.date);
 
+    let anchor = facility.commitment_date.max(as_of);
     let mut balance = facility.drawn_amount;
-
-    // Apply all events up to the target date
     for event in draw_repay_events.iter() {
-        if event.date <= target_date {
-            balance =
-                super::utils::apply_draw_repay_event(balance, event, facility.commitment_amount)?;
+        if event.date > anchor && event.date <= target_date {
+            balance = super::utils::apply_draw_repay_event(
+                balance,
+                event,
+                facility.commitment_at(event.date),
+            )?;
         }
     }
 

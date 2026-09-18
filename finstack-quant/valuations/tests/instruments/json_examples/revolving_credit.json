@@ -20,11 +20,14 @@
           "spread_bp": "250"
         }
       },
+      "business_day_convention": "modified_following",
+      "calendar_id": "usny",
       "commitment_amount": {
         "amount": "50000000",
         "currency": "USD"
       },
       "commitment_date": "2024-01-01",
+      "commitment_schedule": [],
       "credit_curve_id": null,
       "day_count": "act_360",
       "discount_curve_id": "USD-OIS",
@@ -60,6 +63,7 @@
           }
         ],
         "facility_fee_bp": 5.0,
+        "steps": [],
         "upfront_fee": null,
         "usage_fee_tiers": [
           {
@@ -73,9 +77,15 @@
         "unit": "months"
       },
       "id": "RCF-USD-3Y",
+      "lc": null,
       "leq": 0.0,
+      "margin_steps": [],
       "maturity": "2027-01-01",
+      "oid_eir": null,
+      "payment_lag_days": 0,
       "recovery_rate": 0.0,
+      "scheduled_fees": [],
+      "settlement_days": 0,
       "stub": "short_front"
     },
     "type": "revolving_credit"

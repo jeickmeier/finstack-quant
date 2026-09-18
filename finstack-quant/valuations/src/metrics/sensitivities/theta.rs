@@ -165,7 +165,8 @@ pub(crate) fn calculate_theta_date(
 /// - Coupons and stub interest: [`CFKind::Fixed`], [`CFKind::FloatReset`],
 ///   [`CFKind::InflationCoupon`], [`CFKind::Stub`], [`CFKind::AccruedOnDefault`]
 /// - Fees: [`CFKind::Fee`], [`CFKind::CommitmentFee`], [`CFKind::UsageFee`],
-///   [`CFKind::FacilityFee`], [`CFKind::MarginInterest`]
+///   [`CFKind::FacilityFee`], [`CFKind::LcFee`], [`CFKind::FrontingFee`],
+///   [`CFKind::MarginInterest`]
 /// - Principal that is period cash: [`CFKind::Notional`] (signed, so XCCY
 ///   exchanges and amortizing redemptions are included),
 ///   [`CFKind::Amortization`], [`CFKind::PrePayment`],
@@ -265,6 +266,8 @@ fn is_period_economic_cash(kind: CFKind) -> bool {
         | CFKind::CommitmentFee
         | CFKind::UsageFee
         | CFKind::FacilityFee
+        | CFKind::LcFee
+        | CFKind::FrontingFee
         | CFKind::Notional
         | CFKind::Amortization
         | CFKind::PrePayment

@@ -316,7 +316,6 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 4096) -> d
             "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
-                "recovery_rate": 0.4,
                 "credit_spread_process": {
                     "market_anchored": {
                         "credit_curve_id": "ACME-HZD",

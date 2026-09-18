@@ -88,6 +88,7 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
+pub use super::super::loan_terms::{CommitmentStepDown, MarginStepUp, OidEirSpec};
 use super::types::RateSpec;
 
 /// Original Issue Discount (OID) policy for term loan origination.
@@ -153,26 +154,6 @@ pub enum OidPolicy {
 
 impl OidPolicy {}
 
-/// Optional configuration for effective interest rate (EIR) amortization schedules.
-///
-/// When enabled, EIR amortization schedules are computed for reporting using
-/// the loan's full cashflow schedule (including OID effects).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields, default)]
-pub struct OidEirSpec {
-    /// Include fee cashflows (upfront, commitment, usage) in the EIR schedule.
-    ///
-    /// Defaults to true because these fees are typically part of the effective yield.
-    pub include_fees: bool,
-}
-
-impl Default for OidEirSpec {
-    fn default() -> Self {
-        Self { include_fees: true }
-    }
-}
-
 /// Draw event for delayed-draw term loans (DDTL).
 ///
 /// Represents a scheduled or actual draw against the commitment, reducing
@@ -190,25 +171,6 @@ pub struct DrawEvent {
     pub date: Date,
     /// Amount drawn from available commitment
     pub amount: Money,
-}
-
-/// Commitment step-down event for DDTL facilities.
-///
-/// Reduces the total commitment limit at a specified date, typically used
-/// to match construction completion or covenant requirements.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct CommitmentStepDown {
-    /// Effective date of the step-down
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub date: Date,
-    /// New (lower) commitment limit after step-down
-    pub new_limit: Money,
 }
 
 /// Basis for calculating commitment fees on undrawn portions.
@@ -310,27 +272,6 @@ pub struct DdtlSpec {
 }
 
 impl DdtlSpec {}
-
-/// Margin step-up event (covenant penalty or scheduled increase).
-///
-/// Increases the interest margin by a fixed amount at a specified date,
-/// typically triggered by covenant breach or scheduled rating migration.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct MarginStepUp {
-    /// Effective date of margin increase
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub date: Date,
-    /// Increase in margin (basis points)
-    pub delta_bp: i32,
-}
-
-impl MarginStepUp {}
 
 /// Payment-in-kind (PIK) toggle event.
 ///

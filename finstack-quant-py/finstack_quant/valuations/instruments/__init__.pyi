@@ -22421,7 +22421,7 @@ def list_standard_metrics() -> list[str]:
     >>> from finstack_quant.valuations.instruments import list_standard_metrics
     >>> metrics = list_standard_metrics()
     >>> (len(metrics), "dirty_price" in metrics, "dv01" in metrics)
-    (227, True, True)
+    (230, True, True)
     """
     ...
 
@@ -24285,7 +24285,7 @@ class RevolvingCredit:
     @property
     def drawn_amount(self) -> Money:
         """
-        Drawn amount at the commitment date (deterministic schedules) or at the valuation anchor (stochastic facilities).
+        Drawn balance at the simulation anchor (the later of the commitment and valuation dates), in both deterministic and stochastic mode.
 
         Returns
         -------
@@ -24376,18 +24376,98 @@ class RevolvingCredit:
     @property
     def fees(self) -> dict[str, Any]:
         """
-        Fee structure as its serde ``dict``.
+        Fee structure as its serde ``dict`` (including dated ``steps``).
 
         Returns
         -------
         dict[str, Any]
-            ``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers`` and
-            ``facility_fee_bp``.
+            ``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers``,
+            ``facility_fee_bp`` and ``steps``.
 
         Raises
         ------
         ValueError
             If the value cannot be serialized.
+        """
+        ...
+    @property
+    def commitment_schedule(self) -> list[dict[str, Any]]:
+        """
+        Scheduled commitment changes as serde ``dict`` rows (``date``, ``amount``, ``fee_bp``); empty when the commitment is flat.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One row per commitment step, in date order.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def margin_steps(self) -> list[dict[str, Any]]:
+        """
+        Dated margin steps as serde ``dict`` rows (``date``, ``delta_bp``); empty when the margin is flat.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One row per margin step, in date order.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def scheduled_fees(self) -> list[dict[str, Any]]:
+        """
+        Dated fixed fees as serde ``dict`` rows (``date``, ``amount``); empty when none are scheduled.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One row per scheduled fee, in date order.
+
+        Raises
+        ------
+        ValueError
+            If the rows cannot be serialized.
+        """
+        ...
+    @property
+    def oid_eir(self) -> dict[str, Any] | None:
+        """
+        Effective-interest-rate reporting switch (``{"include_fees": bool}``), or ``None`` for the default (fees included).
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The switch, or ``None``.
+
+        Raises
+        ------
+        ValueError
+            If the spec cannot be serialized.
+        """
+        ...
+    @property
+    def lc(self) -> dict[str, Any] | None:
+        """
+        Letter-of-credit sub-facility as its serde ``dict`` (``sublimit``, ``outstanding``, ``events``, ``fee_bp``, ``fronting_fee_bp``, ``leq``), or ``None`` without an LC sublimit.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            The LC sub-facility, or ``None``.
+
+        Raises
+        ------
+        ValueError
+            If the spec cannot be serialized.
         """
         ...
     @property
@@ -24490,6 +24570,66 @@ class RevolvingCredit:
         -------
         StubKind
             The stub kind.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def business_day_convention(self) -> str:
+        """
+        Business-day convention applied to payment dates (serde string, e.g. ``"modified_following"``).
+
+        Returns
+        -------
+        str
+            ``"modified_following"`` unless overridden.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def calendar_id(self) -> str | None:
+        """
+        Holiday calendar identifier used for payment, fixing and settlement rolls, or ``None`` for weekends only.
+
+        Returns
+        -------
+        str | None
+            The calendar identifier, or ``None``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def payment_lag_days(self) -> int:
+        """
+        Business days between an accrual end and its payment date.
+
+        Returns
+        -------
+        int
+            The payment lag; ``0`` pays on the adjusted accrual end.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def settlement_days(self) -> int:
+        """
+        Business days from the valuation date to the settlement date used by quote metrics.
+
+        Returns
+        -------
+        int
+            The settlement lag; ``0`` settles on the valuation date.
 
         Notes
         -----
@@ -24628,7 +24768,7 @@ class RevolvingCreditBuilder:
         ...
     def drawn_amount(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
         """
-        Set the drawn amount at the commitment date (or the valuation anchor for stochastic facilities).
+        Set the drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor.
 
         Parameters
         ----------
@@ -24768,8 +24908,11 @@ class RevolvingCreditBuilder:
         ----------
         value : dict[str, Any] | str
             ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
-            (``upfront_fee``, ``commitment_fee_tiers``, ``usage_fee_tiers``,
-            ``facility_fee_bp``).
+            (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
+            ``{"pct_of_commitment": 0.02}``; ``commitment_fee_tiers``,
+            ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
+            ``{"date", "commitment_delta_bp", "usage_delta_bp",
+            "facility_delta_bp"}`` rows).
 
         Returns
         -------
@@ -24781,6 +24924,127 @@ class RevolvingCreditBuilder:
         ValueError
             If the spec does not match the serde shape or the builder was
             already consumed.
+        """
+        ...
+    def commitment_schedule(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+        """
+        Set the scheduled commitment changes.
+
+        Parameters
+        ----------
+        value : list[dict[str, Any]] | str
+            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict, "fee_bp":
+            float}`` (a ``list`` of dicts or a JSON ``str``), each the
+            commitment in force from its date; ``fee_bp`` is the reduction fee
+            on a step down, in basis points of the reduced amount. Dates must
+            be strictly increasing, after the commitment date and on or before
+            maturity.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If a row does not match the serde shape or the builder was
+            already consumed; ordering and feasibility fail at ``build()``.
+        """
+        ...
+    def scheduled_fees(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+        """
+        Set the dated fixed fees (amendment, waiver, extension, consent).
+
+        Parameters
+        ----------
+        value : list[dict[str, Any]] | str
+            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict}`` (a
+            ``list`` of dicts or a JSON ``str``), each paid on its date. Dates
+            must lie after the commitment date and on or before maturity.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If a row does not match the serde shape or the builder was
+            already consumed; date and sign checks fail at ``build()``.
+        """
+        ...
+    def oid_eir(self, value: dict[str, Any] | str | None) -> RevolvingCreditBuilder:
+        """
+        Set the effective-interest-rate reporting switch.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str | None
+            ``{"include_fees": bool}`` as a ``dict`` or JSON ``str``; ``None``
+            (the default) includes fees in the effective yield.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the spec does not match the serde shape or the builder was
+            already consumed.
+        """
+        ...
+    def lc(self, value: dict[str, Any] | str | None) -> RevolvingCreditBuilder:
+        """
+        Set the letter-of-credit sub-facility.
+
+        Parameters
+        ----------
+        value : dict[str, Any] | str | None
+            ``LetterOfCreditSpec`` as a ``dict`` or JSON ``str`` with
+            ``sublimit`` and ``outstanding`` (Money dicts), ``events`` (rows
+            of ``{"date", "amount", "is_issue"}``), ``fee_bp`` (``None``
+            accrues the floating margin), ``fronting_fee_bp`` and ``leq`` (the
+            fraction of the LC face drawn at default). ``None`` removes the
+            sublimit.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the spec does not match the serde shape or the builder was
+            already consumed; sublimit and capacity checks fail at ``build()``.
+        """
+        ...
+    def margin_steps(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+        """
+        Set the dated margin steps.
+
+        Parameters
+        ----------
+        value : list[dict[str, Any]] | str
+            Rows of ``{"date": "YYYY-MM-DD", "delta_bp": int}`` (a ``list`` of
+            dicts or a JSON ``str``); each delta shifts the floating spread or
+            the fixed rate from its date, cumulatively. Dates must be strictly
+            increasing and strictly inside the facility life.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If a row does not match the serde shape or the builder was
+            already consumed; ordering fails at ``build()``.
         """
         ...
     def fees_flat(
@@ -24940,6 +25204,95 @@ class RevolvingCreditBuilder:
             If ``value`` is neither ``StubKind`` nor ``str``.
         """
         ...
+    def business_day_convention(self, value: BusinessDayConvention | str) -> RevolvingCreditBuilder:
+        """
+        Set the business-day convention for payment dates.
+
+        Parameters
+        ----------
+        value : BusinessDayConvention | str
+            Convention object or serde name (``"modified_following"``,
+            ``"following"``, ``"preceding"``, ...); default
+            ``"modified_following"``. Accrual boundaries stay unadjusted.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the name is unknown or the builder was already consumed.
+        TypeError
+            If ``value`` is neither ``BusinessDayConvention`` nor ``str``.
+        """
+        ...
+    def calendar_id(self, value: str | None) -> RevolvingCreditBuilder:
+        """
+        Set the holiday calendar used for payment, fixing and settlement rolls.
+
+        Parameters
+        ----------
+        value : str | None
+            Calendar identifier such as ``"usny"``; ``None`` (the default)
+            adjusts for weekends only. An unknown identifier fails at
+            ``build()``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def payment_lag_days(self, value: int) -> RevolvingCreditBuilder:
+        """
+        Set the payment lag in business days after each accrual end.
+
+        Parameters
+        ----------
+        value : int
+            Business days on the facility calendar; ``0`` (the default) pays
+            on the adjusted accrual end.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
+    def settlement_days(self, value: int) -> RevolvingCreditBuilder:
+        """
+        Set the settlement lag used by quote metrics.
+
+        Parameters
+        ----------
+        value : int
+            Business days from the valuation date to settlement; ``0`` (the
+            default) settles on the valuation date. The base present value is
+            always anchored at the valuation date.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed.
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> RevolvingCreditBuilder:
         """
         Set scenario-selection attributes.
@@ -25005,7 +25358,6 @@ class EnhancedMonteCarloResult:
     ...         "num_paths": 16,
     ...         "seed": 42,
     ...         "mc_config": {
-    ...             "recovery_rate": spec["recovery_rate"],
     ...             "credit_spread_process": {"constant": 0.025},
     ...         },
     ...     }

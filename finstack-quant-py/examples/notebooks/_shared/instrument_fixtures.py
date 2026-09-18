@@ -166,6 +166,7 @@ def revolver(idx: int) -> tuple[str, dict]:
             "day_count": "act_360",
             "frequency": {"count": 3, "unit": "months"},
             "stub": "short_front",
+            "calendar_id": "usny",
             "recovery_rate": 0.70,
             "base_rate_spec": {
                 "floating": {

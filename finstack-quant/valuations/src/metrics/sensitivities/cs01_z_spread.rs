@@ -60,6 +60,9 @@ use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
     sensitivity_central_diff, validate_buckets_strictly_increasing,
 };
+use crate::metrics::sensitivities::cs01_direct_hazard::{
+    DirectHazardBucketedCs01, DirectHazardParallelCs01,
+};
 use crate::metrics::{
     GenericBucketedCs01, GenericParallelCs01, MetricCalculator, MetricContext, MetricId,
 };
@@ -252,6 +255,21 @@ fn assign_buckets(cached: &[CachedFlow], buckets: &[f64]) -> Vec<Vec<usize>> {
     groups
 }
 
+/// Whether the instrument's hazard curve carries a lossless calibration
+/// recipe. Quote-space CS01 needs one; a curve built directly from hazard
+/// rates falls back to a direct hazard-rate bump.
+fn hazard_is_replayable<I: Instrument>(
+    instrument: &I,
+    context: &MetricContext,
+) -> finstack_quant_core::Result<bool> {
+    let Some((hazard_id, _)) = super::cs01::resolve_optional_cs01_curves(instrument, true, "CS01")?
+    else {
+        return Ok(false);
+    };
+    let hazard = context.curves.get_hazard(hazard_id.as_str())?;
+    Ok(hazard.hazard_calibration().is_some())
+}
+
 /// Resolve whether the instrument declares a credit (hazard) curve.
 fn has_credit_curve<I: Instrument>(instrument: &I) -> finstack_quant_core::Result<bool> {
     Ok(!instrument
@@ -306,7 +324,11 @@ where
             .ok_or(finstack_quant_core::InputError::Invalid)?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
-            return GenericParallelCs01::<I>::default().calculate(context);
+            return if hazard_is_replayable(instrument, context)? {
+                GenericParallelCs01::<I>::default().calculate(context)
+            } else {
+                DirectHazardParallelCs01::<I>::default().calculate(context)
+            };
         }
 
         let curves = Arc::clone(&context.curves);
@@ -389,7 +411,11 @@ where
             .ok_or(finstack_quant_core::InputError::Invalid)?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
-            return GenericBucketedCs01::<I>::default().calculate(context);
+            return if hazard_is_replayable(instrument, context)? {
+                GenericBucketedCs01::<I>::default().calculate(context)
+            } else {
+                DirectHazardBucketedCs01::<I>::default().calculate(context)
+            };
         }
 
         let curves = Arc::clone(&context.curves);

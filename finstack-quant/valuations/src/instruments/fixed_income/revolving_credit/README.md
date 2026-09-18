@@ -22,6 +22,9 @@ Import path:
 | `BaseRateSpec` | `Fixed { rate }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helpers: `flat(..)`, `flat_bp(..)`. |
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
+| `CommitmentStep`, `MarginStepUp`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
+| `LetterOfCreditSpec`, `LcEvent` (from `loan_terms`) | LC sublimit, outstanding face, issuances/expiries, LC and fronting fees, LC draw at default. |
+| `UpfrontFee`, `ScheduledFee`, `OidEirSpec` (from `loan_terms`) | Upfront fee as amount or percentage, dated fixed fees, effective-rate reporting switch. |
 | `StochasticUtilizationSpec`, `UtilizationProcess` | Path count, seed, antithetic/Sobol switch, and the utilization process. |
 | `McConfig`, `CreditSpreadProcessSpec`, `InterestRateProcessSpec` | Optional multi-factor dynamics: correlation matrix, credit-spread and short-rate processes. |
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
@@ -101,8 +104,22 @@ Notes that bite:
 - `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected);
   `flat_bp` takes typed `Bps` and does not.
 - `recovery_rate` is required and must be a finite decimal in `[0, 1]`.
+- Schedule conventions are typed fields: `business_day_convention` (default
+  Modified Following, payment dates only), `calendar_id` (`None` = weekends
+  only; an unknown id fails validation), `payment_lag_days` and
+  `settlement_days` (quote metrics only). Attributes metadata is never read
+  by the schedule builders.
+- `drawn_amount` is the balance at the **simulation anchor**, the later of the
+  commitment date and the valuation date, in both modes. Deterministic
+  draw/repay events describe the future only; an event dated on or before the
+  anchor is rejected by the cashflow engine. The accrual period containing the
+  valuation date accrues on the anchor balance from its accrual start.
 - `leq` (loan-equivalent exposure, Basel CCF) is the fraction of the undrawn
-  commitment assumed drawn at default, in `[0, 1]`; it defaults to `0.0`.
+  commitment assumed drawn at default, in `[0, 1]`; it defaults to `0.0`. A
+  positive `leq` (or LC `leq`) needs a default model: the standalone pricer
+  rejects it without a `credit_curve_id` or a moving stochastic spread
+  process, because the draw at default would be silently inert. Inside a
+  structured-credit pool the deal model supplies default probabilities.
 - A facility `credit_curve_id` on a stochastic facility requires a
   `CreditSpreadProcessSpec::MarketAnchored` process on that same curve (the
   synthesized default already is). An explicit `Cir`/`Constant` process
@@ -143,6 +160,77 @@ Same-date flow ordering is deterministic: interest/reset → fees →
 amortization/PIK → notional.
 
 Both modes emit a `CashFlowSchedule`, so metrics and exporters see one shape.
+
+### Dated terms: commitment, margin and fee steps
+
+Three schedules, all optional and all shared with `TermLoan` through
+`instruments::fixed_income::loan_terms`, let a term sheet be entered without
+custom code:
+
+- `commitment_schedule: Vec<CommitmentStep { date, amount, fee_bp }>` — the
+  commitment in force from each date (amortizing commitments, availability
+  expiries, accordions). Utilization is always drawn over the commitment in
+  force, so a stochastic facility books the implied principal at a step. A
+  step down pays `fee_bp` on the reduced amount on the step date. The drawn
+  balance must never exceed the commitment in force: the analyst dates the
+  repayment.
+- `margin_steps: Vec<MarginStepUp { date, delta_bp }>` — cumulative shifts of
+  the floating spread or the fixed rate: leverage or ratings grids the
+  analyst has forecast, scheduled step-ups, default-rate margins.
+- `fees.steps: Vec<FeeStep { date, commitment_delta_bp, usage_delta_bp,
+  facility_delta_bp }>` — cumulative shifts of every tier of the named fee.
+
+Both engines slice accrual on every step date, so a step inside an accrual
+period is exact. `commitment_at(date)`, `margin_delta_bp_at(date)` and
+`fees.deltas_at(date)` expose the terms in force.
+
+A leverage grid recipe: forecast the covenant ratio per test date, map each
+ratio to the grid margin, and enter one `MarginStepUp` per date the mapped
+margin changes (`delta_bp` = new margin − previous margin).
+
+### Letters of credit
+
+`lc: Option<LetterOfCreditSpec { sublimit, outstanding, events, fee_bp,
+fronting_fee_bp, leq }>` models an LC sublimit. Outstanding letters of credit
+reduce availability and the commitment-fee base, count as usage for fee
+tiers, accrue the LC fee (`fee_bp`, or the floating margin including margin
+steps when unset; a fixed-rate facility must set it) plus the fronting fee,
+and enter the default leg as `leq × LC` funded at par and recovered at the
+facility recovery rate. `outstanding` is the LC face at the simulation
+anchor; `events` are future issuances and expiries. LC usage is deterministic
+in both modes, and the utilization process is capped at `1 − LC(t) / C(t)`.
+The fees are emitted as `CFKind::LcFee` and `CFKind::FrontingFee`.
+
+### Upfront fee, scheduled fees and the effective rate
+
+`fees.upfront_fee` is `UpfrontFee::Amount(Money)` or
+`UpfrontFee::PctOfCommitment(0.02)`, paid on the commitment date; it enters
+the present value only while that date lies after the valuation date.
+`scheduled_fees: Vec<ScheduledFee { date, amount }>` are dated fixed fees
+(amendment, waiver, extension, consent) emitted as `CFKind::Fee`.
+`custom("oid_eir_amortization")` reports the origination effective interest
+rate (`oid_eir_rate`, the XIRR of the full flow set from the commitment date
+including the upfront fee and, unless `oid_eir.include_fees` is false, every
+running fee) with the dated `oid_eir_amortization` and
+`oid_eir_carrying_value` series.
+
+### Recipes for customized deals
+
+No new fields are needed for these; each is a combination of the schedules
+above and is pinned by an executed test in
+`tests/instruments/revolving_credit/analyst_coverage.rs`:
+
+- **Term-out**: a `CommitmentStep` to the drawn balance on the term-out date
+  (availability ends, commitment fee stops) plus dated repayments for the
+  amortization.
+- **Clean-down**: a repayment event into the clean-down window and a redraw
+  event out of it; the balance, interest and usage fee are zero inside the
+  window while the commitment fee runs on the full commitment.
+- **Extension**: move `maturity` and add the extension fee as a
+  `ScheduledFee` on the extension date.
+- **Default margin**: a `MarginStepUp` on the default date (and one back on
+  the cure date).
+- **Amendment or waiver fee**: a `ScheduledFee`.
 
 ### Fee math
 
@@ -246,7 +334,8 @@ bump-and-reprice sensitivities reuse the same variates for base and bumped runs
 on the ACT/365F model clock (`MC_CLOCK_DAY_COUNT`), the clock the rate and
 credit processes are calibrated on; interest and fee accrual keep the
 facility's `day_count`. Seasoned facilities simulate from the valuation date
-with the current drawn amount as the known t₀ state.
+with `drawn_amount` as the known t₀ state, the same anchor balance the
+deterministic engine starts from.
 
 ## Pricing
 
@@ -278,17 +367,20 @@ let option_cost = enhanced.draw_option_cost.mean; // negative when spreads widen
 ```
 
 **Draw option cost.** Each simulated draw `ΔD` at observation `t_d` is a
-forward loan to maturity at the contractual margin `s_K` (the spread over the
-index, or the fixed rate less the par forward to maturity) against the path's
-fair spread `s(t_d)`, worth `ΔD · (s_K − s(t_d)) · A(t_d, T)` to the lender
-with `A` the risky annuity of the remaining accrual periods on the path
-(`Σ DF · SP · dt`). `PathResult::draw_option_cost` sums the path's draws,
+forward loan to maturity at the contractual margin against the path's fair
+spread. The fair spread is anchored to the margin at the valuation date,
+`fair(t_d) = margin + (s(t_d) − s(t₀))`, so a private-credit margin that
+carries illiquidity and funding premia over a CDS-style spread does not bias
+the cost; only spread changes since the valuation date count. The draw is
+worth `−ΔD · (s(t_d) − s(t₀)) · A(t_d, T)` to the lender, with `A` the risky
+annuity of the remaining accrual periods on the path (`Σ DF · SP · dt`).
+`PathResult::draw_option_cost` sums the path's draws,
 `EnhancedMonteCarloResult::draw_option_cost` is the antithetic-aware Monte
 Carlo estimate, and `MetricId::custom("draw_option_cost")` reports its mean.
-The cost is negative when the path's spread sits above the margin, the
-opportunity cost the lender bears on fixed-margin commitments; a constant
-spread process equal to the margin gives exactly zero. Loan-equivalent draws
-at default are priced in the default leg, not here.
+The cost is negative when the spread has widened since the valuation date,
+the opportunity cost the lender bears on fixed-margin commitments; any
+constant spread process gives exactly zero. Loan-equivalent draws at default
+are priced in the default leg, not here.
 
 ### Rate conventions
 
@@ -306,11 +398,19 @@ Registered for `InstrumentType::RevolvingCredit` in `metrics/mod.rs`:
 | `MetricId` | Meaning |
 |-----------|---------|
 | `Dv01`, `BucketedDv01` | Parallel and key-rate curve risk |
-| `Cs01`, `BucketedCs01` | Par-spread rebootstrap CS01 with a replayable credit curve; z-spread CS01 otherwise |
+| `Cs01`, `BucketedCs01` | Par-spread rebootstrap CS01 with a replayable credit curve; direct hazard-rate bump with an analyst-built (knot) curve; z-spread CS01 without a credit curve, which sees the undrawn commitment only through its fee annuity |
+| `custom("exposure_at_default")` | Drawn + `leq` × undrawn + LC `leq` × LC face on the valuation date |
+| `custom("expected_loss")` | Value removed by the default model: PV without the credit curve and contingent draws less the base PV (`0` without a credit curve) |
 | `custom("utilization_rate")` | Drawn / commitment at the valuation date |
 | `custom("available_capacity")` | Commitment − drawn |
 | `custom("weighted_average_cost")` | Approximate all-in cost of the facility |
 | `custom("draw_option_cost")` | Monte Carlo mean draw option cost of a stochastic facility (`0` for deterministic schedules) |
+| `DiscountMargin` | Floating facilities: constant spread over the discount curve repricing the settlement schedule to the quoted clean price on the drawn balance plus accrued (LSTA), else to the model value; decimal |
+| `custom("price_from_dm")` | Clean price per 100 of the drawn balance at settlement implied by `market_quotes.quoted_discount_margin` (decimal) |
+| `Ytm` | IRR of the holder-view flows after settlement against the quoted or model price, on the facility day count |
+| `custom("all_in_rate")` | Running cash cost: interest plus every fee after the valuation date over the time-weighted drawn balance |
+| `custom("accrued_interest")` | Cash interest accrued to the settlement date, in the facility currency |
+| `custom("oid_eir_amortization")` | Total EIR amortization; stores `oid_eir_rate` and the dated amortization and carrying-value series |
 
 `Theta` is registered universally by `metrics::standard_registry()`.
 
@@ -342,6 +442,12 @@ and, for pools of facilities tranched into notes,
 - Single currency per facility throughout the lifecycle.
 - No PIK or amortization on the revolver itself; those belong to
   [`../term_loan/`](../term_loan/).
+- No ABR or prime sub-tranche: a facility accrues on one base rate. Model a
+  mixed borrowing as two facilities.
+- No borrowing base: availability is the commitment schedule, not a
+  collateral formula. Encode a forecast borrowing base as commitment steps.
+- Extension options are not priced as options: model the exercised or the
+  unexercised contract, not the choice.
 
 ## Verification
 

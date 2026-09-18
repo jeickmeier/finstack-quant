@@ -500,6 +500,16 @@
           "type": "string"
         },
         {
+          "const": "lc_fee",
+          "description": "Letter-of-credit fee.\n\nPeriodic fee on the face of letters of credit issued under a revolving\nfacility's LC sublimit, typically at the drawn margin.",
+          "type": "string"
+        },
+        {
+          "const": "fronting_fee",
+          "description": "Fronting fee.\n\nPeriodic fee paid to the issuing bank on the face of letters of credit\noutstanding under a revolving facility.",
+          "type": "string"
+        },
+        {
           "const": "notional",
           "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption.",
           "type": "string"

@@ -67,6 +67,10 @@ pub mod dollar_roll;
 pub mod fi_trs;
 /// Inflation-linked bond module.
 pub mod inflation_linked_bond;
+/// Quote arithmetic shared by term loans and revolving credit facilities.
+pub mod loan_quotes;
+/// Dated loan terms shared by term loans and revolving credit facilities.
+pub mod loan_terms;
 /// MBS passthrough module - Agency MBS pass-throughs (renamed from agency_mbs_passthrough).
 pub mod mbs_passthrough;
 pub mod revolving_credit;

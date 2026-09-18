@@ -6,7 +6,9 @@
 //!
 //! - **With** a replayable credit curve, a par-spread bump followed by hazard
 //!   rebootstrap moves the PV, so CS01 is reported via the canonical
-//!   [`GenericParallelCs01`] calculator.
+//!   [`GenericParallelCs01`] calculator. An analyst-built curve without a
+//!   calibration recipe gets a direct hazard-rate bump instead
+//!   (`metrics::sensitivities::cs01_direct_hazard`).
 //! - **Without** a credit curve, survival is identically `1.0` and the recovery
 //!   leg vanishes, so the canonical CS01 is zero. Credit-spread risk is then
 //!   reported via the market-standard z-spread bump in
@@ -78,10 +80,9 @@ impl ZSpreadCs01 for RevolvingCredit {
 
                 // Upfront fee is a separate PV term in the pricer, paid at the
                 // commitment date and only when that date is in the future.
-                if let Some(upfront) = self.fees.upfront_fee {
-                    if self.commitment_date > as_of {
-                        flows.push((self.commitment_date, upfront));
-                    }
+                let upfront = self.upfront_fee_amount();
+                if upfront.amount() > 0.0 && self.commitment_date > as_of {
+                    flows.push((self.commitment_date, upfront));
                 }
                 flows
             }
