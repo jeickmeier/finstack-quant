@@ -6,7 +6,7 @@
     "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted. Re-baselined 2026-09-18: commit 413953021 anchors a bootstrapped inflation curve at base_date minus the observation lag rather than at base_date, so the calibrated US-CPI curve and therefore this swap's projected index ratio both moved. The same commit also made a historical reference anchor require a published index; that regression is fixed separately so a curve-only inflation market projects off the curve again. Amended 2026-09-18: the contract now states its base CPI explicitly. A start-date reference index is a contractual fixing, and since commit 413953021 it must be supplied rather than projected off the inflation curve. 300.0 is the base CPI the plan's US-CPI inflation step declares at the 2026-04-30 base date, so the swap now uses the same start fixing the bootstrap calibrated against. The contract also states the plan's observation lag (3M) and the USD-CPI convention's linear monthly interpolation, so the priced swap uses the same reference-index convention the inflation bootstrap calibrated against; with those stated the 2031-04-30 pillar reprices at its 2.25% quote to within 1.5e-4 of notional, against 8.9e-4 when they were left implicit.",
+    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the `inflation` step kind's plumbing through engine::execute. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted. Re-baselined 2026-09-18, for three reasons. (1) Commit 413953021 anchors a bootstrapped inflation curve at base_date minus the observation lag rather than at base_date, moving the calibrated US-CPI curve and this swap's projected index ratio. (2) The same commit made a historical reference anchor require a published fixing; that guard is deliberate, so the contract now states its base CPI of 300.0 explicitly - the level the plan's US-CPI inflation step declares at its 2026-04-30 base date, i.e. the same start fixing the bootstrap calibrated against. (3) The contract now follows the USD-CPI market convention (one/one accrual, NYSE calendar, modified following, linear monthly reference interpolation), which is what the bootstrap itself reprices against; the 3M observation lag is resolved from the projection curve's indexation_lag_months rather than restated here, and reproduces an explicit override exactly. With the conventions aligned every ZCIS pillar reprices at its own quote to within 1e-5 USD on a 10MM notional (~1e-12 relative), against 8.9e-4 of notional when day count and lag were left mismatched, so this fixture is now a true round-trip test of the inflation bootstrap.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
@@ -332,18 +332,17 @@
           ],
           "meta": {}
         },
-        "day_count": "act_365f",
+        "day_count": "one_one",
         "base_cpi": 300.0,
-        "lag_override": {
-          "months": 3
-        },
-        "interpolation_override": "linear"
+        "interpolation_override": "linear",
+        "calendar_id": "nyse",
+        "business_day_convention": "modified_following"
       }
     }
   },
   "expected": {
-    "npv": -21505.77810756992,
-    "dv01": 10.75878149655182
+    "npv": -22042.507886875672,
+    "dv01": 11.027293446706608
   },
   "tolerances": {
     "npv": {

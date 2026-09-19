@@ -6,7 +6,7 @@
     "description": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Amended 2026-09-18: the contract now states its base CPI explicitly. A start-date reference index is a contractual fixing, and since commit 413953021 it must be supplied rather than projected off the inflation curve (see the fail-closed guard in reference_inflation_value and test_historical_observation_requires_fixing_or_explicit_contract_base). The value is this curve's own CPI level on the 2026-04-30 start date, so the priced contract is unchanged in substance.",
+    "source_detail": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves. Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Amended and re-baselined 2026-09-18. Commit 413953021 made a historical reference anchor require a published fixing rather than a curve projection, so the contract now states its base CPI explicitly. The contract also follows the USD-CPI market convention (one/one accrual, NYSE calendar, modified following, linear monthly reference interpolation), and the curve's declared 3M indexation lag is now resolved by the instrument, so the stated base CPI is this curve's reference level at the lagged 2026-04-30 anchor rather than at the unlagged start date.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
@@ -185,16 +185,19 @@
           ],
           "meta": {}
         },
-        "day_count": "act_365f",
-        "base_cpi": 314.0272785479525
+        "day_count": "one_one",
+        "base_cpi": 312.49179121221636,
+        "calendar_id": "nyse",
+        "business_day_convention": "modified_following",
+        "interpolation_override": "linear"
       }
     }
   },
   "expected": {
-    "npv": -10322.265559182979,
-    "par_rate": 0.02018378380564667,
-    "dv01": 5.163961012953223,
-    "inflation01": 646.7465221991042
+    "npv": -10212.440055301746,
+    "par_rate": 0.02020714402816104,
+    "dv01": 5.109018169539922,
+    "inflation01": 625.1505110706576
   },
   "tolerances": {
     "npv": {
