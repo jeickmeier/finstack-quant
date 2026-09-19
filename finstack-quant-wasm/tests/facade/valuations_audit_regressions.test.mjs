@@ -475,9 +475,16 @@ test('large homogeneous credit-pool loss meets the independent LHP reference', (
     'hazard_rate',
     ['expected_loss']
   );
+  // Index-sized homogeneous pools use the exact conditional binomial, so the
+  // independent SciPy binomial-CDF case matching this fixture's pool is the
+  // pin. Mirrors the Python twin in tests/test_production_audit.py.
+  const expectedCase = reference.cases.find(
+    (c) => c.n === 125 && c.pd === 0.01 && c.correlation === 0.3 && c.cap === 0.03
+  );
+  assert.ok(expectedCase, 'reference fixture must carry the n=125 pd=0.01 rho=0.3 cap=0.03 case');
   assert.ok(
-    Math.abs(result.measures.expected_loss - 1e6 * reference.large_homogeneous_pool.expected_loss) <
-      2e-4
+    Math.abs(result.measures.expected_loss - 1e6 * expectedCase.expected_loss) < 2e-4,
+    `expected_loss ${result.measures.expected_loss} vs reference ${1e6 * expectedCase.expected_loss}`
   );
 });
 
