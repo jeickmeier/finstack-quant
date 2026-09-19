@@ -2,6 +2,79 @@
 
 ## [Unreleased]
 
+### Requested metrics never go missing; windowed formulas work on money (2026-09-19)
+
+#### Fixed
+
+- **Windowed formula functions are usable on monetary nodes.** `lag`, `shift`,
+  `diff`, `rolling_mean/sum/min/max/median/std`, `ewm_mean`, `ewm_std`,
+  `annualize` and `fiscal_ytd` folded their trailing count, window, offset,
+  smoothing-factor or month argument into the dimension check, so every one of
+  them was rejected on a USD-denominated node with `Dimensional mismatch in
+  lag: cannot combine scalar and USD`. A debt corkscrew written the natural way
+  (`lag(closing_debt, 1) + drawdowns - repayments`) could not be expressed and
+  had to be rebuilt with `cumsum`. Those functions now take their dimension
+  from the series argument alone; an argument that is a count, window, offset,
+  smoothing factor, digit count or month number never participates in dimension
+  unification. `mean`, `sum`, `min`, `max`, `clamp` and `coalesce` are genuinely
+  variadic over values and still reject a currency mismatch between them.
+
+#### Changed (breaking)
+
+- **A metric requested from `price_instrument` / `priceInstrument` /
+  `Instrument::price_with_metrics` is now either returned or raises.**
+  Previously a requested metric with no calculator for that instrument type was
+  silently omitted from `measures`, so a caller could not tell "not supported"
+  from "computed but missing". It now raises `MetricNotApplicable` (Python
+  `ValueError`) naming both the metric and the instrument type.
+  **16,509 of the 17,940 (instrument type, metric) pairs change from silence to
+  an error**; 1,431 remain applicable. Callers passing a broad list across mixed
+  instruments must narrow it.
+- `MetricRegistry::compute` rejects unregistered and non-applicable requests
+  before running any calculator, so the reported error no longer depends on
+  dependency evaluation order.
+- `MetricId::ThetaPeriodDays` is a registered metric that resolves on its own;
+  previously it appeared only when `theta` was requested in the same call.
+- **A portfolio metric list is a documented menu.** `value_portfolio` /
+  `valuePortfolio` / `RequestedMetrics` take one list for a book of mixed
+  instrument types and offer no way to say "`delta` for the options, `cs01` for
+  the credit", so each position is now asked for exactly the entries its own
+  instrument type has a calculator for. This restores mixed-book risk runs,
+  which the strict single-instrument contract above would otherwise have made
+  impossible for any list broader than the standard set. Narrowing covers
+  structural inapplicability only: `strict_risk` still governs a metric an
+  instrument type supports but fails to compute, and an unknown metric name
+  still raises when the request is parsed.
+
+#### Added
+
+- `PositionValue.inapplicable_metrics` (Rust `Vec<MetricId>`, Python
+  `list[str]`, serialized when non-empty) lists the requested metrics a
+  position's instrument type has no calculator for, so the portfolio-level
+  narrowing above is reported rather than silent. It is not a failure list:
+  unlike `degraded_positions` and `PortfolioMetrics.skipped_metrics`, nothing in
+  it could have been computed and was not, so a portfolio total is not
+  understated by it.
+- `MetricRegistry::applicable_subset(&[MetricId], InstrumentType)` narrows a
+  cross-instrument superset to what one instrument type supports, so dropping
+  the rest is a visible decision at the call site rather than a silent filter
+  inside pricing. Used by composite legs, the standard option-Greek set, the
+  portfolio evaluation menu and the attribution engine menu, each of which
+  evaluates a fixed superset across heterogeneous instruments.
+- `expected_loss` is a registered metric for `structured_credit` and `bond`,
+  and `expected_shortfall` for `structured_credit`. These are published by the
+  model pricers themselves — structured credit's deal Monte Carlo pass and the
+  Merton-MC bond engine — rather than derived by a calculator, so the registry
+  previously reported them as inapplicable to those instrument types even
+  though every priced result carried them. Requesting one now returns the
+  pricer's own value, unchanged and never recomputed; on structured credit
+  `expected_shortfall` is the deal Monte Carlo tail loss rather than a
+  historical-simulation estimate, matching what the result envelope already
+  reported. Requesting either on a valuation whose model does not publish it
+  (a discounted bond, say) is an error, as is requesting them on an instrument
+  type that neither publishes nor calculates them.
+
+
 ### Structured credit: analyst remediation (2026-09-17 plan, Phases A–E)
 
 #### Fixed

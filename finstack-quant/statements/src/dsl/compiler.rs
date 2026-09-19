@@ -270,22 +270,34 @@ fn infer_call_dimension(
         .map(|arg| infer_dimension(arg, node_types, capital_structure_currency))
         .collect::<Result<Vec<_>>>()?;
     match func {
-        // Dimension-preserving: the result carries the same units as its
-        // value-bearing argument(s). Includes same-unit transforms such as
-        // `diff` (difference of amounts), `std`/`rolling_std`/`ewm_std`
-        // (dispersion in the series' own units), and `min`/`max`/`median`.
-        "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "rolling_mean"
-        | "rolling_sum" | "rolling_min" | "rolling_max" | "mean" | "sum" | "min" | "max"
-        | "median" | "rolling_median" | "diff" | "std" | "rolling_std" | "ewm_mean" | "ewm_std"
-        | "ttm" | "ltm" | "ytd" | "qtd" | "fiscal_ytd" | "annualize" | "coalesce" | "clamp" => {
+        // Value-variadic: every argument is a value carried in the same units,
+        // so a mismatch between them is a genuine modelling error worth
+        // rejecting. `mean`/`sum`/`min`/`max` aggregate across all of their
+        // arguments, `coalesce` picks between interchangeable alternatives,
+        // and `clamp`'s bounds are compared against its value.
+        "mean" | "sum" | "min" | "max" | "coalesce" | "clamp" => {
             combine_arg_dimensions(func, arg_dims)
         }
-        // Dimension-preserving in the *first* argument only. `floor`/`ceil`
-        // preserve their single argument's units; for `round`, the trailing
-        // `digits` argument is a dimensionless count, so folding it with
-        // `combine_arg_dimensions` would wrongly reject `round(usd_amount, 2)`
-        // as a monetary/scalar mix.
-        "round" | "floor" | "ceil" => Ok(arg_dims.first().copied().unwrap_or(Dimension::Unknown)),
+        // Dimension-preserving in the *first* (series or value) argument only:
+        // the result carries that argument's units. This covers same-unit
+        // transforms such as `diff` (difference of amounts),
+        // `std`/`rolling_std`/`ewm_std` (dispersion in the series' own units)
+        // and the period aggregates.
+        //
+        // The rule, stated once: an argument that is a count, window size,
+        // period offset, smoothing factor, digit count or month number is
+        // dimensionless and NEVER participates in dimension unification.
+        // Folding such an argument in with `combine_arg_dimensions` would
+        // wrongly reject `lag(usd_balance, 1)`, `rolling_sum(usd_flow, 4)` or
+        // `round(usd_amount, 2)` as a monetary/scalar mix. Functions here that
+        // take no trailing argument at all (`abs`, `cumsum`, `ytd`, ...)
+        // behave identically under this rule.
+        "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "diff" | "rolling_mean"
+        | "rolling_sum" | "rolling_min" | "rolling_max" | "rolling_median" | "rolling_std"
+        | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ltm" | "ytd" | "qtd"
+        | "fiscal_ytd" | "annualize" | "round" | "floor" | "ceil" => {
+            Ok(first_arg_dimension(&arg_dims))
+        }
         // Genuinely scalar: ratios, counts, signs, and rates carry no currency
         // unit regardless of input. Transcendentals (`pow`, `ln`, `exp`,
         // `log10`, `sqrt`) only make dimensional sense on scalars, and the
@@ -300,6 +312,16 @@ fn infer_call_dimension(
         // rejects nor falsely passes downstream combinations.
         _ => Ok(Dimension::Unknown),
     }
+}
+
+/// Dimension of a call whose units come from its leading argument alone.
+///
+/// Used for functions whose trailing arguments are dimensionless counts,
+/// windows, offsets, smoothing factors or digit counts (see the rule stated in
+/// [`infer_call_dimension`]). A call with no arguments is dimension-unknown;
+/// arity itself is validated separately by [`compile_function_call`].
+fn first_arg_dimension(arg_dims: &[Dimension]) -> Dimension {
+    arg_dims.first().copied().unwrap_or(Dimension::Unknown)
 }
 
 fn combine_arg_dimensions(context: &str, arg_dims: Vec<Dimension>) -> Result<Dimension> {
@@ -742,6 +764,103 @@ mod tests {
         let ast = parse_formula("clamp(usd_amount, 0 * usd_amount, usd_amount) + usd_amount")
             .expect("should parse");
         assert!(validate_dimensions(&ast, &node_types).is_ok());
+    }
+
+    /// Windowed formulas take a dimensionless count, window or offset as their
+    /// trailing argument, so the result must simply carry the series
+    /// argument's dimension. Folding the count in rejected every windowed
+    /// formula over a monetary node ("cannot combine scalar and USD"), which
+    /// made a debt corkscrew (`lag(debt_balance, 1)`) impossible to express.
+    #[test]
+    fn windowed_functions_preserve_series_dimension() {
+        let mut node_types = IndexMap::new();
+        node_types.insert(
+            NodeId::new("usd_amount"),
+            NodeValueType::Monetary {
+                currency: finstack_quant_core::currency::Currency::USD,
+            },
+        );
+        node_types.insert(NodeId::new("ratio"), NodeValueType::Scalar);
+
+        for formula in [
+            "lag(usd_amount, 1)",
+            "shift(usd_amount, 1)",
+            "rolling_sum(usd_amount, 4)",
+            "rolling_mean(usd_amount, 4, 2)",
+            "ewm_mean(usd_amount, 0.5)",
+            "diff(usd_amount, 1)",
+            "fiscal_ytd(usd_amount, 4)",
+            "annualize(usd_amount, 4)",
+        ] {
+            let ast = parse_formula(formula).expect("should parse");
+            assert_eq!(
+                infer_dimension(&ast, &node_types, None).expect("should infer"),
+                Dimension::Monetary(finstack_quant_core::currency::Currency::USD),
+                "{formula} must carry its series argument's currency"
+            );
+        }
+
+        for formula in ["lag(ratio, 1)", "shift(ratio, 1)", "rolling_sum(ratio, 4)"] {
+            let ast = parse_formula(formula).expect("should parse");
+            assert_eq!(
+                infer_dimension(&ast, &node_types, None).expect("should infer"),
+                Dimension::Scalar,
+                "{formula} must stay scalar"
+            );
+        }
+
+        // The preserved dimension must still combine downstream: adding a
+        // lagged USD balance to a USD flow is fine, mixing currencies is not.
+        node_types.insert(
+            NodeId::new("eur_amount"),
+            NodeValueType::Monetary {
+                currency: finstack_quant_core::currency::Currency::EUR,
+            },
+        );
+        let ast = parse_formula("lag(usd_amount, 1) + usd_amount").expect("should parse");
+        assert!(validate_dimensions(&ast, &node_types).is_ok());
+        let ast = parse_formula("lag(usd_amount, 1) + eur_amount").expect("should parse");
+        assert!(validate_dimensions(&ast, &node_types).is_err());
+    }
+
+    /// The first-argument rule must not widen into a hole: `clamp` and
+    /// `coalesce` take genuine quantities in every position, so a currency
+    /// mismatch between them stays an error.
+    #[test]
+    fn value_variadic_functions_still_reject_currency_mismatch() {
+        let mut node_types = IndexMap::new();
+        node_types.insert(
+            NodeId::new("usd_amount"),
+            NodeValueType::Monetary {
+                currency: finstack_quant_core::currency::Currency::USD,
+            },
+        );
+        node_types.insert(
+            NodeId::new("eur_amount"),
+            NodeValueType::Monetary {
+                currency: finstack_quant_core::currency::Currency::EUR,
+            },
+        );
+
+        for formula in [
+            "clamp(usd_amount, eur_amount, usd_amount)",
+            "coalesce(usd_amount, eur_amount)",
+            "min(usd_amount, eur_amount)",
+            "sum(usd_amount, eur_amount)",
+        ] {
+            let ast = parse_formula(formula).expect("should parse");
+            assert!(
+                validate_dimensions(&ast, &node_types).is_err(),
+                "{formula} mixes currencies and must be rejected"
+            );
+        }
+
+        // Same-currency arguments still resolve to that currency.
+        let ast = parse_formula("coalesce(lag(usd_amount, 1), usd_amount)").expect("should parse");
+        assert_eq!(
+            infer_dimension(&ast, &node_types, None).expect("should infer"),
+            Dimension::Monetary(finstack_quant_core::currency::Currency::USD),
+        );
     }
 
     // Regression (C8): `min`/`max` now compile to a single n-ary

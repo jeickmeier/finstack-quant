@@ -11,6 +11,7 @@ use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar, VarConfig};
 use crate::metrics::sensitivities::breakeven::BreakevenCalculator;
 use crate::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator;
 use crate::metrics::sensitivities::theta::GenericThetaAny;
+use crate::pricer::InstrumentType;
 
 static STANDARD_REGISTRY: OnceLock<MetricRegistry> = OnceLock::new();
 
@@ -43,6 +44,44 @@ impl MetricCalculator for ComputedMetricLookup {
     }
 }
 
+/// Owner entry for a standard metric a model pricer publishes itself.
+///
+/// Some models emit a standard metric identifier as a side output of their own
+/// pricing pass instead of leaving it to a calculator — structured credit's
+/// Monte Carlo `expected_loss`, for example. That value is authoritative, so
+/// the metric layer must read it rather than derive a second, possibly
+/// disagreeing one. The pricing path seeds those measures into
+/// `MetricContext::computed`, which both satisfies the registry's up-front
+/// applicability check and supplies the value here.
+///
+/// The registration still matters: without an entry, the registry would report
+/// the metric as inapplicable to an instrument type whose pricers do produce
+/// it, and `metrics_for_instrument` would omit it. Applicability is recorded
+/// per instrument type, while publication depends on the model actually used,
+/// so this calculator fails when the valuation ran under a model that does not
+/// publish the metric.
+struct PricerPublishedMetric {
+    metric: MetricId,
+}
+
+impl PricerPublishedMetric {
+    fn new(metric: MetricId) -> Self {
+        Self { metric }
+    }
+}
+
+impl MetricCalculator for PricerPublishedMetric {
+    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        context.computed.get(&self.metric).copied().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "Metric '{}' is published by this instrument type's model pricers, \
+                 but the model used for this valuation did not produce it",
+                self.metric
+            ))
+        })
+    }
+}
+
 /// Creates a standard metric registry with all built-in metrics.
 ///
 /// This registry includes metrics for:
@@ -69,7 +108,41 @@ fn build_standard_registry() -> std::result::Result<MetricRegistry, MetricRegist
     register_fx_instrument_metrics(&mut registry)?;
     register_commodity_instrument_metrics(&mut registry)?;
     register_exotic_instrument_metrics(&mut registry)?;
+    register_model_published_metrics(&mut registry)?;
     Ok(registry)
+}
+
+/// Record ownership of standard metrics that model pricers publish themselves.
+///
+/// These have no calculator of their own: the value arrives from the pricing
+/// pass, seeded into the metric context. Registering them keeps the
+/// applicability table truthful, so a caller asking for one on an instrument
+/// type whose pricers emit it is answered instead of rejected.
+///
+/// Registered here rather than in each instrument's metric module because the
+/// entries describe a pricer contract, not a calculator, and are only
+/// auditable as a set.
+fn register_model_published_metrics(
+    registry: &mut MetricRegistry,
+) -> std::result::Result<(), MetricRegistryError> {
+    // `expected_loss` is published by `StructuredCreditStochasticPricer` (deal
+    // Monte Carlo loss) and by the Merton-MC bond engine (path-simulated credit
+    // loss). CDS, CDS index, CDS tranche and revolving credit own it through
+    // real calculators and are deliberately absent here.
+    registry.register_metric(
+        MetricId::ExpectedLoss,
+        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedLoss)),
+        &[InstrumentType::StructuredCredit, InstrumentType::Bond],
+    )?;
+    // `expected_shortfall` has a universal historical-simulation owner, so it
+    // needs an instrument-specific entry to point at the value structured
+    // credit's Monte Carlo pass publishes instead.
+    registry.register_metric(
+        MetricId::ExpectedShortfall,
+        Arc::new(PricerPublishedMetric::new(MetricId::ExpectedShortfall)),
+        &[InstrumentType::StructuredCredit],
+    )?;
+    Ok(())
 }
 
 macro_rules! register_modules {
@@ -234,6 +307,17 @@ fn register_universal_metrics(
         MetricId::ThetaRollDown,
         Arc::new(ComputedMetricLookup::new(
             MetricId::ThetaRollDown,
+            MetricId::Theta,
+        )),
+        &[],
+    )?;
+    // Theta also publishes the horizon it used. It is a requestable metric ID,
+    // so it needs a lookup entry like its siblings; without one a caller asking
+    // for it by name has no registered owner.
+    registry.register_metric(
+        MetricId::ThetaPeriodDays,
+        Arc::new(ComputedMetricLookup::new(
+            MetricId::ThetaPeriodDays,
             MetricId::Theta,
         )),
         &[],

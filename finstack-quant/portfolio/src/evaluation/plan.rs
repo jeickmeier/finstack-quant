@@ -31,10 +31,28 @@ pub(crate) struct PortfolioStateId(u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct EvaluationId(u32);
 
+/// Metric plan carried by an [`EvaluationProfile`].
+///
+/// A portfolio metric list is a **menu**, not a per-position request. It is
+/// chosen once for a book whose positions have different instrument types, and
+/// the API offers no way to say "`delta` for the options, `cs01` for the
+/// credit"; a single flat list is therefore the union a caller wants *where it
+/// applies*. Each position accordingly requests the part of the menu its own
+/// instrument type has a calculator for, and the rest is recorded on
+/// [`PositionValue::inapplicable_metrics`] rather than dropped unseen.
+///
+/// Narrowing is confined to structural inapplicability. A metric an instrument
+/// type does support but fails to compute is still governed by
+/// [`RiskFailurePolicy`], and an identifier that is not a standard metric at
+/// all is rejected earlier, when the request is parsed.
+///
+/// [`PositionValue::inapplicable_metrics`]: crate::valuation::PositionValue::inapplicable_metrics
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum EvaluationMetricProfile {
+    /// No metrics at all; positions are priced for PV only.
     PvOnly,
-    Metrics(Box<[MetricId]>),
+    /// Menu offered to every position, de-duplicated and in request order.
+    Menu(Box<[MetricId]>),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -57,6 +75,15 @@ pub(crate) struct EvaluationProvenance {
 }
 
 impl EvaluationProfile {
+    /// Build the evaluation profile a caller's valuation options describe.
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - Caller valuation options. Their
+    ///   [`RequestedMetrics`] selection becomes the position metric menu
+    ///   (de-duplicated, first occurrence keeping its place), and
+    ///   [`PortfolioValuationOptions::strict_risk`] picks the risk-failure
+    ///   policy applied when a supported metric fails to compute.
     pub(crate) fn from_options(options: &PortfolioValuationOptions) -> Self {
         let metrics = match &options.metrics {
             RequestedMetrics::Standard => standard_metrics(),
@@ -68,29 +95,50 @@ impl EvaluationProfile {
             RequestedMetrics::Only(metrics) => stable_unique(metrics),
         };
 
-        Self {
-            metrics: if metrics.is_empty() {
-                EvaluationMetricProfile::PvOnly
-            } else {
-                EvaluationMetricProfile::Metrics(metrics.into_boxed_slice())
-            },
-            risk_policy: if options.strict_risk {
+        Self::new(
+            metrics,
+            if options.strict_risk {
                 RiskFailurePolicy::Strict
             } else {
                 RiskFailurePolicy::BestEffort
             },
-        }
+        )
     }
 
+    /// Strict profile offering an engine-chosen metric menu.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - Menu of metric identifiers, in engine order; duplicates
+    ///   are removed and the first occurrence keeps its place. An empty slice
+    ///   yields [`EvaluationMetricProfile::PvOnly`].
     pub(crate) fn strict_metrics(metrics: &[MetricId]) -> Self {
-        let metrics = stable_unique(metrics);
+        Self::new(stable_unique(metrics), RiskFailurePolicy::Strict)
+    }
+
+    /// Widen this profile's menu, keeping its risk policy unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - Additional menu entries, in engine order; entries already
+    ///   on the menu are ignored and the rest are appended.
+    pub(crate) fn with_metrics(self, metrics: &[MetricId]) -> Self {
+        let mut merged = match self.metrics {
+            EvaluationMetricProfile::PvOnly => Vec::new(),
+            EvaluationMetricProfile::Menu(existing) => existing.into_vec(),
+        };
+        extend_unique(&mut merged, metrics);
+        Self::new(merged, self.risk_policy)
+    }
+
+    fn new(metrics: Vec<MetricId>, risk_policy: RiskFailurePolicy) -> Self {
         Self {
             metrics: if metrics.is_empty() {
                 EvaluationMetricProfile::PvOnly
             } else {
-                EvaluationMetricProfile::Metrics(metrics.into_boxed_slice())
+                EvaluationMetricProfile::Menu(metrics.into_boxed_slice())
             },
-            risk_policy: RiskFailurePolicy::Strict,
+            risk_policy,
         }
     }
 }
@@ -404,16 +452,17 @@ fn next_id(len: usize) -> u32 {
     u32::try_from(len).unwrap_or(u32::MAX)
 }
 
-/// Risk metrics requested by [`RequestedMetrics::Standard`].
+/// Risk metrics offered by [`RequestedMetrics::Standard`].
 ///
-/// The default plan is deliberately small: PV is always produced, and the
+/// The default menu is deliberately small: PV is always produced, and the
 /// only additional standard metric is `dv01`. Every pricer that carries rate
 /// exposure supports `dv01`, so a plain book (bonds, swaps, deposits) values
-/// under `strict_risk = true` without a per-instrument opt-out. Metrics that
-/// only some pricers support (`theta`, `cs01`, Greeks, bucketed ladders) are
-/// opt-in through [`RequestedMetrics::Only`] or
-/// [`RequestedMetrics::StandardPlus`], so a request for them is always
-/// explicit and a failure is never a surprise.
+/// under `strict_risk = true` with nothing narrowed away. Metrics that only
+/// some pricers support (`theta`, `cs01`, Greeks, bucketed ladders) are opt-in
+/// through [`RequestedMetrics::Only`] or [`RequestedMetrics::StandardPlus`];
+/// like every entry on the menu they are requested per position only where the
+/// instrument type supports them, and the positions that do not are listed on
+/// [`PositionValue::inapplicable_metrics`](crate::valuation::PositionValue::inapplicable_metrics).
 pub(crate) fn standard_metrics() -> Vec<MetricId> {
     vec![MetricId::Dv01]
 }
@@ -528,7 +577,11 @@ mod tests {
         }
 
         fn key(&self) -> InstrumentType {
-            InstrumentType::Basket
+            // Bond, not Basket: the metric menu is narrowed per position to
+            // what the instrument type has calculators for, and `basket` has
+            // no `dv01`. The mock must claim a type that can produce the
+            // metrics these tests request.
+            InstrumentType::Bond
         }
 
         fn as_any(&self) -> &dyn Any {
@@ -649,10 +702,10 @@ mod tests {
             strict_risk: true,
             metrics: RequestedMetrics::Only(vec![MetricId::Dv01, MetricId::Theta, MetricId::Dv01]),
         });
-        let EvaluationMetricProfile::Metrics(metrics) = profile.metrics else {
+        let EvaluationMetricProfile::Menu(menu) = profile.metrics else {
             panic!("expected metrics profile");
         };
-        assert_eq!(metrics.as_ref(), &[MetricId::Dv01, MetricId::Theta]);
+        assert_eq!(menu.as_ref(), &[MetricId::Dv01, MetricId::Theta]);
         assert_eq!(profile.risk_policy, RiskFailurePolicy::Strict);
     }
 
@@ -807,7 +860,10 @@ mod tests {
             strict_risk: false,
             metrics: RequestedMetrics::Only(vec![MetricId::Dv01]),
         });
-        let strict = EvaluationProfile::strict_metrics(&[MetricId::Dv01]);
+        let strict = EvaluationProfile::from_options(&PortfolioValuationOptions {
+            strict_risk: true,
+            metrics: RequestedMetrics::Only(vec![MetricId::Dv01]),
+        });
         let best_effort_job = plan
             .register_evaluation(
                 market_state,
@@ -903,7 +959,10 @@ mod tests {
         let first_state = plan.register_portfolio(&first_portfolio);
         let second_state = plan.register_portfolio(&second_portfolio);
         let market_state = plan.register_market(&market, first_portfolio.as_of);
-        let profile = EvaluationProfile::strict_metrics(&[MetricId::Dv01]);
+        let profile = EvaluationProfile::from_options(&PortfolioValuationOptions {
+            strict_risk: true,
+            metrics: RequestedMetrics::Only(vec![MetricId::Dv01]),
+        });
         let first = plan
             .register_evaluation(
                 market_state,

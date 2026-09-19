@@ -84,6 +84,7 @@ pub(super) fn enrich(
                     model,
                     pricer_registry,
                 ),
+                pricer_measures: base_result.measures.clone(),
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;
@@ -117,6 +118,7 @@ pub(super) fn enrich(
                     model,
                     Arc::clone(&pricer_registry),
                 ),
+                pricer_measures: base_result.measures.clone(),
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?
@@ -141,6 +143,7 @@ pub(super) fn enrich(
                     model,
                     pricer_registry,
                 ),
+                pricer_measures: base_result.measures.clone(),
             },
         )
         .map_err(|error| PricingError::from_core(error, err_ctx.clone()))?;

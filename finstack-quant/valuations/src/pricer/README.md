@@ -218,6 +218,25 @@ Enrichment has two shapes:
 measures last, so a model-produced measure wins when both emit the same
 `MetricId`.
 
+### Requested-metric contract
+
+Every metric a caller names in `metrics` either lands in `result.measures` or
+aborts the call with an error. Nothing requested is silently absent. The metric
+registry owns the three rejections:
+
+| Condition | Error |
+| --- | --- |
+| Identifier is not registered at all | `Error::UnknownMetric` (lists near-matches) |
+| Registered, but no calculator for this instrument type | `Error::MetricNotApplicable` (names metric and instrument type) |
+| Calculator ran and failed, e.g. a missing market input | `Error::MetricCalculationFailed` (wraps the cause) |
+
+`compute_metrics_dyn` therefore forwards the requested list unfiltered. The one
+caller that legitimately tolerates partial support is `CompositeInstrument`,
+which aggregates heterogeneous legs: it narrows the list per leg itself and
+then rejects any metric no primitive supported. `measures` may still contain
+*more* than was requested — composite bucketed keys such as
+`bucketed_dv01::USD-OIS::10y` and custom calculator outputs — but never less.
+
 ## Adding an instrument
 
 The steps that touch this directory, in order:

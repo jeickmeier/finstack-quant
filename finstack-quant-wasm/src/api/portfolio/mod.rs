@@ -654,15 +654,22 @@ pub fn aggregate_metrics(
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed on unavailable requested risk metrics), matching
-///   Rust `PortfolioValuationOptions`. Pass `false` only for an intentional
-///   PV-preserving fallback.
-/// @param metrics - Optional exact risk-metric ids to compute. Omit for the
-///   standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
+///   `true` (fail closed when a requested risk metric fails to compute),
+///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
+///   intentional PV-preserving fallback.
+/// @param metrics - Optional risk-metric ids to offer every position. Omit for
+///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are
-///   validated strictly against the standard `MetricId` set — an unknown
-///   name throws. Mirrors the Python `metrics=` keyword.
+///   valuation. Names are validated strictly against the standard `MetricId`
+///   set — an unknown name throws. The list is a menu, not a
+///   per-position request: one list is chosen for a book of mixed instrument
+///   types, so each position is asked for exactly the entries its own
+///   instrument type has a calculator for, and the rest appear on that
+///   position's `inapplicable_metrics`. Narrowing covers structural
+///   inapplicability only; `strictRisk` still governs a metric an instrument
+///   type supports but fails to compute. `priceInstrument` keeps the opposite
+///   contract and throws on a metric its instrument cannot produce.
+///   Mirrors the Python `metrics=` keyword.
 ///
 /// # Errors
 ///
@@ -750,15 +757,22 @@ pub fn aggregate_full_cashflows_built(
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed on unavailable requested risk metrics), matching
-///   Rust `PortfolioValuationOptions`. Pass `false` only for an intentional
-///   PV-preserving fallback.
-/// @param metrics - Optional exact risk-metric ids to compute. Omit for the
-///   standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
+///   `true` (fail closed when a requested risk metric fails to compute),
+///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
+///   intentional PV-preserving fallback.
+/// @param metrics - Optional risk-metric ids to offer every position. Omit for
+///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are
-///   validated strictly against the standard `MetricId` set — an unknown
-///   name throws instead of silently degrading to PV-only valuation.
+///   valuation. Names are validated strictly against the standard `MetricId`
+///   set — an unknown name throws instead of silently degrading to
+///   PV-only valuation. The list is a menu, not a
+///   per-position request: one list is chosen for a book of mixed instrument
+///   types, so each position is asked for exactly the entries its own
+///   instrument type has a calculator for, and the rest appear on that
+///   position's `inapplicable_metrics`. Narrowing covers structural
+///   inapplicability only; `strictRisk` still governs a metric an instrument
+///   type supports but fails to compute. `priceInstrument` keeps the opposite
+///   contract and throws on a metric its instrument cannot produce.
 ///   Mirrors the Python `metrics=` keyword.
 ///
 /// # Errors

@@ -2013,3 +2013,129 @@ fn test_evaluate_prepared_is_isolated_from_later_evaluations() {
         "prepared evaluation must use the formulas compiled at prepare time"
     );
 }
+
+// Windowed formulas on monetary nodes
+//
+// A debt corkscrew carries the prior period's closing balance forward with
+// `lag(debt_balance, 1)`. The window/offset argument is a dimensionless
+// period count, so it must not participate in dimension unification: folding
+// it in rejected every windowed formula over a monetary node with
+// "Dimensional mismatch in lag: cannot combine scalar and USD".
+
+/// Build a two-period model holding a USD `debt_balance` node and a
+/// dimensionless `ratio` node, plus one formula node applying `formula`.
+fn window_model(
+    node_id: &str,
+    formula: &str,
+) -> finstack_quant_statements::error::Result<FinancialModelSpec> {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::Money;
+
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+
+    ModelBuilder::new("window-dimensions")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value_money(
+            "debt_balance",
+            &[
+                (q1, Money::from((1_000_i64, Currency::USD))),
+                (q2, Money::from((1_400_i64, Currency::USD))),
+            ],
+        )
+        .value_scalar("ratio", &[(q1, 0.25), (q2, 0.5)])
+        .compute(node_id, formula)
+        .unwrap()
+        .build()
+}
+
+/// Assert that `formula` builds, that its node carries `expected_type`, and
+/// that it evaluates to `expected_q2` in 2025Q2.
+fn assert_window_formula(
+    formula: &str,
+    expected_type: finstack_quant_statements::types::NodeValueType,
+    expected_q2: f64,
+) {
+    let model = window_model("windowed", formula)
+        .unwrap_or_else(|error| panic!("{formula} must build: {error}"));
+
+    assert_eq!(
+        model.get_node("windowed").expect("node exists").value_type,
+        Some(expected_type),
+        "{formula} must carry its series argument's dimension"
+    );
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator
+        .evaluate(&model)
+        .unwrap_or_else(|error| panic!("{formula} must evaluate: {error}"));
+    let actual = results
+        .get(
+            "windowed",
+            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
+        )
+        .unwrap_or_else(|| panic!("{formula} produced no 2025Q2 value"));
+    assert!(
+        (actual - expected_q2).abs() < 1e-9,
+        "{formula} expected {expected_q2} at 2025Q2, got {actual}"
+    );
+}
+
+#[test]
+fn test_windowed_functions_on_monetary_node() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_statements::types::NodeValueType;
+
+    let usd = NodeValueType::Monetary {
+        currency: Currency::USD,
+    };
+
+    // A debt corkscrew's opening balance: Q2 opens at Q1's closing balance.
+    assert_window_formula("lag(debt_balance, 1)", usd, 1_000.0);
+    assert_window_formula("shift(debt_balance, 1)", usd, 1_000.0);
+    assert_window_formula("rolling_sum(debt_balance, 2)", usd, 2_400.0);
+}
+
+#[test]
+fn test_windowed_functions_on_dimensionless_node() {
+    use finstack_quant_statements::types::NodeValueType;
+
+    assert_window_formula("lag(ratio, 1)", NodeValueType::Scalar, 0.25);
+    assert_window_formula("shift(ratio, 1)", NodeValueType::Scalar, 0.25);
+    assert_window_formula("rolling_sum(ratio, 2)", NodeValueType::Scalar, 0.75);
+}
+
+/// The dimension rule must not widen into a hole: `clamp` and `coalesce`
+/// carry genuine quantities in every argument position, so mixing currencies
+/// through them is still rejected at build time.
+#[test]
+fn test_value_variadic_functions_reject_currency_mismatch() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::money::Money;
+
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+
+    for formula in [
+        "clamp(usd_amount, eur_amount, usd_amount)",
+        "coalesce(lag(usd_amount, 1), eur_amount)",
+    ] {
+        let result = ModelBuilder::new("mixed-currency")
+            .periods("2025Q1..Q1", None)
+            .unwrap()
+            .value_money("usd_amount", &[(q1, Money::from((100_i64, Currency::USD)))])
+            .value_money("eur_amount", &[(q1, Money::from((40_i64, Currency::EUR)))])
+            .compute("mixed", formula)
+            .unwrap()
+            .build();
+
+        let error = result
+            .err()
+            .unwrap_or_else(|| panic!("{formula} mixes currencies and must be rejected"))
+            .to_string();
+        assert!(
+            error.contains("Dimensional mismatch"),
+            "{formula} must fail with a dimension error, got: {error}"
+        );
+    }
+}

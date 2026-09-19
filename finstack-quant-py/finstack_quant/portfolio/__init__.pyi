@@ -899,12 +899,17 @@ class PositionValue:
     @property
     def risk_metrics_complete(self) -> bool:
         """
-        Whether every requested risk metric was computed for this position.
+        Whether every risk metric requested of this position was computed.
+
+        A portfolio metric list is a menu offered to a heterogeneous book, so
+        metrics this position's instrument type has no calculator for are
+        never requested of it and do not clear this flag; they are listed on
+        :attr:`inapplicable_metrics` instead.
 
         Returns
         -------
         bool
-            ``True`` when no metric fell back to PV-only valuation.
+            ``True`` when no requested metric fell back to PV-only valuation.
 
         Notes
         -----
@@ -925,6 +930,38 @@ class PositionValue:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def inapplicable_metrics(self) -> list[str]:
+        """
+        Requested metrics this position's instrument type cannot produce.
+
+        :func:`value_portfolio` offers one metric list to a book of mixed
+        instrument types, so each position is asked only for the entries it
+        has a calculator for. This reports the remainder, making that
+        narrowing visible. It is not a failure list: nothing here could have
+        been computed and was not, so unlike
+        :attr:`PortfolioValuation.degraded_positions` it does not mean a
+        portfolio total is understated.
+
+        Returns
+        -------
+        list[str]
+            Metric identifiers, in request order. Empty when the position
+            supports every requested metric.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import PositionValue
+        >>> doc = '{"position_id":"p1","entity_id":"e1","value_native":{"amount":"1","currency":"USD"},"value_base":{"amount":"1","currency":"USD"},"metric_scale":1.0,"risk_metrics_complete":true,"inapplicable_metrics":["delta"]}'
+        >>> PositionValue.from_json(doc).inapplicable_metrics
+        ['delta']
         """
         ...
 
@@ -3714,10 +3751,23 @@ def value_portfolio(
         standard-metric risk run fails closed. Set ``False`` only for an
         intentional PV-preserving fallback.
     metrics : list[str] or None, default None
-        Exact metric identifiers to compute. ``None`` requests the standard
-        portfolio risk set; an empty list performs PV-only valuation. Names
-        are validated strictly against the standard ``MetricId`` set; an
-        unknown name raises ``ValueError`` listing the available metrics.
+        Metric identifiers to offer every position. ``None`` requests the
+        standard portfolio risk set; an empty list performs PV-only
+        valuation. Names are validated strictly against the standard
+        ``MetricId`` set; an unknown name raises ``ValueError`` listing the
+        available metrics.
+
+        The list is a *menu*, not a per-position request: one list is chosen
+        for a book of mixed instrument types, so each position is asked for
+        exactly the entries its own instrument type has a calculator for, and
+        the rest are reported on
+        :attr:`PositionValue.inapplicable_metrics`. Narrowing covers
+        structural inapplicability only — a metric an instrument type does
+        support but fails to compute is still governed by ``strict_risk``.
+        Pricing one instrument directly with
+        :func:`finstack_quant.valuations.instruments.price_instrument` keeps
+        the opposite contract and rejects a metric that instrument cannot
+        produce.
 
     Returns
     -------

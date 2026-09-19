@@ -228,7 +228,13 @@ fn metrics_based_explains_convertible_credit_spread_move() {
     let market_t0 = market(150.0);
     let market_t1 = market(300.0);
 
-    let metrics = AttributionMethod::MetricsBased.required_metrics();
+    // `required_metrics()` is the engine's cross-instrument menu, not a
+    // request, so narrow it to what a convertible actually supports, exactly
+    // as the execution path does.
+    let metrics = finstack_quant_valuations::metrics::standard_registry().applicable_subset(
+        &AttributionMethod::MetricsBased.required_metrics(),
+        conv.key(),
+    );
     let opts = finstack_quant_valuations::instruments::PricingOptions::default();
     let val_t0 = conv
         .price_with_metrics(&market_t0, t0(), &metrics, opts.clone())

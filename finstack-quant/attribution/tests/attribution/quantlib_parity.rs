@@ -391,12 +391,10 @@ fn quantlib_parity_metrics_based_irs_attribution() {
     let market_t0 = irs_market(t0, fixture.scenario.rate_t0);
     let market_t1 = irs_market(t1, fixture.scenario.rate_t1);
 
-    let metrics = [
-        MetricId::Theta,
-        MetricId::Dv01,
-        MetricId::BucketedDv01,
-        MetricId::Convexity,
-    ];
+    // `convexity` has no calculator for `interest_rate_swap`; it was silently
+    // dropped before the requested-metric contract became strict, so nothing
+    // here ever read it.
+    let metrics = [MetricId::Theta, MetricId::Dv01, MetricId::BucketedDv01];
     let val_t0 = instrument
         .price_with_metrics(&market_t0, t0, &metrics, PricingOptions::default())
         .expect("price_with_metrics t0");
@@ -605,11 +603,12 @@ fn quantlib_parity_metrics_based_fx_forward_attribution() {
     // construction, USD and EUR DV01s cancel), so the aggregate fallback
     // cannot attribute a single-curve move — the per-curve key-rate series
     // pairs each curve's DV01 with its own realized shift.
+    // `delta` has no calculator for `fx_forward`; it was silently dropped
+    // before the requested-metric contract became strict.
     let metrics = [
         MetricId::Theta,
         MetricId::Dv01,
         MetricId::BucketedDv01,
-        MetricId::Delta,
         MetricId::Fx01,
     ];
     let val_t0 = instrument

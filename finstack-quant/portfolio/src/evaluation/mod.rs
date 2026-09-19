@@ -12,7 +12,8 @@ mod state;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use executor::POSITION_PARALLEL_MIN_POSITIONS;
 pub(crate) use executor::{
-    evaluate_raw_portfolio, PositionExecution, RawEvaluationInput, RawSelectiveSeed,
+    evaluate_raw_portfolio, supported_metrics, PositionExecution, RawEvaluationInput,
+    RawSelectiveSeed,
 };
 pub(crate) use plan::{
     EvaluationMetricProfile, EvaluationProfile, EvaluationProvenance, PortfolioEvaluationPlan,

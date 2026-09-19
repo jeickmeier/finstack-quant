@@ -246,20 +246,29 @@ pub struct ReplayResult {
 use crate::portfolio::Portfolio;
 use finstack_quant_core::config::FinstackConfig;
 
+/// Phase-A valuation profile, widened so its results can also serve as the
+/// metrics-based attribution endpoints.
+///
+/// The attribution metrics widen the menu rather than replacing it, so each
+/// position still requests the part its own instrument type supports.
+/// [`RequestedMetrics::Only`] is left alone — it means "these and no others",
+/// so such a run keeps evaluating the attribution endpoints separately rather
+/// than returning measures the caller excluded.
+///
+/// # Arguments
+///
+/// * `config` - Replay configuration supplying the caller's valuation options,
+///   which decide the caller-named metrics and the risk-failure policy.
+/// * `metrics_attribution` - Whether this run performs metrics-based
+///   attribution and therefore wants the attribution metrics on the menu.
 fn replay_phase_profile(config: &ReplayConfig, metrics_attribution: bool) -> EvaluationProfile {
-    let mut options = config.valuation_options.clone();
-    if metrics_attribution {
-        match &mut options.metrics {
-            RequestedMetrics::Standard => {
-                options.metrics = RequestedMetrics::StandardPlus(default_attribution_metrics());
-            }
-            RequestedMetrics::StandardPlus(extra) => {
-                extra.extend(default_attribution_metrics());
-            }
-            RequestedMetrics::Only(_) => {}
-        }
+    let profile = EvaluationProfile::from_options(&config.valuation_options);
+    if metrics_attribution && !matches!(config.valuation_options.metrics, RequestedMetrics::Only(_))
+    {
+        profile.with_metrics(&default_attribution_metrics())
+    } else {
+        profile
     }
-    EvaluationProfile::from_options(&options)
 }
 
 fn phase_a_results(
@@ -353,10 +362,11 @@ fn valuation_matches_endpoint_profile(
             return false;
         }
         match (&provenance.profile.metrics, &profile.metrics) {
-            (
-                EvaluationMetricProfile::Metrics(actual),
-                EvaluationMetricProfile::Metrics(required),
-            ) => required.iter().all(|metric| actual.contains(metric)),
+            (EvaluationMetricProfile::Menu(actual), EvaluationMetricProfile::Menu(needed)) => {
+                // Both menus are narrowed per position by the same filter, so
+                // a menu superset yields a per-position superset as well.
+                needed.iter().all(|metric| actual.contains(metric))
+            }
             _ => false,
         }
     })

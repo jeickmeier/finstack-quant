@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 
 import pytest
@@ -16,6 +17,9 @@ from finstack_quant.valuations.instruments import (
     structured_credit_tranche_scenario_table,
     validate_instrument_json,
 )
+from tests.golden.conftest import fixture_path
+from tests.golden.pricing_validation import validated_instrument_json
+from tests.golden.runners.pricing_common import _resolve_market
 
 
 def _money(amount: str) -> dict[str, str]:
@@ -650,3 +654,58 @@ def test_structured_credit_waterfall_rules_prices_through_json() -> None:
         "structured_credit_stochastic",
     )
     assert result.price > 0
+
+
+# --- Requested-metric contract -------------------------------------------
+#
+# A metric named in `metrics` either appears in the result or raises; it is
+# never silently absent. `MetricNotApplicable` is a validation-class core error,
+# so `core_to_py` maps it to `ValueError`, matching the documented contract in
+# the `price_instrument` docstring and `.pyi` stub.
+
+_TERM_LOAN_GOLDEN = "pricing/regression_goldens/term_loan/term_loan_b_5y_floating.json"
+_FX_FORWARD_GOLDEN = "pricing/quantlib/fx_forward/eurusd_1y_forward_quantlib.json"
+
+
+def _golden_pricing_call(golden: str, metrics: list[str]) -> Callable[[], object]:
+    body = json.loads(fixture_path(golden).read_text(encoding="utf-8"))
+    return lambda: price_instrument(
+        validated_instrument_json(body["instrument"]),
+        _resolve_market(body["market"]),
+        body["metadata"]["valuation_date"],
+        model=body["model"],
+        metrics=metrics,
+    )
+
+
+@pytest.mark.parametrize(
+    ("golden", "instrument_type", "metric"),
+    [
+        (_TERM_LOAN_GOLDEN, "term_loan", "duration_mod"),
+        (_TERM_LOAN_GOLDEN, "term_loan", "accrued"),
+        (_TERM_LOAN_GOLDEN, "term_loan", "clean_price"),
+        (_FX_FORWARD_GOLDEN, "fx_forward", "spot_rate"),
+        (_FX_FORWARD_GOLDEN, "fx_forward", "base_amount"),
+    ],
+)
+def test_unsupported_requested_metric_raises_rather_than_returning_nothing(
+    golden: str, instrument_type: str, metric: str
+) -> None:
+    with pytest.raises(ValueError, match="is not applicable to instrument type") as excinfo:
+        _golden_pricing_call(golden, [metric])()
+    message = str(excinfo.value)
+    assert metric in message, message
+    assert instrument_type in message, message
+
+
+@pytest.mark.parametrize(
+    ("golden", "metrics"),
+    [
+        (_TERM_LOAN_GOLDEN, ["ytm", "dv01", "discount_margin"]),
+        (_FX_FORWARD_GOLDEN, ["dv01", "fx01"]),
+    ],
+)
+def test_supported_requested_metrics_are_still_returned(golden: str, metrics: list[str]) -> None:
+    result = _golden_pricing_call(golden, metrics)()
+    for metric in metrics:
+        assert metric in result.metric_keys(), metric

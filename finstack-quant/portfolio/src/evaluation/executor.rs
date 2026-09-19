@@ -12,7 +12,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::PricingOptions;
+use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
 use indexmap::IndexMap;
 
@@ -289,12 +290,22 @@ fn collect_in_logical_order<T>(results: Vec<Result<T>>) -> Result<Vec<T>> {
 ///   failed): `risk_metrics_complete = true` — nothing risk-related is
 ///   missing — but `risk_error = Some(..)` records the canonical pricing
 ///   failure so the switch of pricing path is auditable.
+///
+/// Neither covers the profile's metric menu being narrowed to what this
+/// position's instrument type supports. That is structural, not a failure, and
+/// is reported on
+/// [`PositionValue::inapplicable_metrics`](crate::valuation::PositionValue::inapplicable_metrics).
 fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<PositionValue> {
-    let (valuation_result, risk_metrics_complete, risk_error) = match &input.profile.metrics {
-        EvaluationMetricProfile::PvOnly => match position.instrument.price_with_metrics(
+    let PositionMetricRequest {
+        requested,
+        inapplicable_metrics,
+    } = requested_metrics(input, position);
+    let metrics_requested = !requested.is_empty();
+    let (valuation_result, risk_metrics_complete, risk_error) =
+        match position.instrument.price_with_metrics(
             input.market,
             input.as_of,
-            &[],
+            &requested,
             input.pricing_options.clone(),
         ) {
             Ok(result) => (result, true, None),
@@ -305,22 +316,26 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                 });
             }
             Err(pricing_error) => {
+                let failed_path = if metrics_requested {
+                    "metric pricing"
+                } else {
+                    "canonical pricing"
+                };
                 let value = position
                     .instrument
                     .value(input.market, input.as_of)
                     .map_err(|error| Error::ValuationError {
                         position_id: position.position_id.clone(),
                         message: format!(
-                            "instrument '{}' failed PV-only fallback ({error}) after canonical \
-                             pricing also failed ({pricing_error})",
+                            "instrument '{}' failed PV-only fallback ({error}) after \
+                         {failed_path} also failed ({pricing_error})",
                             position.instrument.id()
                         ),
                     })?;
-                // No metrics were requested, so nothing risk-related is
-                // missing and the position is not degraded. The position did,
-                // however, silently switch pricing paths: record the
-                // canonical pricing failure so the fallback is auditable
-                // rather than invisible.
+                // When metrics were requested, the position is degraded: something
+                // risk-related is missing. When none were, nothing risk-related is
+                // missing, but the position did silently switch pricing paths, so
+                // the canonical failure is recorded to keep the switch auditable.
                 (
                     ValuationResult::stamped_with_config(
                         position.instrument.id(),
@@ -328,65 +343,11 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                         value,
                         input.config,
                     ),
-                    true,
+                    !metrics_requested,
                     Some(pricing_error.to_string()),
                 )
             }
-        },
-        EvaluationMetricProfile::Metrics(metrics)
-            if input.profile.risk_policy == RiskFailurePolicy::Strict =>
-        {
-            (
-                position
-                    .instrument
-                    .price_with_metrics(
-                        input.market,
-                        input.as_of,
-                        metrics,
-                        input.pricing_options.clone(),
-                    )
-                    .map_err(|error| Error::ValuationError {
-                        position_id: position.position_id.clone(),
-                        message: error.to_string(),
-                    })?,
-                true,
-                None,
-            )
-        }
-        EvaluationMetricProfile::Metrics(metrics) => {
-            match position.instrument.price_with_metrics(
-                input.market,
-                input.as_of,
-                metrics,
-                input.pricing_options.clone(),
-            ) {
-                Ok(result) => (result, true, None),
-                Err(metric_error) => {
-                    let value = position
-                        .instrument
-                        .value(input.market, input.as_of)
-                        .map_err(|error| Error::ValuationError {
-                            position_id: position.position_id.clone(),
-                            message: format!(
-                                "instrument '{}' failed PV-only fallback ({error}) after \
-                                 metric pricing also failed ({metric_error})",
-                                position.instrument.id()
-                            ),
-                        })?;
-                    (
-                        ValuationResult::stamped_with_config(
-                            position.instrument.id(),
-                            input.as_of,
-                            value,
-                            input.config,
-                        ),
-                        false,
-                        Some(metric_error.to_string()),
-                    )
-                }
-            }
-        }
-    };
+        };
 
     let value_native = position.scale_value(valuation_result.value)?;
     let value_base = collapse_to_base(input, value_native)?;
@@ -399,8 +360,85 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
         metric_scale: position.scale_factor(),
         risk_metrics_complete,
         risk_error,
+        inapplicable_metrics,
         valuation_result: Some(valuation_result),
     })
+}
+
+/// One position's share of an [`EvaluationProfile`]'s metric menu.
+struct PositionMetricRequest {
+    /// Menu entries this position's instrument type supports, in menu order.
+    requested: Vec<MetricId>,
+    /// Menu entries it does not support, in menu order. Surfaced on
+    /// [`PositionValue::inapplicable_metrics`] so the narrowing is reported
+    /// rather than silent.
+    inapplicable_metrics: Vec<MetricId>,
+}
+
+/// Split an evaluation profile's metric menu for one position.
+///
+/// A portfolio metric list spans a heterogeneous book, so it is a menu: each
+/// position asks for the part its own instrument type has a calculator for.
+/// Narrowing portfolio-wide instead would drop metrics that other positions do
+/// support, and requesting the whole menu from every position would fail the
+/// valuation on the first instrument type that lacks one.
+///
+/// # Arguments
+///
+/// * `input` - Evaluation input supplying the profile whose metric menu is
+///   split and the pricing options whose `metric_registry` (or the shared
+///   standard registry when absent) decides applicability.
+/// * `position` - Position whose instrument type decides the split; only its
+///   instrument's [`Instrument::key`] is consulted.
+///
+/// # Returns
+///
+/// The supported and unsupported halves of the menu, both in menu order. A
+/// [`EvaluationMetricProfile::PvOnly`] profile yields two empty lists.
+fn requested_metrics(input: &EvaluationInput<'_>, position: &Position) -> PositionMetricRequest {
+    let EvaluationMetricProfile::Menu(menu) = &input.profile.metrics else {
+        return PositionMetricRequest {
+            requested: Vec::new(),
+            inapplicable_metrics: Vec::new(),
+        };
+    };
+    let requested = supported_metrics(position.instrument.as_ref(), menu, input.pricing_options);
+    let inapplicable_metrics = menu
+        .iter()
+        .filter(|metric| !requested.contains(metric))
+        .cloned()
+        .collect();
+    PositionMetricRequest {
+        requested,
+        inapplicable_metrics,
+    }
+}
+
+/// Narrow a metric menu to the entries one instrument supports.
+///
+/// Pricing rejects any requested metric that has no calculator for the
+/// instrument type, which is correct for a list chosen against one instrument
+/// and wrong for a cross-instrument menu. Callers holding such a menu narrow
+/// here, so dropping the rest is a visible decision at the call site.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument whose registered metric calculators decide the
+///   subset; only its [`Instrument::key`] instrument type is consulted.
+/// * `menu` - Candidate identifiers, in menu order; the returned subset
+///   preserves that order.
+/// * `options` - Pricing options whose `metric_registry`, when present,
+///   decides applicability; otherwise the shared standard registry is used.
+pub(crate) fn supported_metrics(
+    instrument: &dyn Instrument,
+    menu: &[MetricId],
+    options: &PricingOptions,
+) -> Vec<MetricId> {
+    let registry = match options.metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => finstack_quant_valuations::metrics::standard_registry(),
+    };
+    registry.applicable_subset(menu, instrument.key())
 }
 
 fn raw_position_endpoint(

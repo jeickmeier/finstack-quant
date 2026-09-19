@@ -642,7 +642,7 @@ impl Instrument for DependencyProbeInstrument {
     }
 
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        InstrumentType::Bond
     }
 
     fn as_any(&self) -> &dyn Any {

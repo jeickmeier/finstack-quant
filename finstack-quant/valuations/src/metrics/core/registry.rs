@@ -216,6 +216,40 @@ impl MetricRegistry {
             .unwrap_or(false)
     }
 
+    /// Narrow a candidate metric list to the entries this registry can produce
+    /// for one instrument type.
+    ///
+    /// [`Self::compute`] is strict: it rejects anything requested that has no
+    /// calculator for the instrument. That is the right behavior for a
+    /// caller-chosen list, but an engine that evaluates a fixed *superset*
+    /// against heterogeneous instruments — a composite's legs, a standard Greek
+    /// set, an attribution menu — wants the supported part of that superset
+    /// instead. Such callers narrow here, so dropping the rest is a visible
+    /// decision at the call site rather than a silent filter inside pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_ids` - Candidate identifiers, in caller order; the returned
+    ///   subset preserves that order and keeps duplicates as given.
+    /// * `instrument_type` - Instrument type whose registered calculators
+    ///   decide which candidates survive.
+    ///
+    /// # Returns
+    ///
+    /// The candidates for which [`Self::is_applicable`] holds. An empty result
+    /// means this registry can produce none of them for `instrument_type`.
+    pub fn applicable_subset(
+        &self,
+        metric_ids: &[MetricId],
+        instrument_type: InstrumentType,
+    ) -> Vec<MetricId> {
+        metric_ids
+            .iter()
+            .filter(|metric_id| self.is_applicable(metric_id, instrument_type))
+            .cloned()
+            .collect()
+    }
+
     /// Gets registered metrics organized by [`super::ids::MetricGroup`].
     ///
     /// Returns only groups that have at least one registered metric. Within
@@ -247,14 +281,23 @@ impl MetricRegistry {
     /// and strict error handling. Metrics are computed in the correct order based
     /// on their dependencies, and results are cached in the context.
     ///
-    /// **This method defaults to strict mode** (breaking change from v0.7.0).
-    /// Any missing metric, non-applicable metric, or calculation failure will
-    /// immediately return an error. For lenient behavior, handle errors
-    /// explicitly or use `Instrument::price_with_metrics`.
+    /// **This method is strict.** Unregistered and non-applicable requests are
+    /// rejected up front, before any calculator runs, so the reported failure
+    /// does not depend on dependency ordering; a calculator that then fails
+    /// aborts the call as well. The returned map therefore holds a value for
+    /// every requested identifier or the call returns an error — a requested
+    /// metric is never silently omitted. Callers that legitimately tolerate
+    /// partial support across heterogeneous instruments must narrow
+    /// `metric_ids` themselves, for example with [`Self::is_applicable`].
     ///
     /// # Arguments
-    /// * `metric_ids` - Vector of metric IDs to compute
-    /// * `context` - Metric context containing instrument and market data
+    /// * `metric_ids` - Metric identifiers to compute, in caller order. Every
+    ///   entry must be registered and have a calculator for the context's
+    ///   instrument type, unless the context already carries a value a pricer
+    ///   seeded for it. The first entry failing that test decides the error.
+    /// * `context` - Metric context containing instrument and market data.
+    ///   Its `computed` map both satisfies already-seeded requests and receives
+    ///   every value produced here, including intermediate dependencies.
     ///
     /// # Returns
     /// HashMap mapping metric IDs to computed values.
@@ -292,35 +335,23 @@ impl MetricRegistry {
         .entered();
 
         let instrument_type = context.instrument.key();
+        self.reject_unsupported(metric_ids, instrument_type, context)?;
         let order = self.resolve_dependencies(metric_ids, instrument_type, context)?;
 
-        // Compute metrics in dependency order (consume order to avoid cloning MetricId)
+        // Compute metrics in dependency order (consume order to avoid cloning
+        // MetricId). Requested identifiers were already accepted above; entries
+        // reached here without a calculator are dependencies pulled in by the
+        // topological sort, which are skipped rather than rejected.
         for metric_id in order.into_iter() {
             if context.computed.contains_key(&metric_id) {
                 continue;
             }
 
-            let Some(entry) = self.entries.get(&metric_id) else {
-                if metric_ids.contains(&metric_id) {
-                    return Err(finstack_quant_core::Error::unknown_metric(
-                        metric_id.as_str(),
-                        super::ids::closest_metric_names(
-                            metric_id.as_str(),
-                            self.available_metrics().iter().map(MetricId::as_str),
-                            super::ids::MAX_METRIC_SUGGESTIONS,
-                        ),
-                    ));
-                }
-                continue;
-            };
-
-            let Some(calc) = entry.get_for(instrument_type) else {
-                if metric_ids.contains(&metric_id) {
-                    return Err(finstack_quant_core::Error::metric_not_applicable(
-                        metric_id.as_str(),
-                        instrument_type.to_string(),
-                    ));
-                }
+            let Some(calc) = self
+                .entries
+                .get(&metric_id)
+                .and_then(|entry| entry.get_for(instrument_type))
+            else {
                 continue;
             };
 
@@ -346,6 +377,63 @@ impl MetricRegistry {
         }
 
         Ok(results)
+    }
+
+    /// Reject requested metrics this registry cannot produce for the
+    /// instrument, before any calculator runs.
+    ///
+    /// Running this ahead of computation keeps the reported failure
+    /// deterministic: an unsupported request is reported as such rather than
+    /// being masked by whichever other requested metric happened to be
+    /// evaluated first in dependency order.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_ids` - Metric identifiers the caller explicitly requested, in
+    ///   caller order; the first unsupported entry in that order decides the
+    ///   error. Dependencies pulled in later are not checked here, because a
+    ///   calculator may declare optional dependencies it tolerates missing.
+    /// * `instrument_type` - Instrument type whose registered calculators
+    ///   decide applicability; it also appears verbatim in the error message.
+    /// * `context` - Metric context whose `computed` map is consulted first: a
+    ///   value a pricer already seeded satisfies the request on its own and
+    ///   needs no registered calculator.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::UnknownMetric`, carrying the closest registered names,
+    /// when an identifier has no entry at all, and
+    /// `Error::MetricNotApplicable`, naming both the metric and
+    /// `instrument_type`, when an entry exists but exposes no calculator for
+    /// this instrument type.
+    fn reject_unsupported(
+        &self,
+        metric_ids: &[MetricId],
+        instrument_type: InstrumentType,
+        context: &MetricContext,
+    ) -> finstack_quant_core::Result<()> {
+        for metric_id in metric_ids {
+            if context.computed.contains_key(metric_id) {
+                continue;
+            }
+            let Some(entry) = self.entries.get(metric_id) else {
+                return Err(finstack_quant_core::Error::unknown_metric(
+                    metric_id.as_str(),
+                    super::ids::closest_metric_names(
+                        metric_id.as_str(),
+                        self.available_metrics().iter().map(MetricId::as_str),
+                        super::ids::MAX_METRIC_SUGGESTIONS,
+                    ),
+                ));
+            };
+            if !entry.applies_to(instrument_type) {
+                return Err(finstack_quant_core::Error::metric_not_applicable(
+                    metric_id.as_str(),
+                    instrument_type.to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Resolves dependencies and returns computation order.

@@ -6,7 +6,9 @@
 use crate::error::{Error, Result};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
-use crate::evaluation::{EvaluationProfile, PortfolioEvaluationPlan, PositionExecution};
+use crate::evaluation::{
+    supported_metrics, EvaluationProfile, PortfolioEvaluationPlan, PositionExecution,
+};
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use crate::valuation::{
@@ -395,8 +397,16 @@ fn attribute_composite_primitives(
         let value_t0 = instrument.value(market_t0, as_of_t0).map_err(Error::Core)?;
         let value_t1 = instrument.value(market_t1, as_of_t1).map_err(Error::Core)?;
         let mut primitive = if matches!(method, AttributionMethod::MetricsBased) {
-            let metrics = default_attribution_metrics();
             let options = PricingOptions::default().with_config(config);
+            // The attribution metric list is a cross-instrument menu: narrow
+            // it to what this primitive's own instrument type supports so an
+            // unsupported entry is dropped here rather than failing the whole
+            // composite.
+            let metrics = supported_metrics(
+                instrument.as_ref(),
+                &default_attribution_metrics(),
+                &options,
+            );
             let result_t0 = instrument
                 .price_with_metrics(market_t0, as_of_t0, &metrics, options.clone())
                 .map_err(|error| Error::Core(error.into()))?;
@@ -582,6 +592,10 @@ fn add_primitive_attribution(
 }
 
 /// Exact canonical evaluation profile required by an attribution method.
+///
+/// `MetricsBased` needs a cross-instrument menu of sensitivities, so each
+/// position requests the part its own instrument type supports. Every other
+/// method reprices directly and needs PV alone.
 pub(crate) fn attribution_endpoint_profile(method: &AttributionMethod) -> EvaluationProfile {
     if matches!(method, AttributionMethod::MetricsBased) {
         EvaluationProfile::strict_metrics(&default_attribution_metrics())

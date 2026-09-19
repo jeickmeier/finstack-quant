@@ -1143,6 +1143,7 @@ mod tests {
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,
+            inapplicable_metrics: Vec::new(),
             valuation_result: None,
         };
         let mut position_values = IndexMap::new();

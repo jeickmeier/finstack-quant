@@ -59,7 +59,7 @@ impl Instrument for FixedMetricInstrument {
     }
 
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        InstrumentType::Bond
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -130,7 +130,7 @@ impl Instrument for MetricFailingInstrument {
     }
 
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        InstrumentType::Bond
     }
 
     fn as_any(&self) -> &dyn Any {

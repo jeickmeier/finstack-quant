@@ -28,6 +28,35 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+/// Narrow a composite's requested metric list to the subset one leg supports.
+///
+/// Pricing a single instrument rejects any requested metric that has no
+/// calculator for that instrument type. A composite aggregates heterogeneous
+/// legs and only requires that *some* primitive support each requested metric,
+/// so it selects the per-leg subset explicitly here rather than relying on the
+/// single-instrument path to drop the rest. Metrics unsupported by every
+/// primitive are still rejected, by the caller's own coverage check.
+///
+/// # Arguments
+///
+/// * `instrument` - Composite leg whose registered metric calculators decide
+///   the subset; only its [`Instrument::key`] instrument type is consulted.
+/// * `metrics` - Metric identifiers requested for the composite as a whole, in
+///   caller order; the returned subset preserves that order.
+/// * `options` - Pricing options whose `metric_registry`, when present, decides
+///   applicability; otherwise the shared standard registry is used.
+fn metrics_supported_by_leg(
+    instrument: &dyn Instrument,
+    metrics: &[MetricId],
+    options: &PricingOptions,
+) -> Vec<MetricId> {
+    let registry = match options.metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => crate::metrics::standard_registry(),
+    };
+    registry.applicable_subset(metrics, instrument.key())
+}
+
 /// Runtime cache of boxed composite legs. Not serialized.
 #[derive(Default)]
 pub(super) struct BoxedLegCache(OnceLock<Vec<Box<dyn Instrument>>>);
@@ -331,8 +360,14 @@ impl CompositeInstrument {
                 Some(cached) => cached.clone(),
                 None => {
                     let instrument = instrument_json.clone().into_boxed()?;
-                    let priced =
-                        instrument.price_with_metrics(market, as_of, metrics, options.clone())?;
+                    let leg_metrics =
+                        metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
+                    let priced = instrument.price_with_metrics(
+                        market,
+                        as_of,
+                        &leg_metrics,
+                        options.clone(),
+                    )?;
                     price_cache.insert(cache_key, priced.clone());
                     priced
                 }
@@ -422,8 +457,9 @@ impl CompositeInstrument {
             .zip(&self.spec.legs)
             .zip(&self.state.resolved_legs)
             .map(|((instrument, leg), resolved)| {
+                let leg_metrics = metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
                 let valuation =
-                    instrument.price_with_metrics(market, as_of, metrics, options.clone())?;
+                    instrument.price_with_metrics(market, as_of, &leg_metrics, options.clone())?;
                 let native_value = Money::new(
                     valuation.value.amount() * resolved.quantity,
                     valuation.value.currency(),

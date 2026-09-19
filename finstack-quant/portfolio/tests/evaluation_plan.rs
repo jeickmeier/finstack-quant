@@ -39,6 +39,7 @@ struct Probe {
 struct ProbedInstrument {
     id: String,
     attributes: Attributes,
+    instrument_type: InstrumentType,
     value: f64,
     fail_base: bool,
     fail_metrics: bool,
@@ -64,7 +65,7 @@ impl Instrument for ProbedInstrument {
     }
 
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        self.instrument_type
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -168,6 +169,10 @@ fn build_probed_portfolio(
         let instrument: Arc<dyn Instrument> = Arc::new(ProbedInstrument {
             id: instrument_id.clone(),
             attributes: Attributes::new(),
+            // `bond` has calculators for the metrics these tests request; the
+            // menu is narrowed per position to the instrument type's own
+            // registered metrics.
+            instrument_type: InstrumentType::Bond,
             value: (index + 1) as f64,
             fail_base: fail_base_indices.contains(&index),
             fail_metrics,
@@ -188,6 +193,99 @@ fn build_probed_portfolio(
     }
 
     (builder.build().expect("valid probed portfolio"), probes)
+}
+
+/// Two positions of different instrument types, so a single portfolio metric
+/// list covers each of them only in part.
+///
+/// `bond` has a `dv01` calculator; `basket` has none, but both inherit the
+/// universally registered `theta`.
+fn build_mixed_type_portfolio() -> (Portfolio, Probe, Probe) {
+    let mut builder = PortfolioBuilder::new("EVALUATION_MIXED")
+        .base_currency(Currency::USD)
+        .as_of(date!(2024 - 01 - 01))
+        .entity(Entity::new("ENTITY"));
+    let mut probes = Vec::with_capacity(2);
+
+    for (index, instrument_type) in [InstrumentType::Bond, InstrumentType::Basket]
+        .into_iter()
+        .enumerate()
+    {
+        let probe = Probe::default();
+        let instrument_id = format!("INSTRUMENT_{index:04}");
+        let instrument: Arc<dyn Instrument> = Arc::new(ProbedInstrument {
+            id: instrument_id.clone(),
+            attributes: Attributes::new(),
+            instrument_type,
+            value: (index + 1) as f64,
+            fail_base: false,
+            fail_metrics: false,
+            probe: probe.clone(),
+        });
+        builder = builder.position(
+            Position::new(
+                format!("POSITION_{index:04}"),
+                "ENTITY",
+                instrument_id,
+                instrument,
+                1.0,
+                PositionUnit::Units,
+            )
+            .expect("valid probed position"),
+        );
+        probes.push(probe);
+    }
+
+    let mut probes = probes.into_iter();
+    (
+        builder.build().expect("valid probed portfolio"),
+        probes.next().expect("bond probe"),
+        probes.next().expect("basket probe"),
+    )
+}
+
+/// A portfolio metric list is a menu: each position is asked for the part its
+/// own instrument type supports, and the remainder is reported rather than
+/// dropped unseen. Without this a mixed book could not be valued under any
+/// risk list broader than the metrics every instrument type happens to share.
+#[test]
+fn a_metric_list_is_narrowed_per_position_and_the_narrowing_is_reported() {
+    let (portfolio, bond_probe, basket_probe) = build_mixed_type_portfolio();
+    let market = MarketContext::new();
+    let config = FinstackConfig::default();
+
+    let valuation = value_portfolio(
+        &portfolio,
+        &market,
+        &config,
+        &PortfolioValuationOptions {
+            strict_risk: true,
+            metrics: RequestedMetrics::Only(vec![MetricId::Dv01, MetricId::Theta]),
+        },
+    )
+    .expect("a mixed book values under a metric list no single position supports");
+
+    assert_eq!(
+        bond_probe.observed_metrics.lock().expect("probe lock")[0],
+        vec![MetricId::Dv01, MetricId::Theta]
+    );
+    assert_eq!(
+        basket_probe.observed_metrics.lock().expect("probe lock")[0],
+        vec![MetricId::Theta],
+        "basket has no dv01 calculator, so dv01 is never requested of it"
+    );
+
+    let bond = &valuation.position_values["POSITION_0000"];
+    assert!(bond.inapplicable_metrics.is_empty());
+    assert!(bond.risk_metrics_complete);
+
+    let basket = &valuation.position_values["POSITION_0001"];
+    assert_eq!(basket.inapplicable_metrics, vec![MetricId::Dv01]);
+    assert!(
+        basket.risk_metrics_complete,
+        "structural narrowing is not a risk failure"
+    );
+    assert!(valuation.degraded_positions.is_empty());
 }
 
 fn pv_only_options() -> PortfolioValuationOptions {

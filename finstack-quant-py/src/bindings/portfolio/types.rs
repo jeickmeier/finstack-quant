@@ -565,7 +565,10 @@ impl PyPositionValue {
         self.inner.metric_scale
     }
 
-    /// Whether every requested risk metric was computed for this position.
+    /// Whether every risk metric requested *of this position* was computed.
+    ///
+    /// Metrics narrowed away as inapplicable were never requested, so they do
+    /// not clear this flag; see ``inapplicable_metrics``.
     #[getter]
     fn risk_metrics_complete(&self) -> bool {
         self.inner.risk_metrics_complete
@@ -576,6 +579,17 @@ impl PyPositionValue {
     #[getter]
     fn risk_error(&self) -> Option<String> {
         self.inner.risk_error.clone()
+    }
+
+    /// Requested metrics this position's instrument type has no calculator
+    /// for, in request order.
+    #[getter]
+    fn inapplicable_metrics(&self) -> Vec<String> {
+        self.inner
+            .inapplicable_metrics
+            .iter()
+            .map(|metric| metric.as_str().to_owned())
+            .collect()
     }
 
     /// Full instrument ``ValuationResult`` as a JSON-shaped ``dict`` (metrics

@@ -210,7 +210,19 @@ impl AttributionSpec {
                         }
                         parsed
                     }
-                    None => default_attribution_metrics(),
+                    // No caller-named list: fall back to the engine's own
+                    // cross-instrument menu. That menu is a superset, not a
+                    // request, so narrow it to what this instrument type
+                    // actually supports. A metric the caller named above stays
+                    // unnarrowed and still errors if it is inapplicable,
+                    // because that is a genuine request.
+                    None => {
+                        let registry = finstack_quant_valuations::metrics::standard_registry();
+                        registry.applicable_subset(
+                            &default_attribution_metrics(),
+                            metrics_instrument.key(),
+                        )
+                    }
                 };
 
                 // Attach FinstackConfig so sensitivity bump knobs (e.g. rate_bump_bp)

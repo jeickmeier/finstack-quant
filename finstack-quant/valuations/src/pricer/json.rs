@@ -479,9 +479,22 @@ pub fn present_standard_option_greeks(
     model: &str,
     pricing_options: crate::instruments::PricingOptions,
 ) -> finstack_quant_core::Result<Vec<(&'static str, f64)>> {
-    let metric_ids: Vec<String> = STANDARD_OPTION_GREEKS
+    // This entry point asks for a fixed superset, not a caller-chosen list, and
+    // its contract is "an ordered subset". Pricing rejects any requested metric
+    // the instrument type has no calculator for, so narrow the superset here
+    // instead of letting the rejection escape as a spurious error.
+    let metric_registry = match pricing_options.metric_registry.as_deref() {
+        Some(registry) => registry,
+        None => crate::metrics::standard_registry(),
+    };
+    let candidates: Vec<MetricId> = STANDARD_OPTION_GREEKS
         .iter()
-        .map(|m| (*m).to_string())
+        .filter_map(|m| m.parse::<MetricId>().ok())
+        .collect();
+    let metric_ids: Vec<String> = metric_registry
+        .applicable_subset(&candidates, instrument.as_instrument().key())
+        .iter()
+        .map(|id| id.as_str().to_string())
         .collect();
     let result = price_instrument(
         instrument,

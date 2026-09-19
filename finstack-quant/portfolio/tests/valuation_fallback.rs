@@ -50,7 +50,7 @@ impl Instrument for CanonicalPvInstrument {
         "CANONICAL_PV"
     }
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        InstrumentType::Bond
     }
     fn as_any(&self) -> &dyn Any {
         self
@@ -122,7 +122,7 @@ impl Instrument for ValueOnlyInstrument {
         &self.id
     }
     fn key(&self) -> InstrumentType {
-        InstrumentType::Basket
+        InstrumentType::Bond
     }
     fn as_any(&self) -> &dyn Any {
         self

@@ -81,6 +81,12 @@ pub struct AggregatedMetric {
 /// - [`unaggregated_metrics`](Self::unaggregated_metrics) — metrics that
 ///   exist per position but are not portfolio-summable, so they have no
 ///   total at all.
+///
+/// A metric narrowed away because a position's instrument type has no
+/// calculator for it is *not* one of these omissions: the model gives that
+/// instrument type no such exposure, so the total is complete without it. Such
+/// narrowing is reported per position on
+/// [`PositionValue::inapplicable_metrics`](crate::valuation::PositionValue::inapplicable_metrics).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioMetrics {
@@ -758,6 +764,7 @@ mod tests {
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,
+            inapplicable_metrics: Vec::new(),
             valuation_result: None,
         };
 
@@ -788,6 +795,7 @@ mod tests {
             metric_scale: 1.0,
             risk_metrics_complete: true,
             risk_error: None,
+            inapplicable_metrics: Vec::new(),
             valuation_result: None,
         };
 
@@ -825,6 +833,7 @@ mod tests {
                     metric_scale: 1.0,
                     risk_metrics_complete: true,
                     risk_error: None,
+                    inapplicable_metrics: Vec::new(),
                     valuation_result: Some(valuation_result),
                 },
             );

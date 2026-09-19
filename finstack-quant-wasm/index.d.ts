@@ -5303,7 +5303,7 @@ export interface AssetBackedFacility extends WasmOwned {
   toJson(): string;
   /**
    * Borrowing base on the closing collateral.
-   * @returns Plain `BorrowingBaseReport` object.
+   * @returns Plain `BorrowingBaseReport` object with `eligible_collateral`, `concentration_excess` and `borrowing_base` Money values.
    * @throws If the borrowing-base rules are malformed.
    */
   borrowingBase(): BorrowingBaseReport;
@@ -10552,8 +10552,8 @@ export interface PortfolioNamespace {
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed on unavailable requested risk metrics), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional exact risk-metric ids to compute. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws. Mirrors the Python `metrics=` keyword.
+   * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed when a requested risk metric fails to compute), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword.
    * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, a requested metric name is unknown, portfolio construction or valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolio(
@@ -10570,8 +10570,8 @@ export interface PortfolioNamespace {
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a canonical JSON string.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed on unavailable requested risk metrics), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional exact risk-metric ids to compute. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws instead of silently degrading to PV-only valuation. Mirrors the Python `metrics=` keyword.
+   * @param strictRisk - Optional; when omitted or `undefined`, defaults to `true` (fail closed when a requested risk metric fails to compute), matching Rust `PortfolioValuationOptions`. Pass `false` only for an intentional PV-preserving fallback.
+   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names are validated strictly against the standard `MetricId` set — an unknown name throws instead of silently degrading to PV-only valuation. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument type has a calculator for, and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument type supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword.
    * @throws Error - Throws a JavaScript exception if `marketJson` is malformed, a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
   valuePortfolioBuilt(

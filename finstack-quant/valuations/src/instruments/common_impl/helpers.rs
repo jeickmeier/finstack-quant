@@ -490,11 +490,22 @@ pub fn get_unitless_scalar_strict(
 /// * `curves` - Market data context (wrapped in Arc for efficiency)
 /// * `as_of` - Valuation date
 /// * `base_value` - Final scenario-adjusted base value (NPV)
-/// * `metrics` - List of metrics to compute
+/// * `metrics` - List of metrics to compute. Every entry is forwarded to the
+///   metric registry unfiltered, so each one either lands in the returned map
+///   or aborts the call with an error; requested metrics are never silently
+///   dropped. Callers that legitimately tolerate partial support across
+///   heterogeneous instruments (composites) must narrow this list themselves.
 /// * `cfg` - Optional FinstackConfig for user-tunable metric defaults (e.g., bump sizes).
 ///   When `None`, uses global defaults.
 /// * `market_history` - Optional market history for Historical VaR / Expected Shortfall metrics.
 ///   When `None`, these metrics will not be available.
+///
+/// # Errors
+///
+/// Returns `Error::UnknownMetric` when a requested identifier is not
+/// registered, `Error::MetricNotApplicable` when it is registered but has no
+/// calculator for this instrument type, and `Error::MetricCalculationFailed`
+/// when a calculator runs and fails (for example on a missing market input).
 ///
 /// # Performance
 ///
@@ -515,6 +526,10 @@ pub fn get_unitless_scalar_strict(
 pub(crate) struct MetricBuildOptions {
     pub(crate) pricing: PricingOptions,
     pub(crate) pricing_dispatch: PricingDispatch,
+    /// Measures the model pricer already published for this valuation, taken
+    /// verbatim from its `ValuationResult`. Standard identifiers among them
+    /// seed the metric context; see [`compute_metrics_dyn`].
+    pub(crate) pricer_measures: IndexMap<MetricId, f64>,
 }
 
 pub(crate) fn compute_metrics_dyn(
@@ -528,6 +543,7 @@ pub(crate) fn compute_metrics_dyn(
     let MetricBuildOptions {
         pricing,
         pricing_dispatch,
+        pricer_measures,
     } = options;
     let finstack_config = pricing.config.unwrap_or_else(MetricContext::default_config);
     let mut context = MetricContext::new(
@@ -563,17 +579,35 @@ pub(crate) fn compute_metrics_dyn(
         }
     }
 
+    // A model may publish standard metric identifiers as side outputs of its own
+    // pricing pass — structured credit's `expected_loss`, the Merton bond
+    // engine's `expected_loss` — instead of leaving them to a registered
+    // calculator. Those values are the authoritative ones: the result envelope
+    // gives model measures precedence over calculator output. Seeding them here
+    // makes the metric layer read the same number rather than recompute it, and
+    // satisfies the registry's up-front applicability check, which exempts
+    // identifiers the context already carries.
+    //
+    // Only standard identifiers are seeded. Custom and composite keys are merged
+    // into the result envelope by the pricer itself, are not part of the
+    // registry's applicability contract, and seeding them would reorder the
+    // envelope's custom-measure tail.
+    for (metric_id, value) in pricer_measures {
+        if !metric_id.is_custom() {
+            context.computed.insert(metric_id, value);
+        }
+    }
+
     let registry = match pricing.metric_registry.as_deref() {
         Some(registry) => registry,
         None => standard_registry(),
     };
-    let instrument_type = instrument.key();
-    let applicable: Vec<MetricId> = metrics
-        .iter()
-        .filter(|m| registry.is_applicable(m, instrument_type))
-        .cloned()
-        .collect();
-    let metric_measures = registry.compute(&applicable, &mut context)?;
+    // Every requested metric is forwarded to the registry unfiltered: the
+    // registry rejects unknown identifiers and identifiers with no calculator
+    // for this instrument type. Silently dropping a caller-requested metric
+    // here would make "not supported" indistinguishable from "computed but
+    // missing" at the host-language boundary.
+    let metric_measures = registry.compute(metrics, &mut context)?;
 
     // Pre-allocate capacity to avoid reallocations during insertion.
     // Estimate: requested metrics + a few extras from composite keys.

@@ -39,12 +39,36 @@ pub struct PositionValue {
     /// unscaled at the position drill-down level.
     pub metric_scale: f64,
 
-    /// Whether all requested risk metrics were computed successfully.
+    /// Whether every risk metric requested *of this position* was computed
+    /// successfully.
+    ///
+    /// The requested set is the portfolio metric menu narrowed to what this
+    /// position's instrument type supports, so structural narrowing does not
+    /// clear this flag; the narrowed-away entries are listed on
+    /// [`inapplicable_metrics`](Self::inapplicable_metrics). `false` means a
+    /// supported metric failed to compute and the position fell back to
+    /// PV-only.
     pub risk_metrics_complete: bool,
 
     /// Original metrics failure message when the valuation fell back to PV-only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub risk_error: Option<String>,
+
+    /// Metrics on the portfolio menu that this position's instrument type has
+    /// no calculator for, and which were therefore never requested of it.
+    ///
+    /// A portfolio metric list is a menu offered to a heterogeneous book (see
+    /// [`RequestedMetrics`]), so this records the per-position narrowing that
+    /// makes such a list usable. It is not a failure report: unlike
+    /// [`PortfolioValuation::degraded_positions`] and
+    /// [`PortfolioMetrics::skipped_metrics`](crate::metrics::PortfolioMetrics::skipped_metrics),
+    /// nothing here could have been computed and was not. An entry means the
+    /// model gives this instrument type no such exposure, so the position
+    /// contributes nothing to that metric's portfolio total by construction.
+    ///
+    /// Listed in menu order. Empty for a position that supports the whole menu.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inapplicable_metrics: Vec<MetricId>,
 
     /// Full valuation result with metrics (including computed risk measures).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -146,25 +170,49 @@ impl PortfolioValuation {
     }
 }
 
-/// Which metric set to request for every position in the portfolio.
+/// Which metric set to offer every position in the portfolio.
 ///
-/// This replaces the legacy tri-state combination of `additional_metrics`
-/// and `replace_standard_metrics` with a single explicit enum that has one
-/// obvious interpretation for each variant.
+/// # A portfolio metric list is a menu
+///
+/// Whichever variant is used, the resulting list is a **menu**, not a request
+/// made of each position individually. It is chosen once for a book whose
+/// positions have different instrument types, and there is no way to say
+/// "`delta` for the options, `cs01` for the credit" — so a mixed book is only
+/// valuable at all if each position takes the part of the list that applies to
+/// it. Each position is therefore asked for exactly the entries its own
+/// instrument type has a calculator for.
+///
+/// Narrowing is confined to structural inapplicability, and it is reported,
+/// not silent:
+///
+/// - The entries skipped for a position are listed on
+///   [`PositionValue::inapplicable_metrics`].
+/// - An identifier that is not a standard metric is still rejected when the
+///   request is parsed, by [`Self::try_from_metric_names`], so a typo fails
+///   loudly instead of narrowing away everywhere.
+/// - A metric an instrument type *does* support but fails to compute is
+///   governed by
+///   [`PortfolioValuationOptions::strict_risk`](PortfolioValuationOptions::strict_risk),
+///   which is unchanged: the valuation aborts, or the position degrades to
+///   PV-only and is listed on [`PortfolioValuation::degraded_positions`].
+///
+/// Single-instrument pricing keeps the opposite contract: it rejects any
+/// requested metric its instrument type has no calculator for, because there
+/// the caller chose the list against that one instrument.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(tag = "mode", content = "metrics", rename_all = "snake_case")]
 pub enum RequestedMetrics {
     /// Standard portfolio metric set only: PV plus `dv01`.
     ///
-    /// Kept intentionally small so a plain book values under
-    /// `strict_risk = true`; pricer-specific metrics (`theta`, `cs01`,
-    /// Greeks, bucketed ladders) are requested explicitly through
+    /// Kept intentionally small so a plain book values with nothing narrowed
+    /// away; pricer-specific metrics (`theta`, `cs01`, Greeks, bucketed
+    /// ladders) are offered explicitly through
     /// [`RequestedMetrics::StandardPlus`] or [`RequestedMetrics::Only`].
     #[default]
     Standard,
-    /// Standard set plus the listed extra metrics (de-duplicated).
+    /// Standard menu plus the listed extra metrics (de-duplicated).
     StandardPlus(Vec<MetricId>),
-    /// Only the listed metrics; the standard set is not included.
+    /// Only the listed metrics; the standard menu is not included.
     Only(Vec<MetricId>),
 }
 
@@ -218,12 +266,17 @@ impl RequestedMetrics {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PortfolioValuationOptions {
-    /// When `true` (default), any failure to compute requested risk metrics
-    /// for a position causes the entire portfolio valuation to fail.
+    /// When `true` (default), any failure to compute the risk metrics
+    /// requested of a position causes the entire portfolio valuation to fail.
     ///
     /// When `false`, the engine falls back to PV-only valuation for that
     /// position if metrics fail, preserving aggregate PV but leaving those
     /// risk metrics missing (see [`PortfolioValuation::degraded_positions`]).
+    ///
+    /// This governs computation failures only. A metric the position's
+    /// instrument type has no calculator for is never requested of it in the
+    /// first place (see [`RequestedMetrics`]) and so fails neither mode; it is
+    /// reported on [`PositionValue::inapplicable_metrics`].
     pub strict_risk: bool,
 
     /// Which metric set to request. See [`RequestedMetrics`].
