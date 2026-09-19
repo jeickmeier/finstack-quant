@@ -6,11 +6,11 @@
     "description": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved.",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Amended 2026-09-18: the contract now states its base CPI explicitly. A start-date reference index is a contractual fixing, and since commit 413953021 it must be supplied rather than projected off the inflation curve (see the fail-closed guard in reference_inflation_value and test_historical_observation_requires_fixing_or_explicit_contract_base). The value is this curve's own CPI level on the 2026-04-30 start date, so the priced contract is unchanged in substance.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-18",
+    "last_reviewed_on": "2026-09-18",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -185,7 +185,8 @@
           ],
           "meta": {}
         },
-        "day_count": "act_365f"
+        "day_count": "act_365f",
+        "base_cpi": 314.0272785479525
       }
     }
   },
@@ -193,7 +194,7 @@
     "npv": -10322.265559182979,
     "par_rate": 0.02018378380564667,
     "dv01": 5.163961012953223,
-    "inflation01": 443.631684450876
+    "inflation01": 646.7465221991042
   },
   "tolerances": {
     "npv": {

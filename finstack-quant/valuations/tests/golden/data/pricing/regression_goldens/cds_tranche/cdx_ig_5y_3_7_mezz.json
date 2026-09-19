@@ -6,11 +6,11 @@
     "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged. Re-baselined 2026-07-11 after the seasoned premium-accrual boundary correction. Re-pinned expected outputs on 2026-07-23 for 0.6.0 release prep (small calibrate/price round-trip drift). Re-baselined 2026-09-04 from a replayable CDS par-spread calibration so cs01 measures canonical quote-space rebootstrap risk rather than a direct intensity shift.",
+    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged. Re-baselined 2026-07-11 after the seasoned premium-accrual boundary correction. Re-pinned expected outputs on 2026-07-23 for 0.6.0 release prep (small calibrate/price round-trip drift). Re-baselined 2026-09-04 from a replayable CDS par-spread calibration so cs01 measures canonical quote-space rebootstrap risk rather than a direct intensity shift. Re-baselined 2026-09-18: commit 413953021 replaced the tranche factor quadrature with partitioned adaptive Simpson under an explicit absolute integration budget, and commit 82937c4ea's large-homogeneous-pool shortcut (which mis-priced index-sized pools) was reverted so the exact conditional binomial applies at every pool size. The Hull-White (2004) Table 7 par-spread assertions are unchanged and pass; only the internal deterministic pins are re-captured.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-07-23",
+    "last_reviewed_on": "2026-09-18",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -393,11 +393,11 @@
     }
   },
   "expected": {
-    "npv": 2439099.102793273,
-    "par_spread": 701.183429855979,
-    "spread_dv01": -4057.162891827524,
-    "dv01": -786.543323878199,
-    "cs01": 27975.104357133387
+    "npv": 2453383.585027827,
+    "par_spread": 704.950795902777,
+    "spread_dv01": -4055.5093102515675,
+    "dv01": -792.0223425144795,
+    "cs01": 26204.307524086908
   },
   "tolerances": {
     "npv": {

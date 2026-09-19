@@ -3,14 +3,14 @@
   "metadata": {
     "name": "usd_5y_zcis_self_test",
     "domain": "rates.inflation_swap",
-    "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan §18 follow-up #1).",
+    "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted.",
+    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted. Re-baselined 2026-09-18: commit 413953021 anchors a bootstrapped inflation curve at base_date minus the observation lag rather than at base_date, so the calibrated US-CPI curve and therefore this swap's projected index ratio both moved. The same commit also made a historical reference anchor require a published index; that regression is fixed separately so a curve-only inflation market projects off the curve again. Amended 2026-09-18: the contract now states its base CPI explicitly. A start-date reference index is a contractual fixing, and since commit 413953021 it must be supplied rather than projected off the inflation curve. 300.0 is the base CPI the plan's US-CPI inflation step declares at the 2026-04-30 base date, so the swap now uses the same start fixing the bootstrap calibrated against. The contract also states the plan's observation lag (3M) and the USD-CPI convention's linear monthly interpolation, so the priced swap uses the same reference-index convention the inflation bootstrap calibrated against; with those stated the 2031-04-30 pillar reprices at its 2.25% quote to within 1.5e-4 of notional, against 8.9e-4 when they were left implicit.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-07-11",
+    "last_reviewed_on": "2026-09-18",
     "review_interval_months": 12,
     "regen_command": "uv run pytest finstack-quant-py/tests/golden/test_pricing_inflation_swap.py -v -k self_test",
     "screenshots": []
@@ -332,13 +332,18 @@
           ],
           "meta": {}
         },
-        "day_count": "act_365f"
+        "day_count": "act_365f",
+        "base_cpi": 300.0,
+        "lag_override": {
+          "months": 3
+        },
+        "interpolation_override": "linear"
       }
     }
   },
   "expected": {
-    "npv": -91501.4603405339,
-    "dv01": 45.775800972944
+    "npv": -21505.77810756992,
+    "dv01": 10.75878149655182
   },
   "tolerances": {
     "npv": {

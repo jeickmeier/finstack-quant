@@ -5,7 +5,7 @@ use super::config::{
 };
 use super::registry::JumpToDefaultResult;
 use crate::cashflow::primitives::CFKind;
-use crate::constants::{credit, BASIS_POINTS_PER_UNIT};
+use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_core::dates::{next_cds_date, Date};
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
@@ -72,10 +72,6 @@ impl CDSTranchePricer {
                 "conditional default probability must be finite".to_owned(),
             ));
         }
-        if num_constituents > credit::SMALL_POOL_THRESHOLD {
-            return Ok((conditional_default_prob * exposure).min(cap_notional));
-        }
-
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
         // Evaluate the whole conditional binomial PMF once (O(n)) instead of
@@ -126,13 +122,6 @@ impl CDSTranchePricer {
                 "conditional default probability must be finite".to_owned(),
             ));
         }
-        if num_constituents > credit::SMALL_POOL_THRESHOLD {
-            return Ok((
-                (conditional_default_prob * loss_exposure).min(loss_cap),
-                (conditional_default_prob * recovery_exposure).min(recovery_cap),
-            ));
-        }
-
         let individual_notional = 1.0 / num_constituents as f64;
         thread_local! {
             static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
@@ -1005,20 +994,23 @@ mod tests {
         );
     }
 
+    /// Index-sized homogeneous pools keep the exact conditional binomial.
+    ///
+    /// Routing pools above the heterogeneous `SMALL_POOL_THRESHOLD` (64) to
+    /// the large-homogeneous-pool limit `min(p·e, cap)` collapses the
+    /// conditional loss variance to zero and mis-priced the Hull-White (2004)
+    /// Table 7 benchmark spreads by up to 30% on thin tranches. The finite-n
+    /// binomial must stay in force at index pool sizes.
     #[test]
-    fn large_homogeneous_pool_uses_lhp() {
-        let pricer = CDSTranchePricer::new();
-        let lhp = pricer
+    fn index_sized_homogeneous_pool_uses_finite_binomial() {
+        let binomial = CDSTranchePricer::new()
             .conditional_equity_tranche_capped(125, 0.08, 0.20, 0.60)
-            .expect("LHP");
-        assert!((lhp - 0.08_f64).abs() < 1e-15);
-
-        let binomial = pricer
-            .conditional_equity_tranche_capped(10, 0.08, 0.20, 0.60)
             .expect("binomial");
+        let lhp = (0.20_f64 * 0.60).min(0.08);
         assert!(
             (binomial - lhp).abs() > 1e-6,
-            "finite-n binomial must differ from LHP: binomial={binomial}, lhp={lhp}"
+            "125-name pool must use the finite-n binomial, not the LHP limit: \
+             binomial={binomial}, lhp={lhp}"
         );
     }
 

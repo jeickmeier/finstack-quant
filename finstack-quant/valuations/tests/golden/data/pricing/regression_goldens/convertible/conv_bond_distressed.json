@@ -6,11 +6,11 @@
     "description": "Synthetic distressed convertible bond with low-equity stress.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs . Uses two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, and hazard curves are supplied through prior_market; equity data is supplied through market_data. Expected outputs recaptured from Finstack. Re-baselined 2026-07-11 after intentional convertible lattice corrections to date-aligned forward discounting and coupon entitlement handling. Re-baselined 2026-07-12 to preserve the signed +1bp DV01 convention after day-count-aware lattice date mapping. Re-blessed 2026-07-22: dv01 set to 0.0 with abs tolerance 1e-6 because the previously pinned -5.006e-9 was sub-nanodollar FP noise below the lattice repricing noise floor.",
+    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs . Uses two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, and hazard curves are supplied through prior_market; equity data is supplied through market_data. Expected outputs recaptured from Finstack. Re-baselined 2026-07-11 after intentional convertible lattice corrections to date-aligned forward discounting and coupon entitlement handling. Re-baselined 2026-07-12 to preserve the signed +1bp DV01 convention after day-count-aware lattice date mapping. Re-blessed 2026-07-22: dv01 set to 0.0 with abs tolerance 1e-6 because the previously pinned -5.006e-9 was sub-nanodollar FP noise below the lattice repricing noise floor. Re-baselined 2026-09-18: DV01 was pinned at 0.0 because the parallel rate bump reached only USD-OIS, which this bond's PV does not depend on (rho measures 5e-10). It now bumps every rate curve the instrument declares, including the USD-CORP curve it discounts on, so DV01 is the instrument's real rate sensitivity. The magnitude reconciles with a 3y bond (-duration x price x 1bp).",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
-    "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-07-22",
+    "last_reviewed_by": "claude",
+    "last_reviewed_on": "2026-09-18",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -23,7 +23,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "conv_bond_distressed_market",
-        "description": "Two-step calibration (term_loan pattern, plan §17): USD-OIS bootstrapped from synthetic SOFR OIS quotes, USD-SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes. The convertible bond's credit, hazard, and auxiliary curves are supplied through prior_market; equity prices, dividend yield, and volatility are supplied through market_data. Self-test contract.",
+        "description": "Two-step calibration (term_loan pattern, plan \u00a717): USD-OIS bootstrapped from synthetic SOFR OIS quotes, USD-SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes. The convertible bond's credit, hazard, and auxiliary curves are supplied through prior_market; equity prices, dividend yield, and volatility are supplied through market_data. Self-test contract.",
         "quote_sets": {
           "sofr_ois": [
             "USD-SOFR-OIS-DEP-1W",
@@ -601,7 +601,7 @@
   "expected": {
     "npv": 948047.872716489,
     "clean_price": 948047.872716489,
-    "dv01": 0.0,
+    "dv01": -272.3175344810006,
     "cs01": -272.317534483504
   },
   "tolerances": {
@@ -618,7 +618,7 @@
     "dv01": {
       "abs": 1e-06,
       "rel": 5e-09,
-      "tolerance_reason": "Zero dv01: this deeply distressed convertible is equity-floor dominated, so a +1bp rate bump moves NPV by sub-nanodollar FP noise only. The metric is economically zero; abs tolerance reflects the lattice repricing noise floor (~1e-9 observed residuals, pinned at 1e-6) rather than a pinned signed residual."
+      "tolerance_reason": "Self-test pin on the parallel rate bump across every rate curve the bond declares. The bond discounts on USD-CORP, so the shock reaches the PV through that curve; the magnitude reconciles with -duration x price x 1bp for this maturity. Pinned at the lattice repricing noise floor (~1e-9 observed residuals, held at 1e-6) so refactor drift is caught."
     },
     "cs01": {
       "abs": 1e-09,

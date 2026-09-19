@@ -6,11 +6,11 @@
     "description": "Hull-White (2004) Table 7 benchmark: [10,100]% tranche on a 100-name homogeneous pool at flat Gaussian correlation 0.3.",
     "valuation_date": "2006-08-31",
     "source": "textbook",
-    "source_detail": "Hull, J. and White, A. (2004), 'Valuation of a CDO and an nth to Default CDS Without Monte Carlo Simulation', Journal of Derivatives 12(2), Table 7. Fixture: 100-name homogeneous pool, flat hazard 1%/yr (Act/Act ISDA), recovery 40%, flat 5% continuously-compounded risk-free rate (Act/360), 5Y quarterly premium (2006-09-01 to 2011-09-01, Act/360, Following), Gaussian copula at flat correlation. Expected outputs are the published breakeven running spreads in bp (whole-bp table resolution); cross-referenced against QuantLib test-suite/cdo.cpp hwData7, which validates QuantLib's own CDO engines against the same table at 1-10bp absolute / 4-7% relative tolerance. The former direct intensity-shift CS01 regression pin was removed on 2026-09-04 because this source fixture has no replayable par-spread calibration and therefore cannot assert canonical CS01.",
+    "source_detail": "Hull, J. and White, A. (2004), 'Valuation of a CDO and an nth to Default CDS Without Monte Carlo Simulation', Journal of Derivatives 12(2), Table 7. Fixture: 100-name homogeneous pool, flat hazard 1%/yr (Act/Act ISDA), recovery 40%, flat 5% continuously-compounded risk-free rate (Act/360), 5Y quarterly premium (2006-09-01 to 2011-09-01, Act/360, Following), Gaussian copula at flat correlation. Expected outputs are the published breakeven running spreads in bp (whole-bp table resolution); cross-referenced against QuantLib test-suite/cdo.cpp hwData7, which validates QuantLib's own CDO engines against the same table at 1-10bp absolute / 4-7% relative tolerance. The former direct intensity-shift CS01 regression pin was removed on 2026-09-04 because this source fixture has no replayable par-spread calibration and therefore cannot assert canonical CS01. Re-baselined 2026-09-18: commit 413953021 replaced the tranche factor quadrature with partitioned adaptive Simpson under an explicit absolute integration budget, and commit 82937c4ea's large-homogeneous-pool shortcut (which mis-priced index-sized pools) was reverted so the exact conditional binomial applies at every pool size. The Hull-White (2004) Table 7 par-spread assertions are unchanged and pass; only the internal deterministic pins are re-captured.",
     "captured_by": "claude",
     "captured_on": "2026-07-22",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-07-22",
+    "last_reviewed_on": "2026-09-18",
     "review_interval_months": 12,
     "regen_command": "manual transcription of the published Table 7 values; see source_detail",
     "screenshots": []
@@ -162,7 +162,7 @@
   },
   "expected": {
     "par_spread": 7.0,
-    "dv01": 101.162843772239
+    "dv01": 101.33139501931146
   },
   "tolerances": {
     "par_spread": {

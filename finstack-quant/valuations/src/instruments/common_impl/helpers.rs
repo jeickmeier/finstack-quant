@@ -1305,7 +1305,14 @@ pub(crate) fn apply_inflation_lag(date: Date, lag: InflationLag) -> Date {
 /// Resolve the effective lag for an inflation instrument.
 ///
 /// Priority: (1) explicit `lag_override`, (2) index lag from market context,
-/// (3) `InflationLag::None`.
+/// (3) the projection curve's `indexation_lag_months`, (4)
+/// `InflationLag::None`.
+///
+/// A market that carries only a projection curve still carries that curve's
+/// indexation lag, and a bootstrapped inflation curve is anchored at its base
+/// date minus that lag. Ignoring it would read the curve on an unlagged time
+/// axis while the curve itself is built on a lagged one, silently
+/// over-projecting the reference index at both ends of a swap.
 pub(crate) fn resolve_inflation_lag(
     lag_override: Option<InflationLag>,
     index_id: &str,
@@ -1317,7 +1324,13 @@ pub(crate) fn resolve_inflation_lag(
     if let Ok(index) = curves.get_inflation_index(index_id) {
         return index.lag();
     }
-    InflationLag::None
+    let Ok(curve) = curves.get_inflation_curve(index_id) else {
+        return InflationLag::None;
+    };
+    match u8::try_from(curve.indexation_lag_months()) {
+        Ok(0) | Err(_) => InflationLag::None,
+        Ok(months) => InflationLag::Months(months),
+    }
 }
 
 /// Resolve a realized CPI/RPI value from a supplied index history.

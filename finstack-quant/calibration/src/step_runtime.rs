@@ -721,9 +721,11 @@ mod tests {
     }
 
     /// Synthetic 5Y [3,7] CDX mezzanine upfront at ν = 6, ρ = 0.3 under the
-    /// default Student-t pricer (product Gauss + LHP). The step recovers ν
-    /// near 6 without manufacturing the quote from a live price.
-    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.216_304_990_700;
+    /// default Student-t pricer (product Gauss over the exact conditional
+    /// binomial). The step recovers ν near 6 without manufacturing the quote
+    /// from a live price. Re-pinned 2026-09-18 when the homogeneous pool path
+    /// stopped routing index-sized pools to the large-homogeneous-pool limit.
+    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.215_317_595_022;
 
     fn build_student_t_quote(upfront_pct: f64) -> CdsTrancheQuote {
         let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity");
