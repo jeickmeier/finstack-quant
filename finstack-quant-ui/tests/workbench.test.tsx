@@ -150,7 +150,10 @@ it("embeds the existing components, debounces complete requests and retains edit
     ),
   });
   const results = screen.getByRole("region", { name: "Results" });
-  await within(results).findByText("USD 1,042,500");
+  expect(
+    (await within(results).findByTitle(fixture.result.value.amount))
+      .textContent,
+  ).toBe("USD 1,042,500");
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "1000000.123456789" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -190,7 +193,15 @@ it("embeds the existing components, debounces complete requests and retains edit
 }, 15000);
 it("retains the completed context during invalid edits, native pricing failure and catalogue selection", async () => {
   mount();
-  await screen.findByText("USD 1,042,500", {}, { timeout: 3000 });
+  expect(
+    (
+      await screen.findByTitle(
+        fixture.result.value.amount,
+        {},
+        { timeout: 3000 },
+      )
+    ).textContent,
+  ).toBe("USD 1,042,500");
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "abc" } });
   const issue = await screen.findByRole("button", {
@@ -199,7 +210,9 @@ it("retains the completed context during invalid edits, native pricing failure a
   await userEvent.click(issue);
   expect(document.activeElement).toBe(amount);
   expect(prices()).toHaveLength(1);
-  expect(screen.getByText("USD 1,042,500")).toBeTruthy();
+  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+    "USD 1,042,500",
+  );
   fireEvent.change(amount, { target: { value: "1000000" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
@@ -214,7 +227,9 @@ it("retains the completed context during invalid edits, native pricing failure a
       ).toBe(true),
     { timeout: 3000 },
   );
-  expect(screen.getByText("USD 1,042,500")).toBeTruthy();
+  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+    "USD 1,042,500",
+  );
   await userEvent.click(
     screen.getByRole("combobox", { name: "Instrument type" }),
   );
@@ -224,7 +239,9 @@ it("retains the completed context during invalid edits, native pricing failure a
   ).toBeTruthy();
   await waitFor(() => expect(prices()).toHaveLength(3), { timeout: 3000 });
   expect(prices()[2].model).toBe(prices()[0].model);
-  expect(screen.getByText("USD 1,042,500")).toBeTruthy();
+  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+    "USD 1,042,500",
+  );
 }, 15000);
 it("rejects a calibration envelope as a market snapshot before issuing a price request", async () => {
   mount({
@@ -249,7 +266,15 @@ it("rejects a calibration envelope as a market snapshot before issuing a price r
 
 it("feeds the complete native-validated market edit to pricing and shares stored-node selection", async () => {
   mount();
-  await screen.findByText("USD 1,042,500", {}, { timeout: 3000 });
+  expect(
+    (
+      await screen.findByTitle(
+        fixture.result.value.amount,
+        {},
+        { timeout: 3000 },
+      )
+    ).textContent,
+  ).toBe("USD 1,042,500");
   await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
   await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
   fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {

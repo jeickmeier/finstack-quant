@@ -21,7 +21,20 @@ for name in ("bond-A4", "bond-Letter", "xccy_swap-A4", "xccy_swap-Letter"):
             .extract_text() or "" for page in doc.pages
         )
         compact = lambda value: re.sub(r"\s+", "", value)
-        matches = {key: compact(value) in compact(raw) for key, value in expected.items()}
+        matches = {key: compact(expected[key]) in compact(raw)
+                   for key in ("instrument", "market", "cashflows")}
+        # Numbers in the visible measure tables must remain whole words. JSON
+        # text is excluded so an intact raw dump cannot hide crushed columns.
+        measure_words = {
+            word["text"] for page in doc.pages
+            for word in page.filter(lambda obj: obj["object_type"] == "char" and
+                                    "IBMPlexSans" in obj.get("fontname", ""))
+                            .extract_words()
+        }
+        measure_matches = {value: value in measure_words for value in expected["measureValues"]}
+        if name.startswith("bond-"):
+            assert measure_matches, f"{name}: bond report must contain supplied measures"
+        assert all(measure_matches.values()), f"{name}: printed measure values wrap or are missing: {measure_matches}"
         outside = [
             {"page": page.page_number, "text": char["text"]}
             for page in doc.pages for char in page.chars
@@ -41,6 +54,7 @@ for name in ("bond-A4", "bond-Letter", "xccy_swap-A4", "xccy_swap-Letter"):
         assert all(matches.values()) and not outside and images == 0 and vectors > 0, name
         reports.append({"file": file.name, "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
                         "pages": len(doc.pages), "pageSizes": sizes, "textMatches": matches,
+                        "measureWordMatches": measure_matches,
                         "outside": outside, "fonts": fonts, "maxUprightFontSize": max_upright_font_size, "images": images, "vectorPaths": vectors})
 (root / "pdf-check.json").write_text(json.dumps(reports, indent=2) + "\n")
 print(f"{len(reports)} reports passed text, font, vector and page-bound checks.")

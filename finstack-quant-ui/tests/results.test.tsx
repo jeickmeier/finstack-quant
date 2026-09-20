@@ -33,11 +33,9 @@ it("matches the retained fixture against the real Node facade apart from wall-cl
 });
 it("renders all supplied values, stamps, dates and qualified keys without inferred units", () => {
   render(<MeasuresGrid result={fixture.result} groups={fixture.groups} />);
-  expect(
-    screen.getByText(
-      formatMoney(fixture.result.value, returnedRounding(fixture.result.meta)),
-    ),
-  ).toBeTruthy();
+  expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
+    formatMoney(fixture.result.value, returnedRounding(fixture.result.meta)),
+  );
   for (const text of [
     fixture.result.instrument_id,
     fixture.result.as_of,
@@ -119,7 +117,7 @@ it("handles missing and partial metadata without invented rounding or stamps", (
   const view = render(
     <ValuationSummary result={result} compact density="comfortable" />,
   );
-  expect(screen.getByText("USD 1.23456789")).toBeTruthy();
+  expect(screen.getByTitle("1.23456789").textContent).toBe("USD 1.23456789");
   expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
   expect(
     view.container.querySelector('[data-density="comfortable"]'),
@@ -162,4 +160,50 @@ it("uses only explicit per-result units and puts unknown or ambiguous metric gro
   const row = screen.getByText("ytm").closest("tr")!;
   expect(row.textContent).toContain("0.043decimal rate");
   expect(row.textContent).toContain("0.043Unit unavailable");
+});
+
+it("retains independent supplied model context and exact large money while presenting grouped column headers", () => {
+  const result = {
+    ...fixture.result,
+    value: { amount: "9007199254740993.1234567890123456789", currency: "USD" },
+    meta: null,
+    measures: { ytm: 0.043 },
+  };
+  const view = render(
+    <MeasuresGrid
+      result={result}
+      compareTo={{ ...result, instrument_id: "COMPARE" }}
+      model="discounting"
+      comparisonModel="independent-model"
+      groups={{ Pricing: ["ytm"] }}
+    />,
+  );
+  const primary = screen.getByRole("region", { name: "Valuation" });
+  const comparison = screen.getByRole("region", {
+    name: "Comparison valuation",
+  });
+  expect(within(primary).getByTitle(result.value.amount).textContent).toBe(
+    "USD 9,007,199,254,740,993.1234567890123456789",
+  );
+  expect(within(primary).getByText("discounting")).toBeTruthy();
+  expect(within(primary).queryByText("independent-model")).toBeNull();
+  expect(within(comparison).getByText("independent-model")).toBeTruthy();
+  expect(screen.getByRole("columnheader", { name: "Pricing" })).toBeTruthy();
+  expect(screen.getByRole("table", { name: "Pricing measures" })).toBeTruthy();
+  expect(
+    screen.queryByRole("heading", { name: "Pricing measures" }),
+  ).toBeNull();
+  view.rerender(
+    <MeasuresGrid
+      result={result}
+      compareTo={result}
+      model="discounting"
+      groups={{ Pricing: ["ytm"] }}
+    />,
+  );
+  expect(
+    within(
+      screen.getByRole("region", { name: "Comparison valuation" }),
+    ).queryByText("discounting"),
+  ).toBeNull();
 });

@@ -5,7 +5,6 @@ import {
   ValuationSummary,
   type ValuationSummaryProps,
 } from "../valuation-summary/valuation-summary";
-import { idColumn } from "@/lib/finstack/format/columns";
 import type { ColumnDef } from "@tanstack/react-table";
 export interface MeasuresGridProps extends ValuationSummaryProps {
   /** Pass the groups returned by listStandardMetricsGrouped; no local financial taxonomy. */
@@ -51,8 +50,18 @@ export function MeasuresGrid(props: MeasuresGridProps) {
   const noUnits =
     !Object.keys(props.units ?? {}).length &&
     !Object.keys(props.comparisonUnits ?? {}).length;
-  const columns: ColumnDef<{}, MeasureRow, any>[] = [
-    { ...idColumn<MeasureRow>("key", (row) => row.key), header: "Metric key" },
+  const columns = (group: string): ColumnDef<{}, MeasureRow, any>[] => [
+    {
+      id: "key",
+      accessorFn: (row) => row.key,
+      header: () => <span className="font-sans">{group}</span>,
+      meta: { className: "text-left" },
+      cell: (context) => (
+        <span className="finstack-measure-key font-mono">
+          {context.getValue()}
+        </span>
+      ),
+    },
     {
       id: "value",
       header:
@@ -87,33 +96,29 @@ export function MeasuresGrid(props: MeasuresGridProps) {
   ];
   return (
     <div
-      className="space-y-3 font-sans text-foreground"
+      className="finstack-measures font-sans text-foreground"
       data-density={props.density}
     >
       <ValuationSummary
         result={props.result}
         compareTo={props.compareTo}
         compact
+        model={props.model}
+        comparisonModel={props.comparisonModel}
         density={props.density}
         loading={props.loading}
         error={props.error}
       />
-      {grouped.length > 0 && noUnits && (
-        <p className="text-xs text-muted-foreground">
-          Raw measure values · units unavailable
-        </p>
-      )}
       {grouped.length ? (
         grouped.map(({ group, rows }) => (
           <section
             key={group}
-            className="space-y-2"
+            className="finstack-measures__group"
             aria-label={`${group} measures`}
           >
-            <h3 className="text-sm font-medium">{group} measures</h3>
             <FinstackTable
               data={rows}
-              columns={columns}
+              columns={columns(group)}
               getRowId={(row) => row.key}
               caption={`${group} measures`}
               captionVisibility="sr-only"
@@ -123,6 +128,11 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       ) : (
         <p role="status" className="text-sm text-muted-foreground">
           No measures supplied
+        </p>
+      )}
+      {grouped.length > 0 && noUnits && (
+        <p className="text-xs text-muted-foreground">
+          Raw measure values · units unavailable
         </p>
       )}
     </div>

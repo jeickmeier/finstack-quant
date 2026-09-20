@@ -70,6 +70,16 @@ ${imports}
 @container (max-width:420px) {
   .finstack-term-sheet .finstack-field-frame { grid-template-columns:112px minmax(0,1fr); gap:var(--spacing); }
 }
+.finstack-money--prominent { color:var(--foreground); font-family:var(--font-sans); line-height:1.2; overflow-wrap:anywhere; }
+.finstack-money__currency { font-family:var(--font-mono); font-size:var(--text-base); font-weight:500; color:var(--muted-foreground); }
+.finstack-money__amount { font-size:var(--text-2xl); font-weight:500; letter-spacing:-0.025em; }
+.finstack-valuation { display:grid; gap:calc(var(--spacing) * 2); min-width:0; padding-block:var(--spacing) calc(var(--spacing) * 3); border-bottom:var(--border-width) solid var(--border); }
+.finstack-valuation[data-compact] { gap:var(--spacing); }
+.finstack-valuation__context { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:calc(var(--spacing) * 3); row-gap:var(--spacing); color:var(--muted-foreground); font-size:var(--text-xs); }
+.finstack-valuation__context > div { min-width:0; overflow-wrap:anywhere; }
+.finstack-valuation__context dt,.finstack-valuation__context dd { display:inline; }
+.finstack-measures { display:grid; gap:calc(var(--spacing) * 2); min-width:0; }
+.finstack-measure-key { display:block; min-width:8ch; white-space:normal; overflow-wrap:anywhere; }
 .finstack-workbench-container { container-type: inline-size; min-width: 0; }
 .finstack-workbench { display:flex; flex-direction:column; min-width:0; background:var(--background); }
 .finstack-workbench__bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border); }
@@ -79,7 +89,9 @@ ${imports}
 .finstack-workbench__inputs,.finstack-workbench__panel { min-width:0; min-height:0; }
 .finstack-workbench__panel { padding:12px 16px; }
 .finstack-workbench__results { display:grid; grid-template-columns:minmax(0,1fr); min-height:0; border-top:1px solid var(--border); }
-.finstack-workbench__summary { padding:12px 16px; min-width:0; min-height:0; }
+.finstack-workbench__summary { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.finstack-workbench__results-header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; min-height:49px; padding:8px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.finstack-workbench__summary-body { min-width:0; min-height:0; padding:12px 16px; }
 .finstack-workbench__detail { min-width:0; min-height:0; border-top:1px solid var(--border); }
 .finstack-workbench__detail > [role=tabpanel] { padding:12px 16px; }
 .finstack-workbench__status { display:flex; flex-wrap:wrap; gap:12px; padding:5px 12px; border-top:1px solid var(--border); font-size:11px; color:var(--muted-foreground); }
@@ -102,7 +114,7 @@ ${imports}
 .finstack-workbench__inputs { overflow:hidden; }
 .finstack-workbench__panel { height:100%; overflow:auto; }
 .finstack-workbench__results { grid-template-columns:minmax(0,38fr) minmax(0,62fr); overflow:hidden; }
-.finstack-workbench__summary { overflow:auto; }
+.finstack-workbench__summary-body { overflow:auto; }
 .finstack-workbench__detail { display:flex; flex-direction:column; border-top:0; border-left:1px solid var(--border); overflow:hidden; }
 .finstack-workbench__detail > [role=tabpanel] { flex:1; min-height:0; overflow:auto; }
 }
@@ -111,7 +123,7 @@ ${imports}
 [data-printing] .finstack-market__rail { display:none; }
 [data-printing] .finstack-market__selected { width:180mm; max-width:none; }
 [data-printing] [data-finstack-figure] { width:180mm; max-width:100%; }
-@media print { .finstack-workbench { display:block; height:auto; min-height:0; } .finstack-workbench__inputs,.finstack-workbench__panel,.finstack-workbench__results,.finstack-workbench__summary,.finstack-workbench__detail { display:block; height:auto; overflow:visible; } .finstack-workbench__bar,.finstack-workbench__status { display:none; } }
+@media print { .finstack-workbench { display:block; height:auto; min-height:0; } .finstack-workbench__inputs,.finstack-workbench__panel,.finstack-workbench__results,.finstack-workbench__summary,.finstack-workbench__summary-body,.finstack-workbench__detail { display:block; height:auto; overflow:visible; } .finstack-workbench__bar,.finstack-workbench__status { display:none; } }
 
 @media print {
   @page { size: auto; margin: 12mm; }

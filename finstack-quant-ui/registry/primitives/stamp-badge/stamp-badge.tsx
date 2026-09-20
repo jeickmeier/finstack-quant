@@ -58,10 +58,14 @@ export function StampBadge({
       ([currency, scale]) => [`${currency} ingest decimals`, scale],
     ),
   ];
-  const renderFields = (entries: typeof fields) =>
+  const renderFields = (entries: typeof fields, quiet = false) =>
     entries.map(([label, value]) => (
-      <Badge key={String(label)} variant="outline" render={<div />}>
-        <dt className="inline">{String(label)}: </dt>
+      <Badge
+        key={String(label)}
+        variant={quiet ? "secondary" : "outline"}
+        render={<div />}
+      >
+        <dt className={quiet ? "sr-only" : "inline"}>{String(label)}: </dt>
         <dd className="inline">
           {typeof value === "string" ||
           typeof value === "number" ||
@@ -77,12 +81,17 @@ export function StampBadge({
         {renderFields(fields)}
       </dl>
     );
-  const primary = new Set(["Numeric mode", "Rounding", "Version"]);
+  const primary = new Set(["Numeric mode", "Rounding", "FX policy", "Version"]);
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <dl aria-label="Calculation policy" className="flex flex-wrap gap-1">
-          {renderFields(fields.filter(([label]) => primary.has(String(label))))}
+          {renderFields(
+            fields.filter(
+              ([label, value]) => primary.has(String(label)) && value != null,
+            ),
+            true,
+          )}
         </dl>
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring">

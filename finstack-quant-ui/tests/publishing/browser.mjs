@@ -234,6 +234,16 @@ export async function verifyPublishing(page, evidence, repo) {
         );
       });
       const filename = `${kind}-${format}.pdf`;
+      const measureValues = await workbench
+        .locator(".finstack-measures tbody td:nth-child(2) > span[title]")
+        .evaluateAll((spans) =>
+          spans.map((span) => span.getAttribute("title")),
+        );
+      if (kind === "bond")
+        assert(
+          measureValues.length > 0,
+          "Bond report must contain supplied measures",
+        );
       await page.pdf({
         path: path.join(evidence, filename),
         format,
@@ -246,8 +256,11 @@ export async function verifyPublishing(page, evidence, repo) {
       });
       await writeFile(
         path.join(evidence, `${kind}-${format}-text.json`),
-        JSON.stringify({ instrument, market, cashflows: expected }, null, 2) +
-          "\n",
+        JSON.stringify(
+          { instrument, market, cashflows: expected, measureValues },
+          null,
+          2,
+        ) + "\n",
       );
       await page.emulateMedia({ media: "screen" });
       await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));

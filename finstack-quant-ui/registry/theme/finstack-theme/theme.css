@@ -314,6 +314,61 @@
     gap: var(--spacing);
   }
 }
+.finstack-money--prominent {
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.finstack-money__currency {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.finstack-money__amount {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.finstack-valuation {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  min-width: 0;
+  padding-block: var(--spacing) calc(var(--spacing) * 3);
+  border-bottom: var(--border-width) solid var(--border);
+}
+.finstack-valuation[data-compact] {
+  gap: var(--spacing);
+}
+.finstack-valuation__context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: calc(var(--spacing) * 3);
+  row-gap: var(--spacing);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.finstack-valuation__context > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.finstack-valuation__context dt,
+.finstack-valuation__context dd {
+  display: inline;
+}
+.finstack-measures {
+  display: grid;
+  gap: calc(var(--spacing) * 2);
+  min-width: 0;
+}
+.finstack-measure-key {
+  display: block;
+  min-width: 8ch;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .finstack-workbench-container {
   container-type: inline-size;
   min-width: 0;
@@ -360,9 +415,26 @@
   border-top: 1px solid var(--border);
 }
 .finstack-workbench__summary {
-  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+.finstack-workbench__results-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 49px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.finstack-workbench__summary-body {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 16px;
 }
 .finstack-workbench__detail {
   min-width: 0;
@@ -486,7 +558,7 @@
     grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
     overflow: hidden;
   }
-  .finstack-workbench__summary {
+  .finstack-workbench__summary-body {
     overflow: auto;
   }
   .finstack-workbench__detail {
@@ -528,6 +600,7 @@
   .finstack-workbench__panel,
   .finstack-workbench__results,
   .finstack-workbench__summary,
+  .finstack-workbench__summary-body,
   .finstack-workbench__detail {
     display: block;
     height: auto;

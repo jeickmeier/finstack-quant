@@ -527,45 +527,54 @@ export function PricingWorkbench({
           </section>
           <section aria-label="Results" className="finstack-workbench__results">
             <div className="finstack-workbench__summary">
-              <div className="mb-2 flex items-center justify-between gap-2">
+              <header className="finstack-workbench__results-header">
                 <h2 className="text-sm font-medium">Results</h2>
                 <span className="text-xs text-muted-foreground">
-                  Last completed request
+                  {shown
+                    ? `${Object.keys(shown.result.measures).length} metrics · grouped`
+                    : "Awaiting valuation"}
                 </span>
+              </header>
+              <div className="finstack-workbench__summary-body">
+                <MeasuresGrid
+                  result={shown?.result}
+                  model={shown ? (shown.request.model ?? "default") : undefined}
+                  groups={metrics.data ?? {}}
+                  density={currentDensity}
+                  loading={!printSnapshot && price.isFetching}
+                  error={printSnapshot ? undefined : currentError}
+                />
+                {printSnapshot && shown && (
+                  <div className="hidden print:block">
+                    <ValuationDetails
+                      result={shown.result}
+                      density={currentDensity}
+                    />
+                  </div>
+                )}
               </div>
-              <MeasuresGrid
-                result={shown?.result}
-                groups={metrics.data ?? {}}
-                density={currentDensity}
-                loading={!printSnapshot && price.isFetching}
-                error={printSnapshot ? undefined : currentError}
-              />
-              {printSnapshot && shown && (
-                <div className="hidden print:block">
-                  <ValuationDetails
-                    result={shown.result}
-                    density={currentDensity}
-                  />
-                </div>
-              )}
             </div>
             <Tabs
               value={printSnapshot ? "cashflows" : resultTab}
               onValueChange={setResultTab}
               className="finstack-workbench__detail"
             >
-              <TabsList
-                aria-label="Result views"
-                className="finstack-workbench__tabs print:hidden"
-              >
-                <TabsTrigger value="cashflows">3 Cashflow JSON</TabsTrigger>
-                <TabsTrigger value="diagnostics">4 Diagnostics</TabsTrigger>
-                <TabsTrigger value="trace">5 Trace</TabsTrigger>
-                <TabsTrigger value="request">Request</TabsTrigger>
-                {scenario && (
-                  <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
-                )}
-              </TabsList>
+              <div className="finstack-workbench__results-header print:hidden">
+                <TabsList
+                  variant="line"
+                  aria-label="Result views"
+                  className="max-w-full flex-wrap"
+                  style={{ height: "auto", minHeight: "2rem" }}
+                >
+                  <TabsTrigger value="cashflows">3 Cashflow JSON</TabsTrigger>
+                  <TabsTrigger value="diagnostics">4 Diagnostics</TabsTrigger>
+                  <TabsTrigger value="trace">5 Trace</TabsTrigger>
+                  <TabsTrigger value="request">Request</TabsTrigger>
+                  {scenario && (
+                    <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
+                  )}
+                </TabsList>
+              </div>
               <TabsContent value="cashflows" keepMounted>
                 {shown ? (
                   <CashflowViewer

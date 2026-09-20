@@ -14,6 +14,10 @@ export interface ValuationSummaryProps {
   /** Independent supplied result; no differences, currency conversions or ratios are computed. */
   compareTo?: SuppliedValuation | null;
   compact?: boolean;
+  /** Model from the completed pricing request; omitted when context is not supplied. */
+  model?: string;
+  /** Model belonging only to the independently supplied comparison request. */
+  comparisonModel?: string;
   density?: "compact" | "comfortable";
   loading?: boolean;
   error?: string;
@@ -22,46 +26,45 @@ function Summary({
   result,
   label,
   compact,
+  model,
 }: {
   result: SuppliedValuation | null | undefined;
   label: string;
   compact?: boolean;
+  model?: string;
 }) {
   return (
     <section
       aria-label={label}
-      className="min-w-0 space-y-3 border-b border-border pb-3 print:break-inside-avoid"
+      className="finstack-valuation print:break-inside-avoid"
+      data-compact={compact || undefined}
     >
       <h2 className="text-xs font-medium text-muted-foreground">
         {label === "Valuation" ? "Present value" : label}
       </h2>
       {result ? (
         <>
-          <dl
-            className={
-              compact
-                ? "flex flex-wrap gap-x-5 gap-y-2"
-                : "grid grid-cols-2 gap-x-5 gap-y-2"
-            }
-          >
-            <div className="w-full">
-              <dt className="sr-only">Value</dt>
-              <dd className="break-words text-2xl font-semibold leading-tight [&>span]:text-2xl">
-                <MoneyValue
-                  value={result.value}
-                  rounding={returnedRounding(result.meta)}
-                />
-              </dd>
-            </div>
+          <div className="finstack-valuation__value">
+            <MoneyValue
+              value={result.value}
+              rounding={returnedRounding(result.meta)}
+              prominent
+            />
+          </div>
+          <dl className="finstack-valuation__context">
             <div>
-              <dt className="text-xs text-muted-foreground">Instrument</dt>
-              <dd className="break-all font-mono text-xs">
+              <dt>as of</dt> <dd className="font-mono">{result.as_of}</dd>
+            </div>
+            {model !== undefined && (
+              <div>
+                <dt>model</dt> <dd className="font-mono">{model}</dd>
+              </div>
+            )}
+            <div>
+              <dt className="sr-only">Instrument</dt>
+              <dd className="font-mono text-foreground">
                 {result.instrument_id}
               </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">As of</dt>
-              <dd className="finstack-numeric text-xs">{result.as_of}</dd>
             </div>
           </dl>
           <StampBadge meta={result.meta} compact />
@@ -78,6 +81,8 @@ export function ValuationSummary({
   compareTo,
   compact,
   density,
+  model,
+  comparisonModel,
   loading,
   error,
 }: ValuationSummaryProps) {
@@ -102,12 +107,18 @@ export function ValuationSummary({
           compareTo === undefined ? "grid gap-3" : "grid gap-3 lg:grid-cols-2"
         }
       >
-        <Summary result={result} label="Valuation" compact={compact} />
+        <Summary
+          result={result}
+          label="Valuation"
+          compact={compact}
+          model={model}
+        />
         {compareTo !== undefined && (
           <Summary
             result={compareTo}
             label="Comparison valuation"
             compact={compact}
+            model={comparisonModel}
           />
         )}
       </div>

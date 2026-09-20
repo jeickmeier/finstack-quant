@@ -5,18 +5,35 @@ export function MoneyValue({
   value,
   rounding,
   label,
+  prominent = false,
 }: {
   value: Money | null | undefined;
   rounding?: RoundingStamp;
   label?: string;
+  /** Emphasize the amount while keeping its supplied currency visible. */
+  prominent?: boolean;
 }) {
+  const text = value ? formatMoney(value, rounding) : "—";
   return (
     <span
       aria-label={label}
-      className="finstack-numeric font-sans text-foreground"
+      className={
+        prominent
+          ? "finstack-money finstack-money--prominent finstack-numeric"
+          : "finstack-numeric font-sans text-foreground"
+      }
       title={value?.amount}
     >
-      {value ? formatMoney(value, rounding) : "—"}
+      {prominent && value ? (
+        <>
+          <span className="finstack-money__currency">{value.currency}</span>{" "}
+          <span className="finstack-money__amount">
+            {text.slice(value.currency.length + 1)}
+          </span>
+        </>
+      ) : (
+        text
+      )}
     </span>
   );
 }
