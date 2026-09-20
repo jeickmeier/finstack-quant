@@ -92,6 +92,9 @@ jobs:
         run: npm ci --ignore-scripts
         working-directory: finstack-quant-wasm
 
+      - name: Install component registry dependencies
+        run: mise run ui-sync
+
       - name: Set up Python environment
         run: |
           uv venv --python 3.12

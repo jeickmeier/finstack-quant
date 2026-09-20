@@ -746,6 +746,7 @@ run = [
   { task = "core-gen-data" },
   { task = "rust-gen-schemas" },
   { task = "wasm-gen-bindings" },
+  { task = "ui-gen" },
 ]
 
 [tasks.gen-check]
@@ -758,6 +759,7 @@ before_digest=$(uv run --no-sync python scripts/generation_digest.py)
 mise run core-check-data
 mise run rust-check-schemas
 mise run wasm-check-bindings
+npm --prefix finstack-quant-ui run check:generated
 uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
   || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
 uv run --no-sync python scripts/sync_generated_ts_index.py --check \

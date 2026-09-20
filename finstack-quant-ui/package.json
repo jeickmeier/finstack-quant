@@ -7,7 +7,10 @@
     "node": ">=24 <25"
   },
   "exports": {
-    "./instruments": "./src/generated/instruments.ts"
+    "./instruments": "./src/generated/instruments.ts",
+    "./codec": "./src/codec.mjs",
+    "./host": "./src/host.ts",
+    "./views": "./src/views.ts"
   },
   "scripts": {
     "generate": "node scripts/gen.mjs",

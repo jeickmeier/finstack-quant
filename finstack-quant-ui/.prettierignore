@@ -1,3 +1,5 @@
 src/generated/
 package-lock.json
 node_modules/
+
+src/contract-provenance.json

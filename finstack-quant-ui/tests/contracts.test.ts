@@ -16,7 +16,9 @@ describe("discovered canonical fixtures", () => {
       const second = await entry.loader();
       expect(first).toBe(second);
       expect(first.validator).toBe(second.validator);
-      expect(first.validator.parse(first.example)).toEqual(first.example);
+      expect(
+        JSON.parse(first.codec.stringify(first.validator.parse(first.example))),
+      ).toEqual(first.example);
       const broken = structuredClone(first.example);
       (broken.instrument as { type: string }).type = "__invalid__";
       expect(first.validator.safeParse(broken).success).toBe(false);

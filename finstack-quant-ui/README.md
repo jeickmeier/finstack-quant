@@ -1,7 +1,7 @@
 # Finstack Quant UI contracts
 
-PR-001 of the component registry: offline JSON Schema bundles, generated wire
-interfaces, field metadata, fixture discovery and a lazy instrument catalogue.
+Component registry contracts: offline JSON Schema bundles, generated wire
+interfaces, lossless adapters, source provenance and a lazy instrument catalogue.
 This is a standalone Node 24 package. No registry components ship in this slice.
 
 ```sh
@@ -64,9 +64,35 @@ No financial rules, unit tables or arithmetic are implemented here.
 
 Generated interfaces describe wire shapes and cannot express every runtime
 constraint (bounds, patterns or exclusive unions). They are not WASM host types.
-PR-002 owns lossless wide-integer transport, actual facade-shape checks, contract
-provenance and integration with the repository generation digest. Until then,
-ordinary JSON-number parsing is not a canonical import/export path for integers
-above JavaScript's safe range, and generated validators must not be used on
-structured WASM results containing `bigint` or typed arrays. Later phase gates
-own browser footprint, static worker feasibility and component installation.
+Use each instrument loader's `codec.parse(text)` for JSON input and
+`codec.stringify(value, rustCanonicalizer)` for export. The validator returns UI
+state with schema `int64`/`uint64` fields as bigint; generated wire interfaces
+still describe serialized JSON. Decimal-string money is unchanged. Rounded
+integers and non-JSON host objects fail instead of silently losing information.
+
+`finstack-quant-ui/host` reuses published facade types. `adaptValuation` preserves
+actual structured results, and `exportValuation(result,
+valuations.validateValuationResultJson)` emits integer tokens validated by Rust.
+Only Monte Carlo details have a typed view. The other four variants retain raw
+host values, including bigint counts found in live structured-credit results.
+Cashflow viewers must keep the original Rust JSON string; the live FX-swap
+fixture returns mixed-currency rows despite stale facade documentation.
+
+`src/contract-provenance.json` records canonical schema pointers, exact facade
+signatures and inputs, conventions, raw routes and deferred gaps. It includes
+cube/surface constructors and the Rust authority for scenario-price conventions.
+`getCurveView` projects unchanged stored knots for seven canonical variants;
+base-correlation and parametric variants expose schema-declared fields. It
+expects validated market state and does not rebuild or interpolate curves.
+`getValueView` retains raw values and source help when unit metadata is absent.
+All generated artifacts and provenance participate in the repository digest,
+manifest and `gen-check`; `ui-check` verifies their drift and manifest coverage.
+
+The scoped tests price all five result-detail variants using the actual facade,
+transport an actual derived seed above 2^53, validate a u64::MAX transport-boundary
+mutation through Rust (not a claim of pricing with that seed), compare original
+cashflow text byte for byte, and preserve the published Float64Array return.
+These are Node structured-clone tests. PR-003 owns the production browser-worker
+proof; static export and installation remain later gates. Full `gen-check` and
+Rust schema gates are separate library-wide validation and are not implied by a
+passing `ui-check`.

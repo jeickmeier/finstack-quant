@@ -5,6 +5,7 @@ import { compile } from "json-schema-to-typescript";
 import { z } from "zod";
 import { bundleRoot, json, readContracts } from "./schema.mjs";
 import { converterSchema } from "../src/schema.mjs";
+import { generateProvenance } from "./provenance.mjs";
 
 export const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 export const repoRoot = resolve(packageRoot, "..");
@@ -121,7 +122,7 @@ export async function generate(repo = repoRoot) {
       files.set(`examples/${name}.json`, examples[0].text);
       files.set(
         `instrument/${name}.ts`,
-        `${header}import { z } from "zod";\nimport { converterSchema } from "../../schema.mjs";\nimport schema from "../schemas/${name}.json";\nexport { default as metadata } from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport { schema };\nexport const validator = z.fromJSONSchema(converterSchema(schema));\n`,
+        `${header}import { createWireCodec } from "../../codec.mjs";\nimport schema from "../schemas/${name}.json";\nexport { default as metadata } from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport { schema };\nexport const codec = createWireCodec(schema);\nexport const validator = codec.validator;\n`,
       );
       catalogue.push(
         `  { type: ${JSON.stringify(type)}, title: ${JSON.stringify(root.title)}, group: ${JSON.stringify(root.$id.split("/").at(-2))}, loader: () => import("./instrument/${name}") }`,
@@ -178,11 +179,20 @@ if (
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const files = await generate();
-  await writeGenerated(
-    files,
-    resolve(packageRoot, "src/generated"),
-    process.argv.includes("--check"),
+  const check = process.argv.includes("--check");
+  const provenance = await generateProvenance(
+    repoRoot,
+    await readContracts(repoRoot),
+    files.get("fixtures.json"),
   );
+  files.set("curve-views.json", json(provenance.curves));
+  await writeGenerated(files, resolve(packageRoot, "src/generated"), check);
+  const inventoryPath = resolve(packageRoot, "src/contract-provenance.json");
+  const inventory = json(provenance.inventory);
+  if (check) {
+    if ((await readFile(inventoryPath, "utf8").catch(() => null)) !== inventory)
+      throw new Error("Contract provenance drift; run mise run ui-gen.");
+  } else await writeFile(inventoryPath, inventory);
   console.log(
     `${process.argv.includes("--check") ? "Checked" : "Generated"} ${files.size} UI contract files.`,
   );
