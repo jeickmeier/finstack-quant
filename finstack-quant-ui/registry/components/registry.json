@@ -51,6 +51,11 @@
           "path": "schema-form/issue-mapping.ts",
           "type": "registry:component",
           "target": "components/finstack/components/schema-form/issue-mapping.ts"
+        },
+        {
+          "path": "schema-form/field-renderer.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/field-renderer.ts"
         }
       ],
       "registryDependencies": [
@@ -246,6 +251,32 @@
         "@finstack/covenant-report"
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "market-context-form",
+      "type": "registry:component",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries and prices; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "files": [
+        {
+          "path": "market-context-form/market-context-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/market-context-form/market-context-form.tsx"
+        },
+        {
+          "path": "market-context-form/market.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/market-context-form/market.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/schema-form",
+        "@finstack/knot-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/contract-market-context-state",
+        "@finstack/finstack-fixtures"
+      ],
+      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"]
     }
   ]
 }

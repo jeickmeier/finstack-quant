@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Fieldset, buttonClass } from "@/lib/finstack/form";
 import { EnumField } from "../../primitives/enum-field/enum-field";
+import { FieldRendererContext } from "./field-renderer";
 import { discriminator } from "./discriminator";
 import {
   resolve,
@@ -38,6 +39,7 @@ export function RenderField({
   fields?: FieldFilter;
 }) {
   const [more, setMore] = useState(false);
+  const render = useContext(FieldRendererContext);
   const within = (child: string, parent: string) =>
     child === parent ||
     child.startsWith(`${parent}.`) ||
@@ -117,6 +119,8 @@ export function RenderField({
       </div>
     );
   if (Object.hasOwn(schema, "const")) return null;
+  const custom = render?.({ form, location: resolved, path, label, value });
+  if (custom !== undefined) return custom;
   if (!required && !nonNull)
     return (
       <div className="col-span-full space-y-2">

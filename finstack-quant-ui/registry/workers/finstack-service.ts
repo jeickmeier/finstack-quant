@@ -67,6 +67,16 @@ export function createService(native: {
         json: instruments.validateInstrumentJson(request.instrumentJson),
       }));
     },
+    validateMarket(json) {
+      return result(() => {
+        const handle = new native.valuations.Market(json);
+        try {
+          return handle.toJson();
+        } finally {
+          handle.free();
+        }
+      });
+    },
     cashflows(request) {
       return result(() =>
         instruments.instrumentCashflowsWithMarketJson(

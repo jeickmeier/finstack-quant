@@ -88,6 +88,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+    },
+    {
+      "name": "use-market-validator",
+      "type": "registry:hook",
+      "docs": "Canonicalize complete markets through the shared native worker. Aborted validations never replace active edits.",
+      "files": [
+        {
+          "path": "use-market-validator/use-market-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-market-validator/use-market-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

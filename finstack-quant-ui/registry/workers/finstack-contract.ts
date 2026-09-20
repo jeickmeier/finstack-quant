@@ -36,6 +36,8 @@ export interface WorkerApi {
   validate(
     request: ValidationRequest,
   ): Promise<Envelope<{ revision: string | number; json: string }>>;
+  /** Canonicalize the complete market through its native constructor. */
+  validateMarket(marketJson: string): Promise<Envelope<string>>;
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;
   models(): Promise<Envelope<Record<string, string[]>>>;
   metrics(): Promise<Envelope<Record<string, string[]>>>;

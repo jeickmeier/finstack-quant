@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@tanstack/react-form";
 import { useAppForm, focusFormIssue } from "@/lib/finstack/form";
+import { FieldRendererContext, type FieldRenderer } from "./field-renderer";
 import { RenderField } from "./render-field";
 import {
   structuralValidator,
@@ -22,6 +23,9 @@ export interface SchemaFormProps {
   layout?: "basic" | "full";
   /** Canonical field paths, including instrument.spec. Hidden fields retain their values. */
   fields?: FieldFilter;
+  /** Replace presentation for selected schema fields while retaining shared validation. */
+  renderField?: FieldRenderer;
+  submitLabel?: string;
   /** Connect useInstrumentValidator() inside FinstackProvider; returns native canonical JSON. */
   validate(json: string, signal?: AbortSignal): Promise<string>;
   /** Receives canonical native JSON only after valid submission. Never replaces active working values. */
@@ -157,27 +161,33 @@ export function SchemaForm(props: SchemaFormProps) {
         });
       }}
     >
-      <form.AppForm>
-        <form.ErrorSummary errors={[submitError ?? native.error]} />
-        <form.Subscribe selector={(state) => state.values}>
-          {(value) => (
-            <RenderField
-              module={props.module}
-              form={form}
-              location={{ schema: props.module.schema, pointer: "#" }}
-              path=""
-              label={props.module.schema.title ?? "Instrument"}
-              value={value}
-              layout={props.layout ?? "basic"}
-              fields={props.fields}
+      <FieldRendererContext.Provider value={props.renderField}>
+        <form.AppForm>
+          <form.ErrorSummary errors={[submitError ?? native.error]} />
+          <form.Subscribe selector={(state) => state.values}>
+            {(value) => (
+              <RenderField
+                module={props.module}
+                form={form}
+                location={{ schema: props.module.schema, pointer: "#" }}
+                path=""
+                label={props.module.schema.title ?? "Instrument"}
+                value={value}
+                layout={props.layout ?? "basic"}
+                fields={props.fields}
+              />
+            )}
+          </form.Subscribe>
+          <div className="flex gap-2">
+            <form.SubmitButton
+              label={props.submitLabel}
+              disabled={native.pending}
+              allowInvalidSubmission
             />
-          )}
-        </form.Subscribe>
-        <div className="flex gap-2">
-          <form.SubmitButton disabled={native.pending} allowInvalidSubmission />
-          <form.ResetButton onReset={() => props.onValidated?.(null)} />
-        </div>
-      </form.AppForm>
+            <form.ResetButton onReset={() => props.onValidated?.(null)} />
+          </div>
+        </form.AppForm>
+      </FieldRendererContext.Provider>
     </form>
   );
 }
