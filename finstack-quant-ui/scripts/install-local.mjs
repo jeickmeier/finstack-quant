@@ -1,18 +1,9 @@
 import { loadRegistry } from "shadcn/registry";
 import { spawn } from "node:child_process";
-import {
-  readFile,
-  writeFile,
-  mkdtemp,
-  readdir,
-  rm,
-  mkdir,
-  cp,
-} from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile, rm, mkdir, cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { serveExport } from "../tests/browser/static-server.mjs";
+import { serveLocalRegistry } from "./local-registry.mjs";
 
 // Exercise the actual pinned installer against a fresh local registry build.
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -24,25 +15,13 @@ const names = isDocs
   ? (await loadRegistry({ cwd: root })).items.map(
       (item) => `@finstack/${item.name}`,
     )
-  : ["@finstack/pricing-workbench"];
+  : [
+      "@finstack/pricing-workbench",
+      ...process.argv.slice(3).map((name) => `@finstack/${name}`),
+    ];
 const cssPath = path.join(consumer, JSON.parse(original).tailwind.css);
 const originalCss = isDocs ? await readFile(cssPath, "utf8") : null;
-const staged = await mkdtemp(path.join(tmpdir(), "finstack-local-registry-"));
-// The npm release is not published yet. Only dependency transport changes;
-// registry source content and the pinned dependency version remain untouched.
-const wasm = path.resolve(root, "../finstack-quant-wasm");
-for (const name of await readdir(path.join(root, "public/r"))) {
-  if (!name.endsWith(".json")) continue;
-  const item = JSON.parse(
-    await readFile(path.join(root, "public/r", name), "utf8"),
-  );
-  if (item.dependencies)
-    item.dependencies = item.dependencies.map((value) =>
-      value === "finstack-quant-wasm@0.8.0" ? `file:${wasm}` : value,
-    );
-  await writeFile(path.join(staged, name), JSON.stringify(item));
-}
-const server = await serveExport(staged);
+const server = await serveLocalRegistry(root);
 try {
   const config = JSON.parse(original);
   config.registries["@finstack"] = `${server.url}/{name}.json`;
@@ -87,5 +66,4 @@ try {
   if (originalCss !== null) await writeFile(cssPath, originalCss);
   await writeFile(configPath, original);
   await server.close();
-  await rm(staged, { recursive: true, force: true });
 }

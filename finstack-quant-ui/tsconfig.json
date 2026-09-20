@@ -25,5 +25,5 @@
     "registry/**/*.tsx",
     "tests/**/*.tsx"
   ],
-  "exclude": ["tests/browser/fixture"]
+  "exclude": ["tests/browser/fixture", "tests/install/fixture"]
 }

@@ -16,6 +16,7 @@ export function CashflowViewer({
   return (
     <JsonViewer
       label="Cashflows"
+      downloadName="cashflows.json"
       text={query.data}
       density={density}
       loading={query.isFetching || query.workerStatus === "starting"}

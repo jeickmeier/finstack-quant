@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       registry_only:
-        description: Run only the component registry gallery
+        description: Run only component registry gallery and independent installs
         type: boolean
         default: false
 

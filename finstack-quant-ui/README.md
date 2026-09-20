@@ -396,3 +396,30 @@ these baselines do not certify rendering on other operating systems.
 
 The shared docs gallery proves composition. Independent installation and desktop
 publishing have separate gates and evidence.
+
+## Independent installation gate
+
+After a fresh `mise run wasm-pkg`, run `mise run ui-install`. It builds the registry,
+initializes a separate Next 16/Base UI application outside the repository for
+**every catalogue item**, and asks the pinned CLI to add exactly that item. Each
+consumer gets its declared dependency closure, a production build, a type check
+and a served Chromium render/import check. Required unpublished WASM packages
+are copied from an absolute local path before registry resolution.
+
+Only after all independent installs pass does the gate run a separate composed
+workbench and table/chart selection consumer at root and deployment base paths.
+It exercises the real worker, edited inputs, wide integers, structured failures,
+font/worker/WASM assets, native-result agreement and exact cashflow output.
+Standalone chart and financial-wrapper checks use their public callbacks, tooltip
+props and shared SVG/PNG handles. `CashflowViewer` offers an exact-text JSON
+download; it does not parse or reserialize the native export.
+
+Set `REGISTRY_INSTALL_EVIDENCE` and `REGISTRY_SMOKE_DIR` to retain matrix and
+composition reports, logs, screenshots and exports. Failed applications are kept
+at the paths in the report. `REGISTRY_INSTALL_CONCURRENCY` accepts 1–4 independent
+consumers (default 1). A focused diagnostic run can invoke
+`node finstack-quant-ui/scripts/install-matrix.mjs` with
+`REGISTRY_INSTALL_ITEMS=finstack-chart,cashflow-viewer`; its report is explicitly a
+subset and cannot satisfy `ui-install`. The faster `ui-install-smoke` workbench
+check remains available. The dedicated CI `ui-install` job consumes the gallery
+job's fresh native packages and runs the complete gate.

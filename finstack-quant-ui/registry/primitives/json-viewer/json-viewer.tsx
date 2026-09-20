@@ -7,12 +7,15 @@ export function JsonViewer({
   label = "JSON",
   loading = false,
   error,
+  downloadName,
   density = "compact",
 }: {
   text: string | null | undefined;
   label?: string;
   loading?: boolean;
   error?: string;
+  /** Optional filename for downloading the exact supplied text without reserialization. */
+  downloadName?: string;
   density?: "compact" | "comfortable";
 }) {
   const [copyStatus, setCopyStatus] = useState<{
@@ -49,6 +52,24 @@ export function JsonViewer({
         >
           Print
         </Button>
+        {downloadName && (
+          <Button
+            disabled={!present}
+            onClick={() => {
+              const url = URL.createObjectURL(
+                new Blob([text!], { type: "application/json;charset=utf-8" }),
+              );
+              const anchor = document.createElement("a");
+              anchor.href = url;
+              anchor.download = downloadName;
+              anchor.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}
+            className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Download
+          </Button>
+        )}
         <span role="status" className="text-xs">
           {copyStatus && copyStatus.text === text ? copyStatus.message : ""}
         </span>

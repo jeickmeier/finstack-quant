@@ -1,4 +1,4 @@
-name: Component Registry Gallery
+name: Component Registry
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   gallery:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       MISE_TASK_RUN_AUTO_INSTALL: "false"
       CARGO_BUILD_JOBS: "2"
@@ -60,6 +60,15 @@ jobs:
           shared-key: registry-gallery
       - name: Build native packages for the registry consumer
         run: mise run wasm-pkg
+      - name: Retain freshly built native packages for isolated installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-native-packages
+          path: |
+            finstack-quant-wasm/pkg
+            finstack-quant-wasm/pkg-node
+          compression-level: 0
+          include-hidden-files: true
       - name: Install locked consumer dependencies
         run: |
           npm --prefix finstack-quant-ui ci --ignore-scripts
@@ -76,4 +85,45 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: registry-gallery-results
+          path: finstack-quant-ui/test-results
+
+  install:
+    name: ui-install
+    needs: gallery
+    runs-on: macos-15
+    timeout-minutes: 180
+    env:
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+      REGISTRY_INSTALL_CONCURRENCY: "2"
+      REGISTRY_INSTALL_EVIDENCE: ${{ github.workspace }}/finstack-quant-ui/test-results/install
+      REGISTRY_SMOKE_DIR: ${{ github.workspace }}/finstack-quant-ui/test-results/composition
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+          cache: npm
+          cache-dependency-path: finstack-quant-ui/package-lock.json
+      - uses: jdx/mise-action@v4
+        with:
+          install: false
+          add_shims_to_path: false
+          export_path: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: registry-native-packages
+          path: finstack-quant-wasm
+      - name: Install locked registry and docs dependencies
+        run: |
+          npm --prefix finstack-quant-ui ci --ignore-scripts
+          npm --prefix docs-site ci --ignore-scripts
+          npm --prefix finstack-quant-ui exec -- playwright install chromium
+      - name: Check every isolated item before composing production consumers
+        run: mise run ui-install
+      - name: Retain complete install and composition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-install-results
           path: finstack-quant-ui/test-results

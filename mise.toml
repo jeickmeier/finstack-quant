@@ -1038,3 +1038,8 @@ run = "node finstack-quant-ui/tests/browser/install-smoke.mjs"
 [tasks.ui-e2e]
 description = "Verify served registry gallery screenshots, accessibility and keyboard interactions"
 run = "npm --prefix finstack-quant-ui run test:e2e --"
+
+[tasks.ui-install]
+description = "Install every registry item in isolation, then verify composed production consumers"
+depends = ["ui-build"]
+run = ["REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs", "mise run ui-docs-install", "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs"]

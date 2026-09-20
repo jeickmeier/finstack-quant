@@ -106,7 +106,13 @@ await writeFile(
 await run("npm", ["install", "--ignore-scripts", "--install-links"], external);
 await run(
   process.execPath,
-  [path.join(ui, "scripts/install-local.mjs"), external],
+  [
+    path.join(ui, "scripts/install-local.mjs"),
+    external,
+    ...(process.env.REGISTRY_INSTALL_COMPOSITION === "1"
+      ? ["curve-link-example"]
+      : []),
+  ],
   repo,
 );
 await writeFile(
@@ -140,6 +146,13 @@ const installedHash = createHash("sha256")
   )
   .digest("hex");
 if (installedHash !== hash) throw new Error("Installed WASM artifact changed");
+if (process.env.REGISTRY_INSTALL_COMPOSITION === "1") {
+  await mkdir(path.join(external, "app/registry-selection"));
+  await writeFile(
+    path.join(external, "app/registry-selection/page.tsx"),
+    '"use client";import {CurveLinkExample} from "@/components/finstack/components/curve-link-example/curve-link-example";export default function Page(){return <main className="finstack-surface"><h1>Independent selection composition</h1><CurveLinkExample/></main>}',
+  );
+}
 await installProbe(external);
 process.env.REGISTRY_TEST_PROBE = "1";
 for (const [consumer, route, build] of [
@@ -185,6 +198,22 @@ for (const [consumer, route, build] of [
         REGISTRY_EXPECTED_WASM_SHA256: hash,
       },
     );
+    if (
+      consumer === "external" &&
+      process.env.REGISTRY_INSTALL_COMPOSITION === "1"
+    )
+      await run(
+        process.execPath,
+        [path.join(ui, "tests/install/composition.mjs")],
+        repo,
+        {
+          REGISTRY_EXPORT_DIR: path.join(app, "out"),
+          REGISTRY_SELECTION_REPORT: path.join(
+            evidence,
+            `selection-${deployment}.json`,
+          ),
+        },
+      );
     await run(
       process.execPath,
       [path.join(import.meta.dirname, "smoke.mjs")],
