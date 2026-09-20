@@ -21,6 +21,39 @@
         "@finstack/finstack-chart",
         "@finstack/use-linked-selection"
       ]
+    },
+    {
+      "name": "schema-form",
+      "type": "registry:component",
+      "docs": "Bond-subset generated schema form. Supply a lazy generated instrument module and useInstrumentValidator from the shared worker; canonical JSON is emitted only on valid submit. Basic mode hides defaulted fields. Broader renderer coverage remains gated.",
+      "files": [
+        {
+          "path": "schema-form/schema-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/schema-form.tsx"
+        },
+        {
+          "path": "schema-form/render-field.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/render-field.tsx"
+        },
+        {
+          "path": "schema-form/schema.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/schema.ts"
+        },
+        {
+          "path": "schema-form/discriminator.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/discriminator.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-form",
+        "@finstack/finstack-codec",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["react@19.2.8", "zod@4.6.5"]
     }
   ]
 }

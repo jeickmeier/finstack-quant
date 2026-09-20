@@ -60,6 +60,20 @@
         }
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "use-instrument-validator",
+      "type": "registry:hook",
+      "docs": "Native SchemaForm validation using the existing FinstackProvider worker. Returns canonical JSON and rejects superseded revisions; does not write canonical output into active edits.",
+      "files": [
+        {
+          "path": "use-instrument-validator/use-instrument-validator.ts",
+          "type": "registry:hook",
+          "target": "~/hooks/use-instrument-validator/use-instrument-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

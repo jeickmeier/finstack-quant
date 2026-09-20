@@ -1,0 +1,35 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "schema-form",
+    "finstack-form",
+    "field-frame",
+    "finstack-base",
+    "finstack-theme",
+    "decimal-input",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "primitive-contracts",
+    "date-input",
+    "enum-field",
+    "contract-bond",
+    "use-instrument-validator",
+    "use-finstack",
+    "finstack-worker"
+  ],
+  "checks": [
+    "lazy generated bond module",
+    "actual shared WASM worker validation",
+    "inline decimal-pattern errors",
+    "canonical native output",
+    "working text retained after canonicalization",
+    "basic/full fields",
+    "accessible generated controls"
+  ],
+  "failures": [],
+  "accessibility": [],
+  "wasmRequests": 1,
+  "verdict": "pass"
+}

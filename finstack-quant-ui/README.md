@@ -275,3 +275,24 @@ accepted state again there would duplicate the native selection proposal. Shared
 cursors use a parent-owned native `createChartCursor`, with explicitly compatible
 coordinates. See the installable `LinkedFigureExample` and [PR-011 evidence](evidence/pr-011.md).
 The hook imports only React; chart-only consumers load neither tables nor WASM.
+
+## Bond schema form
+
+Install `schema-form`, `contract-bond` and `use-instrument-validator`. Inside the
+existing `FinstackProvider`, call `useInstrumentValidator()` and pass its result
+as `validate` to `SchemaForm`. Supply the lazily imported generated bond module
+as `module`; `onSubmit(json)` receives native canonical JSON. The form uses the
+module's example initially, or supplied `defaultValues`. Remount when switching
+instruments so active edits are never replaced by new defaults.
+
+Structural validation runs on changes; native validation is debounced and ignores
+superseded responses. Numeric edit text is converted at validation/output boundaries;
+exact decimal text and full-width integers retain their canonical representations.
+`layout="basic"` hides defaulted fields under More; `layout="full"` exposes them.
+`fields={{ allow, deny }}` uses canonical paths such as
+`instrument.spec.notional.amount` and preserves hidden values. Schema errors appear
+under fields where mapped, with remaining native errors in the summary.
+
+The shared field kit is available through `useAppForm`. Bond-subset evidence is
+recorded in [PR-012](evidence/pr-012.md); complete cross-instrument rendering and
+field-error mapping remain separate planned slices.

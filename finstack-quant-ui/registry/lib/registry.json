@@ -1,1 +1,24 @@
-{ "$schema": "https://ui.shadcn.com/schema/registry.json", "items": [] }
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "finstack-form",
+      "type": "registry:ui",
+      "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary.",
+      "files": [
+        {
+          "path": "finstack-form/form.tsx",
+          "type": "registry:lib",
+          "target": "lib/finstack/form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/field-frame",
+        "@finstack/decimal-input",
+        "@finstack/date-input",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"]
+    }
+  ]
+}

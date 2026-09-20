@@ -12,7 +12,9 @@
     "baseUrl": ".",
     "paths": {
       "@/lib/finstack/*": ["src/*"],
-      "@/hooks/*": ["registry/hooks/*"]
+      "@/hooks/*": ["registry/hooks/*"],
+      "@/components/finstack/*": ["registry/*"],
+      "@/lib/finstack/form": ["registry/lib/finstack-form/form.tsx"]
     },
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
