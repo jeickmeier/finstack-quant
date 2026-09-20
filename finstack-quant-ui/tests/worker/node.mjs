@@ -17,6 +17,18 @@ class Market extends wasm.Market {
     freed++;
   }
 }
+let fxConstructed = 0,
+  fxFreed = 0;
+class FxDeltaVolSurface extends wasm.FxDeltaVolSurface {
+  constructor(...args) {
+    super(...args);
+    fxConstructed++;
+  }
+  free() {
+    super.free();
+    fxFreed++;
+  }
+}
 const service = createService({
   initialize: async () => {
     if (workerData.fail)
@@ -26,7 +38,8 @@ const service = createService({
         cause: new Error("fixture cause"),
       });
   },
-  core: wasm,
+  core: { ...wasm, FxDeltaVolSurface },
+  models: { volatility: { getFxDeltaVol: wasm.getFxDeltaVol } },
   valuations: {
     Market,
     validateValuationResultJson: wasm.validateValuationResultJson,
@@ -40,6 +53,9 @@ const service = createService({
   },
 });
 expose(
-  { ...service, resources: () => ({ constructed, freed, calls }) },
+  {
+    ...service,
+    resources: () => ({ constructed, freed, calls, fxConstructed, fxFreed }),
+  },
   nodeEndpoint(parentPort),
 );

@@ -102,6 +102,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "use-fx-delta-samples",
+      "type": "registry:hook",
+      "docs": "Native FX delta-surface evaluation with complete immutable quote/coordinate/forward keys. Null means no sampling request. Requires FinstackQueryProvider; returns annualized Black decimal volatilities or native errors.",
+      "files": [
+        {
+          "path": "use-fx-delta-samples/use-fx-delta-samples.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-fx-delta-samples/use-fx-delta-samples.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
     }
   ]
 }

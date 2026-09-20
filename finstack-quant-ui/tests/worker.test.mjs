@@ -167,7 +167,7 @@ it("keeps four native handles, refreshes recency, frees eviction and disposal", 
     unwrap(
       await local.proxy.price({ ...requests.bond, marketJson: markets[4] }),
     );
-    expect(await local.proxy.resources()).toEqual({
+    expect(await local.proxy.resources()).toMatchObject({
       constructed: 5,
       freed: 1,
       calls: 6,

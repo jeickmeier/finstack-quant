@@ -1,3 +1,4 @@
+import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import type { ValuationResult } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
@@ -14,6 +15,15 @@ export interface CashflowRequest {
   readonly marketJson: string;
   readonly asOf: string;
   readonly model: string;
+}
+export interface FxDeltaSampleRequest {
+  readonly surface: MarketContextStateWire["fx_delta_vol_surfaces"][number];
+  /** Explicit years, strike and quote/base forward per sample, in original order. */
+  readonly coordinates: readonly {
+    expiry: number;
+    strike: number;
+    forward: number;
+  }[];
 }
 export interface ValidationRequest {
   readonly instrumentJson: string;
@@ -38,6 +48,7 @@ export interface WorkerApi {
   ): Promise<Envelope<{ revision: string | number; json: string }>>;
   /** Canonicalize the complete market through its native constructor. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
+  sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;
   models(): Promise<Envelope<Record<string, string[]>>>;
   metrics(): Promise<Envelope<Record<string, string[]>>>;

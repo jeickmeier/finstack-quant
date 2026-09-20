@@ -1,11 +1,13 @@
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 export type StoredSurface = MarketContextStateWire["surfaces"][number];
-export interface SurfaceNode {
-  surface: StoredSurface;
+export interface SurfacePoint {
   expiry: number;
   secondary: number;
   value: number;
   key: string;
+}
+export interface SurfaceNode extends SurfacePoint {
+  surface: StoredSurface;
 }
 /** Exact row-major lookup; this adapter never interpolates or converts volatility. */
 export function surfaceNodes(surface: StoredSurface): SurfaceNode[] {
@@ -38,8 +40,8 @@ export function surfaceLabels(surface: StoredSurface) {
   };
 }
 /** Selected stored row and column retain the exact same node references. */
-export function surfaceSlices(
-  nodes: readonly SurfaceNode[],
+export function surfaceSlices<T extends SurfacePoint>(
+  nodes: readonly T[],
   key: string | null,
 ) {
   const selected = nodes.find((node) => node.key === key);

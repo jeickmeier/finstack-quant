@@ -1,0 +1,58 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "market-context-form",
+    "schema-form",
+    "finstack-form",
+    "field-frame",
+    "finstack-base",
+    "finstack-theme",
+    "decimal-input",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "primitive-contracts",
+    "date-input",
+    "enum-field",
+    "knot-table",
+    "finstack-table",
+    "use-linked-selection",
+    "json-viewer",
+    "contract-market-context-state",
+    "finstack-fixtures",
+    "contract-bond",
+    "use-market-validator",
+    "use-finstack",
+    "finstack-worker",
+    "fx-surface-chart",
+    "vol-surface-chart",
+    "finstack-chart",
+    "fx-delta-quotes",
+    "use-fx-delta-samples"
+  ],
+  "before": [
+    0.078, 0.08, 0.09725887618833025, 0.0873029354887523, 0.09,
+    0.10359504173110316
+  ],
+  "changedForward": [
+    0.078, 0.08, 0.09411191097662086, 0.0865, 0.09, 0.1011128589327501
+  ],
+  "changedQuote": [
+    0.078, 0.08, 0.09411191097662086, 0.0915, 0.095, 0.10549691277191336
+  ],
+  "sampleCalls": 4,
+  "accessibility": [
+    {
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "wasmRequests": 1,
+  "failures": [],
+  "verdict": "pass"
+}

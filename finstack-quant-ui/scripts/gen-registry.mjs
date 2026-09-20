@@ -96,7 +96,10 @@ const items = [
       type: "registry:file",
       target: `workers/${name}`,
     })),
-    registryDependencies: ["@finstack/finstack-codec"],
+    registryDependencies: [
+      "@finstack/finstack-codec",
+      "@finstack/contract-market-context-state",
+    ],
     dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
   },
   item(

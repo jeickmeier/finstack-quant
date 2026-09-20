@@ -1,10 +1,11 @@
-import type { core, valuations, Market } from "finstack-quant-wasm";
+import type { core, valuations, models, Market } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
-  core: Pick<typeof core, "availableCalendars">;
+  core: Pick<typeof core, "availableCalendars" | "FxDeltaVolSurface">;
+  models: { volatility: Pick<typeof models.volatility, "getFxDeltaVol"> };
   valuations: Pick<
     typeof valuations,
     "Market" | "instruments" | "validateValuationResultJson"
@@ -72,6 +73,32 @@ export function createService(native: {
         const handle = new native.valuations.Market(json);
         try {
           return handle.toJson();
+        } finally {
+          handle.free();
+        }
+      });
+    },
+    sampleFxDelta(request) {
+      return result(() => {
+        const s = request.surface;
+        const handle = new native.core.FxDeltaVolSurface(
+          s.id,
+          s.expiries,
+          s.atm_vols,
+          s.rr_25d,
+          s.bf_25d,
+          s.rr_10d ?? undefined,
+          s.bf_10d ?? undefined,
+        );
+        try {
+          return request.coordinates.map((c) =>
+            native.models.volatility.getFxDeltaVol(
+              handle,
+              c.expiry,
+              c.strike,
+              c.forward,
+            ),
+          );
         } finally {
           handle.free();
         }
