@@ -1,0 +1,34 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": ["finstack-chart", "finstack-base", "finstack-theme"],
+  "exports": [
+    {
+      "theme": "light",
+      "which": "small",
+      "values": 9,
+      "outside": []
+    },
+    {
+      "theme": "light",
+      "which": "large",
+      "values": 0,
+      "outside": []
+    },
+    {
+      "theme": "dark",
+      "which": "small",
+      "values": 9,
+      "outside": []
+    },
+    {
+      "theme": "dark",
+      "which": "large",
+      "values": 0,
+      "outside": []
+    }
+  ],
+  "accessibilityViolations": 0,
+  "wasmRequests": 0,
+  "failures": [],
+  "verdict": "pass"
+}

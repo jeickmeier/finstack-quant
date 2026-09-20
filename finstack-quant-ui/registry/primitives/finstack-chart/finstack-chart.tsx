@@ -14,6 +14,7 @@ import { composeFigure, figureRenderer, type FigureSpec } from "./figure";
 import { readPresentation, type FigurePresentation } from "./presentation";
 import { exportFigure, type FigureExportOptions } from "./export";
 export type { FigureSpec, FigureExportOptions };
+export { heatmap } from "./heatmap";
 export { chartSelection } from "./selection";
 /** Native notifications preserve original data; onSelect reports activation, not acceptance. */
 export type FigureInteractions<
@@ -101,7 +102,11 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
     () =>
       presentation
         ? composeFigure(
-            { ...prose, definition, ariaLabel: props.ariaLabel },
+            {
+              ...prose,
+              definition,
+              ariaLabel: props.ariaLabel,
+            },
             presentation,
           )
         : null,

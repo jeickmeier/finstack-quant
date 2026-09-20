@@ -73,7 +73,7 @@
   --diverging-neutral: #eeefeb;
   --diverging-positive: #176848;
   --cell-light: #ffffff;
-  --cell-dark: #121b19;
+  --cell-dark: #000000;
 }
 [data-theme="dark"] {
   --background: #121b19;
@@ -113,7 +113,7 @@
   --diverging-neutral: #26342e;
   --diverging-positive: #77cc9d;
   --cell-light: #ffffff;
-  --cell-dark: #121b19;
+  --cell-dark: #000000;
 }
 [data-density="compact"] {
   --row-height: 28px;

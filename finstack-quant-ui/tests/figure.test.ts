@@ -19,6 +19,12 @@ const presentation: FigurePresentation = {
     background: tokens.light.background,
     palette: [tokens.light["chart-1"]],
   },
+  cellText: {
+    light: tokens.light["cell-light"],
+    dark: tokens.light["cell-dark"],
+    size: 11,
+  },
+  ramps: { sequential: [], diverging: [] },
   fontFamily: tokens.theme["font-sans"],
   titleSize: 16,
   bodySize: 14,

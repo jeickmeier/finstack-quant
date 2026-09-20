@@ -20,6 +20,8 @@ export interface FigureText {
 }
 export interface FigurePresentation {
   theme: ChartTheme;
+  cellText: { light: string; dark: string; size: number };
+  ramps: Record<"sequential" | "diverging", readonly string[]>;
   fontFamily: string;
   titleSize: number;
   bodySize: number;
@@ -63,6 +65,19 @@ export function readPresentation(element: HTMLElement): FigurePresentation {
       grid: token("border"),
       background: token("background"),
       palette: Array.from({ length: 6 }, (_, i) => token(`chart-${i + 1}`)),
+    },
+    cellText: {
+      light: token("cell-light"),
+      dark: token("cell-dark"),
+      size: number("text-xs"),
+    },
+    ramps: {
+      sequential: Array.from({ length: 9 }, (_, i) =>
+        token(`sequential-${i + 1}`),
+      ),
+      diverging: ["negative", "neutral", "positive"].map((name) =>
+        token(`diverging-${name}`),
+      ),
     },
     fontFamily: css.fontFamily,
     titleSize: number("text-lg"),

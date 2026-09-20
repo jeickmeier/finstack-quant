@@ -18,7 +18,9 @@ export interface FigureSpec<
   Y extends ChartValue,
 > extends FigureText {
   /** Native scales, axis/unit labels, legend and data-coordinate annotation marks; no alternate grammar. */
-  definition: DomChartDefinition<T, X, Y>;
+  definition:
+    | DomChartDefinition<T, X, Y>
+    | ((presentation: FigurePresentation) => DomChartDefinition<T, X, Y>);
   ariaLabel: string;
   ariaDescription?: string;
 }
@@ -27,6 +29,10 @@ export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
   props: FigureSpec<T, X, Y>,
   presentation: FigurePresentation,
 ) {
+  const supplied =
+    typeof props.definition === "function"
+      ? props.definition(presentation)
+      : props.definition;
   // Responsive runtime options override the returned spec. Carry only native
   // interaction options forward, so original static scales/color cannot undo layout.
   const {
@@ -39,7 +45,7 @@ export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
     theme: _theme,
     guides: _guides,
     ...options
-  } = props.definition as StaticChartDefinition<T, X, Y, "dom">;
+  } = supplied as StaticChartDefinition<T, X, Y, "dom">;
   const definition: DomChartDefinition<T, X, Y> = {
     ...options,
     chart(context) {
@@ -54,9 +60,13 @@ export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
         height: context.height - layout.top - layout.bottom,
       };
       const source =
-        "chart" in props.definition
-          ? props.definition.chart({ ...context, ...size })
-          : props.definition;
+        "chart" in supplied
+          ? supplied.chart({
+              ...context,
+              ...size,
+              defaultTheme: presentation.theme,
+            })
+          : supplied;
       const spec = {
         ...source,
         scales: Object.fromEntries(
