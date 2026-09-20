@@ -207,3 +207,157 @@ it("retains independent supplied model context and exact large money while prese
     ).queryByText("discounting"),
   ).toBeNull();
 });
+
+const riskGroups = { Risk: ["bucketed_dv01", "bucketed_cs01", "cs01"] };
+function bucketCell(key: string, column = 1) {
+  return screen.getByText(key, { exact: true }).closest("tr")!.children[
+    column
+  ] as HTMLElement;
+}
+function bucketFill(key: string, column = 1) {
+  return bucketCell(key, column).querySelector<HTMLElement>(
+    "[data-bucket-bar-fill]",
+  );
+}
+it("draws signed qualified bucket rows, preserves opaque labels and leaves scalars/missing/nonfinite values ungraphed", () => {
+  const measures = {
+    "bucketed_dv01::USD_x3a_x3aOIS::5y": -100,
+    "bucketed_dv01::USD_x3a_x3aOIS::2y": 50,
+    "bucketed_dv01::USD_x3a_x3aOIS::zero": 0,
+    "bucketed_cs01::ACME::4y@2028-01-05@quote-1": -2,
+    "bucketed_dv01::USD_x3a_x3aOIS": 1000,
+    bucketed_dv01: 1000,
+    "cs01::ACME": -200,
+    "bucketed_dv01::USD::5y::extra": 200,
+    "bucketed_dv01::::5y": 200,
+    "bucketed_cs01::ACME::": 200,
+    "unrelated::ACME::5y": 200,
+    "bucketed_dv01::USD::bad": NaN,
+    "bucketed_cs01::ACME::infinite": Infinity,
+  };
+  render(
+    <MeasuresGrid
+      result={{ ...fixture.result, measures }}
+      compareTo={{
+        ...fixture.result,
+        measures: { "bucketed_dv01::OTHER::1y": 2 },
+      }}
+      groups={riskGroups}
+    />,
+  );
+  for (const [key, value] of Object.entries(measures)) {
+    expect(
+      bucketCell(key)
+        .querySelector(":scope > span[title]")
+        ?.getAttribute("title"),
+    ).toBe(String(value));
+  }
+  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::5y")?.style.cssText).toBe(
+    "left: 0%; width: 50%;",
+  );
+  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::2y")?.style.cssText).toBe(
+    "left: 50%; width: 25%;",
+  );
+  expect(
+    bucketCell("bucketed_dv01::USD_x3a_x3aOIS::zero")
+      .querySelector("[data-bucket-bar]")
+      ?.getAttribute("aria-hidden"),
+  ).toBe("true");
+  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::zero")).toBeNull();
+  expect(
+    bucketFill("bucketed_cs01::ACME::4y@2028-01-05@quote-1")?.style.width,
+  ).toBe("50%");
+  for (const key of Object.keys(measures).slice(4))
+    expect(bucketCell(key).querySelector("[data-bucket-bar]")).toBeNull();
+  expect(bucketCell("bucketed_dv01::OTHER::1y").textContent).toBe("—");
+  expect(
+    bucketCell("bucketed_dv01::OTHER::1y").querySelector("[data-bucket-bar]"),
+  ).toBeNull();
+});
+it("scales each risk family, exact identifier, valuation and currency independently", () => {
+  const measures = {
+    "bucketed_dv01::A::1y": -100,
+    "bucketed_dv01::A::2y": 50,
+    "bucketed_dv01::A_x3aB::1y": -1,
+    "bucketed_dv01::A_x5fx3aB::1y": 1000,
+    "bucketed_cs01::A::1y": -2,
+    "bucketed_cs01::A::2y": 1,
+  };
+  render(
+    <MeasuresGrid
+      result={{ ...fixture.result, measures }}
+      compareTo={{
+        ...fixture.result,
+        value: { amount: "1", currency: "EUR" },
+        measures: { "bucketed_dv01::A::1y": -1, "bucketed_dv01::A::2y": 2 },
+      }}
+      groups={riskGroups}
+    />,
+  );
+  for (const key of [
+    "bucketed_dv01::A::1y",
+    "bucketed_dv01::A_x3aB::1y",
+    "bucketed_dv01::A_x5fx3aB::1y",
+    "bucketed_cs01::A::1y",
+  ])
+    expect(bucketFill(key)?.style.width).toBe("50%");
+  expect(bucketFill("bucketed_cs01::A::2y")?.style.width).toBe("25%");
+  expect(bucketFill("bucketed_dv01::A::1y", 2)?.style.width).toBe("25%");
+  expect(bucketFill("bucketed_dv01::A::2y", 2)?.style.width).toBe("50%");
+  expect(
+    bucketCell("bucketed_cs01::A::1y", 2).querySelector("[data-bucket-bar]"),
+  ).toBeNull();
+  expect(
+    screen.getByRole("region", { name: "Comparison valuation" }).textContent,
+  ).toContain("EUR 1");
+});
+it("separates supplied units and handles zero-only, huge and subnormal values without invalid widths", () => {
+  const measures = {
+    "bucketed_dv01::A::one": 100,
+    "bucketed_dv01::A::two": 50,
+    "bucketed_dv01::A::other-unit": 1,
+    "bucketed_dv01::A::other-source": 2,
+    "bucketed_dv01::A::unknown-unit": 0.01,
+    "bucketed_cs01::huge::one": -Number.MAX_VALUE,
+    "bucketed_cs01::huge::two": Number.MAX_VALUE / 2,
+    "bucketed_cs01::tiny::one": Number.MIN_VALUE,
+    "bucketed_cs01::zero::one": 0,
+    "bucketed_cs01::zero::two": -0,
+  };
+  render(
+    <MeasuresGrid
+      result={{ ...fixture.result, measures }}
+      groups={riskGroups}
+      units={{
+        "bucketed_dv01::A::one": { label: "USD/bp", source: "native-one" },
+        "bucketed_dv01::A::two": { label: "USD/bp", source: "native-one" },
+        "bucketed_dv01::A::other-unit": {
+          label: "EUR/bp",
+          source: "native-one",
+        },
+        "bucketed_dv01::A::other-source": {
+          label: "USD/bp",
+          source: "native-other",
+        },
+      }}
+    />,
+  );
+  expect(bucketFill("bucketed_dv01::A::two")?.style.width).toBe("25%");
+  for (const key of [
+    "bucketed_dv01::A::one",
+    "bucketed_dv01::A::other-unit",
+    "bucketed_dv01::A::other-source",
+    "bucketed_dv01::A::unknown-unit",
+    "bucketed_cs01::huge::one",
+    "bucketed_cs01::tiny::one",
+  ])
+    expect(bucketFill(key)?.style.width).toBe("50%");
+  expect(bucketFill("bucketed_cs01::huge::two")?.style.width).toBe("25%");
+  for (const key of ["bucketed_cs01::zero::one", "bucketed_cs01::zero::two"]) {
+    expect(bucketCell(key).querySelector("[data-bucket-bar]")).toBeTruthy();
+    expect(bucketFill(key)).toBeNull();
+  }
+  expect(
+    document.querySelector('[style*="NaN"], [style*="Infinity"]'),
+  ).toBeNull();
+});

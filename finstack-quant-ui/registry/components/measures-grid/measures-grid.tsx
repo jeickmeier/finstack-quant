@@ -18,6 +18,62 @@ type MeasureRow = {
   value: number | undefined;
   comparison: number | undefined;
 };
+/** Normalize display widths only; qualified native bucket labels remain opaque. */
+function bucketBars(
+  measures: Record<string, number> | undefined,
+  units: MeasuresGridProps["units"],
+) {
+  const series = new Map<string, [string, number][]>();
+  for (const [key, value] of Object.entries(measures ?? {})) {
+    const parts = key.split("::");
+    if (
+      parts.length !== 3 ||
+      !["bucketed_dv01", "bucketed_cs01"].includes(parts[0]) ||
+      !parts[1] ||
+      !parts[2] ||
+      !Number.isFinite(value)
+    )
+      continue;
+    const unit = units?.[key];
+    const id = JSON.stringify([parts[0], parts[1], unit?.label, unit?.source]);
+    const entries = series.get(id) ?? [];
+    entries.push([key, value]);
+    series.set(id, entries);
+  }
+  const bars = new Map<string, number>();
+  for (const entries of series.values()) {
+    const maximum = entries.reduce(
+      (max, [, value]) => Math.max(max, Math.abs(value)),
+      0,
+    );
+    for (const [key, value] of entries)
+      bars.set(key, maximum === 0 ? 0 : value / maximum);
+  }
+  return bars;
+}
+function BucketBar({ ratio }: { ratio: number | undefined }) {
+  if (ratio === undefined) return null;
+  const width = Math.abs(ratio) * 50;
+  return (
+    <div
+      aria-hidden="true"
+      className="relative ml-auto mt-1 h-2 w-24 max-w-full"
+      data-bucket-bar
+    >
+      <span className="absolute inset-y-0 left-1/2 border-l border-muted-foreground" />
+      {ratio !== 0 && (
+        <span
+          data-bucket-bar-fill
+          className="absolute top-0.5 h-1 bg-chart-1"
+          style={{
+            left: `${ratio < 0 ? 50 - width : 50}%`,
+            width: `${width}%`,
+          }}
+        />
+      )}
+    </div>
+  );
+}
 /** Group by the canonical metric family prefix while retaining the complete returned key. */
 export function groupMeasures(
   props: Pick<MeasuresGridProps, "result" | "compareTo" | "groups">,
@@ -47,6 +103,11 @@ export function groupMeasures(
 /** Supplied measures and independent comparison context, using the unlinked core table. */
 export function MeasuresGrid(props: MeasuresGridProps) {
   const grouped = groupMeasures(props);
+  const bars = bucketBars(props.result?.measures, props.units);
+  const comparisonBars = bucketBars(
+    props.compareTo?.measures,
+    props.comparisonUnits,
+  );
   const noUnits =
     !Object.keys(props.units ?? {}).length &&
     !Object.keys(props.comparisonUnits ?? {}).length;
@@ -69,11 +130,14 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       accessorFn: (row) => row.value,
       meta: { className: "text-right finstack-numeric" },
       cell: (context) => (
-        <MeasureValue
-          value={context.row.original.value}
-          unit={props.units?.[context.row.original.key]}
-          showUnavailableUnit={!noUnits}
-        />
+        <>
+          <MeasureValue
+            value={context.row.original.value}
+            unit={props.units?.[context.row.original.key]}
+            showUnavailableUnit={!noUnits}
+          />
+          <BucketBar ratio={bars.get(context.row.original.key)} />
+        </>
       ),
     },
     ...(props.compareTo === undefined
@@ -85,11 +149,16 @@ export function MeasuresGrid(props: MeasuresGridProps) {
             accessorFn: (row: MeasureRow) => row.comparison,
             meta: { className: "text-right finstack-numeric" },
             cell: (context: { row: { original: MeasureRow } }) => (
-              <MeasureValue
-                value={context.row.original.comparison}
-                unit={props.comparisonUnits?.[context.row.original.key]}
-                showUnavailableUnit={!noUnits}
-              />
+              <>
+                <MeasureValue
+                  value={context.row.original.comparison}
+                  unit={props.comparisonUnits?.[context.row.original.key]}
+                  showUnavailableUnit={!noUnits}
+                />
+                <BucketBar
+                  ratio={comparisonBars.get(context.row.original.key)}
+                />
+              </>
             ),
           },
         ]),
@@ -113,7 +182,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
         grouped.map(({ group, rows }) => (
           <section
             key={group}
-            className="finstack-measures__group"
+            className="finstack-measures__group min-w-0"
             aria-label={`${group} measures`}
           >
             <FinstackTable
@@ -133,6 +202,12 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       {grouped.length > 0 && noUnits && (
         <p className="text-xs text-muted-foreground">
           Raw measure values · units unavailable
+        </p>
+      )}
+      {(bars.size > 0 || comparisonBars.size > 0) && (
+        <p className="text-xs text-muted-foreground">
+          Bucket bars center on zero. Scales are separate for each risk family,
+          identifier, supplied unit and valuation column.
         </p>
       )}
     </div>

@@ -83,6 +83,11 @@ try {
       (theme) => (document.documentElement.dataset.theme = theme),
       theme,
     );
+    await page.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector("tbody td")).color ===
+        getComputedStyle(document.body).color,
+    );
     for (const density of ["compact", "comfortable"]) {
       const current = await page
         .locator("[data-density]")
@@ -94,6 +99,11 @@ try {
       accessibility.push({
         theme,
         density,
+        rowToken: await page
+          .locator(".finstack-measures")
+          .evaluate((node) =>
+            getComputedStyle(node).getPropertyValue("--row-height").trim(),
+          ),
         violations: axe.violations.map((v) => ({
           id: v.id,
           nodes: v.nodes.map((n) => n.failureSummary),
@@ -127,16 +137,12 @@ try {
     accessibility.every((mode) => mode.violations.length === 0),
     JSON.stringify(accessibility),
   );
+  // Stock shadcn tables retain their own cell spacing in both densities.
   assert(
-    heights
-      .filter((row) => row.density === "comfortable")
-      .every(
-        (row) =>
-          row.height >
-          heights.find(
-            (other) => other.theme === row.theme && other.density === "compact",
-          ).height,
-      ),
+    accessibility.every(
+      (mode) =>
+        mode.rowToken === (mode.density === "comfortable" ? "36px" : "28px"),
+    ),
   );
   assert(
     (
@@ -160,8 +166,58 @@ try {
   );
   assert.equal(
     await page.getByText("Unit unavailable", { exact: true }).count(),
-    30,
+    0,
   );
+  assert.equal(
+    await page
+      .getByText("Raw measure values · units unavailable", { exact: true })
+      .count(),
+    1,
+  );
+  const bars = await page.locator("[data-bucket-bar]").evaluateAll((nodes) =>
+    nodes.map((track) => {
+      const cell = track.parentElement;
+      const rect = track.getBoundingClientRect();
+      const fill = track
+        .querySelector("[data-bucket-bar-fill]")
+        ?.getBoundingClientRect();
+      return {
+        key: cell.parentElement.cells[0].textContent,
+        column: cell.cellIndex,
+        raw: cell.querySelector(":scope > span[title]").getAttribute("title"),
+        hidden: track.getAttribute("aria-hidden"),
+        width: rect.width,
+        fill: fill
+          ? {
+              left: (fill.left - rect.left) / rect.width,
+              width: fill.width / rect.width,
+            }
+          : null,
+      };
+    }),
+  );
+  const bar = (key, column = 2) =>
+    bars.find((item) => item.key === key && item.column === column);
+  const near = (actual, expected) =>
+    assert(
+      Math.abs(actual - expected) < 0.002,
+      `${actual} differs from ${expected}`,
+    );
+  for (const [key, left, width, raw] of [
+    ["bucketed_cs01::SYNTHETIC-CREDIT::1y", 0, 0.5, "-100"],
+    ["bucketed_cs01::SYNTHETIC-CREDIT::3y", 0.5, 0.25, "50"],
+    ["bucketed_cs01::SYNTHETIC-OTHER::1y", 0.5, 0.5, "10"],
+    ["bucketed_dv01::USD-OIS::30y", 0.5, 0.5, "2"],
+    ["bucketed_dv01::USD-OIS::10y", 0.25, 0.25, "-1"],
+  ]) {
+    const item = bar(key);
+    near(item.fill.left, left);
+    near(item.fill.width, width);
+    assert.equal(item.raw, raw);
+  }
+  assert.equal(bar("bucketed_cs01::SYNTHETIC-CREDIT::5y").fill, null);
+  near(bar("bucketed_dv01::USD-OIS::30y", 1).fill.width, 0.5);
+  assert(bars.every((item) => item.hidden === "true" && item.width > 0));
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
   assert(
@@ -170,12 +226,38 @@ try {
     ),
   );
   await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
+  await page.waitForFunction(
+    () =>
+      getComputedStyle(document.querySelector("tbody td")).color ===
+      getComputedStyle(document.body).color,
+  );
   await page.screenshot({ path: "/tmp/pr013-results.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileLayout = await page.evaluate(() => ({
+    viewport: innerWidth,
+    document: document.documentElement.scrollWidth,
+    tables: [...document.querySelectorAll('[data-slot="table-container"]')].map(
+      (node) => ({ width: node.clientWidth, scroll: node.scrollWidth }),
+    ),
+  }));
+  const mobileAxe = await page.evaluate(() => window.axe.run(document));
+  assert.deepEqual(mobileAxe.violations, []);
+  await page.screenshot({
+    path: "/tmp/pr013-results-mobile.png",
+    fullPage: true,
+  });
+  assert(
+    mobileLayout.document <= mobileLayout.viewport,
+    JSON.stringify(mobileLayout),
+  );
   const report = {
     browser: browser.version(),
     installed,
     accessibility,
     heights,
+    bars,
+    mobileAccessibilityViolations: mobileAxe.violations.length,
+    mobileLayout,
     failures,
     wasmRequests: 0,
     verdict: "pass",

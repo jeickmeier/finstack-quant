@@ -108,7 +108,7 @@
     {
       "name": "measures-grid",
       "type": "registry:component",
-      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
+      "docs": "Displays supplied valuation context and raw measures with decorative signed bars for qualified bucketed DV01/CS01 rows. Each metric family, identifier, supplied unit and valuation uses an independent visual scale. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
       "files": [
         {
           "path": "measures-grid/measures-grid.tsx",

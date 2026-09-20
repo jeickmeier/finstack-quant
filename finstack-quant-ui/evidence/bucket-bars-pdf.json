@@ -1,0 +1,200 @@
+[
+  {
+    "file": "bond-A4.pdf",
+    "sha256": "60d9645ad1d65082226d0fe92f6a0741eacca07e57fad3259565224ec9d4077d",
+    "pages": 3,
+    "pageSizes": [
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {
+      "1.307944151889478e-13": true,
+      "0.989751844932828": true,
+      "-103.45856181590352": true,
+      "0": true
+    },
+    "cashflowRows": 4,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+IBMPlexMono-Medium",
+      "FAAAAA+Times-Roman"
+    ],
+    "maxUprightFontSize": 17.999999250000002,
+    "images": 0,
+    "vectorPaths": 116
+  },
+  {
+    "file": "bond-Letter.pdf",
+    "sha256": "0a7730348353d83c7082f7b3b1f3fa64bfc2ef05d6c2f9377e2d8672f21c9272",
+    "pages": 3,
+    "pageSizes": [
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {
+      "1.307944151889478e-13": true,
+      "0.989751844932828": true,
+      "-103.45856181590352": true,
+      "0": true
+    },
+    "cashflowRows": 4,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+Times-Roman",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 120
+  },
+  {
+    "file": "xccy_swap-A4.pdf",
+    "sha256": "ec1db7b973d3691d2ce51369d9268c95cd9e6195412dea4e1f1e18c83636b175",
+    "pages": 7,
+    "pageSizes": [
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ],
+      [
+        595.91998,
+        842.88
+      ]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {},
+    "cashflowRows": 44,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 294
+  },
+  {
+    "file": "xccy_swap-Letter.pdf",
+    "sha256": "38b904443afbbe189718dda3cf8025d876637969529cb0a04bc293189f67c7a4",
+    "pages": 7,
+    "pageSizes": [
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ],
+      [
+        612,
+        792
+      ]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {},
+    "cashflowRows": 44,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 294
+  }
+]
