@@ -124,3 +124,26 @@ Compression does not waive this raw-byte gate. See the
 `test:footprint` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
 package and matching generated glue. The size script reports raw/optimized/gzip/
 Brotli bytes and returns a failing exit code when the raw optimized limit is exceeded.
+
+## Registry distribution
+
+`mise run ui-build` uses shadcn 4.21.0 and writes installable JSON to `public/r`.
+`finstack-base` pins Base UI 1.8.0, React 19.2.8 and Tailwind 4.3.3. The registry
+is Base UI only; the accepted `new-york` config does not select upstream Radix
+components. Add our namespaced items, not upstream primitive names.
+
+Every generated contract has one owner and installs under `lib/finstack` with
+relative imports. `instrument-catalogue` depends on all instrument modules for
+installation, while its runtime imports remain lazy. `contract-bond` can install
+independently with just its codec closure. `finstack-host` declares the published
+WASM package; this checkout validates against the matching local facade.
+
+The root registry owns existing `src/` contracts. The pinned CLI forbids parent
+traversal from included indexes, so category indexes own only sources beneath
+their directories. This follows the upstream [registry composition rules](https://ui.shadcn.com/docs/registry/registry-json)
+without duplicating generated source. No visual placeholders are published.
+
+`ui-check` verifies generated entries, dependency closure, target ownership and
+imports, and type-checks files extracted from a fresh CLI build in a temporary
+consumer without path aliases. Package dependencies are supplied from the locked
+installation; a complete network install matrix is a later slice.

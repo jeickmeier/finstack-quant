@@ -13,29 +13,39 @@
     "./views": "./src/views.ts"
   },
   "scripts": {
-    "generate": "node scripts/gen.mjs",
-    "check:generated": "node scripts/gen.mjs --check",
+    "generate": "node scripts/gen.mjs && node scripts/gen-registry.mjs",
+    "check:generated": "node scripts/gen.mjs --check && node scripts/gen-registry.mjs --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run check:generated && npm run format:check && npm run typecheck && npm test",
+    "check": "npm run check:generated && npm run format:check && npm run check:registry && npm run typecheck && npm test",
     "format:check": "prettier --check .",
     "test:browser": "node tests/browser/run.mjs",
-    "test:footprint": "REGISTRY_MEASURE_FOOTPRINT=1 node tests/browser/run.mjs"
+    "test:footprint": "REGISTRY_MEASURE_FOOTPRINT=1 node tests/browser/run.mjs",
+    "check:registry": "node scripts/check-registry.mjs",
+    "build": "shadcn build --output public/r"
   },
   "dependencies": {
+    "@base-ui/react": "1.8.0",
     "finstack-quant-wasm": "file:../finstack-quant-wasm",
     "lossless-json": "4.3.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@apidevtools/json-schema-ref-parser": "16.0.2",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "json-schema-to-typescript": "16.0.0",
     "playwright": "1.58.2",
     "prettier": "3.9.8",
+    "shadcn": "4.21.0",
     "sirv": "3.0.2",
+    "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "vitest": "5.0.1"
   }

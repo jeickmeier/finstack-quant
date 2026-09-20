@@ -1,0 +1,2923 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "finstack",
+  "homepage": "https://jeickmeier.github.io/finstack-quant/",
+  "include": [
+    "registry/base/registry.json",
+    "registry/theme/registry.json",
+    "registry/primitives/registry.json",
+    "registry/components/registry.json",
+    "registry/blocks/registry.json",
+    "registry/hooks/registry.json",
+    "registry/lib/registry.json",
+    "registry/file/registry.json"
+  ],
+  "items": [
+    {
+      "name": "finstack-codec",
+      "type": "registry:lib",
+      "docs": "Installs finstack-codec under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/codec.mjs",
+          "type": "registry:file",
+          "target": "lib/finstack/codec.mjs"
+        },
+        {
+          "path": "src/codec.d.mts",
+          "type": "registry:file",
+          "target": "lib/finstack/codec.d.mts"
+        },
+        {
+          "path": "src/schema.mjs",
+          "type": "registry:file",
+          "target": "lib/finstack/schema.mjs"
+        },
+        {
+          "path": "src/schema.d.mts",
+          "type": "registry:file",
+          "target": "lib/finstack/schema.d.mts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": ["lossless-json@4.3.1", "zod@4.6.5"]
+    },
+    {
+      "name": "contract-calibration",
+      "type": "registry:lib",
+      "docs": "Installs contract-calibration under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/calibration.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/calibration.json"
+        },
+        {
+          "path": "src/generated/types/calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/calibration.ts"
+        },
+        {
+          "path": "src/generated/meta/calibration.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/calibration.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-asian-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-asian-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_asian_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_asian_option.json"
+        },
+        {
+          "path": "src/generated/types/commodity_asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_asian_option.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_asian_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_asian_option.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_asian_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_asian_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-forward",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-forward under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_forward.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_forward.json"
+        },
+        {
+          "path": "src/generated/types/commodity_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_forward.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_forward.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_forward.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_forward.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_forward.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-future-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_future_option.json"
+        },
+        {
+          "path": "src/generated/types/commodity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_future_option.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_future_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_future_option.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_future_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_future.json"
+        },
+        {
+          "path": "src/generated/types/commodity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_future.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_future.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_option.json"
+        },
+        {
+          "path": "src/generated/types/commodity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_option.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_option.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-spread-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-spread-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_spread_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_spread_option.json"
+        },
+        {
+          "path": "src/generated/types/commodity_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_spread_option.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_spread_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_spread_option.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_spread_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_spread_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_swap.json"
+        },
+        {
+          "path": "src/generated/types/commodity_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-commodity-swaption",
+      "type": "registry:lib",
+      "docs": "Installs contract-commodity-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/commodity_swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/commodity_swaption.json"
+        },
+        {
+          "path": "src/generated/types/commodity_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/commodity_swaption.ts"
+        },
+        {
+          "path": "src/generated/meta/commodity_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/commodity_swaption.ts"
+        },
+        {
+          "path": "src/generated/instrument/commodity_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/commodity_swaption.ts"
+        },
+        {
+          "path": "src/generated/examples/commodity_swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/commodity_swaption.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-composite",
+      "type": "registry:lib",
+      "docs": "Installs contract-composite under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/composite.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/composite.json"
+        },
+        {
+          "path": "src/generated/types/composite.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/composite.ts"
+        },
+        {
+          "path": "src/generated/meta/composite.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/composite.ts"
+        },
+        {
+          "path": "src/generated/instrument/composite.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/composite.ts"
+        },
+        {
+          "path": "src/generated/examples/composite.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/composite.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cds-index",
+      "type": "registry:lib",
+      "docs": "Installs contract-cds-index under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cds_index.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cds_index.json"
+        },
+        {
+          "path": "src/generated/types/cds_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cds_index.ts"
+        },
+        {
+          "path": "src/generated/meta/cds_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cds_index.ts"
+        },
+        {
+          "path": "src/generated/instrument/cds_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cds_index.ts"
+        },
+        {
+          "path": "src/generated/examples/cds_index.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cds_index.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cds-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-cds-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cds_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cds_option.json"
+        },
+        {
+          "path": "src/generated/types/cds_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cds_option.ts"
+        },
+        {
+          "path": "src/generated/meta/cds_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cds_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/cds_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cds_option.ts"
+        },
+        {
+          "path": "src/generated/examples/cds_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cds_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cds-tranche",
+      "type": "registry:lib",
+      "docs": "Installs contract-cds-tranche under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cds_tranche.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cds_tranche.json"
+        },
+        {
+          "path": "src/generated/types/cds_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cds_tranche.ts"
+        },
+        {
+          "path": "src/generated/meta/cds_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cds_tranche.ts"
+        },
+        {
+          "path": "src/generated/instrument/cds_tranche.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cds_tranche.ts"
+        },
+        {
+          "path": "src/generated/examples/cds_tranche.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cds_tranche.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-credit-default-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-credit-default-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/credit_default_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/credit_default_swap.json"
+        },
+        {
+          "path": "src/generated/types/credit_default_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/credit_default_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/credit_default_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/credit_default_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/credit_default_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/credit_default_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/credit_default_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/credit_default_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-autocallable",
+      "type": "registry:lib",
+      "docs": "Installs contract-autocallable under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/autocallable.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/autocallable.json"
+        },
+        {
+          "path": "src/generated/types/autocallable.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/autocallable.ts"
+        },
+        {
+          "path": "src/generated/meta/autocallable.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/autocallable.ts"
+        },
+        {
+          "path": "src/generated/instrument/autocallable.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/autocallable.ts"
+        },
+        {
+          "path": "src/generated/examples/autocallable.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/autocallable.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cliquet-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-cliquet-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cliquet_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cliquet_option.json"
+        },
+        {
+          "path": "src/generated/types/cliquet_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cliquet_option.ts"
+        },
+        {
+          "path": "src/generated/meta/cliquet_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cliquet_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/cliquet_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cliquet_option.ts"
+        },
+        {
+          "path": "src/generated/examples/cliquet_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cliquet_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-discounted-cash-flow",
+      "type": "registry:lib",
+      "docs": "Installs contract-discounted-cash-flow under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/discounted_cash_flow.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/discounted_cash_flow.json"
+        },
+        {
+          "path": "src/generated/types/discounted_cash_flow.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/discounted_cash_flow.ts"
+        },
+        {
+          "path": "src/generated/meta/discounted_cash_flow.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/discounted_cash_flow.ts"
+        },
+        {
+          "path": "src/generated/instrument/discounted_cash_flow.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/discounted_cash_flow.ts"
+        },
+        {
+          "path": "src/generated/examples/discounted_cash_flow.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/discounted_cash_flow.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-equity-future-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-equity-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/equity_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/equity_future_option.json"
+        },
+        {
+          "path": "src/generated/types/equity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/equity_future_option.ts"
+        },
+        {
+          "path": "src/generated/meta/equity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/equity_future_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/equity_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/equity_future_option.ts"
+        },
+        {
+          "path": "src/generated/examples/equity_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/equity_future_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-equity-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-equity-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/equity_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/equity_future.json"
+        },
+        {
+          "path": "src/generated/types/equity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/equity_future.ts"
+        },
+        {
+          "path": "src/generated/meta/equity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/equity_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/equity_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/equity_future.ts"
+        },
+        {
+          "path": "src/generated/examples/equity_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/equity_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-equity-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-equity-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/equity_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/equity_option.json"
+        },
+        {
+          "path": "src/generated/types/equity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/equity_option.ts"
+        },
+        {
+          "path": "src/generated/meta/equity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/equity_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/equity_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/equity_option.ts"
+        },
+        {
+          "path": "src/generated/examples/equity_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/equity_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-equity-total-return-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-equity-total-return-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/equity_total_return_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/equity_total_return_future.json"
+        },
+        {
+          "path": "src/generated/types/equity_total_return_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/equity_total_return_future.ts"
+        },
+        {
+          "path": "src/generated/meta/equity_total_return_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/equity_total_return_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/equity_total_return_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/equity_total_return_future.ts"
+        },
+        {
+          "path": "src/generated/examples/equity_total_return_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/equity_total_return_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-equity",
+      "type": "registry:lib",
+      "docs": "Installs contract-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/equity.json"
+        },
+        {
+          "path": "src/generated/types/equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/equity.ts"
+        },
+        {
+          "path": "src/generated/meta/equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/equity.ts"
+        },
+        {
+          "path": "src/generated/instrument/equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/equity.ts"
+        },
+        {
+          "path": "src/generated/examples/equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/equity.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-levered-real-estate-equity",
+      "type": "registry:lib",
+      "docs": "Installs contract-levered-real-estate-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/levered_real_estate_equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/levered_real_estate_equity.json"
+        },
+        {
+          "path": "src/generated/types/levered_real_estate_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/levered_real_estate_equity.ts"
+        },
+        {
+          "path": "src/generated/meta/levered_real_estate_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/levered_real_estate_equity.ts"
+        },
+        {
+          "path": "src/generated/instrument/levered_real_estate_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/levered_real_estate_equity.ts"
+        },
+        {
+          "path": "src/generated/examples/levered_real_estate_equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/levered_real_estate_equity.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-private-markets-fund",
+      "type": "registry:lib",
+      "docs": "Installs contract-private-markets-fund under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/private_markets_fund.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/private_markets_fund.json"
+        },
+        {
+          "path": "src/generated/types/private_markets_fund.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/private_markets_fund.ts"
+        },
+        {
+          "path": "src/generated/meta/private_markets_fund.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/private_markets_fund.ts"
+        },
+        {
+          "path": "src/generated/instrument/private_markets_fund.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/private_markets_fund.ts"
+        },
+        {
+          "path": "src/generated/examples/private_markets_fund.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/private_markets_fund.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-real-estate-asset",
+      "type": "registry:lib",
+      "docs": "Installs contract-real-estate-asset under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/real_estate_asset.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/real_estate_asset.json"
+        },
+        {
+          "path": "src/generated/types/real_estate_asset.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/real_estate_asset.ts"
+        },
+        {
+          "path": "src/generated/meta/real_estate_asset.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/real_estate_asset.ts"
+        },
+        {
+          "path": "src/generated/instrument/real_estate_asset.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/real_estate_asset.ts"
+        },
+        {
+          "path": "src/generated/examples/real_estate_asset.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/real_estate_asset.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-trs-equity",
+      "type": "registry:lib",
+      "docs": "Installs contract-trs-equity under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/trs_equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/trs_equity.json"
+        },
+        {
+          "path": "src/generated/types/trs_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/trs_equity.ts"
+        },
+        {
+          "path": "src/generated/meta/trs_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/trs_equity.ts"
+        },
+        {
+          "path": "src/generated/instrument/trs_equity.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/trs_equity.ts"
+        },
+        {
+          "path": "src/generated/examples/trs_equity.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/trs_equity.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-variance-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-variance-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/variance_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/variance_swap.json"
+        },
+        {
+          "path": "src/generated/types/variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/variance_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/variance_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/variance_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/variance_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/variance_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-volatility-index-future-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-volatility-index-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/volatility_index_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/volatility_index_future_option.json"
+        },
+        {
+          "path": "src/generated/types/volatility_index_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/volatility_index_future_option.ts"
+        },
+        {
+          "path": "src/generated/meta/volatility_index_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/volatility_index_future_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/volatility_index_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/volatility_index_future_option.ts"
+        },
+        {
+          "path": "src/generated/examples/volatility_index_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/volatility_index_future_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-volatility-index-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-volatility-index-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/volatility_index_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/volatility_index_future.json"
+        },
+        {
+          "path": "src/generated/types/volatility_index_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/volatility_index_future.ts"
+        },
+        {
+          "path": "src/generated/meta/volatility_index_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/volatility_index_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/volatility_index_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/volatility_index_future.ts"
+        },
+        {
+          "path": "src/generated/examples/volatility_index_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/volatility_index_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-asian-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-asian-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/asian_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/asian_option.json"
+        },
+        {
+          "path": "src/generated/types/asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/asian_option.ts"
+        },
+        {
+          "path": "src/generated/meta/asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/asian_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/asian_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/asian_option.ts"
+        },
+        {
+          "path": "src/generated/examples/asian_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/asian_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-barrier-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-barrier-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/barrier_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/barrier_option.json"
+        },
+        {
+          "path": "src/generated/types/barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/barrier_option.ts"
+        },
+        {
+          "path": "src/generated/meta/barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/barrier_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/barrier_option.ts"
+        },
+        {
+          "path": "src/generated/examples/barrier_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/barrier_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-basket",
+      "type": "registry:lib",
+      "docs": "Installs contract-basket under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/basket.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/basket.json"
+        },
+        {
+          "path": "src/generated/types/basket.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/basket.ts"
+        },
+        {
+          "path": "src/generated/meta/basket.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/basket.ts"
+        },
+        {
+          "path": "src/generated/instrument/basket.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/basket.ts"
+        },
+        {
+          "path": "src/generated/examples/basket.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/basket.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-callable-range-accrual",
+      "type": "registry:lib",
+      "docs": "Installs contract-callable-range-accrual under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/callable_range_accrual.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/callable_range_accrual.json"
+        },
+        {
+          "path": "src/generated/types/callable_range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/callable_range_accrual.ts"
+        },
+        {
+          "path": "src/generated/meta/callable_range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/callable_range_accrual.ts"
+        },
+        {
+          "path": "src/generated/instrument/callable_range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/callable_range_accrual.ts"
+        },
+        {
+          "path": "src/generated/examples/callable_range_accrual.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/callable_range_accrual.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-lookback-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-lookback-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/lookback_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/lookback_option.json"
+        },
+        {
+          "path": "src/generated/types/lookback_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/lookback_option.ts"
+        },
+        {
+          "path": "src/generated/meta/lookback_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/lookback_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/lookback_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/lookback_option.ts"
+        },
+        {
+          "path": "src/generated/examples/lookback_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/lookback_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-range-accrual",
+      "type": "registry:lib",
+      "docs": "Installs contract-range-accrual under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/range_accrual.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/range_accrual.json"
+        },
+        {
+          "path": "src/generated/types/range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/range_accrual.ts"
+        },
+        {
+          "path": "src/generated/meta/range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/range_accrual.ts"
+        },
+        {
+          "path": "src/generated/instrument/range_accrual.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/range_accrual.ts"
+        },
+        {
+          "path": "src/generated/examples/range_accrual.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/range_accrual.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-snowball",
+      "type": "registry:lib",
+      "docs": "Installs contract-snowball under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/snowball.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/snowball.json"
+        },
+        {
+          "path": "src/generated/types/snowball.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/snowball.ts"
+        },
+        {
+          "path": "src/generated/meta/snowball.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/snowball.ts"
+        },
+        {
+          "path": "src/generated/instrument/snowball.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/snowball.ts"
+        },
+        {
+          "path": "src/generated/examples/snowball.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/snowball.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-tarn",
+      "type": "registry:lib",
+      "docs": "Installs contract-tarn under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/tarn.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/tarn.json"
+        },
+        {
+          "path": "src/generated/types/tarn.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/tarn.ts"
+        },
+        {
+          "path": "src/generated/meta/tarn.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/tarn.ts"
+        },
+        {
+          "path": "src/generated/instrument/tarn.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/tarn.ts"
+        },
+        {
+          "path": "src/generated/examples/tarn.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/tarn.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-agency-cmo",
+      "type": "registry:lib",
+      "docs": "Installs contract-agency-cmo under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/agency_cmo.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/agency_cmo.json"
+        },
+        {
+          "path": "src/generated/types/agency_cmo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/agency_cmo.ts"
+        },
+        {
+          "path": "src/generated/meta/agency_cmo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/agency_cmo.ts"
+        },
+        {
+          "path": "src/generated/instrument/agency_cmo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/agency_cmo.ts"
+        },
+        {
+          "path": "src/generated/examples/agency_cmo.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/agency_cmo.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-agency-mbs-passthrough",
+      "type": "registry:lib",
+      "docs": "Installs contract-agency-mbs-passthrough under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/agency_mbs_passthrough.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/agency_mbs_passthrough.json"
+        },
+        {
+          "path": "src/generated/types/agency_mbs_passthrough.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/agency_mbs_passthrough.ts"
+        },
+        {
+          "path": "src/generated/meta/agency_mbs_passthrough.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/agency_mbs_passthrough.ts"
+        },
+        {
+          "path": "src/generated/instrument/agency_mbs_passthrough.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/agency_mbs_passthrough.ts"
+        },
+        {
+          "path": "src/generated/examples/agency_mbs_passthrough.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/agency_mbs_passthrough.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-agency-tba",
+      "type": "registry:lib",
+      "docs": "Installs contract-agency-tba under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/agency_tba.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/agency_tba.json"
+        },
+        {
+          "path": "src/generated/types/agency_tba.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/agency_tba.ts"
+        },
+        {
+          "path": "src/generated/meta/agency_tba.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/agency_tba.ts"
+        },
+        {
+          "path": "src/generated/instrument/agency_tba.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/agency_tba.ts"
+        },
+        {
+          "path": "src/generated/examples/agency_tba.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/agency_tba.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-asset-backed-facility",
+      "type": "registry:lib",
+      "docs": "Installs contract-asset-backed-facility under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/asset_backed_facility.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/asset_backed_facility.json"
+        },
+        {
+          "path": "src/generated/types/asset_backed_facility.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/asset_backed_facility.ts"
+        },
+        {
+          "path": "src/generated/meta/asset_backed_facility.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/asset_backed_facility.ts"
+        },
+        {
+          "path": "src/generated/instrument/asset_backed_facility.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/asset_backed_facility.ts"
+        },
+        {
+          "path": "src/generated/examples/asset_backed_facility.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/asset_backed_facility.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-bond-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-bond-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/bond_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/bond_future.json"
+        },
+        {
+          "path": "src/generated/types/bond_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/bond_future.ts"
+        },
+        {
+          "path": "src/generated/meta/bond_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/bond_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/bond_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/bond_future.ts"
+        },
+        {
+          "path": "src/generated/examples/bond_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/bond_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-bond",
+      "type": "registry:lib",
+      "docs": "Installs contract-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/bond.json"
+        },
+        {
+          "path": "src/generated/types/bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/bond.ts"
+        },
+        {
+          "path": "src/generated/meta/bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/bond.ts"
+        },
+        {
+          "path": "src/generated/instrument/bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/bond.ts"
+        },
+        {
+          "path": "src/generated/examples/bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/bond.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-convertible-bond",
+      "type": "registry:lib",
+      "docs": "Installs contract-convertible-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/convertible_bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/convertible_bond.json"
+        },
+        {
+          "path": "src/generated/types/convertible_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/convertible_bond.ts"
+        },
+        {
+          "path": "src/generated/meta/convertible_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/convertible_bond.ts"
+        },
+        {
+          "path": "src/generated/instrument/convertible_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/convertible_bond.ts"
+        },
+        {
+          "path": "src/generated/examples/convertible_bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/convertible_bond.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-dollar-roll",
+      "type": "registry:lib",
+      "docs": "Installs contract-dollar-roll under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/dollar_roll.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/dollar_roll.json"
+        },
+        {
+          "path": "src/generated/types/dollar_roll.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/dollar_roll.ts"
+        },
+        {
+          "path": "src/generated/meta/dollar_roll.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/dollar_roll.ts"
+        },
+        {
+          "path": "src/generated/instrument/dollar_roll.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/dollar_roll.ts"
+        },
+        {
+          "path": "src/generated/examples/dollar_roll.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/dollar_roll.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-inflation-linked-bond",
+      "type": "registry:lib",
+      "docs": "Installs contract-inflation-linked-bond under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/inflation_linked_bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/inflation_linked_bond.json"
+        },
+        {
+          "path": "src/generated/types/inflation_linked_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/inflation_linked_bond.ts"
+        },
+        {
+          "path": "src/generated/meta/inflation_linked_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/inflation_linked_bond.ts"
+        },
+        {
+          "path": "src/generated/instrument/inflation_linked_bond.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/inflation_linked_bond.ts"
+        },
+        {
+          "path": "src/generated/examples/inflation_linked_bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/inflation_linked_bond.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-revolving-credit",
+      "type": "registry:lib",
+      "docs": "Installs contract-revolving-credit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/revolving_credit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/revolving_credit.json"
+        },
+        {
+          "path": "src/generated/types/revolving_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/revolving_credit.ts"
+        },
+        {
+          "path": "src/generated/meta/revolving_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/revolving_credit.ts"
+        },
+        {
+          "path": "src/generated/instrument/revolving_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/revolving_credit.ts"
+        },
+        {
+          "path": "src/generated/examples/revolving_credit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/revolving_credit.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-structured-credit",
+      "type": "registry:lib",
+      "docs": "Installs contract-structured-credit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/structured_credit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/structured_credit.json"
+        },
+        {
+          "path": "src/generated/types/structured_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/structured_credit.ts"
+        },
+        {
+          "path": "src/generated/meta/structured_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/structured_credit.ts"
+        },
+        {
+          "path": "src/generated/instrument/structured_credit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/structured_credit.ts"
+        },
+        {
+          "path": "src/generated/examples/structured_credit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/structured_credit.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-term-loan",
+      "type": "registry:lib",
+      "docs": "Installs contract-term-loan under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/term_loan.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/term_loan.json"
+        },
+        {
+          "path": "src/generated/types/term_loan.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/term_loan.ts"
+        },
+        {
+          "path": "src/generated/meta/term_loan.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/term_loan.ts"
+        },
+        {
+          "path": "src/generated/instrument/term_loan.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/term_loan.ts"
+        },
+        {
+          "path": "src/generated/examples/term_loan.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/term_loan.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-trs-fixed-income-index",
+      "type": "registry:lib",
+      "docs": "Installs contract-trs-fixed-income-index under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/trs_fixed_income_index.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/trs_fixed_income_index.json"
+        },
+        {
+          "path": "src/generated/types/trs_fixed_income_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/trs_fixed_income_index.ts"
+        },
+        {
+          "path": "src/generated/meta/trs_fixed_income_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/trs_fixed_income_index.ts"
+        },
+        {
+          "path": "src/generated/instrument/trs_fixed_income_index.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/trs_fixed_income_index.ts"
+        },
+        {
+          "path": "src/generated/examples/trs_fixed_income_index.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/trs_fixed_income_index.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-barrier-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-barrier-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_barrier_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_barrier_option.json"
+        },
+        {
+          "path": "src/generated/types/fx_barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_barrier_option.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_barrier_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_barrier_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_barrier_option.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_barrier_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_barrier_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-digital-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-digital-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_digital_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_digital_option.json"
+        },
+        {
+          "path": "src/generated/types/fx_digital_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_digital_option.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_digital_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_digital_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_digital_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_digital_option.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_digital_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_digital_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-forward",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-forward under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_forward.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_forward.json"
+        },
+        {
+          "path": "src/generated/types/fx_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_forward.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_forward.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_forward.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_forward.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_forward.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_forward.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-future-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_future_option.json"
+        },
+        {
+          "path": "src/generated/types/fx_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_future_option.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_future_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_future_option.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_future_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_future.json"
+        },
+        {
+          "path": "src/generated/types/fx_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_future.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_future.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_option.json"
+        },
+        {
+          "path": "src/generated/types/fx_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_option.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_option.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-spot",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-spot under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_spot.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_spot.json"
+        },
+        {
+          "path": "src/generated/types/fx_spot.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_spot.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_spot.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_spot.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_spot.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_spot.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_spot.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_spot.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_swap.json"
+        },
+        {
+          "path": "src/generated/types/fx_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-touch-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-touch-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_touch_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_touch_option.json"
+        },
+        {
+          "path": "src/generated/types/fx_touch_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_touch_option.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_touch_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_touch_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_touch_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_touch_option.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_touch_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_touch_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-fx-variance-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-fx-variance-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/fx_variance_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/fx_variance_swap.json"
+        },
+        {
+          "path": "src/generated/types/fx_variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/fx_variance_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/fx_variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/fx_variance_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/fx_variance_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/fx_variance_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/fx_variance_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/fx_variance_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-ndf",
+      "type": "registry:lib",
+      "docs": "Installs contract-ndf under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/ndf.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/ndf.json"
+        },
+        {
+          "path": "src/generated/types/ndf.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/ndf.ts"
+        },
+        {
+          "path": "src/generated/meta/ndf.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/ndf.ts"
+        },
+        {
+          "path": "src/generated/instrument/ndf.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/ndf.ts"
+        },
+        {
+          "path": "src/generated/examples/ndf.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/ndf.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-quanto-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-quanto-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/quanto_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/quanto_option.json"
+        },
+        {
+          "path": "src/generated/types/quanto_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/quanto_option.ts"
+        },
+        {
+          "path": "src/generated/meta/quanto_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/quanto_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/quanto_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/quanto_option.ts"
+        },
+        {
+          "path": "src/generated/examples/quanto_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/quanto_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-basis-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-basis-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/basis_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/basis_swap.json"
+        },
+        {
+          "path": "src/generated/types/basis_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/basis_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/basis_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/basis_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/basis_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/basis_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/basis_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/basis_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-bermudan-swaption",
+      "type": "registry:lib",
+      "docs": "Installs contract-bermudan-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/bermudan_swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/bermudan_swaption.json"
+        },
+        {
+          "path": "src/generated/types/bermudan_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/bermudan_swaption.ts"
+        },
+        {
+          "path": "src/generated/meta/bermudan_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/bermudan_swaption.ts"
+        },
+        {
+          "path": "src/generated/instrument/bermudan_swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/bermudan_swaption.ts"
+        },
+        {
+          "path": "src/generated/examples/bermudan_swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/bermudan_swaption.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cap-floor",
+      "type": "registry:lib",
+      "docs": "Installs contract-cap-floor under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cap_floor.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cap_floor.json"
+        },
+        {
+          "path": "src/generated/types/cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cap_floor.ts"
+        },
+        {
+          "path": "src/generated/meta/cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cap_floor.ts"
+        },
+        {
+          "path": "src/generated/instrument/cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cap_floor.ts"
+        },
+        {
+          "path": "src/generated/examples/cap_floor.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cap_floor.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cms-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-cms-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cms_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cms_option.json"
+        },
+        {
+          "path": "src/generated/types/cms_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cms_option.ts"
+        },
+        {
+          "path": "src/generated/meta/cms_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cms_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/cms_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cms_option.ts"
+        },
+        {
+          "path": "src/generated/examples/cms_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cms_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cms-spread-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-cms-spread-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cms_spread_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cms_spread_option.json"
+        },
+        {
+          "path": "src/generated/types/cms_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cms_spread_option.ts"
+        },
+        {
+          "path": "src/generated/meta/cms_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cms_spread_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/cms_spread_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cms_spread_option.ts"
+        },
+        {
+          "path": "src/generated/examples/cms_spread_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cms_spread_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-cms-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-cms-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/cms_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/cms_swap.json"
+        },
+        {
+          "path": "src/generated/types/cms_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/cms_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/cms_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/cms_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/cms_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/cms_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/cms_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/cms_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-deposit",
+      "type": "registry:lib",
+      "docs": "Installs contract-deposit under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/deposit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/deposit.json"
+        },
+        {
+          "path": "src/generated/types/deposit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/deposit.ts"
+        },
+        {
+          "path": "src/generated/meta/deposit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/deposit.ts"
+        },
+        {
+          "path": "src/generated/instrument/deposit.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/deposit.ts"
+        },
+        {
+          "path": "src/generated/examples/deposit.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/deposit.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-forward-rate-agreement",
+      "type": "registry:lib",
+      "docs": "Installs contract-forward-rate-agreement under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/forward_rate_agreement.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/forward_rate_agreement.json"
+        },
+        {
+          "path": "src/generated/types/forward_rate_agreement.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/forward_rate_agreement.ts"
+        },
+        {
+          "path": "src/generated/meta/forward_rate_agreement.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/forward_rate_agreement.ts"
+        },
+        {
+          "path": "src/generated/instrument/forward_rate_agreement.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/forward_rate_agreement.ts"
+        },
+        {
+          "path": "src/generated/examples/forward_rate_agreement.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/forward_rate_agreement.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-inflation-cap-floor",
+      "type": "registry:lib",
+      "docs": "Installs contract-inflation-cap-floor under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/inflation_cap_floor.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/inflation_cap_floor.json"
+        },
+        {
+          "path": "src/generated/types/inflation_cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/inflation_cap_floor.ts"
+        },
+        {
+          "path": "src/generated/meta/inflation_cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/inflation_cap_floor.ts"
+        },
+        {
+          "path": "src/generated/instrument/inflation_cap_floor.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/inflation_cap_floor.ts"
+        },
+        {
+          "path": "src/generated/examples/inflation_cap_floor.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/inflation_cap_floor.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-inflation-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-inflation-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/inflation_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/inflation_swap.json"
+        },
+        {
+          "path": "src/generated/types/inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/inflation_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/inflation_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-interest-rate-future-option",
+      "type": "registry:lib",
+      "docs": "Installs contract-interest-rate-future-option under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/interest_rate_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/interest_rate_future_option.json"
+        },
+        {
+          "path": "src/generated/types/interest_rate_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/interest_rate_future_option.ts"
+        },
+        {
+          "path": "src/generated/meta/interest_rate_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/interest_rate_future_option.ts"
+        },
+        {
+          "path": "src/generated/instrument/interest_rate_future_option.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/interest_rate_future_option.ts"
+        },
+        {
+          "path": "src/generated/examples/interest_rate_future_option.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/interest_rate_future_option.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-interest-rate-future",
+      "type": "registry:lib",
+      "docs": "Installs contract-interest-rate-future under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/interest_rate_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/interest_rate_future.json"
+        },
+        {
+          "path": "src/generated/types/interest_rate_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/interest_rate_future.ts"
+        },
+        {
+          "path": "src/generated/meta/interest_rate_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/interest_rate_future.ts"
+        },
+        {
+          "path": "src/generated/instrument/interest_rate_future.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/interest_rate_future.ts"
+        },
+        {
+          "path": "src/generated/examples/interest_rate_future.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/interest_rate_future.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-interest-rate-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-interest-rate-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/interest_rate_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/interest_rate_swap.json"
+        },
+        {
+          "path": "src/generated/types/interest_rate_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/interest_rate_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/interest_rate_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/interest_rate_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/interest_rate_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/interest_rate_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/interest_rate_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/interest_rate_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-repo",
+      "type": "registry:lib",
+      "docs": "Installs contract-repo under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/repo.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/repo.json"
+        },
+        {
+          "path": "src/generated/types/repo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/repo.ts"
+        },
+        {
+          "path": "src/generated/meta/repo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/repo.ts"
+        },
+        {
+          "path": "src/generated/instrument/repo.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/repo.ts"
+        },
+        {
+          "path": "src/generated/examples/repo.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/repo.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-swaption",
+      "type": "registry:lib",
+      "docs": "Installs contract-swaption under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/swaption.json"
+        },
+        {
+          "path": "src/generated/types/swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/swaption.ts"
+        },
+        {
+          "path": "src/generated/meta/swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/swaption.ts"
+        },
+        {
+          "path": "src/generated/instrument/swaption.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/swaption.ts"
+        },
+        {
+          "path": "src/generated/examples/swaption.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/swaption.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-xccy-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-xccy-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/xccy_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/xccy_swap.json"
+        },
+        {
+          "path": "src/generated/types/xccy_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/xccy_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/xccy_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/xccy_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/xccy_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/xccy_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/xccy_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/xccy_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-yoy-inflation-swap",
+      "type": "registry:lib",
+      "docs": "Installs contract-yoy-inflation-swap under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/yoy_inflation_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/yoy_inflation_swap.json"
+        },
+        {
+          "path": "src/generated/types/yoy_inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/yoy_inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/meta/yoy_inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/yoy_inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/instrument/yoy_inflation_swap.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instrument/yoy_inflation_swap.ts"
+        },
+        {
+          "path": "src/generated/examples/yoy_inflation_swap.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/yoy_inflation_swap.json"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
+      "dependencies": []
+    },
+    {
+      "name": "contract-market-context-state",
+      "type": "registry:lib",
+      "docs": "Installs contract-market-context-state under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/market_context_state.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/market_context_state.json"
+        },
+        {
+          "path": "src/generated/types/market_context_state.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/market_context_state.ts"
+        },
+        {
+          "path": "src/generated/meta/market_context_state.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/market_context_state.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
+      "name": "contract-valuation-result",
+      "type": "registry:lib",
+      "docs": "Installs contract-valuation-result under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/valuation_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/valuation_result.json"
+        },
+        {
+          "path": "src/generated/types/valuation_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/valuation_result.ts"
+        },
+        {
+          "path": "src/generated/meta/valuation_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/valuation_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
+      "name": "instrument-catalogue",
+      "type": "registry:lib",
+      "docs": "Installs instrument-catalogue under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/instruments.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/instruments.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/contract-commodity-asian-option",
+        "@finstack/contract-commodity-forward",
+        "@finstack/contract-commodity-future-option",
+        "@finstack/contract-commodity-future",
+        "@finstack/contract-commodity-option",
+        "@finstack/contract-commodity-spread-option",
+        "@finstack/contract-commodity-swap",
+        "@finstack/contract-commodity-swaption",
+        "@finstack/contract-composite",
+        "@finstack/contract-cds-index",
+        "@finstack/contract-cds-option",
+        "@finstack/contract-cds-tranche",
+        "@finstack/contract-credit-default-swap",
+        "@finstack/contract-autocallable",
+        "@finstack/contract-cliquet-option",
+        "@finstack/contract-discounted-cash-flow",
+        "@finstack/contract-equity-future-option",
+        "@finstack/contract-equity-future",
+        "@finstack/contract-equity-option",
+        "@finstack/contract-equity-total-return-future",
+        "@finstack/contract-equity",
+        "@finstack/contract-levered-real-estate-equity",
+        "@finstack/contract-private-markets-fund",
+        "@finstack/contract-real-estate-asset",
+        "@finstack/contract-trs-equity",
+        "@finstack/contract-variance-swap",
+        "@finstack/contract-volatility-index-future-option",
+        "@finstack/contract-volatility-index-future",
+        "@finstack/contract-asian-option",
+        "@finstack/contract-barrier-option",
+        "@finstack/contract-basket",
+        "@finstack/contract-callable-range-accrual",
+        "@finstack/contract-lookback-option",
+        "@finstack/contract-range-accrual",
+        "@finstack/contract-snowball",
+        "@finstack/contract-tarn",
+        "@finstack/contract-agency-cmo",
+        "@finstack/contract-agency-mbs-passthrough",
+        "@finstack/contract-agency-tba",
+        "@finstack/contract-asset-backed-facility",
+        "@finstack/contract-bond-future",
+        "@finstack/contract-bond",
+        "@finstack/contract-convertible-bond",
+        "@finstack/contract-dollar-roll",
+        "@finstack/contract-inflation-linked-bond",
+        "@finstack/contract-revolving-credit",
+        "@finstack/contract-structured-credit",
+        "@finstack/contract-term-loan",
+        "@finstack/contract-trs-fixed-income-index",
+        "@finstack/contract-fx-barrier-option",
+        "@finstack/contract-fx-digital-option",
+        "@finstack/contract-fx-forward",
+        "@finstack/contract-fx-future-option",
+        "@finstack/contract-fx-future",
+        "@finstack/contract-fx-option",
+        "@finstack/contract-fx-spot",
+        "@finstack/contract-fx-swap",
+        "@finstack/contract-fx-touch-option",
+        "@finstack/contract-fx-variance-swap",
+        "@finstack/contract-ndf",
+        "@finstack/contract-quanto-option",
+        "@finstack/contract-basis-swap",
+        "@finstack/contract-bermudan-swaption",
+        "@finstack/contract-cap-floor",
+        "@finstack/contract-cms-option",
+        "@finstack/contract-cms-spread-option",
+        "@finstack/contract-cms-swap",
+        "@finstack/contract-deposit",
+        "@finstack/contract-forward-rate-agreement",
+        "@finstack/contract-inflation-cap-floor",
+        "@finstack/contract-inflation-swap",
+        "@finstack/contract-interest-rate-future-option",
+        "@finstack/contract-interest-rate-future",
+        "@finstack/contract-interest-rate-swap",
+        "@finstack/contract-repo",
+        "@finstack/contract-swaption",
+        "@finstack/contract-xccy-swap",
+        "@finstack/contract-yoy-inflation-swap"
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "contract-manifest",
+      "type": "registry:lib",
+      "docs": "Installs contract-manifest under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/roots.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/roots.json"
+        },
+        {
+          "path": "src/generated/fixtures.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/fixtures.json"
+        },
+        {
+          "path": "src/contract-provenance.json",
+          "type": "registry:file",
+          "target": "lib/finstack/contract-provenance.json"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
+      "name": "finstack-views",
+      "type": "registry:lib",
+      "docs": "Installs finstack-views under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/views.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/views.ts"
+        },
+        {
+          "path": "src/generated/curve-views.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/curve-views.json"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
+      "name": "finstack-host",
+      "type": "registry:lib",
+      "docs": "Installs finstack-host under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/host.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/host.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/contract-valuation-result"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.8.0"]
+    }
+  ]
+}

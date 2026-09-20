@@ -1010,3 +1010,7 @@ run = "npm --prefix finstack-quant-ui run generate"
 [tasks.ui-check]
 description = "Check component-registry generation drift, types, and focused tests"
 run = "npm --prefix finstack-quant-ui run check"
+
+[tasks.ui-build]
+description = "Build component-registry distribution with the pinned shadcn CLI"
+run = "npm --prefix finstack-quant-ui run build"

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "finstack-base",
+      "type": "registry:base",
+      "extends": "none",
+      "docs": "Base UI only. Uses @base-ui/react 1.8.0 and React 19 with Tailwind v4 CSS variables. Install finstack-theme for visual items; contracts install independently.",
+      "dependencies": [
+        "@base-ui/react@1.8.0",
+        "react@19.2.8",
+        "react-dom@19.2.8"
+      ],
+      "devDependencies": ["tailwindcss@4.3.3", "@tailwindcss/postcss@4.3.3"],
+      "config": {
+        "style": "new-york",
+        "tailwind": {
+          "cssVariables": true
+        }
+      }
+    }
+  ]
+}

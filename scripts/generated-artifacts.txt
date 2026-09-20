@@ -1,3 +1,4 @@
+finstack-quant-ui/registry.json
 finstack-quant-ui/src/contract-provenance.json
 finstack-quant-ui/src/generated/curve-views.json
 finstack-quant-ui/src/generated/examples/agency_cmo.json
