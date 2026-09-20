@@ -254,3 +254,24 @@ numeric/date/category fixtures, checks text clipping/overlap, vector elements,
 font/style portability, exact raster dimensions, accessibility and no WASM loads.
 See [PR-010 evidence](evidence/pr-010.md); desktop-editor acceptance stays open
 until its planned release slice.
+
+## Linked chart interactions
+
+`FinstackChart` forwards typed `onFocusChange`, `onFocusGroupChange`, `onSelect`
+and `renderTooltipBody` to the native chart adapter. The tooltip context includes
+`defaultBody`, original typed points, `pinned` and `dismiss`; its controls retain
+normal keyboard behavior, and Escape uses native dismissal.
+
+`useLinkedSelection({ selectedKey, onSelectedKeyChange })` shares an accepted
+string key between charts and ordinary controls. Omit `selectedKey` for local
+ownership and optionally provide `defaultSelectedKey`. Call `select(key)` or
+`clear()`; equal accepted keys are no-ops. The controlled parent can reject a
+proposal. Data removal does not silently change the accepted key.
+
+Derive `chartSelection(binding, datum => datum.id)` on render and assign it to
+`definition.selection`. Use native `whenSelected(mark, selection)` for decorative
+highlights without extra hit targets. `onSelect` only reports activation; writing
+accepted state again there would duplicate the native selection proposal. Shared
+cursors use a parent-owned native `createChartCursor`, with explicitly compatible
+coordinates. See the installable `LinkedFigureExample` and [PR-011 evidence](evidence/pr-011.md).
+The hook imports only React; chart-only consumers load neither tables nor WASM.

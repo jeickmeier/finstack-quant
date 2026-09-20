@@ -360,6 +360,11 @@
           "path": "finstack-chart/export.ts",
           "type": "registry:ui",
           "target": "components/finstack/primitives/finstack-chart/export.ts"
+        },
+        {
+          "path": "finstack-chart/selection.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-chart/selection.ts"
         }
       ],
       "registryDependencies": [

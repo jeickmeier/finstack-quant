@@ -1,0 +1,26 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "figure-example",
+    "finstack-chart",
+    "finstack-base",
+    "finstack-theme",
+    "use-linked-selection"
+  ],
+  "checks": [
+    "controlled accept/reject/clear",
+    "programmatic selection preserves focus",
+    "reorder/removal preserves key",
+    "independent parents",
+    "native shared cursor",
+    "single activation and selection proposal",
+    "default/custom tooltip",
+    "keyboard pinned action and dismissal",
+    "null/empty focus clears",
+    "export excludes transient tooltip"
+  ],
+  "failures": [],
+  "tableRuntimeImports": 0,
+  "wasmRequests": 0,
+  "verdict": "pass"
+}

@@ -26,7 +26,8 @@
     "check:tokens": "node scripts/check-tokens.mjs",
     "test:theme:browser": "node tests/browser/theme.mjs",
     "test:primitives:browser": "node tests/browser/primitives.mjs",
-    "test:figures:browser": "node tests/browser/figures.mjs"
+    "test:figures:browser": "node tests/browser/figures.mjs",
+    "test:interactions:browser": "node tests/browser/interactions.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

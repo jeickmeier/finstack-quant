@@ -130,12 +130,21 @@ export function composeFigure<T, X extends ChartValue, Y extends ChartValue>(
       };
     },
   };
-  const renderSvg: ChartSvgRenderer<T, X, Y> = (scene, options) => {
+  return {
+    definition,
+    renderSvg: figureRenderer<T, X, Y>(props, presentation),
+  };
+}
+/** Renderer identity depends only on prose and presentation, never on interaction state. */
+export function figureRenderer<T, X extends ChartValue, Y extends ChartValue>(
+  props: FigureText,
+  presentation: FigurePresentation,
+): ChartSvgRenderer<T, X, Y> {
+  return (scene, options) => {
     const layout = figureLayout(props, scene.width, scene.height, presentation);
     return renderChartSvg(
       { ...scene, nodes: [...scene.nodes, ...layout.lines] },
       options,
     );
   };
-  return { definition, renderSvg };
 }

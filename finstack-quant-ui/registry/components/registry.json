@@ -10,9 +10,17 @@
           "path": "figure-example/figure-example.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/figure-example/figure-example.tsx"
+        },
+        {
+          "path": "figure-example/linked-figures.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/figure-example/linked-figures.tsx"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-chart"]
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/use-linked-selection"
+      ]
     }
   ]
 }

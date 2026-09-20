@@ -11,7 +11,8 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/lib/finstack/*": ["src/*"]
+      "@/lib/finstack/*": ["src/*"],
+      "@/hooks/*": ["registry/hooks/*"]
     },
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },

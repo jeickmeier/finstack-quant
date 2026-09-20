@@ -47,6 +47,19 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+    },
+    {
+      "name": "use-linked-selection",
+      "type": "registry:hook",
+      "docs": "React-only accepted string identity, controlled or locally owned. Pass null to clear; use stable supplied keys. Activation and focus are separate. The consumer owns its standard @/* source alias.",
+      "files": [
+        {
+          "path": "use-linked-selection/use-linked-selection.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-linked-selection/use-linked-selection.ts"
+        }
+      ],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

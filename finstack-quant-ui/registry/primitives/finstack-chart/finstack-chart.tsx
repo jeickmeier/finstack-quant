@@ -8,23 +8,34 @@ import {
   useImperativeHandle,
   type Ref,
 } from "react";
-import { Chart } from "@tanstack/charts/react";
+import { Chart, type ChartCommonProps } from "@tanstack/charts/react/tooltip";
 import type { ChartValue } from "@tanstack/charts";
-import { composeFigure, type FigureSpec } from "./figure";
+import { composeFigure, figureRenderer, type FigureSpec } from "./figure";
 import { readPresentation, type FigurePresentation } from "./presentation";
 import { exportFigure, type FigureExportOptions } from "./export";
 export type { FigureSpec, FigureExportOptions };
+export { chartSelection } from "./selection";
+/** Native notifications preserve original data; onSelect reports activation, not acceptance. */
+export type FigureInteractions<
+  T,
+  X extends ChartValue,
+  Y extends ChartValue,
+> = Pick<
+  ChartCommonProps<T, X, Y>,
+  "onFocusChange" | "onFocusGroupChange" | "onSelect" | "renderTooltipBody"
+>;
 export interface FigureHandle {
   exportSvg(options: FigureExportOptions): Promise<Blob>;
   exportPng(options: FigureExportOptions): Promise<Blob>;
 }
 /** Complete supplied-data SVG figure. Native chart definitions own axes and annotation marks. */
 export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
-  props: FigureSpec<T, X, Y> & {
-    height?: number;
-    width?: number;
-    ref?: Ref<FigureHandle>;
-  },
+  props: FigureSpec<T, X, Y> &
+    FigureInteractions<T, X, Y> & {
+      height?: number;
+      width?: number;
+      ref?: Ref<FigureHandle>;
+    },
 ) {
   const host = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -33,9 +44,34 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
   );
   useEffect(() => {
     let active = true;
+    let signature: string;
     const refresh = () => {
-      if (active && host.current)
-        setPresentation(readPresentation(host.current));
+      if (active && host.current) {
+        const next = readPresentation(host.current);
+        // Exported embedded fonts can emit loadingdone without changing the
+        // screen's typography. Avoid replacing its renderer and focused control.
+        const nextSignature = JSON.stringify({
+          ...next,
+          metrics: next.measureText(
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+            {
+              fontSize: next.bodySize,
+              fontFamily: next.fontFamily,
+              fontStyle: "normal",
+              fontStretch: "normal",
+              letterSpacing: 0,
+              direction: "ltr",
+              anchor: "start",
+              baseline: "hanging",
+              fontScale: 1,
+            },
+          ),
+        });
+        if (signature !== nextSignature) {
+          signature = nextSignature;
+          setPresentation(next);
+        }
+      }
     };
     void document.fonts.ready.then(refresh);
     document.fonts.addEventListener("loadingdone", refresh);
@@ -55,9 +91,26 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
       document.fonts.removeEventListener("loadingdone", refresh);
     };
   }, []);
+  const { definition, title, subtitle, caption, sources, figureAnnotations } =
+    props;
+  const prose = useMemo(
+    () => ({ title, subtitle, caption, sources, figureAnnotations }),
+    [title, subtitle, caption, sources, figureAnnotations],
+  );
   const figure = useMemo(
-    () => (presentation ? composeFigure(props, presentation) : null),
-    [props, presentation],
+    () =>
+      presentation
+        ? composeFigure(
+            { ...prose, definition, ariaLabel: props.ariaLabel },
+            presentation,
+          )
+        : null,
+    [definition, prose, props.ariaLabel, presentation],
+  );
+  const renderSvg = useMemo(
+    () =>
+      presentation ? figureRenderer<T, X, Y>(prose, presentation) : undefined,
+    [prose, presentation],
   );
   useImperativeHandle(
     props.ref,
@@ -78,12 +131,31 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
       {figure && presentation ? (
         <Chart
           {...figure}
+          renderSvg={renderSvg}
           ariaLabel={props.ariaLabel}
           ariaDescription={props.ariaDescription}
           idPrefix={id}
           width={props.width}
           height={props.height ?? 420}
           measureText={presentation.measureText}
+          onFocusChange={props.onFocusChange}
+          onFocusGroupChange={props.onFocusGroupChange}
+          onSelect={props.onSelect}
+          renderTooltipBody={
+            props.renderTooltipBody
+              ? (context) => (
+                  <div
+                    onKeyDown={(event) => {
+                      // The native host handles Enter/arrows on its container. Keep custom
+                      // controls' browser defaults; Escape still reaches native dismissal.
+                      if (event.key !== "Escape") event.stopPropagation();
+                    }}
+                  >
+                    {props.renderTooltipBody!(context)}
+                  </div>
+                )
+              : undefined
+          }
         />
       ) : (
         <div role="status" aria-label={props.ariaLabel}>
