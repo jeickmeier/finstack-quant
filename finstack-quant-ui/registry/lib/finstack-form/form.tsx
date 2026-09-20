@@ -20,6 +20,11 @@ export const buttonClass =
 export function errorText(errors: readonly unknown[]): string | undefined {
   const messages = errors
     .flat(Infinity)
+    .flatMap((error) =>
+      error && typeof error === "object" && "form" in error
+        ? [error.form]
+        : [error],
+    )
     .filter(Boolean)
     .map((error) =>
       typeof error === "object" && error && "message" in error
@@ -35,7 +40,11 @@ function TextField(
 ) {
   const field = useFieldContext<unknown>();
   return (
-    <FieldFrame {...props} error={errorText(field.state.meta.errors)}>
+    <FieldFrame
+      {...props}
+      path={field.name}
+      error={errorText(field.state.meta.errors)}
+    >
       {(control) => (
         <input
           {...control}
@@ -54,6 +63,7 @@ function DecimalField(props: FieldInfo & { pattern?: string }) {
   return (
     <DecimalInput
       {...props}
+      path={field.name}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -65,6 +75,7 @@ function DateField(props: FieldInfo) {
   return (
     <DateInput
       {...props}
+      path={field.name}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -76,6 +87,7 @@ function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
   return (
     <EnumField
       {...props}
+      path={field.name}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -85,7 +97,11 @@ function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
 function BooleanField(props: FieldInfo) {
   const field = useFieldContext<boolean>();
   return (
-    <FieldFrame {...props} error={errorText(field.state.meta.errors)}>
+    <FieldFrame
+      {...props}
+      path={field.name}
+      error={errorText(field.state.meta.errors)}
+    >
       {(control) => (
         <input
           {...control}
@@ -164,7 +180,13 @@ function ArrayField({
     </Fieldset>
   );
 }
-function SubmitButton({ label = "Apply instrument" }: { label?: string }) {
+function SubmitButton({
+  label = "Apply instrument",
+  disabled,
+}: {
+  label?: string;
+  disabled?: boolean;
+}) {
   const form = useFormContext();
   return (
     <form.Subscribe
@@ -176,7 +198,7 @@ function SubmitButton({ label = "Apply instrument" }: { label?: string }) {
         <button
           type="submit"
           className={buttonClass}
-          disabled={!canSubmit || submitting || validating}
+          disabled={disabled || !canSubmit || submitting || validating}
         >
           {submitting ? "Validating…" : label}
         </button>
@@ -184,10 +206,18 @@ function SubmitButton({ label = "Apply instrument" }: { label?: string }) {
     </form.Subscribe>
   );
 }
-function ResetButton() {
+function ResetButton({ onReset }: { onReset?: () => void }) {
   const form = useFormContext();
   return (
-    <button type="button" className={buttonClass} onClick={() => form.reset()}>
+    <button
+      type="button"
+      className={buttonClass}
+      onClick={() => {
+        onReset?.();
+        form.reset();
+        void form.validate("change");
+      }}
+    >
       Reset edits
     </button>
   );
@@ -218,6 +248,37 @@ function ErrorSummary() {
           >
             <strong>Review the instrument</strong>
             <p>{message}</p>
+            {Object.entries(fields)
+              .filter(
+                ([, meta]) =>
+                  meta &&
+                  typeof meta === "object" &&
+                  "errors" in meta &&
+                  Array.isArray(meta.errors) &&
+                  errorText(meta.errors),
+              )
+              .map(([path]) => (
+                <button
+                  key={path}
+                  type="button"
+                  className="block text-left underline focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={(event) => {
+                    const form = event.currentTarget.closest("form");
+                    const field = [
+                      ...(form?.querySelectorAll<HTMLElement>(
+                        "[data-field-path]",
+                      ) ?? []),
+                    ].find((node) => node.dataset.fieldPath === path);
+                    field
+                      ?.querySelector<HTMLElement>(
+                        "input:not([aria-hidden=true]), textarea, [role=combobox], [role=radio], [role=checkbox]",
+                      )
+                      ?.focus();
+                  }}
+                >
+                  {path}
+                </button>
+              ))}
           </div>
         ) : null;
       }}

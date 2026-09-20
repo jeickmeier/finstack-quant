@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import { useAppForm } from "@/lib/finstack/form";
 import { RenderField } from "./render-field";
 import {
@@ -24,6 +25,8 @@ export interface SchemaFormProps {
   validate(json: string, signal?: AbortSignal): Promise<string>;
   /** Receives canonical native JSON only after valid submission. Never replaces active working values. */
   onSubmit(json: string): void | Promise<void>;
+  /** Canonical validation result, cleared immediately when working values change. */
+  onValidated?: (json: string | null) => void;
 }
 function useSchemaForm(props: SchemaFormProps) {
   const validator = useMemo(
@@ -33,37 +36,33 @@ function useSchemaForm(props: SchemaFormProps) {
   const [initial] = useState(() =>
     structuredClone(props.defaultValues ?? objectValue(props.module.example)),
   );
+  const notify = useRef(props.onValidated);
+  notify.current = props.onValidated;
   const valid = useRef<{
     input: string;
     canonical: string;
     validate: SchemaFormProps["validate"];
   } | null>(null);
+  const request = useRef<AbortController | null>(null);
+  const [native, setNative] = useState<{
+    pending: boolean;
+    error: string | null;
+  }>({ pending: true, error: null });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const input = (value: unknown) =>
     props.module.codec.stringify(validator.parse(value));
   const form = useAppForm({
     defaultValues: initial,
-    listeners: { onChange: () => setSubmitError(null) },
+    listeners: {
+      onChange: () => {
+        request.current?.abort();
+        setSubmitError(null);
+        notify.current?.(null);
+      },
+    },
     validators: {
       onChange: validator,
-      onChangeAsyncDebounceMs: 250,
-      onChangeAsync: async ({ value, signal }) => {
-        try {
-          const text = input(value);
-          const canonical = await props.validate(text, signal);
-          if (!signal.aborted)
-            valid.current = {
-              input: text,
-              canonical,
-              validate: props.validate,
-            };
-          return undefined;
-        } catch (error) {
-          return signal.aborted
-            ? undefined
-            : { form: error instanceof Error ? error.message : String(error) };
-        }
-      },
+      onSubmit: validator,
     },
     onSubmit: async ({ value }) => {
       setSubmitError(null);
@@ -80,16 +79,46 @@ function useSchemaForm(props: SchemaFormProps) {
       }
     },
   });
+  const values = useStore(form.store, (state) => state.values);
   useEffect(() => {
-    // A ready/restarted worker supplies a new validator; retry without changing edits.
+    const controller = new AbortController();
+    request.current = controller;
+    // Structural errors remain in TanStack Form; cancelled native work cannot clear them.
     void form.validate("change");
-  }, [form, props.validate]);
-  return { form, submitError };
+    notify.current?.(null);
+    setNative({ pending: true, error: null });
+    const timer = setTimeout(async () => {
+      const structural = validator.safeParse(values);
+      if (!structural.success) {
+        setNative({ pending: false, error: null });
+        return;
+      }
+      try {
+        const text = props.module.codec.stringify(structural.data);
+        const canonical = await props.validate(text, controller.signal);
+        if (controller.signal.aborted) return;
+        valid.current = { input: text, canonical, validate: props.validate };
+        setNative({ pending: false, error: null });
+        notify.current?.(canonical);
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setNative({
+            pending: false,
+            error: error instanceof Error ? error.message : String(error),
+          });
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [values, validator, props.module, props.validate, form]);
+  return { form, submitError, native };
 }
 export type SchemaFormApi = ReturnType<typeof useSchemaForm>["form"];
 /** Schema-driven bond term sheet with structural change and abort-aware native validation. */
 export function SchemaForm(props: SchemaFormProps) {
-  const { form, submitError } = useSchemaForm(props);
+  const { form, submitError, native } = useSchemaForm(props);
   return (
     <form
       noValidate
@@ -102,9 +131,9 @@ export function SchemaForm(props: SchemaFormProps) {
     >
       <form.AppForm>
         <form.ErrorSummary />
-        {submitError && (
+        {(submitError || native.error) && (
           <p role="alert" className="text-sm text-error">
-            {submitError}
+            {submitError ?? native.error}
           </p>
         )}
         <form.Subscribe selector={(state) => state.values}>
@@ -122,8 +151,10 @@ export function SchemaForm(props: SchemaFormProps) {
           )}
         </form.Subscribe>
         <div className="flex gap-2">
-          <form.SubmitButton />
-          <form.ResetButton />
+          <form.SubmitButton
+            disabled={native.pending || Boolean(native.error)}
+          />
+          <form.ResetButton onReset={() => props.onValidated?.(null)} />
         </div>
       </form.AppForm>
     </form>

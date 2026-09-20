@@ -107,6 +107,45 @@
         "@finstack/contract-market-context-state",
         "@finstack/finstack-views"
       ]
+    },
+    {
+      "name": "instrument-form",
+      "type": "registry:component",
+      "docs": "Standalone lazy instrument form with generated catalogue, native validation callback and example replacement. Only bond is enabled until renderer coverage passes. Supply useInstrumentValidator from FinstackProvider; onValidated clears stale accepted JSON on edits.",
+      "files": [
+        {
+          "path": "instrument-form/instrument-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/instrument-form/instrument-form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/schema-form",
+        "@finstack/instrument-catalogue",
+        "@finstack/enum-field",
+        "@finstack/json-viewer"
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "pricing-params-form",
+      "type": "registry:component",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Every supplied option/history string and omitted versus empty metric selection is preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "files": [
+        {
+          "path": "pricing-params-form/pricing-params-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/pricing-params-form/pricing-params-form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/date-input",
+        "@finstack/model-picker",
+        "@finstack/metric-picker",
+        "@finstack/field-frame",
+        "@finstack/json-viewer"
+      ],
+      "dependencies": ["lossless-json@4.3.1"]
     }
   ]
 }

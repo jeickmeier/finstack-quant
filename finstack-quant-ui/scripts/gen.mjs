@@ -53,6 +53,20 @@ export async function discoverFixtures(repo, contracts) {
       }
     }
   }
+  // The existing facade test market is a market snapshot, not a calibration envelope.
+  for await (const source of glob(
+    "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
+    { cwd: repo },
+  )) {
+    const value = JSON.parse(await readFile(resolve(repo, source), "utf8"));
+    fixtures.push({
+      kind: "market-input",
+      source,
+      pointer: "/market",
+      schema: byFile("market_context_state").$id,
+      text: json(value.market),
+    });
+  }
   return fixtures;
 }
 

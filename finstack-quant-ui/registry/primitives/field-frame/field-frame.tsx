@@ -7,6 +7,8 @@ export interface FieldInfo {
   help?: string;
   error?: string;
   id?: string;
+  /** Canonical form path used by the error summary; independent of unique DOM IDs. */
+  path?: string;
 }
 export interface FieldControlProps {
   id: string;
@@ -20,12 +22,16 @@ export function FieldFrame({
   help,
   error,
   id,
+  path,
   children,
 }: FieldInfo & { children: (control: FieldControlProps) => ReactNode }) {
   const generated = useId();
   const fieldId = id ?? generated;
   return (
-    <div className="min-w-0 space-y-1 font-sans text-base text-foreground">
+    <div
+      data-field-path={path}
+      className="min-w-0 space-y-1 font-sans text-base text-foreground"
+    >
       <div className="flex items-center gap-2">
         <label
           id={`${fieldId}-label`}

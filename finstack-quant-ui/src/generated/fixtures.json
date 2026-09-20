@@ -448,5 +448,11 @@
     "kind": "calibration-input",
     "source": "finstack-quant/calibration/examples/market_bootstrap/12_full_credit_desk_market.json",
     "schema": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
+  },
+  {
+    "kind": "market-input",
+    "source": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
+    "pointer": "/market",
+    "schema": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
   }
 ]

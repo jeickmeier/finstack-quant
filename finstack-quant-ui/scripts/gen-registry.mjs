@@ -41,6 +41,26 @@ const contracts = roots.map(({ schema }) => {
 });
 const items = [
   {
+    name: "pricing-forms-example",
+    type: "registry:component",
+    docs: "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at project-root examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",
+    files: [
+      {
+        path: "registry/examples/pricing-forms.tsx",
+        type: "registry:component",
+        target: "~/examples/pricing-forms.tsx",
+      },
+    ],
+    registryDependencies: [
+      "@finstack/instrument-form",
+      "@finstack/pricing-params-form",
+      "@finstack/finstack-fixtures",
+      "@finstack/use-instrument-validator",
+      "@finstack/use-price-instrument",
+      "@finstack/json-viewer",
+    ],
+  },
+  {
     name: "finstack-worker",
     type: "registry:file",
     docs: "Installs the worker and its service/contracts at project-root workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
@@ -56,6 +76,11 @@ const items = [
     registryDependencies: ["@finstack/finstack-codec"],
     dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
   },
+  item(
+    "finstack-fixtures",
+    ["fixtures/results/bond.json"],
+    ["contract-bond", "contract-market-context-state"],
+  ),
   item("primitive-contracts", ["generated/primitive-contracts.json"]),
   item(
     "finstack-format",

@@ -30,7 +30,8 @@
     "test:interactions:browser": "node tests/browser/interactions.mjs",
     "test:form:browser": "node tests/browser/schema-form.mjs",
     "test:results:browser": "node tests/browser/results.mjs",
-    "test:curves:browser": "node tests/browser/curves.mjs"
+    "test:curves:browser": "node tests/browser/curves.mjs",
+    "test:pricing-forms:browser": "node tests/browser/pricing-forms.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

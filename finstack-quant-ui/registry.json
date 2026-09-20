@@ -14,6 +14,26 @@
   ],
   "items": [
     {
+      "name": "pricing-forms-example",
+      "type": "registry:component",
+      "docs": "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at project-root examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",
+      "files": [
+        {
+          "path": "registry/examples/pricing-forms.tsx",
+          "type": "registry:component",
+          "target": "~/examples/pricing-forms.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/instrument-form",
+        "@finstack/pricing-params-form",
+        "@finstack/finstack-fixtures",
+        "@finstack/use-instrument-validator",
+        "@finstack/use-price-instrument",
+        "@finstack/json-viewer"
+      ]
+    },
+    {
       "name": "finstack-worker",
       "type": "registry:file",
       "docs": "Installs the worker and its service/contracts at project-root workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
@@ -36,6 +56,23 @@
       ],
       "registryDependencies": ["@finstack/finstack-codec"],
       "dependencies": ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"]
+    },
+    {
+      "name": "finstack-fixtures",
+      "type": "registry:lib",
+      "docs": "Installs finstack-fixtures under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/fixtures/results/bond.json",
+          "type": "registry:file",
+          "target": "lib/finstack/fixtures/results/bond.json"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/contract-bond",
+        "@finstack/contract-market-context-state"
+      ],
+      "dependencies": []
     },
     {
       "name": "primitive-contracts",

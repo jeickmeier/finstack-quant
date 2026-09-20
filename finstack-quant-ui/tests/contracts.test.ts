@@ -66,7 +66,15 @@ describe("discovered canonical fixtures", () => {
       let value = JSON.parse(
         await readFile(resolve(repo, fixture.source), "utf8"),
       );
-      if ("pointer" in fixture) value = value.final_market;
+      if (typeof fixture.pointer === "string")
+        value = fixture.pointer
+          .slice(1)
+          .split("/")
+          .reduce(
+            (node, key) =>
+              node[key.replaceAll("~1", "/").replaceAll("~0", "~")],
+            value,
+          );
       else {
         delete value.$schema;
         delete value.final_market;

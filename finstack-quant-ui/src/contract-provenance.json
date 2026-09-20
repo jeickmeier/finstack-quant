@@ -1,7 +1,7 @@
 {
   "version": 1,
   "fixtureManifest": "generated/fixtures.json",
-  "fixtureManifestSha256": "ad09e9472bf8e5b599245028654ecaaa41026e4fe9d113849be613ee91f5f410",
+  "fixtureManifestSha256": "a7dc572cca5b701c4dbb31ccf63aab373ec3e76091eca9855939fe7b2376e91a",
   "entries": [
     {
       "id": "instrument-form",
