@@ -123,6 +123,7 @@ try {
     exact: true,
   });
   const output = page.getByLabel("Accepted node");
+  await surface.getByText("All 9 stored nodes", { exact: true }).click();
   await surface.getByRole("gridcell", { name: "0.24", exact: true }).click();
   assert.equal(
     await output.textContent(),

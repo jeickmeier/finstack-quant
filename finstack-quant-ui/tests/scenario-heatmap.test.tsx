@@ -5,7 +5,13 @@ import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from "@testing-library/react";
 import { createChartRuntime } from "@tanstack/charts";
 import type { TrancheScenarioCell } from "finstack-quant-wasm";
 import {
@@ -165,6 +171,13 @@ it("selects exact supplied severity and preserves complete native JSON without o
     scenarioCells(table, 0.6).map((c) =>
       [c.cpr, c.cdr, c.severity, c.price].map(String),
     ),
+  );
+  fireEvent.click(
+    within(
+      screen.getByRole("region", {
+        name: `${table.tranche_id} complete native scenario table`,
+      }),
+    ).getByRole("button", { name: "Original" }),
   );
   expect(
     screen

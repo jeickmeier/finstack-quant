@@ -88,7 +88,7 @@
     {
       "name": "json-viewer",
       "type": "registry:ui",
-      "docs": "Controlled json-viewer primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+      "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required."
     },
     {
       "name": "date-input",

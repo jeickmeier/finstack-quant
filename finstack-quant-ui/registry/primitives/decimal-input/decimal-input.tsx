@@ -64,7 +64,7 @@ export function DecimalInput({
             onValueChange={(next) => onValueChange(next)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            className="finstack-field finstack-numeric w-full min-w-0 rounded-sm border border-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            className="finstack-field finstack-numeric w-full min-w-0 rounded-sm border border-control-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           />
           {suffix && (
             <span className="text-xs text-muted-foreground">{suffix}</span>

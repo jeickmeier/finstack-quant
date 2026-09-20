@@ -46,7 +46,7 @@ it("renders all supplied values, stamps, dates and qualified keys without inferr
     fixture.result.meta.version,
     fixture.result.meta.timestamp,
   ])
-    expect(screen.getByText(text)).toBeTruthy();
+    expect(screen.getAllByText(text).length).toBeGreaterThan(0);
   const rows = screen
     .getAllByRole("row")
     .filter((row) => within(row).queryAllByRole("cell").length);
@@ -54,8 +54,11 @@ it("renders all supplied values, stamps, dates and qualified keys without inferr
   for (const [key, value] of Object.entries(fixture.result.measures)) {
     const row = screen.getByText(key).closest("tr")!;
     expect(row.textContent).toContain(String(value));
-    expect(row.textContent).toContain("Unit unavailable");
+    expect(row.textContent).not.toContain("Unit unavailable");
   }
+  expect(
+    screen.getByText("Raw measure values · units unavailable"),
+  ).toBeTruthy();
   expect(
     groupMeasures({ result: fixture.result, groups: fixture.groups })
       .flatMap((group) => group.rows)

@@ -157,7 +157,7 @@ export function SchemaForm(props: SchemaFormProps) {
     <form
       ref={element}
       noValidate
-      className="space-y-3 font-sans text-foreground"
+      className="finstack-term-sheet space-y-3 font-sans text-foreground"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -185,7 +185,7 @@ export function SchemaForm(props: SchemaFormProps) {
               />
             )}
           </form.Subscribe>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 border-t border-border pt-2">
             <form.SubmitButton
               label={props.submitLabel}
               disabled={native.pending}

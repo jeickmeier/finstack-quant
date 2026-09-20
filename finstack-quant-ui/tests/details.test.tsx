@@ -27,6 +27,13 @@ import fixture from "./details/cases.json";
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
+function showOriginal(scope: HTMLElement = document.body) {
+  for (const button of within(scope).queryAllByRole("button", {
+    name: "Original",
+    hidden: true,
+  }))
+    fireEvent.click(button);
+}
 afterEach(cleanup);
 // Native meta timestamps are wall-clock stamps, including nested composite legs.
 function withoutClock(value: unknown): unknown {
@@ -99,14 +106,16 @@ it.each(fixture.cases)(
       ).toBeTruthy();
       expect(panel.textContent).toContain("frozen fitted exercise policy");
     } else {
-      await waitFor(() =>
+      await waitFor(() => {
+        showOriginal();
         expect(document.querySelectorAll("pre")[0]?.textContent).toBe(
           serializeHost(result.details!.data),
-        ),
-      );
+        );
+      });
     }
     for (const density of ["compact", "comfortable"] as const) {
       rerender(tree(density));
+      showOriginal();
       expect(
         screen.getByRole("region", { name: "Valuation details" }).dataset
           .density,
@@ -169,6 +178,7 @@ it.each(["future_variant", "__proto__", "constructor"])(
     const raw = await screen.findByRole("region", {
       name: "Unrecognized details JSON",
     });
+    showOriginal(raw);
     expect(raw.querySelector("pre")!.textContent).toBe(
       serializeHost(result.details!.data),
     );
@@ -179,6 +189,7 @@ it("shows absence distinctly and preserves actual native covenant reports withou
   const reports = native.evaluateEngine(r.engineJson, r.metricsJson, r.asOf);
   expect(serializeHost(reports)).toBe(fixture.covenantReportsJson);
   render(<CovenantReport value={reports} />);
+  showOriginal();
   expect(document.querySelector("pre")!.textContent).toBe(
     fixture.covenantReportsJson,
   );
@@ -225,6 +236,7 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
     name: "Explanation JSON",
     hidden: true,
   });
+  showOriginal(trace);
   expect(trace.querySelector("pre")!.textContent).toBe(
     serializeHost(explanation),
   );
@@ -232,6 +244,7 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
     name: "Covenant reports JSON",
     hidden: true,
   });
+  showOriginal(covenants);
   expect(covenants.querySelector("pre")!.textContent).toBe(
     serializeHost(result.covenants),
   );

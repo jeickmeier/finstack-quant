@@ -35,7 +35,7 @@ export function IdCombobox({
         >
           <Autocomplete.Input
             {...control}
-            className="finstack-field w-full rounded-sm border border-border bg-background px-2 font-mono text-sm focus-visible:outline-2 focus-visible:outline-ring"
+            className="finstack-field w-full rounded-sm border border-control-border bg-background px-2 font-mono text-sm focus-visible:outline-2 focus-visible:outline-ring"
           />
           <Autocomplete.Portal>
             <Autocomplete.Positioner sideOffset={4}>

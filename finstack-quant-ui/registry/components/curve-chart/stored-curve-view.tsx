@@ -35,43 +35,54 @@ export function StoredCurveView({
     [points],
   );
   return (
-    <div className="space-y-3">
-      {points.length > 0 && (
-        <FinstackTable
-          caption="Stored curve knots"
-          data={points}
-          getRowId={storedCurveKey}
-          link={link}
-          getRowKey={storedCurveKey}
-          getCellKey={(point, column) =>
-            column === "value" ? storedCurveKey(point) : null
-          }
-          getActiveCell={(key) => addresses.get(key) ?? null}
-          columns={[
-            {
-              id: "curve",
-              header: "Curve",
-              accessorFn: (point) => point.curve.id,
-            },
-            {
-              id: "type",
-              header: "Variant",
-              accessorFn: (point) => point.curve.type,
-            },
-            {
-              id: "x",
-              header: "Stored x",
-              accessorFn: (point) => point.knot[0],
-            },
-            {
-              id: "value",
-              header: "Stored value",
-              accessorFn: (point) => point.knot[1],
-            },
-          ]}
-        />
-      )}
-      <CurveChart {...props} link={{ ...link, getPointKey: storedCurveKey }} />
+    <div className="@container">
+      <div className="finstack-stored-curve__layout grid min-w-0 gap-4 @min-[720px]:grid-cols-2">
+        <div className="min-w-0">
+          <CurveChart
+            {...props}
+            link={{ ...link, getPointKey: storedCurveKey }}
+          />
+        </div>
+        <div className="min-w-0 max-h-[320px] overflow-auto">
+          {points.length > 0 && (
+            <FinstackTable
+              caption="Stored curve knots"
+              data={points}
+              getRowId={storedCurveKey}
+              link={link}
+              getRowKey={storedCurveKey}
+              getCellKey={(point, column) =>
+                column === "value" ? storedCurveKey(point) : null
+              }
+              getActiveCell={(key) => addresses.get(key) ?? null}
+              columns={[
+                {
+                  id: "curve",
+                  header: "Curve",
+                  accessorFn: (point) => point.curve.id,
+                },
+                {
+                  id: "type",
+                  header: "Variant",
+                  accessorFn: (point) => point.curve.type,
+                },
+                {
+                  id: "x",
+                  header: "Stored x",
+                  meta: { className: "text-right finstack-numeric" },
+                  accessorFn: (point) => point.knot[0],
+                },
+                {
+                  id: "value",
+                  header: "Stored value",
+                  meta: { className: "text-right finstack-numeric" },
+                  accessorFn: (point) => point.knot[1],
+                },
+              ]}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

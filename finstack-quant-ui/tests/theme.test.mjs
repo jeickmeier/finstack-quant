@@ -39,6 +39,15 @@ it("keeps contrast in the default and single-stylesheet tenant themes", async ()
     checkContrast({ ...tokens.light, foreground: tokens.light.background }),
   ).toThrow(/Contrast/);
   expect(() =>
+    checkContrast({
+      ...tokens.light,
+      "control-border": tokens.light.background,
+    }),
+  ).toThrow(/Contrast/);
+  expect(() =>
+    checkContrast({ ...tokens.light, border: tokens.light.background }),
+  ).not.toThrow();
+  expect(() =>
     checkContrast({ ...tokens.dark, "chart-1": tokens.dark.card }),
   ).toThrow(/Contrast/);
   expect(() =>

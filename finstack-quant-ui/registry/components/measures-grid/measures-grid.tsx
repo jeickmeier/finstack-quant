@@ -48,17 +48,22 @@ export function groupMeasures(
 /** Supplied measures and independent comparison context, using the unlinked core table. */
 export function MeasuresGrid(props: MeasuresGridProps) {
   const grouped = groupMeasures(props);
+  const noUnits =
+    !Object.keys(props.units ?? {}).length &&
+    !Object.keys(props.comparisonUnits ?? {}).length;
   const columns: ColumnDef<{}, MeasureRow, any>[] = [
     { ...idColumn<MeasureRow>("key", (row) => row.key), header: "Metric key" },
     {
       id: "value",
-      header: "Valuation · raw value",
+      header:
+        props.compareTo === undefined ? "Raw value" : "Valuation · raw value",
       accessorFn: (row) => row.value,
       meta: { className: "text-right finstack-numeric" },
       cell: (context) => (
         <MeasureValue
           value={context.row.original.value}
           unit={props.units?.[context.row.original.key]}
+          showUnavailableUnit={!noUnits}
         />
       ),
     },
@@ -74,6 +79,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
               <MeasureValue
                 value={context.row.original.comparison}
                 unit={props.comparisonUnits?.[context.row.original.key]}
+                showUnavailableUnit={!noUnits}
               />
             ),
           },
@@ -92,6 +98,11 @@ export function MeasuresGrid(props: MeasuresGridProps) {
         loading={props.loading}
         error={props.error}
       />
+      {grouped.length > 0 && noUnits && (
+        <p className="text-xs text-muted-foreground">
+          Raw measure values · units unavailable
+        </p>
+      )}
       {grouped.length ? (
         grouped.map(({ group, rows }) => (
           <FinstackTable

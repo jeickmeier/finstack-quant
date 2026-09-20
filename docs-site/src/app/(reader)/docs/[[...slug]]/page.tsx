@@ -12,8 +12,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
 }
 
 export default async function GuidePage({ params }: { params: Promise<{ slug?: string[] }> }) {
-  const page = docsSource.getPage((await params).slug);
+  const slug = (await params).slug;
+  const workbench = slug?.join("/") === "registry/workbench";
+  const page = docsSource.getPage(slug);
   if (!page) notFound();
   const Body = page.data.body;
-  return <DocsPage toc={page.data.toc} footer={{ enabled: false }}><div id="main-content"><p className="section-eyebrow">Workspace guide</p><DocsTitle>{page.data.title}</DocsTitle><DocsDescription>{page.data.description}</DocsDescription></div><DocsBody><Body components={getMDXComponents()} /></DocsBody></DocsPage>;
+  return <DocsPage full={workbench} tableOfContent={{ enabled: !workbench }} tableOfContentPopover={{ enabled: !workbench }} toc={page.data.toc} footer={{ enabled: false }}><div id="main-content"><p className="section-eyebrow">Workspace guide</p><DocsTitle>{page.data.title}</DocsTitle><DocsDescription>{page.data.description}</DocsDescription></div><DocsBody><Body components={getMDXComponents()} /></DocsBody></DocsPage>;
 }

@@ -37,6 +37,13 @@ const market = fixture.supplemental as unknown as MarketContextStateWire;
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
+function showOriginal(viewer: HTMLElement) {
+  const button = within(viewer).queryByRole("button", {
+    name: "Original",
+    hidden: true,
+  });
+  if (button) fireEvent.click(button);
+}
 it("retains the fresh full credit-desk calibration and native canonical supplemental fixture", () => {
   const source = readFileSync(
     resolve(dirname(fileURLToPath(import.meta.url)), "../..", fixture.source),
@@ -88,6 +95,7 @@ it("navigates every supplied leaf with exact displayed and copied values", async
       const view = screen.getByRole("region", {
         name: "Selected stored value",
       });
+      showOriginal(view);
       expect(view.querySelector("pre")!.textContent).toBe(
         serializeHost(original),
       );
@@ -105,6 +113,7 @@ it("searches literal paths and preserves identified selection across reorder, th
   const { rerender } = render(
     <MarketContextBrowser state={market} link={link} />,
   );
+  showOriginal(screen.getByRole("region", { name: "Selected stored value" }));
   expect(
     screen.getByRole("region", { name: "Selected stored value" }).textContent,
   ).toContain('"min_forward_rate":-1');
@@ -114,6 +123,7 @@ it("searches literal paths and preserves identified selection across reorder, th
       link={link}
     />,
   );
+  showOriginal(screen.getByRole("region", { name: "Selected stored value" }));
   expect(
     screen
       .getByRole("region", { name: "Selected stored value" })
@@ -155,6 +165,7 @@ it("shows absent generated roots as unavailable and preserves null and empty sto
     ["prices", "{}"],
   ]) {
     fireEvent.click(screen.getByRole("button", { name: `Inspect /${field}` }));
+    showOriginal(screen.getByRole("region", { name: "Selected stored value" }));
     expect(
       screen
         .getByRole("region", { name: "Selected stored value" })
@@ -181,6 +192,9 @@ it("preserves FX source, direction, date, policy and unavailable diagonals witho
     market
       .fx!.pinned_quotes.map((q) => `${q[4]} · ${q[2]} · ${q[3]}`)
       .join("; "),
+  );
+  showOriginal(
+    screen.getByRole("region", { name: "Complete stored FX state" }),
   );
   expect(
     screen

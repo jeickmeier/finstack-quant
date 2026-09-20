@@ -32,7 +32,7 @@ export function checkContrast(palette) {
     ])
       check(fg, bg, 4.5);
     for (const mark of [
-      "border",
+      "control-border",
       "ring",
       ...Array.from({ length: 6 }, (_, i) => `chart-${i + 1}`),
     ])

@@ -52,14 +52,17 @@ function canonical(json: string) {
   }
 }
 async function submit(onSubmit: ReturnType<typeof vi.fn>) {
-  await waitFor(() =>
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Apply market",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(false),
+  // This state waits for debounced validation in the real shared WASM worker.
+  await waitFor(
+    () =>
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "Apply market",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false),
+    { timeout: 3000 },
   );
   fireEvent.click(screen.getByRole("button", { name: "Apply market" }));
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());

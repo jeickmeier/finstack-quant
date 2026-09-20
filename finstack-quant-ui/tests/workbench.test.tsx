@@ -118,6 +118,13 @@ const canonicalMarket = (json: string) => {
     market.free();
   }
 };
+function showOriginal(viewer: HTMLElement) {
+  const button = within(viewer).queryByRole("button", {
+    name: "Original",
+    hidden: true,
+  });
+  if (button) fireEvent.click(button);
+}
 const prices = () =>
   call.mock.calls
     .filter(([method]) => method === "price")
@@ -146,6 +153,7 @@ it("embeds the existing components, debounces complete requests and retains edit
   await within(results).findByText("USD 1,042,500");
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "1000000.123456789" } });
+  await userEvent.click(screen.getByText("Settings", { selector: "summary" }));
   const overrides = ' {"theta_period":"1W"} ';
   const history = '{"base_date":"2025-01-01","window_days":2,"scenarios":[]}';
   fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
@@ -162,11 +170,15 @@ it("embeds the existing components, debounces complete requests and retains edit
     marketHistory: history,
   });
   await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
-  expect(
-    within(screen.getByRole("region", { name: "Market snapshot" })).getByText(
-      canonicalMarket(fixture.request.marketJson),
-    ),
-  ).toBeTruthy();
+  await userEvent.click(screen.getByRole("tab", { name: "Snapshot JSON" }));
+  showOriginal(screen.getByRole("region", { name: "Market snapshot" }));
+  const snapshot = screen.getByRole("region", { name: "Market snapshot" });
+  expect(snapshot.querySelector("pre")!.textContent).toBe(
+    canonicalMarket(fixture.request.marketJson),
+  );
+  expect(snapshot.querySelector("[data-json-print-source]")!.textContent).toBe(
+    canonicalMarket(fixture.request.marketJson),
+  );
   expect(screen.getByRole("region", { name: "Results" })).toBe(results);
   await userEvent.click(screen.getByRole("tab", { name: "1 Instrument" }));
   expect(
@@ -189,6 +201,7 @@ it("retains the completed context during invalid edits, native pricing failure a
   expect(prices()).toHaveLength(1);
   expect(screen.getByText("USD 1,042,500")).toBeTruthy();
   fireEvent.change(amount, { target: { value: "1000000" } });
+  await userEvent.click(screen.getByText("Settings", { selector: "summary" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
     target: { value: '{"unknown_seed":18446744073709551615}' },
   });
@@ -220,7 +233,7 @@ it("rejects a calibration envelope as a market snapshot before issuing a price r
   });
   const marketTab = screen.getByRole("tab", { name: "2 Market" });
   await userEvent.click(marketTab);
-  await userEvent.click(screen.getByRole("tab", { name: "Edit" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
   expect(
     within(
       screen.getByRole("region", { name: "Market context form" }),
@@ -238,7 +251,7 @@ it("feeds the complete native-validated market edit to pricing and shares stored
   mount();
   await screen.findByText("USD 1,042,500", {}, { timeout: 3000 });
   await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
-  await userEvent.click(screen.getByRole("tab", { name: "Edit" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
   fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
     target: { value: "0.96" },
   });
@@ -250,7 +263,7 @@ it("feeds the complete native-validated market edit to pricing and shares stored
   expect({ ...request, marketJson: prices()[0].marketJson }).toEqual(
     prices()[0],
   );
-  await userEvent.click(screen.getByRole("tab", { name: "View" }));
+  await userEvent.click(screen.getByRole("tab", { name: "View market" }));
   const curveIndex = JSON.parse(request.marketJson).curves.findIndex(
     (curve: any) => curve.id === expected.curves[0].id,
   );
@@ -263,6 +276,7 @@ it("feeds the complete native-validated market edit to pricing and shares stored
   const cell = screen.getByRole("cell", { name: "0.96" });
   await userEvent.click(cell);
   expect(cell.getAttribute("aria-selected")).toBe("true");
+  await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
   const direct = native.priceInstrument(
     request.instrumentJson,
     request.marketJson,
@@ -286,11 +300,13 @@ it.each(detailFixtures.cases)(
   "composes actual $type pricing with its returned $detailType route",
   async (entry) => {
     mount(entry.request);
+    await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
     const raw = await screen.findByRole(
       "region",
       { name: "Complete valuation result JSON", hidden: true },
       { timeout: 10000 },
     );
+    showOriginal(raw);
     const result = JSON.parse(raw.querySelector("pre")!.textContent!);
     const index = call.mock.calls.findLastIndex(
       ([method]) => method === "price",
@@ -328,6 +344,7 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
   "keeps $type pricing intact with exact cashflow output or its actual native export error",
   async (entry) => {
     mount(entry.request);
+    await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
     const result = await screen.findByRole(
       "region",
       { name: "Complete valuation result JSON", hidden: true },
@@ -336,10 +353,7 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
     );
-    expect(call.mock.calls.some(([method]) => method === "cashflows")).toBe(
-      false,
-    );
-    fireEvent.click(screen.getByText("Cashflows", { selector: "summary" }));
+    await userEvent.click(screen.getByRole("tab", { name: "3 Cashflow JSON" }));
     const viewer = await screen.findByRole("region", { name: "Cashflows" });
     if (entry.error)
       await waitFor(() =>
@@ -348,9 +362,10 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
         ),
       );
     else
-      await waitFor(() =>
-        expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows),
-      );
+      await waitFor(() => {
+        showOriginal(viewer);
+        expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
+      });
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
     );
@@ -394,6 +409,7 @@ it("loads configured scenario prices only on demand from the completed structure
   expect(call.mock.calls.some(([method]) => method === "scenarioTable")).toBe(
     false,
   );
+  await userEvent.click(screen.getByRole("tab", { name: "Scenarios" }));
   const toggle = await screen.findByText(
     "Scenario prices",
     { selector: "summary" },
@@ -479,6 +495,10 @@ it("prepares one completed cashflow snapshot before printing and restores the in
       asOf: request.asOf,
       model: request.model ?? "default",
     });
+    showOriginal(
+      workbench.querySelector('[aria-label="Priced instrument JSON"]')!,
+    );
+    showOriginal(workbench.querySelector('[aria-label="Market snapshot"]')!);
     expect(
       workbench.querySelector('[aria-label="Priced instrument JSON"] pre')
         ?.textContent,
@@ -496,9 +516,53 @@ it("prepares one completed cashflow snapshot before printing and restores the in
         .getByRole("tab", { name: "1 Instrument" })
         .getAttribute("aria-selected"),
     ).toBe("true");
-    expect(workbench.querySelector('[aria-label="Cashflows"]')).toBeNull();
+    expect(
+      screen
+        .getByRole("tab", { name: "3 Cashflow JSON" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
   } finally {
     Reflect.deleteProperty(document, "fonts");
     release();
   }
 }, 30000);
+
+it("keeps shortcuts within the focused workbench and leaves field typing intact", () => {
+  const first = mount(),
+    second = mount();
+  const [left, right] = screen.getAllByRole("region", {
+    name: "Pricing workbench",
+  });
+  fireEvent.keyDown(left, { key: "2" });
+  expect(
+    within(left)
+      .getByRole("tab", { name: "2 Market" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  expect(
+    within(right)
+      .getByRole("tab", { name: "1 Instrument" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  fireEvent.keyDown(within(right).getByRole("textbox", { name: "As of" }), {
+    key: "2",
+  });
+  expect(
+    within(right)
+      .getByRole("tab", { name: "1 Instrument" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  fireEvent.keyDown(left, { key: "4" });
+  expect(
+    within(left)
+      .getByRole("tab", { name: "4 Diagnostics" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  expect(
+    within(right)
+      .getByRole("tab", { name: "3 Cashflow JSON" })
+      .getAttribute("aria-selected"),
+  ).toBe("true");
+  first.unmount();
+  second.unmount();
+});

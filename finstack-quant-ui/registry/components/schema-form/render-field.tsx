@@ -1,5 +1,7 @@
 "use client";
-import { useContext, useState } from "react";
+import { useContext, useState, useRef, type ReactNode } from "react";
+import { Popover } from "@base-ui/react/popover";
+import { useStore } from "@tanstack/react-form";
 import { Fieldset, buttonClass } from "@/lib/finstack/form";
 import { EnumField } from "../../primitives/enum-field/enum-field";
 import { FieldRendererContext } from "./field-renderer";
@@ -16,6 +18,40 @@ import {
 } from "./schema";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 
+function TermActions({
+  label,
+  content,
+  children,
+}: {
+  label: string;
+  content: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="finstack-editable-term">
+      <div className="min-w-0">{content}</div>
+      <Popover.Root>
+        <Popover.Trigger
+          aria-label={`${label} options`}
+          className="finstack-field self-start px-1 text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          ⋯
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Positioner sideOffset={4}>
+            <Popover.Popup className="flex flex-col gap-1 rounded-md border border-border bg-card p-2 text-card-foreground shadow-[var(--elevation)]">
+              <Popover.Title className="text-xs text-muted-foreground">
+                {label}
+              </Popover.Title>
+              {children}
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
+    </div>
+  );
+}
+
 /** Shared renderer over generated structure; the module codec owns validation. */
 export function RenderField({
   module,
@@ -28,6 +64,7 @@ export function RenderField({
   layout,
   fields,
   skipOverride = false,
+  sectionless = false,
 }: {
   module: InstrumentModule;
   form: SchemaFormApi;
@@ -39,8 +76,11 @@ export function RenderField({
   layout: "basic" | "full";
   fields?: FieldFilter;
   skipOverride?: boolean;
+  sectionless?: boolean;
 }) {
   const [more, setMore] = useState(false);
+  const visibleTerms = useRef(new Map<string, Set<string>>());
+  const fieldMeta = useStore(form.store, (state) => state.fieldMeta);
   const render = useContext(FieldRendererContext);
   const within = (child: string, parent: string) =>
     child === parent ||
@@ -61,7 +101,7 @@ export function RenderField({
   const nonNull = nullable(module.schema, resolved);
   if ((!required && value === undefined) || (nonNull && value == null))
     return (
-      <div className="space-y-1 text-sm">
+      <div className="finstack-optional-term flex min-w-0 flex-wrap items-center gap-2 border-b border-border py-1 text-sm">
         <span>{label}</span>
         <button
           type="button"
@@ -97,20 +137,25 @@ export function RenderField({
     );
   if (nonNull)
     return (
-      <div className="col-span-full space-y-2">
-        <RenderField
-          {...{
-            module,
-            form,
-            path,
-            label,
-            value,
-            layout,
-            fields,
-            skipOverride,
-          }}
-          location={nonNull}
-        />
+      <TermActions
+        label={label}
+        content={
+          <RenderField
+            {...{
+              module,
+              form,
+              path,
+              label,
+              value,
+              layout,
+              fields,
+              skipOverride,
+              sectionless,
+            }}
+            location={nonNull}
+          />
+        }
+      >
         {!required && (
           <button
             type="button"
@@ -127,7 +172,7 @@ export function RenderField({
         >
           Clear {label.toLowerCase()}
         </button>
-      </div>
+      </TermActions>
     );
   if (Object.hasOwn(schema, "const")) return null;
   const custom = skipOverride
@@ -158,21 +203,26 @@ export function RenderField({
   if (custom !== undefined) return custom;
   if (!required && !nonNull)
     return (
-      <div className="col-span-full space-y-2">
-        <RenderField
-          {...{
-            module,
-            form,
-            location,
-            path,
-            label,
-            value,
-            layout,
-            fields,
-            skipOverride,
-          }}
-          required
-        />
+      <TermActions
+        label={label}
+        content={
+          <RenderField
+            {...{
+              module,
+              form,
+              location,
+              path,
+              label,
+              value,
+              layout,
+              fields,
+              skipOverride,
+              sectionless,
+            }}
+            required
+          />
+        }
+      >
         <button
           type="button"
           className={buttonClass}
@@ -180,7 +230,7 @@ export function RenderField({
         >
           Omit {label.toLowerCase()}
         </button>
-      </div>
+      </TermActions>
     );
   const union = discriminator(module.schema, resolved);
   if (union) {
@@ -211,6 +261,7 @@ export function RenderField({
               fields,
               skipOverride,
             }}
+            sectionless
             location={union.branches[selected]}
           />
         )}
@@ -261,7 +312,7 @@ export function RenderField({
             })}
           >
             {(index) => (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="finstack-term-fields">
                 <form.AppField name={`${path}[${index}].key`}>
                   {(keyField) => (
                     <keyField.TextField label={`${label} key ${index + 1}`} />
@@ -290,15 +341,65 @@ export function RenderField({
   }
   if (schema.type === "object") {
     const properties = propertiesOf(schema);
-    const primary = properties.filter(
-      ([, node]) => !Object.hasOwn(node, "default"),
-    );
-    const secondary = properties.filter(([, node]) =>
-      Object.hasOwn(node, "default"),
-    );
+    const requiredOrder = schema.required ?? [];
+    const order = (key: string) => {
+      if (key === "id") return -1;
+      const index = requiredOrder.indexOf(key);
+      return index < 0 ? requiredOrder.length : index;
+    };
+    properties.sort(([a], [b]) => order(a) - order(b));
+    const empty = (entry: unknown): boolean =>
+      entry == null ||
+      (Array.isArray(entry)
+        ? entry.length === 0
+        : typeof entry === "object" && Object.values(entry).every(empty));
+    const secondaryTerm = ([key, node]: (typeof properties)[number]) => {
+      const fieldPath = path ? `${path}.${key}` : key;
+      if (
+        Object.entries(fieldMeta).some(
+          ([name, meta]) =>
+            within(name, fieldPath) && Boolean(meta?.errors.length),
+        )
+      )
+        return false;
+      const current = objectValue(value)[key];
+      // Keep supplied non-default values and invalid fields visible. Empty
+      // optional objects and nullable branches remain under More terms.
+      if (
+        Object.hasOwn(node, "default") &&
+        (Object.is(current, node.default) ||
+          (typeof node.default === "number" &&
+            current === String(node.default)) ||
+          (empty(current) && empty(node.default)))
+      )
+        return true;
+      if (!empty(current)) return false;
+      if (!schema.required?.includes(key)) return true;
+      return (
+        Boolean(
+          nullable(module.schema, {
+            schema: node,
+            pointer: `${pointer}/properties/${key}`,
+          }),
+        ) ||
+        (current != null && typeof current === "object")
+      );
+    };
+    // Once a term is visible through a supplied value, edit or error, keep it
+    // available for this editor session. Matching a default must not hide the
+    // control beneath the user's cursor. Each schema branch owns its own set.
+    let visible = visibleTerms.current.get(pointer);
+    if (!visible) {
+      visible = new Set<string>();
+      visibleTerms.current.set(pointer, visible);
+    }
+    for (const entry of properties)
+      if (!secondaryTerm(entry)) visible.add(entry[0]);
+    const secondary = properties.filter(([key]) => !visible.has(key));
     const render = ([key, node]: (typeof properties)[number]) => (
       <RenderField
         key={key}
+        sectionless={sectionless && properties.length === 1}
         {...{ module, form, layout, fields }}
         location={{ schema: node, pointer: `${pointer}/properties/${key}` }}
         path={path ? `${path}.${key}` : key}
@@ -312,25 +413,36 @@ export function RenderField({
       />
     );
     if (!path || (path === "instrument" && schema.properties?.spec))
-      return (
-        <div className="col-span-full grid gap-3">{properties.map(render)}</div>
-      );
-    return (
-      <Fieldset {...info}>
-        <div className="grid gap-3 md:grid-cols-2">
-          {primary.map(render)}
-          {(layout === "full" || more) && secondary.map(render)}
+      return <div className="min-w-0">{properties.map(render)}</div>;
+    const contents = (
+      <>
+        <div className="finstack-term-fields">
+          {properties
+            .filter(([key]) => layout === "full" || more || visible.has(key))
+            .map(render)}
         </div>
         {layout === "basic" && secondary.length > 0 && (
           <button
             type="button"
-            className={buttonClass}
+            className="py-1 text-xs text-primary focus-visible:outline-2 focus-visible:outline-ring"
             aria-expanded={more}
             onClick={() => setMore(!more)}
           >
-            {more ? "Fewer" : "More"} {label.toLowerCase()} fields
+            {more ? "Fewer" : "More"} {label.toLowerCase()} fields (
+            {secondary.length})
           </button>
         )}
+      </>
+    );
+    if (sectionless) return <div className="min-w-0">{contents}</div>;
+    return (
+      <Fieldset
+        {...info}
+        className={
+          path === "instrument.spec" ? "finstack-schema-root" : undefined
+        }
+      >
+        {contents}
       </Fieldset>
     );
   }

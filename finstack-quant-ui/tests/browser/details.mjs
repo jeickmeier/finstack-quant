@@ -105,6 +105,7 @@ try {
     const raw = page.getByRole("region", {
       name: "Complete valuation result JSON",
     });
+    await raw.getByRole("button", { name: "Original", exact: true }).click();
     const text = await raw.locator("pre").textContent();
     assert(text.includes(`"type":"${entry.detailType}"`));
     if (entry.type === "bond") {

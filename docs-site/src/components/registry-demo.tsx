@@ -1,5 +1,6 @@
 "use client";
 import { Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";
 import { FinstackQueryProvider } from "@/hooks/use-finstack/use-finstack";
@@ -7,7 +8,15 @@ function WorkbenchRoute() {
   const search = useSearchParams();
   const type = search.get("instrument") ?? undefined;
   return (
-    <div className="not-prose finstack-surface">
+    <div className="not-prose finstack-surface text-sm">
+      <div className="mb-3 flex justify-end">
+        <Link
+          className="rounded-sm border border-border px-3 py-1.5 text-xs text-primary"
+          href={`/registry-gallery/?${new URLSearchParams({ item: "pricing-workbench", focus: "1", ...(type ? { instrument: type } : {}) })}`}
+        >
+          Open full-screen workbench ↗
+        </Link>
+      </div>
       <FinstackQueryProvider>
         <PricingWorkbench
           key={type ?? "default"}

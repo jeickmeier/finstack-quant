@@ -3,6 +3,7 @@ import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 import {
   FieldFrame,
+  FieldHelp,
   type FieldInfo,
 } from "@/components/finstack/primitives/field-frame/field-frame";
 import { DecimalInput } from "@/components/finstack/primitives/decimal-input/decimal-input";
@@ -14,9 +15,9 @@ import {
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
 export const fieldClass =
-  "finstack-field w-full rounded-sm border border-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring";
+  "finstack-field w-full rounded-sm border border-control-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring";
 export const buttonClass =
-  "rounded-sm border border-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50";
+  "rounded-sm border border-control-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50";
 export function errorText(errors: readonly unknown[]): string | undefined {
   const messages = errors
     .flat(Infinity)
@@ -87,6 +88,7 @@ function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
   return (
     <EnumField
       {...props}
+      layout="select"
       path={field.name}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
@@ -118,16 +120,19 @@ export function Fieldset({
   label,
   help,
   children,
-}: FieldInfo & { children: ReactNode }) {
+  className = "",
+}: FieldInfo & { children: ReactNode; className?: string }) {
   return (
-    <fieldset className="col-span-full min-w-0 space-y-3 rounded-sm border border-border p-3">
-      <legend className="px-1 text-sm font-semibold">{label}</legend>
-      {help && (
-        <details className="text-sm text-muted-foreground">
-          <summary>About {label.toLowerCase()}</summary>
-          <p className="whitespace-pre-wrap">{help}</p>
-        </details>
-      )}
+    <fieldset
+      aria-label={label}
+      className={`finstack-fieldset min-w-0 ${className}`}
+    >
+      <legend className="w-full border-b border-border pb-1 text-sm font-medium">
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {help && <FieldHelp label={label} help={help} />}
+        </span>
+      </legend>
       {children}
     </fieldset>
   );
@@ -148,10 +153,10 @@ function ArrayField({
       {rows.map((_, index) => (
         <div
           key={index}
-          className="space-y-2 rounded-sm border border-border p-2"
+          className="finstack-array-row min-w-0 border-b border-border py-2"
         >
           {children(index)}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               className={buttonClass}

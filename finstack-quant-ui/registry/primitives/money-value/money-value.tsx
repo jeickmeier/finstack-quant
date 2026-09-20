@@ -13,7 +13,7 @@ export function MoneyValue({
   return (
     <span
       aria-label={label}
-      className="finstack-numeric font-sans text-base text-foreground"
+      className="finstack-numeric font-sans text-foreground"
       title={value?.amount}
     >
       {value ? formatMoney(value, rounding) : "—"}

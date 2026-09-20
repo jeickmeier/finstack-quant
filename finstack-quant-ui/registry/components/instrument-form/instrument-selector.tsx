@@ -52,7 +52,7 @@ export function InstrumentSelector({
     onValueChange(type);
   };
   return (
-    <div className="space-y-2">
+    <div className="finstack-instrument-selector space-y-2">
       <Combobox.Root
         items={groups}
         value={instruments.find((entry) => entry.type === value) ?? null}
@@ -68,11 +68,11 @@ export function InstrumentSelector({
         <Combobox.Input
           id={id}
           placeholder="Search instruments…"
-          className="finstack-field w-full rounded-sm border border-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          className="finstack-field w-full rounded-sm border border-control-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
         />
         <Combobox.Portal>
           <Combobox.Positioner sideOffset={4}>
-            <Combobox.Popup className="min-w-[var(--anchor-width)] rounded-md border border-border bg-card text-card-foreground shadow-[var(--elevation)]">
+            <Combobox.Popup className="min-w-[var(--anchor-width)] rounded-md border border-control-border bg-card text-card-foreground shadow-[var(--elevation)]">
               <Combobox.Empty className="p-2 text-sm">
                 No matching instrument
               </Combobox.Empty>
@@ -92,7 +92,7 @@ export function InstrumentSelector({
                           <span>{entry.title}</span>
                           <span
                             aria-hidden
-                            className="rounded-sm border border-border px-1 text-xs text-muted-foreground"
+                            className="rounded-sm border border-control-border px-1 text-xs text-muted-foreground"
                           >
                             {entry.group.replaceAll("_", " ")}
                           </span>
@@ -117,7 +117,7 @@ export function InstrumentSelector({
               key={type}
               type="button"
               onClick={() => select(type)}
-              className="rounded-sm border border-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
+              className="rounded-sm border border-control-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
             >
               {type}
             </button>

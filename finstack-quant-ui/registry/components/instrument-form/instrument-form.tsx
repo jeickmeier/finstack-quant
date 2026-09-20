@@ -60,13 +60,27 @@ export function InstrumentForm(props: {
       aria-label="Instrument form"
       className="space-y-3 font-sans text-foreground"
     >
-      <InstrumentSelector
-        value={props.type}
-        onValueChange={(type) => {
-          props.onValidated?.(null);
-          props.onTypeChange(type);
-        }}
-      />
+      <header className="finstack-instrument-header">
+        <InstrumentSelector
+          value={props.type}
+          onValueChange={(type) => {
+            props.onValidated?.(null);
+            props.onTypeChange(type);
+          }}
+        />
+        {module && (
+          <button
+            type="button"
+            className="rounded-sm border border-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+            onClick={() => {
+              props.onValidated?.(null);
+              setExample((n) => n + 1);
+            }}
+          >
+            Load example
+          </button>
+        )}
+      </header>
       {!instruments.some((entry) => entry.type === props.type) ? (
         <p role="alert">Unknown instrument type: {props.type}</p>
       ) : (
@@ -75,16 +89,6 @@ export function InstrumentForm(props: {
           {!module && !error && <p role="status">Loading instrument schema…</p>}
           {module && (
             <>
-              <button
-                type="button"
-                className="rounded-sm border border-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-                onClick={() => {
-                  props.onValidated?.(null);
-                  setExample((n) => n + 1);
-                }}
-              >
-                Load example
-              </button>
               {parseError ? (
                 <p role="alert">{parseError}</p>
               ) : (

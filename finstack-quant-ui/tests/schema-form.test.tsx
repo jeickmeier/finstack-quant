@@ -26,7 +26,16 @@ const validate = async (json: string) => native.validateInstrumentJson(json);
 it("edits generated bond controls, shows decimal errors and emits native canonical JSON without replacing edits", async () => {
   const submit = vi.fn();
   render(<SchemaForm module={bond} validate={validate} onSubmit={submit} />);
-  expect(screen.queryByRole("textbox", { name: "Settlement days" })).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: "Add credit curve id" }),
+  ).toBeNull();
+  expect(
+    (
+      screen.getByRole("textbox", {
+        name: "Settlement days",
+      }) as HTMLInputElement
+    ).value,
+  ).toBe("1");
   const amount = within(
     screen.getByRole("group", { name: "Notional" }),
   ).getByRole("textbox", { name: "Amount" });
@@ -62,15 +71,23 @@ it("switches canonical external coupon branches, and exposes defaulted fields on
   const user = userEvent.setup();
   render(<SchemaForm module={bond} validate={validate} onSubmit={() => {}} />);
   await user.click(
-    screen.getByRole("button", { name: "More instrument terms fields" }),
+    screen.getByRole("button", { name: /^More instrument terms fields/ }),
   );
   expect(screen.getByRole("textbox", { name: "Settlement days" })).toBeTruthy();
   const types = screen.getByRole("radiogroup", { name: "Cashflow spec type" });
   await user.click(within(types).getByRole("radio", { name: "Floating" }));
-  expect(screen.getByRole("group", { name: "Floating" })).toBeTruthy();
+  expect(
+    within(types)
+      .getByRole("radio", { name: "Floating" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
   expect(screen.queryByRole("group", { name: "Fixed" })).toBeNull();
   await user.click(within(types).getByRole("radio", { name: "Fixed" }));
-  expect(screen.getByRole("group", { name: "Fixed" })).toBeTruthy();
+  expect(
+    within(types)
+      .getByRole("radio", { name: "Fixed" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
 });
 it("supports nullable references without inventing IDs and ignores stale native validation errors", async () => {
   const pending: {
@@ -88,6 +105,9 @@ it("supports nullable references without inventing IDs and ignores stale native 
       }
       onSubmit={() => {}}
     />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: /^More instrument terms fields/ }),
   );
   fireEvent.click(screen.getByRole("button", { name: "Add credit curve id" }));
   const credit = screen.getByRole("textbox", { name: "Credit curve id" });
@@ -109,7 +129,10 @@ it("supports nullable references without inventing IDs and ignores stale native 
   );
   expect(screen.queryByText("Obsolete native error")).toBeNull();
   fireEvent.click(
-    screen.getByRole("button", { name: "Clear credit curve id" }),
+    screen.getByRole("button", { name: "Credit curve id options" }),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Clear credit curve id" }),
   );
   expect(screen.queryByRole("textbox", { name: "Credit curve id" })).toBeNull();
 });
@@ -311,3 +334,46 @@ it("delegates optional field presentation without recursively reapplying its ove
     1,
   );
 });
+
+it.each(["", "loaded"])(
+  "keeps focus while editing between default and non-default values from %j",
+  async (initial) => {
+    const schema: Schema = {
+      type: "object",
+      properties: {
+        terms: {
+          type: "object",
+          properties: { note: { type: "string", default: "" } },
+        },
+      },
+    };
+    const module = {
+      schema,
+      metadata: [],
+      codec: createWireCodec({ ...schema }),
+      example: { terms: { note: initial } },
+    };
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        module={module}
+        validate={async (json) => json}
+        onSubmit={() => {}}
+      />,
+    );
+    if (!initial)
+      await user.click(
+        screen.getByRole("button", { name: /^More terms fields/ }),
+      );
+    const note = screen.getByRole("textbox", { name: "Note" });
+    if (initial) {
+      await user.clear(note);
+      expect(screen.getByRole("textbox", { name: "Note" })).toBe(note);
+      expect(document.activeElement).toBe(note);
+    }
+    await user.type(note, "edited");
+    expect(screen.getByRole("textbox", { name: "Note" })).toBe(note);
+    expect(document.activeElement).toBe(note);
+    expect((note as HTMLInputElement).value).toBe("edited");
+  },
+);

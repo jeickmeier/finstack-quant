@@ -13,6 +13,11 @@ import { installBuilt } from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-workbench-"));
 let browser, server;
+async function original(viewer) {
+  await viewer.locator("pre").waitFor();
+  await viewer.getByRole("button", { name: "Original", exact: true }).click();
+}
+
 try {
   const detail = JSON.parse(
     await readFile(path.join(root, "tests/details/cases.json"), "utf8"),
@@ -119,12 +124,21 @@ try {
   for (const entry of cases) {
     await page.getByRole("button", { name: entry.id, exact: true }).click();
     const results = page.getByRole("region", { name: "Results", exact: true });
+    await results
+      .getByRole("tab", { name: "4 Diagnostics", exact: true })
+      .click();
     await results.getByText("Complete result JSON", { exact: true }).click();
+    await original(
+      results.getByRole("region", { name: "Complete valuation result JSON" }),
+    );
     const resultText = await results
       .getByRole("region", { name: "Complete valuation result JSON" })
       .locator("pre")
       .textContent();
-    await results.getByText("Last priced request", { exact: true }).click();
+    await results.getByRole("tab", { name: "Request", exact: true }).click();
+    await original(
+      results.getByRole("region", { name: "Last priced request JSON" }),
+    );
     const request = JSON.parse(
       await results
         .getByRole("region", { name: "Last priced request JSON" })
@@ -147,6 +161,9 @@ try {
       ),
     );
     if (entry.detailType) {
+      await results
+        .getByRole("tab", { name: "4 Diagnostics", exact: true })
+        .click();
       assert.equal(direct.details.type, entry.detailType);
       if (entry.detailType === "monte_carlo") {
         await results
@@ -166,7 +183,9 @@ try {
           .waitFor();
     }
     if (entry.id.startsWith("cashflows-")) {
-      await results.getByText("Cashflows", { exact: true }).click();
+      await results
+        .getByRole("tab", { name: "3 Cashflow JSON", exact: true })
+        .click();
       const viewer = results.getByRole("region", {
         name: "Cashflows",
         exact: true,
@@ -178,6 +197,7 @@ try {
           `Cashflows unavailable: ${entry.error}`,
         );
       } else {
+        await original(viewer);
         await page.waitForFunction(
           (text) =>
             document.querySelector('section[aria-label="Cashflows"] pre')
@@ -189,6 +209,13 @@ try {
           entry.cashflows,
         );
       }
+      await results
+        .getByRole("tab", { name: "4 Diagnostics", exact: true })
+        .click();
+      await results.getByText("Complete result JSON", { exact: true }).click();
+      await original(
+        results.getByRole("region", { name: "Complete valuation result JSON" }),
+      );
       assert.equal(
         await results
           .getByRole("region", { name: "Complete valuation result JSON" })
@@ -212,12 +239,18 @@ try {
     });
   }
   await page.getByRole("button", { name: "details-bond", exact: true }).click();
+  await page.getByRole("tab", { name: "4 Diagnostics", exact: true }).click();
   await page.getByRole("region", { name: "Monte Carlo diagnostics" }).waitFor();
   await page.getByRole("tab", { name: "2 Market", exact: true }).click();
-  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.getByRole("tab", { name: "Edit market", exact: true }).click();
   await page.getByLabel("Stored value 1", { exact: true }).first().fill("0.96");
   await page.getByRole("button", { name: "Apply market", exact: true }).click();
-  await page.getByRole("tab", { name: "View", exact: true }).click();
+  await page.getByRole("tab", { name: "View market", exact: true }).click();
+  await page.getByLabel("Search market fields").fill("USD-OIS");
+  await page
+    .getByRole("button", { name: /Inspect \/curves\/\d+$/ })
+    .filter({ hasText: "USD-OIS" })
+    .click();
   const cell = page.getByRole("gridcell", { name: "0.96", exact: true });
   await cell.click();
   assert.equal(await cell.getAttribute("aria-selected"), "true");
@@ -225,7 +258,9 @@ try {
   const selectedY = await page
     .locator('svg.ts-chart circle[r="9"]')
     .getAttribute("cy");
-  const chart = page.locator('[aria-label="discount stored curves"][tabindex]');
+  const chart = page.locator(
+    '[aria-label="Selected market curve stored curves"][tabindex]',
+  );
   await chart.focus();
   await chart.press("Home");
   await chart.press("Enter");
@@ -244,7 +279,10 @@ try {
     selectedY,
   );
   const results = page.getByRole("region", { name: "Results", exact: true });
-  await results.getByText("Last priced request", { exact: true }).click();
+  await results.getByRole("tab", { name: "Request", exact: true }).click();
+  await original(
+    results.getByRole("region", { name: "Last priced request JSON" }),
+  );
   await page.waitForFunction(() =>
     document
       .querySelector('[aria-label="Last priced request JSON"] pre')

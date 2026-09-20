@@ -30,9 +30,9 @@ export function FieldFrame({
   return (
     <div
       data-field-path={path}
-      className="min-w-0 space-y-1 font-sans text-base text-foreground"
+      className="finstack-field-frame min-w-0 space-y-1 font-sans text-base text-foreground"
     >
-      <div className="flex items-center gap-2">
+      <div className="finstack-field-label flex min-w-0 items-center gap-1">
         <label
           id={`${fieldId}-label`}
           htmlFor={fieldId}
@@ -40,38 +40,45 @@ export function FieldFrame({
         >
           {label}
         </label>
-        {help && (
-          <Popover.Root>
-            <Popover.Trigger
-              aria-label={`${label} help`}
-              className="text-sm text-primary focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              ?
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Positioner sideOffset={4}>
-                <Popover.Popup className="max-w-sm rounded-md border border-border bg-card p-3 text-sm text-card-foreground shadow-[var(--elevation)]">
-                  <Popover.Title>{label}</Popover.Title>
-                  <Popover.Description className="whitespace-pre-wrap">
-                    {help}
-                  </Popover.Description>
-                </Popover.Popup>
-              </Popover.Positioner>
-            </Popover.Portal>
-          </Popover.Root>
-        )}
+        {help && <FieldHelp label={label} help={help} />}
       </div>
-      {children({
-        id: fieldId,
-        "aria-labelledby": `${fieldId}-label`,
-        "aria-describedby": error ? `${fieldId}-error` : undefined,
-        "aria-invalid": Boolean(error),
-      })}
+      <div className="finstack-field-control min-w-0">
+        {children({
+          id: fieldId,
+          "aria-labelledby": `${fieldId}-label`,
+          "aria-describedby": error ? `${fieldId}-error` : undefined,
+          "aria-invalid": Boolean(error),
+        })}
+      </div>
       {error && (
         <p id={`${fieldId}-error`} role="alert" className="text-xs text-error">
           {error}
         </p>
       )}
     </div>
+  );
+}
+
+/** Shared on-demand schema description for a field or section. */
+export function FieldHelp({ label, help }: { label: string; help: string }) {
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label={`${label} help`}
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        ?
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner sideOffset={4}>
+          <Popover.Popup className="max-w-sm rounded-md border border-border bg-card p-3 text-sm text-card-foreground shadow-[var(--elevation)]">
+            <Popover.Title>{label}</Popover.Title>
+            <Popover.Description className="whitespace-pre-wrap">
+              {help}
+            </Popover.Description>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }

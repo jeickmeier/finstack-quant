@@ -13,6 +13,11 @@ import { installBuilt } from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-workbench-"));
 let browser, server;
+async function original(viewer) {
+  await viewer.locator("pre").waitFor();
+  await viewer.getByRole("button", { name: "Original", exact: true }).click();
+}
+
 try {
   let installed = ["pricing-workbench"];
   if (!process.env.REGISTRY_EXPORT_DIR) {
@@ -83,7 +88,10 @@ try {
   );
   await page.getByText("USD 1,042,500", { exact: true }).waitFor();
   const results = page.getByRole("region", { name: "Results", exact: true });
-  await results.getByText("Last priced request", { exact: true }).click();
+  await results.getByRole("tab", { name: "Request", exact: true }).click();
+  await original(
+    results.getByRole("region", { name: "Last priced request JSON" }),
+  );
   const old = JSON.parse(
     await results
       .getByRole("region", { name: "Last priced request JSON" })
@@ -115,7 +123,13 @@ try {
     request.pricingOptions,
     request.marketHistory,
   );
+  await results
+    .getByRole("tab", { name: "4 Diagnostics", exact: true })
+    .click();
   await results.getByText("Complete result JSON", { exact: true }).click();
+  await original(
+    results.getByRole("region", { name: "Complete valuation result JSON" }),
+  );
   const actual = JSON.parse(
     await results
       .getByRole("region", { name: "Complete valuation result JSON" })
@@ -131,9 +145,11 @@ try {
     .getByRole("button", { name: "Inspect /curves/0", exact: true })
     .click();
   await page.locator("svg.ts-chart").first().waitFor();
+  await page.getByRole("tab", { name: "Snapshot JSON", exact: true }).click();
   assert(
     await page.getByRole("region", { name: "Market snapshot" }).isVisible(),
   );
+  await page.getByRole("tab", { name: "View market", exact: true }).click();
   await page.getByRole("tab", { name: "1 Instrument" }).click();
   assert.equal(await amount.inputValue(), "1000000.123456789");
   const calibrationChecks = [];
@@ -141,7 +157,7 @@ try {
     const cases = JSON.parse(
       await readFile(path.join(root, "tests/calibration/cases.json"), "utf8"),
     );
-    await page.getByRole("tab", { name: "3 Calibrate" }).click();
+    await page.getByRole("tab", { name: "Calibrate" }).click();
     const panel = page.getByRole("region", { name: "Calibration workflow" });
     await panel
       .getByText("Import calibration envelope", { exact: true })
@@ -199,6 +215,12 @@ try {
         );
         const expectedMarket = marketHandle.toJson();
         marketHandle.free();
+        await results
+          .getByRole("tab", { name: "Request", exact: true })
+          .click();
+        await original(
+          results.getByRole("region", { name: "Last priced request JSON" }),
+        );
         await page.waitForFunction(
           (expected) =>
             JSON.parse(
@@ -222,6 +244,17 @@ try {
           priced.metrics,
           priced.pricingOptions,
           priced.marketHistory,
+        );
+        await results
+          .getByRole("tab", { name: "4 Diagnostics", exact: true })
+          .click();
+        await results
+          .getByText("Complete result JSON", { exact: true })
+          .click();
+        await original(
+          results.getByRole("region", {
+            name: "Complete valuation result JSON",
+          }),
         );
         const actualPrice = JSON.parse(
           await results
@@ -300,7 +333,7 @@ try {
           .count(),
         0,
       );
-      await page.getByRole("tab", { name: "3 Calibrate" }).click();
+      await page.getByRole("tab", { name: "Calibrate" }).click();
     }
     const supplemental = JSON.parse(
       await readFile(
@@ -310,7 +343,7 @@ try {
     ).supplemental;
     supplemental.fx_delta_vol_surfaces = [fxQuotes];
     await page.getByRole("tab", { name: "2 Market" }).click();
-    await page.getByRole("tab", { name: "Edit", exact: true }).click();
+    await page.getByRole("tab", { name: "Edit market", exact: true }).click();
     const editor = page.getByRole("region", { name: "Market context form" });
     await editor.getByText("Import market", { exact: true }).click();
     await editor
@@ -319,7 +352,7 @@ try {
     await editor
       .getByRole("button", { name: "Import JSON", exact: true })
       .click();
-    await page.getByRole("tab", { name: "View", exact: true }).click();
+    await page.getByRole("tab", { name: "View market", exact: true }).click();
     await page
       .getByLabel("Search market fields")
       .fill("/fx_delta_vol_surfaces/0");
@@ -341,7 +374,7 @@ try {
         .count(),
       0,
     );
-    await page.getByRole("tab", { name: "3 Calibrate" }).click();
+    await page.getByRole("tab", { name: "Calibrate" }).click();
     const missing = structuredClone(cases[0].input);
     missing.plan.steps[0].quote_set = "missing_quotes";
     await panel

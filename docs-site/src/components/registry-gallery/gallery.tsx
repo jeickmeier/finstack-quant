@@ -69,14 +69,16 @@ export function RegistryGallery() {
       search.get("density") === "comfortable" ? "comfortable" : "compact",
     variant = search.get("variant") ?? "default",
     publication = variant === "publication",
+    focused = search.get("focus") === "1",
     width = search.get("width") === "narrow" ? 360 : publication ? 1000 : 880;
   const item = inventory.visual.find((item) => item.name === name);
+  const block = item?.type === "registry:block";
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.density = density;
   }, [theme, density]);
   const href = (item: string, nextTheme = theme, nextDensity = density) =>
-    `?${new URLSearchParams({ item, theme: nextTheme, density: nextDensity })}`;
+    `?${new URLSearchParams({ item, theme: nextTheme, density: nextDensity, ...(focused ? { focus: "1" } : {}), ...(variant !== "default" ? { variant } : {}) })}`;
   const content = item ? (
     item.type === "registry:ui" || item.type === "registry:theme" ? (
       <PrimitiveDemo
@@ -91,22 +93,32 @@ export function RegistryGallery() {
         density={density}
         width={width}
         variant={variant}
+        instrument={search.get("instrument") ?? undefined}
       />
     )
   ) : null;
   return (
     <main
       id="main-content"
-      className="finstack-surface min-h-screen bg-background p-4 font-sans text-foreground"
+      className={`finstack-surface not-prose min-h-screen bg-background font-sans text-sm text-foreground ${focused ? "" : "p-4"}`}
       data-theme={theme}
       data-density={density}
+      data-registry-focus={focused ? "" : undefined}
     >
-      <header className="mb-6 space-y-3">
-        <h1 className="text-2xl font-semibold">Component registry gallery</h1>
-        <p>
-          Installed components with explicit fixtures. Light/dark and
-          compact/comfortable states share the same public APIs.
-        </p>
+      <header
+        className={
+          focused
+            ? "hidden"
+            : "mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4"
+        }
+      >
+        <h1 className="text-lg font-semibold">
+          finstack{" "}
+          <span className="font-normal text-muted-foreground">
+            / component registry
+          </span>
+        </h1>
+
         <nav aria-label="Gallery state" className="flex flex-wrap gap-4">
           <a href={href(name, "light", density)}>Light</a>
           <a href={href(name, "dark", density)}>Dark</a>
@@ -115,10 +127,18 @@ export function RegistryGallery() {
           <a href={href("nonvisual")}>Nonvisual harnesses</a>
         </nav>
       </header>
-      <div className="grid items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div
+        className={
+          focused
+            ? ""
+            : "grid items-start gap-5 lg:grid-cols-[190px_minmax(0,1fr)]"
+        }
+      >
         <nav
           aria-label="Registry tiers"
-          className="max-h-[80vh] overflow-auto space-y-4"
+          className={
+            focused ? "hidden" : "max-h-[84vh] overflow-auto space-y-5 text-xs"
+          }
         >
           {[
             {
@@ -129,13 +149,16 @@ export function RegistryGallery() {
             { title: "Blocks", types: ["registry:block"] },
           ].map((group) => (
             <section key={group.title}>
-              <h2 className="font-semibold">{group.title}</h2>
+              <h2 className="mb-2 font-medium text-muted-foreground">
+                {group.title}
+              </h2>
               <ul>
                 {inventory.visual
                   .filter((item) => group.types.includes(item.type))
                   .map((item) => (
                     <li key={item.name}>
                       <a
+                        className={`block border-l-2 px-3 py-1.5 ${name === item.name ? "border-primary bg-accent text-primary" : "border-transparent hover:bg-muted"}`}
                         aria-current={name === item.name ? "page" : undefined}
                         href={href(item.name)}
                       >
@@ -147,7 +170,7 @@ export function RegistryGallery() {
             </section>
           ))}
         </nav>
-        <div className="min-w-0 overflow-auto">
+        <div className="min-w-0">
           {name === "nonvisual" ? (
             <Imports />
           ) : item ? (
@@ -155,13 +178,34 @@ export function RegistryGallery() {
               key={`${name}/${variant}/${density}`}
               data-item={name}
               data-state={`${theme}-${density}`}
-              className="space-y-4 border border-border bg-background p-4"
-              style={{ width: width + 34, maxWidth: "100%" }}
+              className={focused ? "bg-background" : "space-y-3 bg-background"}
+              style={{
+                width: block || focused ? "100%" : width + 34,
+                maxWidth: "100%",
+              }}
             >
-              <h2 className="text-xl font-semibold">{name}</h2>
-              <p className="text-sm text-muted-foreground">{item.docs}</p>
+              {!focused && (
+                <header className="space-y-2 pb-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-semibold">{name}</h2>
+                    <a
+                      className="rounded-sm border border-border px-3 py-1 text-xs"
+                      href={`${href(name)}&focus=1`}
+                    >
+                      Open focused preview ↗
+                    </a>
+                  </div>
+                  <p className="max-w-4xl text-xs text-muted-foreground">
+                    {item.docs}
+                  </p>
+                </header>
+              )}
               <div
-                className="max-h-[1100px] overflow-auto"
+                className={
+                  block
+                    ? "min-w-0 border border-border"
+                    : "max-h-[1100px] overflow-auto border border-border p-4"
+                }
                 data-preview
                 tabIndex={0}
                 role="region"

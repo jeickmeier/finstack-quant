@@ -30,8 +30,11 @@ export function returnedRounding(
 /** Display actual supplied policy/version fields; absent metadata stays explicitly unavailable. */
 export function StampBadge({
   meta,
+  compact = false,
 }: {
   meta: Record<string, unknown> | null | undefined;
+  /** Keep primary policy badges visible and disclose the full stamp; print retains all fields. */
+  compact?: boolean;
 }) {
   if (!meta)
     return (
@@ -54,23 +57,53 @@ export function StampBadge({
       ([currency, scale]) => [`${currency} ingest decimals`, scale],
     ),
   ];
+  const renderFields = (entries: typeof fields) =>
+    entries.map(([label, value]) => (
+      <div
+        key={String(label)}
+        className="rounded-sm border border-border px-1 font-mono text-xs text-muted-foreground"
+      >
+        <dt className="inline">{String(label)}: </dt>
+        <dd className="inline">
+          {typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+            ? String(value)
+            : "Unavailable"}
+        </dd>
+      </div>
+    ));
+  if (!compact)
+    return (
+      <dl aria-label="Calculation metadata" className="flex flex-wrap gap-1">
+        {renderFields(fields)}
+      </dl>
+    );
+  const primary = new Set(["Numeric mode", "Rounding", "Version"]);
   return (
-    <dl aria-label="Calculation metadata" className="flex flex-wrap gap-1">
-      {fields.map(([label, value]) => (
-        <div
-          key={String(label)}
-          className="rounded-sm border border-border px-1 font-mono text-xs text-muted-foreground"
-        >
-          <dt className="inline">{String(label)}: </dt>
-          <dd className="inline">
-            {typeof value === "string" ||
-            typeof value === "number" ||
-            typeof value === "boolean"
-              ? String(value)
-              : "Unavailable"}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <div>
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <dl aria-label="Calculation policy" className="flex flex-wrap gap-1">
+          {renderFields(fields.filter(([label]) => primary.has(String(label))))}
+        </dl>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring">
+            Full metadata
+          </summary>
+          <dl
+            aria-label="Calculation metadata"
+            className="mt-2 flex flex-wrap gap-1"
+          >
+            {renderFields(fields)}
+          </dl>
+        </details>
+      </div>
+      <dl
+        aria-label="Printed calculation metadata"
+        className="hidden flex-wrap gap-1 print:flex"
+      >
+        {renderFields(fields)}
+      </dl>
+    </div>
   );
 }

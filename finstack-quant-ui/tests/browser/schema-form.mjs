@@ -5,6 +5,7 @@ import path from "node:path";
 import { build } from "vite";
 import tailwind from "@tailwindcss/postcss";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import { serveExport } from "./static-server.mjs";
 import { installBuilt } from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -108,10 +109,10 @@ try {
     await page
       .getByRole("textbox", { name: "Settlement days", exact: true })
       .count(),
-    0,
+    1,
   );
   await page
-    .getByRole("button", { name: "More instrument terms fields", exact: true })
+    .getByRole("button", { name: /^More instrument terms fields/ })
     .click();
   const settlement = page.getByRole("textbox", {
     name: "Settlement days",
@@ -134,10 +135,7 @@ try {
   await page
     .getByRole("button", { name: "Apply instrument", exact: true })
     .click();
-  assert.equal(
-    await summary.evaluate((node) => node === document.activeElement),
-    true,
-  );
+  await expect(summary).toBeFocused();
   assert.equal(await output.inputValue(), canonical);
   await maturity.fill("2034-01-15");
   await summary.waitFor({ state: "detached" });

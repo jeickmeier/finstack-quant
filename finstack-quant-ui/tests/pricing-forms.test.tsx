@@ -142,6 +142,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
     pricingOptions: exact,
   });
   expect(jsonError(exact)).toBeUndefined();
+  await userEvent.click(screen.getByRole("button", { name: "Metrics" }));
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([
     "hidden_metric",
@@ -151,6 +152,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
     screen.getByRole("button", { name: "Omit metric selection" }),
   );
   expect(changes.mock.calls.at(-1)?.[0].metrics).toBeUndefined();
+  await userEvent.click(screen.getByRole("button", { name: "Metrics" }));
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([]);
@@ -163,11 +165,16 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   );
   expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBeUndefined();
   await userEvent.click(screen.getByText("View market history"));
-  expect(
+  await userEvent.click(
     within(
       screen.getByRole("region", { name: "Market history JSON" }),
-    ).getByText(history),
-  ).toBeTruthy();
+    ).getByRole("button", { name: "Original" }),
+  );
+  expect(
+    screen
+      .getByRole("region", { name: "Market history JSON" })
+      .querySelector("pre")?.textContent,
+  ).toBe(history);
 });
 it("keeps a new structural error and invalid accepted state when an older native validation completes", async () => {
   let finish!: (json: string) => void;
@@ -208,4 +215,20 @@ it("keeps a new structural error and invalid accepted state when an older native
   await waitFor(() => expect(document.activeElement).toBe(amount));
   expect(amount.getAttribute("aria-invalid")).toBe("true");
   expect(accepted.mock.calls.at(-1)?.[0]).toBeNull();
+});
+
+it("waits for model discovery before announcing unavailable selection", () => {
+  const props = {
+    value: { asOf: "2025-01-01", model: "discounting" },
+    onValueChange: () => {},
+    instrumentType: "bond",
+    models: {},
+    metrics: {},
+  };
+  const { rerender } = render(
+    <PricingParamsForm {...props} loading sections={["context"]} />,
+  );
+  expect(screen.queryByText(/Selected model unavailable/)).toBeNull();
+  rerender(<PricingParamsForm {...props} sections={["context"]} />);
+  expect(screen.getByText(/Selected model unavailable/)).toBeTruthy();
 });

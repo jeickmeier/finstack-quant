@@ -1,7 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { parse, stringify } from "lossless-json";
 import { Button } from "@base-ui/react/button";
-/** Read-only original supplied text. Copy is exact; print only changes layout. */
+/** Read-only JSON with lossless formatted or original presentation.
+ * Formatting preserves numeric tokens; invalid JSON (including duplicate keys)
+ * remains in Original view. Copy, download and compact print retain the supplied bytes.
+ */
 export function JsonViewer({
   text,
   label = "JSON",
@@ -22,6 +26,22 @@ export function JsonViewer({
     text: string | null | undefined;
     message: string;
   } | null>(null);
+  const [view, setView] = useState<"formatted" | "original">("formatted");
+  const presentation = useMemo(() => {
+    if (!text) return { formatted: null, error: null };
+    try {
+      return {
+        formatted: stringify(parse(text), undefined, 2) ?? null,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        formatted: null,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }, [text]);
+  const formatted = view === "formatted" && presentation.formatted !== null;
   const present = text !== null && text !== undefined && text !== "";
   return (
     <section
@@ -31,8 +51,25 @@ export function JsonViewer({
       className="font-sans text-base text-foreground"
     >
       <h3 className="hidden text-sm font-semibold print:block">{label}</h3>
-      <div className="flex items-center gap-2 print:hidden">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <span className="text-sm">{label}</span>
+        <div role="group" aria-label="JSON presentation" className="flex gap-1">
+          <Button
+            aria-pressed={formatted}
+            disabled={presentation.formatted === null}
+            onClick={() => setView("formatted")}
+            className="rounded-sm px-2 text-xs text-muted-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Formatted
+          </Button>
+          <Button
+            aria-pressed={!formatted}
+            onClick={() => setView("original")}
+            className="rounded-sm px-2 text-xs text-muted-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Original
+          </Button>
+        </div>
         <Button
           disabled={!present}
           onClick={async () => {
@@ -75,6 +112,11 @@ export function JsonViewer({
           {copyStatus && copyStatus.text === text ? copyStatus.message : ""}
         </span>
       </div>
+      {present && presentation.error && (
+        <p className="text-xs text-muted-foreground" role="status">
+          Original text — formatting unavailable: {presentation.error}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-error">
           {error}
@@ -82,12 +124,20 @@ export function JsonViewer({
       )}
       {loading && <p role="status">Loading…</p>}
       {present ? (
-        <pre
-          tabIndex={0}
-          className={`max-h-96 overflow-auto whitespace-pre font-mono focus-visible:outline-2 focus-visible:outline-ring print:max-h-none print:whitespace-pre-wrap print:break-all print:overflow-visible ${density === "compact" ? "text-xs leading-5" : "text-sm leading-6"}`}
-        >
-          {text}
-        </pre>
+        <>
+          <pre
+            tabIndex={0}
+            className={`max-h-96 overflow-auto whitespace-pre-wrap break-all font-mono focus-visible:outline-2 focus-visible:outline-ring print:hidden ${density === "compact" ? "text-xs leading-5" : "text-sm leading-6"}`}
+          >
+            {formatted ? presentation.formatted : text}
+          </pre>
+          <code
+            data-json-print-source
+            className="hidden whitespace-pre-wrap break-all font-mono text-xs leading-5 print:block"
+          >
+            {text}
+          </code>
+        </>
       ) : (
         !loading && <p className="text-muted-foreground">No JSON supplied</p>
       )}

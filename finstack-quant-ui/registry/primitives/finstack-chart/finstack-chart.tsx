@@ -36,6 +36,8 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
       height?: number;
       width?: number;
       ref?: Ref<FigureHandle>;
+      /** Put source links in an on-screen disclosure; exports retain full source text. */
+      sourceDisplay?: "inline" | "disclosure";
     },
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -95,8 +97,14 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
   const { definition, title, subtitle, caption, sources, figureAnnotations } =
     props;
   const prose = useMemo(
-    () => ({ title, subtitle, caption, sources, figureAnnotations }),
-    [title, subtitle, caption, sources, figureAnnotations],
+    () => ({
+      title,
+      subtitle,
+      caption,
+      sources: props.sourceDisplay === "disclosure" ? undefined : sources,
+      figureAnnotations,
+    }),
+    [title, subtitle, caption, sources, figureAnnotations, props.sourceDisplay],
   );
   const figure = useMemo(
     () =>
@@ -167,6 +175,24 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
           Loading figure…
         </div>
       )}
+      {props.sourceDisplay === "disclosure" && sources?.length ? (
+        <details className="mt-2 text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Sources</summary>
+          <ul className="mt-2 space-y-1">
+            {sources.map((source, index) => (
+              <li key={index}>
+                {source.url ? (
+                  <a href={source.url} className="break-all underline">
+                    {source.label}
+                  </a>
+                ) : (
+                  source.label
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { createChartRuntime } from "@tanstack/charts";
 import type { CalibrationReport as NativeReport } from "finstack-quant-wasm";
 import type { CalibrationWire } from "../src/generated/types/calibration";
@@ -125,6 +125,8 @@ it("renders exact plan and step reports, unavailable diagnostics and native zero
       const mounted = render(
         <CalibrationReport stepId={stepId} report={report} />,
       );
+      for (const button of screen.getAllByRole("button", { name: "Original" }))
+        fireEvent.click(button);
       expect(
         screen
           .getByRole("region", { name: `${stepId} complete report` })
@@ -165,6 +167,8 @@ it("preserves actual native structured failures with available and unavailable s
   const { rerender } = render(
     <CalibrationReport stepId={failure.step_id} error={failure} />,
   );
+  for (const button of screen.getAllByRole("button", { name: "Original" }))
+    fireEvent.click(button);
   expect(screen.getByRole("alert").textContent).toBe(failure.message);
   expect(
     screen

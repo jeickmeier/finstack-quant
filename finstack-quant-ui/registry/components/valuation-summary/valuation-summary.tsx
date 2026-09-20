@@ -30,19 +30,23 @@ function Summary({
   return (
     <section
       aria-label={label}
-      className="min-w-0 space-y-2 rounded-sm border border-border p-3 print:break-inside-avoid"
+      className="min-w-0 space-y-3 border-b border-border pb-3 print:break-inside-avoid"
     >
-      <h2 className="text-sm font-medium">{label}</h2>
+      <h2 className="text-xs font-medium text-muted-foreground">
+        {label === "Valuation" ? "Present value" : label}
+      </h2>
       {result ? (
         <>
           <dl
             className={
-              compact ? "flex flex-wrap gap-x-6 gap-y-2" : "grid gap-3"
+              compact
+                ? "flex flex-wrap gap-x-5 gap-y-2"
+                : "grid grid-cols-2 gap-x-5 gap-y-2"
             }
           >
-            <div>
-              <dt className="text-xs text-muted-foreground">Value</dt>
-              <dd className="font-semibold">
+            <div className="w-full">
+              <dt className="sr-only">Value</dt>
+              <dd className="break-words text-2xl font-semibold leading-tight [&>span]:text-2xl">
                 <MoneyValue
                   value={result.value}
                   rounding={returnedRounding(result.meta)}
@@ -51,16 +55,16 @@ function Summary({
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Instrument</dt>
-              <dd className="break-all font-mono text-sm">
+              <dd className="break-all font-mono text-xs">
                 {result.instrument_id}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">As of</dt>
-              <dd className="finstack-numeric text-sm">{result.as_of}</dd>
+              <dd className="finstack-numeric text-xs">{result.as_of}</dd>
             </div>
           </dl>
-          <StampBadge meta={result.meta} />
+          <StampBadge meta={result.meta} compact />
         </>
       ) : (
         <p className="text-sm text-muted-foreground">No valuation supplied</p>

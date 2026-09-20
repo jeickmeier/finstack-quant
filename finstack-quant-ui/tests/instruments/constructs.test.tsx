@@ -125,7 +125,10 @@ it("adds and edits a native tuple array and distinguishes nullable omission", as
     ["2025-06-01", 1.23456789],
   ]);
   expect(first.instrument.spec.price_quote).toBe(123.456789);
-  await user.click(screen.getByRole("button", { name: "Clear price quote" }));
+  await user.click(screen.getByRole("button", { name: "Price quote options" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Clear price quote" }),
+  );
   const cleared = await apply(submit);
   expect(cleared.instrument.spec.price_quote).toBeNull();
   await user.click(screen.getByRole("button", { name: "Omit price quote" }));

@@ -6,12 +6,15 @@ export function MeasureValue({
   precision,
   signed = false,
   label,
+  showUnavailableUnit = true,
 }: {
   value: number | null | undefined;
   unit?: { label: string; source: string };
   precision?: number;
   signed?: boolean;
   label?: string;
+  /** Hide only the missing-unit note when the enclosing table states it once. */
+  showUnavailableUnit?: boolean;
 }) {
   const raw = formatRaw(value);
   const text =
@@ -29,9 +32,11 @@ export function MeasureValue({
       title={raw}
     >
       {signed && value != null ? formatSigned(text) : text}
-      <span className="ml-1 text-xs text-muted-foreground">
-        {unit?.label ?? "Unit unavailable"}
-      </span>
+      {(unit || showUnavailableUnit) && (
+        <span className="ml-1 text-xs text-muted-foreground">
+          {unit?.label ?? "Unit unavailable"}
+        </span>
+      )}
     </span>
   );
 }

@@ -124,6 +124,7 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
     );
     const { rerender } = render(tree("compact"));
     const viewer = screen.getByRole("region", { name: "Cashflows" });
+    fireEvent.click(within(viewer).getByRole("button", { name: "Original" }));
     await waitFor(() =>
       expect(viewer.querySelector("pre")?.textContent).toBe(entry.cashflows),
     );

@@ -255,6 +255,7 @@ it("changes grouped metrics while preserving supplied selections outside the sho
       onValueChange={change}
     />,
   );
+  await user.click(screen.getByRole("button", { name: "Metrics" }));
   await user.click(screen.getByRole("checkbox", { name: "Alpha" }));
   expect(change).toHaveBeenCalledWith(["hidden", "a"]);
 });
@@ -375,18 +376,83 @@ it("value primitives show supplied values and explicit unavailable metadata", ()
   expect(screen.getByText("USD 1.23")).toBeTruthy();
   expect(screen.getByText("Metadata unavailable")).toBeTruthy();
 });
-it("JSON viewer displays and copies the original text including wide tokens", async () => {
+it("formats JSON without losing numeric tokens and copies or downloads only the original bytes", async () => {
   const user = userEvent.setup();
   const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
   const print = vi.spyOn(window, "print").mockImplementation(() => {});
-  const text = ' {"seed":18446744073709551615,"amount":"1.2300"}\n';
-  render(<JsonViewer text={text} />);
-  expect(document.querySelector("pre")?.textContent).toBe(text);
+  const text =
+    ' {"seed":18446744073709551615,"exponent":1.2300e+400,"decimal":1.2300,"amount":" 1.2300 ","message":" two  spaces "}\n';
+  render(<JsonViewer text={text} downloadName="original.json" />);
+  const pre = document.querySelector("pre")!;
+  const printed = document.querySelector("code[data-json-print-source]")!;
+  expect(printed.textContent).toBe(text);
+  expect(printed.classList.contains("hidden")).toBe(true);
+  expect(printed.classList.contains("print:block")).toBe(true);
+  expect(pre.classList.contains("print:hidden")).toBe(true);
+  expect(pre.textContent).toBe(
+    '{\n  "seed": 18446744073709551615,\n  "exponent": 1.2300e+400,\n  "decimal": 1.2300,\n  "amount": " 1.2300 ",\n  "message": " two  spaces "\n}',
+  );
+  expect(
+    screen
+      .getByRole("button", { name: "Formatted" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true");
+  await user.click(screen.getByRole("button", { name: "Original" }));
+  expect(pre.textContent).toBe(text);
+  expect(document.querySelector("code[data-json-print-source]")).toBe(printed);
+  expect(printed.textContent).toBe(text);
+  await user.click(screen.getByRole("button", { name: "Formatted" }));
   await user.click(screen.getByRole("button", { name: "Copy" }));
   expect(write).toHaveBeenCalledWith(text);
   await user.click(screen.getByRole("button", { name: "Print" }));
   expect(print).toHaveBeenCalledOnce();
+  const originalURL = globalThis.URL;
+  let downloaded: Blob | undefined;
+  globalThis.URL = class extends originalURL {
+    static createObjectURL(blob: Blob) {
+      downloaded = blob;
+      return "blob:original-json";
+    }
+    static revokeObjectURL() {}
+  };
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => {});
+  try {
+    await user.click(screen.getByRole("button", { name: "Download" }));
+    expect(click).toHaveBeenCalledOnce();
+    const bytes = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsText(downloaded!);
+    });
+    expect(bytes).toBe(text);
+    await new Promise((resolve) => setTimeout(resolve, 1050));
+  } finally {
+    globalThis.URL = originalURL;
+  }
 });
+it.each(["not JSON", '{"same":1,"same":2}'])(
+  "keeps invalid or duplicate-key input in the original view: %s",
+  (text) => {
+    render(<JsonViewer text={text} />);
+    expect(document.querySelector("pre")?.textContent).toBe(text);
+    expect(
+      (screen.getByRole("button", { name: "Formatted" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "Original" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByText(/Original text.*formatting unavailable/),
+    ).toBeTruthy();
+  },
+);
+
 it.each([
   <DecimalInput label="Decimal" value="1" onValueChange={() => {}} />,
   <MoneyInput

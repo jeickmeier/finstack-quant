@@ -1,0 +1,39 @@
+{
+  "baseCommit": "acdf9383d",
+  "visualReview": {
+    "verdict": "pass",
+    "rounds": 3,
+    "docsContrastFinding": "fixed and covered by computed-color regression"
+  },
+  "isolatedRegistry": {
+    "tests": 562,
+    "files": 42,
+    "seconds": 87.9,
+    "generation": true,
+    "formatting": true,
+    "tokens": true,
+    "dependencyClosures": 150,
+    "typecheck": true
+  },
+  "gallery": {
+    "snapshotsUpdated": false,
+    "startTime": "2026-09-20T13:52:47.272Z",
+    "duration": 228729.666,
+    "expected": 204,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "installedChecks": [
+    "schema form with actual worker and native validation",
+    "edited workbench/native pricing and retained state",
+    "A4 and Letter reports; all 14 pages visually inspected"
+  ],
+  "pageErrors": [],
+  "excluded": [
+    "pending PR039 metadata/distribution",
+    "full-library Rust/Python tests",
+    "notebooks",
+    "broad docs suites"
+  ]
+}

@@ -139,6 +139,7 @@ try {
       .inputValue(),
     "2024-02-28",
   );
+  await page.getByRole("button", { name: "Original", exact: true }).click();
   assert.equal(await page.locator("pre").textContent(), text);
   await page.getByRole("button", { name: "Copy", exact: true }).click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), text);

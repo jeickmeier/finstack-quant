@@ -71,6 +71,20 @@ export async function verifyPublishing(page, evidence, repo) {
       exact: true,
     });
     await expect(workbench.getByText("Priced", { exact: true })).toBeVisible();
+    await workbench.getByRole("tab", { name: "Request", exact: true }).click();
+    const requestViewer = workbench.getByRole("region", {
+      name: "Last priced request JSON",
+      exact: true,
+    });
+    await requestViewer
+      .getByRole("button", { name: "Original", exact: true })
+      .click();
+    const request = JSON.parse(
+      await requestViewer.locator("pre").textContent(),
+    );
+    await workbench
+      .getByRole("tab", { name: "3 Cashflow JSON", exact: true })
+      .click();
     await workbench.getByRole("tab", { name: "2 Market", exact: true }).click();
     await workbench.getByLabel("Search market fields").fill("/curves/0");
     await workbench
@@ -78,7 +92,24 @@ export async function verifyPublishing(page, evidence, repo) {
       .click();
     for (const format of ["A4", "Letter"]) {
       await page.evaluate(() => {
+        window.readPrintFigureGeometry = () =>
+          [...document.querySelectorAll("[data-printing] svg.ts-chart")].map(
+            (svg) => {
+              const box = svg.getBoundingClientRect(),
+                viewBox = svg.viewBox.baseVal,
+                matrix = svg.getScreenCTM();
+              return {
+                width: box.width,
+                height: box.height,
+                viewBoxWidth: viewBox.width,
+                viewBoxHeight: viewBox.height,
+                scaleX: matrix ? Math.hypot(matrix.a, matrix.b) : null,
+                scaleY: matrix ? Math.hypot(matrix.c, matrix.d) : null,
+              };
+            },
+          );
         window.print = () => {
+          window.printFigureGeometry = window.readPrintFigureGeometry();
           window.printPrepared = true;
         };
         window.printPrepared = false;
@@ -88,17 +119,40 @@ export async function verifyPublishing(page, evidence, repo) {
         .click();
       await page.waitForFunction(() => window.printPrepared === true);
       await expect(workbench).toHaveAttribute("data-printing", "ready");
+      const preparedFigures = await page.evaluate(
+        () => window.printFigureGeometry,
+      );
+      assert.equal(
+        preparedFigures.length,
+        1,
+        "Selected market curve remains in the report",
+      );
+      for (const figure of preparedFigures) {
+        assert(
+          figure.width >= 640 && figure.width <= 690,
+          "Prepared market figure has a stable paper-sized width",
+        );
+        assert(
+          figure.height <= 260,
+          "Prepared market figure retains its compact physical height",
+        );
+        assert(
+          Math.abs(figure.scaleX - 1) < 0.02 &&
+            Math.abs(figure.scaleY - 1) < 0.02,
+          "Prepared SVG text is not stretched",
+        );
+      }
+      for (const name of ["Priced instrument JSON", "Market snapshot"])
+        await workbench
+          .getByRole("region", { name, exact: true })
+          .getByRole("button", { name: "Original", exact: true })
+          .click();
       const instrument = await workbench
         .locator('[aria-label="Priced instrument JSON"] pre')
         .textContent();
       const market = await workbench
         .locator('[aria-label="Market snapshot"] pre')
         .textContent();
-      const request = JSON.parse(
-        await workbench
-          .locator('[aria-label="Last priced request JSON"] pre')
-          .textContent(),
-      );
       assert.equal(JSON.parse(instrument).instrument.type, kind);
       assert.equal(instrument, request.instrumentJson);
       assert.equal(market, request.marketJson);
@@ -112,6 +166,9 @@ export async function verifyPublishing(page, evidence, repo) {
         name: "Cashflows",
         exact: true,
       });
+      await cashflows
+        .getByRole("button", { name: "Original", exact: true })
+        .click();
       assert.equal(await cashflows.locator("pre").textContent(), expected);
       const downloadPromise = page.waitForEvent("download");
       await cashflows
@@ -121,6 +178,17 @@ export async function verifyPublishing(page, evidence, repo) {
         await readFile(await (await downloadPromise).path(), "utf8"),
         expected,
       );
+      for (const viewer of [
+        workbench.getByRole("region", {
+          name: "Priced instrument JSON",
+          exact: true,
+        }),
+        workbench.getByRole("region", { name: "Market snapshot", exact: true }),
+        cashflows,
+      ])
+        await viewer
+          .getByRole("button", { name: "Formatted", exact: true })
+          .click();
       await page.emulateMedia({ media: "print" });
       await page.evaluate(
         () =>
@@ -132,8 +200,11 @@ export async function verifyPublishing(page, evidence, repo) {
         await workbench.getByRole("button").filter({ visible: true }).count(),
         0,
       );
-      await expect(cashflows.locator("pre")).toBeVisible();
-      const geometry = await cashflows.locator("pre").evaluate((node) => ({
+      const printSource = cashflows.locator("[data-json-print-source]");
+      await expect(printSource).toBeVisible();
+      await expect(cashflows.locator("pre")).toBeHidden();
+      assert.equal(await printSource.textContent(), expected);
+      const geometry = await printSource.evaluate((node) => ({
         wrap: getComputedStyle(node).whiteSpace,
         overflow: node.scrollWidth > node.clientWidth,
         maxHeight: getComputedStyle(node).maxHeight,
@@ -142,6 +213,25 @@ export async function verifyPublishing(page, evidence, repo) {
         wrap: "pre-wrap",
         overflow: false,
         maxHeight: "none",
+      });
+      const printedFigures = await page.evaluate(() =>
+        window.readPrintFigureGeometry(),
+      );
+      assert.equal(printedFigures.length, preparedFigures.length);
+      printedFigures.forEach((figure, index) => {
+        assert(
+          Math.abs(figure.width - preparedFigures[index].width) < 1,
+          "Print media preserves the prepared chart width",
+        );
+        assert(
+          Math.abs(figure.height - preparedFigures[index].height) < 1,
+          "Print media preserves the prepared chart height",
+        );
+        assert(
+          Math.abs(figure.scaleX - 1) < 0.02 &&
+            Math.abs(figure.scaleY - 1) < 0.02,
+          "Print SVG text is not stretched",
+        );
       });
       const filename = `${kind}-${format}.pdf`;
       await page.pdf({
@@ -173,6 +263,8 @@ export async function verifyPublishing(page, evidence, repo) {
         exactDownload: true,
         controlsHidden: true,
         printGeometry: geometry,
+        preparedFigures,
+        printedFigures,
       });
     }
   }

@@ -47,7 +47,7 @@ export function EnumField({
                 <Radio.Root
                   value={option.value}
                   disabled={option.disabled}
-                  className="size-4 rounded-full border border-border data-checked:border-primary focus-visible:outline-2 focus-visible:outline-ring"
+                  className="size-4 rounded-full border border-control-border data-checked:border-primary focus-visible:outline-2 focus-visible:outline-ring"
                 >
                   <Radio.Indicator className="m-auto block size-2 rounded-full bg-primary" />
                 </Radio.Root>
@@ -64,14 +64,17 @@ export function EnumField({
           >
             <Select.Trigger
               {...control}
-              className="finstack-field flex w-full items-center justify-between rounded-sm border border-border bg-background px-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
+              className="finstack-field flex w-full items-center justify-between rounded-sm border border-control-border bg-background px-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <Select.Value placeholder="Select…" />
-              <Select.Icon>⌄</Select.Icon>
+              <Select.Value
+                className="min-w-0 truncate"
+                placeholder="Select…"
+              />
+              <Select.Icon className="shrink-0">⌄</Select.Icon>
             </Select.Trigger>
             <Select.Portal>
               <Select.Positioner sideOffset={4}>
-                <Select.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-border bg-card p-1 text-card-foreground shadow-[var(--elevation)]">
+                <Select.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-control-border bg-card p-1 text-card-foreground shadow-[var(--elevation)]">
                   <Select.List>
                     {[...groups].map(([group, items]) => (
                       <Select.Group key={group}>

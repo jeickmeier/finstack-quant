@@ -95,6 +95,9 @@ try {
         .knot_points[1][1] === 0.96
     );
   });
+  await marketView
+    .getByRole("button", { name: "Original", exact: true })
+    .click();
   const marketJson = await marketView.locator("pre").textContent();
   const handle = new native.Market(marketJson);
   try {

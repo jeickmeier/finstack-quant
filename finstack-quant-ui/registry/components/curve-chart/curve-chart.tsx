@@ -167,6 +167,7 @@ function KnotPanel({
       subtitle={props.subtitle}
       caption={props.caption}
       sources={sources}
+      sourceDisplay="disclosure"
       figureAnnotations={props.figureAnnotations}
       width={props.width}
       height={props.height}

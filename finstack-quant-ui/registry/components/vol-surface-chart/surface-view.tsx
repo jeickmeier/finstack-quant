@@ -44,7 +44,9 @@ export interface SurfaceViewProps<T extends SurfacePoint>
 export function SurfaceView<T extends SurfacePoint>(
   props: SurfaceViewProps<T>,
 ) {
-  const owned = useLinkedSelection();
+  const owned = useLinkedSelection({
+    defaultSelectedKey: props.nodes[0]?.key ?? null,
+  });
   const link = props.link ?? owned;
   const { nodes, labels } = props;
   const slices = surfaceSlices(nodes, link.selectedKey);
@@ -94,135 +96,161 @@ export function SurfaceView<T extends SurfacePoint>(
   return (
     <section
       aria-label={`${props.id} ${props.mode} surface`}
-      className="space-y-4 font-sans text-sm text-foreground"
+      className="@container space-y-3 font-sans text-sm text-foreground"
+      style={{ width: props.width, maxWidth: "100%" }}
     >
-      <p>{props.description}</p>
-      {nodes.length ? (
-        <FinstackChart
-          key={coordinates}
-          {...preset}
-          {...prose}
-          {...interactions}
-          ariaLabel={`${props.id} heatmap`}
-          height={props.height}
-          width={props.width}
-          ref={props.figureRefs?.heatmap}
-        />
-      ) : (
-        <p>No nodes supplied</p>
-      )}
-      <div className="flex flex-wrap gap-3">
-        <label>
-          {props.mode === "stored"
-            ? "Stored coordinate"
-            : "Evaluated coordinate"}
-          <select
-            aria-label={
-              props.mode === "stored"
-                ? "Stored coordinate"
-                : "Evaluated coordinate"
-            }
-            value={accepted.selectedKey ?? ""}
-            onChange={(event) => link.select(event.target.value || null)}
-            className="ml-2 rounded-sm border border-border bg-background px-2"
-          >
-            <option value="">Choose a node</option>
-            {nodes.map((node) => (
-              <option key={node.key} value={node.key}>
-                {labels.expiry} {node.expiry} · {labels.secondary}{" "}
-                {node.secondary}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={link.clear}>
-          Clear selected node
-        </button>
-      </div>
-      <FinstackTable
-        data={nodes}
-        getRowId={(node) => node.key}
-        caption={`${props.id} ${props.mode} nodes`}
-        link={accepted}
-        getRowKey={(node) => node.key}
-        getCellKey={(node, column) => (column === "value" ? node.key : null)}
-        getActiveCell={(key) => ({ rowId: key, columnId: "value" })}
-        columns={[
-          {
-            id: "expiry",
-            accessorFn: (node) => node.expiry,
-            header: labels.expiry,
-          },
-          {
-            id: "secondary",
-            accessorFn: (node) => node.secondary,
-            header: labels.secondary,
-          },
-          {
-            id: "value",
-            accessorFn: (node) => node.value,
-            header: labels.value,
-          },
-        ]}
-      />
-      {slices.selected ? (
-        (["row", "column"] as const).map((kind) => {
-          const horizontal = kind === "row" ? labels.secondary : labels.expiry;
-          const selection = chartSelection<T, number, number>(
-            accepted,
-            (node) => node.key,
-          );
-          const channels = {
-            x: (node: T) => (kind === "row" ? node.secondary : node.expiry),
-            y: (node: T) => node.value,
-            key: (node: T) => node.key,
-          };
-          const definition = defineChart({
-            marks: [
-              dot(slices[kind], { ...channels, r: 5 }),
-              whenSelected(
-                dot(slices[kind], {
-                  ...channels,
-                  r: 9,
-                  fill: "none",
-                  stroke: "var(--primary)",
-                  strokeWidth: 2,
-                }),
-                selection,
-              ),
-            ],
-            scales: {
-              x: { scale: scaleLinear, axis: { label: horizontal } },
-              y: { scale: scaleLinear, axis: { label: labels.value } },
-            },
-            selection,
-            tooltip: {
-              use: tooltip,
-              content: (points) => ({
-                rows: points.map((point) => ({
-                  label: `${horizontal}: ${channels.x(point.datum)}`,
-                  value: `${labels.value}: ${point.datum.value}`,
-                })),
-              }),
-            },
-          });
-          return (
+      <p className="text-xs text-muted-foreground">{props.description}</p>
+      <div className="grid min-w-0 gap-4 @min-[720px]:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          {nodes.length ? (
             <FinstackChart
-              key={`${coordinates}-${kind}`}
-              definition={definition}
+              key={coordinates}
+              {...preset}
               {...prose}
               {...interactions}
-              title={`${props.id} ${props.mode} ${kind} slice`}
-              ariaLabel={`${props.id} ${kind} slice`}
-              height={props.height}
-              width={props.width}
-              ref={props.figureRefs?.[kind]}
+              ariaLabel={`${props.id} heatmap`}
+              height={props.height ?? 360}
+              sourceDisplay="disclosure"
+              ref={props.figureRefs?.heatmap}
             />
-          );
-        })
-      ) : (
-        <p>Select a node to inspect its row and column.</p>
-      )}
+          ) : (
+            <p>No nodes supplied</p>
+          )}
+          <div className="flex flex-wrap gap-2 text-xs">
+            <label>
+              {props.mode === "stored"
+                ? "Stored coordinate"
+                : "Evaluated coordinate"}
+              <select
+                aria-label={
+                  props.mode === "stored"
+                    ? "Stored coordinate"
+                    : "Evaluated coordinate"
+                }
+                value={accepted.selectedKey ?? ""}
+                onChange={(event) => link.select(event.target.value || null)}
+                className="ml-2 max-w-full rounded-sm border border-border bg-background px-2"
+              >
+                <option value="">Choose a node</option>
+                {nodes.map((node) => (
+                  <option key={node.key} value={node.key}>
+                    {labels.expiry} {node.expiry} · {labels.secondary}{" "}
+                    {node.secondary}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={link.clear}>
+              Clear selected node
+            </button>
+          </div>
+        </div>
+        <div className="grid min-w-0 gap-3">
+          {slices.selected ? (
+            (["row", "column"] as const).map((kind) => {
+              const horizontal =
+                kind === "row" ? labels.secondary : labels.expiry;
+              const selection = chartSelection<T, number, number>(
+                accepted,
+                (node) => node.key,
+              );
+              const channels = {
+                x: (node: T) => (kind === "row" ? node.secondary : node.expiry),
+                y: (node: T) => node.value,
+                key: (node: T) => node.key,
+              };
+              const definition = defineChart({
+                marks: [
+                  dot(slices[kind], { ...channels, r: 5 }),
+                  whenSelected(
+                    dot(slices[kind], {
+                      ...channels,
+                      r: 9,
+                      fill: "none",
+                      stroke: "var(--primary)",
+                      strokeWidth: 2,
+                    }),
+                    selection,
+                  ),
+                ],
+                scales: {
+                  x: { scale: scaleLinear, axis: { label: horizontal } },
+                  y: { scale: scaleLinear, axis: { label: "Value" } },
+                },
+                selection,
+                tooltip: {
+                  use: tooltip,
+                  content: (points) => ({
+                    rows: points.map((point) => ({
+                      label: `${horizontal}: ${channels.x(point.datum)}`,
+                      value: `${labels.value}: ${point.datum.value}`,
+                    })),
+                  }),
+                },
+              });
+              return (
+                <FinstackChart
+                  key={`${coordinates}-${kind}`}
+                  definition={definition}
+                  {...prose}
+                  {...interactions}
+                  title={`${props.id} ${props.mode} ${kind} slice`}
+                  subtitle={[
+                    props.subtitle,
+                    `${labels.value} · ${kind === "row" ? labels.expiry : labels.secondary} ${kind === "row" ? slices.selected!.expiry : slices.selected!.secondary}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  ariaLabel={`${props.id} ${kind} slice`}
+                  height={240}
+                  sourceDisplay="disclosure"
+                  ref={props.figureRefs?.[kind]}
+                />
+              );
+            })
+          ) : (
+            <p>Select a node to inspect its row and column.</p>
+          )}
+        </div>
+      </div>
+      <details>
+        <summary className="cursor-pointer border-t border-border py-2 text-xs">
+          All {nodes.length} {props.mode} nodes
+        </summary>
+        <div className="max-h-80 overflow-auto">
+          <FinstackTable
+            data={nodes}
+            getRowId={(node) => node.key}
+            caption={`${props.id} ${props.mode} nodes`}
+            link={accepted}
+            getRowKey={(node) => node.key}
+            getCellKey={(node, column) =>
+              column === "value" ? node.key : null
+            }
+            getActiveCell={(key) => ({ rowId: key, columnId: "value" })}
+            columns={[
+              {
+                id: "expiry",
+                accessorFn: (node) => node.expiry,
+                header: labels.expiry,
+                meta: { className: "text-right finstack-numeric" },
+              },
+              {
+                id: "secondary",
+                accessorFn: (node) => node.secondary,
+                header: labels.secondary,
+                meta: { className: "text-right finstack-numeric" },
+              },
+              {
+                id: "value",
+                accessorFn: (node) => node.value,
+                header: labels.value,
+                meta: { className: "text-right finstack-numeric" },
+              },
+            ]}
+          />
+        </div>
+      </details>
     </section>
   );
 }

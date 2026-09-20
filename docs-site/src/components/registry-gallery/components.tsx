@@ -74,11 +74,13 @@ export function ComponentDemo({
   density,
   width,
   variant,
+  instrument,
 }: {
   name: string;
   density: "compact" | "comfortable";
   width: number;
   variant: string;
+  instrument?: string;
 }) {
   const [params, setParams] = useState<PricingParams>(data.bond.request),
     [severity, setSeverity] = useState(scenario.cells[0]!.severity),
@@ -179,7 +181,6 @@ export function ComponentDemo({
           }}
           colorDomain={[0.15, 0.3]}
           width={width}
-          height={460}
         />
       );
     case "fx-delta-quotes":
@@ -253,7 +254,21 @@ export function ComponentDemo({
     case "pricing-workbench":
       return (
         <PricingWorkbench
-          defaultRequest={data.bond.request}
+          defaultInstrumentType={instrument}
+          defaultRequest={
+            variant === "equity-option"
+              ? {
+                  ...data.cashflows.cases.find(
+                    (entry) => entry.type === "equity_option",
+                  )!.request,
+                  metrics: ["delta", "gamma", "vega", "theta"],
+                }
+              : variant === "structured-credit"
+                ? data.details.cases.find(
+                    (entry) => entry.type === "structured_credit",
+                  )?.request
+                : data.bond.request
+          }
           density={density}
           defaultCalibrationJson={JSON.stringify(data.calibration[0]!.input)}
         />

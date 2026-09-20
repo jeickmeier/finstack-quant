@@ -32,9 +32,12 @@ const rawLabels: Record<string, string> = {
 export function ValuationDetails({
   result,
   density = "compact",
+  includeExplanation = true,
 }: {
   result: ValuationResult;
   density?: "compact" | "comfortable";
+  /** Hide the trace when the host provides a dedicated result tab. */
+  includeExplanation?: boolean;
 }) {
   const details = result.details;
   const view = details ? getDetailsView(details) : null;
@@ -74,7 +77,7 @@ export function ValuationDetails({
         ) : (
           <p role="status">No valuation details returned</p>
         )}
-        {result.explanation != null && (
+        {includeExplanation && result.explanation != null && (
           <Explanation value={result.explanation} density={density} />
         )}
         {result.covenants != null && (

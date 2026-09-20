@@ -97,6 +97,9 @@ try {
       entry.request.model,
     );
     if (entry.cashflows !== null) {
+      await viewer
+        .getByRole("button", { name: "Original", exact: true })
+        .click();
       await page.waitForFunction(
         (expected) =>
           document.querySelector('section[aria-label="Cashflows"] pre')
@@ -125,15 +128,18 @@ try {
         assert.deepEqual(audit.violations, []);
       }
       await page.emulateMedia({ media: "print" });
-      const print = await viewer.locator("pre").evaluate((node) => ({
+      const printSource = viewer.locator("[data-json-print-source]");
+      assert.equal(await printSource.isVisible(), true);
+      assert.equal(await viewer.locator("pre").isVisible(), false);
+      const print = await printSource.evaluate((node) => ({
         text: node.textContent,
         wrap: getComputedStyle(node).whiteSpace,
         maxHeight: getComputedStyle(node).maxHeight,
       }));
       assert.equal(
-        await viewer
-          .locator("pre")
-          .evaluate((node) => node.scrollWidth <= node.clientWidth),
+        await printSource.evaluate(
+          (node) => node.scrollWidth <= node.clientWidth,
+        ),
         true,
         "Printed raw JSON must wrap within the page width",
       );

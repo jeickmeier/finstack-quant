@@ -49,19 +49,29 @@ export function DateInput({
             min={min}
             max={max}
             disabled={disabled}
-            className="finstack-field finstack-numeric w-full rounded-sm border border-border bg-background px-2 focus-visible:outline-2 focus-visible:outline-ring"
+            className="finstack-field finstack-numeric w-full rounded-sm border border-control-border bg-background px-2 focus-visible:outline-2 focus-visible:outline-ring"
           />
           <Popover.Root open={open} onOpenChange={setOpen}>
             <Popover.Trigger
               disabled={disabled}
               aria-label={`${field.label} calendar`}
-              className="finstack-field rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+              className="finstack-field rounded-sm border border-control-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
             >
-              Calendar
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                className="size-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <rect x="2.5" y="3.5" width="11" height="10" rx="1" />
+                <path d="M5 2v3M11 2v3M3 7h10" />
+              </svg>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Positioner sideOffset={4}>
-                <Popover.Popup className="rounded-md border border-border bg-card p-3 text-card-foreground shadow-[var(--elevation)]">
+                <Popover.Popup className="rounded-md border border-control-border bg-card p-3 text-card-foreground shadow-[var(--elevation)]">
                   <Popover.Title className="text-sm">
                     {field.label}
                   </Popover.Title>
@@ -87,8 +97,10 @@ export function DateInput({
                       months: "relative",
                       month_caption: "flex justify-center p-2 font-medium",
                       nav: "flex justify-between",
-                      button_previous: "rounded-sm border border-border px-2",
-                      button_next: "rounded-sm border border-border px-2",
+                      button_previous:
+                        "rounded-sm border border-control-border px-2",
+                      button_next:
+                        "rounded-sm border border-control-border px-2",
                       weekday: "text-xs text-muted-foreground",
                       day_button:
                         "finstack-field min-w-8 rounded-sm focus-visible:outline-2 focus-visible:outline-ring",

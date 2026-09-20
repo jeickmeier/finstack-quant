@@ -70,6 +70,14 @@ try {
     origin: server.url,
   });
   await page.goto(server.url, { waitUntil: "networkidle" });
+  async function originalSelected() {
+    const viewer = page.locator('[aria-label="Selected stored value"]');
+    if (!(await viewer.isVisible()))
+      await page
+        .getByText("Selected stored value · JSON", { exact: true })
+        .click();
+    await viewer.getByRole("button", { name: "Original", exact: true }).click();
+  }
   const leaves = await page.evaluate(() => window.marketProbe.leaves);
   for (const leaf of leaves) {
     await page
@@ -78,6 +86,7 @@ try {
     await page
       .getByRole("button", { name: `Inspect ${leaf.pointer}`, exact: true })
       .click();
+    await originalSelected();
     assert.equal(
       await page
         .getByRole("region", { name: "Selected stored value", exact: true })
@@ -92,6 +101,7 @@ try {
   await page
     .getByRole("button", { name: "Inspect /collateral/USD~1CSA", exact: true })
     .click();
+  await originalSelected();
   assert.equal(
     await page
       .getByRole("region", { name: "Selected stored value", exact: true })
@@ -104,6 +114,7 @@ try {
   await page
     .getByRole("button", { name: `Inspect ${pointer}`, exact: true })
     .click();
+  await originalSelected();
   const selected = page
     .getByRole("region", { name: "Selected stored value", exact: true })
     .locator("pre");

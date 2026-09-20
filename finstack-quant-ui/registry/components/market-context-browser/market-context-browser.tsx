@@ -38,32 +38,48 @@ function EntryBranch({
   selectedKey,
   onSelect,
   searching,
+  activeCategory,
 }: {
   entry: MarketEntry;
   visible: Set<string> | null;
   selectedKey: string | null;
   onSelect: (key: string) => void;
   searching: boolean;
+  activeCategory?: string | number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(entry.path.length === 1);
   if (visible && !visible.has(entry.key)) return null;
   const button = (
     <button
       type="button"
       aria-pressed={entry.key === selectedKey}
       onClick={() => onSelect(entry.key)}
-      className="rounded-sm px-1 text-left focus-visible:outline-2 focus-visible:outline-ring"
+      className="min-w-0 flex-1 break-words rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-ring"
       aria-label={`Inspect ${marketPointer(entry.path)}`}
     >
-      {entry.label}
-      {!entry.children.length
+      {entry.path.length === 1
+        ? entry.label.replaceAll("_", " ")
+        : entry.value && typeof entry.value === "object" && "id" in entry.value
+          ? String(entry.value.id)
+          : entry.label}
+      {entry.path.length === 1 && (
+        <span className="ml-2 font-mono text-xs text-muted-foreground">
+          {entry.children.length}
+        </span>
+      )}
+      {entry.path.length > 1 && !entry.children.length
         ? `: ${entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
         : ""}
     </button>
   );
   const expanded = searching || open;
   return (
-    <li>
+    <li
+      data-active-category={entry.path[0] === activeCategory}
+      className={
+        entry.path.length === 1 ? "finstack-market__category" : undefined
+      }
+    >
       <div className="flex items-start">
         {entry.children.length > 0 && (
           <button
@@ -89,6 +105,7 @@ function EntryBranch({
               selectedKey={selectedKey}
               onSelect={onSelect}
               searching={searching}
+              activeCategory={activeCategory}
             />
           ))}
         </ul>
@@ -103,10 +120,14 @@ export function MarketContextBrowser({
   surfaceOptions,
   renderObject,
 }: MarketContextBrowserProps) {
-  const owned = useLinkedSelection(),
+  const entries = useMemo(() => marketTree(state), [state]);
+  const owned = useLinkedSelection({
+      defaultSelectedKey:
+        entries.find((entry) => entry.children.length)?.children[0]?.key ??
+        null,
+    }),
     link = external ?? owned;
   const [search, setSearch] = useState("");
-  const entries = useMemo(() => marketTree(state), [state]);
   const all = useMemo(() => flattenMarket(entries), [entries]);
   const index = useMemo(
     () => ({
@@ -148,6 +169,7 @@ export function MarketContextBrowser({
           <StoredCurveView
             curves={[state.curves[position]!]}
             ariaLabel="Selected market curve"
+            height={230}
           />
         );
       else if (field === "fx") view = <FxMatrixGrid state={state.fx} />;
@@ -181,54 +203,108 @@ export function MarketContextBrowser({
   return (
     <section
       aria-label="Market context browser"
-      className="space-y-4 font-sans text-sm text-foreground"
+      className="finstack-market font-sans text-sm text-foreground"
     >
-      <label className="print:hidden">
-        Search market fields
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="ml-2 rounded-sm border border-border bg-background px-2"
-        />
-      </label>
-      <nav
-        aria-label="Market fields"
-        className="max-h-80 overflow-auto rounded-sm border border-border p-2 print:hidden"
-      >
-        <ul className="space-y-1">
-          {entries.map((entry) => (
-            <EntryBranch
-              key={entry.key}
-              entry={entry}
-              visible={visible}
-              selectedKey={selected?.key ?? null}
-              onSelect={link.select}
-              searching={!!query}
+      <div className="finstack-market__layout">
+        <aside className="finstack-market__rail print:hidden">
+          <label className="text-xs text-muted-foreground">
+            Search market fields
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="rounded-sm border border-border bg-background px-2 text-foreground"
             />
-          ))}
-        </ul>
-      </nav>
-      {selected ? (
-        <section aria-label="Selected market field">
-          <h2>{marketPointer(selected.path)}</h2>
-          {selected.value === undefined ? (
-            <p>Field unavailable in supplied state</p>
-          ) : (
-            <JsonViewer
-              label="Selected stored value"
-              text={serializeHost(selected.value)}
-            />
-          )}
-          {view}
-        </section>
-      ) : (
-        <p className="print:hidden">
-          {link.selectedKey
-            ? "Selected field is no longer available"
-            : "Select a market field"}
-        </p>
-      )}
+          </label>
+          <label className="finstack-market__category-picker mb-2 text-xs text-muted-foreground">
+            Market category
+            <select
+              className="mt-1 w-full rounded-sm border border-border bg-background px-2 py-1.5 text-foreground"
+              value={String(selected?.path[0] ?? "")}
+              onChange={(event) => {
+                const category = entries.find(
+                  (entry) => String(entry.path[0]) === event.target.value,
+                );
+                if (category)
+                  link.select(category.children[0]?.key ?? category.key);
+              }}
+            >
+              <option value="" disabled>
+                Choose a category
+              </option>
+              {entries.map((entry) => (
+                <option key={entry.key} value={String(entry.path[0])}>
+                  {entry.label.replaceAll("_", " ")} · {entry.children.length}
+                </option>
+              ))}
+            </select>
+          </label>
+          <nav aria-label="Market fields" data-searching={!!query}>
+            <ul>
+              {entries.map((entry) => (
+                <EntryBranch
+                  key={entry.key}
+                  entry={entry}
+                  visible={visible}
+                  selectedKey={selected?.key ?? null}
+                  onSelect={link.select}
+                  searching={!!query}
+                  activeCategory={selected?.path[0]}
+                />
+              ))}
+            </ul>
+          </nav>
+        </aside>
+        {selected ? (
+          <section
+            aria-label="Selected market field"
+            className="finstack-market__selected"
+          >
+            <header>
+              <div>
+                <h2>
+                  {typeof selected.value === "object" &&
+                  selected.value !== null &&
+                  "id" in selected.value
+                    ? String(selected.value.id)
+                    : selected.label.replaceAll("_", " ")}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {marketPointer(selected.path)}
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Stored market data
+              </span>
+            </header>
+            {view}
+            {selected.value === undefined ? (
+              <p>Field unavailable in supplied state</p>
+            ) : view ? (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-muted-foreground">
+                  Selected stored value · JSON
+                </summary>
+                <JsonViewer
+                  label="Selected stored value"
+                  text={serializeHost(selected.value)}
+                />
+              </details>
+            ) : (
+              <JsonViewer
+                label="Selected stored value"
+                text={serializeHost(selected.value)}
+              />
+            )}
+          </section>
+        ) : (
+          <p className="print:hidden">
+            {link.selectedKey
+              ? "Selected field is no longer available"
+              : "Select a market field"}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
