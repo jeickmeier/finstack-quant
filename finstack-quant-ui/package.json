@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run check:generated && npm run format:check && npm run typecheck && npm test",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:browser": "node tests/browser/run.mjs"
   },
   "dependencies": {
     "finstack-quant-wasm": "file:../finstack-quant-wasm",
@@ -31,7 +32,9 @@
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "json-schema-to-typescript": "16.0.0",
+    "playwright": "1.58.2",
     "prettier": "3.9.8",
+    "sirv": "3.0.2",
     "typescript": "5.9.3",
     "vitest": "5.0.1"
   }

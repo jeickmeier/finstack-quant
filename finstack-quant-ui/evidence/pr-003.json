@@ -1,0 +1,744 @@
+{
+  "measuredAt": "2026-09-20T01:44:59.404Z",
+  "configuration": {
+    "next": "16.3.4",
+    "bundler": "Turbopack",
+    "comlink": "4.4.2",
+    "playwright": "1.58.2",
+    "node": "v24.14.0",
+    "os": "27.0.0",
+    "cpu": "Apple M5 Max",
+    "memoryBytes": 137438953472,
+    "wasmSha256": "2160856ce24d44a47325a4701c6b010b18a82381fb69fb2b93f8a731024324cd",
+    "wasmBytes": 50772702
+  },
+  "docsExports": [
+    {
+      "browser": "145.0.7632.6",
+      "platform": "darwin",
+      "arch": "arm64",
+      "basePath": "",
+      "verdict": "pass",
+      "seed": "10049819788103739979",
+      "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
+      "initializationError": {
+        "ok": false,
+        "error": {
+          "name": "TypeError",
+          "message": "Failed to execute 'compile' on 'WebAssembly': HTTP status code is not ok"
+        }
+      },
+      "assets": [
+        {
+          "path": "/_next/static/chunks/2l4jx9qj3p0c9.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/36zyblry1td1d.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/11uqltkagch5i.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/202coquh5r8rb.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-22gpn6ewiv-8p.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2veb7ujjm0j16.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/3kau96pw0x63z.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1c3qhcs3amhs0.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2nbk2jyx7vt27.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1jyduu2xyugmv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1s33m1ilkvwe2.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1z5fawekv13xp.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/3lnmqr8yw3b55.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-38i8bp6uey7hs.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1gq3nrs_3igmf.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/media/finstack_quant_wasm_bg.1_hbi-suzqxse.wasm",
+          "status": 200,
+          "mime": "application/wasm"
+        },
+        {
+          "path": "/registry-probe/",
+          "status": 200,
+          "mime": "text/html;charset=utf-8"
+        },
+        {
+          "path": "/_next/static/chunks/2l4jx9qj3p0c9.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/36zyblry1td1d.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-22gpn6ewiv-8p.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/11uqltkagch5i.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/3kau96pw0x63z.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/202coquh5r8rb.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1c3qhcs3amhs0.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2veb7ujjm0j16.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1jyduu2xyugmv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/3lnmqr8yw3b55.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2nbk2jyx7vt27.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1z5fawekv13xp.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1s33m1ilkvwe2.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-38i8bp6uey7hs.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1gq3nrs_3igmf.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/missing.wasm",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "browser": "145.0.7632.6",
+      "platform": "darwin",
+      "arch": "arm64",
+      "basePath": "/finstack-quant",
+      "verdict": "pass",
+      "seed": "10049819788103739979",
+      "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
+      "initializationError": {
+        "ok": false,
+        "error": {
+          "name": "TypeError",
+          "message": "Failed to execute 'compile' on 'WebAssembly': HTTP status code is not ok"
+        }
+      },
+      "workerUrl": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+      "errors": {
+        "badInstrument": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Validation error: invalid instrument envelope JSON: unknown variant `__invalid__`, expected one of `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `interest_rate_swap`, `basis_swap`, `xccy_swap`, `inflation_swap`, `yoy_inflation_swap`, `inflation_cap_floor`, `forward_rate_agreement`, `swaption`, `bermudan_swaption`, `interest_rate_future`, `interest_rate_future_option`, `cap_floor`, `cms_swap`, `cms_option`, `deposit`, `repo`, `credit_default_swap`, `cds_index`, `cds_tranche`, `cds_option`, `equity`, `equity_option`, `asian_option`, `barrier_option`, `lookback_option`, `variance_swap`, `volatility_index_future`, `volatility_index_future_option`, `fx_spot`, `fx_swap`, `fx_forward`, `ndf`, `fx_option`, `fx_digital_option`, `fx_touch_option`, `fx_barrier_option`, `fx_variance_swap`, `quanto_option`, `commodity_option`, `commodity_asian_option`, `commodity_forward`, `commodity_swap`, `commodity_swaption`, `commodity_spread_option`, `commodity_future`, `commodity_future_option`, `fx_future`, `fx_future_option`, `equity_future`, `equity_future_option`, `equity_total_return_future`, `autocallable`, `cliquet_option`, `range_accrual`, `tarn`, `snowball`, `cms_spread_option`, `trs_equity`, `trs_fixed_income_index`, `basket`, `private_markets_fund`, `real_estate_asset`, `discounted_cash_flow`, `callable_range_accrual`, `bond_future`, `structured_credit`, `asset_backed_facility`, `levered_real_estate_equity`, `composite` at line 1 column 677",
+            "kind": "validation"
+          }
+        },
+        "missingMarket": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Requested item not found: USD-OIS",
+            "kind": "not_found"
+          }
+        }
+      },
+      "assets": [
+        {
+          "path": "/finstack-quant/_next/static/chunks/2l4jx9qj3p0c9.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/36zyblry1td1d.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/11uqltkagch5i.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/202coquh5r8rb.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-2_hjnvbi5rtkv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2gg0vojj4140l.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/24h4rg241nbne.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2veb7ujjm0j16.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2nbk2jyx7vt27.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1z5fawekv13xp.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1s33m1ilkvwe2.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/3lnmqr8yw3b55.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2tves5pzhsmos.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-1wazuldxchhhm.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2vq9heugqvcx3.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/media/finstack_quant_wasm_bg.1_hbi-suzqxse.wasm",
+          "status": 200,
+          "mime": "application/wasm"
+        },
+        {
+          "path": "/finstack-quant/registry-probe/",
+          "status": 200,
+          "mime": "text/html;charset=utf-8"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2l4jx9qj3p0c9.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/36zyblry1td1d.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/11uqltkagch5i.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-2_hjnvbi5rtkv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/202coquh5r8rb.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/24h4rg241nbne.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2veb7ujjm0j16.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2gg0vojj4140l.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2tves5pzhsmos.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/3lnmqr8yw3b55.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1z5fawekv13xp.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2nbk2jyx7vt27.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1s33m1ilkvwe2.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-1wazuldxchhhm.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2vq9heugqvcx3.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/missing.wasm",
+          "status": 404
+        }
+      ]
+    }
+  ],
+  "isolatedExports": [
+    {
+      "browser": "145.0.7632.6",
+      "platform": "darwin",
+      "arch": "arm64",
+      "basePath": "",
+      "verdict": "pass",
+      "seed": "10049819788103739979",
+      "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
+      "initializationError": {
+        "ok": false,
+        "error": {
+          "name": "TypeError",
+          "message": "Failed to execute 'compile' on 'WebAssembly': HTTP status code is not ok"
+        }
+      },
+      "workerUrl": "/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+      "errors": {
+        "badInstrument": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Validation error: invalid instrument envelope JSON: unknown variant `__invalid__`, expected one of `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `interest_rate_swap`, `basis_swap`, `xccy_swap`, `inflation_swap`, `yoy_inflation_swap`, `inflation_cap_floor`, `forward_rate_agreement`, `swaption`, `bermudan_swaption`, `interest_rate_future`, `interest_rate_future_option`, `cap_floor`, `cms_swap`, `cms_option`, `deposit`, `repo`, `credit_default_swap`, `cds_index`, `cds_tranche`, `cds_option`, `equity`, `equity_option`, `asian_option`, `barrier_option`, `lookback_option`, `variance_swap`, `volatility_index_future`, `volatility_index_future_option`, `fx_spot`, `fx_swap`, `fx_forward`, `ndf`, `fx_option`, `fx_digital_option`, `fx_touch_option`, `fx_barrier_option`, `fx_variance_swap`, `quanto_option`, `commodity_option`, `commodity_asian_option`, `commodity_forward`, `commodity_swap`, `commodity_swaption`, `commodity_spread_option`, `commodity_future`, `commodity_future_option`, `fx_future`, `fx_future_option`, `equity_future`, `equity_future_option`, `equity_total_return_future`, `autocallable`, `cliquet_option`, `range_accrual`, `tarn`, `snowball`, `cms_spread_option`, `trs_equity`, `trs_fixed_income_index`, `basket`, `private_markets_fund`, `real_estate_asset`, `discounted_cash_flow`, `callable_range_accrual`, `bond_future`, `structured_credit`, `asset_backed_facility`, `levered_real_estate_equity`, `composite` at line 1 column 677",
+            "kind": "validation"
+          }
+        },
+        "missingMarket": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Requested item not found: USD-OIS",
+            "kind": "not_found"
+          }
+        }
+      },
+      "assets": [
+        {
+          "path": "/_next/static/chunks/2omdjrhtu645w.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1rf4th9_acxf1.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-3q-qeha9j089p.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/0ao1xrfg5u4ew.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2ztc572h5eihv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/05f9py1dyuc_7.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-3lsxunw2y70fh.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1nx9lwo4w7m38.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/media/finstack_quant_wasm_bg.1_hbi-suzqxse.wasm",
+          "status": 200,
+          "mime": "application/wasm"
+        },
+        {
+          "path": "/registry-probe/",
+          "status": 200,
+          "mime": "text/html;charset=utf-8"
+        },
+        {
+          "path": "/_next/static/chunks/2omdjrhtu645w.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-3q-qeha9j089p.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/0ao1xrfg5u4ew.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2ztc572h5eihv.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1rf4th9_acxf1.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/05f9py1dyuc_7.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/turbopack-3lsxunw2y70fh.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/1nx9lwo4w7m38.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/missing.wasm",
+          "status": 404
+        }
+      ]
+    },
+    {
+      "browser": "145.0.7632.6",
+      "platform": "darwin",
+      "arch": "arm64",
+      "basePath": "/finstack-quant",
+      "verdict": "pass",
+      "seed": "10049819788103739979",
+      "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
+      "initializationError": {
+        "ok": false,
+        "error": {
+          "name": "TypeError",
+          "message": "Failed to execute 'compile' on 'WebAssembly': HTTP status code is not ok"
+        }
+      },
+      "workerUrl": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+      "errors": {
+        "badInstrument": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Validation error: invalid instrument envelope JSON: unknown variant `__invalid__`, expected one of `bond`, `convertible_bond`, `inflation_linked_bond`, `term_loan`, `revolving_credit`, `agency_mbs_passthrough`, `agency_tba`, `agency_cmo`, `dollar_roll`, `interest_rate_swap`, `basis_swap`, `xccy_swap`, `inflation_swap`, `yoy_inflation_swap`, `inflation_cap_floor`, `forward_rate_agreement`, `swaption`, `bermudan_swaption`, `interest_rate_future`, `interest_rate_future_option`, `cap_floor`, `cms_swap`, `cms_option`, `deposit`, `repo`, `credit_default_swap`, `cds_index`, `cds_tranche`, `cds_option`, `equity`, `equity_option`, `asian_option`, `barrier_option`, `lookback_option`, `variance_swap`, `volatility_index_future`, `volatility_index_future_option`, `fx_spot`, `fx_swap`, `fx_forward`, `ndf`, `fx_option`, `fx_digital_option`, `fx_touch_option`, `fx_barrier_option`, `fx_variance_swap`, `quanto_option`, `commodity_option`, `commodity_asian_option`, `commodity_forward`, `commodity_swap`, `commodity_swaption`, `commodity_spread_option`, `commodity_future`, `commodity_future_option`, `fx_future`, `fx_future_option`, `equity_future`, `equity_future_option`, `equity_total_return_future`, `autocallable`, `cliquet_option`, `range_accrual`, `tarn`, `snowball`, `cms_spread_option`, `trs_equity`, `trs_fixed_income_index`, `basket`, `private_markets_fund`, `real_estate_asset`, `discounted_cash_flow`, `callable_range_accrual`, `bond_future`, `structured_credit`, `asset_backed_facility`, `levered_real_estate_equity`, `composite` at line 1 column 677",
+            "kind": "validation"
+          }
+        },
+        "missingMarket": {
+          "ok": false,
+          "error": {
+            "name": "FinstackError",
+            "message": "Requested item not found: USD-OIS",
+            "kind": "not_found"
+          }
+        }
+      },
+      "assets": [
+        {
+          "path": "/finstack-quant/_next/static/chunks/2omdjrhtu645w.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/3shqfm0zh80k_.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-3wx_8zzhfvhbk.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/0ao1xrfg5u4ew.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1030hsl3fp_si.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/05f9py1dyuc_7.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-2q4x34_oaokcs.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/22hoy1-hebx3a.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/media/finstack_quant_wasm_bg.1_hbi-suzqxse.wasm",
+          "status": 200,
+          "mime": "application/wasm"
+        },
+        {
+          "path": "/finstack-quant/registry-probe/",
+          "status": 200,
+          "mime": "text/html;charset=utf-8"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2omdjrhtu645w.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-3wx_8zzhfvhbk.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/0ao1xrfg5u4ew.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/1030hsl3fp_si.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/3shqfm0zh80k_.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/05f9py1dyuc_7.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-worker-2ru9m5gbh1na6.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/turbopack-2q4x34_oaokcs.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/22hoy1-hebx3a.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/_next/static/chunks/2qdcwshobx5xg.js",
+          "status": 200,
+          "mime": "text/javascript"
+        },
+        {
+          "path": "/finstack-quant/missing.wasm",
+          "status": 404
+        }
+      ]
+    }
+  ]
+}

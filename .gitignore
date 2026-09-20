@@ -148,3 +148,6 @@ instrument_tearsheet.html
 
 # Ephemeral clean notebook execution trees
 /docs-site/.lab-run-*/
+
+# Isolated component-registry production export fixtures
+/docs-site/.registry-probe-*/

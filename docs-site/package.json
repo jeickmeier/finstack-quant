@@ -10,6 +10,9 @@
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
+    "comlink": "4.4.2",
+    "finstack-quant-ui": "file:../finstack-quant-ui",
+    "finstack-quant-wasm": "file:../finstack-quant-wasm",
     "fumadocs-core": "16.15.5",
     "fumadocs-mdx": "15.4.0",
     "fumadocs-ui": "16.15.5",

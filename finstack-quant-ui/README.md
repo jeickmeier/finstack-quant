@@ -96,3 +96,18 @@ These are Node structured-clone tests. PR-003 owns the production browser-worker
 proof; static export and installation remain later gates. Full `gen-check` and
 Rust schema gates are separate library-wide validation and are not implied by a
 passing `ui-check`.
+
+## Production browser worker smoke test
+
+PR-003 retains an isolated Next production-export fixture using the docs site's
+shared configuration and local dependencies. After `mise run wasm-pkg`, install
+the docs dependencies with `npm --prefix docs-site ci --ignore-scripts`, install
+Chromium with `npm --prefix finstack-quant-ui exec -- playwright install chromium`,
+and run `npm --prefix finstack-quant-ui run test:browser`. It checks root and
+`/finstack-quant` deployments and removes its temporary app afterward.
+`REGISTRY_SMOKE_DIR` selects a directory for JSON evidence.
+
+The fixture runs independently of the docs notebook publication suite. See the
+[PR-003 feasibility record](evidence/pr-003.md) for the actual docs export checks,
+configuration, browser version, and validation boundaries. The browser smoke test
+is separate from the fast `ui-check`; PR-004 owns optimized footprint acceptance.
