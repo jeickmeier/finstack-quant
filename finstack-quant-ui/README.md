@@ -115,9 +115,10 @@ is separate from the fast `ui-check`; PR-004 owns optimized footprint acceptance
 ## Browser footprint gate
 
 PR-004 measured all 78 instrument validators and the optimized `release-size`
-WASM package. The corpus completed, but the optimized raw artifact is 21,534,873
-bytes against a 10,000,000-byte limit. **Phase 0 blocks PR-005.** Compression and
-successful browser execution do not waive this gate. See the
+WASM package. The corpus completed and the optimized raw artifact is 21,534,873
+bytes against the user-authorized revised 25,000,000-byte limit. Browser
+feasibility passes; the original 10 MB failure is retained in the evidence.
+Compression does not waive this raw-byte gate. See the
 [PR-004 evidence and reproduction commands](evidence/pr-004.md).
 
 `test:footprint` requires `REGISTRY_WASM_PACKAGE` to select the optimized web

@@ -10,6 +10,7 @@ if (!rawPath || !optimizedPath || !output)
 const raw = await readFile(rawPath);
 const optimized = await readFile(optimizedPath);
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+const limitBytes = 25_000_000;
 const report = {
   measuredAt: new Date().toISOString(),
   rawBytes: raw.length,
@@ -20,8 +21,8 @@ const report = {
   }).length,
   rawSha256: hash(raw),
   optimizedSha256: hash(optimized),
-  limitBytes: 10_000_000,
-  verdict: optimized.length <= 10_000_000 ? "pass" : "fail",
+  limitBytes,
+  verdict: optimized.length <= limitBytes ? "pass" : "fail",
   method:
     "Raw is wasm-bindgen output from release-size with --no-opt. Optimized uses wasm-opt -Oz with the existing release feature allowlist. Compression is gzip level 9 and Brotli quality 11; neither changes the raw-byte gate.",
 };

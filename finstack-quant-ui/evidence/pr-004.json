@@ -1,6 +1,6 @@
 {
-  "phase0Verdict": "blocked",
-  "reason": "Optimized raw WASM exceeds the 10 MB gate; PR-005 blocked by plan.",
+  "phase0Verdict": "pass",
+  "reason": "Browser feasibility passes the revised 25,000,000-byte optimized raw WASM limit and complete-corpus execution gate. Aggregate library gates were not rerun.",
   "toolchain": {
     "rustc": "1.91.1",
     "wasmPack": "0.14.0",
@@ -39,8 +39,8 @@
     "brotliBytes": 4483234,
     "rawSha256": "83f13c8f201a1c50b2f09de3f4b55ef28a15b2f518179e602e7601406a648ecc",
     "optimizedSha256": "afe247bad5421dce0e95aae10e09d4ee48fbd544205cafe9334e789915ca88bf",
-    "limitBytes": 10000000,
-    "verdict": "fail",
+    "limitBytes": 25000000,
+    "verdict": "pass",
     "method": "Raw is wasm-bindgen output from release-size with --no-opt. Optimized uses wasm-opt -Oz with the existing release feature allowlist. Compression is gzip level 9 and Brotli quality 11; neither changes the raw-byte gate."
   },
   "browserExports": [
@@ -378,5 +378,13 @@
         }
       ]
     }
-  ]
+  ],
+  "gateRevision": {
+    "date": "2026-09-19",
+    "authorization": "User requested: Revise size gate and continue through all prs",
+    "previousLimitBytes": 10000000,
+    "previousVerdict": "fail",
+    "limitBytes": 25000000,
+    "basis": "Retain the complete default-feature artifact and all 78 validators; continue reporting uncompressed size and retained heap."
+  }
 }
