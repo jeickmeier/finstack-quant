@@ -14,6 +14,20 @@
   ],
   "items": [
     {
+      "name": "primitive-contracts",
+      "type": "registry:lib",
+      "docs": "Installs primitive-contracts under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/primitive-contracts.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/primitive-contracts.json"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": []
+    },
+    {
       "name": "finstack-format",
       "type": "registry:lib",
       "docs": "Installs finstack-format under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",

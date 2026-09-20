@@ -119,11 +119,15 @@ it("type-checks the installed corpus without workspace aliases", async () => {
         await mkdir(path.dirname(target), { recursive: true });
         expect(typeof file.content).toBe("string");
         await writeFile(target, file.content);
-        if (/\.(?:ts|mts)$/.test(target)) files.push(target);
+        if (/\.(?:tsx?|mts)$/.test(target)) files.push(target);
       }
     }
     const program = ts.createProgram(files, {
       target: ts.ScriptTarget.ES2022,
+      jsx: ts.JsxEmit.ReactJSX,
+      lib: ["lib.es2024.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
+      baseUrl: consumer,
+      paths: { "@/*": ["./*"] },
       module: ts.ModuleKind.ESNext,
       moduleResolution: ts.ModuleResolutionKind.Bundler,
       strict: true,

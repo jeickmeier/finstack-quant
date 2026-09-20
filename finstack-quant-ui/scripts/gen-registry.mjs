@@ -40,6 +40,7 @@ const contracts = roots.map(({ schema }) => {
   );
 });
 const items = [
+  item("primitive-contracts", ["generated/primitive-contracts.json"]),
   item(
     "finstack-format",
     ["format/format.ts", "format/columns.ts", "format/transport.ts"],

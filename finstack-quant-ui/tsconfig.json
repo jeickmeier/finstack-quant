@@ -7,7 +7,20 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/lib/finstack/*": ["src/*"]
+    },
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "registry/**/*.ts",
+    "registry/**/*.tsx",
+    "tests/**/*.tsx"
+  ],
+  "exclude": ["tests/browser/fixture"]
 }

@@ -242,6 +242,7 @@ finstack-quant-ui/src/generated/meta/volatility_index_future.ts
 finstack-quant-ui/src/generated/meta/volatility_index_future_option.ts
 finstack-quant-ui/src/generated/meta/xccy_swap.ts
 finstack-quant-ui/src/generated/meta/yoy_inflation_swap.ts
+finstack-quant-ui/src/generated/primitive-contracts.json
 finstack-quant-ui/src/generated/roots.json
 finstack-quant-ui/src/generated/schemas/agency_cmo.json
 finstack-quant-ui/src/generated/schemas/agency_mbs_passthrough.json

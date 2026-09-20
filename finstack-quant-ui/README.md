@@ -2,7 +2,7 @@
 
 Component registry contracts: offline JSON Schema bundles, generated wire
 interfaces, lossless adapters, source provenance and a lazy instrument catalogue.
-This is a standalone Node 24 package. No registry components ship in this slice.
+This is a standalone Node 24 package with installable controlled primitives.
 
 ```sh
 mise run wasm-pkg
@@ -145,7 +145,7 @@ without duplicating generated source. No visual placeholders are published.
 
 `ui-check` verifies generated entries, dependency closure, target ownership and
 imports, and type-checks files extracted from a fresh CLI build in a temporary
-consumer without path aliases. Package dependencies are supplied from the locked
+consumer with its own `@/*` application alias (no workspace aliases). Package dependencies are supplied from the locked
 installation; a complete network install matrix is a later slice.
 
 ## Shared theme
@@ -176,3 +176,23 @@ source strings remain the caller's state. Grouping currently uses en-US.
 `isoToEpoch` and `epochToIso` call the native core date functions in an initialized
 host (inside the worker for browser consumers). Column presets target Table
 9.2.4 and add formatting/alignment only.
+
+## Controlled primitives
+
+The 18 public primitives install under `components/finstack/primitives`, with a
+shared `field-frame`. Each declares its theme and actual dependency closure.
+Cross-category imports use the consumer's standard `@/lib/finstack` alias;
+configure `@/*` to the application source root. The CLI handles `src` layouts.
+
+Inputs receive controlled values, labels, help, constraints and options. Calendar,
+model, metric and ID choices come from the caller. Decimal money stays text;
+number-backed rate and knot inputs preserve incomplete/invalid text for editing.
+Only explicit source-backed rate presentation changes display units. Domain
+validation remains in Rust. Date calendars only present dates and any supplied
+business-day highlights.
+
+`FinstackTable` uses Table 9 with no optional features and caller-owned stable row
+IDs; `KnotTable` reuses it. `JsonViewer` displays/copies the original supplied
+string and never parses it. `npm run test:primitives:browser` builds an isolated
+consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
+10,000-option virtualization, and runs axe in both themes and densities.

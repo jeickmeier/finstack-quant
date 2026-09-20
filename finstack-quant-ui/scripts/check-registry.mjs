@@ -85,10 +85,12 @@ export function checkImports(items, contents) {
         throw new Error(`Missing installed content: ${file.target}`);
       const imports = ts.preProcessFile(source, true, true).importedFiles;
       for (const { fileName: specifier } of imports) {
-        if (specifier.startsWith(".")) {
-          const base = path.posix.normalize(
-            path.posix.join(path.posix.dirname(file.target), specifier),
-          );
+        if (specifier.startsWith(".") || specifier.startsWith("@/")) {
+          const base = specifier.startsWith("@/")
+            ? specifier.slice(2)
+            : path.posix.normalize(
+                path.posix.join(path.posix.dirname(file.target), specifier),
+              );
           const candidates = [
             base,
             ...[

@@ -144,6 +144,20 @@ export async function generate(repo = repoRoot) {
       })),
     ),
   );
+  const primitiveContracts = {};
+  for (const name of [
+    "decimal",
+    "day_count",
+    "business_day_convention",
+    "tenor",
+  ]) {
+    const entry = [...contracts.values()].find((entry) =>
+      entry.source.endsWith(`/common/1/${name}.schema.json`),
+    );
+    if (!entry) throw new Error(`Missing primitive contract: ${name}`);
+    primitiveContracts[name] = { source: entry.source, schema: entry.schema };
+  }
+  files.set("primitive-contracts.json", json(primitiveContracts));
   return files;
 }
 

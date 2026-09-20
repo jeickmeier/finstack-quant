@@ -1,4 +1,340 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
-  "items": []
+  "items": [
+    {
+      "name": "field-frame",
+      "type": "registry:ui",
+      "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "field-frame/field-frame.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/field-frame/field-frame.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme"
+      ]
+    },
+    {
+      "name": "finstack-table",
+      "type": "registry:ui",
+      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "finstack-table/finstack-table.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-table/finstack-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4"]
+    },
+    {
+      "name": "decimal-input",
+      "type": "registry:ui",
+      "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "decimal-input/decimal-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/decimal-input/decimal-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "@finstack/finstack-format",
+        "@finstack/primitive-contracts"
+      ]
+    },
+    {
+      "name": "enum-field",
+      "type": "registry:ui",
+      "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "enum-field/enum-field.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/enum-field/enum-field.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame"
+      ]
+    },
+    {
+      "name": "money-input",
+      "type": "registry:ui",
+      "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "money-input/money-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/money-input/money-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ]
+    },
+    {
+      "name": "rate-input",
+      "type": "registry:ui",
+      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "rate-input/rate-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/rate-input/rate-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/decimal-input",
+        "@finstack/finstack-format"
+      ]
+    },
+    {
+      "name": "tenor-input",
+      "type": "registry:ui",
+      "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "tenor-input/tenor-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/tenor-input/tenor-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/primitive-contracts"
+      ]
+    },
+    {
+      "name": "day-count-select",
+      "type": "registry:ui",
+      "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "day-count-select/day-count-select.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/day-count-select/day-count-select.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field",
+        "@finstack/primitive-contracts"
+      ]
+    },
+    {
+      "name": "bdc-select",
+      "type": "registry:ui",
+      "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "bdc-select/bdc-select.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/bdc-select/bdc-select.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field",
+        "@finstack/primitive-contracts"
+      ]
+    },
+    {
+      "name": "calendar-select",
+      "type": "registry:ui",
+      "docs": "Controlled calendar-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "calendar-select/calendar-select.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/calendar-select/calendar-select.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field"
+      ]
+    },
+    {
+      "name": "model-picker",
+      "type": "registry:ui",
+      "docs": "Controlled model-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "model-picker/model-picker.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/model-picker/model-picker.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field"
+      ]
+    },
+    {
+      "name": "metric-picker",
+      "type": "registry:ui",
+      "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "metric-picker/metric-picker.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/metric-picker/metric-picker.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "@finstack/enum-field"
+      ]
+    },
+    {
+      "name": "knot-table",
+      "type": "registry:ui",
+      "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "knot-table/knot-table.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/knot-table/knot-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input"
+      ]
+    },
+    {
+      "name": "measure-value",
+      "type": "registry:ui",
+      "docs": "Controlled measure-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "measure-value/measure-value.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/measure-value/measure-value.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format"
+      ]
+    },
+    {
+      "name": "money-value",
+      "type": "registry:ui",
+      "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "money-value/money-value.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/money-value/money-value.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format"
+      ]
+    },
+    {
+      "name": "stamp-badge",
+      "type": "registry:ui",
+      "docs": "Controlled stamp-badge primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "stamp-badge/stamp-badge.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/stamp-badge/stamp-badge.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/contract-valuation-result"
+      ]
+    },
+    {
+      "name": "json-viewer",
+      "type": "registry:ui",
+      "docs": "Controlled json-viewer primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "json-viewer/json-viewer.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/json-viewer/json-viewer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme"
+      ]
+    },
+    {
+      "name": "date-input",
+      "type": "registry:ui",
+      "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "date-input/date-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/date-input/date-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame"
+      ],
+      "dependencies": ["@daypicker/react@10.0.1"]
+    },
+    {
+      "name": "id-combobox",
+      "type": "registry:ui",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Uses Base UI Autocomplete, its free-text combobox API, with virtualized supplied suggestions.",
+      "files": [
+        {
+          "path": "id-combobox/id-combobox.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/id-combobox/id-combobox.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame"
+      ],
+      "dependencies": ["@tanstack/react-virtual@3.14.13"]
+    }
+  ]
 }
