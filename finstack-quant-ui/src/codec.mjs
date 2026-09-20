@@ -54,6 +54,18 @@ function structuralSchema(schema) {
   return mapChildren(schema, structuralSchema);
 }
 
+// Keep machine-readable path segments beside transport diagnostics. Consumers must
+// not reconstruct field semantics from prose or split punctuation-bearing keys.
+function wireError(path, message) {
+  const pointer = path
+    .map((key) => String(key).replaceAll("~", "~0").replaceAll("/", "~1"))
+    .join("/");
+  return Object.assign(
+    new TypeError(`${path.length ? "/" : ""}${pointer}: ${message}`),
+    { path },
+  );
+}
+
 function numeric(value, path) {
   if (isLosslessNumber(value)) {
     const converted = value.valueOf();
@@ -65,29 +77,35 @@ function numeric(value, path) {
     (!Number.isFinite(value) ||
       (Number.isInteger(value) && !Number.isSafeInteger(value)))
   )
-    throw new TypeError(
-      `${path}: unsafe numeric value; supply an exact integer token or bigint`,
+    throw wireError(
+      path,
+      "unsafe numeric value; supply an exact integer token or bigint",
     );
   return value;
 }
 
 /** Convert JSON-compatible trees without invoking toJSON or dropping unsupported values. */
-function tree(value, leaf, path = "", ancestors = new Set()) {
+function tree(value, leaf, path = [], ancestors = new Set()) {
   if (isLosslessNumber(value) || value === null || typeof value !== "object") {
     if (value === undefined || ["function", "symbol"].includes(typeof value))
-      throw new TypeError(`${path}: not a JSON value`);
+      throw wireError(path, "not a JSON value");
     return leaf(value, path);
   }
-  if (ancestors.has(value)) throw new TypeError(`${path}: cyclic input`);
+  if (ancestors.has(value)) throw wireError(path, "cyclic input");
   if (
     !Array.isArray(value) &&
     ![Object.prototype, null].includes(Object.getPrototypeOf(value))
   )
-    throw new TypeError(`${path}: host object requires an explicit adapter`);
+    throw wireError(path, "host object requires an explicit adapter");
   ancestors.add(value);
   const entries = Object.entries(value).map(([key, child]) => [
     key,
-    tree(child, leaf, `${path}/${key}`, ancestors),
+    tree(
+      child,
+      leaf,
+      [...path, Array.isArray(value) ? Number(key) : key],
+      ancestors,
+    ),
   ]);
   const output = Array.isArray(value)
     ? entries.map(([, child]) => child)
@@ -97,7 +115,7 @@ function tree(value, leaf, path = "", ancestors = new Set()) {
     (entries.length !== value.length ||
       entries.some(([key], index) => key !== String(index)))
   )
-    throw new TypeError(`${path}: sparse array`);
+    throw wireError(path, "sparse array");
   ancestors.delete(value);
   return output;
 }
@@ -154,15 +172,26 @@ export function createWireCodec(source) {
     if (value === null) return value;
     if (wide(node)) {
       if (host && typeof value !== "bigint")
-        throw new TypeError(`${path}: host int64/uint64 must be bigint`);
+        throw wireError(path, "host int64/uint64 must be bigint");
       if (isLosslessNumber(value)) {
         if (!/^-?\d+$/.test(value.value))
-          throw new TypeError(`${path}: expected an integer token`);
+          throw wireError(path, "expected an integer token");
         value = BigInt(value.value);
       } else if (typeof value === "number" && Number.isSafeInteger(value))
         value = BigInt(value);
       if (!integers.has(node)) integers.set(node, integerSchema(node));
-      return integers.get(node).parse(value);
+      try {
+        return integers.get(node).parse(value);
+      } catch (error) {
+        if (error instanceof z.ZodError)
+          throw new z.ZodError(
+            error.issues.map((issue) => ({
+              ...issue,
+              path: [...path, ...issue.path],
+            })),
+          );
+        throw error;
+      }
     }
     for (const keyword of ["oneOf", "anyOf"]) {
       if (!node[keyword]) continue;
@@ -178,27 +207,24 @@ export function createWireCodec(source) {
         }
       }
       if (!matches.length || (keyword === "oneOf" && matches.length !== 1))
-        throw new TypeError(
-          `${path}: no unambiguous ${keyword} wire representation`,
-        );
+        throw wireError(path, `no unambiguous ${keyword} wire representation`);
       value = matches[0];
     }
     if (node.allOf)
       for (const branch of node.allOf) value = walk(branch, value, host, path);
     if (Array.isArray(value)) {
       const converted = value.map((item, i) =>
-        walk(
-          node.prefixItems?.[i] ?? node.items ?? true,
-          item,
-          host,
-          `${path}/${i}`,
-        ),
+        walk(node.prefixItems?.[i] ?? node.items ?? true, item, host, [
+          ...path,
+          i,
+        ]),
       );
       if (node.uniqueItems)
         tree(converted, (item) => {
           if (typeof item === "bigint")
-            throw new TypeError(
-              `${path}: unsupported wide-integer uniqueness constraint`,
+            throw wireError(
+              path,
+              "unsupported wide-integer uniqueness constraint",
             );
           return item;
         });
@@ -212,7 +238,7 @@ export function createWireCodec(source) {
             node.properties?.[key] ?? node.additionalProperties ?? true,
             item,
             host,
-            `${path}/${key}`,
+            [...path, key],
           ),
         ]),
       );
@@ -226,15 +252,16 @@ export function createWireCodec(source) {
         Object.hasOwn(node, "const") ||
         node.enum)
     )
-      throw new TypeError(
-        `${path}: cannot narrow bigint to the published number representation`,
+      throw wireError(
+        path,
+        "cannot narrow bigint to the published number representation",
       );
     return value;
   }
   function normalize(value, host) {
     // Check cycles and unsupported host objects before schema recursion.
     value = tree(value, (item) => item);
-    value = walk(schema, value, host, "");
+    value = walk(schema, value, host, []);
     value = tree(value, numeric);
     rootValidator.parse(shadow(value));
     return value;
@@ -245,7 +272,15 @@ export function createWireCodec(source) {
     } catch (error) {
       if (error instanceof z.ZodError)
         for (const issue of error.issues) context.addIssue(issue);
-      else context.addIssue({ code: "custom", message: String(error) });
+      else
+        context.addIssue({
+          code: "custom",
+          message: String(error),
+          path:
+            error instanceof TypeError && Array.isArray(error.path)
+              ? error.path
+              : [],
+        });
       return z.NEVER;
     }
   });

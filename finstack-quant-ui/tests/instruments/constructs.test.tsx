@@ -72,13 +72,16 @@ it("edits native map keys literally, rejects duplicates and removes entries", as
         .join(" "),
     ).toContain("Duplicate"),
   );
-  expect(
-    (
-      screen.getByRole("button", {
-        name: "Apply instrument",
-      }) as HTMLButtonElement
-    ).disabled,
-  ).toBe(true);
+  const attempts = submit.mock.calls.length;
+  fireEvent.submit(
+    screen.getByRole("button", { name: "Apply instrument" }).closest("form")!,
+  );
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("alert", { name: "Validation errors" }),
+    ),
+  );
+  expect(submit).toHaveBeenCalledTimes(attempts);
   await user.click(screen.getByRole("button", { name: "Remove Meta 2" }));
   const final = await apply(submit);
   expect(final.instrument.spec.attributes.meta).toEqual(

@@ -201,8 +201,10 @@ it("keeps a new structural error and invalid accepted state when an older native
           name: "Apply instrument",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(true),
+    ).toBe(false),
   );
+  fireEvent.submit(amount.closest("form")!);
+  await waitFor(() => expect(document.activeElement).toBe(amount));
   expect(amount.getAttribute("aria-invalid")).toBe("true");
   expect(accepted.mock.calls.at(-1)?.[0]).toBeNull();
 });

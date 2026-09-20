@@ -80,6 +80,17 @@ try {
     (await page.getByRole("alert").allTextContents()).join(" "),
     /pattern|decimal/i,
   );
+  await page
+    .getByRole("button", { name: "Apply instrument", exact: true })
+    .click();
+  assert.equal(
+    await amount.evaluate((node) => node === document.activeElement),
+    true,
+  );
+  assert.equal(
+    await page.getByRole("textbox", { name: "Canonical output" }).inputValue(),
+    "",
+  );
   await amount.fill("1234567.1234567890");
   await page
     .getByRole("button", { name: "Apply instrument", exact: true })
@@ -116,6 +127,20 @@ try {
         .settlement_days === 1,
   );
   assert.equal(await settlement.inputValue(), "001");
+  const maturity = page.getByRole("textbox", { name: "Maturity", exact: true });
+  await maturity.fill("2020-01-01");
+  const summary = page.getByRole("alert", { name: "Validation errors" });
+  await summary.waitFor();
+  await page
+    .getByRole("button", { name: "Apply instrument", exact: true })
+    .click();
+  assert.equal(
+    await summary.evaluate((node) => node === document.activeElement),
+    true,
+  );
+  assert.equal(await output.inputValue(), canonical);
+  await maturity.fill("2034-01-15");
+  await summary.waitFor({ state: "detached" });
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -142,6 +167,8 @@ try {
       "lazy generated bond module",
       "actual shared WASM worker validation",
       "inline decimal-pattern errors",
+      "invalid submit focuses the field",
+      "native domain error focuses summary and preserves prior output",
       "canonical native output",
       "working text retained after canonicalization",
       "basic/full fields",

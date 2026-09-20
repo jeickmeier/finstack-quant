@@ -46,6 +46,11 @@
           "path": "schema-form/discriminator.ts",
           "type": "registry:component",
           "target": "components/finstack/components/schema-form/discriminator.ts"
+        },
+        {
+          "path": "schema-form/issue-mapping.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/schema-form/issue-mapping.ts"
         }
       ],
       "registryDependencies": [

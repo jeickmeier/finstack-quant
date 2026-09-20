@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@tanstack/react-form";
-import { useAppForm } from "@/lib/finstack/form";
+import { useAppForm, focusFormIssue } from "@/lib/finstack/form";
 import { RenderField } from "./render-field";
 import {
   structuralValidator,
@@ -52,6 +52,8 @@ function useSchemaForm(props: SchemaFormProps) {
     validate: SchemaFormProps["validate"];
   } | null>(null);
   const request = useRef<AbortController | null>(null);
+  const submission = useRef<AbortController | null>(null);
+  useEffect(() => () => submission.current?.abort(), []);
   const [native, setNative] = useState<{
     pending: boolean;
     error: string | null;
@@ -64,6 +66,7 @@ function useSchemaForm(props: SchemaFormProps) {
     listeners: {
       onChange: () => {
         request.current?.abort();
+        submission.current?.abort();
         setSubmitError(null);
         notify.current?.(null);
       },
@@ -73,6 +76,9 @@ function useSchemaForm(props: SchemaFormProps) {
       onSubmit: validator,
     },
     onSubmit: async ({ value }) => {
+      submission.current?.abort();
+      const controller = new AbortController();
+      submission.current = controller;
       setSubmitError(null);
       try {
         const text = input(value);
@@ -80,10 +86,13 @@ function useSchemaForm(props: SchemaFormProps) {
           valid.current?.input === text &&
           valid.current.validate === props.validate
             ? valid.current.canonical
-            : await props.validate(text);
-        await props.onSubmit(canonical);
+            : await props.validate(text, controller.signal);
+        if (!controller.signal.aborted) await props.onSubmit(canonical);
       } catch (error) {
-        setSubmitError(error instanceof Error ? error.message : String(error));
+        if (!controller.signal.aborted)
+          setSubmitError(
+            error instanceof Error ? error.message : String(error),
+          );
       }
     },
   });
@@ -119,6 +128,7 @@ function useSchemaForm(props: SchemaFormProps) {
     return () => {
       clearTimeout(timer);
       controller.abort();
+      submission.current?.abort();
     };
   }, [values, validator, props.module, props.validate, form]);
   return { form, submitError, native };
@@ -127,23 +137,28 @@ export type SchemaFormApi = ReturnType<typeof useSchemaForm>["form"];
 /** Schema-driven instrument term sheet with structural change and abort-aware native validation. */
 export function SchemaForm(props: SchemaFormProps) {
   const { form, submitError, native } = useSchemaForm(props);
+  const element = useRef<HTMLFormElement>(null);
+  const [focusAttempt, setFocusAttempt] = useState(0);
+  useEffect(() => {
+    if (focusAttempt) focusFormIssue(element.current);
+  }, [focusAttempt]);
   return (
     <form
+      ref={element}
       noValidate
       className="space-y-3 font-sans text-foreground"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        void form.handleSubmit();
+        const snapshot = form.state.values;
+        void form.handleSubmit().finally(() => {
+          if (form.state.values === snapshot)
+            setFocusAttempt((value) => value + 1);
+        });
       }}
     >
       <form.AppForm>
-        <form.ErrorSummary />
-        {(submitError || native.error) && (
-          <p role="alert" className="text-sm text-error">
-            {submitError ?? native.error}
-          </p>
-        )}
+        <form.ErrorSummary errors={[submitError ?? native.error]} />
         <form.Subscribe selector={(state) => state.values}>
           {(value) => (
             <RenderField
@@ -159,9 +174,7 @@ export function SchemaForm(props: SchemaFormProps) {
           )}
         </form.Subscribe>
         <div className="flex gap-2">
-          <form.SubmitButton
-            disabled={native.pending || Boolean(native.error)}
-          />
+          <form.SubmitButton disabled={native.pending} allowInvalidSubmission />
           <form.ResetButton onReset={() => props.onValidated?.(null)} />
         </div>
       </form.AppForm>

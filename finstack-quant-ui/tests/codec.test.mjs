@@ -166,3 +166,26 @@ it("rejects array properties and bigint values outside the declared numeric adap
     createWireCodec({ const: 0 }).stringify(18446744073709551615n),
   ).toThrow();
 });
+
+it("retains structured paths for wire enums, wide integers and escaped literal keys", () => {
+  const keyed = createWireCodec({
+    type: "object",
+    additionalProperties: {
+      type: "array",
+      items: { type: "integer", format: "uint64" },
+    },
+  });
+  const result = keyed.validator.safeParse({ "a/b~1": [1n, -1n] });
+  expect(result.success).toBe(false);
+  expect(result.error.issues[0].path).toEqual(["a/b~1", 1]);
+  const enumCodec = createWireCodec({
+    type: "object",
+    additionalProperties: {
+      oneOf: [{ const: "call" }, { const: "put" }],
+    },
+  });
+  const invalid = enumCodec.validator.safeParse({ "a/b~1": "neither" });
+  expect(invalid.success).toBe(false);
+  expect(invalid.error.issues[0].path).toEqual(["a/b~1"]);
+  expect(invalid.error.issues[0].message).toContain("/a~1b~01:");
+});

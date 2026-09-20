@@ -183,9 +183,11 @@ function ArrayField({
 function SubmitButton({
   label = "Apply instrument",
   disabled,
+  allowInvalidSubmission = false,
 }: {
   label?: string;
   disabled?: boolean;
+  allowInvalidSubmission?: boolean;
 }) {
   const form = useFormContext();
   return (
@@ -198,7 +200,12 @@ function SubmitButton({
         <button
           type="submit"
           className={buttonClass}
-          disabled={disabled || !canSubmit || submitting || validating}
+          disabled={
+            disabled ||
+            (!allowInvalidSubmission && !canSubmit) ||
+            submitting ||
+            validating
+          }
         >
           {submitting ? "Validating…" : label}
         </button>
@@ -222,7 +229,23 @@ function ResetButton({ onReset }: { onReset?: () => void }) {
     </button>
   );
 }
-function ErrorSummary() {
+/** Focus a mounted invalid control, otherwise the accessible summary. */
+export function focusFormIssue(form: HTMLFormElement | null) {
+  if (!form) return;
+  const frames = [...form.querySelectorAll<HTMLElement>("[data-field-path]")];
+  for (const frame of frames) {
+    if (!frame.querySelector('[aria-invalid="true"]')) continue;
+    const control = frame.querySelector<HTMLElement>(
+      "input:not([aria-hidden=true]):not([type=hidden]):not(:disabled), textarea:not(:disabled), [role=combobox]:not(:disabled), [role=radio]:not([aria-disabled=true]), [role=checkbox]:not([aria-disabled=true])",
+    );
+    if (control) {
+      control.focus();
+      return;
+    }
+  }
+  form.querySelector<HTMLElement>("[data-error-summary]")?.focus();
+}
+function ErrorSummary({ errors: extra = [] }: { errors?: readonly unknown[] }) {
   const form = useFormContext();
   return (
     <form.Subscribe
@@ -230,6 +253,7 @@ function ErrorSummary() {
     >
       {([errors, fields]) => {
         const all = [
+          ...extra,
           ...errors,
           ...Object.values(fields).flatMap((field) =>
             field &&
@@ -244,7 +268,10 @@ function ErrorSummary() {
         return message ? (
           <div
             role="alert"
-            className="rounded-sm border border-error p-2 text-sm text-error"
+            data-error-summary
+            tabIndex={-1}
+            aria-label="Validation errors"
+            className="rounded-sm border border-error p-2 text-sm text-error focus-visible:outline-2 focus-visible:outline-ring"
           >
             <strong>Review the instrument</strong>
             <p>{message}</p>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { issuePathToFieldPath } from "./issue-mapping";
 import type { WireCodec } from "@/lib/finstack/codec.mjs";
 
 /** Generated schema shape used for presentation, not a second financial validator. */
@@ -356,7 +357,14 @@ export function structuralValidator(module: InstrumentModule) {
       );
     } catch (error) {
       if (error instanceof z.ZodError)
-        for (const issue of error.issues) context.addIssue({ ...issue });
+        for (const issue of error.issues)
+          context.addIssue({
+            ...issue,
+            path:
+              issue.code === "unrecognized_keys"
+                ? []
+                : (issuePathToFieldPath(issue.path, value) ?? []),
+          });
       else context.addIssue({ code: "custom", message: String(error) });
       return z.NEVER;
     }
