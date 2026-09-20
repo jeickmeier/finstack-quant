@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 export default defineConfig({
+  // Bound concurrent WASM instances and generated-schema transforms during scoped iteration.
+  test: { maxWorkers: 4 },
   resolve: {
     alias: {
       "@/lib/finstack/form": fileURLToPath(

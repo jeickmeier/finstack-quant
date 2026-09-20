@@ -368,6 +368,53 @@
         "@finstack/enum-field"
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "fx-matrix-grid",
+      "type": "registry:component",
+      "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation.",
+      "files": [
+        {
+          "path": "fx-matrix-grid/fx-matrix-grid.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/fx-matrix-grid/fx-matrix-grid.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/contract-market-context-state"
+      ],
+      "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "market-context-browser",
+      "type": "registry:component",
+      "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator.",
+      "files": [
+        {
+          "path": "market-context-browser/market-context-browser.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/market-context-browser/market-context-browser.tsx"
+        },
+        {
+          "path": "market-context-browser/tree.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/market-context-browser/tree.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/curve-chart",
+        "@finstack/vol-surface-chart",
+        "@finstack/fx-delta-quotes",
+        "@finstack/fx-matrix-grid",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/use-linked-selection",
+        "@finstack/contract-market-context-state"
+      ],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

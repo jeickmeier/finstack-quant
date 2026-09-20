@@ -118,8 +118,9 @@ it("edits money without changing amount precision when currency changes", async 
       onValueChange={change}
     />,
   );
-  await user.click(screen.getByRole("combobox"));
-  await user.click(screen.getByRole("option", { name: "EUR" }));
+  screen.getByRole("combobox").focus();
+  await user.keyboard("{ArrowDown}");
+  await user.click(await screen.findByRole("option", { name: "EUR" }));
   expect(change).toHaveBeenLastCalledWith({
     amount: "12345678901234567890.1",
     currency: "EUR",
