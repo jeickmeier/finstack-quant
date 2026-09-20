@@ -1,0 +1,79 @@
+name: Component Registry Gallery
+
+on:
+  pull_request:
+    paths:
+      - "finstack-quant-ui/**"
+      - "docs-site/src/components/registry-gallery/**"
+      - "docs-site/src/app/(gallery)/**"
+      - ".github/workflows/ui-gallery.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  gallery:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+      CARGO_BUILD_JOBS: "2"
+      RUSTUP_TOOLCHAIN: "1.91.1"
+      UV_NO_SYNC: "1"
+      UV_PYTHON_DOWNLOADS: never
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+          cache: npm
+          cache-dependency-path: finstack-quant-ui/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.10.11"
+      - uses: jdx/mise-action@v4
+        with:
+          install: false
+          # Use the explicitly provisioned registry tools, not the broad workspace tool set.
+          add_shims_to_path: false
+          export_path: false
+      - name: Provision verified WASM build tools
+        shell: bash
+        run: |
+          rustup toolchain install 1.91.1 --profile minimal --target wasm32-unknown-unknown
+          curl --fail --location --output /tmp/wasm-pack.tar.gz https://github.com/wasm-bindgen/wasm-pack/releases/download/v0.14.0/wasm-pack-v0.14.0-aarch64-apple-darwin.tar.gz
+          echo '9d0e70c6b229de18f0abfe910f2963e8f09ebae218250e9b09a1c3fdd955bef9  /tmp/wasm-pack.tar.gz' | shasum -a 256 --check
+          tar -xzf /tmp/wasm-pack.tar.gz -C /tmp
+          echo '/tmp/wasm-pack-v0.14.0-aarch64-apple-darwin' >> "$GITHUB_PATH"
+          curl --fail --location --output /tmp/binaryen.tar.gz https://github.com/WebAssembly/binaryen/releases/download/version_130/binaryen-version_130-arm64-macos.tar.gz
+          echo '79d3ab9f417d9e215f15f598f523d001a7d9ac1e59367e5c869fbdabd1cba72e  /tmp/binaryen.tar.gz' | shasum -a 256 --check
+          tar -xzf /tmp/binaryen.tar.gz -C /tmp
+          echo '/tmp/binaryen-version_130/bin' >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: registry-gallery
+      - name: Build native packages for the registry consumer
+        run: mise run wasm-pkg
+      - name: Install locked consumer dependencies
+        run: |
+          npm --prefix finstack-quant-ui ci --ignore-scripts
+          npm --prefix docs-site ci --ignore-scripts
+          npm --prefix finstack-quant-ui exec -- playwright install chromium
+      - name: Check registry and export production gallery
+        run: |
+          mise run ui-check
+          mise run ui-docs-build
+      - name: Verify committed baselines and accessibility
+        run: mise run ui-e2e
+      - name: Retain browser failures and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registry-gallery-results
+          path: finstack-quant-ui/test-results

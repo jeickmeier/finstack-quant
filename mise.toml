@@ -1016,9 +1016,9 @@ description = "Build component-registry distribution with the pinned shadcn CLI"
 run = "npm --prefix finstack-quant-ui run build"
 
 [tasks.ui-docs-install]
-description = "Install the built workbench into the docs consumer using the pinned CLI"
+description = "Install the built catalogue into the docs consumer using the pinned CLI"
 depends = ["ui-build"]
-run = "node finstack-quant-ui/scripts/install-local.mjs docs-site"
+run = ["node finstack-quant-ui/scripts/gen-gallery.mjs", "node finstack-quant-ui/scripts/install-local.mjs docs-site"]
 
 [tasks.ui-docs-check]
 description = "Type-check the installed registry and existing docs host"
@@ -1034,3 +1034,7 @@ run = "node finstack-quant-ui/scripts/build-docs.mjs"
 description = "Production docs and external Next registry installation checks at both deployment paths"
 depends = ["ui-docs-install"]
 run = "node finstack-quant-ui/tests/browser/install-smoke.mjs"
+
+[tasks.ui-e2e]
+description = "Verify served registry gallery screenshots, accessibility and keyboard interactions"
+run = "npm --prefix finstack-quant-ui run test:e2e --"

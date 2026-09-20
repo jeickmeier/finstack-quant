@@ -15,3 +15,6 @@
 /src/hooks/use-cube-samples/
 /src/hooks/use-fx-delta-samples/
 /src/hooks/use-scenario-table/
+
+/src/hooks/use-validate-instrument/
+/src/examples/pricing-forms.tsx

@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      registry_only:
+        description: Run only the component registry gallery
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,6 +31,7 @@ jobs:
   # Rust docs — strict rustdoc build, public input-doc contract, doctests
   # ============================================
   rust-docs:
+    if: ${{ !inputs.registry_only }}
     name: Rust Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -81,6 +87,7 @@ jobs:
   # Host docs — Python stubs, WASM/TypeScript facade, benchmark documents
   # ============================================
   host-docs:
+    if: ${{ !inputs.registry_only }}
     name: Python and WASM Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -119,3 +126,7 @@ jobs:
 
       - name: Check benchmark documents
         run: mise run materialization-benchmark-doc-check
+
+  registry-gallery:
+    if: ${{ inputs.registry_only }}
+    uses: ./.github/workflows/ui-gallery.yml

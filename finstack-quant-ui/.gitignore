@@ -1,2 +1,5 @@
 /public/r/
 /.consumer-*/
+
+/test-results/
+/playwright-report/

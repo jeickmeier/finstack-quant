@@ -1,3 +1,4 @@
+import { loadRegistry } from "shadcn/registry";
 import { spawn } from "node:child_process";
 import {
   readFile,
@@ -19,6 +20,11 @@ const consumer = path.resolve(process.argv[2]);
 const configPath = path.join(consumer, "components.json");
 const original = await readFile(configPath, "utf8");
 const isDocs = consumer === path.resolve(root, "../docs-site");
+const names = isDocs
+  ? (await loadRegistry({ cwd: root })).items.map(
+      (item) => `@finstack/${item.name}`,
+    )
+  : ["@finstack/pricing-workbench"];
 const cssPath = path.join(consumer, JSON.parse(original).tailwind.css);
 const originalCss = isDocs ? await readFile(cssPath, "utf8") : null;
 const staged = await mkdtemp(path.join(tmpdir(), "finstack-local-registry-"));
@@ -47,7 +53,7 @@ try {
       [
         path.join(root, "node_modules/shadcn/dist/index.js"),
         "add",
-        "@finstack/pricing-workbench",
+        ...names,
         "--yes",
         "--overwrite",
         "--cwd",

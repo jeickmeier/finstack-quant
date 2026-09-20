@@ -1,0 +1,684 @@
+{
+  "visual": [
+    {
+      "name": "finstack-theme",
+      "type": "registry:theme",
+      "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files."
+    },
+    {
+      "name": "field-frame",
+      "type": "registry:ui",
+      "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "finstack-table",
+      "type": "registry:ui",
+      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "decimal-input",
+      "type": "registry:ui",
+      "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "enum-field",
+      "type": "registry:ui",
+      "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "money-input",
+      "type": "registry:ui",
+      "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "rate-input",
+      "type": "registry:ui",
+      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "tenor-input",
+      "type": "registry:ui",
+      "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "day-count-select",
+      "type": "registry:ui",
+      "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "bdc-select",
+      "type": "registry:ui",
+      "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "calendar-select",
+      "type": "registry:ui",
+      "docs": "Controlled calendar-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "model-picker",
+      "type": "registry:ui",
+      "docs": "Controlled model-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "metric-picker",
+      "type": "registry:ui",
+      "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "knot-table",
+      "type": "registry:ui",
+      "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "measure-value",
+      "type": "registry:ui",
+      "docs": "Controlled measure-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "money-value",
+      "type": "registry:ui",
+      "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "stamp-badge",
+      "type": "registry:ui",
+      "docs": "Controlled stamp-badge primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "json-viewer",
+      "type": "registry:ui",
+      "docs": "Controlled json-viewer primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "date-input",
+      "type": "registry:ui",
+      "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
+    },
+    {
+      "name": "id-combobox",
+      "type": "registry:ui",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Uses Base UI Autocomplete, its free-text combobox API, with virtualized supplied suggestions."
+    },
+    {
+      "name": "finstack-chart",
+      "type": "registry:ui",
+      "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions."
+    },
+    {
+      "name": "figure-example",
+      "type": "registry:component",
+      "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts."
+    },
+    {
+      "name": "schema-form",
+      "type": "registry:component",
+      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates."
+    },
+    {
+      "name": "valuation-summary",
+      "type": "registry:component",
+      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available."
+    },
+    {
+      "name": "measures-grid",
+      "type": "registry:component",
+      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available."
+    },
+    {
+      "name": "curve-chart",
+      "type": "registry:component",
+      "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine."
+    },
+    {
+      "name": "instrument-form",
+      "type": "registry:component",
+      "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer."
+    },
+    {
+      "name": "pricing-params-form",
+      "type": "registry:component",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Every supplied option/history string and omitted versus empty metric selection is preserved. JSON validation checks syntax only; native pricing owns financial validation."
+    },
+    {
+      "name": "cashflow-viewer",
+      "type": "registry:component",
+      "docs": "Exact native cashflow JSON through the shared worker with loading, unavailable/error, copy and print states. Requires FinstackQueryProvider. Caller pricing and model state remain intact; no typed rows or totals are inferred."
+    },
+    {
+      "name": "monte-carlo-diagnostics",
+      "type": "registry:component",
+      "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat."
+    },
+    {
+      "name": "explanation-trace",
+      "type": "registry:component",
+      "docs": "Optional original valuation explanation rendered losslessly; its published host shape is unknown, so no steps or severity are inferred."
+    },
+    {
+      "name": "covenant-report",
+      "type": "registry:component",
+      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred."
+    },
+    {
+      "name": "valuation-details",
+      "type": "registry:component",
+      "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available."
+    },
+    {
+      "name": "market-context-form",
+      "type": "registry:component",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit."
+    },
+    {
+      "name": "vol-surface-chart",
+      "type": "registry:component",
+      "docs": "Canonical stored volatility heatmap, node table and exact row/column slices. Supply validated surface metadata and an explicit raw-unit color extent. Optional shared selection links caller controls; no interpolation or worker dependency. Import the shared theme. FX quote arrays remain separate from stored grids."
+    },
+    {
+      "name": "fx-delta-quotes",
+      "type": "registry:component",
+      "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred."
+    },
+    {
+      "name": "fx-surface-chart",
+      "type": "registry:component",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator."
+    },
+    {
+      "name": "vol-cube-explorer",
+      "type": "registry:component",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation."
+    },
+    {
+      "name": "fx-matrix-grid",
+      "type": "registry:component",
+      "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation."
+    },
+    {
+      "name": "market-context-browser",
+      "type": "registry:component",
+      "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator."
+    },
+    {
+      "name": "calibration-form",
+      "type": "registry:component",
+      "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred."
+    },
+    {
+      "name": "calibration-report",
+      "type": "registry:component",
+      "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys."
+    },
+    {
+      "name": "calibration-fit-chart",
+      "type": "registry:component",
+      "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection."
+    },
+    {
+      "name": "scenario-heatmap",
+      "type": "registry:component",
+      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay."
+    },
+    {
+      "name": "pricing-workbench",
+      "type": "registry:block",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs."
+    },
+    {
+      "name": "finstack-form",
+      "type": "registry:ui",
+      "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary."
+    },
+    {
+      "name": "curve-link-example",
+      "type": "registry:component",
+      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations."
+    },
+    {
+      "name": "pricing-forms-example",
+      "type": "registry:component",
+      "docs": "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported."
+    }
+  ],
+  "nonvisual": [
+    {
+      "name": "finstack-base",
+      "type": "registry:base"
+    },
+    {
+      "name": "use-finstack",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-price-instrument",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-validate-instrument",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-linked-selection",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-instrument-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cashflows",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-market-validator",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-fx-delta-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-cube-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-calibrate",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-scenario-table",
+      "type": "registry:hook"
+    },
+    {
+      "name": "finstack-worker",
+      "type": "registry:file"
+    },
+    {
+      "name": "finstack-fixtures",
+      "type": "registry:lib"
+    },
+    {
+      "name": "primitive-contracts",
+      "type": "registry:lib"
+    },
+    {
+      "name": "finstack-format",
+      "type": "registry:lib"
+    },
+    {
+      "name": "finstack-codec",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-calibration",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-asian-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-forward",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-future-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-spread-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-commodity-swaption",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-composite",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cds-index",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cds-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cds-tranche",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-credit-default-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-autocallable",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cliquet-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-discounted-cash-flow",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-equity-future-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-equity-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-equity-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-equity-total-return-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-equity",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-levered-real-estate-equity",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-private-markets-fund",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-real-estate-asset",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-trs-equity",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-variance-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-volatility-index-future-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-volatility-index-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-asian-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-barrier-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-basket",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-callable-range-accrual",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-lookback-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-range-accrual",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-snowball",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-tarn",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-agency-cmo",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-agency-mbs-passthrough",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-agency-tba",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-asset-backed-facility",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-bond-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-bond",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-convertible-bond",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-dollar-roll",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-inflation-linked-bond",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-revolving-credit",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-structured-credit",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-term-loan",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-trs-fixed-income-index",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-barrier-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-digital-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-forward",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-future-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-spot",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-touch-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-fx-variance-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-ndf",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-quanto-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-basis-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-bermudan-swaption",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cap-floor",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cms-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cms-spread-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-cms-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-deposit",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-forward-rate-agreement",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-inflation-cap-floor",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-inflation-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-interest-rate-future-option",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-interest-rate-future",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-interest-rate-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-repo",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-swaption",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-xccy-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-yoy-inflation-swap",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-market-context-state",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-valuation-result",
+      "type": "registry:lib"
+    },
+    {
+      "name": "instrument-catalogue",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-manifest",
+      "type": "registry:lib"
+    },
+    {
+      "name": "finstack-views",
+      "type": "registry:lib"
+    },
+    {
+      "name": "finstack-host",
+      "type": "registry:lib"
+    }
+  ],
+  "provenance": [
+    {
+      "path": "finstack-quant-ui/src/fixtures/results/bond.json",
+      "sha256": "f9ce826f0c7625e00fa9f931e33700bb1ef3d7990e73f244dfe2b5e2492c36a9"
+    },
+    {
+      "path": "finstack-quant-ui/tests/market-browser/cases.json",
+      "sha256": "3903e6d951b9c783ccb0677538066e653a40dd925630d87b4d75b5bb831930d7"
+    },
+    {
+      "path": "finstack-quant-ui/tests/cubes/cases.json",
+      "sha256": "b650cc571861cb45d3f827dc4b2697fb5d1bdfb5284022da1310ed74cac7e24d"
+    },
+    {
+      "path": "finstack-quant-ui/tests/calibration/cases.json",
+      "sha256": "03591f426d9e95782f62b367999333b380627304eb8ca26a6f2343ff3563b3ec"
+    },
+    {
+      "path": "finstack-quant-ui/tests/scenarios/cases.json",
+      "sha256": "d81cf8f5b28fd4bd31ca2e0510d9b68630c0e148cd363563959851ff33b3a45c"
+    },
+    {
+      "path": "finstack-quant-ui/tests/cashflows/cases.json",
+      "sha256": "d32c246b6edbee85ad5253eb9c869c3844219302fd8590eaeccc62bc468a364e"
+    },
+    {
+      "path": "finstack-quant-ui/tests/details/cases.json",
+      "sha256": "ece5e296f20bfb310cf2d2383d1ad1bd93a9d1a9acf460cfb99bd69c04ca8cf5"
+    }
+  ]
+}

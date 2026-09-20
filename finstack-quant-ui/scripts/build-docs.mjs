@@ -29,6 +29,7 @@ for (const name of [
   "globals.css",
   "(reader)/layout.tsx",
   "(reader)/docs",
+  "(gallery)",
 ])
   await cp(
     path.join(site, "src/app", name),

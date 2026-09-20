@@ -375,3 +375,24 @@ options, the market browser retains exact stored data. Scenario prices are fetch
 only when the detail panel is opened for a completed structured-credit request.
 `calibrationChartOptions` forwards existing figure annotations, export refs and
 interaction callbacks; the workbench owns the shared report/chart selection.
+
+## Served gallery checks
+
+`mise run ui-docs-build` installs all registry items into the docs consumer and
+exports `/registry-gallery/` with the production Next build. The generated
+inventory and import harness follow the registry catalogue; `mise run ui-check`
+rejects stale copies. Fixtures preserve their source-file hashes.
+
+Run `mise run ui-e2e` after the build. The suite verifies light/dark and
+compact/comfortable screenshots, serious/critical axe findings, nonvisual imports,
+publication layouts, accepted table/chart selection, pinned tooltip actions and
+bond-form keyboard submission. It serves the static export without a dev server.
+Playwright defaults to **no snapshot updates**. For an intentional visual change,
+run `mise run ui-e2e -- --update-snapshots`, inspect the changed PNGs, record the
+reason in PR evidence, and then rerun `mise run ui-e2e` without that flag.
+Baselines use pinned Chromium 145, local Fontsource faces, UTC and en-US at 1×.
+Only the volatile calculation timestamp is masked. The CI gallery job uses macOS;
+these baselines do not certify rendering on other operating systems.
+
+The shared docs gallery proves composition. Independent installation and desktop
+publishing have separate gates and evidence.
