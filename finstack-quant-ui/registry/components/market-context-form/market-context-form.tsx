@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import fixture from "@/lib/finstack/fixtures/results/bond.json";
 import { SchemaForm, type SchemaFormProps } from "../schema-form/schema-form";
@@ -10,8 +10,46 @@ import {
 } from "../../primitives/knot-table/knot-table";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import { marketModule, importMarket } from "./market";
-const editable = ["curves", "fx", "prices"];
-const knots: FieldRenderer = ({ form, location, path, value }) => {
+const editable = [
+  "curves",
+  "fx",
+  "prices",
+  "surfaces",
+  "fx_delta_vol_surfaces",
+];
+function DeferredField({
+  label,
+  children,
+}: {
+  label: string;
+  children: () => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-2">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? "Close" : "Edit"} {label}
+      </button>
+      {open && children()}
+    </div>
+  );
+}
+const knots: FieldRenderer = ({
+  form,
+  location,
+  path,
+  value,
+  label,
+  renderDefault,
+}) => {
+  if (/^(surfaces|fx_delta_vol_surfaces)\[\d+\]$/.test(path))
+    return (
+      <DeferredField
+        label={`${label}: ${String((value as { id?: string })?.id ?? "new")}`}
+      >
+        {renderDefault}
+      </DeferredField>
+    );
   // This exact stored field is declared by the selected curve variant; no-knot models delegate.
   if (
     !/^curves\[\d+\]\.knot_points$/.test(path) ||

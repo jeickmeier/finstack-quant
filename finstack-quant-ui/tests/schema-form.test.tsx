@@ -281,3 +281,33 @@ it.each(["external", "internal", "adjacent"])(
     );
   },
 );
+
+it("delegates optional field presentation without recursively reapplying its override", async () => {
+  const schema: Schema = {
+    type: "object",
+    properties: { note: { type: "string" } },
+    additionalProperties: false,
+  };
+  const module = {
+    schema,
+    metadata: [],
+    codec: createWireCodec({ ...schema }),
+    example: { note: "Stored note" },
+  };
+  render(
+    <SchemaForm
+      module={module}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+      renderField={({ path, renderDefault }) =>
+        path === "note" ? (
+          <section aria-label="Deferred note">{renderDefault()}</section>
+        ) : undefined
+      }
+    />,
+  );
+  expect(screen.getByLabelText("Note")).toBeTruthy();
+  expect(screen.getAllByRole("region", { name: "Deferred note" })).toHaveLength(
+    1,
+  );
+});

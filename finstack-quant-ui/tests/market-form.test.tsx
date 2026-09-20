@@ -269,7 +269,7 @@ it("rejects malformed imports without discarding edits or exposing readonly data
   ).toBe(0.97);
 });
 
-it("edits stored FX entries and scalar prices while preserving populated read-only surfaces", async () => {
+it("edits stored FX entries and scalar prices while preserving populated unopened surfaces", async () => {
   const market = {
     ...marketModule.example,
     fx: marketFixture.fx,
@@ -335,3 +335,59 @@ it("edits stored FX entries and scalar prices while preserving populated read-on
     expect(input(key)).toBeNull();
   }
 });
+
+it("edits stored surfaces and raw FX quotes through generated fields and native validation", async () => {
+  const { storedSurface, fxQuotes } = await import("./surfaces/fixtures");
+  const input = {
+    ...JSON.parse(bond.request.marketJson),
+    surfaces: [storedSurface],
+    fx_delta_vol_surfaces: [fxQuotes],
+  };
+  const onSubmit = vi.fn();
+  render(
+    <MarketContextForm
+      defaultJson={JSON.stringify(input)}
+      validate={validate}
+      onSubmit={onSubmit}
+    />,
+  );
+  const field = (path: string) =>
+    document.querySelector(
+      `[data-field-path="${path}"] input`,
+    ) as HTMLInputElement;
+  fireEvent.click(
+    screen.getByRole("button", { name: /Edit .*Supplied surface/ }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Edit .*EURUSD/ }));
+  fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
+    target: { value: "0.241" },
+  });
+  fireEvent.change(field("fx_delta_vol_surfaces[0].atm_vols[1]"), {
+    target: { value: "0.095" },
+  });
+  const json = await submit(onSubmit);
+  const expected = structuredClone(input);
+  expected.surfaces[0].vols_row_major[4] = 0.241;
+  expected.fx_delta_vol_surfaces[0].atm_vols[1] = 0.095;
+  expect(JSON.parse(json)).toEqual(
+    JSON.parse(canonical(JSON.stringify(expected))),
+  );
+  const { surfaceNodes } =
+    await import("../registry/components/vol-surface-chart/stored");
+  expect(surfaceNodes(JSON.parse(json).surfaces[0])[4]!.value).toBe(0.241);
+  fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
+    target: { value: "-1" },
+  });
+  await waitFor(() =>
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Apply market",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true),
+  );
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+  );
+}, 15000);

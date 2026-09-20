@@ -8,6 +8,8 @@ export type FieldRenderer = (field: {
   path: string;
   label: string;
   value: unknown;
+  /** Render this field with the generated renderer while retaining overrides for descendants. */
+  renderDefault(): ReactNode;
 }) => ReactNode | undefined;
 export const FieldRendererContext = createContext<FieldRenderer | undefined>(
   undefined,

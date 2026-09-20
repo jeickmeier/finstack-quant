@@ -27,6 +27,7 @@ export function RenderField({
   required = true,
   layout,
   fields,
+  skipOverride = false,
 }: {
   module: InstrumentModule;
   form: SchemaFormApi;
@@ -37,6 +38,7 @@ export function RenderField({
   required?: boolean;
   layout: "basic" | "full";
   fields?: FieldFilter;
+  skipOverride?: boolean;
 }) {
   const [more, setMore] = useState(false);
   const render = useContext(FieldRendererContext);
@@ -97,7 +99,16 @@ export function RenderField({
     return (
       <div className="col-span-full space-y-2">
         <RenderField
-          {...{ module, form, path, label, value, layout, fields }}
+          {...{
+            module,
+            form,
+            path,
+            label,
+            value,
+            layout,
+            fields,
+            skipOverride,
+          }}
           location={nonNull}
         />
         {!required && (
@@ -119,13 +130,47 @@ export function RenderField({
       </div>
     );
   if (Object.hasOwn(schema, "const")) return null;
-  const custom = render?.({ form, location: resolved, path, label, value });
+  const custom = skipOverride
+    ? undefined
+    : render?.({
+        form,
+        location: resolved,
+        path,
+        label,
+        value,
+        renderDefault: () => (
+          <RenderField
+            {...{
+              module,
+              form,
+              location,
+              path,
+              label,
+              value,
+              required,
+              layout,
+              fields,
+            }}
+            skipOverride
+          />
+        ),
+      });
   if (custom !== undefined) return custom;
   if (!required && !nonNull)
     return (
       <div className="col-span-full space-y-2">
         <RenderField
-          {...{ module, form, location, path, label, value, layout, fields }}
+          {...{
+            module,
+            form,
+            location,
+            path,
+            label,
+            value,
+            layout,
+            fields,
+            skipOverride,
+          }}
           required
         />
         <button
@@ -156,7 +201,16 @@ export function RenderField({
         />
         {selected >= 0 && (
           <RenderField
-            {...{ module, form, path, label, value, layout, fields }}
+            {...{
+              module,
+              form,
+              path,
+              label,
+              value,
+              layout,
+              fields,
+              skipOverride,
+            }}
             location={union.branches[selected]}
           />
         )}

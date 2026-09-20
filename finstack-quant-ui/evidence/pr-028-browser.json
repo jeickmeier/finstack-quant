@@ -1,0 +1,54 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "vol-surface-chart",
+    "finstack-chart",
+    "finstack-base",
+    "finstack-theme",
+    "finstack-table",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "use-linked-selection",
+    "contract-market-context-state",
+    "fx-delta-quotes",
+    "json-viewer"
+  ],
+  "exports": [
+    {
+      "kind": "heatmap",
+      "theme": "light",
+      "bytes": 269033
+    },
+    {
+      "kind": "row",
+      "theme": "light",
+      "bytes": 263700
+    },
+    {
+      "kind": "column",
+      "theme": "light",
+      "bytes": 262940
+    },
+    {
+      "kind": "heatmap",
+      "theme": "dark",
+      "bytes": 269033
+    },
+    {
+      "kind": "row",
+      "theme": "dark",
+      "bytes": 263703
+    },
+    {
+      "kind": "column",
+      "theme": "dark",
+      "bytes": 262943
+    }
+  ],
+  "accessibilityViolations": 0,
+  "wasmRequests": 0,
+  "failures": [],
+  "verdict": "pass"
+}
