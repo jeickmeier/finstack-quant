@@ -1,0 +1,680 @@
+{
+  "schema_version": 1,
+  "curves": [
+    {
+      "type": "discount",
+      "id": "USD-OIS",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "discount",
+      "id": "USD-TREASURY",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "discount",
+      "id": "USD-IG",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "discount",
+      "id": "USD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "discount",
+      "id": "EUR-OIS",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "discount",
+      "id": "JPY-OIS",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.97],
+        [40, 0.3]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "forward",
+      "id": "USD-SOFR-3M",
+      "base": "2023-12-28",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.25,
+      "knot_points": [
+        [0, 0.04],
+        [40, 0.04]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "forward",
+      "id": "USD-SOFR-1M",
+      "base": "2023-12-28",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.08333333333333333,
+      "knot_points": [
+        [0, 0.035],
+        [40, 0.035]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "forward",
+      "id": "USD-SOFR-6M",
+      "base": "2023-12-28",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.5,
+      "knot_points": [
+        [0, 0.04],
+        [40, 0.04]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "forward",
+      "id": "USD-LIBOR-3M",
+      "base": "2023-12-28",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.25,
+      "knot_points": [
+        [0, 0.04],
+        [40, 0.04]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "forward",
+      "id": "EUR-EURIBOR-3M",
+      "base": "2023-12-28",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.25,
+      "knot_points": [
+        [0, 0.03],
+        [40, 0.03]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "hazard",
+      "id": "CDX.NA.IG.HAZARD",
+      "base": "2023-12-28",
+      "knot_points": [
+        [0, 0.02],
+        [40, 0.02]
+      ],
+      "recovery_rate": 0.4,
+      "issuer": null,
+      "seniority": null,
+      "currency": null,
+      "day_count": "act_365f",
+      "par_points": [],
+      "par_interp": "linear",
+      "hazard_calibration": null
+    },
+    {
+      "type": "hazard",
+      "id": "CORP-HAZARD",
+      "base": "2023-12-28",
+      "knot_points": [
+        [0, 0.02],
+        [40, 0.02]
+      ],
+      "recovery_rate": 0.4,
+      "issuer": null,
+      "seniority": null,
+      "currency": null,
+      "day_count": "act_365f",
+      "par_points": [],
+      "par_interp": "linear",
+      "hazard_calibration": null
+    },
+    {
+      "type": "hazard",
+      "id": "USD-CREDIT-BBB",
+      "base": "2023-12-28",
+      "knot_points": [
+        [0, 0.02],
+        [40, 0.02]
+      ],
+      "recovery_rate": 0.4,
+      "issuer": null,
+      "seniority": null,
+      "currency": null,
+      "day_count": "act_365f",
+      "par_points": [],
+      "par_interp": "linear",
+      "hazard_calibration": null
+    },
+    {
+      "type": "hazard",
+      "id": "ACME-HAZARD",
+      "base": "2023-12-28",
+      "knot_points": [
+        [0, 0.02],
+        [40, 0.02]
+      ],
+      "recovery_rate": 0.4,
+      "issuer": null,
+      "seniority": null,
+      "currency": null,
+      "day_count": "act_365f",
+      "par_points": [],
+      "par_interp": "linear",
+      "hazard_calibration": null
+    },
+    {
+      "type": "price",
+      "id": "WTI-FORWARD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 80,
+      "knot_points": [
+        [0, 80],
+        [40, 80]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "price",
+      "id": "CL-FORWARD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 80,
+      "knot_points": [
+        [0, 80],
+        [40, 80]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "price",
+      "id": "NG-SPOT-AVG",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 4,
+      "knot_points": [
+        [0, 4],
+        [40, 4]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "price",
+      "id": "NG-FORWARD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 4,
+      "knot_points": [
+        [0, 4],
+        [40, 4]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "price",
+      "id": "RBOB-FORWARD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 90,
+      "knot_points": [
+        [0, 90],
+        [40, 90]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "price",
+      "id": "IRON-ORE-FORWARD",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_price": 110,
+      "knot_points": [
+        [0, 110],
+        [40, 110]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "vol_index",
+      "id": "VIX",
+      "base": "2023-12-28",
+      "day_count": "act_365f",
+      "spot_level": 20,
+      "knot_points": [
+        [0, 20],
+        [40, 22]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "inflation",
+      "id": "US-CPI",
+      "base_date": "2023-10-01",
+      "base_cpi": 300,
+      "day_count": "act_365f",
+      "indexation_lag_months": 3,
+      "knot_points": [
+        [0, 300],
+        [4, 330],
+        [40, 500]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_zero"
+    }
+  ],
+  "fx": {
+    "config": {
+      "cache_capacity": 256,
+      "enable_triangulation": true,
+      "pivot_currency": "USD"
+    },
+    "pinned_quotes": [],
+    "provider_quotes": [],
+    "quotes": [
+      ["EUR", "USD", 1.1],
+      ["JPY", "USD", 0.007142857142857143]
+    ]
+  },
+  "surfaces": [
+    {
+      "id": "SPX-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [450, 4500, 9000],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "SPX",
+      "expiries": [0.01, 1, 40],
+      "strikes": [450, 4500, 9000],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "SX5E-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [500, 5000, 10000],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "NKY-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [3500, 35000, 70000],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "EURUSD-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.11000000000000001, 1.1, 2.2],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15]
+    },
+    {
+      "id": "JPYUSD-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.0007000000000000001, 0.007, 0.014],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    },
+    {
+      "id": "WTI-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [8, 80, 160],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+    },
+    {
+      "id": "CL-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [8, 80, 160],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+    },
+    {
+      "id": "RBOB-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [9, 90, 180],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+    },
+    {
+      "id": "NG-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.4, 4, 8],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+    },
+    {
+      "id": "USD-CAPFLOOR-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "USD-SWPNVOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "USD-CMS10Y-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "USD-SWAPTION-VOL-10Y",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "USD-SWAPTION-VOL-2Y",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "USD-INFL-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.003, 0.03, 0.06],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    },
+    {
+      "id": "CDSOPT-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.001, 0.01, 0.02],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4]
+    },
+    {
+      "id": "SOFR-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.005000000000000001, 0.05, 0.1],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+    },
+    {
+      "id": "USD-SOFR-HW-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [0.004, 0.04, 0.08],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+    },
+    {
+      "id": "EQUITY-VOL",
+      "expiries": [0.01, 1, 40],
+      "strikes": [450, 4500, 9000],
+      "secondary_axis": "strike",
+      "quote_type": "black_lognormal",
+      "interpolation_mode": "vol",
+      "vols_row_major": [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+    }
+  ],
+  "prices": {
+    "SPX-SPOT": {
+      "unitless": 4500
+    },
+    "SPX": {
+      "unitless": 4500
+    },
+    "SPX-DIV": {
+      "unitless": 0.02
+    },
+    "SPX-DIVYIELD": {
+      "unitless": 0.02
+    },
+    "AAPL-SPOT": {
+      "unitless": 180
+    },
+    "AAPL-DIV": {
+      "unitless": 0.01
+    },
+    "UST10Y-PRICE": {
+      "unitless": 98
+    },
+    "UST_10Y_PRICE": {
+      "unitless": 100
+    },
+    "US91282CJL54": {
+      "unitless": 98
+    },
+    "TECH": {
+      "unitless": 50
+    },
+    "SX5E-SPOT": {
+      "unitless": 5000
+    },
+    "SX5E-CLOSE": {
+      "unitless": 5300
+    },
+    "SX5E-DIV": {
+      "unitless": 0.02
+    },
+    "EURUSD-SPOT": {
+      "unitless": 1.1
+    },
+    "EURUSD": {
+      "unitless": 1.1
+    },
+    "NKY-SPOT": {
+      "unitless": 35000
+    },
+    "NKY-DIV": {
+      "unitless": 0.01
+    },
+    "JPYUSD-SPOT": {
+      "unitless": 0.007142857142857143
+    },
+    "US-CORP-INDEX": {
+      "unitless": 100
+    },
+    "US-CORP-DURATION": {
+      "unitless": 5
+    },
+    "US-CORP-YIELD": {
+      "unitless": 0.05
+    },
+    "TESX-ACCRUED-DISTRIBUTIONS": {
+      "unitless": 80
+    },
+    "TESX-ACCRUED-FUNDING": {
+      "unitless": 30
+    },
+    "TESX-SPREAD-BPS": {
+      "unitless": 15
+    },
+    "SOFR-RATE": {
+      "unitless": 0.05
+    },
+    "EQUITY-SPOT": {
+      "unitless": 4500
+    },
+    "EQUITY-DIVYIELD": {
+      "unitless": 0.02
+    }
+  },
+  "series": [],
+  "inflation_indices": [
+    {
+      "id": "US-CPI",
+      "currency": "USD",
+      "observations": [
+        ["2023-09-01", 299],
+        ["2023-10-01", 300],
+        ["2023-11-01", 301],
+        ["2023-12-01", 302]
+      ],
+      "interpolation": "linear",
+      "lag": {
+        "months": 3
+      },
+      "seasonality": null
+    }
+  ],
+  "dividends": [],
+  "credit_indices": [],
+  "fx_delta_vol_surfaces": [],
+  "vol_cubes": [],
+  "collateral": {},
+  "hierarchy": null
+}

@@ -1,23 +1,14 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { Worker } from "node:worker_threads";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import { build } from "vite";
-import { wrap, releaseProxy } from "comlink";
-import nodeEndpoint from "comlink/dist/esm/node-adapter.mjs";
+import { startWorker } from "./worker/harness.mjs";
 import { QueryClient } from "@tanstack/react-query";
 import { pricingCases } from "./browser/cases.mjs";
 import { priceOptions } from "../registry/hooks/use-price-instrument/use-price-instrument";
 import { errorValue, unwrap } from "../registry/workers/finstack-contract";
-const root = fileURLToPath(new URL("../", import.meta.url));
-const packagePath = path.resolve(
-  root,
-  "../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+const native = createRequire(import.meta.url)(
+  "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
-const native = createRequire(import.meta.url)(packagePath);
-let directory, proxy, worker;
+let proxy, harness;
 const requests = await pricingCases();
 const history = JSON.stringify({
   base_date: requests.bond.asOf,
@@ -76,48 +67,11 @@ function same(actual, expected) {
   }
   expect(actual).toEqual(expected);
 }
-function start(fail = false) {
-  const worker = new Worker(path.join(directory, "node.mjs"), {
-    workerData: { packagePath, fail },
-  });
-  return { worker, proxy: wrap(nodeEndpoint(worker)) };
-}
 beforeAll(async () => {
-  directory = await mkdtemp(path.join(root, ".worker-test-"));
-  await build({
-    root,
-    configFile: false,
-    logLevel: "error",
-    resolve: { alias: { "@/lib/finstack": path.join(root, "src") } },
-    build: {
-      ssr: true,
-      target: "node24",
-      outDir: directory,
-      emptyOutDir: false,
-      rolldownOptions: { output: { entryFileNames: "node.mjs" } },
-      lib: {
-        entry: path.join(root, "tests/worker/node.mjs"),
-        formats: ["es"],
-        fileName: () => "node.mjs",
-      },
-    },
-  });
-  ({ worker, proxy } = start());
-  expect(
-    await Promise.race([
-      proxy.initialize(),
-      new Promise((_, reject) => worker.once("error", reject)),
-    ]),
-  ).toEqual({
-    ok: true,
-    value: { state: "ready", worker: true },
-  });
+  harness = await startWorker();
+  proxy = harness.proxy;
 }, 30000);
-afterAll(async () => {
-  proxy?.[releaseProxy]();
-  await worker?.terminate();
-  await rm(directory, { recursive: true, force: true });
-});
+afterAll(async () => harness?.close());
 it("compares real worker results and errors with the direct native facade", async () => {
   for (const request of Object.values(requests))
     same(await proxy.price(request), direct(request));
@@ -199,7 +153,7 @@ it("uses the exact native option registries and tags validation with its revisio
   );
 });
 it("keeps four native handles, refreshes recency, frees eviction and disposal", async () => {
-  const local = start();
+  const local = await startWorker();
   try {
     const markets = Array.from(
       { length: 5 },
@@ -231,12 +185,11 @@ it("keeps four native handles, refreshes recency, frees eviction and disposal", 
     expect(resources.freed).toBe(resources.constructed);
     expect((await local.proxy.price(requests.bond)).ok).toBe(false);
   } finally {
-    local.proxy[releaseProxy]();
-    await local.worker.terminate();
+    await local.close();
   }
 });
 it("preserves initialization failure fields and rejects every later operation", async () => {
-  const local = start(true);
+  const local = await startWorker({ fail: true });
   try {
     const initial = await local.proxy.initialize();
     expect(initial).toMatchObject({
@@ -252,7 +205,6 @@ it("preserves initialization failure fields and rejects every later operation", 
     expect(await local.proxy.price(requests.bond)).toEqual(initial);
     expect(() => unwrap(initial)).toThrow("Native initialization failed");
   } finally {
-    local.proxy[releaseProxy]();
-    await local.worker.terminate();
+    await local.close();
   }
 });
