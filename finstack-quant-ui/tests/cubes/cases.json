@@ -1,0 +1,335 @@
+{
+  "source": "finstack-quant/calibration/examples/market_bootstrap/07_swaption_vol_surface.json",
+  "sha256": "f428ab74458aaa5c49113a7ef71c755dad2d63fc5814bb4f665235d135364241",
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2026-05-08",
+        "day_count": "act_365f",
+        "knot_points": [
+          [0, 1],
+          [0.0958904109589041, 0.9949217535493369],
+          [0.26301369863013696, 0.9863126300274143],
+          [1.0164383561643835, 0.9500181643911029],
+          [2.0246575342465754, 0.9065521544949088],
+          [5.019178082191781, 0.7999882376687321],
+          [10.024657534246575, 0.6677728466654677]
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": -0.005,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 0.000001,
+        "rate_calibration": {
+          "currency": "USD",
+          "method": "bootstrap",
+          "curve_day_count": "act_365f",
+          "ois_compounding": null,
+          "role": {
+            "discount": {
+              "projection_curve_id": "USD-OIS"
+            }
+          },
+          "quotes": [
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.0525
+              }
+            },
+            {
+              "deposit": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 3,
+                    "unit": "months"
+                  }
+                },
+                "rate": 0.052
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 1,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.051,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 2,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.049,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 5,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.045,
+                "spread_decimal": null
+              }
+            },
+            {
+              "swap": {
+                "index_id": "USD-SOFR-OIS",
+                "pillar": {
+                  "tenor": {
+                    "count": 10,
+                    "unit": "years"
+                  }
+                },
+                "rate": 0.041,
+                "spread_decimal": null
+              }
+            }
+          ]
+        },
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "forward",
+        "id": "USD-SOFR-3M",
+        "base": "2026-05-08",
+        "reset_lag": 2,
+        "day_count": "act_360",
+        "tenor": 0.25,
+        "knot_points": [
+          [0, 0.0495],
+          [0.2611111111111111, 0.05],
+          [0.5138888888888888, 0.051],
+          [0.7666666666666667, 0.0515],
+          [1.0194444444444444, 0.052]
+        ],
+        "projection_grid": [
+          0, 0.2611111111111111, 0.5138888888888888, 0.7666666666666667,
+          1.0194444444444444, 1.525
+        ],
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "rate_calibration": {
+          "currency": "USD",
+          "method": {
+            "global_solve": {
+              "use_analytical_jacobian": false
+            }
+          },
+          "curve_day_count": "act_360",
+          "ois_compounding": null,
+          "role": {
+            "projection": {
+              "discount_curve_id": "USD-OIS"
+            }
+          },
+          "quotes": [
+            {
+              "fra": {
+                "index_id": "USD-SOFR-3M",
+                "start": {
+                  "date": "2026-05-08"
+                },
+                "end": {
+                  "date": "2026-08-08"
+                },
+                "rate": 0.0495
+              }
+            },
+            {
+              "fra": {
+                "index_id": "USD-SOFR-3M",
+                "start": {
+                  "date": "2026-08-08"
+                },
+                "end": {
+                  "date": "2026-11-08"
+                },
+                "rate": 0.05
+              }
+            },
+            {
+              "fra": {
+                "index_id": "USD-SOFR-3M",
+                "start": {
+                  "date": "2026-11-08"
+                },
+                "end": {
+                  "date": "2027-02-08"
+                },
+                "rate": 0.051
+              }
+            },
+            {
+              "fra": {
+                "index_id": "USD-SOFR-3M",
+                "start": {
+                  "date": "2027-02-08"
+                },
+                "end": {
+                  "date": "2027-05-08"
+                },
+                "rate": 0.0515
+              }
+            },
+            {
+              "fra": {
+                "index_id": "USD-SOFR-3M",
+                "start": {
+                  "date": "2027-05-08"
+                },
+                "end": {
+                  "date": "2027-11-08"
+                },
+                "rate": 0.052
+              }
+            }
+          ]
+        },
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [
+      {
+        "id": "SHIFTED-BLACK",
+        "expiries": [1, 2],
+        "tenors": [2, 5],
+        "params": [
+          {
+            "alpha": 0.03,
+            "beta": 0.5,
+            "rho": -0.2,
+            "nu": 0.4,
+            "shift": 0.03
+          },
+          {
+            "alpha": 0.03,
+            "beta": 0.5,
+            "rho": -0.2,
+            "nu": 0.4,
+            "shift": 0.03
+          },
+          {
+            "alpha": 0.03,
+            "beta": 0.5,
+            "rho": -0.2,
+            "nu": 0.4,
+            "shift": 0.03
+          },
+          {
+            "alpha": 0.03,
+            "beta": 0.5,
+            "rho": -0.2,
+            "nu": 0.4,
+            "shift": 0.03
+          }
+        ],
+        "forwards": [-0.005, 0.001, 0.002, 0.01],
+        "interpolation_mode": "vol"
+      },
+      {
+        "id": "USD-SWAPTION-NORMAL-VOL",
+        "expiries": [1, 2, 5],
+        "tenors": [2, 5, 10],
+        "params": [
+          {
+            "alpha": 0.006723139894816255,
+            "beta": 0,
+            "rho": 0.47936272191131857,
+            "nu": 1.0928192474405651
+          },
+          {
+            "alpha": 0.006610779782716063,
+            "beta": 0,
+            "rho": 0.39986988320220695,
+            "nu": 0.4615773819611334
+          },
+          {
+            "alpha": 0.006200289347407124,
+            "beta": 0,
+            "rho": 0.99,
+            "nu": 0.034512484274044845
+          },
+          {
+            "alpha": 0.006991707899172874,
+            "beta": 0,
+            "rho": 0.3947154082120705,
+            "nu": 0.6761922222695548
+          },
+          {
+            "alpha": 0.006794172125887239,
+            "beta": 0,
+            "rho": 0.33231112964508136,
+            "nu": 0.33468189577514035
+          },
+          {
+            "alpha": 0.006400604414453095,
+            "beta": 0,
+            "rho": 0.9899999999999987,
+            "nu": 0.03471477318456286
+          },
+          {
+            "alpha": 0.007757466944548578,
+            "beta": 0,
+            "rho": 0.29542345997107144,
+            "nu": 0.2938321947537667
+          },
+          {
+            "alpha": 0.00730104012632996,
+            "beta": 0,
+            "rho": 0.29000453118657,
+            "nu": 0.1929413680866764
+          },
+          {
+            "alpha": 0.006694099799157092,
+            "beta": 0,
+            "rho": 0.42269370692315156,
+            "nu": 0.05375747436127988
+          }
+        ],
+        "forwards": [
+          0.0547125361247418, 0.0577974549391606, 0.06259508935136313,
+          0.05695502911900591, 0.059963384826412655, 0.06473190991136472,
+          0.06326464128035729, 0.06628803920407438, 0.07102276825095641
+        ],
+        "interpolation_mode": "vol"
+      }
+    ],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

@@ -17,6 +17,20 @@ class Market extends wasm.Market {
     freed++;
   }
 }
+let cubeConstructed = 0,
+  cubeFreed = 0,
+  cubeParams = [];
+class VolCube extends wasm.VolCube {
+  constructor(...args) {
+    super(...args);
+    cubeConstructed++;
+    cubeParams = [...args[3]];
+  }
+  free() {
+    super.free();
+    cubeFreed++;
+  }
+}
 let fxConstructed = 0,
   fxFreed = 0;
 class FxDeltaVolSurface extends wasm.FxDeltaVolSurface {
@@ -38,8 +52,14 @@ const service = createService({
         cause: new Error("fixture cause"),
       });
   },
-  core: { ...wasm, FxDeltaVolSurface },
-  models: { volatility: { getFxDeltaVol: wasm.getFxDeltaVol } },
+  core: { ...wasm, FxDeltaVolSurface, VolCube },
+  models: {
+    volatility: {
+      getCubeVol: wasm.getCubeVol,
+      getCubeNormalVol: wasm.getCubeNormalVol,
+      getFxDeltaVol: wasm.getFxDeltaVol,
+    },
+  },
   valuations: {
     Market,
     validateValuationResultJson: wasm.validateValuationResultJson,
@@ -55,7 +75,16 @@ const service = createService({
 expose(
   {
     ...service,
-    resources: () => ({ constructed, freed, calls, fxConstructed, fxFreed }),
+    resources: () => ({
+      constructed,
+      freed,
+      calls,
+      fxConstructed,
+      fxFreed,
+      cubeConstructed,
+      cubeFreed,
+      cubeParams,
+    }),
   },
   nodeEndpoint(parentPort),
 );

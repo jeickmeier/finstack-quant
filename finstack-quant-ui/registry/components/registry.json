@@ -259,7 +259,7 @@
     {
       "name": "market-context-form",
       "type": "registry:component",
-      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
       "files": [
         {
           "path": "market-context-form/market-context-form.tsx",
@@ -345,6 +345,27 @@
         "@finstack/vol-surface-chart",
         "@finstack/fx-delta-quotes",
         "@finstack/use-fx-delta-samples"
+      ],
+      "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "vol-cube-explorer",
+      "type": "registry:component",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "files": [
+        {
+          "path": "vol-cube-explorer/vol-cube-explorer.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/vol-cube-explorer/vol-cube-explorer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/use-cube-samples",
+        "@finstack/vol-surface-chart",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
       ],
       "dependencies": ["react@19.2.8"]
     }

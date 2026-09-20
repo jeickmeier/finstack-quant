@@ -4,8 +4,16 @@ import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
-  core: Pick<typeof core, "availableCalendars" | "FxDeltaVolSurface">;
-  models: { volatility: Pick<typeof models.volatility, "getFxDeltaVol"> };
+  core: Pick<
+    typeof core,
+    "availableCalendars" | "FxDeltaVolSurface" | "VolCube"
+  >;
+  models: {
+    volatility: Pick<
+      typeof models.volatility,
+      "getFxDeltaVol" | "getCubeVol" | "getCubeNormalVol"
+    >;
+  };
   valuations: Pick<
     typeof valuations,
     "Market" | "instruments" | "validateValuationResultJson"
@@ -73,6 +81,40 @@ export function createService(native: {
         const handle = new native.valuations.Market(json);
         try {
           return handle.toJson();
+        } finally {
+          handle.free();
+        }
+      });
+    },
+    sampleCube(request) {
+      return result(() => {
+        const c = request.cube;
+        const evaluate =
+          request.convention === "normal"
+            ? native.models.volatility.getCubeNormalVol
+            : request.convention === "black_lognormal"
+              ? native.models.volatility.getCubeVol
+              : null;
+        if (!evaluate)
+          throw new RangeError("Unsupported cube output convention");
+        const handle = new native.core.VolCube(
+          c.id,
+          c.expiries,
+          c.tenors,
+          c.params.flatMap((p) => [
+            p.alpha,
+            p.beta,
+            p.rho,
+            p.nu,
+            p.shift ?? NaN,
+          ]),
+          c.forwards,
+          c.interpolation_mode,
+        );
+        try {
+          return request.coordinates.map((point) =>
+            evaluate(handle, point.expiry, point.tenor, point.strike),
+          );
         } finally {
           handle.free();
         }

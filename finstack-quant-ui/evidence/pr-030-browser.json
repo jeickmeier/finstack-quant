@@ -1,0 +1,137 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "market-context-form",
+    "schema-form",
+    "finstack-form",
+    "field-frame",
+    "finstack-base",
+    "finstack-theme",
+    "decimal-input",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "primitive-contracts",
+    "date-input",
+    "enum-field",
+    "knot-table",
+    "finstack-table",
+    "use-linked-selection",
+    "json-viewer",
+    "contract-market-context-state",
+    "finstack-fixtures",
+    "contract-bond",
+    "use-market-validator",
+    "use-finstack",
+    "finstack-worker",
+    "vol-cube-explorer",
+    "use-cube-samples",
+    "vol-surface-chart",
+    "finstack-chart"
+  ],
+  "values": [
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "normal",
+      "strike": 0.05,
+      "expected": [
+        0.00650576166359449, 0.006282977507740939, 0.005982370866681709,
+        0.006957442253463543, 0.006605502706497719, 0.006143547632779701,
+        0.0077369084816386515, 0.007161237752303674, 0.00648645196949466
+      ]
+    },
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "normal",
+      "strike": 0.05,
+      "expected": [
+        0.00650576166359449, 0.006282977507740939, 0.005982370866681709,
+        0.006957442253463543, 0.006605502706497719, 0.006143547632779701,
+        0.0077369084816386515, 0.007161237752303674, 0.00648645196949466
+      ]
+    },
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "black_lognormal",
+      "strike": 0.05,
+      "expected": [
+        0.12442314578186693, 0.11684769241937375, 0.10677289532191829,
+        0.13045837441358765, 0.12062279915870365, 0.10781466917326828,
+        0.13777036686341293, 0.12438892691966363, 0.10859241589734552
+      ]
+    },
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "black_lognormal",
+      "strike": 0.051,
+      "expected": [
+        0.12343687936564592, 0.11598825869899165, 0.10606410262358831,
+        0.12903278376557673, 0.1195306114521053, 0.1070977053048871,
+        0.136379950075622, 0.12323084797313498, 0.10772293792791814
+      ]
+    },
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "black_lognormal",
+      "strike": 0.051,
+      "expected": [
+        0.16725382919551512, 0.11598825869899165, 0.10606410262358831,
+        0.12903278376557673, 0.1195306114521053, 0.1070977053048871,
+        0.136379950075622, 0.12323084797313498, 0.10772293792791814
+      ]
+    },
+    {
+      "id": "USD-SWAPTION-NORMAL-VOL",
+      "convention": "black_lognormal",
+      "strike": 0.051,
+      "expected": [
+        0.16725382919551512, 0.11598825869899165, 0.10606410262358831,
+        0.12903278376557673, 0.1195306114521053, 0.1070977053048871,
+        0.136379950075622, 0.12323084797313498, 0.10772293792791814
+      ]
+    },
+    {
+      "id": "SHIFTED-BLACK",
+      "convention": "black_lognormal",
+      "strike": 0.051,
+      "expected": [
+        0.22543396418875183, 0.19947687003233194, 0.19783270836709857,
+        0.17049676548276563
+      ]
+    },
+    {
+      "id": "SHIFTED-BLACK",
+      "convention": "normal",
+      "strike": 0.051,
+      "expected": [
+        0.01072991474471138, 0.01037671516636574, 0.010422831522463975,
+        0.009894642835287541
+      ]
+    }
+  ],
+  "exports": [
+    {
+      "convention": "normal",
+      "bytes": 269028
+    },
+    {
+      "convention": "black_lognormal",
+      "bytes": 268640
+    }
+  ],
+  "nativeError": "Validation error: volatility coordinate 999 is out of bounds [1, 5]",
+  "accessibility": [
+    {
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "wasmRequests": 1,
+  "failures": [],
+  "verdict": "pass"
+}

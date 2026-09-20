@@ -185,9 +185,11 @@ it("imports an actual native calibration envelope and canonical fixture, leaving
     name: "Read-only market data",
     hidden: true,
   });
-  expect(readonly.querySelector("pre")?.textContent).toContain('"vol_cubes"');
+  expect(readonly.querySelector("pre")?.textContent).toContain(
+    '"inflation_indices"',
+  );
   expect(
-    document.querySelector('[data-field-path="vol_cubes"] input'),
+    document.querySelector('[data-field-path="inflation_indices"] input'),
   ).toBeNull();
   fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
     target: { value: serializeHost(envelope) },
@@ -376,6 +378,57 @@ it("edits stored surfaces and raw FX quotes through generated fields and native 
     await import("../registry/components/vol-surface-chart/stored");
   expect(surfaceNodes(JSON.parse(json).surfaces[0])[4]!.value).toBe(0.241);
   fireEvent.change(field("surfaces[0].vols_row_major[4]"), {
+    target: { value: "-1" },
+  });
+  await waitFor(() =>
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Apply market",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true),
+  );
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+  );
+}, 15000);
+
+it("edits canonical cube parameters and forwards without altering shifts or interpolation", async () => {
+  const fixture = await import("./cubes/cases.json");
+  const cube = fixture.default.market.vol_cubes.find(
+    (c) => c.id !== "SHIFTED-BLACK",
+  )!;
+  const input = { ...JSON.parse(bond.request.marketJson), vol_cubes: [cube] };
+  const onSubmit = vi.fn();
+  render(
+    <MarketContextForm
+      defaultJson={JSON.stringify(input)}
+      validate={validate}
+      onSubmit={onSubmit}
+    />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: new RegExp(`Edit .*${cube.id}`) }),
+  );
+  const field = (path: string) =>
+    document.querySelector(
+      `[data-field-path="${path}"] input`,
+    ) as HTMLInputElement;
+  fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
+    target: { value: "0.008" },
+  });
+  fireEvent.change(field("vol_cubes[0].forwards[0]"), {
+    target: { value: "0.051" },
+  });
+  const json = await submit(onSubmit),
+    expected = structuredClone(input);
+  expected.vol_cubes[0].params[0].alpha = 0.008;
+  expected.vol_cubes[0].forwards[0] = 0.051;
+  expect(JSON.parse(json)).toEqual(
+    JSON.parse(canonical(JSON.stringify(expected))),
+  );
+  fireEvent.change(field("vol_cubes[0].params[0].alpha"), {
     target: { value: "-1" },
   });
   await waitFor(() =>

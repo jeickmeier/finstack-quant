@@ -25,6 +25,15 @@ export interface FxDeltaSampleRequest {
     forward: number;
   }[];
 }
+export interface CubeSampleRequest {
+  readonly cube: MarketContextStateWire["vol_cubes"][number];
+  readonly coordinates: readonly {
+    expiry: number;
+    tenor: number;
+    strike: number;
+  }[];
+  readonly convention: "normal" | "black_lognormal";
+}
 export interface ValidationRequest {
   readonly instrumentJson: string;
   readonly revision: string | number;
@@ -48,6 +57,7 @@ export interface WorkerApi {
   ): Promise<Envelope<{ revision: string | number; json: string }>>;
   /** Canonicalize the complete market through its native constructor. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
+  sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;
   models(): Promise<Envelope<Record<string, string[]>>>;

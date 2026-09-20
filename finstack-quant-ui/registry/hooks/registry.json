@@ -116,6 +116,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+    },
+    {
+      "name": "use-cube-samples",
+      "type": "registry:hook",
+      "docs": "Checked native cube evaluation with complete SABR/forward/interpolation/coordinate/convention query keys. Null disables sampling. Requires FinstackQueryProvider; no local model calculation or clamping.",
+      "files": [
+        {
+          "path": "use-cube-samples/use-cube-samples.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-cube-samples/use-cube-samples.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
     }
   ]
 }

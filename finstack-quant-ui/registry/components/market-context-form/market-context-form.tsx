@@ -15,6 +15,7 @@ const editable = [
   "fx",
   "prices",
   "surfaces",
+  "vol_cubes",
   "fx_delta_vol_surfaces",
 ];
 function DeferredField({
@@ -42,7 +43,7 @@ const knots: FieldRenderer = ({
   label,
   renderDefault,
 }) => {
-  if (/^(surfaces|fx_delta_vol_surfaces)\[\d+\]$/.test(path))
+  if (/^(surfaces|fx_delta_vol_surfaces|vol_cubes)\[\d+\]$/.test(path))
     return (
       <DeferredField
         label={`${label}: ${String((value as { id?: string })?.id ?? "new")}`}
