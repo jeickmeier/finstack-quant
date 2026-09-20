@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs } from "@base-ui/react/tabs";
 import type { ValuationResult } from "finstack-quant-wasm";
 import { InstrumentForm } from "@/components/finstack/components/instrument-form/instrument-form";
@@ -8,7 +8,19 @@ import {
   jsonError,
   type PricingParams,
 } from "@/components/finstack/components/pricing-params-form/pricing-params-form";
-import { CurveChart } from "@/components/finstack/components/curve-chart/curve-chart";
+import { MarketContextForm } from "@/components/finstack/components/market-context-form/market-context-form";
+import { marketModule } from "@/components/finstack/components/market-context-form/market";
+import { CashflowViewer } from "@/components/finstack/components/cashflow-viewer/cashflow-viewer";
+import { ValuationDetails } from "@/components/finstack/components/valuation-details/valuation-details";
+import { FinstackTable } from "@/components/finstack/primitives/finstack-table/finstack-table";
+import { useLinkedSelection } from "@/hooks/use-linked-selection/use-linked-selection";
+import { useMarketValidator } from "@/hooks/use-market-validator/use-market-validator";
+import type { ColumnDef } from "@tanstack/react-table";
+import {
+  CurveChart,
+  curvePanels,
+  type CurvePoint,
+} from "@/components/finstack/components/curve-chart/curve-chart";
 import { MeasuresGrid } from "@/components/finstack/components/measures-grid/measures-grid";
 import { JsonViewer } from "@/components/finstack/primitives/json-viewer/json-viewer";
 import { useFinstack } from "@/hooks/use-finstack/use-finstack";
@@ -19,21 +31,74 @@ import {
   usePriceInstrument,
   type PriceRequest,
 } from "@/hooks/use-price-instrument/use-price-instrument";
-import { createWireCodec, serializeHost } from "@/lib/finstack/codec.mjs";
-import marketSchema from "@/lib/finstack/generated/schemas/market_context_state.json";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import fixture from "@/lib/finstack/fixtures/results/bond.json";
+const pointKey = (point: CurvePoint) =>
+  JSON.stringify([point.curve.type, point.curve.id, point.knot[0]]);
+const columns: ColumnDef<{}, CurvePoint, string | number>[] = [
+  { id: "curve", header: "Curve", accessorFn: (point) => point.curve.id },
+  { id: "type", header: "Variant", accessorFn: (point) => point.curve.type },
+  { id: "x", header: "Stored x", accessorFn: (point) => point.knot[0] },
+  { id: "value", header: "Stored value", accessorFn: (point) => point.knot[1] },
+];
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
   defaultRequest = fixture.request,
   density = "compact",
+  defaultInstrumentType,
 }: {
-  /** Initial bond request and canonical market snapshot. Remount to load another document. */
+  /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
   defaultRequest?: PriceRequest;
   density?: "compact" | "comfortable";
+  /** Host-owned deep link selects this canonical example; supplied market/parameters stay explicit. */
+  defaultInstrumentType?: string;
 }) {
   const [initial] = useState(() => structuredClone(defaultRequest));
-  const [type, setType] = useState("bond");
+  const [initialType] = useState(() => {
+    try {
+      const value = JSON.parse(initial.instrumentJson).instrument?.type;
+      return typeof value === "string" ? value : "";
+    } catch {
+      return "";
+    }
+  });
+  const [type, setType] = useState(defaultInstrumentType ?? initialType);
+  const [cashflowsOpen, setCashflowsOpen] = useState(false);
+  const link = useLinkedSelection();
+  const [marketReady, setMarketReady] = useState(false);
+  const [market, setMarket] = useState<{
+    json: string;
+    state: MarketContextStateWire;
+  } | null>(null);
+  const acceptMarket = useCallback((json: string | null) => {
+    setMarketReady(json !== null);
+    if (json !== null)
+      setMarket((current) =>
+        current?.json === json
+          ? current
+          : {
+              json,
+              state: marketModule.codec.parse(json) as MarketContextStateWire,
+            },
+      );
+  }, []);
+  const points = useMemo(
+    () =>
+      market
+        ? curvePanels(market.state.curves).flatMap((panel) => panel.points)
+        : [],
+    [market],
+  );
+  const addresses = useMemo(
+    () =>
+      new Map(
+        points.map((point) => [
+          pointKey(point),
+          { rowId: pointKey(point), columnId: "value" },
+        ]),
+      ),
+    [points],
+  );
   const [instrument, setInstrument] = useState<string | null>(null);
   const [params, setParams] = useState<PricingParams>(() => ({
     asOf: initial.asOf,
@@ -49,37 +114,23 @@ export function PricingWorkbench({
   } | null>(null);
   const worker = useFinstack();
   const validate = useInstrumentValidator();
+  const validateMarket = useMarketValidator();
   const models = useModels(),
     metrics = useMetrics();
-  const market = useMemo(() => {
-    try {
-      return {
-        state: createWireCodec(marketSchema).parse(
-          initial.marketJson,
-        ) as MarketContextStateWire,
-        error: undefined,
-      };
-    } catch (error) {
-      return {
-        state: undefined,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }, [initial.marketJson]);
   const candidate = useMemo<PriceRequest | null>(
     () =>
-      type === "bond" &&
       instrument &&
-      market.state &&
+      marketReady &&
+      market &&
       !jsonError(params.pricingOptions) &&
       !jsonError(params.marketHistory)
         ? {
             instrumentJson: instrument,
-            marketJson: initial.marketJson,
+            marketJson: market.json,
             ...params,
           }
         : null,
-    [type, instrument, market.state, initial.marketJson, params],
+    [instrument, market, marketReady, params],
   );
   useEffect(() => {
     if (!candidate) return;
@@ -97,19 +148,17 @@ export function PricingWorkbench({
   const status =
     worker.status !== "ready"
       ? `Worker ${worker.status}`
-      : type !== "bond"
-        ? "Instrument not yet supported"
-        : !candidate
-          ? "Waiting for valid inputs"
-          : request !== candidate
-            ? "Pricing queued"
-            : price.isFetching
-              ? "Pricing…"
-              : currentError
-                ? "Pricing failed"
-                : completed
-                  ? "Priced"
-                  : "Waiting for valuation";
+      : !candidate
+        ? "Waiting for valid inputs"
+        : request !== candidate
+          ? "Pricing queued"
+          : price.isFetching
+            ? "Pricing…"
+            : currentError
+              ? "Pricing failed"
+              : completed
+                ? "Priced"
+                : "Waiting for valuation";
   return (
     <section
       aria-label="Pricing workbench"
@@ -154,7 +203,11 @@ export function PricingWorkbench({
             <InstrumentForm
               type={type}
               onTypeChange={setType}
-              defaultJson={initial.instrumentJson}
+              defaultJson={
+                (defaultInstrumentType ?? initialType) === initialType
+                  ? initial.instrumentJson
+                  : undefined
+              }
               validate={validate}
               onValidated={setInstrument}
               onSubmit={setInstrument}
@@ -175,12 +228,58 @@ export function PricingWorkbench({
           keepMounted
           className="max-h-[55vh] space-y-3 overflow-y-auto pr-2"
         >
-          <JsonViewer
-            label="Market snapshot"
-            text={initial.marketJson}
-            error={market.error}
-          />
-          {market.state && <CurveChart curves={market.state.curves} />}
+          <Tabs.Root defaultValue="view">
+            <Tabs.List aria-label="Market mode" className="flex gap-2">
+              <Tabs.Tab
+                value="view"
+                className="rounded-sm border border-border px-3 py-1 data-active:bg-accent"
+              >
+                View
+              </Tabs.Tab>
+              <Tabs.Tab
+                value="edit"
+                className="rounded-sm border border-border px-3 py-1 data-active:bg-accent"
+              >
+                Edit
+              </Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="edit" keepMounted>
+              <MarketContextForm
+                defaultJson={initial.marketJson}
+                validate={validateMarket}
+                onValidated={acceptMarket}
+                onSubmit={acceptMarket}
+              />
+            </Tabs.Panel>
+            <Tabs.Panel value="view" keepMounted>
+              <JsonViewer
+                label="Market snapshot"
+                text={market?.json ?? initial.marketJson}
+                density={density}
+              />
+              {market && (
+                <>
+                  <FinstackTable
+                    caption="Stored curve knots"
+                    data={points}
+                    columns={columns}
+                    getRowId={pointKey}
+                    link={link}
+                    getRowKey={pointKey}
+                    getCellKey={(point, column) =>
+                      column === "value" ? pointKey(point) : null
+                    }
+                    getActiveCell={(key) => addresses.get(key) ?? null}
+                    density={density}
+                  />
+                  <CurveChart
+                    curves={market.state.curves}
+                    link={{ ...link, getPointKey: pointKey }}
+                  />
+                </>
+              )}
+            </Tabs.Panel>
+          </Tabs.Root>
         </Tabs.Panel>
       </Tabs.Root>
       <section
@@ -197,12 +296,24 @@ export function PricingWorkbench({
           loading={price.isFetching}
           error={currentError}
         />
-        <details>
-          <summary>Result JSON</summary>
-          <JsonViewer
-            label="Valuation result JSON"
-            text={completed ? serializeHost(completed.result) : null}
-          />
+        {completed && (
+          <ValuationDetails result={completed.result} density={density} />
+        )}
+        <details
+          onToggle={(event) => setCashflowsOpen(event.currentTarget.open)}
+        >
+          <summary>Cashflows</summary>
+          {completed && cashflowsOpen && (
+            <CashflowViewer
+              density={density}
+              request={{
+                instrumentJson: completed.request.instrumentJson,
+                marketJson: completed.request.marketJson,
+                asOf: completed.request.asOf,
+                model: completed.request.model ?? "default",
+              }}
+            />
+          )}
         </details>
         <details>
           <summary>Last priced request</summary>

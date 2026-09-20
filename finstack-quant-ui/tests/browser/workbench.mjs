@@ -111,10 +111,10 @@ try {
     request.pricingOptions,
     request.marketHistory,
   );
-  await results.getByText("Result JSON", { exact: true }).click();
+  await results.getByText("Complete result JSON", { exact: true }).click();
   const actual = JSON.parse(
     await results
-      .getByRole("region", { name: "Valuation result JSON" })
+      .getByRole("region", { name: "Complete valuation result JSON" })
       .locator("pre")
       .textContent(),
   );

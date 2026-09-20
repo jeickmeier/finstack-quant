@@ -5,7 +5,11 @@ createRoot(document.getElementById("root")!).render(
   <main className="mx-auto max-w-6xl p-4">
     <h1 className="mb-4 text-xl">Embedded bond pricing</h1>
     <FinstackQueryProvider>
-      <PricingWorkbench />
+      <PricingWorkbench
+        defaultInstrumentType={
+          new URLSearchParams(location.search).get("instrument") ?? undefined
+        }
+      />
     </FinstackQueryProvider>
   </main>,
 );

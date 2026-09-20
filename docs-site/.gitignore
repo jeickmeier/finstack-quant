@@ -3,6 +3,9 @@
 /src/hooks/use-finstack/
 /src/hooks/use-price-instrument/
 /src/hooks/use-instrument-validator/
+/src/hooks/use-cashflows/
+/src/hooks/use-market-validator/
+/src/hooks/use-linked-selection/
 /src/lib/finstack/
 /src/styles/finstack/
 /src/workers/

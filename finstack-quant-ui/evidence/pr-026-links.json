@@ -1,0 +1,320 @@
+{
+  "browser": "145.0.7632.6",
+  "source": "served registry docs export",
+  "links": 78,
+  "checks": [
+    {
+      "type": "commodity_asian_option",
+      "exampleId": "WTI-ASIAN-6M"
+    },
+    {
+      "type": "commodity_forward",
+      "exampleId": "WTI-FWD-2025M03"
+    },
+    {
+      "type": "commodity_future_option",
+      "exampleId": "COMMODITY-FUTURE-OPTION-EXAMPLE"
+    },
+    {
+      "type": "commodity_future",
+      "exampleId": "SGX-IRON-ORE-DEC26"
+    },
+    {
+      "type": "commodity_option",
+      "exampleId": "WTI-OPT-2025M06"
+    },
+    {
+      "type": "commodity_spread_option",
+      "exampleId": "WTI-RBOB-CRACK-SPREAD"
+    },
+    {
+      "type": "commodity_swap",
+      "exampleId": "NG-SWAP-2025"
+    },
+    {
+      "type": "commodity_swaption",
+      "exampleId": "NG-SWAPTION-2025"
+    },
+    {
+      "type": "composite"
+    },
+    {
+      "type": "cds_index",
+      "exampleId": "CDX-IG-42"
+    },
+    {
+      "type": "cds_option",
+      "exampleId": "CDSOPT-CALL-CORP-5Y"
+    },
+    {
+      "type": "cds_tranche",
+      "exampleId": "CDXIG-42-0X3"
+    },
+    {
+      "type": "credit_default_swap",
+      "exampleId": "CDS-CORP-5Y"
+    },
+    {
+      "type": "autocallable",
+      "exampleId": "AUTO-SPX-QTR"
+    },
+    {
+      "type": "cliquet_option",
+      "exampleId": "CLIQ-SPX-QTR"
+    },
+    {
+      "type": "discounted_cash_flow",
+      "exampleId": "DCF-TECH-CO"
+    },
+    {
+      "type": "equity_future_option",
+      "exampleId": "EQUITY-FUTURE-OPTION-EXAMPLE"
+    },
+    {
+      "type": "equity_future",
+      "exampleId": "EUREX-FESQ-DEC26"
+    },
+    {
+      "type": "equity_option",
+      "exampleId": "SPX-CALL-4500"
+    },
+    {
+      "type": "equity_total_return_future",
+      "exampleId": "EUREX-TESX-DEC27"
+    },
+    {
+      "type": "equity",
+      "exampleId": "EQUITY-AAPL"
+    },
+    {
+      "type": "levered_real_estate_equity",
+      "exampleId": "RE-LEVERED-OFFICE"
+    },
+    {
+      "type": "private_markets_fund",
+      "exampleId": "PMF-EXAMPLE"
+    },
+    {
+      "type": "real_estate_asset",
+      "exampleId": "RE-OFFICE-DCF"
+    },
+    {
+      "type": "trs_equity",
+      "exampleId": "TRS-SPX-1Y"
+    },
+    {
+      "type": "variance_swap",
+      "exampleId": "VARSPX-1Y"
+    },
+    {
+      "type": "volatility_index_future_option",
+      "exampleId": "VSTOXX-FUTURE-OPTION-EXAMPLE"
+    },
+    {
+      "type": "volatility_index_future",
+      "exampleId": "VIX-FUT-2025M03"
+    },
+    {
+      "type": "asian_option",
+      "exampleId": "ASIAN-SPX-ARITH-6M"
+    },
+    {
+      "type": "barrier_option",
+      "exampleId": "BAR-SPX-UO-CALL"
+    },
+    {
+      "type": "basket",
+      "exampleId": "BASKET-60-40"
+    },
+    {
+      "type": "callable_range_accrual",
+      "exampleId": "CALLABLE-RA-SOFR-1Y"
+    },
+    {
+      "type": "lookback_option",
+      "exampleId": "LOOKBACK-SPX-FIXED-CALL"
+    },
+    {
+      "type": "range_accrual",
+      "exampleId": "RANGE-SPX-1Y"
+    },
+    {
+      "type": "snowball",
+      "exampleId": "SNOWBALL-USD-3Y"
+    },
+    {
+      "type": "tarn",
+      "exampleId": "TARN-USD-5Y"
+    },
+    {
+      "type": "agency_cmo",
+      "exampleId": "FNR-2024-1-A"
+    },
+    {
+      "type": "agency_mbs_passthrough",
+      "exampleId": "FN-MA1234"
+    },
+    {
+      "type": "agency_tba",
+      "exampleId": "FN30-4.0-202703"
+    },
+    {
+      "type": "asset_backed_facility",
+      "exampleId": "ABF-EXAMPLE"
+    },
+    {
+      "type": "bond_future",
+      "exampleId": "TYU5"
+    },
+    {
+      "type": "bond",
+      "exampleId": "US912828XG33"
+    },
+    {
+      "type": "convertible_bond",
+      "exampleId": "CB-TECH-5Y"
+    },
+    {
+      "type": "dollar_roll",
+      "exampleId": "FN30-4.0-ROLL-0326-0426"
+    },
+    {
+      "type": "inflation_linked_bond",
+      "exampleId": "TIPS-10Y"
+    },
+    {
+      "type": "revolving_credit",
+      "exampleId": "RCF-USD-3Y"
+    },
+    {
+      "type": "structured_credit",
+      "exampleId": "CLO-EXAMPLE"
+    },
+    {
+      "type": "term_loan",
+      "exampleId": "TERM-LOAN-USD-5Y"
+    },
+    {
+      "type": "trs_fixed_income_index",
+      "exampleId": "TRS-US-CORP-1Y"
+    },
+    {
+      "type": "fx_barrier_option",
+      "exampleId": "FXBAR-EURUSD-UO-CALL"
+    },
+    {
+      "type": "fx_digital_option",
+      "exampleId": "FXDIG-EURUSD-CALL"
+    },
+    {
+      "type": "fx_forward",
+      "exampleId": "EURUSD-FWD-6M"
+    },
+    {
+      "type": "fx_future_option",
+      "exampleId": "FX-FUTURE-OPTION-EXAMPLE"
+    },
+    {
+      "type": "fx_future",
+      "exampleId": "CME-6E-DEC26"
+    },
+    {
+      "type": "fx_option",
+      "exampleId": "FXOPT-EURUSD-CALL"
+    },
+    {
+      "type": "fx_spot",
+      "exampleId": "EURUSD"
+    },
+    {
+      "type": "fx_swap",
+      "exampleId": "FXSWAP-EURUSD-6M"
+    },
+    {
+      "type": "fx_touch_option",
+      "exampleId": "FXTOUCH-EURUSD-OT"
+    },
+    {
+      "type": "fx_variance_swap",
+      "exampleId": "FXVAR-EURUSD-1Y"
+    },
+    {
+      "type": "ndf",
+      "exampleId": "USDCNY-NDF-3M"
+    },
+    {
+      "type": "quanto_option",
+      "exampleId": "QUANTO-NKY-USD-CALL"
+    },
+    {
+      "type": "basis_swap",
+      "exampleId": "BASIS-SWAP-USD-3M1M-5Y"
+    },
+    {
+      "type": "bermudan_swaption",
+      "exampleId": "BERM-10NC2-USD"
+    },
+    {
+      "type": "cap_floor",
+      "exampleId": "IRCAP-USD-5Y-3PCT"
+    },
+    {
+      "type": "cms_option",
+      "exampleId": "CMSOPT-10Y-USD"
+    },
+    {
+      "type": "cms_spread_option",
+      "exampleId": "CMS-SPREAD-10Y2Y"
+    },
+    {
+      "type": "cms_swap",
+      "exampleId": "CMSSWAP-10Y-USD"
+    },
+    {
+      "type": "deposit",
+      "exampleId": "DEP-USD-6M"
+    },
+    {
+      "type": "forward_rate_agreement",
+      "exampleId": "FRA-3X6-USD"
+    },
+    {
+      "type": "inflation_cap_floor",
+      "exampleId": "INFLCAP-USD-5Y"
+    },
+    {
+      "type": "inflation_swap",
+      "exampleId": "INFLSWAP-USD-5Y"
+    },
+    {
+      "type": "interest_rate_future_option",
+      "exampleId": "INTEREST-RATE-FUTURE-OPTION-EXAMPLE"
+    },
+    {
+      "type": "interest_rate_future",
+      "exampleId": "IRF-ED-3M-MAR25"
+    },
+    {
+      "type": "interest_rate_swap",
+      "exampleId": "IRS-5Y-USD-STD"
+    },
+    {
+      "type": "repo",
+      "exampleId": "REPO-GC-7D"
+    },
+    {
+      "type": "swaption",
+      "exampleId": "SWPN-1Yx5Y-USD"
+    },
+    {
+      "type": "xccy_swap",
+      "exampleId": "XCCY-USDEUR-5Y"
+    },
+    {
+      "type": "yoy_inflation_swap",
+      "exampleId": "YOYSWAP-USD-5Y"
+    }
+  ],
+  "errors": [],
+  "verdict": "pass"
+}

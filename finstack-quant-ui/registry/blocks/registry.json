@@ -4,7 +4,7 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "Embeddable bond workbench. Wrap PricingWorkbench with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Hooks, workers and components follow the consumer source directory. Host owns the route. defaultRequest supplies initial canonical bond/market JSON and complete parameters; remount for a different document. Input edits debounce complete requests. Unsupported instruments cannot price; results retain their last completed request context.",
+      "docs": "Embeddable all-instrument workbench using shared schema forms, market editor, linked stored-node table/chart, cashflow and typed/raw result components. Host owns routes; defaultInstrumentType selects a canonical example without replacing supplied market/model parameters. Complete native-validated edits feed pricing; successful result/cashflow views retain their completed request.",
       "files": [
         {
           "path": "pricing-workbench/pricing-workbench.tsx",
@@ -20,9 +20,19 @@
         "@finstack/json-viewer",
         "@finstack/use-instrument-validator",
         "@finstack/use-price-instrument",
-        "@finstack/finstack-fixtures"
+        "@finstack/finstack-fixtures",
+        "@finstack/market-context-form",
+        "@finstack/use-market-validator",
+        "@finstack/cashflow-viewer",
+        "@finstack/valuation-details",
+        "@finstack/finstack-table",
+        "@finstack/use-linked-selection"
       ],
-      "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"]
+      "dependencies": [
+        "@base-ui/react@1.8.0",
+        "finstack-quant-wasm@0.8.0",
+        "@tanstack/react-table@9.2.4"
+      ]
     }
   ]
 }

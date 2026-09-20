@@ -1,16 +1,15 @@
 ---
-title: Bond pricing workbench
-description: Edit a bond and inspect its native valuation against a supplied market snapshot.
+title: Instrument pricing workbench
+description: Edit an instrument and market, then inspect native results and cashflow exports.
 ---
 
-import { RegistryDemo } from '@/components/registry-demo';
+import { RegistryDemo } from "@/components/registry-demo";
 
 <RegistryDemo />
 
 The workbench installs into the host application. One shared browser worker validates
 and prices the request. Amounts remain decimal strings while editing; results retain
-the last completed request until a new valuation succeeds. The current form supports
-bonds; other instrument forms remain gated.
+the last completed request until a new valuation succeeds. The catalogue supports every discovered instrument. Open a [canonical example](/docs/registry/instruments), select its model and supply its complete market. Market Edit mode validates complete snapshots natively before repricing; View links the stored-node table and chart. Cashflows retain original native text, including mixed currencies; unsupported exports leave successful pricing intact. Detail views preserve metadata and bigint seeds, with raw JSON for incompletely declared payloads.
 
 ## Install locally
 
