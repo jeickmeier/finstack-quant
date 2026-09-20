@@ -438,6 +438,48 @@
         "@finstack/finstack-codec"
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "calibration-report",
+      "type": "registry:component",
+      "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys.",
+      "files": [
+        {
+          "path": "calibration-report/calibration-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/calibration-report/calibration-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/use-linked-selection"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
+    },
+    {
+      "name": "calibration-fit-chart",
+      "type": "registry:component",
+      "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection.",
+      "files": [
+        {
+          "path": "calibration-fit-chart/calibration-fit-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/calibration-fit-chart/calibration-fit-chart.tsx"
+        },
+        {
+          "path": "calibration-fit-chart/residuals.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/calibration-fit-chart/residuals.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/use-linked-selection",
+        "@finstack/contract-calibration"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
     }
   ]
 }

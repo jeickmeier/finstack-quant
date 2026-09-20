@@ -1,0 +1,38 @@
+{
+  "message": "step 'AAPL-EQUITY-VOL-STEP' did not converge: max residual 2.040e-3 > tolerance 1.000e-3 after 262 iterations. Worst quote: 'AAPL-VOL-20260808-155.0' (residual 2.040e-3).",
+  "name": "CalibrationEnvelopeError",
+  "kind": "solver_not_converged",
+  "cause": {
+    "stage": "solver",
+    "step_id": "AAPL-EQUITY-VOL-STEP",
+    "category": "solver_not_converged",
+    "solver_diagnostics": {
+      "max_residual": 0.0020403078711594413,
+      "tolerance": 0.001,
+      "iterations": 262,
+      "worst_quote_id": "AAPL-VOL-20260808-155.0",
+      "worst_quote_residual": 0.0020403078711594413
+    },
+    "cause": "step 'AAPL-EQUITY-VOL-STEP' did not converge: max residual 2.040e-3 > tolerance 1.000e-3 after 262 iterations. Worst quote: 'AAPL-VOL-20260808-155.0' (residual 2.040e-3).",
+    "envelope_error": {
+      "kind": "solver_not_converged",
+      "step_id": "AAPL-EQUITY-VOL-STEP",
+      "max_residual": 0.0020403078711594413,
+      "tolerance": 0.001,
+      "iterations": 262,
+      "worst_quote_id": "AAPL-VOL-20260808-155.0",
+      "worst_quote_residual": 0.0020403078711594413
+    },
+    "diagnostics": []
+  },
+  "stage": "solver",
+  "step_id": "AAPL-EQUITY-VOL-STEP",
+  "solver_diagnostics": {
+    "max_residual": 0.0020403078711594413,
+    "tolerance": 0.001,
+    "iterations": 262,
+    "worst_quote_id": "AAPL-VOL-20260808-155.0",
+    "worst_quote_residual": 0.0020403078711594413
+  },
+  "details": "{\"stage\":\"solver\",\"step_id\":\"AAPL-EQUITY-VOL-STEP\",\"category\":\"solver_not_converged\",\"solver_diagnostics\":{\"max_residual\":0.0020403078711594413,\"tolerance\":0.001,\"iterations\":262,\"worst_quote_id\":\"AAPL-VOL-20260808-155.0\",\"worst_quote_residual\":0.0020403078711594413},\"cause\":\"step 'AAPL-EQUITY-VOL-STEP' did not converge: max residual 2.040e-3 > tolerance 1.000e-3 after 262 iterations. Worst quote: 'AAPL-VOL-20260808-155.0' (residual 2.040e-3).\",\"envelope_error\":{\"kind\":\"solver_not_converged\",\"step_id\":\"AAPL-EQUITY-VOL-STEP\",\"max_residual\":0.0020403078711594413,\"tolerance\":0.001,\"iterations\":262,\"worst_quote_id\":\"AAPL-VOL-20260808-155.0\",\"worst_quote_residual\":0.0020403078711594413},\"diagnostics\":[]}"
+}

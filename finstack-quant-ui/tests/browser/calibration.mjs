@@ -17,6 +17,8 @@ try {
     "use-calibrate",
     "use-price-instrument",
     "market-context-browser",
+    "calibration-report",
+    "calibration-fit-chart",
   ]);
   await writeFile(
     path.join(consumer, "main.tsx"),
@@ -204,6 +206,45 @@ try {
   await page
     .getByLabel("Search market fields", { exact: true })
     .fill("USD-OIS");
+  const firstQuote = Object.keys(
+    (await page.evaluate(() => window.calibrationProbe.result)).result
+      .step_reports["USD-OIS"].residuals,
+  )[0];
+  const table = page.getByRole("grid", {
+    name: "USD-OIS returned residuals",
+    exact: true,
+  });
+  await table.getByText(firstQuote, { exact: true }).click();
+  await page.waitForFunction(
+    (key) =>
+      window.calibrationProbe.selectedKey === JSON.stringify(["USD-OIS", key]),
+    firstQuote,
+  );
+  const chart = page.locator(
+    '[aria-label="USD-OIS rate_quote / swap residuals"][tabindex]',
+  );
+  await chart.focus();
+  await chart.press("Home");
+  await chart.press("Enter");
+  await page
+    .getByText(`Transient residual ${firstQuote}`, { exact: true })
+    .waitFor();
+  assert.equal(
+    (await page.evaluate(() => window.calibrationProbe.activated)).key,
+    JSON.stringify(["USD-OIS", firstQuote]),
+  );
+  const svg = await page.evaluate(() => window.calibrationProbe.export());
+  for (const text of [
+    "Native residual figure",
+    "Signed returned solver values",
+    "Canonical calibration report",
+    "Residuals, not repriced quotes",
+    "Solver units (quote convention unavailable)",
+    firstQuote,
+  ])
+    assert(svg.includes(text), text);
+  assert(!svg.includes("Transient residual"));
+  await writeFile("/tmp/pr033-residual.svg", svg);
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -216,8 +257,11 @@ try {
     const axe = await page.evaluate(() => window.axe.run(document));
     accessibility.push({ theme, violations: axe.violations });
     await page
-      .getByRole("region", { name: "Market context browser", exact: true })
-      .screenshot({ path: `/tmp/pr032-${theme}.png` });
+      .getByRole("region", {
+        name: "USD-OIS calibration residuals",
+        exact: true,
+      })
+      .screenshot({ path: `/tmp/pr033-${theme}.png` });
   }
   assert(
     accessibility.every((a) => a.violations.length === 0),
@@ -241,7 +285,7 @@ try {
     verdict: "pass",
   };
   await writeFile(
-    "/tmp/pr032-calibration.json",
+    "/tmp/pr033-calibration.json",
     JSON.stringify(report, null, 2) + "\n",
   );
   console.log(JSON.stringify(report, null, 2));

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { FinstackQueryProvider } from "./hooks/use-finstack/use-finstack";
 import {
@@ -11,6 +11,13 @@ import { CalibrationForm } from "./components/finstack/components/calibration-fo
 import { MarketContextBrowser } from "./components/finstack/components/market-context-browser/market-context-browser";
 import { JsonViewer } from "./components/finstack/primitives/json-viewer/json-viewer";
 import { serializeHost } from "./lib/finstack/codec.mjs";
+import { CalibrationReport } from "./components/finstack/components/calibration-report/calibration-report";
+import {
+  CalibrationFitChart,
+  residualPanels,
+} from "./components/finstack/components/calibration-fit-chart/calibration-fit-chart";
+import { useLinkedSelection } from "./hooks/use-linked-selection/use-linked-selection";
+import type { FigureHandle } from "./components/finstack/primitives/finstack-chart/finstack-chart";
 import fixture from "./fixture.json";
 function App() {
   const [request, setRequest] = useState<string | null>(null),
@@ -36,8 +43,27 @@ function App() {
         ),
       )
     : null;
+  const link = useLinkedSelection(),
+    figure = useRef<FigureHandle>(null),
+    activated = useRef<unknown>(null);
+  const report = result.data?.result.step_reports["USD-OIS"];
+  const panels = report
+    ? residualPanels("USD-OIS", report, fixture.input.market_data)
+    : [];
   Object.assign(window, {
     calibrationProbe: {
+      selectedKey: link.selectedKey,
+      get activated() {
+        return activated.current;
+      },
+      export: async () =>
+        (
+          await figure.current!.exportSvg({
+            width: 1000,
+            height: 650,
+            theme: "light",
+          })
+        ).text(),
       request,
       result: result.data,
       error: failure,
@@ -79,9 +105,7 @@ function App() {
             label="Structured calibration error"
             text={serializeHost(failure)}
           />
-          {failure.solver_diagnostics === undefined && (
-            <p>Solver diagnostics unavailable</p>
-          )}
+          <CalibrationReport stepId="Failed step" error={failure} />
         </>
       )}
       {dry.data && <JsonViewer label="Static diagnostics" text={dry.data} />}
@@ -92,6 +116,40 @@ function App() {
             label="Native calibration result"
             text={serializeHost(result.data)}
           />
+          <CalibrationReport stepId="Plan" report={result.data.result.report} />
+          {report && (
+            <>
+              <CalibrationReport stepId="USD-OIS" report={report} link={link} />
+              <CalibrationFitChart
+                stepId="USD-OIS"
+                report={report}
+                marketData={fixture.input.market_data}
+                link={link}
+                width={900}
+                height={600}
+                title="Native residual figure"
+                caption="Signed returned solver values"
+                sources={[{ label: "Canonical calibration report" }]}
+                figureAnnotations={[
+                  { text: "Residuals, not repriced quotes", x: 0.55, y: 0.12 },
+                ]}
+                figureRefs={{ [panels[0].key]: figure }}
+                onSelect={(point) => {
+                  if (point) {
+                    if (point.datum.report !== report)
+                      throw new Error("Stale report callback");
+                    activated.current = {
+                      key: point.datum.key,
+                      residual: point.datum.residual,
+                    };
+                  }
+                }}
+                renderTooltipBody={({ points }) => (
+                  <span>Transient residual {points[0]?.datum.quoteId}</span>
+                )}
+              />
+            </>
+          )}
           <MarketContextBrowser state={result.data.result.final_market} />
         </>
       )}
