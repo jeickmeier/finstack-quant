@@ -1,0 +1,96 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "figure-example",
+    "finstack-chart",
+    "finstack-base",
+    "finstack-theme"
+  ],
+  "exports": [
+    {
+      "name": "numeric",
+      "width": 340,
+      "height": 640,
+      "pngWidth": 680,
+      "pngHeight": 1280,
+      "svgBytes": 265812,
+      "pngBytes": 166604,
+      "clippedText": 0
+    },
+    {
+      "name": "numeric",
+      "width": 900,
+      "height": 640,
+      "pngWidth": 1800,
+      "pngHeight": 1280,
+      "svgBytes": 264987,
+      "pngBytes": 206283,
+      "clippedText": 0
+    },
+    {
+      "name": "date",
+      "width": 340,
+      "height": 480,
+      "pngWidth": 680,
+      "pngHeight": 960,
+      "svgBytes": 260077,
+      "pngBytes": 87970,
+      "clippedText": 0
+    },
+    {
+      "name": "date",
+      "width": 900,
+      "height": 480,
+      "pngWidth": 1800,
+      "pngHeight": 960,
+      "svgBytes": 260077,
+      "pngBytes": 128765,
+      "clippedText": 0
+    },
+    {
+      "name": "category",
+      "width": 340,
+      "height": 480,
+      "pngWidth": 680,
+      "pngHeight": 960,
+      "svgBytes": 259491,
+      "pngBytes": 77933,
+      "clippedText": 0
+    },
+    {
+      "name": "category",
+      "width": 900,
+      "height": 480,
+      "pngWidth": 1800,
+      "pngHeight": 960,
+      "svgBytes": 259545,
+      "pngBytes": 110221,
+      "clippedText": 0
+    }
+  ],
+  "accessibility": [
+    {
+      "theme": "light",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "violations": []
+    }
+  ],
+  "failures": [],
+  "wasmRequests": 0,
+  "verdict": "pass"
+}

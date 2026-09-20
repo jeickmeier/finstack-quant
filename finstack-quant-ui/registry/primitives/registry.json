@@ -335,6 +335,38 @@
         "@finstack/field-frame"
       ],
       "dependencies": ["@tanstack/react-virtual@3.14.13"]
+    },
+    {
+      "name": "finstack-chart",
+      "type": "registry:ui",
+      "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions.",
+      "files": [
+        {
+          "path": "finstack-chart/finstack-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-chart/finstack-chart.tsx"
+        },
+        {
+          "path": "finstack-chart/presentation.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-chart/presentation.ts"
+        },
+        {
+          "path": "finstack-chart/figure.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-chart/figure.ts"
+        },
+        {
+          "path": "finstack-chart/export.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-chart/export.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme"
+      ],
+      "dependencies": ["@tanstack/charts@0.18.0"]
     }
   ]
 }

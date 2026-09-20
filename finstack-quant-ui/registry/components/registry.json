@@ -1,4 +1,18 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
-  "items": []
+  "items": [
+    {
+      "name": "figure-example",
+      "type": "registry:component",
+      "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts.",
+      "files": [
+        {
+          "path": "figure-example/figure-example.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/figure-example/figure-example.tsx"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-chart"]
+    }
+  ]
 }

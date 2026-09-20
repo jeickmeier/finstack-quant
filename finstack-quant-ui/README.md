@@ -228,3 +228,29 @@ Run `UV_NO_SYNC=1 mise run wasm-pkg` for scoped package builds; disabling uv
 synchronization prevents the final marker-file command from rebuilding Python.
 The production browser harness now exercises the installed provider and worker,
 not a separate probe implementation. See [PR-009 evidence](evidence/pr-009.md).
+
+## Publication figures
+
+`@finstack/finstack-chart` installs the shared SVG figure; `@finstack/figure-example`
+installs a standalone controlled-data example with SVG/PNG download actions.
+Supply a native `defineChart` definition, an accessible label, and optional title,
+subtitle, caption, sources and `figureAnnotations` at explicit figure fractions.
+Use native text, dot, arrow, rule and rectangle marks for data-coordinate
+annotations. Native scale/axis props carry supplied unit labels, tick formatting,
+thinning and explicit label rotation. No units or financial values are inferred.
+
+A `FigureHandle` ref exposes `exportSvg` and `exportPng` with explicit width/height,
+optional raster scale, theme and background. Exports use the same composition at
+that size after fonts load. Dimensions too small for the supplied prose reject
+instead of silently dropping text. Same-origin font stylesheets allow the export
+to embed loaded webfonts; desktop editors may require the font installed locally.
+PNG scale changes pixel density, not data/layout coordinates. For example, a
+900×600 layout at scale 2 gives 1800×1200 pixels, suitable for 6×4 inches at 300 PPI.
+The original inputs are unchanged. SVG includes all persistent prose, sources,
+axes, legends and marks, without HTML overlays or rasterized marks.
+
+`npm run test:figures:browser` builds the installed example, exports narrow/wide
+numeric/date/category fixtures, checks text clipping/overlap, vector elements,
+font/style portability, exact raster dimensions, accessibility and no WASM loads.
+See [PR-010 evidence](evidence/pr-010.md); desktop-editor acceptance stays open
+until its planned release slice.
