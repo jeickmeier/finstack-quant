@@ -74,6 +74,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "use-cashflows",
+      "type": "registry:hook",
+      "docs": "Original native cashflow JSON with complete immutable request/session keys and native errors. Requires the shared Finstack/Query provider. No cashflow rows or financial logic are inferred.",
+      "files": [
+        {
+          "path": "use-cashflows/use-cashflows.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-cashflows/use-cashflows.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
     }
   ]
 }

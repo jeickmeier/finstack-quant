@@ -219,7 +219,9 @@ reset or changing that URL creates a fresh worker and query session.
 `marketJson`, `asOf`, `model`, `metrics`, `pricingOptions`, `marketHistory`). JSON
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
-canonical JSON. `useInstrumentCashflows` returns original native JSON text.
+canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON
+text. `CashflowViewer` composes that hook with exact copy/print presentation;
+unsupported export preserves caller pricing/model state and shows the native error.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useValidateInstrument` takes canonical text and a caller-owned revision; its
 250ms debounce never exposes a different revision's validation error or result.

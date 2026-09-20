@@ -2,10 +2,7 @@
 import { useQuery, queryOptions } from "@tanstack/react-query";
 import { useFinstack } from "../use-finstack/use-finstack";
 import type { FinstackClient } from "../use-finstack/client";
-import type {
-  PriceRequest,
-  CashflowRequest,
-} from "../../workers/finstack-contract";
+import type { PriceRequest } from "../../workers/finstack-contract";
 export type { PriceRequest } from "../../workers/finstack-contract";
 /** Snapshot every input without parsing JSON, filling financial defaults or collapsing selections. */
 export function priceOptions(
@@ -37,26 +34,6 @@ export function usePriceInstrument(request: PriceRequest, enabled = true) {
   const query = useQuery({
     ...priceOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && enabled,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
-}
-/** Original native cashflow JSON, with all request fields in the key. */
-export function useInstrumentCashflows(
-  request: CashflowRequest,
-  enabled = true,
-) {
-  const worker = useFinstack();
-  const snapshot = Object.freeze({ ...request });
-  const query = useQuery({
-    queryKey: ["finstack", worker.session, "cashflows", snapshot],
-    queryFn: () => worker.client!.call("cashflows", snapshot),
-    enabled: worker.status === "ready" && enabled,
-    staleTime: Infinity,
-    retry: false,
   });
   return {
     ...query,

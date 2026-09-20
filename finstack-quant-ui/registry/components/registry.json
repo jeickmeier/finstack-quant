@@ -151,6 +151,23 @@
         "@finstack/json-viewer"
       ],
       "dependencies": ["lossless-json@4.3.1"]
+    },
+    {
+      "name": "cashflow-viewer",
+      "type": "registry:component",
+      "docs": "Exact native cashflow JSON through the shared worker with loading, unavailable/error, copy and print states. Requires FinstackQueryProvider. Caller pricing and model state remain intact; no typed rows or totals are inferred.",
+      "files": [
+        {
+          "path": "cashflow-viewer/cashflow-viewer.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/cashflow-viewer/cashflow-viewer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/use-cashflows"
+      ],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

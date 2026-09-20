@@ -33,7 +33,8 @@
     "test:curves:browser": "node tests/browser/curves.mjs",
     "test:pricing-forms:browser": "node tests/browser/pricing-forms.mjs",
     "test:workbench:browser": "node tests/browser/workbench.mjs",
-    "test:table-link:browser": "node tests/browser/table-link.mjs"
+    "test:table-link:browser": "node tests/browser/table-link.mjs",
+    "test:cashflows:browser": "node tests/browser/cashflows.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

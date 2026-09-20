@@ -7,11 +7,13 @@ export function JsonViewer({
   label = "JSON",
   loading = false,
   error,
+  density = "compact",
 }: {
   text: string | null | undefined;
   label?: string;
   loading?: boolean;
   error?: string;
+  density?: "compact" | "comfortable";
 }) {
   const [copyStatus, setCopyStatus] = useState<{
     text: string | null | undefined;
@@ -21,6 +23,7 @@ export function JsonViewer({
   return (
     <section
       aria-label={label}
+      data-density={density}
       aria-busy={loading}
       className="font-sans text-base text-foreground"
     >
@@ -59,7 +62,7 @@ export function JsonViewer({
       {present ? (
         <pre
           tabIndex={0}
-          className="max-h-96 overflow-auto whitespace-pre font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring print:max-h-none print:whitespace-pre-wrap"
+          className={`max-h-96 overflow-auto whitespace-pre font-mono focus-visible:outline-2 focus-visible:outline-ring print:max-h-none print:whitespace-pre-wrap print:break-all print:overflow-visible ${density === "compact" ? "text-xs leading-5" : "text-sm leading-6"}`}
         >
           {text}
         </pre>
