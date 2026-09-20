@@ -110,12 +110,19 @@
           "path": "curve-chart/curve-chart.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/curve-chart/curve-chart.tsx"
+        },
+        {
+          "path": "curve-chart/stored-curve-view.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/curve-chart/stored-curve-view.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/finstack-chart",
         "@finstack/contract-market-context-state",
-        "@finstack/finstack-views"
+        "@finstack/finstack-views",
+        "@finstack/finstack-table",
+        "@finstack/use-linked-selection"
       ]
     },
     {

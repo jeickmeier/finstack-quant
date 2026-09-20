@@ -8,6 +8,7 @@ export function CalibrationForm({
   validate,
   onSubmit,
   onValidated,
+  onInputJson,
 }: {
   /** Full canonical envelope; no market, quote, model or solver defaults are inferred. */
   defaultJson: string;
@@ -15,6 +16,7 @@ export function CalibrationForm({
   /** Receives native canonical JSON on explicit submission. Connect it to useCalibrate. */
   onSubmit: SchemaFormProps["onSubmit"];
   onValidated?: SchemaFormProps["onValidated"];
+  onInputJson?: SchemaFormProps["onInputJson"];
 }) {
   const [initial] = useState(() => {
     try {
@@ -34,6 +36,7 @@ export function CalibrationForm({
       validate={validate}
       onSubmit={onSubmit}
       onValidated={onValidated}
+      onInputJson={onInputJson}
       submitLabel="Calibrate"
       layout="full"
     />

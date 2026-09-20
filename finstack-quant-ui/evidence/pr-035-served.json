@@ -1,0 +1,44 @@
+{
+  "browser": "145.0.7632.6",
+  "basePath": "",
+  "wasm": {
+    "bytes": 21534873,
+    "sha256": "afe247bad5421dce0e95aae10e09d4ee48fbd544205cafe9334e789915ca88bf"
+  },
+  "fonts": [
+    "http://127.0.0.1:58426/_next/static/media/ibm-plex-sans-latin-500-normal.2i4a1iuj6lbvw.woff2",
+    "http://127.0.0.1:58426/_next/static/media/ibm-plex-mono-latin-400-normal.3xdfs0-p_zi4c.woff2",
+    "http://127.0.0.1:58426/_next/static/media/ibm-plex-mono-latin-500-normal.11q3guvgd1r20.woff2",
+    "http://127.0.0.1:58426/_next/static/media/ibm-plex-sans-latin-600-normal.2ovda_azncp9b.woff2",
+    "http://127.0.0.1:58426/_next/static/media/ibm-plex-sans-latin-400-normal.1xf5nwxyfigak.woff2"
+  ],
+  "excludedPrefetchRequests": [
+    "http://127.0.0.1:58426/",
+    "http://127.0.0.1:58426/labs/"
+  ],
+  "installed": ["pricing-workbench"],
+  "calibrationChecks": [
+    "finstack-quant/calibration/examples/market_bootstrap/01_usd_discount.json",
+    "finstack-quant/calibration/examples/market_bootstrap/02_usd_3m_forward_curve.json",
+    "finstack-quant/calibration/examples/market_bootstrap/03_single_name_hazard.json",
+    "finstack-quant/calibration/examples/market_bootstrap/04_cdx_ig_hazard.json",
+    "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
+    "finstack-quant/calibration/examples/market_bootstrap/06_cdx_index_vol.json",
+    "finstack-quant/calibration/examples/market_bootstrap/07_swaption_vol_surface.json",
+    "finstack-quant/calibration/examples/market_bootstrap/08_equity_vol_surface.json",
+    "finstack-quant/calibration/examples/market_bootstrap/09_fx_matrix.json",
+    "finstack-quant/calibration/examples/market_bootstrap/10_bond_prices.json",
+    "finstack-quant/calibration/examples/market_bootstrap/11_equity_spots_dividends.json",
+    "finstack-quant/calibration/examples/market_bootstrap/12_full_credit_desk_market.json",
+    "finstack-quant/calibration/examples/market_bootstrap/01_usd_discount.json"
+  ],
+  "violations": [],
+  "failures": [],
+  "checks": [
+    "edited block matches native facade",
+    "persistent result context",
+    "tabs retain controls",
+    "stored market curves"
+  ],
+  "verdict": "pass"
+}

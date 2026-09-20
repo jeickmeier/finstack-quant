@@ -23,9 +23,15 @@ import type { MarketContextStateWire } from "../src/generated/types/market_conte
 import { serializeHost } from "../src/codec.mjs";
 import fixture from "./market-browser/cases.json";
 import schema from "../src/generated/schemas/market_context_state.json";
-vi.mock("../registry/primitives/finstack-chart/finstack-chart", () => ({
-  FinstackChart: () => <div>Native chart</div>,
-}));
+vi.mock(
+  "../registry/primitives/finstack-chart/finstack-chart",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("../registry/primitives/finstack-chart/finstack-chart")
+    >()),
+    FinstackChart: () => <div>Native chart</div>,
+  }),
+);
 afterEach(cleanup);
 const market = fixture.supplemental as unknown as MarketContextStateWire;
 const native = createRequire(import.meta.url)(

@@ -1,3 +1,4 @@
+import { fxQuotes } from "../surfaces/fixtures.ts";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
@@ -60,7 +61,10 @@ try {
   const failures = [],
     requests = [],
     excludedPrefetchRequests = [];
-  page.on("pageerror", (error) => failures.push(error.message));
+  page.on("pageerror", (error) => {
+    failures.push(error.message);
+    console.error(error);
+  });
   page.on("response", (r) => {
     requests.push(r.url());
     const pathname = new URL(r.url()).pathname.slice(basePath.length);
@@ -122,14 +126,282 @@ try {
   assert.deepEqual(actual, direct);
   assert.equal(old.marketJson, request.marketJson);
   await page.getByRole("tab", { name: "2 Market" }).click();
-  await page.waitForFunction(
-    () => document.querySelectorAll("svg.ts-chart").length === 2,
-  );
+  await page.getByLabel("Search market fields").fill("/curves/0");
+  await page
+    .getByRole("button", { name: "Inspect /curves/0", exact: true })
+    .click();
+  await page.locator("svg.ts-chart").first().waitFor();
   assert(
     await page.getByRole("region", { name: "Market snapshot" }).isVisible(),
   );
   await page.getByRole("tab", { name: "1 Instrument" }).click();
   assert.equal(await amount.inputValue(), "1000000.123456789");
+  const calibrationChecks = [];
+  if (process.env.REGISTRY_PHASE3 === "1") {
+    const cases = JSON.parse(
+      await readFile(path.join(root, "tests/calibration/cases.json"), "utf8"),
+    );
+    await page.getByRole("tab", { name: "3 Calibrate" }).click();
+    const panel = page.getByRole("region", { name: "Calibration workflow" });
+    await panel
+      .getByText("Import calibration envelope", { exact: true })
+      .click();
+    for (const c of cases) {
+      await panel
+        .getByLabel("Calibration envelope JSON", { exact: true })
+        .fill(JSON.stringify(c.input));
+      await panel
+        .getByRole("button", { name: "Load envelope", exact: true })
+        .click();
+      await panel
+        .getByRole("region", { name: "Static diagnostics", exact: true })
+        .waitFor();
+      await page.waitForFunction(
+        () =>
+          !document.querySelector(
+            '[aria-label="Calibration workflow"] button[type="submit"]',
+          )?.disabled,
+      );
+      await panel
+        .getByRole("button", { name: "Calibrate", exact: true })
+        .click();
+      const output = panel.getByRole("region", {
+        name: "Native calibration result",
+        exact: true,
+      });
+      await output.waitFor({ timeout: 60000 });
+      const value = JSON.parse(await output.locator("pre").textContent());
+      assert.deepEqual(
+        value,
+        native.calibrate(JSON.stringify(c.input)),
+        c.source,
+      );
+      const step = Object.keys(value.result.step_reports)[0];
+      if (step) {
+        await panel
+          .getByLabel("Calibration report", { exact: true })
+          .selectOption(`step/${step}`);
+        await panel
+          .getByRole("region", {
+            name: `${step} calibration report`,
+            exact: true,
+          })
+          .waitFor();
+      }
+      calibrationChecks.push(c.source);
+      console.log(`Verified calibration ${c.source}`);
+      if (c.source.includes("01_usd_discount")) {
+        await panel
+          .getByRole("button", { name: "Use calibrated market", exact: true })
+          .click();
+        const marketHandle = new native.Market(
+          JSON.stringify(value.result.final_market),
+        );
+        const expectedMarket = marketHandle.toJson();
+        marketHandle.free();
+        await page.waitForFunction(
+          (expected) =>
+            JSON.parse(
+              document.querySelector(
+                '[aria-label="Last priced request JSON"] pre',
+              ).textContent,
+            ).marketJson === expected,
+          expectedMarket,
+        );
+        const priced = JSON.parse(
+          await results
+            .getByRole("region", { name: "Last priced request JSON" })
+            .locator("pre")
+            .textContent(),
+        );
+        const directPrice = native.priceInstrument(
+          priced.instrumentJson,
+          priced.marketJson,
+          priced.asOf,
+          priced.model,
+          priced.metrics,
+          priced.pricingOptions,
+          priced.marketHistory,
+        );
+        const actualPrice = JSON.parse(
+          await results
+            .getByRole("region", { name: "Complete valuation result JSON" })
+            .locator("pre")
+            .textContent(),
+        );
+        directPrice.meta.timestamp = actualPrice.meta.timestamp;
+        assert.deepEqual(actualPrice, directPrice);
+        const rate = panel.locator(
+          '[data-field-path="market_data[0].rate"] input',
+        );
+        await rate.fill("0.0527");
+        assert.equal(
+          await panel
+            .getByRole("button", { name: "Use calibrated market", exact: true })
+            .isDisabled(),
+          true,
+        );
+        await page.waitForTimeout(500);
+        assert.equal(
+          await panel
+            .getByRole("button", { name: "Use calibrated market", exact: true })
+            .isDisabled(),
+          true,
+        );
+      }
+    }
+    // Evaluate supplied native market objects through the block's public view options.
+    for (const source of ["07_swaption", "08_equity"]) {
+      const c = cases.find((item) => item.source.includes(source));
+      if (!c) throw new Error(`Missing calibration source ${source}`);
+      await panel
+        .getByLabel("Calibration envelope JSON", { exact: true })
+        .fill(JSON.stringify(c.input));
+      await panel
+        .getByRole("button", { name: "Load envelope", exact: true })
+        .click();
+      await panel
+        .getByRole("region", { name: "Static diagnostics", exact: true })
+        .waitFor();
+      await page.waitForFunction(
+        () =>
+          !document.querySelector(
+            '[aria-label="Calibration workflow"] button[type="submit"]',
+          )?.disabled,
+      );
+      await panel
+        .getByRole("button", { name: "Calibrate", exact: true })
+        .click();
+      await panel
+        .getByRole("region", { name: "Native calibration result", exact: true })
+        .waitFor();
+      await panel
+        .getByRole("button", { name: "Use calibrated market", exact: true })
+        .click();
+      await page.getByRole("tab", { name: "2 Market" }).click();
+      const field = source.includes("swaption")
+        ? "vol_cubes"
+        : source.includes("fx")
+          ? "fx_delta_vol_surfaces"
+          : "surfaces";
+      await page.getByLabel("Search market fields").fill(`/${field}/0`);
+      await page
+        .getByRole("button", { name: `Inspect /${field}/0`, exact: true })
+        .click();
+      await page
+        .getByRole("region", { name: "Selected market field" })
+        .locator("svg.ts-chart")
+        .first()
+        .waitFor();
+      assert.equal(
+        await page
+          .getByRole("region", { name: "Selected market field" })
+          .getByRole("alert")
+          .count(),
+        0,
+      );
+      await page.getByRole("tab", { name: "3 Calibrate" }).click();
+    }
+    const supplemental = JSON.parse(
+      await readFile(
+        path.join(root, "tests/market-browser/cases.json"),
+        "utf8",
+      ),
+    ).supplemental;
+    supplemental.fx_delta_vol_surfaces = [fxQuotes];
+    await page.getByRole("tab", { name: "2 Market" }).click();
+    await page.getByRole("tab", { name: "Edit", exact: true }).click();
+    const editor = page.getByRole("region", { name: "Market context form" });
+    await editor.getByText("Import market", { exact: true }).click();
+    await editor
+      .getByLabel("Market or calibration result JSON", { exact: true })
+      .fill(JSON.stringify(supplemental));
+    await editor
+      .getByRole("button", { name: "Import JSON", exact: true })
+      .click();
+    await page.getByRole("tab", { name: "View", exact: true }).click();
+    await page
+      .getByLabel("Search market fields")
+      .fill("/fx_delta_vol_surfaces/0");
+    await page
+      .getByRole("button", {
+        name: "Inspect /fx_delta_vol_surfaces/0",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("region", { name: "Selected market field" })
+      .locator("svg.ts-chart")
+      .first()
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("region", { name: "Selected market field" })
+        .getByRole("alert")
+        .count(),
+      0,
+    );
+    await page.getByRole("tab", { name: "3 Calibrate" }).click();
+    const missing = structuredClone(cases[0].input);
+    missing.plan.steps[0].quote_set = "missing_quotes";
+    await panel
+      .getByLabel("Calibration envelope JSON", { exact: true })
+      .fill(JSON.stringify(missing));
+    await panel
+      .getByRole("button", { name: "Load envelope", exact: true })
+      .click();
+    const diagnostics = panel.getByRole("region", {
+      name: "Static diagnostics",
+      exact: true,
+    });
+    await diagnostics.waitFor();
+    assert(
+      JSON.parse(await diagnostics.locator("pre").textContent()).errors.length >
+        0,
+    );
+    await panel.getByRole("button", { name: "Calibrate", exact: true }).click();
+    assert.equal(
+      await panel
+        .getByRole("region", { name: "Native calibration result", exact: true })
+        .count(),
+      0,
+    );
+    const solver = structuredClone(
+      cases.find((c) => c.source.includes("08_equity")).input,
+    );
+    solver.plan.steps[1].target_strikes = [140, 180, 220];
+    solver.plan.settings.fail_on_bad_fit = true;
+    solver.plan.settings.vol_surface = { validation_tolerance: 0.001 };
+    await panel
+      .getByLabel("Calibration envelope JSON", { exact: true })
+      .fill(JSON.stringify(solver));
+    await panel
+      .getByRole("button", { name: "Load envelope", exact: true })
+      .click();
+    await panel
+      .getByRole("region", { name: "Static diagnostics", exact: true })
+      .waitFor();
+    await page.waitForFunction(
+      () =>
+        !document.querySelector(
+          '[aria-label="Calibration workflow"] button[type="submit"]',
+        )?.disabled,
+    );
+    await panel.getByRole("button", { name: "Calibrate", exact: true }).click();
+    const failure = panel.getByRole("region", {
+      name: "Failed step structured failure",
+      exact: true,
+    });
+    await failure.waitFor();
+    const expectedFailure = JSON.parse(
+      await readFile(path.join(root, "tests/calibration/failure.json"), "utf8"),
+    );
+    assert.deepEqual(
+      JSON.parse(await failure.locator("pre").textContent()),
+      expectedFailure,
+    );
+    await page.getByRole("tab", { name: "1 Instrument" }).click();
+  }
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -182,6 +454,7 @@ try {
     fonts: requests.filter((url) => /\.woff2?(\?|$)/.test(url)),
     excludedPrefetchRequests,
     installed,
+    calibrationChecks,
     violations: [],
     failures,
     checks: [

@@ -134,3 +134,37 @@ it.each(["null", "[]", "42", '"text"', "{ malformed"])(
     expect(onSubmit).not.toHaveBeenCalled();
   },
 );
+
+it("exposes structurally valid JSON for diagnostics while native rejection prevents acceptance, and clears it on edit", async () => {
+  const input = vi.fn(),
+    accepted = vi.fn();
+  render(
+    <CalibrationForm
+      defaultJson={JSON.stringify(load("01_usd_discount"))}
+      validate={async () => {
+        throw new Error("Rejected plan");
+      }}
+      onSubmit={() => {}}
+      onValidated={accepted}
+      onInputJson={input}
+    />,
+  );
+  await waitFor(
+    () =>
+      expect(input.mock.calls.some(([json]) => typeof json === "string")).toBe(
+        true,
+      ),
+    { timeout: 5000 },
+  );
+  expect(accepted.mock.calls.every(([json]) => json === null)).toBe(true);
+  input.mockClear();
+  const field = document.querySelector(
+    '[data-field-path="market_data[0].rate"] input',
+  ) as HTMLInputElement;
+  fireEvent.change(field, { target: { value: "not-a-number" } });
+  expect(input).toHaveBeenCalledWith(null);
+  await waitFor(() =>
+    expect(screen.getAllByRole("alert").length).toBeGreaterThan(0),
+  );
+  expect(input.mock.calls.every(([json]) => json === null)).toBe(true);
+});

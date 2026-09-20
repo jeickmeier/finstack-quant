@@ -1,6 +1,6 @@
 ---
 title: Instrument pricing workbench
-description: Edit an instrument and market, then inspect native results and cashflow exports.
+description: Edit markets, calibrate canonical envelopes and inspect native pricing, reports and exports.
 ---
 
 import { RegistryDemo } from "@/components/registry-demo";
@@ -30,3 +30,21 @@ Published registry JSON is served under `/r/`; the npm WASM release is still pen
 Import `styles/finstack/theme.css` after Tailwind and mount `PricingWorkbench` inside
 `FinstackQueryProvider`. Applications with an existing Query provider may use
 `FinstackProvider` directly. Keep the installed workers, hooks and component paths together.
+
+## Calibration and market views
+
+The Calibrate tab imports complete canonical calibration envelopes. Static diagnostics
+retain native dependency errors; a solve runs on submission. Select a returned step
+for its linked residual table and chart. Use calibrated market validates the returned
+market and updates the editor and pricing together. An edited envelope must be solved
+again before its result can replace the market. Native solver failures remain visible
+with their structured fields and any available diagnostics.
+
+This demo explicitly supplies illustrative view inputs: surface extent 0–1, cube
+absolute strike 0.05 with normal extent 0–0.1 and lognormal extent 0–2, and one FX
+coordinate (expiry 1 year, strike 1.1, forward 1.12). These are demo inputs, not
+recommended market parameters. Applications supply their own `surfaceOptions`,
+`cubeOptions` and `fxOptions`; omitting them keeps stored data available. Optional
+`scenario` inputs specify the native tranche ID, grid JSON and price extent for
+structured-credit detail views. Registry checks preserve native output and do not
+certify the upstream diagnostic quote association or deferred quote-space fits.

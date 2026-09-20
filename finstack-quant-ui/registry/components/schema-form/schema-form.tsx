@@ -32,6 +32,8 @@ export interface SchemaFormProps {
   onSubmit(json: string): void | Promise<void>;
   /** Canonical validation result, cleared immediately when working values change. */
   onValidated?: (json: string | null) => void;
+  /** Structurally valid working JSON before native acceptance; null immediately on edits. Useful for native dry-run diagnostics. */
+  onInputJson?: (json: string | null) => void;
 }
 function useSchemaForm(props: SchemaFormProps) {
   const validator = useMemo(
@@ -50,6 +52,8 @@ function useSchemaForm(props: SchemaFormProps) {
   );
   const notify = useRef(props.onValidated);
   notify.current = props.onValidated;
+  const notifyInput = useRef(props.onInputJson);
+  notifyInput.current = props.onInputJson;
   const valid = useRef<{
     input: string;
     canonical: string;
@@ -73,6 +77,7 @@ function useSchemaForm(props: SchemaFormProps) {
         submission.current?.abort();
         setSubmitError(null);
         notify.current?.(null);
+        notifyInput.current?.(null);
       },
     },
     validators: {
@@ -107,6 +112,7 @@ function useSchemaForm(props: SchemaFormProps) {
     // Structural errors remain in TanStack Form; cancelled native work cannot clear them.
     void form.validate("change");
     notify.current?.(null);
+    notifyInput.current?.(null);
     setNative({ pending: true, error: null });
     const timer = setTimeout(async () => {
       const structural = validator.safeParse(values);
@@ -116,6 +122,7 @@ function useSchemaForm(props: SchemaFormProps) {
       }
       try {
         const text = props.module.codec.stringify(structural.data);
+        notifyInput.current?.(text);
         const canonical = await props.validate(text, controller.signal);
         if (controller.signal.aborted) return;
         valid.current = { input: text, canonical, validate: props.validate };

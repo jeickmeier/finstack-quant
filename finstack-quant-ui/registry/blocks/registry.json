@@ -4,18 +4,27 @@
     {
       "name": "pricing-workbench",
       "type": "registry:block",
-      "docs": "Embeddable all-instrument workbench using shared schema forms, market editor, linked stored-node table/chart, cashflow and typed/raw result components. Host owns routes; defaultInstrumentType selects a canonical example without replacing supplied market/model parameters. Complete native-validated edits feed pricing; successful result/cashflow views retain their completed request.",
+      "docs": "All-instrument workbench with complete market browser/editor, explicitly configured evaluated views, native calibration/diagnostics, linked residuals, validated market-to-pricing handoff and optional structured-credit scenarios. Host owns routes and domain inputs.",
       "files": [
         {
           "path": "pricing-workbench/pricing-workbench.tsx",
           "type": "registry:block",
           "target": "components/finstack/blocks/pricing-workbench/pricing-workbench.tsx"
+        },
+        {
+          "path": "pricing-workbench/calibration-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/blocks/pricing-workbench/calibration-panel.tsx"
+        },
+        {
+          "path": "pricing-workbench/scenario-panel.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/blocks/pricing-workbench/scenario-panel.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/instrument-form",
         "@finstack/pricing-params-form",
-        "@finstack/curve-chart",
         "@finstack/measures-grid",
         "@finstack/json-viewer",
         "@finstack/use-instrument-validator",
@@ -25,14 +34,18 @@
         "@finstack/use-market-validator",
         "@finstack/cashflow-viewer",
         "@finstack/valuation-details",
-        "@finstack/finstack-table",
-        "@finstack/use-linked-selection"
+        "@finstack/use-linked-selection",
+        "@finstack/market-context-browser",
+        "@finstack/vol-cube-explorer",
+        "@finstack/fx-surface-chart",
+        "@finstack/calibration-form",
+        "@finstack/calibration-report",
+        "@finstack/calibration-fit-chart",
+        "@finstack/use-calibrate",
+        "@finstack/use-scenario-table",
+        "@finstack/scenario-heatmap"
       ],
-      "dependencies": [
-        "@base-ui/react@1.8.0",
-        "finstack-quant-wasm@0.8.0",
-        "@tanstack/react-table@9.2.4"
-      ]
+      "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"]
     }
   ]
 }

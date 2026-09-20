@@ -2,6 +2,7 @@ import type { MarketContextStateWire } from "@/lib/finstack/generated/types/mark
 import type {
   ValuationResult,
   CalibrationResultEnvelope,
+  ScenarioTable,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
@@ -12,6 +13,14 @@ export interface PriceRequest {
   readonly metrics?: readonly string[] | null;
   readonly pricingOptions?: string | null;
   readonly marketHistory?: string | null;
+}
+export interface ScenarioRequest {
+  readonly instrumentJson: string;
+  readonly trancheId: string;
+  readonly marketJson: string;
+  readonly asOf: string;
+  /** Complete native ScenarioGrid JSON; no model inputs are inferred. */
+  readonly gridJson: string;
 }
 export interface CashflowRequest {
   readonly instrumentJson: string;
@@ -66,6 +75,7 @@ export interface WorkerApi {
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
+  scenarioTable(request: ScenarioRequest): Promise<Envelope<ScenarioTable>>;
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;
   models(): Promise<Envelope<Record<string, string[]>>>;
   metrics(): Promise<Envelope<Record<string, string[]>>>;

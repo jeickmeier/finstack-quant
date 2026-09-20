@@ -144,6 +144,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+    },
+    {
+      "name": "use-scenario-table",
+      "type": "registry:hook",
+      "docs": "Native structured-credit scenario table with immutable complete request/session keys. No locally computed prices.",
+      "files": [
+        {
+          "path": "use-scenario-table/use-scenario-table.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-scenario-table/use-scenario-table.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
     }
   ]
 }

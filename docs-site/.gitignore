@@ -11,3 +11,7 @@
 /src/workers/
 /public/r/
 /.registry-publish/
+/src/hooks/use-calibrate/
+/src/hooks/use-cube-samples/
+/src/hooks/use-fx-delta-samples/
+/src/hooks/use-scenario-table/

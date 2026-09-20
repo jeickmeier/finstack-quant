@@ -339,3 +339,39 @@ comment remains an upstream documentation exclusion. No rebasing, normalization
 or WAL/writedown overlay is performed. Neither the component nor its example
 requires a worker or workbench block. Native fixture provenance, including a
 factor-adjusted tranche, is in [PR-034 evidence](evidence/pr-034.md).
+
+The complete workbench is installed with `npx shadcn@4.21.0 add @finstack/pricing-workbench`.
+Embed `PricingWorkbench` inside `FinstackQueryProvider`. Supply an explicit
+`defaultRequest` and optionally `defaultCalibrationJson` (a complete canonical
+envelope). The Calibrate tab can also import an envelope, shows native static
+diagnostics even for semantically invalid plans, and runs the solver only on
+submission. **Use calibrated market** validates the returned market and updates
+the shared market editor and pricing request. Editing the envelope disables that
+handoff until the current envelope has been solved.
+
+Evaluated market views take explicit domain inputs through public options:
+
+```tsx
+<PricingWorkbench
+  defaultRequest={request}
+  defaultCalibrationJson={envelopeJson}
+  surfaceOptions={() => ({ colorDomain: [0, 1] })}
+  cubeOptions={() => ({
+    initialStrike: 0.05,
+    initialConvention: "normal",
+    colorDomains: { normal: [0, 0.1], black_lognormal: [0, 2] },
+  })}
+  fxOptions={() => ({
+    coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
+    colorDomain: [0, 1],
+  })}
+  scenario={{ trancheId, gridJson, priceDomain: [80, 140] }}
+/>
+```
+
+Those numbers are illustrative caller inputs, not financial defaults. Use extents,
+strike, forward and coordinates appropriate to the supplied objects. Without
+options, the market browser retains exact stored data. Scenario prices are fetched
+only when the detail panel is opened for a completed structured-credit request.
+`calibrationChartOptions` forwards existing figure annotations, export refs and
+interaction callbacks; the workbench owns the shared report/chart selection.

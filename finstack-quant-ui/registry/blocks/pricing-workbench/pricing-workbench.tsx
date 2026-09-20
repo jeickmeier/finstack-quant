@@ -12,15 +12,22 @@ import { MarketContextForm } from "@/components/finstack/components/market-conte
 import { marketModule } from "@/components/finstack/components/market-context-form/market";
 import { CashflowViewer } from "@/components/finstack/components/cashflow-viewer/cashflow-viewer";
 import { ValuationDetails } from "@/components/finstack/components/valuation-details/valuation-details";
-import { FinstackTable } from "@/components/finstack/primitives/finstack-table/finstack-table";
-import { useLinkedSelection } from "@/hooks/use-linked-selection/use-linked-selection";
-import { useMarketValidator } from "@/hooks/use-market-validator/use-market-validator";
-import type { ColumnDef } from "@tanstack/react-table";
 import {
-  CurveChart,
-  curvePanels,
-  type CurvePoint,
-} from "@/components/finstack/components/curve-chart/curve-chart";
+  MarketContextBrowser,
+  type MarketContextBrowserProps,
+} from "@/components/finstack/components/market-context-browser/market-context-browser";
+import {
+  VolCubeExplorer,
+  type VolCubeExplorerProps,
+} from "@/components/finstack/components/vol-cube-explorer/vol-cube-explorer";
+import {
+  FxSurfaceChart,
+  type FxSurfaceChartProps,
+} from "@/components/finstack/components/fx-surface-chart/fx-surface-chart";
+import { useMarketValidator } from "@/hooks/use-market-validator/use-market-validator";
+import { ScenarioPanel } from "./scenario-panel";
+import { CalibrationPanel } from "./calibration-panel";
+import type { CalibrationFitChartProps } from "@/components/finstack/components/calibration-fit-chart/calibration-fit-chart";
 import { MeasuresGrid } from "@/components/finstack/components/measures-grid/measures-grid";
 import { JsonViewer } from "@/components/finstack/primitives/json-viewer/json-viewer";
 import { useFinstack } from "@/hooks/use-finstack/use-finstack";
@@ -33,25 +40,41 @@ import {
 } from "@/hooks/use-price-instrument/use-price-instrument";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import fixture from "@/lib/finstack/fixtures/results/bond.json";
-const pointKey = (point: CurvePoint) =>
-  JSON.stringify([point.curve.type, point.curve.id, point.knot[0]]);
-const columns: ColumnDef<{}, CurvePoint, string | number>[] = [
-  { id: "curve", header: "Curve", accessorFn: (point) => point.curve.id },
-  { id: "type", header: "Variant", accessorFn: (point) => point.curve.type },
-  { id: "x", header: "Stored x", accessorFn: (point) => point.knot[0] },
-  { id: "value", header: "Stored value", accessorFn: (point) => point.knot[1] },
-];
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
   defaultRequest = fixture.request,
   density = "compact",
   defaultInstrumentType,
+  defaultCalibrationJson,
+  surfaceOptions,
+  cubeOptions,
+  fxOptions,
+  calibrationChartOptions,
+  scenario,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
   defaultRequest?: PriceRequest;
   density?: "compact" | "comfortable";
   /** Host-owned deep link selects this canonical example; supplied market/parameters stay explicit. */
   defaultInstrumentType?: string;
+  defaultCalibrationJson?: string;
+  /** Explicit native tranche/grid inputs and display extent; evaluated on the completed structured-credit request only. */
+  scenario?: {
+    trancheId: string;
+    gridJson: string;
+    priceDomain: readonly [number, number];
+  };
+  surfaceOptions?: MarketContextBrowserProps["surfaceOptions"];
+  cubeOptions?(
+    cube: MarketContextStateWire["vol_cubes"][number],
+  ): Omit<VolCubeExplorerProps, "cube"> | undefined;
+  fxOptions?(
+    surface: MarketContextStateWire["fx_delta_vol_surfaces"][number],
+  ): Omit<FxSurfaceChartProps, "surface"> | undefined;
+  calibrationChartOptions?: Omit<
+    CalibrationFitChartProps,
+    "stepId" | "report" | "marketData" | "link"
+  >;
 }) {
   const [initial] = useState(() => structuredClone(defaultRequest));
   const [initialType] = useState(() => {
@@ -63,8 +86,12 @@ export function PricingWorkbench({
     }
   });
   const [type, setType] = useState(defaultInstrumentType ?? initialType);
+  const [scenariosOpen, setScenariosOpen] = useState(false);
   const [cashflowsOpen, setCashflowsOpen] = useState(false);
-  const link = useLinkedSelection();
+  const [marketDocument, setMarketDocument] = useState({
+    json: initial.marketJson,
+    revision: 0,
+  });
   const [marketReady, setMarketReady] = useState(false);
   const [market, setMarket] = useState<{
     json: string;
@@ -82,23 +109,6 @@ export function PricingWorkbench({
             },
       );
   }, []);
-  const points = useMemo(
-    () =>
-      market
-        ? curvePanels(market.state.curves).flatMap((panel) => panel.points)
-        : [],
-    [market],
-  );
-  const addresses = useMemo(
-    () =>
-      new Map(
-        points.map((point) => [
-          pointKey(point),
-          { rowId: pointKey(point), columnId: "value" },
-        ]),
-      ),
-    [points],
-  );
   const [instrument, setInstrument] = useState<string | null>(null);
   const [params, setParams] = useState<PricingParams>(() => ({
     asOf: initial.asOf,
@@ -193,6 +203,12 @@ export function PricingWorkbench({
           >
             2 Market
           </Tabs.Tab>
+          <Tabs.Tab
+            value="calibrate"
+            className="border-b-2 border-transparent px-3 py-2 data-active:border-primary focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            3 Calibrate
+          </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel
           value="instrument"
@@ -245,7 +261,8 @@ export function PricingWorkbench({
             </Tabs.List>
             <Tabs.Panel value="edit" keepMounted>
               <MarketContextForm
-                defaultJson={initial.marketJson}
+                key={marketDocument.revision}
+                defaultJson={marketDocument.json}
                 validate={validateMarket}
                 onValidated={acceptMarket}
                 onSubmit={acceptMarket}
@@ -258,28 +275,54 @@ export function PricingWorkbench({
                 density={density}
               />
               {market && (
-                <>
-                  <FinstackTable
-                    caption="Stored curve knots"
-                    data={points}
-                    columns={columns}
-                    getRowId={pointKey}
-                    link={link}
-                    getRowKey={pointKey}
-                    getCellKey={(point, column) =>
-                      column === "value" ? pointKey(point) : null
+                <MarketContextBrowser
+                  state={market.state}
+                  surfaceOptions={surfaceOptions}
+                  renderObject={(entry) => {
+                    const [field, index] = entry.path;
+                    if (typeof index !== "number") return undefined;
+                    if (field === "vol_cubes") {
+                      const cube = market.state.vol_cubes[index]!,
+                        options = cubeOptions?.(cube);
+                      return options ? (
+                        <VolCubeExplorer
+                          key={cube.id}
+                          {...options}
+                          cube={cube}
+                        />
+                      ) : undefined;
                     }
-                    getActiveCell={(key) => addresses.get(key) ?? null}
-                    density={density}
-                  />
-                  <CurveChart
-                    curves={market.state.curves}
-                    link={{ ...link, getPointKey: pointKey }}
-                  />
-                </>
+                    if (field === "fx_delta_vol_surfaces") {
+                      const surface =
+                          market.state.fx_delta_vol_surfaces[index]!,
+                        options = fxOptions?.(surface);
+                      return options ? (
+                        <FxSurfaceChart {...options} surface={surface} />
+                      ) : undefined;
+                    }
+                    return undefined;
+                  }}
+                />
               )}
             </Tabs.Panel>
           </Tabs.Root>
+        </Tabs.Panel>
+        <Tabs.Panel
+          value="calibrate"
+          keepMounted
+          className="max-h-[55vh] space-y-3 overflow-y-auto pr-2"
+        >
+          <CalibrationPanel
+            defaultJson={defaultCalibrationJson}
+            chartOptions={calibrationChartOptions}
+            onMarket={(json) => {
+              acceptMarket(json);
+              setMarketDocument((current) => ({
+                json,
+                revision: current.revision + 1,
+              }));
+            }}
+          />
         </Tabs.Panel>
       </Tabs.Root>
       <section
@@ -315,6 +358,28 @@ export function PricingWorkbench({
             />
           )}
         </details>
+        {scenario &&
+          completed &&
+          JSON.parse(completed.request.instrumentJson).instrument?.type ===
+            "structured_credit" && (
+            <details
+              onToggle={(event) => setScenariosOpen(event.currentTarget.open)}
+            >
+              <summary>Scenario prices</summary>
+              {scenariosOpen && (
+                <ScenarioPanel
+                  request={{
+                    instrumentJson: completed.request.instrumentJson,
+                    marketJson: completed.request.marketJson,
+                    asOf: completed.request.asOf,
+                    trancheId: scenario.trancheId,
+                    gridJson: scenario.gridJson,
+                  }}
+                  priceDomain={scenario.priceDomain}
+                />
+              )}
+            </details>
+          )}
         <details>
           <summary>Last priced request</summary>
           <JsonViewer

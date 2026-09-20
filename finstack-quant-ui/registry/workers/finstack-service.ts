@@ -165,6 +165,17 @@ export function createService(native: {
         }
       });
     },
+    scenarioTable(request) {
+      return result(() =>
+        instruments.structuredCreditTrancheScenarioTable(
+          request.instrumentJson,
+          request.trancheId,
+          request.marketJson,
+          request.asOf,
+          request.gridJson,
+        ),
+      );
+    },
     cashflows(request) {
       return result(() =>
         instruments.instrumentCashflowsWithMarketJson(

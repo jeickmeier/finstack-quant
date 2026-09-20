@@ -6,7 +6,7 @@ import {
   useLinkedSelection,
   type LinkedSelection,
 } from "@/hooks/use-linked-selection/use-linked-selection";
-import { CurveChart } from "../curve-chart/curve-chart";
+import { StoredCurveView } from "../curve-chart/stored-curve-view";
 import {
   VolSurfaceChart,
   type VolSurfaceChartProps,
@@ -145,7 +145,7 @@ export function MarketContextBrowser({
     if (view === undefined) {
       if (field === "curves" && typeof position === "number")
         view = (
-          <CurveChart
+          <StoredCurveView
             curves={[state.curves[position]!]}
             ariaLabel="Selected market curve"
           />

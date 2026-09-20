@@ -15,6 +15,8 @@ import { FinstackQueryProvider } from "../registry/hooks/use-finstack/use-finsta
 import { serializeHost } from "../src/codec.mjs";
 import detailFixtures from "./details/cases.json";
 import cashflowFixtures from "./cashflows/cases.json";
+import scenarioCases from "./scenarios/cases.json";
+import pricingMarket from "./instruments/pricing-market.json";
 import fixture from "../src/fixtures/results/bond.json";
 import {
   type PriceRequest,
@@ -64,6 +66,20 @@ beforeEach(() => {
           market.free();
         }
       }
+      case "validateCalibration":
+        return native.validateCalibrationJson(request);
+      case "dryRun":
+        return native.dryRun(request);
+      case "calibrate":
+        return native.calibrate(request);
+      case "scenarioTable":
+        return native.structuredCreditTrancheScenarioTable(
+          request.instrumentJson,
+          request.trancheId,
+          request.marketJson,
+          request.asOf,
+          request.gridJson,
+        );
       case "cashflows":
         return native.instrumentCashflowsJson(
           request.instrumentJson,
@@ -235,6 +251,15 @@ it("feeds the complete native-validated market edit to pricing and shares stored
     prices()[0],
   );
   await userEvent.click(screen.getByRole("tab", { name: "View" }));
+  const curveIndex = JSON.parse(request.marketJson).curves.findIndex(
+    (curve: any) => curve.id === expected.curves[0].id,
+  );
+  fireEvent.change(screen.getByLabelText("Search market fields"), {
+    target: { value: `/curves/${curveIndex}` },
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: `Inspect /curves/${curveIndex}` }),
+  );
   const cell = screen.getByRole("cell", { name: "0.96" });
   await userEvent.click(cell);
   expect(cell.getAttribute("aria-selected")).toBe("true");
@@ -346,3 +371,58 @@ it("lets the host deep link select another canonical example while preserving ex
   expect(request.marketJson).toBe(canonicalMarket(fixture.request.marketJson));
   expect(request.model).toBe(fixture.request.model);
 });
+
+it("loads configured scenario prices only on demand from the completed structured-credit context", async () => {
+  const request = {
+    instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),
+    marketJson: JSON.stringify(pricingMarket),
+    asOf: scenarioCases.asOf,
+    model: "discounting",
+    metrics: [],
+  };
+  const scenario = {
+    trancheId: scenarioCases.trancheId,
+    gridJson: JSON.stringify(scenarioCases.grid),
+    priceDomain: [80, 140] as const,
+  };
+  render(
+    <FinstackQueryProvider>
+      <PricingWorkbench defaultRequest={request} scenario={scenario} />
+    </FinstackQueryProvider>,
+  );
+  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 10000 });
+  expect(call.mock.calls.some(([method]) => method === "scenarioTable")).toBe(
+    false,
+  );
+  const toggle = await screen.findByText(
+    "Scenario prices",
+    { selector: "summary" },
+    { timeout: 5000 },
+  );
+  fireEvent.click(toggle);
+  await waitFor(
+    () =>
+      expect(
+        call.mock.calls.some(([method]) => method === "scenarioTable"),
+      ).toBe(true),
+    { timeout: 5000 },
+  );
+  const invocation = call.mock.calls.find(
+    ([method]) => method === "scenarioTable",
+  )![1];
+  expect(invocation).toEqual({
+    instrumentJson: prices()[0].instrumentJson,
+    marketJson: prices()[0].marketJson,
+    asOf: prices()[0].asOf,
+    trancheId: scenario.trancheId,
+    gridJson: scenario.gridJson,
+  });
+  await waitFor(
+    () =>
+      expect(
+        document.querySelector('[aria-label="CLONOTES-A scenario prices"]'),
+      ).toBeTruthy(),
+    { timeout: 5000 },
+  );
+  expect(prices()).toHaveLength(1);
+}, 30000);
