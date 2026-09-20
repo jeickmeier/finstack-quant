@@ -41,6 +41,29 @@ const contracts = roots.map(({ schema }) => {
 });
 const items = [
   {
+    name: "curve-link-example",
+    type: "registry:component",
+    docs: "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
+    files: [
+      {
+        path: "registry/components/curve-link-example/curve-link-example.tsx",
+        type: "registry:component",
+        target:
+          "components/finstack/components/curve-link-example/curve-link-example.tsx",
+      },
+      file("fixtures/curves/market.json"),
+    ],
+    registryDependencies: [
+      "@finstack/finstack-table",
+      "@finstack/curve-chart",
+      "@finstack/use-linked-selection",
+      "@finstack/finstack-codec",
+      "@finstack/contract-market-context-state",
+    ],
+    dependencies: ["@tanstack/charts@0.18.0", "@tanstack/react-table@9.2.4"],
+  },
+
+  {
     name: "pricing-forms-example",
     type: "registry:component",
     docs: "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",

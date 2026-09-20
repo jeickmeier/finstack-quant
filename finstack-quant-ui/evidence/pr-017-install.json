@@ -14,9 +14,7 @@
       "http://127.0.0.1:52766/finstack-quant/_next/static/media/ibm-plex-mono-latin-500-normal.11q3guvgd1r20.woff2"
     ],
     "excludedPrefetchRequests": [],
-    "installed": [
-      "pricing-workbench"
-    ],
+    "installed": ["pricing-workbench"],
     "violations": [],
     "failures": [],
     "checks": [
@@ -34,12 +32,7 @@
     "basePath": "/finstack-quant",
     "verdict": "pass",
     "seed": "10049819788103739979",
-    "cases": [
-      "bond",
-      "stochastic",
-      "badInstrument",
-      "missingMarket"
-    ],
+    "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
     "initializationError": {
       "ok": false,
       "error": {
@@ -287,9 +280,7 @@
       "http://127.0.0.1:52602/",
       "http://127.0.0.1:52602/labs/"
     ],
-    "installed": [
-      "pricing-workbench"
-    ],
+    "installed": ["pricing-workbench"],
     "violations": [],
     "failures": [],
     "checks": [
@@ -307,12 +298,7 @@
     "basePath": "",
     "verdict": "pass",
     "seed": "10049819788103739979",
-    "cases": [
-      "bond",
-      "stochastic",
-      "badInstrument",
-      "missingMarket"
-    ],
+    "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
     "initializationError": {
       "ok": false,
       "error": {
@@ -489,12 +475,7 @@
     "basePath": "/finstack-quant",
     "verdict": "pass",
     "seed": "10049819788103739979",
-    "cases": [
-      "bond",
-      "stochastic",
-      "badInstrument",
-      "missingMarket"
-    ],
+    "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
     "initializationError": {
       "ok": false,
       "error": {
@@ -682,9 +663,7 @@
       "http://127.0.0.1:52659/finstack-quant/",
       "http://127.0.0.1:52659/finstack-quant/labs/"
     ],
-    "installed": [
-      "pricing-workbench"
-    ],
+    "installed": ["pricing-workbench"],
     "violations": [],
     "failures": [],
     "checks": [
@@ -710,9 +689,7 @@
       "http://127.0.0.1:52725/_next/static/media/ibm-plex-mono-latin-500-normal.11q3guvgd1r20.woff2"
     ],
     "excludedPrefetchRequests": [],
-    "installed": [
-      "pricing-workbench"
-    ],
+    "installed": ["pricing-workbench"],
     "violations": [],
     "failures": [],
     "checks": [
@@ -730,12 +707,7 @@
     "basePath": "",
     "verdict": "pass",
     "seed": "10049819788103739979",
-    "cases": [
-      "bond",
-      "stochastic",
-      "badInstrument",
-      "missingMarket"
-    ],
+    "cases": ["bond", "stochastic", "badInstrument", "missingMarket"],
     "initializationError": {
       "ok": false,
       "error": {

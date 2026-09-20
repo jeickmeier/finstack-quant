@@ -30,6 +30,8 @@ export interface CurveChartProps
   extends FigureText, FigureInteractions<CurvePoint, number, number> {
   /** Validated canonical entries. Same-variant entries overlay; variants get separate panels. */
   curves: readonly CurveState[];
+  /** Distinguishes landmarks when multiple curve views share a page. */
+  ariaLabel?: string;
   height?: number;
   width?: number;
   axes?: { x?: ChartAxisOptions<number>; y?: ChartAxisOptions<number> };
@@ -160,7 +162,7 @@ function KnotPanel({
   return (
     <FinstackChart
       definition={definition}
-      ariaLabel={`${panel.type} stored curves`}
+      ariaLabel={`${props.ariaLabel ?? panel.type} stored curves`}
       title={props.title ?? panel.route.source.description}
       subtitle={props.subtitle}
       caption={props.caption}
@@ -183,7 +185,14 @@ export function CurveChart(props: CurveChartProps) {
     <div className="space-y-6 font-sans text-sm text-foreground">
       {panels.length === 0 && <p>No curves supplied</p>}
       {panels.map((panel) => (
-        <section key={panel.type} aria-label={`${panel.type} panel`}>
+        <section
+          key={panel.type}
+          aria-label={
+            props.ariaLabel
+              ? `${props.ariaLabel}: ${panel.type} panel`
+              : `${panel.type} panel`
+          }
+        >
           {panel.route.route === "stored-knots" ? (
             panel.points.length ? (
               <KnotPanel panel={panel} props={props} />

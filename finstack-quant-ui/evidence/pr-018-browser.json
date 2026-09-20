@@ -1,0 +1,58 @@
+{
+  "reports": [
+    {
+      "browser": "145.0.7632.6",
+      "reports": [
+        {
+          "name": "finstack-table",
+          "installed": [
+            "finstack-table",
+            "finstack-base",
+            "finstack-theme",
+            "finstack-format",
+            "finstack-codec",
+            "finstack-host",
+            "contract-valuation-result",
+            "use-linked-selection"
+          ],
+          "violations": [],
+          "failures": [],
+          "chartRuntime": false,
+          "wasmRuntime": false,
+          "verdict": "pass"
+        }
+      ],
+      "verdict": "pass"
+    },
+    {
+      "browser": "145.0.7632.6",
+      "reports": [
+        {
+          "name": "curve-link-example",
+          "installed": [
+            "curve-link-example",
+            "finstack-table",
+            "finstack-base",
+            "finstack-theme",
+            "finstack-format",
+            "finstack-codec",
+            "finstack-host",
+            "contract-valuation-result",
+            "use-linked-selection",
+            "curve-chart",
+            "finstack-chart",
+            "contract-market-context-state",
+            "finstack-views"
+          ],
+          "violations": [],
+          "failures": [],
+          "chartRuntime": true,
+          "wasmRuntime": false,
+          "verdict": "pass"
+        }
+      ],
+      "verdict": "pass"
+    }
+  ],
+  "verdict": "pass"
+}

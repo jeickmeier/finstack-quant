@@ -26,12 +26,18 @@
           "path": "finstack-table/finstack-table.tsx",
           "type": "registry:ui",
           "target": "components/finstack/primitives/finstack-table/finstack-table.tsx"
+        },
+        {
+          "path": "finstack-table/selection.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/primitives/finstack-table/selection.ts"
         }
       ],
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
-        "@finstack/finstack-format"
+        "@finstack/finstack-format",
+        "@finstack/use-linked-selection"
       ],
       "dependencies": ["@tanstack/react-table@9.2.4"]
     },
