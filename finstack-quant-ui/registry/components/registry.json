@@ -15,6 +15,11 @@
           "path": "figure-example/linked-figures.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/figure-example/linked-figures.tsx"
+        },
+        {
+          "path": "figure-example/figure-data.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/figure-example/figure-data.ts"
         }
       ],
       "registryDependencies": [
@@ -291,7 +296,7 @@
       ],
       "registryDependencies": [
         "@finstack/date-input",
-        "@finstack/model-picker",
+        "@finstack/enum-field",
         "@finstack/metric-picker",
         "@finstack/field-frame",
         "@finstack/json-viewer",
@@ -323,7 +328,8 @@
         "@finstack/use-cashflows",
         "@finstack/finstack-format",
         "table",
-        "badge"
+        "badge",
+        "@finstack/contract-instrument-cashflow"
       ],
       "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
       "categories": ["Individual Components"],
@@ -332,6 +338,7 @@
         "wasmVersion": "0.8.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
@@ -421,11 +428,6 @@
           "path": "valuation-details/valuation-details.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/valuation-details/valuation-details.tsx"
-        },
-        {
-          "path": "valuation-details/raw-details.tsx",
-          "type": "registry:component",
-          "target": "components/finstack/components/valuation-details/raw-details.tsx"
         }
       ],
       "registryDependencies": [
@@ -468,7 +470,6 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/contract-market-context-state",
-        "@finstack/finstack-fixtures",
         "button",
         "label",
         "textarea"
@@ -479,7 +480,6 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]

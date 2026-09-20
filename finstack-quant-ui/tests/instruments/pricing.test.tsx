@@ -153,9 +153,7 @@ it.each(manifest.cases)(
     const initial = module.codec.parse(validated) as Record<string, unknown>;
     const submit = vi.fn();
     const validate = async (instrumentJson: string) =>
-      unwrap(
-        await worker.proxy.validate({ instrumentJson, revision: entry.type }),
-      ).json;
+      unwrap(await worker.proxy.validate(instrumentJson));
     const { container } = render(
       <SchemaForm
         module={module}

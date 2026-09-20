@@ -73,10 +73,11 @@ integers and non-JSON host objects fail instead of silently losing information.
 `finstack-quant-ui/host` reuses published facade types. `adaptValuation` preserves
 actual structured results, and `exportValuation(result,
 valuations.validateValuationResultJson)` emits integer tokens validated by Rust.
-Only Monte Carlo details have a typed view. The other four variants retain raw
-host values, including bigint counts found in live structured-credit results.
-Cashflow viewers must keep the original Rust JSON string; the live FX-swap
-fixture returns mixed-currency rows despite stale facade documentation.
+All five detail variants use Rust-derived WASM host declarations and validation
+metadata. Monte Carlo has a dedicated view; the other four retain raw views,
+including structured-credit bigint counts. Cashflow structure comes from the
+published Rust `instrument_cashflow` schema. Its presentation adapter preserves
+numeric tokens and the original JSON, including mixed-currency FX-swap rows.
 
 `src/contract-provenance.json` records canonical schema pointers, exact facade
 signatures and inputs, conventions, raw routes and deferred gaps. It includes
@@ -121,9 +122,14 @@ feasibility passes; the original 10 MB failure is retained in the evidence.
 Compression does not waive this raw-byte gate. See the
 [PR-004 evidence and reproduction commands](evidence/pr-004.md).
 
+`mise run wasm-pkg` owns the optimized web build and records raw/optimized/gzip/
+Brotli measurements without a UI-specific limit. `mise run ui-size` checks the
+selected artifact hash and enforces the 25,000,000-byte UI budget.
+
 `test:footprint` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
-package and matching generated glue. The size script reports raw/optimized/gzip/
-Brotli bytes and returns a failing exit code when the raw optimized limit is exceeded.
+package and matching generated glue, and runs the size gate before browser
+measurements. `REGISTRY_WASM_PACKAGE` also selects the package for `ui-size`; it
+defaults to the repository web package.
 
 ## Registry distribution
 
@@ -185,7 +191,7 @@ host (inside the worker for browser consumers). Column presets target Table
 
 ## Controlled primitives
 
-The 18 public primitives install under `components/finstack/primitives`, with a
+The controlled input and value primitives install under `components/finstack/primitives`, with a
 shared `field-frame`. Each declares its theme and actual dependency closure.
 Cross-category imports use the consumer's standard `@/lib/finstack` alias;
 configure `@/*` to the application source root. The CLI handles `src` layouts.
@@ -209,7 +215,7 @@ consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 
 ## Worker and query boundary
 
-Install `@finstack/use-price-instrument` and/or `@finstack/use-validate-instrument`.
+Install `@finstack/use-price-instrument` and/or `@finstack/use-instrument-validator`.
 They include `use-finstack` and the worker closure. Hooks install at project-root
 `hooks/<item>/`; the worker/service/contracts install at project-root `workers/`
 (the `~/` registry target intentionally stays outside an optional `src` folder).
@@ -233,8 +239,9 @@ canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns ori
 text. `CashflowViewer` presents its native rows in a table, with exact JSON copy/download in a secondary disclosure;
 unsupported export preserves caller pricing/model state and shows the native error.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
-`useValidateInstrument` takes canonical text and a caller-owned revision; its
-250ms debounce never exposes a different revision's validation error or result.
+`useInstrumentValidator` accepts canonical text and an optional abort signal;
+`SchemaForm` owns the 250ms debounce and prevents superseded responses from
+replacing the current validation state.
 
 Run `UV_NO_SYNC=1 mise run wasm-pkg` for scoped package builds; disabling uv
 synchronization prevents the final marker-file command from rebuilding Python.
@@ -355,7 +362,7 @@ factor-adjusted tranche, is in [PR-034 evidence](evidence/pr-034.md).
 
 The complete workbench is installed with `npx shadcn@4.21.0 add @finstack/pricing-workbench`.
 Embed `PricingWorkbench` inside `FinstackQueryProvider`. Supply an explicit
-`defaultRequest` and optionally `defaultCalibrationJson` (a complete canonical
+a required `defaultRequest` (the caller owns example/default data) and optionally `defaultCalibrationJson` (a complete canonical
 envelope). The Calibrate tab can also import an envelope, shows native static
 diagnostics even for semantically invalid plans, and runs the solver only on
 submission. **Use calibrated market** validates the returned market and updates

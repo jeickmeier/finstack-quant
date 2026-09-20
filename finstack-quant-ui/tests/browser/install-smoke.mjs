@@ -123,9 +123,13 @@ await writeFile(
   path.join(external, "app/layout.tsx"),
   'import "./globals.css"; export default function Layout({ children }: {children: React.ReactNode}) { return <html lang="en"><body>{children}</body></html>; }\n',
 );
+await cp(
+  path.join(ui, "src/fixtures/results/bond.json"),
+  path.join(external, "app/bond.json"),
+);
 await writeFile(
   path.join(external, "app/page.tsx"),
-  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/use-finstack/use-finstack";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench /></FinstackQueryProvider></main>; }\n',
+  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} /></FinstackQueryProvider></main>; }\n',
 );
 const hash = createHash("sha256")
   .update(

@@ -1,3 +1,4 @@
+import { figureExample } from "@/components/finstack/components/figure-example/figure-data";
 import { useEffect, useRef } from "react";
 import { readPresentation } from "./components/finstack/primitives/finstack-chart/presentation";
 import { createRoot } from "react-dom/client";
@@ -9,10 +10,7 @@ import {
   FinstackChart,
   type FigureHandle,
 } from "./components/finstack/primitives/finstack-chart/finstack-chart";
-import {
-  figureExample,
-  FigureExample,
-} from "./components/finstack/components/figure-example/figure-example";
+import { FigureExample } from "./components/finstack/components/figure-example/figure-example";
 const dates = [
   { date: new Date("2025-01-01T00:00Z"), value: -2e6 },
   { date: new Date("2025-02-01T00:00Z"), value: 1e6 },

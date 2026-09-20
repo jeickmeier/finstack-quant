@@ -768,8 +768,7 @@
     {
       "id": "valuation-details",
       "route": "host-declaration",
-      "convention": "Only the published MonteCarloValuationDetails is typed; remaining data is unknown.",
-      "deferred": "weak-detail-declarations",
+      "convention": "All detail variants use Rust-derived WASM host declarations and validation metadata.",
       "api": {
         "name": "valuations.instruments.priceInstrument",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -949,8 +948,7 @@
     {
       "id": "cashflow-viewer",
       "route": "native-json-table",
-      "convention": "CashflowRow presentation adapter from valuations/src/instruments/common_impl/cashflow_export.rs. Lossless tokens, native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
-      "deferred": "cashflow-declarations",
+      "convention": "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
       "api": {
         "name": "valuations.instruments.instrumentCashflowsJson",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -981,7 +979,16 @@
         "returns": "string",
         "declaration": "/**\n   * Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.\n   *\n   * `model` must be `\"discounting\"` or `\"hazard_rate\"`. Unsupported models or\n   * incompatible instrument types throw. Hazard-rate export also rejects bonds\n   * with call, put, or return-floor rights because static rows cannot represent\n   * exercise-contingent value. For supported static-flow pairs, the envelope's\n   * `total_pv` matches the instrument's `base_value` within rounding.\n   * @returns Per-flow cashflow envelope JSON (discount factor, survival, PV).\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Must be `\"discounting\"` or `\"hazard_rate\"`; `\"default\"` is not accepted.\n   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.\n   */\n  instrumentCashflowsJson(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model: string\n  ): string;",
         "sha256": "239c436e5b835473d57ee96c08af0ac2839fda784b1dc96993aad11a72b2f6f4"
-      }
+      },
+      "schemas": [
+        {
+          "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
+          "pointer": "#",
+          "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
+          "sha256": "7142e7d3100f6e6b9f8efc2e5a4f0f0648dfacd316051c498ee00c57ddd027fa",
+          "description": "Native cashflow rows, reporting-currency PV and reconciliation status."
+        }
+      ]
     },
     {
       "id": "curve-chart",
@@ -1239,8 +1246,7 @@
     {
       "id": "scenario-heatmap",
       "route": "returned-prices",
-      "convention": "Rust clean settlement price, percent of current tranche balance; facade original-balance wording is upstream drift.",
-      "deferred": "scenario-price-docs",
+      "convention": "Rust clean settlement price, percent of current tranche balance.",
       "api": {
         "name": "valuations.instruments.structuredCreditTrancheScenarioTable",
         "source": "finstack-quant-wasm/index.d.ts",
@@ -1289,14 +1295,14 @@
     {
       "name": "ValuationDetails",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Model-specific detail carried by a valuation result.\n */\nexport type ValuationDetails =\n  | { type: 'monte_carlo'; data: MonteCarloValuationDetails }\n  | {\n      type: 'composite' | 'credit_derivative' | 'structured_credit_stochastic' | 'fx';\n      data: unknown;\n    };",
-      "sha256": "545ad677c81f3c0b9230e846e08acca13d295d5043ea1d16811091ffb1292423"
+      "declaration": "/**\n * Model-specific native detail, generated from Rust with exact host integer representations.\n */\nexport type ValuationDetails = import('./types/valuation-result').ValuationDetails;",
+      "sha256": "e1f4a49abc2e18d23b84a2be5c96c3816005315f856da21c7327a95dd22babb4"
     },
     {
       "name": "MonteCarloValuationDetails",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Convergence and reproducibility diagnostics for a Monte Carlo valuation.\n */\nexport interface MonteCarloValuationDetails {\n  /**\n   * Registered model key used for the simulation.\n   */\n  model_key: string;\n  /**\n   * Sampling standard error of the discounted PV mean in the result currency.\n   * For LSMC valuations, this measures pricing-path uncertainty under the\n   * frozen fitted exercise policy. It excludes regression approximation,\n   * time-grid discretization, and model error.\n   */\n  standard_error: number;\n  /**\n   * Configured independent paths used to fit the exercise or control policy.\n   */\n  training_paths: number;\n  /**\n   * Training factor paths including antithetic partners.\n   */\n  training_simulated_paths: number;\n  /**\n   * Configured independent paths used to fit state-conditional make-whole\n   * reference values; zero when that stage is absent.\n   */\n  make_whole_training_paths: number;\n  /**\n   * Make-whole training paths including antithetic partners; zero when that\n   * stage is absent.\n   */\n  make_whole_training_simulated_paths: number;\n  /**\n   * Independent path estimators contributing to the reported mean.\n   */\n  estimator_paths: number;\n  /**\n   * Total estimator paths including antithetic partners.\n   */\n  simulated_paths: number;\n  /**\n   * Deterministic random seed used for the run, preserved across the full\n   * unsigned 64-bit range.\n   */\n  seed: bigint;\n  /**\n   * Simulation times in year fractions, including zero and maturity.\n   */\n  time_grid: number[];\n  /**\n   * Whether antithetic variates were enabled.\n   */\n  antithetic: boolean;\n  /**\n   * Whether Sobol quasi-random sampling was enabled.\n   */\n  sobol: boolean;\n  /**\n   * Whether Brownian-bridge ordering was enabled for Sobol paths.\n   */\n  brownian_bridge: boolean;\n}",
-      "sha256": "862a1b8c5a848f1fb7ed27edfbe14d03baff2270d4bb74590674ea8f82b581d5"
+      "declaration": "/**\n * Convergence and reproducibility diagnostics for a Monte Carlo valuation.\n */\nexport type MonteCarloValuationDetails = import('./types/valuation-result').MonteCarloValuationDetails;",
+      "sha256": "e477db664943e8533a784c326a7ebfc84ea98ce05ed498a822539068527d51b7"
     },
     {
       "name": "MoneyValue",
@@ -1307,8 +1313,8 @@
     {
       "name": "TrancheScenarioCell",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * One evaluated scenario cell of a structured-credit tranche scenario table.\n */\nexport interface TrancheScenarioCell {\n  /**\n   * Constant prepayment rate for the cell, annual decimal.\n   */\n  cpr: number;\n  /**\n   * Constant default rate for the cell, annual decimal.\n   */\n  cdr: number;\n  /**\n   * Loss severity for the cell, decimal.\n   */\n  severity: number;\n  /**\n   * Tranche price, as a percentage of original balance.\n   */\n  price: number;\n  /**\n   * Weighted-average life, in years.\n   */\n  wal: number;\n  /**\n   * Principal writedown, in currency units.\n   */\n  writedown: number;\n}",
-      "sha256": "e4639e3f4f26086e5db649d34256a1d1998e1561848047aa2665e493115697e1"
+      "declaration": "/**\n * One evaluated scenario cell of a structured-credit tranche scenario table.\n */\nexport interface TrancheScenarioCell {\n  /**\n   * Constant prepayment rate for the cell, annual decimal.\n   */\n  cpr: number;\n  /**\n   * Constant default rate for the cell, annual decimal.\n   */\n  cdr: number;\n  /**\n   * Loss severity for the cell, decimal.\n   */\n  severity: number;\n  /**\n   * Clean settlement price as a percentage of current outstanding balance.\n   */\n  price: number;\n  /**\n   * Weighted-average life, in years.\n   */\n  wal: number;\n  /**\n   * Principal writedown, in currency units.\n   */\n  writedown: number;\n}",
+      "sha256": "4a1cf80e484e09ad14c815a8674e59af3b17ac58ca13fec42daa58c6fb99d5bd"
     },
     {
       "name": "VolCubeConstructor",
@@ -1323,6 +1329,10 @@
       "sha256": "2a3263437a537c7d33f59512e70ed382e72d0681604daf3056ac03014a0dce66"
     }
   ],
+  "hostContract": {
+    "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
+    "sha256": "1da186b5bad4bab69ec309e354bb325dedeb8af6c6d83a893a7d62b4d1c653f0"
+  },
   "details": [
     {
       "type": "composite",
@@ -1351,12 +1361,9 @@
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",
-    "cashflow-declarations": "No public typed WASM cashflow return. The viewer validates a presentation-only adapter against canonical Rust CashflowRow and native fixtures; it does not add a native API.",
-    "weak-detail-declarations": "Unknown host details remain raw. Actual structured-credit num_paths is bigint; the typed Monte Carlo path counts are number. Never infer unknown host shapes from wire integer formats.",
     "full-state-curve-evaluation": "Use stored nodes and parameters; no constructor-based curve recreation.",
     "off-grid-surface-evaluation": "Stored nodes only.",
     "quote-space-calibration-fits": "Returned residuals only until quote repricing is published.",
-    "scenario-price-docs": "Rust defines clean settlement percent of current balance.",
     "missing-financial-aggregates": "Unavailable unless an existing canonical result supplies the value."
   }
 }

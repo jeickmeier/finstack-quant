@@ -641,14 +641,29 @@ run = [
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"
 run = [
-  "node finstack-quant-ui/scripts/build-wasm-web.mjs",
+  "node finstack-quant-wasm/scripts/build-web.mjs",
   "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
   '''uv run python -c "from pathlib import Path; [Path(p).touch() for p in ('finstack-quant-wasm/pkg/.npmignore', 'finstack-quant-wasm/pkg-node/.npmignore')]"''',
+]
+
+[tasks.wasm-gen-contracts]
+description = "Generate Rust-derived WASM host result schema and declarations"
+run = [
+  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
+  "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
+]
+
+[tasks.wasm-check-contracts]
+description = "Check Rust-derived WASM host result schema and declarations"
+run = [
+  "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check",
+  "node finstack-quant-wasm/scripts/generate-contract-types.mjs --check",
 ]
 
 [tasks.wasm-gen-bindings]
 description = "Export TypeScript types from Rust (writes finstack-quant-wasm/types/generated/)"
 run = [
+  "mise run wasm-gen-contracts",
   "cargo test -p finstack-quant-calibration --test ts_export --features ts_export -- --test-threads=1",
   "cargo test -p finstack-quant-portfolio --test ts_export --features ts_export",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
@@ -657,6 +672,7 @@ run = [
 [tasks.wasm-check-bindings]
 description = "Verify Rust-exported TypeScript types without mutating the workspace"
 run = [
+  "mise run wasm-check-contracts",
   "uv run --no-sync pytest scripts/tests/test_check_generated_ts.py -q",
   "uv run --no-sync python scripts/check_generated_ts.py",
 ]
@@ -1011,6 +1027,10 @@ run = "npm --prefix finstack-quant-ui run generate"
 [tasks.ui-check]
 description = "Check component-registry generation drift, types, and focused tests"
 run = "npm --prefix finstack-quant-ui run check"
+
+[tasks.ui-size]
+description = "Enforce the UI raw-byte budget on the optimized WASM package"
+run = "npm --prefix finstack-quant-ui run test:size"
 
 [tasks.ui-build]
 description = "Build component-registry distribution with the pinned shadcn CLI"

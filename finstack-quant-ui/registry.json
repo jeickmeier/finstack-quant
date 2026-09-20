@@ -183,7 +183,7 @@
         }
       ],
       "registryDependencies": [
-        "@finstack/finstack-codec",
+        "@finstack/finstack-host",
         "@finstack/contract-market-context-state"
       ],
       "dependencies": ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
@@ -192,7 +192,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -3646,6 +3647,38 @@
         "wasmVersion": "0.8.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-instrument-cashflow",
+      "type": "registry:lib",
+      "docs": "Installs contract-instrument-cashflow under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/instrument_cashflow.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/instrument_cashflow.json"
+        },
+        {
+          "path": "src/generated/types/instrument_cashflow.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/instrument_cashflow.ts"
+        },
+        {
+          "path": "src/generated/meta/instrument_cashflow.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/instrument_cashflow.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json"
         ]
       }
     },

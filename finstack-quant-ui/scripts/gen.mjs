@@ -77,9 +77,12 @@ export async function generate(repo = repoRoot) {
     .filter(
       (entry) =>
         /\/instrument\/1\/[^/]+\/[^/]+\.schema\.json$/.test(entry.$id) ||
-        ["calibration", "market_context_state", "valuation_result"].some(
-          (name) => entry.$id.endsWith(`/${name}.schema.json`),
-        ),
+        [
+          "calibration",
+          "market_context_state",
+          "valuation_result",
+          "instrument_cashflow",
+        ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));
   const files = new Map();

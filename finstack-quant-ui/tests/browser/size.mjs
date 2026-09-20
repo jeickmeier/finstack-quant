@@ -1,32 +1,32 @@
-import { readFile, writeFile } from "node:fs/promises";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { gzipSync, brotliCompressSync, constants } from "node:zlib";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const [rawPath, optimizedPath, output] = process.argv.slice(2);
-if (!rawPath || !optimizedPath || !output)
-  throw new Error(
-    "Usage: node size.mjs <raw.wasm> <optimized.wasm> <report.json>",
-  );
-const raw = await readFile(rawPath);
-const optimized = await readFile(optimizedPath);
-const hash = (value) => createHash("sha256").update(value).digest("hex");
+const pkg = resolve(
+  process.env.REGISTRY_WASM_PACKAGE ??
+    fileURLToPath(new URL("../../../finstack-quant-wasm/pkg", import.meta.url)),
+);
+const measured = JSON.parse(
+  await readFile(resolve(pkg, "size-report.json"), "utf8"),
+);
+const binary = await readFile(resolve(pkg, "finstack_quant_wasm_bg.wasm"));
+assert.equal(
+  binary.length,
+  measured.optimizedBytes,
+  "Size report must match the selected WASM artifact",
+);
+assert.equal(
+  createHash("sha256").update(binary).digest("hex"),
+  measured.optimizedSha256,
+  "Size report must identify the selected WASM artifact",
+);
 const limitBytes = 25_000_000;
 const report = {
-  measuredAt: new Date().toISOString(),
-  rawBytes: raw.length,
-  optimizedBytes: optimized.length,
-  gzipBytes: gzipSync(optimized, { level: 9 }).length,
-  brotliBytes: brotliCompressSync(optimized, {
-    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-  }).length,
-  rawSha256: hash(raw),
-  optimizedSha256: hash(optimized),
+  ...measured,
   limitBytes,
-  verdict: optimized.length <= limitBytes ? "pass" : "fail",
-  method:
-    "Raw is wasm-bindgen output from release-size with --no-opt. Optimized uses wasm-opt -Oz with the existing release feature allowlist. Compression is gzip level 9 and Brotli quality 11; neither changes the raw-byte gate.",
+  verdict: binary.length <= limitBytes ? "pass" : "fail",
 };
-await writeFile(output, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
-
 if (report.verdict === "fail") process.exitCode = 1;

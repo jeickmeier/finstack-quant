@@ -19,6 +19,8 @@ DEFAULT_PATHS = (
     Path("finstack-quant/valuations/tests/instruments/json_examples"),
     Path("finstack-quant/portfolio/schemas"),
     Path("finstack-quant-wasm/types/generated"),
+    Path("finstack-quant-wasm/types/valuation-result.d.ts"),
+    Path("finstack-quant-wasm/schemas/host"),
     Path("finstack-quant-ui/src/generated"),
     Path("finstack-quant-ui/src/contract-provenance.json"),
     Path("finstack-quant-ui/registry.json"),
@@ -30,6 +32,8 @@ DEFAULT_PATHS = (
 DEFAULT_MANIFEST_PATHS = (
     Path("finstack-quant/valuations/tests/instruments/json_examples"),
     Path("finstack-quant-wasm/types/generated"),
+    Path("finstack-quant-wasm/types/valuation-result.d.ts"),
+    Path("finstack-quant-wasm/schemas/host"),
     Path("finstack-quant-ui/src/generated"),
     Path("finstack-quant-ui/src/contract-provenance.json"),
     Path("finstack-quant-ui/registry.json"),

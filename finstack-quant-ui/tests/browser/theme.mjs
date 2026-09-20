@@ -1,18 +1,15 @@
+import { buildConsumer, openConsumer, closeConsumer } from "./consumer.mjs";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { build } from "vite";
-import tailwind from "@tailwindcss/postcss";
-import { chromium } from "playwright";
-import { serveExport } from "./static-server.mjs";
 import { copyShadcn } from "../../scripts/shadcn.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-theme-"));
-let browser, server;
+let browser, server, page;
 try {
   await promisify(execFile)(
     process.execPath,
@@ -42,26 +39,13 @@ try {
     path.join(consumer, "public/tenant.css"),
     await readFile(path.join(root, "tests/fixtures/tenant.css")),
   );
-  await writeFile(
-    path.join(consumer, "app.css"),
-    '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./components";\n',
-  );
-  await writeFile(
-    path.join(consumer, "index.html"),
-    `<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Registry theme</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface p-8"><main class="max-w-3xl mx-auto"><h1 class="text-xl font-medium">Component registry theme</h1><p class="text-muted-foreground my-4">IBM Plex · shared controls, tables and charts</p><section class="bg-card border border-border rounded-md p-4"><label class="block text-sm" for="field">Instrument identifier</label><div id="field-host"></div><div id="row" class="finstack-row finstack-numeric flex items-center justify-between border-b border-border"><span>Present value · USD</span><span>1,024,567.80</span></div><p class="text-primary my-4">Shared tenant primary</p><div class="flex gap-2">${Array.from({ length: 6 }, (_, i) => `<span class="rounded-sm p-2 text-xs" style="border: var(--border-width) solid var(--chart-${i + 1})">Series ${i + 1}</span>`).join("")}</div></section></main><script type="module" src="/main.tsx"></script></body></html>`,
-  );
-  await build({
-    root: consumer,
-    configFile: false,
-    logLevel: "warn",
-    css: { postcss: { plugins: [tailwind()] } },
-    build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
+
+  await buildConsumer(consumer, {
+    html: `<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Registry theme</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface p-8"><main class="max-w-3xl mx-auto"><h1 class="text-xl font-medium">Component registry theme</h1><p class="text-muted-foreground my-4">IBM Plex · shared controls, tables and charts</p><section class="bg-card border border-border rounded-md p-4"><label class="block text-sm" for="field">Instrument identifier</label><div id="field-host"></div><div id="row" class="finstack-row finstack-numeric flex items-center justify-between border-b border-border"><span>Present value · USD</span><span>1,024,567.80</span></div><p class="text-primary my-4">Shared tenant primary</p><div class="flex gap-2">${Array.from({ length: 6 }, (_, i) => `<span class="rounded-sm p-2 text-xs" style="border: var(--border-width) solid var(--chart-${i + 1})">Series ${i + 1}</span>`).join("")}</div></section></main><script type="module" src="/main.tsx"></script></body></html>`,
   });
-  server = await serveExport(path.join(consumer, "dist"));
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
+  ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
     viewport: { width: 1000, height: 650 },
-  });
+  }));
   const fonts = [];
   const failures = [];
   page.on("response", (r) => {
@@ -160,7 +144,5 @@ try {
   await writeFile(output, JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server?.close();
-  await rm(consumer, { recursive: true, force: true });
+  await closeConsumer({ browser, server }, consumer);
 }

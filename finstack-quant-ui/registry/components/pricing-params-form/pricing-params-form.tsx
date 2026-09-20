@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
 import { parse } from "lossless-json";
 import { DateInput } from "../../primitives/date-input/date-input";
-import { ModelPicker } from "../../primitives/model-picker/model-picker";
+import { EnumField } from "../../primitives/enum-field/enum-field";
 import { MetricPicker } from "../../primitives/metric-picker/metric-picker";
 import { FieldFrame } from "../../primitives/field-frame/field-frame";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
@@ -109,7 +109,8 @@ export function PricingParamsForm({
             />
           </div>
           <div className="w-fit max-w-full">
-            <ModelPicker
+            <EnumField
+              layout="select"
               orientation="horizontal"
               label="Pricing model"
               value={value.model ?? ""}

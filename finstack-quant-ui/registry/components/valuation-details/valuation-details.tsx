@@ -9,9 +9,6 @@ const MonteCarlo = lazy(() =>
     (module) => ({ default: module.MonteCarloDiagnostics }),
   ),
 );
-const Raw = lazy(() =>
-  import("./raw-details").then((module) => ({ default: module.RawDetails })),
-);
 const Explanation = lazy(() =>
   import("../explanation-trace/explanation-trace").then((module) => ({
     default: module.ExplanationTrace,
@@ -65,7 +62,7 @@ export function ValuationDetails({
             density={density}
           />
         ) : view ? (
-          <Raw
+          <JsonViewer
             text={view.text}
             label={
               Object.hasOwn(rawLabels, view.type)

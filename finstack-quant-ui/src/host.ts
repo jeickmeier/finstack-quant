@@ -1,7 +1,7 @@
 import type { ValuationDetails, ValuationResult } from "finstack-quant-wasm";
 import { createWireCodec, serializeHost } from "./codec.mjs";
 import schema from "./generated/schemas/valuation_result.json";
-import { mapChildren } from "./schema.mjs";
+import hostSchema from "finstack-quant-wasm/contracts/valuation-result.schema.json";
 
 export type {
   ValuationDetails,
@@ -11,36 +11,12 @@ export type {
 /** Cached adapter for the canonical result schema and its declared 64-bit host fields. */
 export const valuationCodec = createWireCodec(schema);
 
-// The facade declares four detail payloads as unknown. Their live usize fields
-// can be bigint even though typed Monte Carlo counts are number. Preserve these
-// raw trees and let Rust validate their wire export; never invent host types.
-function hostSchema(
-  node: Record<string, unknown> | boolean,
-): Record<string, unknown> | boolean {
-  if (typeof node === "boolean") return node;
-  const mapped = mapChildren(node, hostSchema);
-  const properties = node.properties as Record<string, unknown> | undefined;
-  const tag = (properties?.type as { const?: unknown } | undefined)?.const;
-  if (
-    typeof tag === "string" &&
-    properties?.data &&
-    [
-      "structured_credit_stochastic",
-      "credit_derivative",
-      "fx",
-      "composite",
-    ].includes(tag)
-  ) {
-    (mapped.properties as Record<string, unknown>).data = true;
-  }
-  return mapped;
-}
-const hostCodec = createWireCodec(hostSchema(schema));
+const hostCodec = createWireCodec(hostSchema);
 
 /**
- * Validate published host fields while preserving unknown detail payloads exactly.
+ * Validate native host fields against the Rust-derived WASM contract.
  * @param result - Actual facade result or its structured clone.
- * @returns Validated plain host tree, retaining bigint in weakly typed details.
+ * @returns Validated plain host tree, retaining bigint in every declared wide-integer field.
  * @throws TypeError or ZodError for unsafe numbers or invalid published fields.
  */
 export function adaptValuation(result: ValuationResult): ValuationResult {
@@ -62,9 +38,9 @@ export function exportValuation(
 }
 
 /**
- * Choose presentation using the published host declaration, without inferring types.
+ * Choose presentation from the native detail discriminator.
  * @param details - Unmodified details from the facade result.
- * @returns Typed Monte Carlo data or a lossless raw preview for unknown detail data.
+ * @returns Monte Carlo diagnostics or a lossless raw preview for other detail data.
  * @throws TypeError if raw data contains an unsupported non-JSON host object.
  */
 export function getDetailsView(details: ValuationDetails) {

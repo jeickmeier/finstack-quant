@@ -4,7 +4,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useState, type ReactNode } from "react";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
-import fixture from "@/lib/finstack/fixtures/results/bond.json";
 import { SchemaForm, type SchemaFormProps } from "../schema-form/schema-form";
 import type { FieldRenderer } from "../schema-form/field-renderer";
 import {
@@ -146,17 +145,6 @@ export function MarketContextForm({
             onClick={() => load(text)}
           >
             Import JSON
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            onClick={() => {
-              setText(fixture.request.marketJson);
-              load(fixture.request.marketJson);
-            }}
-          >
-            Load bond market example
           </Button>
         </div>
       </details>

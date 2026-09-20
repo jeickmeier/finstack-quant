@@ -10,19 +10,14 @@ export const importHarnesses = {
       import("@/hooks/use-finstack/use-finstack"),
       import("@/hooks/use-finstack/client"),
       import("@/hooks/use-finstack/version"),
+      import("@/hooks/use-finstack/validation"),
+      import("@/hooks/use-finstack/snapshot"),
     ]).then((modules) => ({ name: "use-finstack", modules: modules.length })),
   "use-price-instrument": () =>
     Promise.all([
       import("@/hooks/use-price-instrument/use-price-instrument"),
     ]).then((modules) => ({
       name: "use-price-instrument",
-      modules: modules.length,
-    })),
-  "use-validate-instrument": () =>
-    Promise.all([
-      import("@/hooks/use-validate-instrument/use-validate-instrument"),
-    ]).then((modules) => ({
-      name: "use-validate-instrument",
       modules: modules.length,
     })),
   "use-linked-selection": () =>
@@ -964,6 +959,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/meta/market_context_state"),
     ]).then((modules) => ({
       name: "contract-market-context-state",
+      modules: modules.length,
+    })),
+  "contract-instrument-cashflow": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/instrument_cashflow.json"),
+      import("@/lib/finstack/generated/types/instrument_cashflow"),
+      import("@/lib/finstack/generated/meta/instrument_cashflow"),
+    ]).then((modules) => ({
+      name: "contract-instrument-cashflow",
       modules: modules.length,
     })),
   "contract-valuation-result": () =>

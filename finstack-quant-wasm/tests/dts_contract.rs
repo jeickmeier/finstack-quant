@@ -492,9 +492,15 @@ fn pricing_entry_points_declare_structured_valuation_results() {
         "measures: Record<string, number>;"
     ));
     assert!(contains_ignoring_ws(&dts, "details?: ValuationDetails;"));
-    let monte_carlo = interface_block(&dts, "MonteCarloValuationDetails");
+    assert!(dts.contains("import('./types/valuation-result').MonteCarloValuationDetails"));
+    assert!(dts.contains("import('./types/valuation-result').ValuationDetails"));
+    let host = fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("types/valuation-result.d.ts"),
+    )
+    .expect("read generated facade host declarations");
+    let monte_carlo = interface_block(&host, "MonteCarloValuationDetails");
     for field in [
-        "model_key: string;",
+        "model_key:",
         "standard_error: number;",
         "training_paths: number;",
         "training_simulated_paths: number;",
@@ -513,7 +519,26 @@ fn pricing_entry_points_declare_structured_valuation_results() {
             "MonteCarloValuationDetails is missing `{field}`"
         );
     }
-    assert!(dts.contains("type: 'monte_carlo'; data: MonteCarloValuationDetails"));
+    for variant in [
+        "composite",
+        "credit_derivative",
+        "fx",
+        "structured_credit_stochastic",
+        "monte_carlo",
+    ] {
+        assert!(
+            host.contains(&format!("type: \"{variant}\";")),
+            "missing host detail variant {variant}"
+        );
+    }
+    assert!(contains_ignoring_ws(
+        interface_block(&host, "StochasticPricingResult"),
+        "num_paths: bigint;"
+    ));
+    assert!(contains_ignoring_ws(
+        interface_block(&host, "FxValuationDetails"),
+        "fx_triangulated?: boolean | null;"
+    ));
     assert!(contains_ignoring_ws(
         &dts,
         "priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model?: string | null, metrics?: string[] | null, pricingOptions?: string | null, marketHistory?: string | null): ValuationResult;",

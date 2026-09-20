@@ -11,6 +11,8 @@ target/
 # Generated files
 *.d.ts
 types/generated/
+# Rust schema generator owns deterministic formatting.
+schemas/host/
 *.wasm
 *.wasm.d.ts
 

@@ -1,3 +1,4 @@
+import fixture from "./bond.json";
 import { createRoot } from "react-dom/client";
 import { FinstackQueryProvider } from "./hooks/use-finstack/use-finstack";
 import { PricingWorkbench } from "./components/finstack/blocks/pricing-workbench/pricing-workbench";
@@ -6,6 +7,7 @@ createRoot(document.getElementById("root")!).render(
     <h1 className="mb-4 text-xl">Embedded bond pricing</h1>
     <FinstackQueryProvider>
       <PricingWorkbench
+        defaultRequest={fixture.request}
         surfaceOptions={() => ({ colorDomain: [0, 1] })}
         cubeOptions={() => ({
           initialStrike: 0.05,

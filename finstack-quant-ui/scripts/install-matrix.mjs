@@ -235,13 +235,15 @@ async function installItem(index, item) {
     await writeFile(path.join(consumer, "app/layout.tsx"), layout);
     const visual = visualTypes.has(item.type);
     if (visual) {
-      const projected = await visualHarness(repo, item),
-        source = typeof projected === "string" ? projected : projected.source;
+      const harness = await visualHarness(repo, item),
+        source = harness.source;
       await writeFile(path.join(consumer, "app/harness.tsx"), source);
-      for (const [name, text] of Object.entries(
-        typeof projected === "string" ? {} : projected.extra,
-      ))
+      for (const [name, text] of Object.entries(harness.extra)) {
+        await mkdir(path.dirname(path.join(consumer, "app", name)), {
+          recursive: true,
+        });
         await writeFile(path.join(consumer, "app", name), text);
+      }
       await cp(
         path.join(repo, "docs-site/src/components/registry-gallery/data.json"),
         path.join(consumer, "app/data.json"),

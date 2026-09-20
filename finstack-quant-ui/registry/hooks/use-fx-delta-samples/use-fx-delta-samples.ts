@@ -1,4 +1,5 @@
 "use client";
+import { requestSnapshot } from "../use-finstack/snapshot";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useFinstack } from "../use-finstack/use-finstack";
 import type { FinstackClient } from "../use-finstack/client";
@@ -10,13 +11,7 @@ export function fxDeltaOptions(
   session: number,
   request: FxDeltaSampleRequest | null,
 ) {
-  const snapshot = request === null ? null : structuredClone(request);
-  // Query's default JSON hash collapses NaN/Infinity to null; keep invalid native requests distinct.
-  const key = JSON.stringify(snapshot, (_name, value) =>
-    typeof value === "number" && !Number.isFinite(value)
-      ? { nonFinite: String(value) }
-      : value,
-  );
+  const { snapshot, key } = requestSnapshot(request);
   return queryOptions({
     queryKey: ["finstack", session, "sampleFxDelta", key] as const,
     queryFn: () => {

@@ -1,0 +1,2251 @@
+{
+  "$defs": {
+    "CompositeExposureReport": {
+      "additionalProperties": false,
+      "description": "Complete primitive decomposition with path, net, and gross views.",
+      "properties": {
+        "aggregates": {
+          "description": "Primitive aggregates ordered by identifier.",
+          "items": {
+            "$ref": "#/$defs/PrimitiveAggregate"
+          },
+          "type": "array"
+        },
+        "paths": {
+          "description": "Every primitive path before overlap netting.",
+          "items": {
+            "$ref": "#/$defs/PrimitiveExposure"
+          },
+          "type": "array"
+        },
+        "reporting_currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Composite reporting currency."
+        }
+      },
+      "required": [
+        "reporting_currency",
+        "paths",
+        "aggregates"
+      ],
+      "type": "object"
+    },
+    "CompositeLegValuation": {
+      "additionalProperties": false,
+      "description": "One top-level leg result retained in composite valuation details.",
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Identifier of the top-level leg specification."
+        },
+        "native_value": {
+          "$ref": "#/$defs/Money",
+          "description": "Quantity-scaled value in the underlying instrument's native currency."
+        },
+        "quantity": {
+          "description": "Signed frozen leg quantity applied to the unit valuation.",
+          "format": "double",
+          "type": "number"
+        },
+        "reporting_value": {
+          "$ref": "#/$defs/Money",
+          "description": "Quantity-scaled value converted to the composite reporting currency."
+        },
+        "valuation": {
+          "$ref": "#",
+          "description": "Complete unit-instrument valuation, including nested details where applicable."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "quantity",
+        "native_value",
+        "reporting_value",
+        "valuation"
+      ],
+      "type": "object"
+    },
+    "CompositeValuationDetails": {
+      "additionalProperties": false,
+      "description": "Rich structured details attached to composite valuation results.",
+      "properties": {
+        "exposure_report": {
+          "$ref": "#/$defs/CompositeExposureReport",
+          "description": "Recursive path-level and net/gross primitive exposures."
+        },
+        "leg_results": {
+          "description": "Native and reporting-currency results for every top-level leg.",
+          "items": {
+            "$ref": "#/$defs/CompositeLegValuation"
+          },
+          "type": "array"
+        },
+        "reporting_currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency of all reported values and additive risk measures."
+        },
+        "resolved_legs": {
+          "description": "Frozen top-level quantities used for this valuation.",
+          "items": {
+            "$ref": "#/$defs/ResolvedCompositeLeg"
+          },
+          "type": "array"
+        },
+        "state_effective_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Effective date of the frozen holdings state used for pricing."
+        },
+        "weighting_inputs": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Scalar inputs retained when the state was resolved.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "state_effective_date",
+        "reporting_currency",
+        "resolved_legs",
+        "weighting_inputs",
+        "leg_results",
+        "exposure_report"
+      ],
+      "type": "object"
+    },
+    "CovenantReport": {
+      "additionalProperties": false,
+      "description": "Covenant check result.",
+      "properties": {
+        "actual_value": {
+          "description": "Actual value of the metric",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "covenant_id": {
+          "description": "Stable machine-readable covenant instance identifier.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "covenant_type": {
+          "description": "Type of covenant being checked",
+          "type": "string"
+        },
+        "details": {
+          "description": "Details or explanation",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headroom": {
+          "description": "Cushion relative to threshold (positive => passing buffer)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "meta": {
+          "$ref": "#/$defs/ResultsMeta",
+          "default": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "mode": "bankers",
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10,
+                "rate_epsilon": 1e-12
+              },
+              "version": 1
+            },
+            "version": "0.8.0"
+          },
+          "description": "Audit stamp: numeric mode, rounding context, and FX policy in force."
+        },
+        "passed": {
+          "description": "Whether the covenant passed",
+          "type": "boolean"
+        },
+        "threshold": {
+          "description": "Required threshold",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "covenant_type",
+        "passed"
+      ],
+      "type": "object"
+    },
+    "CreditDerivativeValuationDetails": {
+      "description": "Metadata for CDS-family valuation paths.",
+      "properties": {
+        "integration_method": {
+          "description": "CDS integration method actually used, when applicable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_key": {
+          "$ref": "#/$defs/ModelKey",
+          "description": "Registered model key used by the pricer."
+        }
+      },
+      "required": [
+        "model_key"
+      ],
+      "type": "object"
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "DecimalWire": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
+    },
+    "ExplanationTrace": {
+      "description": "Container for detailed execution traces of financial computations.\n\nTraces are organized by type (calibration, pricing, waterfall) and contain\na sequence of domain-specific entries. Traces can be serialized to JSON for\ninspection, debugging, or audit purposes.\n\nMutation is intentionally single-threaded through `&mut self`. If multiple\nworkers need to append to one trace, wrap it in external synchronization and\nkeep ordering semantics explicit at the call site.",
+      "properties": {
+        "entries": {
+          "description": "Sequence of trace entries",
+          "items": {
+            "$ref": "#/$defs/TraceEntry"
+          },
+          "type": "array"
+        },
+        "truncated": {
+          "description": "Whether the trace was truncated due to size limits",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "type": {
+          "description": "Type of trace (e.g., \"calibration\", \"pricing\", \"waterfall\")",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "entries"
+      ],
+      "type": "object"
+    },
+    "FxValuationDetails": {
+      "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the cross-cutting invariant documented in\n`.claude/rules/project-description.md` (\"FX policy visibility: Applied\nconversion strategy recorded per layer (e.g., valuations, statements,\nportfolio)\").",
+      "properties": {
+        "fx_triangulated": {
+          "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_rate_id`) rather than the matrix.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "ModelKey": {
+      "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```",
+      "oneOf": [
+        {
+          "const": "discounting",
+          "description": "Present value discounting of projected cashflows.\n\nUsed for: bonds, swaps, deposits, repos, forwards.",
+          "type": "string"
+        },
+        {
+          "const": "tree",
+          "description": "Binomial or trinomial tree for callable/putable instruments.\n\nUsed for: callable bonds, Bermudan options.",
+          "type": "string"
+        },
+        {
+          "const": "black76",
+          "description": "Black-76 lognormal model for forward-based options.\n\nUsed for: caps, floors, swaptions, FX options, commodity options.",
+          "type": "string"
+        },
+        {
+          "const": "hull_white_1f",
+          "description": "Hull-White one-factor short rate model.\n\nUsed for: callable bonds with OAS, Bermudan swaptions.",
+          "type": "string"
+        },
+        {
+          "const": "hazard_rate",
+          "description": "Hazard rate model for credit instruments.\n\nUsed for: CDS, CDS indices, and non-callable credit-risky bonds.",
+          "type": "string"
+        },
+        {
+          "const": "rates_credit",
+          "description": "Joint short-rate and hazard-rate model for credit-risky bonds.\n\nUsed for: callable, puttable, return-floor, and straight bonds whose\nrates and credit dynamics must be valued on one calibrated path.",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Bachelier (normal) model for rate options.\n\nUsed for: inflation caps/floors, options on rates near zero.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_gbm",
+          "description": "Monte Carlo with Geometric Brownian Motion.\n\nUsed for: path-dependent options, exotics requiring simulation.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_heston",
+          "description": "Monte Carlo with Heston stochastic volatility.\n\nUsed for: options requiring volatility smile dynamics.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_hull_white_1f",
+          "description": "Monte Carlo with Hull-White 1F rates.\n\nUsed for: Bermudan swaptions, CMS options.",
+          "type": "string"
+        },
+        {
+          "const": "barrier_bs_continuous",
+          "description": "Reiner-Rubinstein continuous barrier formulas.\n\nUsed for: equity/FX barrier options with continuous monitoring.",
+          "type": "string"
+        },
+        {
+          "const": "asian_geometric_bs",
+          "description": "Kemna-Vorst exact geometric Asian formula.\n\nUsed for: geometric average Asian options.",
+          "type": "string"
+        },
+        {
+          "const": "asian_turnbull_wakeman",
+          "description": "Turnbull-Wakeman approximation for arithmetic Asians.\n\nUsed for: arithmetic average Asian options.",
+          "type": "string"
+        },
+        {
+          "const": "lookback_bs_continuous",
+          "description": "Conze-Viswanathan lookback option formulas.\n\nUsed for: lookback options with continuous monitoring.",
+          "type": "string"
+        },
+        {
+          "const": "quanto_bs",
+          "description": "Quanto BS with drift adjustment.\n\nUsed for: quanto options (cross-currency).",
+          "type": "string"
+        },
+        {
+          "const": "fx_barrier_bs_continuous",
+          "description": "FX barrier with Reiner-Rubinstein mapping.\n\nUsed for: FX barrier options.",
+          "type": "string"
+        },
+        {
+          "const": "heston_fourier",
+          "description": "Heston semi-analytical via Fourier transform.\n\nUsed for: European options requiring stochastic vol.",
+          "type": "string"
+        },
+        {
+          "const": "merton_mc",
+          "description": "Merton structural credit Monte Carlo with PIK support.\n\nUsed for: PIK bonds, credit-risky bonds with structural default model.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_schwartz_smith",
+          "description": "Monte Carlo with Schwartz-Smith two-factor commodity model.\n\nUsed for: commodity options requiring mean-reverting short-term dynamics.",
+          "type": "string"
+        },
+        {
+          "const": "static_replication",
+          "description": "Static replication via a portfolio of vanilla options.\n\nUsed for: CMS options (replicates the payoff with a smile-consistent\nswaption portfolio, capturing all convexity orders beyond Hagan's\nfirst-order approximation).",
+          "type": "string"
+        },
+        {
+          "const": "lmm_monte_carlo",
+          "description": "LMM/BGM Monte Carlo with predictor-corrector discretization.\n\nUsed for: Bermudan swaptions, exotic rate derivatives requiring\nmulti-factor forward rate dynamics.",
+          "type": "string"
+        },
+        {
+          "const": "structured_credit_stochastic",
+          "description": "Structured-credit stochastic scenario waterfall model.\n\nUsed for: ABS/CLO/RMBS/CMBS tranche PVs with path-level waterfall cashflows.",
+          "type": "string"
+        },
+        {
+          "const": "bond_future_clean_price_proxy",
+          "description": "Bond future clean-price proxy model.\n\nUsed for: bond futures when only the current CTD clean-price proxy is\navailable. This is intentionally separate from [`Discounting`](Self::Discounting)\nbecause it does not model delivery carry, invoice economics, or delivery\noptionality.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_rough_bergomi",
+          "description": "Monte Carlo with rough Bergomi (rBergomi) stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough volatility\ndynamics with fractional Brownian motion.",
+          "type": "string"
+        },
+        {
+          "const": "monte_carlo_rough_heston",
+          "description": "Monte Carlo with rough Heston stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough Heston\ndynamics with Volterra-driven variance.",
+          "type": "string"
+        },
+        {
+          "const": "rough_heston_fourier",
+          "description": "Rough Heston semi-analytical via fractional Riccati Fourier transform.\n\nUsed for: European equity options with rough Heston dynamics,\nusing Lewis (2000) single-integral Fourier inversion.",
+          "type": "string"
+        },
+        {
+          "const": "pde_crank_nicolson_1d",
+          "description": "1D Crank-Nicolson finite difference PDE solver.\n\nUsed for: European/American equity options, barrier options,\nFX options. Names the scheme family: production pricers run\nRannacher-damped CN (implicit start-up steps, Rannacher 1984),\nwith a penalty method for early exercise.",
+          "type": "string"
+        },
+        {
+          "const": "pde_adi_2d",
+          "description": "2D ADI (Craig-Sneyd) finite difference PDE solver.\n\nUsed for: Heston stochastic volatility, local-stochastic vol,\nand other 2D pricing problems. Splits the 2D PDE into\ndirectional tridiagonal sweeps with explicit cross-derivative.",
+          "type": "string"
+        },
+        {
+          "const": "bloomberg_cdso",
+          "description": "Bloomberg CDSO numerical-quadrature model for credit-default-swap\noptions.\n\nReference: Bloomberg L.P. Quantitative Analytics, *Pricing Credit\nIndex Options*, March 2012 (DOCS 2055833 ⟨GO⟩). The model\npreserves the lognormal-spread assumption of the original\nBlack-on-spreads model but solves `O = P(t_e) · E[(V_te + H(K) +\nD)+]` by numerical integration over the lognormal density. The\nlognormal mean `m` is calibrated by Brent root finding so that\n`F_0 = E[V_te]` (the no-knockout clean forward value); `H(K)` is\nthe strike-adjustment term `ξN(c − K)A(K)`; `D` is the realized\nloss settlement. The closed-form Black-on-spreads model was\ndecommissioned on the Bloomberg CDSO terminal in 2010.\n\nUsed for: CDS options (`InstrumentType::CdsOption`).",
+          "type": "string"
+        }
+      ]
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "MonteCarloValuationDetails": {
+      "description": "Reproducibility and convergence diagnostics for a Monte Carlo valuation.",
+      "properties": {
+        "antithetic": {
+          "description": "Whether antithetic variates were enabled.",
+          "type": "boolean"
+        },
+        "brownian_bridge": {
+          "description": "Whether Brownian-bridge ordering was enabled for Sobol paths.",
+          "type": "boolean"
+        },
+        "estimator_paths": {
+          "description": "Number of independent path estimators contributing to the mean.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "make_whole_training_paths": {
+          "description": "Independent paths used to fit state-conditional make-whole reference\nvalues. Zero when no stochastic make-whole stage is required.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "make_whole_training_simulated_paths": {
+          "description": "Total factor paths simulated for state-conditional make-whole training,\nincluding antithetic partners. Zero when that stage is absent.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model_key": {
+          "$ref": "#/$defs/ModelKey",
+          "description": "Registered model used for the simulation."
+        },
+        "seed": {
+          "description": "Deterministic random seed used for the run.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "simulated_paths": {
+          "description": "Total number of simulated paths, including antithetic partners.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sobol": {
+          "description": "Whether Sobol quasi-random sampling was enabled.",
+          "type": "boolean"
+        },
+        "standard_error": {
+          "description": "Sampling standard error of the discounted PV mean in the result\ncurrency. For LSMC valuations, this measures pricing-path uncertainty\nunder the frozen fitted exercise policy. It excludes regression\napproximation, time-grid discretization, and model error.",
+          "format": "double",
+          "type": "number"
+        },
+        "time_grid": {
+          "description": "Simulation times in year fractions, including zero and maturity.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "training_paths": {
+          "description": "Number of independent paths used to fit an exercise or control policy.\n\nZero for Monte Carlo engines that do not have a separate training\nstage.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "training_simulated_paths": {
+          "description": "Total factor paths simulated in the policy-training stage, including\nantithetic partners. Zero when no policy is trained.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model_key",
+        "standard_error",
+        "training_paths",
+        "training_simulated_paths",
+        "make_whole_training_paths",
+        "make_whole_training_simulated_paths",
+        "estimator_paths",
+        "simulated_paths",
+        "seed",
+        "time_grid",
+        "antithetic",
+        "sobol",
+        "brownian_bridge"
+      ],
+      "type": "object"
+    },
+    "PositiveF64Wire": {
+      "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
+      "exclusiveMinimum": 0.0,
+      "format": "double",
+      "type": "number"
+    },
+    "PrimitiveAggregate": {
+      "additionalProperties": false,
+      "description": "Net and gross exposure aggregated by primitive instrument identifier.",
+      "properties": {
+        "gross_measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Sum of absolute path risk by metric.",
+          "type": "object"
+        },
+        "gross_quantity": {
+          "description": "Sum of absolute path quantities.",
+          "format": "double",
+          "type": "number"
+        },
+        "gross_value": {
+          "$ref": "#/$defs/Money",
+          "description": "Sum of absolute reporting-currency path values."
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Primitive instrument identifier."
+        },
+        "instrument_type": {
+          "description": "Canonical primitive instrument type discriminator.",
+          "type": "string"
+        },
+        "net_measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Algebraic additive risk by metric.",
+          "type": "object"
+        },
+        "net_quantity": {
+          "description": "Algebraic sum of path quantities.",
+          "format": "double",
+          "type": "number"
+        },
+        "net_value": {
+          "$ref": "#/$defs/Money",
+          "description": "Algebraic reporting-currency value."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "instrument_type",
+        "net_quantity",
+        "gross_quantity",
+        "net_value",
+        "gross_value",
+        "net_measures",
+        "gross_measures"
+      ],
+      "type": "object"
+    },
+    "PrimitiveExposure": {
+      "additionalProperties": false,
+      "description": "Path-level primitive exposure in a resolved composite tree.",
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Primitive instrument identifier."
+        },
+        "instrument_type": {
+          "description": "Canonical primitive instrument type discriminator.",
+          "type": "string"
+        },
+        "measures": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Reporting-currency additive risk measures for this path.",
+          "type": "object"
+        },
+        "path": {
+          "description": "Composite and leg identifiers from the root to the primitive.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "quantity": {
+          "description": "Signed primitive quantity after multiplying every nested state quantity.",
+          "format": "double",
+          "type": "number"
+        },
+        "value": {
+          "$ref": "#/$defs/Money",
+          "description": "Reporting-currency signed value for this path."
+        }
+      },
+      "required": [
+        "path",
+        "instrument_id",
+        "instrument_type",
+        "quantity",
+        "value",
+        "measures"
+      ],
+      "type": "object"
+    },
+    "ResolvedCompositeLeg": {
+      "additionalProperties": false,
+      "description": "Immutable resolved quantity for one top-level composite leg.",
+      "properties": {
+        "instrument_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Identifier of the corresponding leg specification."
+        },
+        "quantity": {
+          "description": "Signed quantity held from the state's effective date until the next rebalance.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "instrument_id",
+        "quantity"
+      ],
+      "type": "object"
+    },
+    "ResultsMeta": {
+      "description": "Metadata bundle that accompanies valuation outputs.\n\nThe metadata is intentionally small so it can be attached to reports and\ndownstream data stores for reproducibility and audit trails.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};\n\nlet meta = results_meta(&FinstackConfig::default());\nassert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);\nassert!(meta.timestamp.is_none()); // deterministic by default\n```",
+      "properties": {
+        "fx_policy_applied": {
+          "default": null,
+          "description": "Optional FX policy applied by the computing layer (human-readable key).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "numeric_mode": {
+          "description": "Numeric engine mode used to produce the results.\n\nAlways [`NUMERIC_MODE_F64`] today; a plain string so result\nenvelopes stay wire-compatible across host languages.",
+          "type": "string"
+        },
+        "parallel": {
+          "description": "Whether the producing computation ran in parallel.\n\nSerial results omit the field entirely so existing payloads and golden\nfiles stay byte-identical.",
+          "type": "boolean"
+        },
+        "rounding": {
+          "$ref": "#/$defs/RoundingContext",
+          "description": "Rounding context snapshot applied to IO boundaries."
+        },
+        "timestamp": {
+          "description": "Timestamp when result was computed (ISO 8601 format).\nUseful for audit trails and reproducibility.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Finstack Quant library version used to produce the result.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "numeric_mode",
+        "rounding"
+      ],
+      "type": "object"
+    },
+    "RoundingContext": {
+      "description": "Snapshot of active rounding settings used for result stamping.\n\nInstances are typically produced via [`rounding_context_from`] and persisted\nalongside valuation results.",
+      "properties": {
+        "ingest_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Ingest scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "mode": {
+          "$ref": "#/$defs/RoundingMode",
+          "description": "Active rounding mode."
+        },
+        "output_scale_by_currency": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "description": "Output scale map snapshot by currency code.",
+          "type": "object"
+        },
+        "tolerances": {
+          "$ref": "#/$defs/ToleranceConfig",
+          "default": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "description": "Tolerance settings snapshot for floating-point comparisons."
+        },
+        "version": {
+          "description": "Schema version for forward compatibility.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode",
+        "ingest_scale_by_currency",
+        "output_scale_by_currency",
+        "version"
+      ],
+      "type": "object"
+    },
+    "RoundingMode": {
+      "description": "Rounding modes supported by the library.\n\nThe variants mirror the most common conventions found in pricing engines.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\ncfg.rounding.mode = RoundingMode::TowardZero;\nassert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));\n```",
+      "oneOf": [
+        {
+          "const": "bankers",
+          "description": "Banker's rounding (ties to even).",
+          "type": "string"
+        },
+        {
+          "const": "away_from_zero",
+          "description": "Round halves away from zero.",
+          "type": "string"
+        },
+        {
+          "const": "toward_zero",
+          "description": "Round toward zero (truncate).",
+          "type": "string"
+        },
+        {
+          "const": "floor",
+          "description": "Round toward negative infinity.",
+          "type": "string"
+        },
+        {
+          "const": "ceil",
+          "description": "Round toward positive infinity.",
+          "type": "string"
+        }
+      ]
+    },
+    "SchemaVersion": {
+      "description": "Numeric schema revision for contracts whose sole supported revision is v1.",
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "StochasticPricingResult": {
+      "description": "Stochastic pricing result for a structured credit deal.",
+      "properties": {
+        "clean_price": {
+          "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nSC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
+          "format": "double",
+          "type": "number"
+        },
+        "dirty_price": {
+          "description": "Dirty price (percent of the sum of current tranche balances),\nincluding accrued interest.\n\nThis is the authoritative price: it is the present value of all future\ncashflows from the valuation date, which by definition contains the\naccrued portion of the next coupon. The face is the notes' current\nbalance, the same basis as the deterministic `dirty_price` metric,\nso a deal whose notes total less than the pool prices near par rather\nthan at the note-to-pool ratio.",
+          "format": "double",
+          "type": "number"
+        },
+        "draw_option_cost": {
+          "$ref": "#/$defs/Money",
+          "description": "Mean over paths of the draw option cost: the value to the deal of its\nrevolvers' simulated draws having been made at the contractual margin\ninstead of each path's fair spread, obtained per path as the present\nvalue of the actual tranche cashflows less that of a counterfactual\nrun where every draw accrues at its fair spread. Negative when spreads\nwiden; zero for pools without stochastic revolvers."
+        },
+        "draw_option_cost_paths": {
+          "description": "Per-path draw option cost in path order (same currency as `npv`),\npopulated only for pools with stochastic revolvers.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "es_confidence": {
+          "description": "ES confidence level used",
+          "format": "double",
+          "type": "number"
+        },
+        "expected_collateral_draws": {
+          "$ref": "#/$defs/Money",
+          "description": "Mean over paths of the collateral draws funded through the reserve\naccount and principal collections (revolver utilization increases,\ndelayed draws and loan-equivalent draws at default)."
+        },
+        "expected_loss": {
+          "$ref": "#/$defs/Money",
+          "description": "Expected loss (probability-weighted average loss)"
+        },
+        "expected_shortfall": {
+          "$ref": "#/$defs/Money",
+          "description": "Expected shortfall (tail risk metric)"
+        },
+        "npv": {
+          "$ref": "#/$defs/Money",
+          "description": "Net present value of the deal"
+        },
+        "num_paths": {
+          "description": "Number of scenario paths",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pricing_mode": {
+          "$ref": "#/$defs/StructuredCreditPricingMode",
+          "description": "Pricing mode used."
+        },
+        "pv_confidence_interval": {
+          "description": "95% confidence interval for the mean PV",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        },
+        "pv_std_error": {
+          "description": "Standard error of the mean PV estimate",
+          "format": "double",
+          "type": "number"
+        },
+        "tranche_results": {
+          "description": "Tranche-level results",
+          "items": {
+            "$ref": "#/$defs/TranchePricingResult"
+          },
+          "type": "array"
+        },
+        "unexpected_loss": {
+          "$ref": "#/$defs/Money",
+          "description": "Unexpected loss (loss standard deviation)"
+        },
+        "unfunded_draw_path_fraction": {
+          "default": 0.0,
+          "description": "Fraction of paths on which a collateral draw could not be funded from\nthe reserve account and that period's principal collections (`0.0`\nfor pools without draws).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "npv",
+        "clean_price",
+        "dirty_price",
+        "expected_loss",
+        "unexpected_loss",
+        "expected_shortfall",
+        "es_confidence",
+        "pv_std_error",
+        "pv_confidence_interval",
+        "num_paths",
+        "pricing_mode",
+        "tranche_results",
+        "expected_collateral_draws",
+        "draw_option_cost"
+      ],
+      "type": "object"
+    },
+    "StructuredCreditPricingMode": {
+      "description": "Pricing mode selection.\n\nChoose based on horizon × dimensionality: `Tree` for SHORT-horizon\nnon-recombining stochastic deals (deterministic, low variance),\n`MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to\nfront-load tree precision and tail with MC.\n\n# Tree mode is bounded by construction — read this before selecting it\n\nSC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`\nperiods, checked against `max_tree_paths` (default 100,000). `3^11 =\n177,147`, so **Tree hard-errors for any deal with more than ten periods\nremaining** — which is essentially every real deal, since\n`build_scenario_tree_config` sets `num_periods` to months-to-maturity.\n\nThe default is [`PricingMode::MonteCarlo`] — the mode that can price the\ndeals this module is built for at realistic horizons (the public\n`price_stochastic` entry point also selects Monte Carlo). Tree remains\navailable and correct for genuinely short horizons; select it explicitly.\n\nTest coverage:\n- **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.\n- **MonteCarlo**: the same suites plus the convergence tests.\n- **Hybrid**: structured-credit pricer integration tests.",
+      "oneOf": [
+        {
+          "const": "tree",
+          "description": "Tree-based pricing (exact, non-recombining).\n\nBounded to roughly ten periods by the `3^n` node count — see the type\ndocs. Not the default for that reason.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Monte Carlo pricing with specified number of paths.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon.",
+          "properties": {
+            "monte_carlo": {
+              "additionalProperties": false,
+              "properties": {
+                "antithetic": {
+                  "description": "Use antithetic variates for variance reduction",
+                  "type": "boolean"
+                },
+                "num_paths": {
+                  "description": "Number of simulation paths",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "num_paths",
+                "antithetic"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "monte_carlo"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Hybrid: tree for short horizons, MC for long",
+          "properties": {
+            "hybrid": {
+              "additionalProperties": false,
+              "properties": {
+                "mc_paths": {
+                  "description": "MC paths for tail",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tree_periods": {
+                  "description": "Tree periods before switching to MC",
+                  "format": "uint64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "tree_periods",
+                "mc_paths"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "hybrid"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ToleranceConfig": {
+      "additionalProperties": false,
+      "description": "Numerical tolerance configuration for floating-point comparisons.\n\nProvides configurable epsilon values for zero-checks in rate calculations\nand generic floating-point comparisons. These defaults are chosen to balance\nnumerical stability with practical precision requirements.\n\n# Examples\n```rust\nuse finstack_quant_core::config::ToleranceConfig;\n\nlet mut tol = ToleranceConfig::default();\nassert_eq!(tol.rate_epsilon, 1e-12);\n\n// Customize for stricter rate comparisons\ntol.rate_epsilon = 1e-14;\n```",
+      "properties": {
+        "generic_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-10,
+          "description": "Epsilon for generic floating-point comparisons (default: 1e-10).\n\nUsed for general numerical comparisons where higher tolerance is acceptable."
+        },
+        "rate_epsilon": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "default": 1e-12,
+          "description": "Epsilon for rate comparisons (default: 1e-12).\n\nUsed when comparing interest rates, yields, and other small ratios."
+        }
+      },
+      "type": "object"
+    },
+    "TraceEntry": {
+      "description": "Domain-specific trace entry types.\n\nEach variant captures relevant details for different types of computations:\n- Calibration: iteration details, convergence status\n- Pricing: cashflow-level PV breakdowns\n- Waterfall: step-by-step payment allocations",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Calibration solver iteration details",
+          "properties": {
+            "converged": {
+              "description": "Whether convergence was achieved",
+              "type": "boolean"
+            },
+            "iteration": {
+              "description": "Iteration number (0-based)",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "calibration_iteration",
+              "type": "string"
+            },
+            "knots_updated": {
+              "description": "Knot points that were updated",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "residual": {
+              "description": "Objective function residual",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "iteration",
+            "residual",
+            "knots_updated",
+            "converged"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cashflow present value breakdown",
+          "properties": {
+            "cashflow_amount": {
+              "description": "Cashflow amount (stored as f64 for JSON simplicity)",
+              "format": "double",
+              "type": "number"
+            },
+            "cashflow_currency": {
+              "description": "Cashflow currency",
+              "type": "string"
+            },
+            "curve_id": {
+              "description": "Discount curve ID used",
+              "type": "string"
+            },
+            "date": {
+              "$ref": "#/$defs/DateWire",
+              "description": "Cashflow payment date (ISO8601)"
+            },
+            "discount_factor": {
+              "description": "Discount factor applied",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "cashflow_pv",
+              "type": "string"
+            },
+            "pv_amount": {
+              "description": "Present value of this cashflow",
+              "format": "double",
+              "type": "number"
+            },
+            "pv_currency": {
+              "description": "PV currency",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "date",
+            "cashflow_amount",
+            "cashflow_currency",
+            "discount_factor",
+            "pv_amount",
+            "pv_currency",
+            "curve_id"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Structured credit waterfall step",
+          "properties": {
+            "cash_in_amount": {
+              "description": "Cash inflow amount",
+              "format": "double",
+              "type": "number"
+            },
+            "cash_in_currency": {
+              "description": "Cash inflow currency",
+              "type": "string"
+            },
+            "cash_out_amount": {
+              "description": "Cash outflow amount",
+              "format": "double",
+              "type": "number"
+            },
+            "cash_out_currency": {
+              "description": "Cash outflow currency",
+              "type": "string"
+            },
+            "kind": {
+              "const": "waterfall_step",
+              "type": "string"
+            },
+            "period": {
+              "description": "Period index",
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "shortfall_amount": {
+              "description": "Shortfall amount if any",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "shortfall_currency": {
+              "description": "Shortfall currency",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "step_name": {
+              "description": "Step name/description",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "period",
+            "step_name",
+            "cash_in_amount",
+            "cash_in_currency",
+            "cash_out_amount",
+            "cash_out_currency"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Generic computation step (extensible)",
+          "properties": {
+            "description": {
+              "description": "Step description",
+              "type": "string"
+            },
+            "kind": {
+              "const": "computation_step",
+              "type": "string"
+            },
+            "metadata": {
+              "description": "Arbitrary metadata (JSON object)"
+            },
+            "name": {
+              "description": "Step name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "description"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TranchePricingResult": {
+      "description": "Tranche-level pricing result.",
+      "properties": {
+        "attachment": {
+          "description": "Attachment point (percentage)",
+          "format": "double",
+          "type": "number"
+        },
+        "average_life": {
+          "description": "Average life (years) over the paths on which the tranche received\nprincipal; `0.0` when it never did.",
+          "format": "double",
+          "type": "number"
+        },
+        "credit_duration": {
+          "description": "Credit duration (price sensitivity to credit spread)",
+          "format": "double",
+          "type": "number"
+        },
+        "detachment": {
+          "description": "Detachment point (percentage)",
+          "format": "double",
+          "type": "number"
+        },
+        "draw_option_cost": {
+          "$ref": "#/$defs/Money",
+          "description": "This tranche's share of the deal's draw option cost: the mean over\npaths of its present value on the actual run less that on the\ncounterfactual run where revolver draws accrue at their fair spread.\nTranche shares sum to the deal's `draw_option_cost` on every path."
+        },
+        "expected_loss": {
+          "$ref": "#/$defs/Money",
+          "description": "Expected loss"
+        },
+        "expected_shortfall": {
+          "$ref": "#/$defs/Money",
+          "description": "Expected shortfall"
+        },
+        "npv": {
+          "$ref": "#/$defs/Money",
+          "description": "Net present value"
+        },
+        "paths_with_principal": {
+          "default": 0,
+          "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `average_life` averages over).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "price_pct": {
+          "description": "Mean present value as a percent of the tranche's current balance at\nthe valuation date (100 = par); `0.0` for a fully retired tranche.",
+          "format": "double",
+          "type": "number"
+        },
+        "seniority": {
+          "$ref": "#/$defs/TrancheSeniority",
+          "description": "Tranche seniority level."
+        },
+        "tranche_id": {
+          "description": "Tranche identifier",
+          "type": "string"
+        },
+        "unexpected_loss": {
+          "$ref": "#/$defs/Money",
+          "description": "Unexpected loss"
+        }
+      },
+      "required": [
+        "tranche_id",
+        "seniority",
+        "npv",
+        "price_pct",
+        "expected_loss",
+        "unexpected_loss",
+        "expected_shortfall",
+        "attachment",
+        "detachment",
+        "average_life",
+        "credit_duration",
+        "draw_option_cost"
+      ],
+      "type": "object"
+    },
+    "TrancheSeniority": {
+      "description": "Tranche seniority levels",
+      "oneOf": [
+        {
+          "const": "senior",
+          "description": "Most senior debt tranche",
+          "type": "string"
+        },
+        {
+          "const": "mezzanine",
+          "description": "Mezzanine debt tranches",
+          "type": "string"
+        },
+        {
+          "const": "subordinated",
+          "description": "Subordinated debt tranches",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity/first loss piece",
+          "type": "string"
+        }
+      ]
+    },
+    "ValuationDetails": {
+      "description": "Model-specific typed valuation details.\n\nThese details are for rich structured outputs that do not fit the scalar\n`measures` map while still belonging in the standard valuation envelope.",
+      "oneOf": [
+        {
+          "description": "Recursive leg valuation and primitive exposure detail for a composite.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/CompositeValuationDetails"
+            },
+            "type": {
+              "const": "composite",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Credit-derivative pricing metadata.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/CreditDerivativeValuationDetails"
+            },
+            "type": {
+              "const": "credit_derivative",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Scenario-waterfall structured credit stochastic pricing result.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/StochasticPricingResult"
+            },
+            "type": {
+              "const": "structured_credit_stochastic",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "FX-bearing instrument pricing metadata (forwards, options, quanto, …).\n\nSurfaces the [`FxMatrix`](finstack_quant_core::money::fx::FxMatrix) lookup\nchain that backed the spot rate used at pricing time, satisfying the\nproject-wide FX-policy-visibility invariant for instruments that\nresolve their spot through the matrix.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/FxValuationDetails"
+            },
+            "type": {
+              "const": "fx",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Monte Carlo estimator and reproducibility metadata.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/MonteCarloValuationDetails"
+            },
+            "type": {
+              "const": "monte_carlo",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/wasm/1/valuation_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Facade valuation result. int64/uint64 fields are host bigint; JSON export uses integer tokens.",
+  "properties": {
+    "as_of": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Valuation date (T+0) for the calculation."
+    },
+    "covenants": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CovenantReport"
+      },
+      "description": "Covenant compliance results for structured products.\n\nPresent only for instruments with covenants (loans, structured credit).\nEach covenant is keyed by its identifier with pass/fail status and details.",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "details": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ValuationDetails"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional rich model-specific pricing detail."
+    },
+    "explanation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExplanationTrace"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional computation explanation trace.\n\nEnabled via `ExplainOpts` in configuration. Provides step-by-step\ntrace of calculations for debugging and auditability."
+    },
+    "instrument_id": {
+      "description": "Unique identifier for the priced instrument.",
+      "type": "string"
+    },
+    "measures": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Computed risk measures and financial metrics.\n\nContains **derived risk metrics** such as DV01, Delta, Vega, etc.\nThe present value (PV) is **not** included here - it is available\nin the `value` field above.\n\nKeys are strongly-typed metric IDs (serialized as strings such as\n\"ytm\", \"dv01\", \"delta\"). Use `MetricId` helpers for consistent lookups.\n\n# Interpretation\n\nEntries in this map are heterogeneous by design:\n- some are currency amounts (`jump_to_default`)\n- some are currency-per-bump sensitivities (`dv01`, `vega`, `rho`)\n- some are decimal rates or probabilities (`ytm`, `default_probability`)\n- some are ratios or counts (`tvpi_lp`, `constituent_count`)\n\nAlways interpret a measure together with its [`MetricId`] contract.",
+      "type": "object"
+    },
+    "meta": {
+      "$ref": "#/$defs/ResultsMeta",
+      "description": "Calculation metadata and policy stamps.\n\nContains:\n- Numeric mode (Decimal vs f64)\n- Rounding context and precision\n- FX policy for cross-currency calculations\n- Calculation timing information"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "description": "Required wire-format schema version. Only numeric `1` is accepted."
+    },
+    "value": {
+      "$ref": "#/$defs/Money",
+      "description": "Present value in the instrument's native currency.\n\nThis is the primary pricing output and is **always available** regardless\nof which metrics are requested. The PV is **not** included in the `measures`\nmap - it is provided here as a `Money` type with full currency information.\n\nFor cross-currency instruments, this may be in a different currency than\nthe base calculation currency.\n\n# Example\n```rust\n# use finstack_quant_valuations::results::ValuationResult;\n# use finstack_quant_core::currency::Currency;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::dates::create_date;\n# use time::Month;\n# fn main() -> Result<(), Box<dyn std::error::Error>> {\n# let as_of = create_date(2025, Month::January, 15)?;\n# let pv = Money::from((1_000_000_i64, Currency::USD));\n# let result = ValuationResult::stamped(\"BOND-001\", as_of, pv);\n// PV is always in result.value, not in measures\nlet pv_money = result.value;  // Money type\nlet pv_amount = result.value.amount();  // f64 value\nlet currency = result.value.currency();  // Currency type\n# Ok(())\n# }\n```"
+    }
+  },
+  "required": [
+    "schema_version",
+    "instrument_id",
+    "as_of",
+    "value",
+    "measures",
+    "meta"
+  ],
+  "title": "ValuationResult",
+  "type": "object"
+}

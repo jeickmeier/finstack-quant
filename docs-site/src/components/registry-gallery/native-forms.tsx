@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { SchemaForm } from "@/components/finstack/components/schema-form/schema-form";
 import { InstrumentForm } from "@/components/finstack/components/instrument-form/instrument-form";
@@ -12,6 +13,10 @@ import data from "./data.json";
 export function NativeForms({ name }: { name: string }) {
   const [type, setType] = useState("bond"),
     [submissions, setSubmissions] = useState(0);
+  const [marketDocument, setMarketDocument] = useState({
+    json: JSON.stringify(data.market.supplemental),
+    revision: 0,
+  });
   const validate = useInstrumentValidator(),
     market = useMarketValidator(),
     calibration = useCalibrationValidator();
@@ -42,11 +47,25 @@ export function NativeForms({ name }: { name: string }) {
           onSubmit={submitted}
         />
       ) : name === "market-context-form" ? (
-        <MarketContextForm
-          defaultJson={JSON.stringify(data.market.supplemental)}
-          validate={market}
-          onSubmit={submitted}
-        />
+        <>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setMarketDocument((current) => ({
+                json: data.bond.request.marketJson,
+                revision: current.revision + 1,
+              }))
+            }
+          >
+            Load bond market example
+          </Button>
+          <MarketContextForm
+            key={marketDocument.revision}
+            defaultJson={marketDocument.json}
+            validate={market}
+            onSubmit={submitted}
+          />
+        </>
       ) : (
         <CalibrationForm
           defaultJson={JSON.stringify(data.calibration[0]!.input)}

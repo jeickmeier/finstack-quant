@@ -202,7 +202,10 @@ it("imports an actual native calibration envelope and canonical fixture, leaving
     JSON.parse(canonical(serializeHost(envelope.result.final_market))),
   );
   onSubmit.mockClear();
-  fireEvent.click(screen.getByText("Load bond market example"));
+  fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
+    target: { value: bond.request.marketJson },
+  });
+  fireEvent.click(screen.getByText("Import JSON"));
   expect(await submit(onSubmit)).toBe(canonical(bond.request.marketJson));
 });
 it("retains actual native domain errors and frees every successful validation handle", async () => {

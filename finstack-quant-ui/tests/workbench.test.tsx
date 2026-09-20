@@ -54,10 +54,7 @@ beforeEach(() => {
       case "metrics":
         return native.listStandardMetricsGrouped();
       case "validate":
-        return {
-          json: native.validateInstrumentJson(request.instrumentJson),
-          revision: request.revision,
-        };
+        return native.validateInstrumentJson(request);
       case "validateMarket": {
         const market = new native.Market(request);
         try {
@@ -129,7 +126,7 @@ const prices = () =>
   call.mock.calls
     .filter(([method]) => method === "price")
     .map(([, request]) => request as PriceRequest);
-function mount(request?: PriceRequest) {
+function mount(request: PriceRequest = fixture.request) {
   return render(
     <div>
       <h1>Host route</h1>
@@ -407,7 +404,10 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
 it("lets the host deep link select another canonical example while preserving explicit market and parameters", async () => {
   render(
     <FinstackQueryProvider>
-      <PricingWorkbench defaultInstrumentType="equity" />
+      <PricingWorkbench
+        defaultRequest={fixture.request}
+        defaultInstrumentType="equity"
+      />
     </FinstackQueryProvider>,
   );
   await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 5000 });

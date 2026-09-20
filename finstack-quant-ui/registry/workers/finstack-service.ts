@@ -5,7 +5,7 @@ import type {
   calibration,
   Market,
 } from "finstack-quant-wasm";
-import { serializeHost } from "@/lib/finstack/codec.mjs";
+import { exportValuation } from "@/lib/finstack/host";
 import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(native: {
@@ -30,7 +30,6 @@ export function createService(native: {
   >;
 }): WorkerApi {
   let ready: Promise<unknown> | undefined;
-  let disposed = false;
   const markets = new Map<string, Market>();
   const initialize = (url?: string) =>
     (ready ??= Promise.resolve().then(() => native.initialize(url)));
@@ -39,7 +38,6 @@ export function createService(native: {
   ): Promise<Envelope<T>> {
     try {
       await initialize();
-      if (disposed) throw new Error("Worker has been disposed");
       return { ok: true, value: await operation() };
     } catch (error) {
       return { ok: false, error: errorValue(error) };
@@ -80,11 +78,8 @@ export function createService(native: {
         ),
       );
     },
-    validate(request) {
-      return result(() => ({
-        revision: request.revision,
-        json: instruments.validateInstrumentJson(request.instrumentJson),
-      }));
+    validate(instrumentJson) {
+      return result(() => instruments.validateInstrumentJson(instrumentJson));
     },
     validateMarket(json) {
       return result(() => {
@@ -191,13 +186,7 @@ export function createService(native: {
     calendars: () => result(() => native.core.availableCalendars()),
     exportResult: (value) =>
       result(() =>
-        native.valuations.validateValuationResultJson(serializeHost(value)),
+        exportValuation(value, native.valuations.validateValuationResultJson),
       ),
-    async dispose() {
-      disposed = true;
-      for (const handle of markets.values()) handle.free();
-      markets.clear();
-      return { ok: true, value: undefined };
-    },
   };
 }

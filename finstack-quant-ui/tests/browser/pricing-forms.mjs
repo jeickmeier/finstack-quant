@@ -1,16 +1,17 @@
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { build } from "vite";
-import tailwind from "@tailwindcss/postcss";
-import { chromium } from "playwright";
-import { serveExport } from "./static-server.mjs";
-import { installBuilt } from "./consumer.mjs";
+import {
+  installBuilt,
+  buildConsumer,
+  openConsumer,
+  closeConsumer,
+} from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-pricing-forms-"));
-let browser, server;
+let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, [
     "pricing-forms-example",
@@ -19,44 +20,18 @@ try {
     path.join(consumer, "main.tsx"),
     await readFile(new URL("./fixture/pricing-forms.tsx", import.meta.url)),
   );
-  await writeFile(
-    path.join(consumer, "app.css"),
-    '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./main.tsx";\n@source "./components";\n',
-  );
-  await writeFile(
-    path.join(consumer, "index.html"),
-    '<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Standalone pricing forms</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
-  );
-  const modules = [];
-  await build({
-    root: consumer,
-    configFile: false,
-    logLevel: "error",
-    resolve: { alias: { "@": consumer } },
-    worker: { format: "es" },
-    plugins: [
-      {
-        name: "inspect-dependencies",
-        generateBundle(_, bundle) {
-          for (const chunk of Object.values(bundle))
-            if (chunk.type === "chunk")
-              modules.push(...Object.keys(chunk.modules));
-        },
-      },
-    ],
-    css: { postcss: { plugins: [tailwind()] } },
-    build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
+
+  const modules = await buildConsumer(consumer, {
+    title: "Standalone pricing forms",
   });
   assert(
     !modules.some((id) =>
       /tanstack\/(?:react-)?table|finstack-quant-wasm/.test(id),
     ),
   );
-  server = await serveExport(path.join(consumer, "dist"));
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
+  ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
     viewport: { width: 1000, height: 1000 },
-  });
+  }));
   const failures = [],
     requests = [];
   page.on("pageerror", (error) => failures.push(error.message));
@@ -232,7 +207,5 @@ try {
   );
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server?.close();
-  await rm(consumer, { recursive: true, force: true });
+  await closeConsumer({ browser, server }, consumer);
 }

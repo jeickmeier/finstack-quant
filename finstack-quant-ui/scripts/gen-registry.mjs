@@ -102,7 +102,7 @@ const items = [
       target: `workers/${name}`,
     })),
     registryDependencies: [
-      "@finstack/finstack-codec",
+      "@finstack/finstack-host",
       "@finstack/contract-market-context-state",
     ],
     dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],

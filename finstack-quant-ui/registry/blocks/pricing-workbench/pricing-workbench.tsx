@@ -55,10 +55,9 @@ import {
   type PriceRequest,
 } from "@/hooks/use-price-instrument/use-price-instrument";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
-import fixture from "@/lib/finstack/fixtures/results/bond.json";
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
-  defaultRequest = fixture.request,
+  defaultRequest,
   density = "compact",
   defaultInstrumentType,
   defaultCalibrationJson,
@@ -69,7 +68,7 @@ export function PricingWorkbench({
   scenario,
 }: {
   /** Complete initial instrument request and canonical market snapshot. Remount to load another document. */
-  defaultRequest?: PriceRequest;
+  defaultRequest: PriceRequest;
   density?: "compact" | "comfortable";
   /** Host-owned deep link selects this canonical example; supplied market/parameters stay explicit. */
   defaultInstrumentType?: string;

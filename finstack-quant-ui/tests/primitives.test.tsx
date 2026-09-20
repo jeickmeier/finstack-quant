@@ -17,8 +17,6 @@ import { TenorInput } from "../registry/primitives/tenor-input/tenor-input";
 import { EnumField } from "../registry/primitives/enum-field/enum-field";
 import { DayCountSelect } from "../registry/primitives/day-count-select/day-count-select";
 import { BdcSelect } from "../registry/primitives/bdc-select/bdc-select";
-import { CalendarSelect } from "../registry/primitives/calendar-select/calendar-select";
-import { ModelPicker } from "../registry/primitives/model-picker/model-picker";
 import { MetricPicker } from "../registry/primitives/metric-picker/metric-picker";
 import { IdCombobox } from "../registry/primitives/id-combobox/id-combobox";
 import { DateInput } from "../registry/primitives/date-input/date-input";
@@ -213,7 +211,7 @@ it("supports keyboard radio changes and supplied help with Escape focus restorat
     ),
   );
 });
-it.each([DayCountSelect, BdcSelect, CalendarSelect, ModelPicker])(
+it.each([DayCountSelect, BdcSelect])(
   "select primitive %# works with supplied options",
   async (Component) => {
     const user = userEvent.setup();
@@ -475,13 +473,15 @@ it.each([
   />,
   <DayCountSelect label="Day count" value="act_360" onValueChange={() => {}} />,
   <BdcSelect label="BDC" value="following" onValueChange={() => {}} />,
-  <CalendarSelect
+  <EnumField
+    layout="select"
     label="Calendar"
     value="a"
     options={options}
     onValueChange={() => {}}
   />,
-  <ModelPicker
+  <EnumField
+    layout="select"
     label="Model"
     value="a"
     options={options}
@@ -523,3 +523,25 @@ it("JSON viewer supports undefined and error states without claiming a copy", ()
   rerender(<JsonViewer text={null} error="Native request failed" />);
   expect(screen.getByRole("alert").textContent).toBe("Native request failed");
 });
+
+it.each([
+  [1000, undefined, "+1,000"],
+  [-1234.5, undefined, "-1,234.5"],
+  [0, undefined, "0"],
+  [0.001, 0, "0"],
+  [1234.567, 2, "+1,234.57"],
+  [1e-7, undefined, "+1e-7"],
+] as const)(
+  "formats signed measure %s before grouping",
+  (value, precision, text) => {
+    render(
+      <MeasureValue
+        value={value}
+        precision={precision}
+        signed
+        showUnavailableUnit={false}
+      />,
+    );
+    expect(screen.getByText(text).getAttribute("title")).toBe(String(value));
+  },
+);

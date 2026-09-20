@@ -35,7 +35,8 @@
     "test:workbench:browser": "node tests/browser/workbench.mjs",
     "test:table-link:browser": "node tests/browser/table-link.mjs",
     "test:cashflows:browser": "node tests/browser/cashflows.mjs",
-    "test:e2e": "playwright test -c playwright.config.ts"
+    "test:e2e": "playwright test -c playwright.config.ts",
+    "test:size": "node tests/browser/size.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",

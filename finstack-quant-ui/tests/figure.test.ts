@@ -9,7 +9,7 @@ import {
   figureLayout,
   type FigurePresentation,
 } from "../registry/primitives/finstack-chart/presentation";
-import { figureExample } from "../registry/components/figure-example/figure-example";
+import { figureExample } from "../registry/components/figure-example/figure-data";
 import tokens from "../registry/theme/finstack-theme/tokens.json";
 const presentation: FigurePresentation = {
   theme: {

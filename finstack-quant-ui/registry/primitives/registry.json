@@ -226,44 +226,6 @@
       "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
-      "name": "calendar-select",
-      "type": "registry:ui",
-      "docs": "Controlled calendar-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "files": [
-        {
-          "path": "calendar-select/calendar-select.tsx",
-          "type": "registry:ui",
-          "target": "components/finstack/primitives/calendar-select/calendar-select.tsx"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/finstack-base",
-        "@finstack/finstack-theme",
-        "@finstack/enum-field"
-      ],
-      "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
-    },
-    {
-      "name": "model-picker",
-      "type": "registry:ui",
-      "docs": "Controlled model-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
-      "files": [
-        {
-          "path": "model-picker/model-picker.tsx",
-          "type": "registry:ui",
-          "target": "components/finstack/primitives/model-picker/model-picker.tsx"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/finstack-base",
-        "@finstack/finstack-theme",
-        "@finstack/enum-field"
-      ],
-      "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
-    },
-    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",

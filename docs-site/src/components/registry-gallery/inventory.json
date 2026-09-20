@@ -51,16 +51,6 @@
       "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
     },
     {
-      "name": "calendar-select",
-      "type": "registry:ui",
-      "docs": "Controlled calendar-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
-    },
-    {
-      "name": "model-picker",
-      "type": "registry:ui",
-      "docs": "Controlled model-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
-    },
-    {
       "name": "metric-picker",
       "type": "registry:ui",
       "docs": "Controlled metric-picker primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
@@ -252,10 +242,6 @@
     },
     {
       "name": "use-price-instrument",
-      "type": "registry:hook"
-    },
-    {
-      "name": "use-validate-instrument",
       "type": "registry:hook"
     },
     {
@@ -631,6 +617,10 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-instrument-cashflow",
+      "type": "registry:lib"
+    },
+    {
       "name": "contract-valuation-result",
       "type": "registry:lib"
     },
@@ -678,7 +668,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/details/cases.json",
-      "sha256": "ece5e296f20bfb310cf2d2383d1ad1bd93a9d1a9acf460cfb99bd69c04ca8cf5"
+      "sha256": "750e6aee52d58291fcc448b0e3e27cd807e5d4b2753ad533d0970d1ba674704a"
     }
   ]
 }

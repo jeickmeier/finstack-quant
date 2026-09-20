@@ -1850,21 +1850,21 @@ export default [
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/estimator_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/estimator_paths",
     "description": "Number of independent path estimators contributing to the mean.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/make_whole_training_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/make_whole_training_paths",
     "description": "Independent paths used to fit state-conditional make-whole reference\nvalues. Zero when no stochastic make-whole stage is required.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/make_whole_training_simulated_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/make_whole_training_simulated_paths",
     "description": "Total factor paths simulated for state-conditional make-whole training,\nincluding antithetic partners. Zero when that stage is absent.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {
@@ -1885,7 +1885,7 @@ export default [
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/simulated_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/simulated_paths",
     "description": "Total number of simulated paths, including antithetic partners.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {
@@ -1913,14 +1913,14 @@ export default [
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/training_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/training_paths",
     "description": "Number of independent paths used to fit an exercise or control policy.\n\nZero for Monte Carlo engines that do not have a separate training\nstage.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {
     "path": "#/$defs/d_adb505b22deadbdfe62e/properties/training_simulated_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/MonteCarloValuationDetails/properties/training_simulated_paths",
     "description": "Total factor paths simulated in the policy-training stage, including\nantithetic partners. Zero when no policy is trained.",
-    "format": "uint",
+    "format": "uint32",
     "minimum": 0
   },
   {

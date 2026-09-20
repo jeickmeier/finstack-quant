@@ -400,6 +400,11 @@
     "schema": "schemas/market_context_state.json"
   },
   {
+    "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
+    "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
+    "schema": "schemas/instrument_cashflow.json"
+  },
+  {
     "uri": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
     "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
     "schema": "schemas/valuation_result.json"

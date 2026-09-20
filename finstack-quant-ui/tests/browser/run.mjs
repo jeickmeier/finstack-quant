@@ -42,6 +42,8 @@ function run(command, args, env) {
   });
 }
 try {
+  if (process.env.REGISTRY_MEASURE_FOOTPRINT === "1")
+    await run(process.execPath, [resolve(import.meta.dirname, "size.mjs")]);
   await mkdir(resolve(fixture, "app/registry-probe"), { recursive: true });
   await installBuilt(resolve(repo, "finstack-quant-ui"), fixture, [
     "use-finstack",

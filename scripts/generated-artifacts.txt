@@ -218,6 +218,7 @@ finstack-quant-ui/src/generated/meta/fx_variance_swap.ts
 finstack-quant-ui/src/generated/meta/inflation_cap_floor.ts
 finstack-quant-ui/src/generated/meta/inflation_linked_bond.ts
 finstack-quant-ui/src/generated/meta/inflation_swap.ts
+finstack-quant-ui/src/generated/meta/instrument_cashflow.ts
 finstack-quant-ui/src/generated/meta/interest_rate_future.ts
 finstack-quant-ui/src/generated/meta/interest_rate_future_option.ts
 finstack-quant-ui/src/generated/meta/interest_rate_swap.ts
@@ -301,6 +302,7 @@ finstack-quant-ui/src/generated/schemas/fx_variance_swap.json
 finstack-quant-ui/src/generated/schemas/inflation_cap_floor.json
 finstack-quant-ui/src/generated/schemas/inflation_linked_bond.json
 finstack-quant-ui/src/generated/schemas/inflation_swap.json
+finstack-quant-ui/src/generated/schemas/instrument_cashflow.json
 finstack-quant-ui/src/generated/schemas/interest_rate_future.json
 finstack-quant-ui/src/generated/schemas/interest_rate_future_option.json
 finstack-quant-ui/src/generated/schemas/interest_rate_swap.json
@@ -382,6 +384,7 @@ finstack-quant-ui/src/generated/types/fx_variance_swap.ts
 finstack-quant-ui/src/generated/types/inflation_cap_floor.ts
 finstack-quant-ui/src/generated/types/inflation_linked_bond.ts
 finstack-quant-ui/src/generated/types/inflation_swap.ts
+finstack-quant-ui/src/generated/types/instrument_cashflow.ts
 finstack-quant-ui/src/generated/types/interest_rate_future.ts
 finstack-quant-ui/src/generated/types/interest_rate_future_option.ts
 finstack-quant-ui/src/generated/types/interest_rate_swap.ts
@@ -409,6 +412,7 @@ finstack-quant-ui/src/generated/types/volatility_index_future_option.ts
 finstack-quant-ui/src/generated/types/xccy_swap.ts
 finstack-quant-ui/src/generated/types/yoy_inflation_swap.ts
 finstack-quant-ui/tests/instruments/encoding-report.json
+finstack-quant-wasm/schemas/host/1/valuation_result.schema.json
 finstack-quant-wasm/types/generated/BaseCorrelationParams.ts
 finstack-quant-wasm/types/generated/CalibrationConfig.ts
 finstack-quant-wasm/types/generated/CalibrationDiagnostics.ts
@@ -480,6 +484,7 @@ finstack-quant-wasm/types/generated/VolSurfaceSolveConfig.ts
 finstack-quant-wasm/types/generated/XccyBasisParams.ts
 finstack-quant-wasm/types/generated/XccyQuote.ts
 finstack-quant-wasm/types/generated/index.ts
+finstack-quant-wasm/types/valuation-result.d.ts
 finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json
 finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json

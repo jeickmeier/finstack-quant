@@ -5460,76 +5460,12 @@ export interface MoneyValue {
 /**
  * Convergence and reproducibility diagnostics for a Monte Carlo valuation.
  */
-export interface MonteCarloValuationDetails {
-  /**
-   * Registered model key used for the simulation.
-   */
-  model_key: string;
-  /**
-   * Sampling standard error of the discounted PV mean in the result currency.
-   * For LSMC valuations, this measures pricing-path uncertainty under the
-   * frozen fitted exercise policy. It excludes regression approximation,
-   * time-grid discretization, and model error.
-   */
-  standard_error: number;
-  /**
-   * Configured independent paths used to fit the exercise or control policy.
-   */
-  training_paths: number;
-  /**
-   * Training factor paths including antithetic partners.
-   */
-  training_simulated_paths: number;
-  /**
-   * Configured independent paths used to fit state-conditional make-whole
-   * reference values; zero when that stage is absent.
-   */
-  make_whole_training_paths: number;
-  /**
-   * Make-whole training paths including antithetic partners; zero when that
-   * stage is absent.
-   */
-  make_whole_training_simulated_paths: number;
-  /**
-   * Independent path estimators contributing to the reported mean.
-   */
-  estimator_paths: number;
-  /**
-   * Total estimator paths including antithetic partners.
-   */
-  simulated_paths: number;
-  /**
-   * Deterministic random seed used for the run, preserved across the full
-   * unsigned 64-bit range.
-   */
-  seed: bigint;
-  /**
-   * Simulation times in year fractions, including zero and maturity.
-   */
-  time_grid: number[];
-  /**
-   * Whether antithetic variates were enabled.
-   */
-  antithetic: boolean;
-  /**
-   * Whether Sobol quasi-random sampling was enabled.
-   */
-  sobol: boolean;
-  /**
-   * Whether Brownian-bridge ordering was enabled for Sobol paths.
-   */
-  brownian_bridge: boolean;
-}
+export type MonteCarloValuationDetails = import('./types/valuation-result').MonteCarloValuationDetails;
 
 /**
- * Model-specific detail carried by a valuation result.
+ * Model-specific native detail, generated from Rust with exact host integer representations.
  */
-export type ValuationDetails =
-  | { type: 'monte_carlo'; data: MonteCarloValuationDetails }
-  | {
-      type: 'composite' | 'credit_derivative' | 'structured_credit_stochastic' | 'fx';
-      data: unknown;
-    };
+export type ValuationDetails = import('./types/valuation-result').ValuationDetails;
 
 /**
  * Valuation envelope returned by the `priceInstrument*` entry points.
@@ -6089,7 +6025,7 @@ export interface TrancheScenarioCell {
    */
   severity: number;
   /**
-   * Tranche price, as a percentage of original balance.
+   * Clean settlement price as a percentage of current outstanding balance.
    */
   price: number;
   /**

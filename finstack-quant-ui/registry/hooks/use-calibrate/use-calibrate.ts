@@ -1,5 +1,5 @@
 "use client";
-import { useCallback } from "react";
+import { useNativeValidator } from "../use-finstack/validation";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useFinstack } from "../use-finstack/use-finstack";
 import type { WorkerApi } from "../../workers/finstack-contract";
@@ -66,20 +66,5 @@ export function useCalibrationDryRun(envelopeJson: string | null) {
 }
 /** Native canonicalization for CalibrationForm; a superseded validation cannot accept old edits. */
 export function useCalibrationValidator() {
-  const worker = useFinstack();
-  return useCallback(
-    async (envelopeJson: string, signal?: AbortSignal) => {
-      if (worker.error) throw worker.error;
-      if (worker.status !== "ready" || !worker.client)
-        throw new Error("Calibration validation is waiting for the worker");
-      const json = await worker.client.call(
-        "validateCalibration",
-        envelopeJson,
-      );
-      if (signal?.aborted)
-        throw new DOMException("Validation superseded", "AbortError");
-      return json;
-    },
-    [worker.client, worker.status, worker.error],
-  );
+  return useNativeValidator("validateCalibration", "Calibration");
 }

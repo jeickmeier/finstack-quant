@@ -1,42 +1,27 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { build } from "vite";
-import tailwind from "@tailwindcss/postcss";
-import { chromium } from "playwright";
-import { serveExport } from "./static-server.mjs";
-import { installBuilt } from "./consumer.mjs";
+import {
+  installBuilt,
+  buildConsumer,
+  openConsumer,
+  closeConsumer,
+} from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-figures-"));
-let browser, server;
+let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["figure-example"]);
   await writeFile(
     path.join(consumer, "main.tsx"),
     await readFile(new URL("./fixture/figures.tsx", import.meta.url)),
   );
-  await writeFile(
-    path.join(consumer, "app.css"),
-    '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./main.tsx";\n@source "./components";\n',
-  );
-  await writeFile(
-    path.join(consumer, "index.html"),
-    '<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Publication figures</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
-  );
-  await build({
-    root: consumer,
-    resolve: { alias: { "@": consumer } },
-    configFile: false,
-    logLevel: "error",
-    css: { postcss: { plugins: [tailwind()] } },
-    build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
-  });
-  server = await serveExport(path.join(consumer, "dist"));
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
+
+  await buildConsumer(consumer, { title: "Publication figures" });
+  ({ server, browser, page } = await openConsumer(path.join(consumer, "dist"), {
     viewport: { width: 1050, height: 1000 },
-  });
+  }));
   const failures = [],
     requests = [];
   page.on("pageerror", (error) => failures.push(error.message));
@@ -274,7 +259,5 @@ try {
   );
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server?.close();
-  await rm(consumer, { recursive: true, force: true });
+  await closeConsumer({ browser, server }, consumer);
 }

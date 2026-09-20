@@ -5,7 +5,7 @@ import { MoneyInput } from "./components/finstack/primitives/money-input/money-i
 import { RateInput } from "./components/finstack/primitives/rate-input/rate-input";
 import { DateInput } from "./components/finstack/primitives/date-input/date-input";
 import { IdCombobox } from "./components/finstack/primitives/id-combobox/id-combobox";
-import { ModelPicker } from "./components/finstack/primitives/model-picker/model-picker";
+import { EnumField } from "./components/finstack/primitives/enum-field/enum-field";
 import { MetricPicker } from "./components/finstack/primitives/metric-picker/metric-picker";
 import {
   KnotTable,
@@ -89,7 +89,8 @@ function App() {
           value={id}
           onValueChange={setId}
         />
-        <ModelPicker
+        <EnumField
+          layout="select"
           label="Supplied model"
           value={model}
           onValueChange={setModel}

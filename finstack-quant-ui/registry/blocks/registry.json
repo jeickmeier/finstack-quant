@@ -29,7 +29,6 @@
         "@finstack/json-viewer",
         "@finstack/use-instrument-validator",
         "@finstack/use-price-instrument",
-        "@finstack/finstack-fixtures",
         "@finstack/market-context-form",
         "@finstack/use-market-validator",
         "@finstack/cashflow-viewer",
@@ -137,6 +136,7 @@
           "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
           "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }

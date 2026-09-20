@@ -892,6 +892,14 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
              beside it: this document is too large to hand to a model.",
         )
         .with_examples(instrument_examples),
+        SchemaArtifact::new::<crate::instruments::cashflow_export::InstrumentCashflowEnvelope>(
+            "schemas/results/1/instrument_cashflow.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
+            "Instrument Cashflow",
+            "Native cashflow rows, reporting-currency PV and reconciliation status.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output),
         SchemaArtifact::new::<crate::results::ValuationResult>(
             "schemas/results/1/valuation_result.schema.json",
             "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",

@@ -46,10 +46,6 @@ export interface CubeSampleRequest {
   }[];
   readonly convention: "normal" | "black_lognormal";
 }
-export interface ValidationRequest {
-  readonly instrumentJson: string;
-  readonly revision: string | number;
-}
 /** Explicit cloneable exception data; never Comlink's lossy default thrown-error transfer. */
 export interface ErrorValue {
   name: string;
@@ -64,9 +60,8 @@ export interface WorkerApi {
     wasmUrl?: string,
   ): Promise<Envelope<{ state: "ready"; worker: boolean }>>;
   price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
-  validate(
-    request: ValidationRequest,
-  ): Promise<Envelope<{ revision: string | number; json: string }>>;
+  /** Validate and canonicalize instrument JSON through the native facade. */
+  validate(instrumentJson: string): Promise<Envelope<string>>;
   /** Canonicalize the complete market through its native constructor. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
   /** Full envelope includes prior_market, quote sets, data and every plan setting. */
@@ -81,7 +76,6 @@ export interface WorkerApi {
   metrics(): Promise<Envelope<Record<string, string[]>>>;
   calendars(): Promise<Envelope<string[]>>;
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
-  dispose(): Promise<Envelope<void>>;
 }
 /** Preserve native exception fields and recursively preserve Error causes. */
 export function errorValue(error: unknown): ErrorValue {

@@ -240,6 +240,16 @@ the manually-run `tests/return_shapes.rs`.
 Rust types with `ts-rs`. Regenerate with `mise run wasm-gen-bindings`; verify without
 mutating the tree with `mise run wasm-check-bindings` (also run by `mise run gen-check`).
 
+`types/valuation-result.d.ts` and `schemas/host/1/valuation_result.schema.json`
+are generated from Rust for the facade's bigint-enabled result serializer.
+The facade re-exports all five typed detail variants through `ValuationDetails`.
+Import validation metadata from
+`finstack-quant-wasm/contracts/valuation-result.schema.json`; its `int64`/`uint64`
+fields describe host `bigint` values, while JSON export uses integer tokens.
+Monte Carlo counts describe their existing `u32` serialization and remain numbers.
+Regenerate with `mise run wasm-gen-contracts` and check with
+`mise run wasm-check-contracts`; both are included in the binding generation/check tasks.
+
 ## WASM Object Disposal
 
 Most functions return plain JavaScript values and need no manual cleanup.

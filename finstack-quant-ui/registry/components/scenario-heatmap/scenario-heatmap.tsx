@@ -14,7 +14,7 @@ import type { FigureText } from "../../primitives/finstack-chart/presentation";
 import { EnumField } from "../../primitives/enum-field/enum-field";
 import { FinstackTable } from "../../primitives/finstack-table/finstack-table";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
-/** Canonical Rust ScenarioCell.price convention; the facade's original-balance prose is outdated. */
+/** Canonical Rust ScenarioCell.price convention: clean settlement price per current outstanding balance. */
 export const scenarioPriceLabel =
   "Clean settlement price (% of current tranche balance)";
 export const scenarioKey = (trancheId: string, cell: TrancheScenarioCell) =>

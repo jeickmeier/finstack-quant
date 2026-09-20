@@ -1,4 +1,5 @@
 "use client";
+import data from "./registry-gallery/data.json";
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -19,6 +20,7 @@ function WorkbenchRoute() {
       </div>
       <FinstackQueryProvider>
         <PricingWorkbench
+          defaultRequest={data.bond.request}
           key={type ?? "default"}
           surfaceOptions={() => ({ colorDomain: [0, 1] })}
           cubeOptions={() => ({

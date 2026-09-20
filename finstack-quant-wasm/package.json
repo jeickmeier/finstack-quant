@@ -12,7 +12,8 @@
     "pkg/**",
     "pkg-node/**",
     "snippets/**",
-    "types/**"
+    "types/**",
+    "schemas/host/**"
   ],
   "exports": {
     ".": {
@@ -23,7 +24,8 @@
       "types": "./types/generated/index.ts"
     },
     "./package.json": "./package.json",
-    "./pkg/finstack_quant_wasm_bg.wasm": "./pkg/finstack_quant_wasm_bg.wasm"
+    "./pkg/finstack_quant_wasm_bg.wasm": "./pkg/finstack_quant_wasm_bg.wasm",
+    "./contracts/valuation-result.schema.json": "./schemas/host/1/valuation_result.schema.json"
   },
   "scripts": {
     "build": "wasm-pack build --target web --out-dir pkg",
@@ -43,7 +45,9 @@
     "format": "prettier --check \"**/*.{ts,js,json,css,md,mjs,mks}\" index.d.ts",
     "format:fix": "prettier --write \"**/*.{ts,js,json,css,md,mjs,mks}\" index.d.ts",
     "format:check": "npm run format",
-    "bench": "node benchmarks/bench.mjs"
+    "bench": "node benchmarks/bench.mjs",
+    "generate:contracts": "node scripts/generate-contract-types.mjs",
+    "check:contracts": "node scripts/generate-contract-types.mjs --check"
   },
   "repository": {
     "type": "git",
@@ -83,6 +87,7 @@
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^16.5.0",
+    "json-schema-to-typescript": "16.0.0",
     "prettier": "^3.8.2",
     "typescript": "^5.9.3"
   },

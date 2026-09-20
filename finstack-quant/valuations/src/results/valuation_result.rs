@@ -93,24 +93,30 @@ pub struct MonteCarloValuationDetails {
     /// Zero for Monte Carlo engines that do not have a separate training
     /// stage.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub training_paths: usize,
     /// Total factor paths simulated in the policy-training stage, including
     /// antithetic partners. Zero when no policy is trained.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub training_simulated_paths: usize,
     /// Independent paths used to fit state-conditional make-whole reference
     /// values. Zero when no stochastic make-whole stage is required.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub make_whole_training_paths: usize,
     /// Total factor paths simulated for state-conditional make-whole training,
     /// including antithetic partners. Zero when that stage is absent.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub make_whole_training_simulated_paths: usize,
     /// Number of independent path estimators contributing to the mean.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub estimator_paths: usize,
     /// Total number of simulated paths, including antithetic partners.
     #[serde(serialize_with = "serialize_path_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub simulated_paths: usize,
     /// Deterministic random seed used for the run.
     pub seed: u64,

@@ -249,3 +249,33 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
     serializeHost(result.covenants),
   );
 });
+
+it("validates formerly opaque FX fields and structured-credit bigint counts", () => {
+  const fx = restore(fixture.cases.find((entry) => entry.detailType === "fx")!);
+  expect(() =>
+    adaptValuation({
+      ...fx,
+      details: { type: "fx", data: { fx_triangulated: "yes" } },
+    } as unknown as ValuationResult),
+  ).toThrow();
+  const credit = restore(
+    fixture.cases.find(
+      (entry) => entry.detailType === "structured_credit_stochastic",
+    )!,
+  );
+  if (credit.details?.type !== "structured_credit_stochastic")
+    throw new Error("Wrong fixture");
+  expect(typeof credit.details.data.num_paths).toBe("bigint");
+  const invalid = {
+    ...credit,
+    details: {
+      ...credit.details,
+      data: {
+        ...credit.details.data,
+        num_paths: Number(credit.details.data.num_paths),
+      },
+    },
+  } as unknown as ValuationResult;
+  expect(() => adaptValuation(invalid)).toThrow();
+  expect(adaptValuation(credit)).toEqual(credit);
+});

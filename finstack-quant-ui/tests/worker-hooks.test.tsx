@@ -2,6 +2,7 @@
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   render,
+  renderHook,
   screen,
   cleanup,
   waitFor,
@@ -11,10 +12,9 @@ import {
 import { renderToString } from "react-dom/server";
 import {
   FinstackProvider,
-  FinstackQueryProvider,
   useFinstack,
 } from "../registry/hooks/use-finstack/use-finstack";
-import { useValidateInstrument } from "../registry/hooks/use-validate-instrument/use-validate-instrument";
+import { useInstrumentValidator } from "../registry/hooks/use-instrument-validator/use-instrument-validator";
 import { FinstackError } from "../registry/workers/finstack-contract";
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("../registry/hooks/use-finstack/client", () => ({
@@ -103,43 +103,40 @@ it("exposes initialization and later worker crashes as errors", async () => {
   );
   expect(screen.getByText("worker crashed")).toBeTruthy();
 });
-it("debounces native validation and hides stale results/errors on any newer revision", async () => {
-  const pending: {
-    resolve: (value: unknown) => void;
-    reject: (error: Error) => void;
-  }[] = [];
-  call.mockImplementation((method: string) =>
-    method === "initialize"
-      ? Promise.resolve()
-      : new Promise((resolve, reject) => pending.push({ resolve, reject })),
+it("returns canonical text and rejects a superseded validation response", async () => {
+  const hook = renderHook(
+    () => ({ validate: useInstrumentValidator(), worker: useFinstack() }),
+    {
+      wrapper: ({ children }) => (
+        <FinstackProvider>{children}</FinstackProvider>
+      ),
+    },
   );
-  function Validation({ text, revision }: { text: string; revision: number }) {
-    const state = useValidateInstrument({ instrumentJson: text, revision });
-    return (
-      <output>{state.error?.message ?? state.data?.json ?? "pending"}</output>
-    );
-  }
-  const wrapper = ({ text, revision }: { text: string; revision: number }) => (
-    <FinstackQueryProvider>
-      <Validation text={text} revision={revision} />
-    </FinstackQueryProvider>
+  await waitFor(() => expect(hook.result.current.worker.status).toBe("ready"));
+  call.mockResolvedValueOnce("canonical text");
+  expect(await hook.result.current.validate("original text")).toBe(
+    "canonical text",
   );
-  const view = render(wrapper({ text: "first", revision: 1 }));
-  await waitFor(() => expect(pending).toHaveLength(1));
-  expect(call).toHaveBeenLastCalledWith("validate", {
-    instrumentJson: "first",
-    revision: 1,
+  expect(call).toHaveBeenLastCalledWith("validate", "original text");
+  let finish!: (value: string) => void;
+  call.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const controller = new AbortController();
+  const pending = hook.result.current.validate("superseded", controller.signal);
+  const rejected = expect(pending).rejects.toMatchObject({
+    name: "AbortError",
   });
-  view.rerender(wrapper({ text: "second", revision: 2 }));
-  await act(async () => pending[0].reject(new Error("stale failure")));
-  expect(screen.queryByText("stale failure")).toBeNull();
-  await waitFor(() => expect(pending).toHaveLength(2));
-  await act(async () =>
-    pending[1].resolve({ json: "validated second", revision: 2 }),
+  controller.abort();
+  finish("old canonical text");
+  await rejected;
+  call.mockRejectedValueOnce(new Error("native validation failure"));
+  await expect(hook.result.current.validate("invalid")).rejects.toThrow(
+    "native validation failure",
   );
-  await screen.findByText("validated second");
-  view.rerender(wrapper({ text: "second", revision: 3 }));
-  expect(screen.queryByText("validated second")).toBeNull();
 });
 it("transport cleanup and worker errors reject in-flight Comlink requests", async () => {
   const { createClient } = await vi.importActual<

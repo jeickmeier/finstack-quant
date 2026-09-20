@@ -745,8 +745,16 @@
       "title": "yoy_inflation_swap"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
+      "bytes": 16094,
+      "kind": "output",
+      "path": "schemas/results/1/instrument_cashflow.schema.json",
+      "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
+      "title": "Instrument Cashflow"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 58875,
+      "bytes": 58887,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

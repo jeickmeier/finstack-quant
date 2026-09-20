@@ -68,8 +68,7 @@ const displays = [
     api: price,
     route: "host-declaration",
     convention:
-      "Only the published MonteCarloValuationDetails is typed; remaining data is unknown.",
-    deferred: "weak-detail-declarations",
+      "All detail variants use Rust-derived WASM host declarations and validation metadata.",
   },
   {
     id: "explanation-trace",
@@ -89,6 +88,8 @@ const displays = [
   },
   {
     id: "cashflow-viewer",
+    schema: `${base}results/1/instrument_cashflow.schema.json`,
+    pointer: "#",
     api: [
       "valuations.instruments.instrumentCashflowsJson",
       "ValuationInstrumentsNamespace",
@@ -96,8 +97,7 @@ const displays = [
     ],
     route: "native-json-table",
     convention:
-      "CashflowRow presentation adapter from valuations/src/instruments/common_impl/cashflow_export.rs. Lossless tokens, native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
-    deferred: "cashflow-declarations",
+      "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
   },
   {
     id: "curve-chart",
@@ -199,8 +199,7 @@ const displays = [
     ],
     route: "returned-prices",
     convention:
-      "Rust clean settlement price, percent of current tranche balance; facade original-balance wording is upstream drift.",
-    deferred: "scenario-price-docs",
+      "Rust clean settlement price, percent of current tranche balance.",
   },
 ];
 
@@ -318,7 +317,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
       sha256: digest(declaration),
     };
   });
-  // The scenario field's published TS comment is known to disagree with Rust.
+  // Retain the native scenario authority alongside the matching facade declaration.
   const scenarioPath =
     "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/scenario.rs";
   const scenarioSource = await readFile(resolve(repo, scenarioPath), "utf8");
@@ -329,6 +328,18 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
       fixtureManifestSha256: digest(fixtureManifest),
       entries,
       hostDeclarations,
+      hostContract: {
+        source:
+          "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
+        sha256: digest(
+          await readFile(
+            resolve(
+              repo,
+              "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
+            ),
+          ),
+        ),
+      },
       details,
       scenarioAuthority: {
         source: scenarioPath,
@@ -337,17 +348,11 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
       deferred: {
         "machine-readable-units":
           "Generic values stay raw; do not infer units from names or decimal refs.",
-        "cashflow-declarations":
-          "No public typed WASM cashflow return. The viewer validates a presentation-only adapter against canonical Rust CashflowRow and native fixtures; it does not add a native API.",
-        "weak-detail-declarations":
-          "Unknown host details remain raw. Actual structured-credit num_paths is bigint; the typed Monte Carlo path counts are number. Never infer unknown host shapes from wire integer formats.",
         "full-state-curve-evaluation":
           "Use stored nodes and parameters; no constructor-based curve recreation.",
         "off-grid-surface-evaluation": "Stored nodes only.",
         "quote-space-calibration-fits":
           "Returned residuals only until quote repricing is published.",
-        "scenario-price-docs":
-          "Rust defines clean settlement percent of current balance.",
         "missing-financial-aggregates":
           "Unavailable unless an existing canonical result supplies the value.",
       },

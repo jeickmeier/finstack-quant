@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { startWorker } from "./worker/harness.mjs";
 import { QueryClient } from "@tanstack/react-query";
 import { pricingCases } from "./browser/cases.mjs";
+import { exportValuation } from "../src/host";
 import { priceOptions } from "../registry/hooks/use-price-instrument/use-price-instrument";
 import { errorValue, unwrap } from "../registry/workers/finstack-contract";
 const native = createRequire(import.meta.url)(
@@ -131,28 +132,18 @@ it("keys every pricing input, preserves snapshots, and forwards native history",
   expect(options.queryKey.at(-1).metrics).toEqual(["dv01"]);
   query.clear();
 });
-it("uses the exact native option registries and tags validation with its revision", async () => {
+it("uses the exact native option registries and canonicalizes instrument text", async () => {
   expect(unwrap(await proxy.models())).toEqual(native.listModelsGrouped());
   expect(unwrap(await proxy.metrics())).toEqual(
     native.listStandardMetricsGrouped(),
   );
   expect(unwrap(await proxy.calendars())).toEqual(native.availableCalendars());
-  expect(
-    unwrap(
-      await proxy.validate({
-        instrumentJson: requests.bond.instrumentJson,
-        revision: 7,
-      }),
-    ),
-  ).toEqual({
-    revision: 7,
-    json: native.validateInstrumentJson(requests.bond.instrumentJson),
-  });
-  expect((await proxy.validate({ instrumentJson: "{", revision: 8 })).ok).toBe(
-    false,
+  expect(unwrap(await proxy.validate(requests.bond.instrumentJson))).toBe(
+    native.validateInstrumentJson(requests.bond.instrumentJson),
   );
+  expect((await proxy.validate("{")).ok).toBe(false);
 });
-it("keeps four native handles, refreshes recency, frees eviction and disposal", async () => {
+it("keeps four native handles, refreshes recency, frees evictions until worker termination", async () => {
   const local = await startWorker();
   try {
     const markets = Array.from(
@@ -180,10 +171,6 @@ it("keeps four native handles, refreshes recency, frees eviction and disposal", 
       await local.proxy.price({ ...requests.bond, marketJson: markets[1] }),
     );
     expect((await local.proxy.resources()).freed).toBe(2);
-    unwrap(await local.proxy.dispose());
-    const resources = await local.proxy.resources();
-    expect(resources.freed).toBe(resources.constructed);
-    expect((await local.proxy.price(requests.bond)).ok).toBe(false);
   } finally {
     await local.close();
   }
@@ -206,5 +193,25 @@ it("preserves initialization failure fields and rejects every later operation", 
     expect(() => unwrap(initial)).toThrow("Native initialization failed");
   } finally {
     await local.close();
+  }
+});
+
+it("exports identical host values and rejects non-bigint seeds through both boundaries", async () => {
+  const result = unwrap(await proxy.price(requests.stochastic));
+  expect(result.details.type).toBe("monte_carlo");
+  for (const seed of [result.details.data.seed, 0n, (1n << 64n) - 1n]) {
+    const value = structuredClone(result);
+    value.details.data.seed = seed;
+    expect(unwrap(await proxy.exportResult(value))).toBe(
+      exportValuation(value, native.validateValuationResultJson),
+    );
+  }
+  for (const seed of [0, 42, Number.MAX_SAFE_INTEGER, "42", -1n, 1n << 64n]) {
+    const value = structuredClone(result);
+    value.details.data.seed = seed;
+    expect(() =>
+      exportValuation(value, native.validateValuationResultJson),
+    ).toThrow();
+    expect((await proxy.exportResult(value)).ok).toBe(false);
   }
 });

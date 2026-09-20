@@ -2,17 +2,18 @@ import { parse } from "lossless-json";
 import { serializeHost } from "../../src/codec.mjs";
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { build } from "vite";
-import tailwind from "@tailwindcss/postcss";
-import { chromium } from "playwright";
-import { serveExport } from "./static-server.mjs";
-import { installBuilt } from "./consumer.mjs";
+import {
+  installBuilt,
+  buildConsumer,
+  openConsumer,
+  closeConsumer,
+} from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-workbench-"));
-let browser, server;
+let browser, server, page;
 async function original(viewer) {
   await viewer.locator("pre").waitFor();
   await viewer.getByRole("button", { name: "Original", exact: true }).click();
@@ -41,43 +42,18 @@ try {
         new URL("./fixture/workbench-phase2.tsx", import.meta.url),
       ),
     );
-    await writeFile(
-      path.join(consumer, "app.css"),
-      '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./main.tsx";\n@source "./components";\n',
-    );
-    await writeFile(
-      path.join(consumer, "index.html"),
-      '<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Embedded bond pricing</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
-    );
-    const modules = [];
-    await build({
-      root: consumer,
-      configFile: false,
-      logLevel: "error",
-      resolve: { alias: { "@": consumer } },
-      worker: { format: "es" },
-      plugins: [
-        {
-          name: "inspect-dependencies",
-          generateBundle(_, bundle) {
-            for (const chunk of Object.values(bundle))
-              if (chunk.type === "chunk")
-                modules.push(...Object.keys(chunk.modules));
-          },
-        },
-      ],
-      css: { postcss: { plugins: [tailwind()] } },
-      build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
+
+    const modules = await buildConsumer(consumer, {
+      title: "Embedded bond pricing",
     });
   }
   const exportDirectory =
     process.env.REGISTRY_EXPORT_DIR ?? path.join(consumer, "dist");
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  server = await serveExport(exportDirectory, basePath);
-  browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
+  ({ server, browser, page } = await openConsumer(exportDirectory, {
     viewport: { width: 1200, height: 1000 },
-  });
+    basePath,
+  }));
   const failures = [],
     requests = [],
     excludedPrefetchRequests = [];
@@ -325,7 +301,5 @@ try {
   );
   console.log(JSON.stringify(report, null, 2));
 } finally {
-  await browser?.close();
-  await server?.close();
-  await rm(consumer, { recursive: true, force: true });
+  await closeConsumer({ browser, server }, consumer);
 }

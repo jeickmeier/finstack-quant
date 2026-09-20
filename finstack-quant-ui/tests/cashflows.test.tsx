@@ -250,7 +250,7 @@ function suppliedExport(text: string) {
   );
 }
 it("preserves wide signed tokens, row currencies, zero and absent diagnostics without summing or rounding", async () => {
-  const json = `{"instrument_id":"EXACT","currency":"USD","model":"discounting","as_of":"2025-01-01","total_pv":9007199254740993.123456789,"reconciles_with_base_value":false,"flows":[{"date":"2026-01-01","kind":"fixed","currency":"EUR","amount":-9007199254740993.123456789,"accrual_factor":0,"year_fraction":1.00000000000000001,"discount_factor":0,"discount_curve_id":"EUR-OIS","pv":0,"rate":0,"survival_probability":0}]}`;
+  const json = `{"instrument_id":"EXACT","discount_curve_id":"USD-OIS","currency":"USD","model":"discounting","as_of":"2025-01-01","total_pv":9007199254740993.123456789,"reconciles_with_base_value":false,"flows":[{"date":"2026-01-01","kind":"fixed","currency":"EUR","amount":-9007199254740993.123456789,"accrual_factor":0,"year_fraction":1.00000000000000001,"discount_factor":0,"discount_curve_id":"EUR-OIS","pv":0,"rate":0,"survival_probability":0}]}`;
   suppliedExport(json);
   const table = await screen.findByRole("table", { name: "Cashflow schedule" });
   expect(
@@ -289,6 +289,7 @@ it("omits absent optional columns and retains zero total for an empty native sch
 });
 it.each([
   "not JSON",
+  fixture.cases[0].cashflows!.replace(/,"discount_curve_id":"[^"]+"/, ""),
   '{"flows":[]}',
   fixture.cases[0].cashflows!.replace(
     '"amount":-1000000.0',
