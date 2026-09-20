@@ -41,6 +41,12 @@ const contracts = roots.map(({ schema }) => {
 });
 const items = [
   item(
+    "finstack-format",
+    ["format/format.ts", "format/columns.ts", "format/transport.ts"],
+    ["finstack-codec", "finstack-host", "contract-valuation-result"],
+    ["big.js@7.0.1", "@tanstack/react-table@9.2.4", "@types/big.js@6.2.2"],
+  ),
+  item(
     "finstack-codec",
     ["codec.mjs", "codec.d.mts", "schema.mjs", "schema.d.mts"],
     [],

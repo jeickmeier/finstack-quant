@@ -8,9 +8,9 @@ import init, {
 import {
   adaptValuation,
   exportValuation,
-  getDetailsView,
   valuationCodec,
-} from "../src/host";
+} from "../src/format/transport";
+import { getDetailsView } from "../src/host";
 
 await init({
   module_or_path: await readFile(

@@ -14,6 +14,38 @@
   ],
   "items": [
     {
+      "name": "finstack-format",
+      "type": "registry:lib",
+      "docs": "Installs finstack-format under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/format/format.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/format/format.ts"
+        },
+        {
+          "path": "src/format/columns.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/format/columns.ts"
+        },
+        {
+          "path": "src/format/transport.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/format/transport.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/finstack-host",
+        "@finstack/contract-valuation-result"
+      ],
+      "dependencies": [
+        "big.js@7.0.1",
+        "@tanstack/react-table@9.2.4",
+        "@types/big.js@6.2.2"
+      ]
+    },
+    {
       "name": "finstack-codec",
       "type": "registry:lib",
       "docs": "Installs finstack-codec under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",

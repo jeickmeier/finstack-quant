@@ -161,3 +161,18 @@ and SIL OFL-1.1 licences. `ui-gen` emits CSS and registry metadata; `ui-check`
 checks drift, literal colours/fonts and contrast, including the tenant example.
 `npm run test:theme:browser` builds and statically serves an installed theme
 fixture, checking actual font loading and the theme/density switches.
+
+## Display formatting
+
+`finstack-format` installs `lib/finstack/format/{format,columns,transport}.ts`.
+Scalar formatting is independent of WASM initialization. Import `transport`
+explicitly for canonical import/export; it reuses the existing adapters.
+
+`formatMoney` preserves the amount and uses returned per-currency rounding
+stamps for display. Without an explicit scale it preserves all supplied digits.
+`formatRate` requires a source-backed wire/display convention; absent metadata
+returns raw text and `unit: null`. Decimal conversions use exact decimal text;
+source strings remain the caller's state. Grouping currently uses en-US.
+`isoToEpoch` and `epochToIso` call the native core date functions in an initialized
+host (inside the worker for browser consumers). Column presets target Table
+9.2.4 and add formatting/alignment only.
