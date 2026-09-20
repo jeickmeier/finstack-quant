@@ -126,3 +126,27 @@ All mandatory concepts, labs, exercises and solutions remain part of each unit.
 Longer lessons span multiple sessions. Learner completion time is measured during
 delivery; it is not inferred from notebook execution time. Release gates and
 retrospectives determine scheduling, not a fixed 12–14-week ceiling.
+
+## Component registry development
+
+The docs host uses the pinned Base UI build of Fumadocs. Registry files are installed
+copies, ignored by Git and regenerated with `mise run ui-docs-install`. The registry
+source remains in `finstack-quant-ui`; edit it there and reinstall the consumer.
+Import the installed `src/styles/finstack/theme.css` as the shared token authority.
+
+Use `mise run wasm-pkg` first to build the optimized web artifact and the separate
+Node target. Then use `mise run ui-docs-check`, `mise run ui-docs-build`, or
+`mise run ui-install-smoke`. These tasks install the built block with the pinned
+shadcn CLI. The local runner serves registry JSON over HTTP and substitutes only
+the unpublished WASM npm dependency with its resolved absolute local package path.
+Dependency lifecycle builds are disabled to preserve the measured artifact.
+The public `/r/` output retains the release dependency declaration.
+
+The scoped docs build exports the existing docs route, reader layout, navigation
+and installed components under `.registry-publish/out`. It projects existing lesson
+metadata for navigation but does not execute or certify lessons/notebooks, and it
+omits their routes. The full analyst-site publication pipeline remains separate.
+The install smoke also creates an external Next app, copies the local WASM package
+with npm `--install-links`, installs only `@finstack/pricing-workbench`, and tests
+production exports at root and `/finstack-quant`. Temporary consumers and browser
+reports are retained at the paths printed by the runner for diagnosis.

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
@@ -12,52 +13,70 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-workbench-"));
 let browser, server;
 try {
-  const installed = await installBuilt(root, consumer, ["pricing-workbench"]);
-  await writeFile(
-    path.join(consumer, "main.tsx"),
-    await readFile(new URL("./fixture/workbench.tsx", import.meta.url)),
-  );
-  await writeFile(
-    path.join(consumer, "app.css"),
-    '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./main.tsx";\n@source "./components";\n',
-  );
-  await writeFile(
-    path.join(consumer, "index.html"),
-    '<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Embedded bond pricing</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
-  );
-  const modules = [];
-  await build({
-    root: consumer,
-    configFile: false,
-    logLevel: "error",
-    resolve: { alias: { "@": consumer } },
-    worker: { format: "es" },
-    plugins: [
-      {
-        name: "inspect-dependencies",
-        generateBundle(_, bundle) {
-          for (const chunk of Object.values(bundle))
-            if (chunk.type === "chunk")
-              modules.push(...Object.keys(chunk.modules));
+  let installed = ["pricing-workbench"];
+  if (!process.env.REGISTRY_EXPORT_DIR) {
+    installed = await installBuilt(root, consumer, ["pricing-workbench"]);
+    await writeFile(
+      path.join(consumer, "main.tsx"),
+      await readFile(new URL("./fixture/workbench.tsx", import.meta.url)),
+    );
+    await writeFile(
+      path.join(consumer, "app.css"),
+      '@import "tailwindcss" source(none);\n@import "./styles/finstack/theme.css";\n@source "./index.html";\n@source "./main.tsx";\n@source "./components";\n',
+    );
+    await writeFile(
+      path.join(consumer, "index.html"),
+      '<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>Embedded bond pricing</title><link rel="stylesheet" href="/app.css"></head><body class="finstack-surface"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
+    );
+    const modules = [];
+    await build({
+      root: consumer,
+      configFile: false,
+      logLevel: "error",
+      resolve: { alias: { "@": consumer } },
+      worker: { format: "es" },
+      plugins: [
+        {
+          name: "inspect-dependencies",
+          generateBundle(_, bundle) {
+            for (const chunk of Object.values(bundle))
+              if (chunk.type === "chunk")
+                modules.push(...Object.keys(chunk.modules));
+          },
         },
-      },
-    ],
-    css: { postcss: { plugins: [tailwind()] } },
-    build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
-  });
-  server = await serveExport(path.join(consumer, "dist"));
+      ],
+      css: { postcss: { plugins: [tailwind()] } },
+      build: { outDir: path.join(consumer, "dist"), emptyOutDir: true },
+    });
+  }
+  const exportDirectory =
+    process.env.REGISTRY_EXPORT_DIR ?? path.join(consumer, "dist");
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  server = await serveExport(exportDirectory, basePath);
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     viewport: { width: 1200, height: 1000 },
   });
   const failures = [],
-    requests = [];
+    requests = [],
+    excludedPrefetchRequests = [];
   page.on("pageerror", (error) => failures.push(error.message));
   page.on("response", (r) => {
     requests.push(r.url());
-    if (r.status() >= 400) failures.push(`${r.status()} ${r.url()}`);
+    const pathname = new URL(r.url()).pathname.slice(basePath.length);
+    // Next prefetches unrelated navigation targets omitted by the scoped docs export.
+    const outsideScope =
+      process.env.REGISTRY_SCOPED_DOCS === "1" &&
+      ["/", "/labs/"].includes(pathname);
+    if (outsideScope && r.status() >= 400)
+      excludedPrefetchRequests.push(r.url());
+    if (r.status() >= 400 && !outsideScope)
+      failures.push(`${r.status()} ${r.url()}`);
   });
-  await page.goto(server.url, { waitUntil: "networkidle" });
+  await page.goto(
+    `${server.url}${process.env.REGISTRY_WORKBENCH_PATH ?? "/"}`,
+    { waitUntil: "networkidle" },
+  );
   await page.getByText("USD 1,042,500", { exact: true }).waitFor();
   const results = page.getByRole("region", { name: "Results", exact: true });
   await results.getByText("Last priced request", { exact: true }).click();
@@ -114,7 +133,9 @@ try {
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
-  const axe = await page.evaluate(() => window.axe.run(document));
+  const axe = await page.evaluate(() =>
+    window.axe.run(document.querySelector(".finstack-surface")),
+  );
   assert.deepEqual(
     axe.violations.map((v) => ({
       id: v.id,
@@ -124,9 +145,42 @@ try {
   );
   assert.deepEqual(failures, []);
   assert(requests.some((url) => url.endsWith(".wasm")));
-  await page.screenshot({ path: "/tmp/pr016-workbench.png" });
+  const output =
+    process.env.REGISTRY_WORKBENCH_REPORT ?? "/tmp/pr016-workbench.json";
+  let wasm;
+  if (process.env.REGISTRY_EXPORT_DIR) {
+    if (process.env.REGISTRY_SCOPED_DOCS === "1") {
+      const response = await fetch(`${server.url}/r/pricing-workbench.json`);
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).name, "pricing-workbench");
+    }
+    assert(
+      requests.some((url) => /\.woff2?(\?|$)/.test(url)),
+      "local font requests",
+    );
+    const url = new URL(requests.find((url) => url.endsWith(".wasm")));
+    assert(url.pathname.startsWith(`${basePath}/`));
+    const bytes = await readFile(
+      path.join(
+        exportDirectory,
+        decodeURIComponent(url.pathname.slice(basePath.length)),
+      ),
+    );
+    wasm = {
+      bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
+    assert(wasm.bytes <= 25_000_000);
+    assert.equal(wasm.sha256, process.env.REGISTRY_EXPECTED_WASM_SHA256);
+    assert.equal(page.workers().length, 1);
+  }
+  await page.screenshot({ path: output.replace(/\.json$/, ".png") });
   const report = {
     browser: browser.version(),
+    basePath,
+    wasm,
+    fonts: requests.filter((url) => /\.woff2?(\?|$)/.test(url)),
+    excludedPrefetchRequests,
     installed,
     violations: [],
     failures,
@@ -138,10 +192,7 @@ try {
     ],
     verdict: "pass",
   };
-  await writeFile(
-    "/tmp/pr016-workbench.json",
-    JSON.stringify(report, null, 2) + "\n",
-  );
+  await writeFile(output, JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report, null, 2));
 } finally {
   await browser?.close();

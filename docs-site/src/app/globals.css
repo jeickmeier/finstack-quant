@@ -2,13 +2,11 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'katex/dist/katex.min.css';
+@import '../styles/finstack/theme.css';
 
 @source '../../node_modules/fumadocs-ui/dist/**/*.js';
 
-@theme {
-  --font-sans: 'Avenir Next', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
-}
+
 
 :root {
   --color-fd-background: #f8faf9;

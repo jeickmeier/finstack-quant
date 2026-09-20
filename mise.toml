@@ -641,7 +641,7 @@ run = [
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"
 run = [
-  "wasm-pack build finstack-quant-wasm --target web --release --out-dir pkg",
+  "node finstack-quant-ui/scripts/build-wasm-web.mjs",
   "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
   '''uv run python -c "from pathlib import Path; [Path(p).touch() for p in ('finstack-quant-wasm/pkg/.npmignore', 'finstack-quant-wasm/pkg-node/.npmignore')]"''',
 ]
@@ -1014,3 +1014,23 @@ run = "npm --prefix finstack-quant-ui run check"
 [tasks.ui-build]
 description = "Build component-registry distribution with the pinned shadcn CLI"
 run = "npm --prefix finstack-quant-ui run build"
+
+[tasks.ui-docs-install]
+description = "Install the built workbench into the docs consumer using the pinned CLI"
+depends = ["ui-build"]
+run = "node finstack-quant-ui/scripts/install-local.mjs docs-site"
+
+[tasks.ui-docs-check]
+description = "Type-check the installed registry and existing docs host"
+depends = ["ui-docs-install"]
+run = "npm --prefix docs-site run typecheck"
+
+[tasks.ui-docs-build]
+description = "Export registry docs routes and the existing layout without notebook execution"
+depends = ["ui-docs-install"]
+run = "node finstack-quant-ui/scripts/build-docs.mjs"
+
+[tasks.ui-install-smoke]
+description = "Production docs and external Next registry installation checks at both deployment paths"
+depends = ["ui-docs-install"]
+run = "node finstack-quant-ui/tests/browser/install-smoke.mjs"

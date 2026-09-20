@@ -1,0 +1,33 @@
+---
+title: Bond pricing workbench
+description: Edit a bond and inspect its native valuation against a supplied market snapshot.
+---
+
+import { RegistryDemo } from '@/components/registry-demo';
+
+<RegistryDemo />
+
+The workbench installs into the host application. One shared browser worker validates
+and prices the request. Amounts remain decimal strings while editing; results retain
+the last completed request until a new valuation succeeds. The current form supports
+bonds; other instrument forms remain gated.
+
+## Install locally
+
+Build the optimized WASM package and registry from a checkout with the pinned tools:
+
+```sh
+mise run wasm-pkg
+mise run ui-build
+mise exec -- node finstack-quant-ui/scripts/install-local.mjs /absolute/path/to/next-app
+```
+
+Configure the Next app with Tailwind v4, a `components.json` using the `@finstack`
+registry, and source aliases. The local installer serves built registry JSON over
+HTTP and resolves the unpublished WASM dependency to an absolute local package path.
+It disables dependency lifecycle builds so installation preserves the optimized artifact.
+Published registry JSON is served under `/r/`; the npm WASM release is still pending.
+
+Import `styles/finstack/theme.css` after Tailwind and mount `PricingWorkbench` inside
+`FinstackQueryProvider`. Applications with an existing Query provider may use
+`FinstackProvider` directly. Keep the installed workers, hooks and component paths together.
