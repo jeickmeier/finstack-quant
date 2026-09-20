@@ -426,3 +426,79 @@ it("loads configured scenario prices only on demand from the completed structure
   );
   expect(prices()).toHaveLength(1);
 }, 30000);
+
+it("prepares one completed cashflow snapshot before printing and restores the input tab", async () => {
+  const invoke = call.getMockImplementation()! as (
+    method: string,
+    request: any,
+  ) => Promise<any>;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  call.mockImplementation(async (method, request) => {
+    if (method === "cashflows") await pending;
+    return invoke(method, request);
+  });
+  const print = vi.fn();
+  vi.stubGlobal("print", print);
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) =>
+    setTimeout(callback, 0),
+  );
+  Object.defineProperty(document, "fonts", {
+    configurable: true,
+    value: { ready: Promise.resolve() },
+  });
+  try {
+    mount();
+    const button = await screen.findByRole("button", { name: "Print report" });
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false), {
+      timeout: 10000,
+    });
+    const request = prices()[0]!;
+    fireEvent.click(button);
+    const workbench = screen.getByRole("region", { name: "Pricing workbench" });
+    await waitFor(() =>
+      expect(workbench.getAttribute("data-printing")).toBe("preparing"),
+    );
+    expect(print).not.toHaveBeenCalled();
+    expect(
+      screen
+        .getByRole("tab", { name: "2 Market" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    release();
+    await waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    const cashflowCalls = call.mock.calls.filter(
+      ([method]) => method === "cashflows",
+    );
+    expect(cashflowCalls).toHaveLength(1);
+    expect(cashflowCalls[0]![1]).toEqual({
+      instrumentJson: request.instrumentJson,
+      marketJson: request.marketJson,
+      asOf: request.asOf,
+      model: request.model ?? "default",
+    });
+    expect(
+      workbench.querySelector('[aria-label="Priced instrument JSON"] pre')
+        ?.textContent,
+    ).toBe(request.instrumentJson);
+    expect(
+      workbench.querySelector('[aria-label="Market snapshot"] pre')
+        ?.textContent,
+    ).toBe(request.marketJson);
+    fireEvent(window, new Event("afterprint"));
+    await waitFor(() =>
+      expect(workbench.hasAttribute("data-printing")).toBe(false),
+    );
+    expect(
+      screen
+        .getByRole("tab", { name: "1 Instrument" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(workbench.querySelector('[aria-label="Cashflows"]')).toBeNull();
+  } finally {
+    Reflect.deleteProperty(document, "fonts");
+    release();
+  }
+}, 30000);

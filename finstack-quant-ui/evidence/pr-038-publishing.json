@@ -1,0 +1,362 @@
+{
+  "scope": "one-item publishing consumer, four browser reports, offline exports and Pages placement",
+  "install": {
+    "name": "pricing-workbench",
+    "checks": [
+      "A4/Letter bond and mixed-currency reports reuse completed components; exact native text/downloads; standalone publication SVG/PNG"
+    ]
+  },
+  "browser": {
+    "reports": [
+      {
+        "kind": "bond",
+        "format": "A4",
+        "filename": "bond-A4.pdf",
+        "exactNativeText": true,
+        "exactDownload": true,
+        "controlsHidden": true,
+        "printGeometry": {
+          "wrap": "pre-wrap",
+          "overflow": false,
+          "maxHeight": "none"
+        }
+      },
+      {
+        "kind": "bond",
+        "format": "Letter",
+        "filename": "bond-Letter.pdf",
+        "exactNativeText": true,
+        "exactDownload": true,
+        "controlsHidden": true,
+        "printGeometry": {
+          "wrap": "pre-wrap",
+          "overflow": false,
+          "maxHeight": "none"
+        }
+      },
+      {
+        "kind": "xccy_swap",
+        "format": "A4",
+        "filename": "xccy_swap-A4.pdf",
+        "exactNativeText": true,
+        "exactDownload": true,
+        "controlsHidden": true,
+        "printGeometry": {
+          "wrap": "pre-wrap",
+          "overflow": false,
+          "maxHeight": "none"
+        }
+      },
+      {
+        "kind": "xccy_swap",
+        "format": "Letter",
+        "filename": "xccy_swap-Letter.pdf",
+        "exactNativeText": true,
+        "exactDownload": true,
+        "controlsHidden": true,
+        "printGeometry": {
+          "wrap": "pre-wrap",
+          "overflow": false,
+          "maxHeight": "none"
+        }
+      }
+    ],
+    "figure": {
+      "layout": [900, 600],
+      "pixels": [1800, 1200],
+      "inches": [6, 4],
+      "ppiAtPlacement": 300,
+      "editableSvg": true,
+      "embeddedFonts": true,
+      "lightFromDark": true
+    }
+  },
+  "pdf": [
+    {
+      "file": "bond-A4.pdf",
+      "sha256": "cea1ca6ed5892137b319445e8ec43ea84916cbb94d3766063cadc6eac3a66da9",
+      "pages": 2,
+      "pageSizes": [
+        [595.91998, 842.88],
+        [595.91998, 842.88]
+      ],
+      "textMatches": {
+        "instrument": true,
+        "market": true,
+        "cashflows": true
+      },
+      "outside": [],
+      "fonts": [
+        "AAAAAA+IBMPlexSans-Regular",
+        "BAAAAA+IBMPlexSans-SemiBold",
+        "CAAAAA+IBMPlexMono-Regular",
+        "DAAAAA+IBMPlexSans-Medium",
+        "EAAAAA+Times-Roman",
+        "FAAAAA+IBMPlexMono-Medium"
+      ],
+      "images": 0,
+      "vectorPaths": 89
+    },
+    {
+      "file": "bond-Letter.pdf",
+      "sha256": "a5eb1da8536b29dd8617fc5cf6a3afa80a64d235fc8a665bd830470eb02dd700",
+      "pages": 2,
+      "pageSizes": [
+        [612, 792],
+        [612, 792]
+      ],
+      "textMatches": {
+        "instrument": true,
+        "market": true,
+        "cashflows": true
+      },
+      "outside": [],
+      "fonts": [
+        "AAAAAA+IBMPlexSans-Regular",
+        "BAAAAA+IBMPlexSans-SemiBold",
+        "CAAAAA+IBMPlexMono-Regular",
+        "DAAAAA+IBMPlexSans-Medium",
+        "EAAAAA+Times-Roman",
+        "FAAAAA+IBMPlexMono-Medium"
+      ],
+      "images": 0,
+      "vectorPaths": 89
+    },
+    {
+      "file": "xccy_swap-A4.pdf",
+      "sha256": "899f3e9aab0d848fba7b359c6d230abd79560543654190b4f4479cffc03ded08",
+      "pages": 5,
+      "pageSizes": [
+        [595.91998, 842.88],
+        [595.91998, 842.88],
+        [595.91998, 842.88],
+        [595.91998, 842.88],
+        [595.91998, 842.88]
+      ],
+      "textMatches": {
+        "instrument": true,
+        "market": true,
+        "cashflows": true
+      },
+      "outside": [],
+      "fonts": [
+        "AAAAAA+IBMPlexSans-Regular",
+        "BAAAAA+IBMPlexSans-SemiBold",
+        "CAAAAA+IBMPlexMono-Regular",
+        "DAAAAA+Times-Roman",
+        "EAAAAA+IBMPlexSans-Medium"
+      ],
+      "images": 0,
+      "vectorPaths": 57
+    },
+    {
+      "file": "xccy_swap-Letter.pdf",
+      "sha256": "24f26c95aebd85fe9be80a27230883c739104f6fa4307065e07191445a2e53c5",
+      "pages": 5,
+      "pageSizes": [
+        [612, 792],
+        [612, 792],
+        [612, 792],
+        [612, 792],
+        [612, 792]
+      ],
+      "textMatches": {
+        "instrument": true,
+        "market": true,
+        "cashflows": true
+      },
+      "outside": [],
+      "fonts": [
+        "AAAAAA+IBMPlexSans-Regular",
+        "BAAAAA+IBMPlexSans-SemiBold",
+        "CAAAAA+IBMPlexMono-Regular",
+        "DAAAAA+Times-Roman",
+        "EAAAAA+IBMPlexSans-Medium"
+      ],
+      "images": 0,
+      "vectorPaths": 57
+    }
+  ],
+  "offline": {
+    "offline": true,
+    "svg": {
+      "fonts": [
+        {
+          "family": "IBM Plex Sans",
+          "weight": "400",
+          "status": "loaded"
+        },
+        {
+          "family": "IBM Plex Sans",
+          "weight": "400",
+          "status": "unloaded"
+        },
+        {
+          "family": "IBM Plex Sans",
+          "weight": "500",
+          "status": "loaded"
+        },
+        {
+          "family": "IBM Plex Sans",
+          "weight": "600",
+          "status": "loaded"
+        }
+      ],
+      "text": [
+        {
+          "text": "Supplied callout",
+          "x": 255.82437133789062,
+          "y": 135.09500122070312,
+          "width": 116.03125,
+          "height": 20
+        },
+        {
+          "text": "1.0",
+          "x": 142.9168701171875,
+          "y": 480.3500061035156,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "1.5",
+          "x": 304.6368713378906,
+          "y": 480.3500061035156,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "2.0",
+          "x": 466.34686279296875,
+          "y": 480.3500061035156,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "2.5",
+          "x": 628.056884765625,
+          "y": 480.3500061035156,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "3.0",
+          "x": 789.766845703125,
+          "y": 480.3500061035156,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "Supplied coordinate",
+          "x": 410.23748779296875,
+          "y": 498.703125,
+          "width": 130.625,
+          "height": 18
+        },
+        {
+          "text": "-0.5",
+          "x": 23.709373474121094,
+          "y": 448.27874755859375,
+          "width": 23.390625,
+          "height": 16
+        },
+        {
+          "text": "0.0",
+          "x": 28.693748474121094,
+          "y": 361.8387451171875,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "0.5",
+          "x": 28.693748474121094,
+          "y": 275.3887634277344,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "1.0",
+          "x": 28.693748474121094,
+          "y": 188.94874572753906,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "1.5",
+          "x": 28.693748474121094,
+          "y": 102.50875091552734,
+          "width": 18.40625,
+          "height": 16
+        },
+        {
+          "text": "Stored value (raw)",
+          "x": 0.2662496566772461,
+          "y": 225.66220092773438,
+          "width": 18,
+          "height": 119.015625
+        },
+        {
+          "text": "Supplied series",
+          "x": 68.0999984741211,
+          "y": 59.84375,
+          "width": 75.75000762939453,
+          "height": 14
+        },
+        {
+          "text": "Supplied observations with an explicit reference range",
+          "x": 8,
+          "y": 4.796875,
+          "width": 397.796875,
+          "height": 20
+        },
+        {
+          "text": "A complete figure: the same coordinates in a compact application and a publication export",
+          "x": 8,
+          "y": 31.603126525878906,
+          "width": 565.21875,
+          "height": 18
+        },
+        {
+          "text": "Illustrative supplied values. Lines connect observations; they do not represent a priced interpolation.",
+          "x": 8,
+          "y": 524.90625,
+          "width": 563.5,
+          "height": 16
+        },
+        {
+          "text": "Registry illustration \u2014 https://example.com/source",
+          "x": 8,
+          "y": 546.40625,
+          "width": 283.03125,
+          "height": 16
+        },
+        {
+          "text": "Annotation values supplied by the caller",
+          "x": 8,
+          "y": 567.90625,
+          "width": 224.0625,
+          "height": 16
+        },
+        {
+          "text": "Figure note",
+          "x": 558,
+          "y": 405.40625,
+          "width": 63.40625,
+          "height": 16
+        }
+      ],
+      "externalReferences": []
+    },
+    "png": {
+      "width": 1800,
+      "height": 1200,
+      "complete": true
+    },
+    "errors": [],
+    "verdict": "pass"
+  },
+  "files": {
+    "publication.svg": "191fa92455797d3b727c1e9924fbe278b254a52b4f1d5f6358dfe5cc7dbbfd2b",
+    "publication.png": "3edb73a6463d9da5ad71b7d90eb8eed4e95c4a8a13ef845f80c6f933af1adeb9",
+    "pages-placement.png": "0af84340afcbfee296e0874753017a516fbdd615268f7ccf39da0bb63103a586"
+  }
+}

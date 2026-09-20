@@ -9,7 +9,7 @@ const directory =
 const server = await serveExport(
   path.resolve(directory),
   process.env.NEXT_PUBLIC_BASE_PATH ?? "",
-  4178,
+  Number(process.env.REGISTRY_GALLERY_PORT ?? 4178),
 );
 console.log(`Registry gallery server: ${server.url}`);
 for (const signal of ["SIGINT", "SIGTERM"])

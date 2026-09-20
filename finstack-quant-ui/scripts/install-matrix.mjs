@@ -320,6 +320,14 @@ async function installItem(index, item) {
       });
     }
     const checks = await verifyItem(page, item, evidence, repo);
+    if (
+      item.name === "pricing-workbench" &&
+      process.env.REGISTRY_INSTALL_PUBLISHING === "1"
+    ) {
+      const { verifyPublishing } =
+        await import("../tests/publishing/browser.mjs");
+      checks.push(...(await verifyPublishing(page, evidence, repo)));
+    }
     if (errors.length) throw Error(JSON.stringify(errors));
     const alerts = (
       await page.locator('[role="alert"]').allTextContents()

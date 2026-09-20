@@ -1,4 +1,5 @@
 import { defineConfig } from "playwright/test";
+const baseURL = `http://127.0.0.1:${process.env.REGISTRY_GALLERY_PORT ?? 4178}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "**/*.spec.ts",
@@ -18,7 +19,7 @@ export default defineConfig({
   },
   use: {
     actionTimeout: 20000,
-    baseURL: "http://127.0.0.1:4178",
+    baseURL,
     viewport: { width: 1440, height: 1700 },
     deviceScaleFactor: 1,
     colorScheme: "light",
@@ -29,7 +30,7 @@ export default defineConfig({
   reporter: [["line"], ["json", { outputFile: "test-results/gallery.json" }]],
   webServer: {
     command: "node tests/e2e/serve.mjs",
-    url: "http://127.0.0.1:4178/registry-gallery",
+    url: `${baseURL}/registry-gallery`,
     timeout: 30000,
     reuseExistingServer: false,
   },

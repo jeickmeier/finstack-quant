@@ -30,7 +30,7 @@ function Summary({
   return (
     <section
       aria-label={label}
-      className="min-w-0 space-y-2 rounded-sm border border-border p-3"
+      className="min-w-0 space-y-2 rounded-sm border border-border p-3 print:break-inside-avoid"
     >
       <h2 className="text-sm font-medium">{label}</h2>
       {result ? (

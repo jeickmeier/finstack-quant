@@ -183,7 +183,7 @@ export function MarketContextBrowser({
       aria-label="Market context browser"
       className="space-y-4 font-sans text-sm text-foreground"
     >
-      <label>
+      <label className="print:hidden">
         Search market fields
         <input
           type="search"
@@ -194,7 +194,7 @@ export function MarketContextBrowser({
       </label>
       <nav
         aria-label="Market fields"
-        className="max-h-80 overflow-auto rounded-sm border border-border p-2"
+        className="max-h-80 overflow-auto rounded-sm border border-border p-2 print:hidden"
       >
         <ul className="space-y-1">
           {entries.map((entry) => (
@@ -223,7 +223,7 @@ export function MarketContextBrowser({
           {view}
         </section>
       ) : (
-        <p>
+        <p className="print:hidden">
           {link.selectedKey
             ? "Selected field is no longer available"
             : "Select a market field"}

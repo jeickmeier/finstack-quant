@@ -1043,3 +1043,13 @@ run = "npm --prefix finstack-quant-ui run test:e2e --"
 description = "Install every registry item in isolation, then verify composed production consumers"
 depends = ["ui-build"]
 run = ["REGISTRY_INSTALL_COMPLETE=1 node finstack-quant-ui/scripts/install-matrix.mjs", "mise run ui-docs-install", "REGISTRY_INSTALL_COMPOSITION=1 node finstack-quant-ui/tests/browser/install-smoke.mjs"]
+
+[tasks.ui-publish-check]
+description = "Verify installed workbench PDF reports and offline figure exports"
+depends = ["ui-build"]
+run = """
+export REGISTRY_INSTALL_EVIDENCE="${REGISTRY_INSTALL_EVIDENCE:-$PWD/finstack-quant-ui/test-results/publishing}"
+REGISTRY_INSTALL_ITEMS=pricing-workbench REGISTRY_INSTALL_PUBLISHING=1 node finstack-quant-ui/scripts/install-matrix.mjs
+node finstack-quant-ui/tests/publishing/offline.mjs "$REGISTRY_INSTALL_EVIDENCE"
+uv run --no-project --with pdfplumber==0.11.9 python finstack-quant-ui/tests/publishing/pdf-check.py "$REGISTRY_INSTALL_EVIDENCE"
+"""

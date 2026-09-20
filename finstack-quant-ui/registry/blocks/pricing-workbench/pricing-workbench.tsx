@@ -11,6 +11,7 @@ import {
 import { MarketContextForm } from "@/components/finstack/components/market-context-form/market-context-form";
 import { marketModule } from "@/components/finstack/components/market-context-form/market";
 import { CashflowViewer } from "@/components/finstack/components/cashflow-viewer/cashflow-viewer";
+import { useCashflows } from "@/hooks/use-cashflows/use-cashflows";
 import { ValuationDetails } from "@/components/finstack/components/valuation-details/valuation-details";
 import {
   MarketContextBrowser,
@@ -88,6 +89,9 @@ export function PricingWorkbench({
   const [type, setType] = useState(defaultInstrumentType ?? initialType);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [cashflowsOpen, setCashflowsOpen] = useState(false);
+  const [instrumentOpen, setInstrumentOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("instrument");
+  const [marketTab, setMarketTab] = useState("view");
   const [marketDocument, setMarketDocument] = useState({
     json: initial.marketJson,
     revision: 0,
@@ -122,6 +126,47 @@ export function PricingWorkbench({
     request: PriceRequest;
     result: ValuationResult;
   } | null>(null);
+  const [printSnapshot, setPrintSnapshot] = useState<typeof completed>(null);
+  const shown = printSnapshot ?? completed;
+  const printRequest = printSnapshot?.request ?? initial;
+  const printCashflows = useCashflows(
+    {
+      instrumentJson: printRequest.instrumentJson,
+      marketJson: printRequest.marketJson,
+      asOf: printRequest.asOf,
+      model: printRequest.model ?? "default",
+    },
+    printSnapshot !== null,
+  );
+  const printMarket = useMemo(
+    () =>
+      printSnapshot
+        ? (marketModule.codec.parse(
+            printSnapshot.request.marketJson,
+          ) as MarketContextStateWire)
+        : null,
+    [printSnapshot],
+  );
+  useEffect(() => {
+    const finish = () => setPrintSnapshot(null);
+    window.addEventListener("afterprint", finish);
+    return () => window.removeEventListener("afterprint", finish);
+  }, []);
+  useEffect(() => {
+    if (!printSnapshot || printCashflows.isPending || printCashflows.isFetching)
+      return;
+    let active = true;
+    void document.fonts.ready.then(() =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (active) window.print();
+        }),
+      ),
+    );
+    return () => {
+      active = false;
+    };
+  }, [printSnapshot, printCashflows.isPending, printCashflows.isFetching]);
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
@@ -172,6 +217,15 @@ export function PricingWorkbench({
   return (
     <section
       aria-label="Pricing workbench"
+      data-finstack-print=""
+      data-printing={
+        printSnapshot
+          ? printCashflows.isPending || printCashflows.isFetching
+            ? "preparing"
+            : "ready"
+          : undefined
+      }
+      data-theme={printSnapshot ? "light" : undefined}
       data-density={density}
       className="space-y-4 font-sans text-sm text-foreground"
     >
@@ -180,16 +234,42 @@ export function PricingWorkbench({
         <p role="status" aria-live="polite">
           {status}
         </p>
+        <button
+          type="button"
+          className="rounded-sm border border-border px-3 py-1 print:hidden"
+          disabled={!completed || status !== "Priced" || printSnapshot !== null}
+          onClick={() => setPrintSnapshot(completed)}
+        >
+          {printSnapshot ? "Preparing report…" : "Print report"}
+        </button>
       </header>
       {worker.error && (
         <p role="alert" className="text-error">
           {worker.error.message}
         </p>
       )}
-      <Tabs.Root defaultValue="instrument">
+      {shown && (
+        <details
+          open={instrumentOpen || printSnapshot !== null}
+          onToggle={(event) => {
+            if (!printSnapshot) setInstrumentOpen(event.currentTarget.open);
+          }}
+        >
+          <summary>Priced instrument</summary>
+          <JsonViewer
+            label="Priced instrument JSON"
+            text={shown.request.instrumentJson}
+            density={density}
+          />
+        </details>
+      )}
+      <Tabs.Root
+        value={printSnapshot ? "market" : activeTab}
+        onValueChange={setActiveTab}
+      >
         <Tabs.List
           aria-label="Pricing inputs"
-          className="mb-3 flex gap-2 border-b border-border"
+          className="mb-3 flex gap-2 border-b border-border print:hidden"
         >
           <Tabs.Tab
             value="instrument"
@@ -213,7 +293,7 @@ export function PricingWorkbench({
         <Tabs.Panel
           value="instrument"
           keepMounted
-          className="max-h-[55vh] overflow-y-auto pr-2"
+          className="max-h-[55vh] overflow-y-auto pr-2 print:hidden"
         >
           <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
             <InstrumentForm
@@ -244,8 +324,14 @@ export function PricingWorkbench({
           keepMounted
           className="max-h-[55vh] space-y-3 overflow-y-auto pr-2"
         >
-          <Tabs.Root defaultValue="view">
-            <Tabs.List aria-label="Market mode" className="flex gap-2">
+          <Tabs.Root
+            value={printSnapshot ? "view" : marketTab}
+            onValueChange={setMarketTab}
+          >
+            <Tabs.List
+              aria-label="Market mode"
+              className="flex gap-2 print:hidden"
+            >
               <Tabs.Tab
                 value="view"
                 className="rounded-sm border border-border px-3 py-1 data-active:bg-accent"
@@ -259,7 +345,7 @@ export function PricingWorkbench({
                 Edit
               </Tabs.Tab>
             </Tabs.List>
-            <Tabs.Panel value="edit" keepMounted>
+            <Tabs.Panel value="edit" keepMounted className="print:hidden">
               <MarketContextForm
                 key={marketDocument.revision}
                 defaultJson={marketDocument.json}
@@ -271,18 +357,24 @@ export function PricingWorkbench({
             <Tabs.Panel value="view" keepMounted>
               <JsonViewer
                 label="Market snapshot"
-                text={market?.json ?? initial.marketJson}
+                text={
+                  printSnapshot?.request.marketJson ??
+                  market?.json ??
+                  initial.marketJson
+                }
                 density={density}
               />
               {market && (
                 <MarketContextBrowser
-                  state={market.state}
+                  state={printMarket ?? market.state}
                   surfaceOptions={surfaceOptions}
                   renderObject={(entry) => {
                     const [field, index] = entry.path;
                     if (typeof index !== "number") return undefined;
                     if (field === "vol_cubes") {
-                      const cube = market.state.vol_cubes[index]!,
+                      const cube = (printMarket ?? market.state).vol_cubes[
+                          index
+                        ]!,
                         options = cubeOptions?.(cube);
                       return options ? (
                         <VolCubeExplorer
@@ -293,8 +385,8 @@ export function PricingWorkbench({
                       ) : undefined;
                     }
                     if (field === "fx_delta_vol_surfaces") {
-                      const surface =
-                          market.state.fx_delta_vol_surfaces[index]!,
+                      const surface = (printMarket ?? market.state)
+                          .fx_delta_vol_surfaces[index]!,
                         options = fxOptions?.(surface);
                       return options ? (
                         <FxSurfaceChart {...options} surface={surface} />
@@ -310,7 +402,7 @@ export function PricingWorkbench({
         <Tabs.Panel
           value="calibrate"
           keepMounted
-          className="max-h-[55vh] space-y-3 overflow-y-auto pr-2"
+          className="max-h-[55vh] space-y-3 overflow-y-auto pr-2 print:hidden"
         >
           <CalibrationPanel
             defaultJson={defaultCalibrationJson}
@@ -333,27 +425,28 @@ export function PricingWorkbench({
           Results reflect the last completed request.
         </p>
         <MeasuresGrid
-          result={completed?.result}
+          result={shown?.result}
           groups={metrics.data ?? {}}
           density={density}
-          loading={price.isFetching}
-          error={currentError}
+          loading={!printSnapshot && price.isFetching}
+          error={printSnapshot ? undefined : currentError}
         />
-        {completed && (
-          <ValuationDetails result={completed.result} density={density} />
-        )}
+        {shown && <ValuationDetails result={shown.result} density={density} />}
         <details
-          onToggle={(event) => setCashflowsOpen(event.currentTarget.open)}
+          open={cashflowsOpen || printSnapshot !== null}
+          onToggle={(event) => {
+            if (!printSnapshot) setCashflowsOpen(event.currentTarget.open);
+          }}
         >
           <summary>Cashflows</summary>
-          {completed && cashflowsOpen && (
+          {shown && (cashflowsOpen || printSnapshot !== null) && (
             <CashflowViewer
               density={density}
               request={{
-                instrumentJson: completed.request.instrumentJson,
-                marketJson: completed.request.marketJson,
-                asOf: completed.request.asOf,
-                model: completed.request.model ?? "default",
+                instrumentJson: shown.request.instrumentJson,
+                marketJson: shown.request.marketJson,
+                asOf: shown.request.asOf,
+                model: shown.request.model ?? "default",
               }}
             />
           )}
@@ -363,6 +456,7 @@ export function PricingWorkbench({
           JSON.parse(completed.request.instrumentJson).instrument?.type ===
             "structured_credit" && (
             <details
+              className="print:hidden"
               onToggle={(event) => setScenariosOpen(event.currentTarget.open)}
             >
               <summary>Scenario prices</summary>
@@ -380,7 +474,7 @@ export function PricingWorkbench({
               )}
             </details>
           )}
-        <details>
+        <details className="print:hidden">
           <summary>Last priced request</summary>
           <JsonViewer
             label="Last priced request JSON"

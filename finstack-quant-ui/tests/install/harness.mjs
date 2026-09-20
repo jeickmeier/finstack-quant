@@ -146,6 +146,25 @@ const nativeForms = new Map([
   ],
 ]);
 export async function visualHarness(repo, item) {
+  if (
+    item.name === "pricing-workbench" &&
+    process.env.REGISTRY_INSTALL_PUBLISHING === "1"
+  ) {
+    const chart = await visualHarness(repo, {
+      name: "finstack-chart",
+      type: "registry:ui",
+    });
+    return {
+      source: await readFile(
+        path.join(
+          repo,
+          "finstack-quant-ui/tests/install/fixture/publishing.tsx",
+        ),
+        "utf8",
+      ),
+      extra: chart.extra,
+    };
+  }
   if (nativeForms.has(item.name)) {
     const [component, target] = nativeForms.get(item.name);
     const properties =

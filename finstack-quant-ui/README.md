@@ -254,8 +254,11 @@ axes, legends and marks, without HTML overlays or rasterized marks.
 `npm run test:figures:browser` builds the installed example, exports narrow/wide
 numeric/date/category fixtures, checks text clipping/overlap, vector elements,
 font/style portability, exact raster dimensions, accessibility and no WASM loads.
-See [PR-010 evidence](evidence/pr-010.md); desktop-editor acceptance stays open
-until its planned release slice.
+See [PR-010 evidence](evidence/pr-010.md) and [publishing verification](evidence/pr-038.md).
+Pages 14.5 places the complete SVG at 15.24 × 10.16 cm with IBM Plex Sans
+400/500/600 and Mono 400/500 installed. Keep it as a placed SVG: Pages
+“Break Apart” discards SVG text and axes. The exported SVG retains editable
+text and vectors for SVG-aware editing; Pages shape conversion is unsupported.
 
 ## Linked chart interactions
 
@@ -423,3 +426,21 @@ consumers (default 1). A focused diagnostic run can invoke
 subset and cannot satisfy `ui-install`. The faster `ui-install-smoke` workbench
 check remains available. The dedicated CI `ui-install` job consumes the gallery
 job's fresh native packages and runs the complete gate.
+
+## Printing completed valuations
+
+Use **Print report** after the workbench reports **Priced**. It captures that
+completed request and result, waits for the existing raw-cashflow query and fonts,
+and opens the browser print dialog. Choose A4 or Letter; shared rules use 12 mm
+margins, a light theme, wrapping JSON and repeating table headers. Instrument,
+market, valuation, measures and raw cashflows reuse the existing components.
+Closing the dialog restores the prior tabs and disclosure state. Unsupported
+cashflow requests retain the native error. Downloaded cashflow JSON remains exact;
+printing adds line wrapping and no currency conversion or typed cashflow table.
+
+`mise run ui-publish-check` builds a fresh installed workbench consumer, generates
+four PDFs, verifies native download identity, checks offline SVG/PNG reopening
+and inspects PDF text/fonts/vectors/bounds with pinned pdfplumber. Evidence is
+written under `finstack-quant-ui/test-results/publishing` by default; set
+`REGISTRY_INSTALL_EVIDENCE` to retain it elsewhere. Visual page and desktop-editor
+inspection remain explicit release checks; no library tests run in this task.

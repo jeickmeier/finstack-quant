@@ -86,6 +86,8 @@ jobs:
           mise run ui-docs-build
       - name: Verify committed baselines and accessibility
         run: mise run ui-e2e
+      - name: Verify printed reports and offline publication figures
+        run: mise run ui-publish-check
       - name: Retain browser failures and report
         if: always()
         uses: actions/upload-artifact@v4

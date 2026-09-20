@@ -30,6 +30,7 @@ export function JsonViewer({
       aria-busy={loading}
       className="font-sans text-base text-foreground"
     >
+      <h3 className="hidden text-sm font-semibold print:block">{label}</h3>
       <div className="flex items-center gap-2 print:hidden">
         <span className="text-sm">{label}</span>
         <Button

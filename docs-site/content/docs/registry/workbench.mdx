@@ -48,3 +48,21 @@ recommended market parameters. Applications supply their own `surfaceOptions`,
 `scenario` inputs specify the native tranche ID, grid JSON and price extent for
 structured-credit detail views. Registry checks preserve native output and do not
 certify the upstream diagnostic quote association or deferred quote-space fits.
+
+## Print and publication output
+
+After **Priced**, choose **Print report**. The workbench captures its completed
+request, waits for raw cashflows and fonts, and prints the existing instrument,
+market, valuation and measures with controls hidden. Select A4 or Letter in the
+browser dialog; the shared theme supplies 12 mm margins and a light presentation.
+Closing the dialog restores your tabs and disclosures. Cashflow text wraps on
+paper; its **Download** action retains the native JSON bytes and currency labels.
+
+Chart wrappers expose the shared `FigureHandle` through `figureRef`. A 900 × 600
+layout with `scale: 2` produces a PNG of 1800 × 1200 pixels: place it at 6 × 4 inches
+for 300 PPI. SVG retains text, vectors, complete labels, legend, annotations and
+sources, and embeds the licensed browser fonts. Desktop editors may require IBM
+Plex Sans 400/500/600 and Mono 400/500 installed. Pages 14.5 preserves the complete
+placed SVG; its **Break Apart** conversion removes SVG text and axes, so keep the
+original SVG intact in Pages. Use `theme: "light"` for publication independently
+of the app's dark theme. No chart-specific export or separate PDF renderer exists.

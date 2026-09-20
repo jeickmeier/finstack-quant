@@ -32,6 +32,23 @@ export function themeOutput(tokens) {
 @utility finstack-row { min-height: var(--row-height); }
 @utility finstack-field { min-height: var(--field-height); }
 @utility finstack-surface { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: var(--text-base); }
+@media print {
+  @page { size: auto; margin: 12mm; }
+  .finstack-surface:has([data-finstack-print]) { ${declarations(tokens.light)} width: auto !important; max-width: none !important; padding: 0 !important; }
+  [data-finstack-print] { ${declarations(tokens.light)} font-size: 9pt; color: var(--foreground); background: var(--background); }
+  [data-finstack-print] div, [data-finstack-print] section { max-height: none !important; overflow: visible !important; }
+  [data-finstack-print] button, [data-finstack-print] [role="tablist"] { display: none !important; }
+  [data-finstack-print] pre { max-height: none; overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 8pt; line-height: 1.4; }
+  [data-finstack-print] table { width: 100%; font-size: 9pt; border-collapse: collapse; }
+  [data-finstack-print] thead { position: static !important; display: table-header-group; }
+  [data-finstack-print] tfoot { position: static !important; display: table-footer-group; }
+  [data-finstack-print] tr { break-inside: avoid; }
+  [data-finstack-print] th, [data-finstack-print] td { white-space: normal; overflow-wrap: anywhere; }
+  [data-finstack-print] [data-finstack-figure] { break-inside: avoid; }
+  [data-finstack-print] .ts-chart-host, [data-finstack-print] .ts-chart-surface { height: auto !important; }
+  [data-finstack-print] svg { max-width: 100%; height: auto; break-inside: avoid; }
+  [data-finstack-print] caption, [data-finstack-print] h2, [data-finstack-print] h3, [data-finstack-print] summary { break-after: avoid; }
+}
 `;
   const item = {
     name: "finstack-theme",

@@ -192,3 +192,151 @@
   font-family: var(--font-sans);
   font-size: var(--text-base);
 }
+@media print {
+  @page {
+    size: auto;
+    margin: 12mm;
+  }
+  .finstack-surface:has([data-finstack-print]) {
+    --background: #faf9f6;
+    --foreground: #202b29;
+    --card: #ffffff;
+    --card-foreground: #202b29;
+    --muted: #eeefeb;
+    --muted-foreground: #59645f;
+    --border: #86928c;
+    --primary: #086c61;
+    --primary-foreground: #ffffff;
+    --accent: #e4f0eb;
+    --accent-foreground: #145b50;
+    --ring: #086c61;
+    --positive: #176848;
+    --negative: #b1272d;
+    --warning: #865607;
+    --error: #b1272d;
+    --info: #175f8c;
+    --par: #59645f;
+    --chart-1: #0d9488;
+    --chart-2: #c2410c;
+    --chart-3: #4f46e5;
+    --chart-4: #b91c1c;
+    --chart-5: #0369a1;
+    --chart-6: #a16207;
+    --sequential-1: #f0fdfa;
+    --sequential-2: #ccfbf1;
+    --sequential-3: #99f6e4;
+    --sequential-4: #5eead4;
+    --sequential-5: #2dd4bf;
+    --sequential-6: #14b8a6;
+    --sequential-7: #0d9488;
+    --sequential-8: #0f766e;
+    --sequential-9: #134e4a;
+    --diverging-negative: #b1272d;
+    --diverging-neutral: #eeefeb;
+    --diverging-positive: #176848;
+    --cell-light: #ffffff;
+    --cell-dark: #000000;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  [data-finstack-print] {
+    --background: #faf9f6;
+    --foreground: #202b29;
+    --card: #ffffff;
+    --card-foreground: #202b29;
+    --muted: #eeefeb;
+    --muted-foreground: #59645f;
+    --border: #86928c;
+    --primary: #086c61;
+    --primary-foreground: #ffffff;
+    --accent: #e4f0eb;
+    --accent-foreground: #145b50;
+    --ring: #086c61;
+    --positive: #176848;
+    --negative: #b1272d;
+    --warning: #865607;
+    --error: #b1272d;
+    --info: #175f8c;
+    --par: #59645f;
+    --chart-1: #0d9488;
+    --chart-2: #c2410c;
+    --chart-3: #4f46e5;
+    --chart-4: #b91c1c;
+    --chart-5: #0369a1;
+    --chart-6: #a16207;
+    --sequential-1: #f0fdfa;
+    --sequential-2: #ccfbf1;
+    --sequential-3: #99f6e4;
+    --sequential-4: #5eead4;
+    --sequential-5: #2dd4bf;
+    --sequential-6: #14b8a6;
+    --sequential-7: #0d9488;
+    --sequential-8: #0f766e;
+    --sequential-9: #134e4a;
+    --diverging-negative: #b1272d;
+    --diverging-neutral: #eeefeb;
+    --diverging-positive: #176848;
+    --cell-light: #ffffff;
+    --cell-dark: #000000;
+    font-size: 9pt;
+    color: var(--foreground);
+    background: var(--background);
+  }
+  [data-finstack-print] div,
+  [data-finstack-print] section {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  [data-finstack-print] button,
+  [data-finstack-print] [role="tablist"] {
+    display: none !important;
+  }
+  [data-finstack-print] pre {
+    max-height: none;
+    overflow: visible;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 8pt;
+    line-height: 1.4;
+  }
+  [data-finstack-print] table {
+    width: 100%;
+    font-size: 9pt;
+    border-collapse: collapse;
+  }
+  [data-finstack-print] thead {
+    position: static !important;
+    display: table-header-group;
+  }
+  [data-finstack-print] tfoot {
+    position: static !important;
+    display: table-footer-group;
+  }
+  [data-finstack-print] tr {
+    break-inside: avoid;
+  }
+  [data-finstack-print] th,
+  [data-finstack-print] td {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  [data-finstack-print] [data-finstack-figure] {
+    break-inside: avoid;
+  }
+  [data-finstack-print] .ts-chart-host,
+  [data-finstack-print] .ts-chart-surface {
+    height: auto !important;
+  }
+  [data-finstack-print] svg {
+    max-width: 100%;
+    height: auto;
+    break-inside: avoid;
+  }
+  [data-finstack-print] caption,
+  [data-finstack-print] h2,
+  [data-finstack-print] h3,
+  [data-finstack-print] summary {
+    break-after: avoid;
+  }
+}
