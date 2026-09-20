@@ -52,7 +52,7 @@ export function JsonViewer({
     >
       <h3 className="hidden text-sm font-semibold print:block">{label}</h3>
       <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <span className="text-sm">{label}</span>
+        <span className="text-sm font-medium">{label}</span>
         <div role="group" aria-label="JSON presentation" className="flex gap-1">
           <Button
             aria-pressed={formatted}
@@ -128,7 +128,7 @@ export function JsonViewer({
         <>
           <pre
             tabIndex={0}
-            className={`max-h-96 overflow-auto whitespace-pre-wrap break-all font-mono focus-visible:outline-2 focus-visible:outline-ring print:hidden ${density === "compact" ? "text-xs leading-5" : "text-sm leading-6"}`}
+            className={`mt-2 max-h-96 overflow-auto rounded-md border border-border bg-card p-2 whitespace-pre-wrap break-words font-mono focus-visible:outline-2 focus-visible:outline-ring print:hidden ${density === "compact" ? "text-xs leading-5" : "text-sm leading-6"}`}
           >
             {formatted ? presentation.formatted : text}
           </pre>

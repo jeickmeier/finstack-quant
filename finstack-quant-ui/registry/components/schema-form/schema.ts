@@ -94,8 +94,56 @@ export const objectValue = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+const ACRONYMS = new Set([
+  "mc",
+  "fx",
+  "ois",
+  "cds",
+  "cms",
+  "fra",
+  "irs",
+  "tba",
+  "cmo",
+  "mbs",
+  "abs",
+  "clo",
+  "oas",
+  "dv01",
+  "cs01",
+  "pv",
+  "npv",
+  "ytm",
+  "atm",
+  "rr",
+  "bf",
+  "hw1f",
+  "cpr",
+  "cdr",
+  "wal",
+  "isda",
+  "imm",
+  "sofr",
+  "libor",
+  "ndf",
+  "trs",
+  "yoy",
+  "xccy",
+  "vol",
+  "sabr",
+  "pde",
+]);
+/** Sentence-case labels from wire names; market acronyms stay upright. */
 export const labelFor = (name: string) =>
-  name.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
+  name
+    .split("_")
+    .map((word, index) =>
+      ACRONYMS.has(word)
+        ? word.toUpperCase()
+        : index === 0
+          ? word.replace(/^./, (letter) => letter.toUpperCase())
+          : word,
+    )
+    .join(" ");
 
 /** Create an editable branch from declared defaults; missing required inputs stay visibly incomplete. */
 export function initialValue(

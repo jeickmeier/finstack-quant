@@ -81,7 +81,7 @@ export function CashflowViewer({
         </p>
       )}
       {error && (
-        <p role="alert" className="text-error">
+        <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}

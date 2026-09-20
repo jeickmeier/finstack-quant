@@ -217,11 +217,25 @@ export function PricingWorkbench({
     if (request && price.data) setCompleted({ request, result: price.data });
   }, [request, price.data]);
   const currentError = request === candidate ? price.error?.message : undefined;
+  // Results belong to `completed.request`; any newer candidate (or invalid edit) makes them stale.
+  const stale =
+    completed !== null &&
+    (candidate === null ||
+      candidate.instrumentJson !== completed.request.instrumentJson ||
+      candidate.marketJson !== completed.request.marketJson ||
+      candidate.asOf !== completed.request.asOf ||
+      candidate.model !== completed.request.model ||
+      JSON.stringify(candidate.metrics) !==
+        JSON.stringify(completed.request.metrics) ||
+      candidate.pricingOptions !== completed.request.pricingOptions ||
+      candidate.marketHistory !== completed.request.marketHistory);
   const status =
     worker.status !== "ready"
       ? `Worker ${worker.status}`
       : !candidate
-        ? "Waiting for valid inputs"
+        ? completed
+          ? "Edits pending validation"
+          : "Waiting for valid inputs"
         : request !== candidate
           ? "Pricing queued"
           : price.isFetching
@@ -231,6 +245,19 @@ export function PricingWorkbench({
               : completed
                 ? "Priced"
                 : "Waiting for valuation";
+  const stateKind =
+    status === "Priced"
+      ? "priced"
+      : status === "Pricing failed"
+        ? "failed"
+        : worker.status !== "ready" || (!candidate && !completed)
+          ? "idle"
+          : "pending";
+  const meta = shown?.result.meta as Record<string, unknown> | undefined;
+  const rounding =
+    meta && typeof meta.rounding === "object" && meta.rounding
+      ? (meta.rounding as Record<string, unknown>).mode
+      : undefined;
   const pricingContext = (
     <PricingParamsForm
       value={params}
@@ -282,6 +309,7 @@ export function PricingWorkbench({
             }
           }}
           data-finstack-print=""
+          data-stale={stale && !printSnapshot ? "" : undefined}
           data-printing={
             printSnapshot
               ? printCashflows.isPending || printCashflows.isFetching
@@ -295,12 +323,20 @@ export function PricingWorkbench({
         >
           <header className="finstack-workbench__bar print:hidden">
             <h2 className="finstack-workbench__brand">finstack</h2>
+            <span className="finstack-workbench__id">
+              {shown?.result.instrument_id ?? type}
+            </span>
             <TabsList
+              variant="line"
               aria-label="Pricing inputs"
               className="finstack-workbench__tabs"
             >
-              <TabsTrigger value="instrument">1 Instrument</TabsTrigger>
-              <TabsTrigger value="market">2 Market</TabsTrigger>
+              <TabsTrigger value="instrument">
+                <span className="finstack-kbd">1</span> Instrument
+              </TabsTrigger>
+              <TabsTrigger value="market">
+                <span className="finstack-kbd">2</span> Market
+              </TabsTrigger>
               <TabsTrigger value="calibrate">Calibrate</TabsTrigger>
             </TabsList>
             <div className="finstack-workbench__context">{pricingContext}</div>
@@ -394,6 +430,7 @@ export function PricingWorkbench({
               role="status"
               aria-live="polite"
               className="finstack-workbench__state"
+              data-state={stateKind}
             >
               {status}
             </p>
@@ -427,6 +464,7 @@ export function PricingWorkbench({
                 validate={validate}
                 onValidated={setInstrument}
                 onSubmit={setInstrument}
+                submitVariant="outline"
               />
             </TabsContent>
             <TabsContent
@@ -439,6 +477,7 @@ export function PricingWorkbench({
                 onValueChange={setMarketTab}
               >
                 <TabsList
+                  variant="line"
                   aria-label="Market mode"
                   className="finstack-workbench__tabs mb-2 print:hidden"
                 >
@@ -528,12 +567,18 @@ export function PricingWorkbench({
           <section aria-label="Results" className="finstack-workbench__results">
             <div className="finstack-workbench__summary">
               <header className="finstack-workbench__results-header">
-                <h2 className="text-sm font-medium">Results</h2>
-                <span className="text-xs text-muted-foreground">
-                  {shown
-                    ? `${Object.keys(shown.result.measures).length} metrics · grouped`
-                    : "Awaiting valuation"}
-                </span>
+                <h2 className="finstack-title">Results</h2>
+                {stale && !printSnapshot ? (
+                  <span className="finstack-workbench__stale">
+                    Stale · reprice to update
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {shown
+                      ? `${Object.keys(shown.result.measures).length} metrics · grouped`
+                      : "Awaiting valuation"}
+                  </span>
+                )}
               </header>
               <div className="finstack-workbench__summary-body">
                 <MeasuresGrid
@@ -566,9 +611,15 @@ export function PricingWorkbench({
                   className="max-w-full flex-wrap"
                   style={{ height: "auto", minHeight: "2rem" }}
                 >
-                  <TabsTrigger value="cashflows">3 Cashflows</TabsTrigger>
-                  <TabsTrigger value="diagnostics">4 Diagnostics</TabsTrigger>
-                  <TabsTrigger value="trace">5 Trace</TabsTrigger>
+                  <TabsTrigger value="cashflows">
+                    <span className="finstack-kbd">3</span> Cashflows
+                  </TabsTrigger>
+                  <TabsTrigger value="diagnostics">
+                    <span className="finstack-kbd">4</span> Diagnostics
+                  </TabsTrigger>
+                  <TabsTrigger value="trace">
+                    <span className="finstack-kbd">5</span> Trace
+                  </TabsTrigger>
                   <TabsTrigger value="request">Request</TabsTrigger>
                   {scenario && (
                     <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
@@ -666,18 +717,38 @@ export function PricingWorkbench({
           </section>
           <footer className="finstack-workbench__status print:hidden">
             <span>
-              {shown ? `Priced ${shown.request.asOf}` : "Awaiting valuation"}
+              {shown ? (
+                <>
+                  priced <span className="font-mono">{shown.request.asOf}</span>
+                </>
+              ) : (
+                "Awaiting valuation"
+              )}
             </span>
             <span>
-              model {shown?.request.model ?? params.model ?? "default"}
+              model{" "}
+              <span className="font-mono">
+                {shown?.request.model ?? params.model ?? "default"}
+              </span>
             </span>
-            <span className="font-mono">
-              {shown?.result.instrument_id ?? type}
-            </span>
-            <span>
-              {shown?.result.meta?.version
-                ? `WASM ${String(shown.result.meta.version)}`
-                : ""}
+            {typeof meta?.numeric_mode === "string" && (
+              <span className="font-mono">{meta.numeric_mode}</span>
+            )}
+            {typeof rounding === "string" && <span>{rounding}</span>}
+            {shown?.result.meta?.version ? (
+              <span>
+                finstack-quant-wasm{" "}
+                <span className="font-mono">
+                  {String(shown.result.meta.version)}
+                </span>
+              </span>
+            ) : null}
+            <span className="ml-auto">
+              <span className="finstack-kbd">1</span>
+              <span className="finstack-kbd">2</span>inputs{" "}
+              <span className="finstack-kbd">3</span>
+              <span className="finstack-kbd">4</span>
+              <span className="finstack-kbd">5</span>results
             </span>
           </footer>
         </section>

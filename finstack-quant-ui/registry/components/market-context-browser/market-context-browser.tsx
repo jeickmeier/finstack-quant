@@ -61,7 +61,7 @@ function EntryBranch({
   if (visible && !visible.has(entry.key)) return null;
   const button = (
     <Button
-      variant={entry.key === selectedKey ? "secondary" : "ghost"}
+      variant="ghost"
       size="sm"
       type="button"
       aria-pressed={entry.key === selectedKey}

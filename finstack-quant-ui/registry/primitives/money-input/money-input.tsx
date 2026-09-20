@@ -20,8 +20,8 @@ export function MoneyInput({
   lockCurrency?: boolean;
 }) {
   return (
-    <fieldset className="grid grid-cols-2 gap-2 font-sans text-base text-foreground">
-      <legend className="text-sm">{label}</legend>
+    <fieldset className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 font-sans text-base text-foreground">
+      <legend className="text-sm text-muted-foreground">{label}</legend>
       <DecimalInput
         {...props}
         label={`${label} amount`}

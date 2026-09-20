@@ -29,7 +29,7 @@ export function DecimalInput({
   ...props
 }: DecimalInputProps) {
   const [focused, setFocused] = useState(false);
-  const { label, help, error, id, path, ...input } = props;
+  const { label, help, error, id, path, dirty, ...input } = props;
   const invalid =
     value !== "" &&
     (!new RegExp(pattern).test(value) ||
@@ -43,7 +43,7 @@ export function DecimalInput({
     }
   return (
     <FieldFrame
-      {...{ label, help, id, path }}
+      {...{ label, help, id, path, dirty }}
       error={
         error ??
         (invalid
@@ -61,12 +61,16 @@ export function DecimalInput({
             pattern={pattern}
             data-scale={scale}
             value={focused ? value : display}
-            onChange={(event) => onValueChange(event.target.value)}
+            onChange={(event) =>
+              onValueChange(event.target.value.replaceAll(",", ""))
+            }
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
           />
           {suffix && (
-            <span className="text-xs text-muted-foreground">{suffix}</span>
+            <span className="text-xs whitespace-nowrap text-muted-foreground">
+              {suffix}
+            </span>
           )}
         </div>
       )}

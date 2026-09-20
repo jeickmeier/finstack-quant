@@ -18,6 +18,8 @@ export interface FieldInfo {
   /** Stock field layout for the surrounding domain composition. */
   orientation?: "horizontal" | "vertical" | "responsive";
   /** Canonical form path independent of DOM IDs. */ path?: string;
+  /** Supplied edit state; renders the changed-term marker without owning form state. */
+  dirty?: boolean;
 }
 export interface FieldControlProps {
   id: string;
@@ -33,6 +35,7 @@ export function FieldFrame({
   id,
   path,
   orientation,
+  dirty,
   children,
 }: FieldInfo & { children: (control: FieldControlProps) => ReactNode }) {
   const generated = useId(),
@@ -42,6 +45,7 @@ export function FieldFrame({
       orientation={orientation}
       data-field-path={path}
       data-invalid={Boolean(error)}
+      data-dirty={dirty || undefined}
       className="finstack-field-frame"
     >
       <div className="finstack-field-label flex items-center gap-2">

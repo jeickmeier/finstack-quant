@@ -20,6 +20,7 @@ export function InstrumentForm(props: {
   /** Native canonical result, or null as soon as an edit invalidates the prior validation. */
   onValidated?: (json: string | null) => void;
   layout?: SchemaFormProps["layout"];
+  submitVariant?: SchemaFormProps["submitVariant"];
 }) {
   const [loaded, setLoaded] = useState<{
     type: string;
@@ -85,15 +86,23 @@ export function InstrumentForm(props: {
         )}
       </header>
       {!instruments.some((entry) => entry.type === props.type) ? (
-        <p role="alert">Unknown instrument type: {props.type}</p>
+        <p role="alert" className="text-sm text-error">
+          Unknown instrument type: {props.type}
+        </p>
       ) : (
         <>
-          {error && <p role="alert">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-error">
+              {error}
+            </p>
+          )}
           {!module && !error && <p role="status">Loading instrument schema…</p>}
           {module && (
             <>
               {parseError ? (
-                <p role="alert">{parseError}</p>
+                <p role="alert" className="text-sm text-error">
+                  {parseError}
+                </p>
               ) : (
                 <SchemaForm
                   key={`${props.type}:${example}`}
@@ -103,6 +112,7 @@ export function InstrumentForm(props: {
                   onSubmit={props.onSubmit}
                   onValidated={props.onValidated}
                   layout={props.layout}
+                  submitVariant={props.submitVariant}
                 />
               )}
               <details>

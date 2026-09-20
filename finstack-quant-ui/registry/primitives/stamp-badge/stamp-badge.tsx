@@ -44,13 +44,14 @@ export function StampBadge({
       </span>
     );
   const rounding = record(meta.rounding);
+  const supplied = (key: string) => (key in meta ? meta[key] : undefined);
   const fields = [
-    ["Numeric mode", meta.numeric_mode],
+    ["Numeric mode", supplied("numeric_mode")],
     ["Rounding", rounding?.mode],
-    ["FX policy", meta.fx_policy_applied],
-    ["Version", meta.version],
-    ["Timestamp", meta.timestamp],
-    ["Parallel", meta.parallel],
+    ["FX policy", supplied("fx_policy_applied")],
+    ["Version", supplied("version")],
+    ["Timestamp", supplied("timestamp")],
+    ["Parallel", supplied("parallel")],
     ...Object.entries(record(rounding?.output_scale_by_currency) ?? {}).map(
       ([currency, scale]) => [`${currency} output decimals`, scale],
     ),
@@ -58,20 +59,33 @@ export function StampBadge({
       ([currency, scale]) => [`${currency} ingest decimals`, scale],
     ),
   ];
+  const short: Record<string, string> = {
+    "Numeric mode": "mode",
+    Rounding: "rounding",
+    "FX policy": "fx",
+    Version: "v",
+  };
   const renderFields = (entries: typeof fields, quiet = false) =>
     entries.map(([label, value]) => (
       <Badge
         key={String(label)}
         variant={quiet ? "secondary" : "outline"}
+        className="rounded-md font-normal"
         render={<div />}
       >
-        <dt className={quiet ? "sr-only" : "inline"}>{String(label)}: </dt>
-        <dd className="inline">
+        <dt className={quiet ? "inline text-muted-foreground" : "inline"}>
+          {quiet
+            ? (short[String(label)] ?? String(label))
+            : `${String(label)}:`}{" "}
+        </dt>
+        <dd className="inline finstack-numeric">
           {typeof value === "string" ||
           typeof value === "number" ||
           typeof value === "boolean"
             ? String(value)
-            : "Unavailable"}
+            : value === null
+              ? "none"
+              : "Unavailable"}
         </dd>
       </Badge>
     ));
@@ -88,7 +102,8 @@ export function StampBadge({
         <dl aria-label="Calculation policy" className="flex flex-wrap gap-1">
           {renderFields(
             fields.filter(
-              ([label, value]) => primary.has(String(label)) && value != null,
+              ([label, value]) =>
+                primary.has(String(label)) && value !== undefined,
             ),
             true,
           )}

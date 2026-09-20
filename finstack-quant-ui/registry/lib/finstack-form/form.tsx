@@ -43,12 +43,17 @@ function TextField(
     <FieldFrame
       {...props}
       path={field.name}
+      dirty={field.state.meta.isDirty}
       error={errorText(field.state.meta.errors)}
     >
       {(control) => (
         <Input
           {...control}
-
+          className={
+            props.inputMode && props.inputMode !== "text"
+              ? "finstack-numeric"
+              : undefined
+          }
           inputMode={props.inputMode}
           value={String(field.state.value ?? "")}
           onBlur={field.handleBlur}
@@ -64,6 +69,7 @@ function DecimalField(props: FieldInfo & { pattern?: string }) {
     <DecimalInput
       {...props}
       path={field.name}
+      dirty={field.state.meta.isDirty}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -76,6 +82,7 @@ function DateField(props: FieldInfo) {
     <DateInput
       {...props}
       path={field.name}
+      dirty={field.state.meta.isDirty}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -89,6 +96,7 @@ function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
       {...props}
       layout="select"
       path={field.name}
+      dirty={field.state.meta.isDirty}
       value={field.state.value ?? ""}
       onValueChange={field.handleChange}
       error={errorText(field.state.meta.errors)}
@@ -101,6 +109,7 @@ function BooleanField(props: FieldInfo) {
     <FieldFrame
       {...props}
       path={field.name}
+      dirty={field.state.meta.isDirty}
       error={errorText(field.state.meta.errors)}
     >
       {(control) => (
@@ -194,10 +203,13 @@ function SubmitButton({
   label = "Apply instrument",
   disabled,
   allowInvalidSubmission = false,
+  variant = "default",
 }: {
   label?: string;
   disabled?: boolean;
   allowInvalidSubmission?: boolean;
+  /** Use "outline" when a block already owns the primary action (e.g. Price). */
+  variant?: "default" | "outline";
 }) {
   const form = useFormContext();
   return (
@@ -210,7 +222,7 @@ function SubmitButton({
         <Button
           size="sm"
           type="submit"
-
+          variant={variant}
           disabled={
             disabled ||
             (!allowInvalidSubmission && !canSubmit) ||
@@ -286,7 +298,7 @@ function ErrorSummary({ errors: extra = [] }: { errors?: readonly unknown[] }) {
             aria-label="Validation errors"
             className="rounded-sm border border-error p-2 text-sm text-error focus-visible:outline-2 focus-visible:outline-ring"
           >
-            <strong>Review the instrument</strong>
+            <strong>Review the highlighted terms</strong>
             <p>{message}</p>
             {Object.entries(fields)
               .filter(

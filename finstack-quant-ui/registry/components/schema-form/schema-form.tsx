@@ -26,6 +26,8 @@ export interface SchemaFormProps {
   /** Replace presentation for selected schema fields while retaining shared validation. */
   renderField?: FieldRenderer;
   submitLabel?: string;
+  /** "outline" when the composing block owns the primary action. */
+  submitVariant?: "default" | "outline";
   /** Connect useInstrumentValidator() inside FinstackProvider; returns native canonical JSON. */
   validate(json: string, signal?: AbortSignal): Promise<string>;
   /** Receives canonical native JSON only after valid submission. Never replaces active working values. */
@@ -188,6 +190,7 @@ export function SchemaForm(props: SchemaFormProps) {
           <div className="flex flex-wrap gap-2 border-t border-border pt-2">
             <form.SubmitButton
               label={props.submitLabel}
+              variant={props.submitVariant}
               disabled={native.pending}
               allowInvalidSubmission
             />

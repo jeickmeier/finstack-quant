@@ -17,23 +17,31 @@ export function MeasureValue({
   showUnavailableUnit?: boolean;
 }) {
   const raw = formatRaw(value);
-  const text =
+  const exact =
     value == null
       ? raw
       : precision === undefined
         ? raw
         : value.toFixed(precision);
+  // Display-only digit grouping of plain decimals; every digit of the raw value is retained.
+  const text = /^-?\d{4,}(\.\d+)?$/.test(exact)
+    ? exact.replace(
+        /^(-?)(\d+)/,
+        (_, sign, digits) =>
+          sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ","),
+      )
+    : exact;
   if (unit && !unit.source.trim())
     throw new Error("Measure units require a canonical source");
   return (
     <span
       aria-label={label}
-      className="finstack-numeric font-sans text-base text-foreground"
+      className="finstack-numeric font-sans text-foreground"
       title={raw}
     >
       {signed && value != null ? formatSigned(text) : text}
       {(unit || showUnavailableUnit) && (
-        <span className="ml-1 text-xs text-muted-foreground">
+        <span className="finstack-na ml-1 text-xs whitespace-nowrap">
           {unit?.label ?? "Unit unavailable"}
         </span>
       )}

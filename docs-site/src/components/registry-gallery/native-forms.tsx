@@ -18,7 +18,9 @@ export function NativeForms({ name }: { name: string }) {
   const submitted = () => setSubmissions((count) => count + 1);
   return (
     <>
-      <output aria-label="Submission count">{submissions}</output>
+      <output aria-label="Submission count" className="sr-only">
+        {submissions}
+      </output>
       {name === "schema-form" ? (
         <SchemaForm
           module={bond}

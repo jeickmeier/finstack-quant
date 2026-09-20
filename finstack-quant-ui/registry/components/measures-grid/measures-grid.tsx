@@ -57,7 +57,7 @@ function BucketBar({ ratio }: { ratio: number | undefined }) {
   return (
     <div
       aria-hidden="true"
-      className="relative ml-auto mt-1 h-2 w-24 max-w-full"
+      className="relative ml-2 inline-block h-2 w-16 shrink-0 align-middle"
       data-bucket-bar
     >
       <span className="absolute inset-y-0 left-1/2 border-l border-muted-foreground" />
@@ -125,8 +125,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
     },
     {
       id: "value",
-      header:
-        props.compareTo === undefined ? "Raw value" : "Valuation · raw value",
+      header: props.compareTo === undefined ? "Value" : "Valuation",
       accessorFn: (row) => row.value,
       meta: { className: "text-right finstack-numeric" },
       cell: (context) => (
@@ -145,7 +144,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       : [
           {
             id: "comparison",
-            header: "Comparison · raw value",
+            header: "Comparison",
             accessorFn: (row: MeasureRow) => row.comparison,
             meta: { className: "text-right finstack-numeric" },
             cell: (context: { row: { original: MeasureRow } }) => (

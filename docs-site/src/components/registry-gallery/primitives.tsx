@@ -55,7 +55,9 @@ function FormDemo() {
         <form.SubmitButton label="Submit amount" />
         <form.ResetButton />
       </form.AppForm>
-      <output aria-label="Submitted amount">{submitted}</output>
+      <output aria-label="Submitted amount" className="sr-only">
+        {submitted}
+      </output>
     </form>
   );
 }
@@ -260,7 +262,9 @@ export function PrimitiveDemo({
             getRowId={(row) => row.id}
             onRowActivate={() => setActivations((n) => n + 1)}
           />
-          <output aria-label="Activation count">{activations}</output>
+          <output aria-label="Activation count" className="sr-only">
+            {activations}
+          </output>
         </>
       );
     case "finstack-chart":

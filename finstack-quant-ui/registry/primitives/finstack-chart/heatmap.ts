@@ -77,6 +77,13 @@ export function heatmap<T>(options: HeatmapOptions<T> & HeatmapColors) {
   const xs = [...new Set(data.map(x))],
     ys = [...new Set(data.map(y))];
   const format = options.formatValue ?? String;
+  // In-cell text is display only: long raw floats are shortened so labels never overprint neighbours.
+  const cellLabel = (v: number) => {
+    const raw = format(v);
+    if (options.formatValue || raw.length <= 7) return raw;
+    const compact = Number(v).toPrecision(4);
+    return compact.includes("e") ? compact : String(Number(compact));
+  };
   const selection = options.link
     ? chartSelection<T, ChartKey, ChartKey>(options.link, key)
     : undefined;
@@ -111,7 +118,7 @@ export function heatmap<T>(options: HeatmapOptions<T> & HeatmapColors) {
                     ...channels,
                     id: "heatmap-values",
                     color: undefined,
-                    text: (row) => format(value(row)),
+                    text: (row) => cellLabel(value(row)),
                     fontSize: size,
                     fill: (row) =>
                       wcagContrast(colors(value(row)), dark) >=

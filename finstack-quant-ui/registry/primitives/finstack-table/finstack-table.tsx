@@ -151,6 +151,7 @@ function TableContent<TData extends RowData, TValue>({
         tabIndex={0}
         role={link ? "grid" : undefined}
         aria-multiselectable={link ? false : undefined}
+        className="focus-visible:outline-2 focus-visible:outline-ring"
       >
         <TableCaption
           className={captionVisibility === "sr-only" ? "sr-only" : undefined}
@@ -163,7 +164,7 @@ function TableContent<TData extends RowData, TValue>({
               <TableHead
                 key={header.id}
                 scope="col"
-                className={`${(header.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
+                className={`sticky top-0 z-[1] h-[var(--row-height)] bg-background py-0 text-xs font-medium tracking-wide text-muted-foreground ${(header.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
               >
                 <table.FlexRender header={header} />
               </TableHead>
@@ -201,7 +202,7 @@ function TableContent<TData extends RowData, TValue>({
               {row.getAllCells().map((cell) => (
                 <TableCell
                   key={cell.id}
-                  className={`px-2 data-[linked=true]:bg-accent data-[linked=true]:outline data-[linked=true]:outline-1 data-[linked=true]:outline-primary focus-visible:outline-2 focus-visible:outline-ring ${(cell.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
+                  className={`h-[var(--row-height)] px-2 py-0 data-[linked=true]:bg-accent data-[linked=true]:outline data-[linked=true]:outline-1 data-[linked=true]:outline-primary focus-visible:outline-2 focus-visible:outline-ring ${(cell.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
                   data-linked={
                     link &&
                     link.selectedKey !== null &&
@@ -255,7 +256,7 @@ function TableContent<TData extends RowData, TValue>({
               {table.getAllLeafColumns().map((column) => (
                 <TableCell
                   key={column.id}
-                  className={`${(column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
+                  className={`h-[var(--row-height)] py-0 font-medium ${(column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
                 >
                   {totals[column.id]}
                 </TableCell>
