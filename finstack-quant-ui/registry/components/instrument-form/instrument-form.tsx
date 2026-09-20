@@ -1,14 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { instruments } from "@/lib/finstack/generated/instruments";
-import { EnumField } from "../../primitives/enum-field/enum-field";
+import { InstrumentSelector } from "./instrument-selector";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import {
   SchemaForm,
   type InstrumentModule,
   type SchemaFormProps,
 } from "../schema-form/schema-form";
-/** Phase 1 accepts only the verified bond renderer; the generated catalogue remains visible. */
+/** Independently installed all-instrument editor; generated modules convert only when selected. */
 export function InstrumentForm(props: {
   type: string;
   onTypeChange(type: string): void;
@@ -26,12 +26,12 @@ export function InstrumentForm(props: {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [example, setExample] = useState(0);
-  const [initial] = useState(props.defaultJson);
+  const [initial] = useState({ type: props.type, json: props.defaultJson });
   useEffect(() => {
     let active = true;
     setError(null);
-    if (props.type === "bond") {
-      const entry = instruments.find((entry) => entry.type === props.type)!;
+    const entry = instruments.find((entry) => entry.type === props.type);
+    if (entry) {
       void entry.loader().then(
         (module) => {
           if (active) setLoaded({ type: entry.type, module });
@@ -48,9 +48,9 @@ export function InstrumentForm(props: {
   const module = loaded?.type === props.type ? loaded.module : null;
   let defaults: Record<string, unknown> | undefined;
   let parseError: string | undefined;
-  if (module && initial && example === 0) {
+  if (module && initial.type === props.type && initial.json && example === 0) {
     try {
-      defaults = module.codec.parse(initial) as Record<string, unknown>;
+      defaults = module.codec.parse(initial.json) as Record<string, unknown>;
     } catch (error) {
       parseError = error instanceof Error ? error.message : String(error);
     }
@@ -60,25 +60,15 @@ export function InstrumentForm(props: {
       aria-label="Instrument form"
       className="space-y-3 font-sans text-foreground"
     >
-      <EnumField
-        label="Instrument type"
-        layout="select"
+      <InstrumentSelector
         value={props.type}
         onValueChange={(type) => {
           props.onValidated?.(null);
           props.onTypeChange(type);
         }}
-        options={instruments.map((entry) => ({
-          value: entry.type,
-          label:
-            entry.type === "bond"
-              ? entry.title
-              : `${entry.title} — not yet supported`,
-          group: entry.group,
-        }))}
       />
-      {props.type !== "bond" ? (
-        <p role="status">{props.type}: not yet supported</p>
+      {!instruments.some((entry) => entry.type === props.type) ? (
+        <p role="alert">Unknown instrument type: {props.type}</p>
       ) : (
         <>
           {error && <p role="alert">{error}</p>}

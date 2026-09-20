@@ -84,6 +84,7 @@ export async function generate(repo = repoRoot) {
     .sort((a, b) => a.$id.localeCompare(b.$id));
   const files = new Map();
   const catalogue = [];
+  const catalogueMetadata = [];
   const names = new Set();
   for (const root of roots) {
     const name = root.$id.split("/").at(-1).replace(".schema.json", "");
@@ -138,8 +139,27 @@ export async function generate(repo = repoRoot) {
         `instrument/${name}.ts`,
         `${header}import { createWireCodec } from "../../codec.mjs";\nimport schema from "../schemas/${name}.json";\nexport { default as metadata } from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport { schema };\nexport const codec = createWireCodec(schema);\nexport const validator = codec.validator;\n`,
       );
+      const schemaGroup = root.$id.split("/").at(-2);
+      const group = [
+        "real_estate_asset",
+        "levered_real_estate_equity",
+        "private_markets_fund",
+      ].includes(type)
+        ? "real_assets"
+        : schemaGroup === "credit_derivatives"
+          ? "credit"
+          : schemaGroup;
+      const entry = {
+        type,
+        title: root.title,
+        group,
+        schemaGroup,
+        exampleSource: examples[0].source,
+        exampleId: JSON.parse(examples[0].text).instrument.spec.id,
+      };
+      catalogueMetadata.push(entry);
       catalogue.push(
-        `  { type: ${JSON.stringify(type)}, title: ${JSON.stringify(root.title)}, group: ${JSON.stringify(root.$id.split("/").at(-2))}, loader: () => import("./instrument/${name}") }`,
+        `  { type: ${JSON.stringify(type)}, title: ${JSON.stringify(root.title)}, group: ${JSON.stringify(group)}, loader: () => import("./instrument/${name}") }`,
       );
     }
   }
@@ -147,6 +167,7 @@ export async function generate(repo = repoRoot) {
     "instruments.ts",
     `${header}export const instruments = [\n${catalogue.join(",\n")}\n] as const;\n`,
   );
+  files.set("catalogue.json", json(catalogueMetadata));
   files.set("fixtures.json", json(fixtures.map(({ text, ...entry }) => entry)));
   files.set(
     "roots.json",

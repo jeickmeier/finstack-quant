@@ -121,21 +121,25 @@
     {
       "name": "instrument-form",
       "type": "registry:component",
-      "docs": "Standalone lazy instrument form with generated catalogue, native validation callback and example replacement. Only bond is enabled until renderer coverage passes. Supply useInstrumentValidator from FinstackProvider; onValidated clears stale accepted JSON on edits.",
+      "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer.",
       "files": [
         {
           "path": "instrument-form/instrument-form.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/instrument-form/instrument-form.tsx"
+        },
+        {
+          "path": "instrument-form/instrument-selector.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/instrument-form/instrument-selector.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/schema-form",
         "@finstack/instrument-catalogue",
-        "@finstack/enum-field",
         "@finstack/json-viewer"
       ],
-      "dependencies": []
+      "dependencies": ["react@19.2.8", "@base-ui/react@1.8.0"]
     },
     {
       "name": "pricing-params-form",

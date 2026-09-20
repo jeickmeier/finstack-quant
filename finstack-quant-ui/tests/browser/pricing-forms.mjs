@@ -190,10 +190,8 @@ try {
   await page.getByRole("button", { name: "Load example" }).click();
   assert.notEqual(await amount.inputValue(), "1000000.123456789");
   await page.getByRole("combobox", { name: "Instrument type" }).click();
-  await page
-    .getByRole("option", { name: "equity — not yet supported", exact: true })
-    .click();
-  await page.getByText("equity: not yet supported", { exact: true }).waitFor();
+  await page.getByRole("option", { name: "equity", exact: true }).click();
+  await page.getByRole("textbox", { name: "Ticker", exact: true }).waitFor();
   assert(await price.isDisabled());
   await page.getByRole("combobox", { name: "Instrument type" }).click();
   await page.getByRole("option", { name: "bond", exact: true }).click();
@@ -211,7 +209,7 @@ try {
   );
   assert.deepEqual(failures, []);
   assert(requests.some((url) => url.endsWith(".wasm")));
-  assert(!requests.some((url) => /equity-[^/]+\.js$/.test(url)));
+  assert(requests.some((url) => /equity-[^/]+\.js$/.test(url)));
   await page.screenshot({ path: "/tmp/pr015-forms.png" });
   const report = {
     browser: browser.version(),
@@ -219,7 +217,7 @@ try {
     violations: [],
     failures,
     checks: [
-      "lazy bond and unsupported catalogue",
+      "lazy bond and full catalogue",
       "exact overrides and history",
       "full request matches native hvar",
       "wide token preserved and native error returned",

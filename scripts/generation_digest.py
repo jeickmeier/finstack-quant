@@ -25,6 +25,7 @@ DEFAULT_PATHS = (
     Path("finstack-quant-ui/registry/theme/registry.json"),
     Path("finstack-quant-ui/registry/theme/finstack-theme/theme.css"),
     Path("finstack-quant-ui/tests/instruments/encoding-report.json"),
+    Path("docs-site/content/docs/registry/instruments.mdx"),
 )
 DEFAULT_MANIFEST_PATHS = (
     Path("finstack-quant/valuations/tests/instruments/json_examples"),
@@ -35,6 +36,7 @@ DEFAULT_MANIFEST_PATHS = (
     Path("finstack-quant-ui/registry/theme/registry.json"),
     Path("finstack-quant-ui/registry/theme/finstack-theme/theme.css"),
     Path("finstack-quant-ui/tests/instruments/encoding-report.json"),
+    Path("docs-site/content/docs/registry/instruments.mdx"),
 )
 DEFAULT_MANIFEST = Path("scripts/generated-artifacts.txt")
 

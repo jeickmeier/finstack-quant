@@ -120,7 +120,7 @@ const items = [
   ...contracts,
   item(
     "instrument-catalogue",
-    ["generated/instruments.ts"],
+    ["generated/instruments.ts", "generated/catalogue.json"],
     contracts
       .filter((entry) =>
         entry.files.some((f) => f.path.includes("/instrument/")),

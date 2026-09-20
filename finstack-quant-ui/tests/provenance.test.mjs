@@ -88,9 +88,14 @@ it("includes every UI generated artifact in the repository manifest", async () =
   )
     .trim()
     .split("\n")
-    .filter((path) => path.startsWith("finstack-quant-ui/"))
+    .filter(
+      (path) =>
+        path.startsWith("finstack-quant-ui/") ||
+        path === "docs-site/content/docs/registry/instruments.mdx",
+    )
     .sort();
   const actual = [
+    "docs-site/content/docs/registry/instruments.mdx",
     "finstack-quant-ui/src/contract-provenance.json",
     "finstack-quant-ui/registry.json",
     "finstack-quant-ui/registry/theme/registry.json",

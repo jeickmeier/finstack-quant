@@ -176,7 +176,7 @@ it("imports an actual native calibration envelope and canonical fixture, leaving
   const onSubmit = vi.fn();
   render(
     <MarketContextForm
-      defaultJson={JSON.stringify(curves)}
+      defaultJson={bond.request.marketJson}
       validate={validate}
       onSubmit={onSubmit}
     />,

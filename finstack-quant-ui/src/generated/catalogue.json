@@ -1,0 +1,625 @@
+[
+  {
+    "type": "commodity_asian_option",
+    "title": "commodity_asian_option",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_asian_option.json",
+    "exampleId": "WTI-ASIAN-6M"
+  },
+  {
+    "type": "commodity_forward",
+    "title": "commodity_forward",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_forward.json",
+    "exampleId": "WTI-FWD-2025M03"
+  },
+  {
+    "type": "commodity_future_option",
+    "title": "commodity_future_option",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future_option.json",
+    "exampleId": "COMMODITY-FUTURE-OPTION-EXAMPLE"
+  },
+  {
+    "type": "commodity_future",
+    "title": "commodity_future",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future.json",
+    "exampleId": "SGX-IRON-ORE-DEC26"
+  },
+  {
+    "type": "commodity_option",
+    "title": "commodity_option",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_option.json",
+    "exampleId": "WTI-OPT-2025M06"
+  },
+  {
+    "type": "commodity_spread_option",
+    "title": "commodity_spread_option",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_spread_option.json",
+    "exampleId": "WTI-RBOB-CRACK-SPREAD"
+  },
+  {
+    "type": "commodity_swap",
+    "title": "commodity_swap",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_swap.json",
+    "exampleId": "NG-SWAP-2025"
+  },
+  {
+    "type": "commodity_swaption",
+    "title": "commodity_swaption",
+    "group": "commodity",
+    "schemaGroup": "commodity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/commodity_swaption.json",
+    "exampleId": "NG-SWAPTION-2025"
+  },
+  {
+    "type": "composite",
+    "title": "composite",
+    "group": "composite",
+    "schemaGroup": "composite",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/composite.json"
+  },
+  {
+    "type": "cds_index",
+    "title": "cds_index",
+    "group": "credit",
+    "schemaGroup": "credit_derivatives",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cds_index.json",
+    "exampleId": "CDX-IG-42"
+  },
+  {
+    "type": "cds_option",
+    "title": "cds_option",
+    "group": "credit",
+    "schemaGroup": "credit_derivatives",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cds_option.json",
+    "exampleId": "CDSOPT-CALL-CORP-5Y"
+  },
+  {
+    "type": "cds_tranche",
+    "title": "cds_tranche",
+    "group": "credit",
+    "schemaGroup": "credit_derivatives",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cds_tranche.json",
+    "exampleId": "CDXIG-42-0X3"
+  },
+  {
+    "type": "credit_default_swap",
+    "title": "credit_default_swap",
+    "group": "credit",
+    "schemaGroup": "credit_derivatives",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/credit_default_swap.json",
+    "exampleId": "CDS-CORP-5Y"
+  },
+  {
+    "type": "autocallable",
+    "title": "autocallable",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/autocallable.json",
+    "exampleId": "AUTO-SPX-QTR"
+  },
+  {
+    "type": "cliquet_option",
+    "title": "cliquet_option",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cliquet_option.json",
+    "exampleId": "CLIQ-SPX-QTR"
+  },
+  {
+    "type": "discounted_cash_flow",
+    "title": "discounted_cash_flow",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/discounted_cash_flow.json",
+    "exampleId": "DCF-TECH-CO"
+  },
+  {
+    "type": "equity_future_option",
+    "title": "equity_future_option",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/equity_future_option.json",
+    "exampleId": "EQUITY-FUTURE-OPTION-EXAMPLE"
+  },
+  {
+    "type": "equity_future",
+    "title": "equity_future",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/equity_future.json",
+    "exampleId": "EUREX-FESQ-DEC26"
+  },
+  {
+    "type": "equity_option",
+    "title": "equity_option",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
+    "exampleId": "SPX-CALL-4500"
+  },
+  {
+    "type": "equity_total_return_future",
+    "title": "equity_total_return_future",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/equity_total_return_future.json",
+    "exampleId": "EUREX-TESX-DEC27"
+  },
+  {
+    "type": "equity",
+    "title": "equity",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/equity.json",
+    "exampleId": "EQUITY-AAPL"
+  },
+  {
+    "type": "levered_real_estate_equity",
+    "title": "levered_real_estate_equity",
+    "group": "real_assets",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/levered_real_estate_equity.json",
+    "exampleId": "RE-LEVERED-OFFICE"
+  },
+  {
+    "type": "private_markets_fund",
+    "title": "private_markets_fund",
+    "group": "real_assets",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/private_markets_fund.json",
+    "exampleId": "PMF-EXAMPLE"
+  },
+  {
+    "type": "real_estate_asset",
+    "title": "real_estate_asset",
+    "group": "real_assets",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/real_estate_asset.json",
+    "exampleId": "RE-OFFICE-DCF"
+  },
+  {
+    "type": "trs_equity",
+    "title": "trs_equity",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/trs_equity.json",
+    "exampleId": "TRS-SPX-1Y"
+  },
+  {
+    "type": "variance_swap",
+    "title": "variance_swap",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/variance_swap.json",
+    "exampleId": "VARSPX-1Y"
+  },
+  {
+    "type": "volatility_index_future_option",
+    "title": "volatility_index_future_option",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future_option.json",
+    "exampleId": "VSTOXX-FUTURE-OPTION-EXAMPLE"
+  },
+  {
+    "type": "volatility_index_future",
+    "title": "volatility_index_future",
+    "group": "equity",
+    "schemaGroup": "equity",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future.json",
+    "exampleId": "VIX-FUT-2025M03"
+  },
+  {
+    "type": "asian_option",
+    "title": "asian_option",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/asian_option.json",
+    "exampleId": "ASIAN-SPX-ARITH-6M"
+  },
+  {
+    "type": "barrier_option",
+    "title": "barrier_option",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/barrier_option.json",
+    "exampleId": "BAR-SPX-UO-CALL"
+  },
+  {
+    "type": "basket",
+    "title": "basket",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/basket.json",
+    "exampleId": "BASKET-60-40"
+  },
+  {
+    "type": "callable_range_accrual",
+    "title": "callable_range_accrual",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/callable_range_accrual.json",
+    "exampleId": "CALLABLE-RA-SOFR-1Y"
+  },
+  {
+    "type": "lookback_option",
+    "title": "lookback_option",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/lookback_option.json",
+    "exampleId": "LOOKBACK-SPX-FIXED-CALL"
+  },
+  {
+    "type": "range_accrual",
+    "title": "range_accrual",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/range_accrual.json",
+    "exampleId": "RANGE-SPX-1Y"
+  },
+  {
+    "type": "snowball",
+    "title": "snowball",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/snowball.json",
+    "exampleId": "SNOWBALL-USD-3Y"
+  },
+  {
+    "type": "tarn",
+    "title": "tarn",
+    "group": "exotics",
+    "schemaGroup": "exotics",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/tarn.json",
+    "exampleId": "TARN-USD-5Y"
+  },
+  {
+    "type": "agency_cmo",
+    "title": "agency_cmo",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json",
+    "exampleId": "FNR-2024-1-A"
+  },
+  {
+    "type": "agency_mbs_passthrough",
+    "title": "agency_mbs_passthrough",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
+    "exampleId": "FN-MA1234"
+  },
+  {
+    "type": "agency_tba",
+    "title": "agency_tba",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/agency_tba.json",
+    "exampleId": "FN30-4.0-202703"
+  },
+  {
+    "type": "asset_backed_facility",
+    "title": "asset_backed_facility",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
+    "exampleId": "ABF-EXAMPLE"
+  },
+  {
+    "type": "bond_future",
+    "title": "bond_future",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/bond_future.json",
+    "exampleId": "TYU5"
+  },
+  {
+    "type": "bond",
+    "title": "bond",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/bond.json",
+    "exampleId": "US912828XG33"
+  },
+  {
+    "type": "convertible_bond",
+    "title": "convertible_bond",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/convertible_bond.json",
+    "exampleId": "CB-TECH-5Y"
+  },
+  {
+    "type": "dollar_roll",
+    "title": "dollar_roll",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/dollar_roll.json",
+    "exampleId": "FN30-4.0-ROLL-0326-0426"
+  },
+  {
+    "type": "inflation_linked_bond",
+    "title": "inflation_linked_bond",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/inflation_linked_bond.json",
+    "exampleId": "TIPS-10Y"
+  },
+  {
+    "type": "revolving_credit",
+    "title": "revolving_credit",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json",
+    "exampleId": "RCF-USD-3Y"
+  },
+  {
+    "type": "structured_credit",
+    "title": "structured_credit",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
+    "exampleId": "CLO-EXAMPLE"
+  },
+  {
+    "type": "term_loan",
+    "title": "term_loan",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json",
+    "exampleId": "TERM-LOAN-USD-5Y"
+  },
+  {
+    "type": "trs_fixed_income_index",
+    "title": "trs_fixed_income_index",
+    "group": "fixed_income",
+    "schemaGroup": "fixed_income",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/trs_fixed_income_index.json",
+    "exampleId": "TRS-US-CORP-1Y"
+  },
+  {
+    "type": "fx_barrier_option",
+    "title": "fx_barrier_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_barrier_option.json",
+    "exampleId": "FXBAR-EURUSD-UO-CALL"
+  },
+  {
+    "type": "fx_digital_option",
+    "title": "fx_digital_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_digital_option.json",
+    "exampleId": "FXDIG-EURUSD-CALL"
+  },
+  {
+    "type": "fx_forward",
+    "title": "fx_forward",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_forward.json",
+    "exampleId": "EURUSD-FWD-6M"
+  },
+  {
+    "type": "fx_future_option",
+    "title": "fx_future_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_future_option.json",
+    "exampleId": "FX-FUTURE-OPTION-EXAMPLE"
+  },
+  {
+    "type": "fx_future",
+    "title": "fx_future",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_future.json",
+    "exampleId": "CME-6E-DEC26"
+  },
+  {
+    "type": "fx_option",
+    "title": "fx_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_option.json",
+    "exampleId": "FXOPT-EURUSD-CALL"
+  },
+  {
+    "type": "fx_spot",
+    "title": "fx_spot",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_spot.json",
+    "exampleId": "EURUSD"
+  },
+  {
+    "type": "fx_swap",
+    "title": "fx_swap",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_swap.json",
+    "exampleId": "FXSWAP-EURUSD-6M"
+  },
+  {
+    "type": "fx_touch_option",
+    "title": "fx_touch_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_touch_option.json",
+    "exampleId": "FXTOUCH-EURUSD-OT"
+  },
+  {
+    "type": "fx_variance_swap",
+    "title": "fx_variance_swap",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/fx_variance_swap.json",
+    "exampleId": "FXVAR-EURUSD-1Y"
+  },
+  {
+    "type": "ndf",
+    "title": "ndf",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/ndf.json",
+    "exampleId": "USDCNY-NDF-3M"
+  },
+  {
+    "type": "quanto_option",
+    "title": "quanto_option",
+    "group": "fx",
+    "schemaGroup": "fx",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/quanto_option.json",
+    "exampleId": "QUANTO-NKY-USD-CALL"
+  },
+  {
+    "type": "basis_swap",
+    "title": "basis_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/basis_swap.json",
+    "exampleId": "BASIS-SWAP-USD-3M1M-5Y"
+  },
+  {
+    "type": "bermudan_swaption",
+    "title": "bermudan_swaption",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/bermudan_swaption.json",
+    "exampleId": "BERM-10NC2-USD"
+  },
+  {
+    "type": "cap_floor",
+    "title": "cap_floor",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cap_floor.json",
+    "exampleId": "IRCAP-USD-5Y-3PCT"
+  },
+  {
+    "type": "cms_option",
+    "title": "cms_option",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cms_option.json",
+    "exampleId": "CMSOPT-10Y-USD"
+  },
+  {
+    "type": "cms_spread_option",
+    "title": "cms_spread_option",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cms_spread_option.json",
+    "exampleId": "CMS-SPREAD-10Y2Y"
+  },
+  {
+    "type": "cms_swap",
+    "title": "cms_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/cms_swap.json",
+    "exampleId": "CMSSWAP-10Y-USD"
+  },
+  {
+    "type": "deposit",
+    "title": "deposit",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/deposit.json",
+    "exampleId": "DEP-USD-6M"
+  },
+  {
+    "type": "forward_rate_agreement",
+    "title": "forward_rate_agreement",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/forward_rate_agreement.json",
+    "exampleId": "FRA-3X6-USD"
+  },
+  {
+    "type": "inflation_cap_floor",
+    "title": "inflation_cap_floor",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/inflation_cap_floor.json",
+    "exampleId": "INFLCAP-USD-5Y"
+  },
+  {
+    "type": "inflation_swap",
+    "title": "inflation_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/inflation_swap.json",
+    "exampleId": "INFLSWAP-USD-5Y"
+  },
+  {
+    "type": "interest_rate_future_option",
+    "title": "interest_rate_future_option",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future_option.json",
+    "exampleId": "INTEREST-RATE-FUTURE-OPTION-EXAMPLE"
+  },
+  {
+    "type": "interest_rate_future",
+    "title": "interest_rate_future",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future.json",
+    "exampleId": "IRF-ED-3M-MAR25"
+  },
+  {
+    "type": "interest_rate_swap",
+    "title": "interest_rate_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
+    "exampleId": "IRS-5Y-USD-STD"
+  },
+  {
+    "type": "repo",
+    "title": "repo",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/repo.json",
+    "exampleId": "REPO-GC-7D"
+  },
+  {
+    "type": "swaption",
+    "title": "swaption",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/swaption.json",
+    "exampleId": "SWPN-1Yx5Y-USD"
+  },
+  {
+    "type": "xccy_swap",
+    "title": "xccy_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/xccy_swap.json",
+    "exampleId": "XCCY-USDEUR-5Y"
+  },
+  {
+    "type": "yoy_inflation_swap",
+    "title": "yoy_inflation_swap",
+    "group": "rates",
+    "schemaGroup": "rates",
+    "exampleSource": "finstack-quant/valuations/tests/instruments/json_examples/yoy_inflation_swap.json",
+    "exampleId": "YOYSWAP-USD-5Y"
+  }
+]

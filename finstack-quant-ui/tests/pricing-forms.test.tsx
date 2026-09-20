@@ -64,7 +64,7 @@ it("loads bond lazily, replaces edits only on explicit example load, and focuses
   ).toBe(original);
   loader.mockRestore();
 });
-it("keeps discovered unsupported types visible without loading their schemas", async () => {
+it("loads a selected non-bond schema and lists the complete catalogue", async () => {
   const entry = instruments.find((x) => x.type === "equity")!;
   const loader = vi.spyOn(entry, "loader");
   render(
@@ -75,15 +75,16 @@ it("keeps discovered unsupported types visible without loading their schemas", a
       onSubmit={() => {}}
     />,
   );
-  expect(screen.getByRole("status").textContent).toBe(
-    "equity: not yet supported",
-  );
-  expect(screen.queryByRole("button", { name: "Load example" })).toBeNull();
+  expect(
+    await screen.findByRole("button", { name: "Load example" }),
+  ).toBeTruthy();
   await userEvent.click(
     screen.getByRole("combobox", { name: "Instrument type" }),
   );
-  expect(screen.getAllByRole("option")).toHaveLength(instruments.length);
-  expect(loader).not.toHaveBeenCalled();
+  await waitFor(() =>
+    expect(screen.getAllByRole("option")).toHaveLength(instruments.length),
+  );
+  expect(loader).toHaveBeenCalledTimes(1);
   loader.mockRestore();
 });
 it("displays native semantic errors unchanged and retains edited text", async () => {

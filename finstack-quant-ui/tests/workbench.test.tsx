@@ -162,10 +162,10 @@ it("retains the completed context during invalid edits, native pricing failure a
   await userEvent.click(
     screen.getByRole("combobox", { name: "Instrument type" }),
   );
-  await userEvent.click(
-    screen.getByRole("option", { name: "equity — not yet supported" }),
-  );
-  expect(screen.getByText("equity: not yet supported")).toBeTruthy();
+  await userEvent.click(screen.getByRole("option", { name: "equity" }));
+  expect(
+    await screen.findByRole("button", { name: "Load example" }),
+  ).toBeTruthy();
   expect(screen.getByText("Instrument not yet supported")).toBeTruthy();
   expect(prices()).toHaveLength(2);
 });

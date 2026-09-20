@@ -2907,6 +2907,11 @@
           "path": "src/generated/instruments.ts",
           "type": "registry:file",
           "target": "lib/finstack/generated/instruments.ts"
+        },
+        {
+          "path": "src/generated/catalogue.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/catalogue.json"
         }
       ],
       "registryDependencies": [
