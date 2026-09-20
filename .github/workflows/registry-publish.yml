@@ -1,0 +1,87 @@
+name: Publish Component Registry
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: component-registry-publish
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ui-gallery.yml
+  publish:
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_BASE_PATH: /finstack-quant
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          version: "0.10.11"
+      - uses: jdx/mise-action@v4
+        with:
+          install: false
+          add_shims_to_path: false
+          export_path: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: registry-native-packages
+          path: finstack-quant-wasm
+      - run: |
+          npm --prefix finstack-quant-ui ci --ignore-scripts
+          npm --prefix docs-site ci --ignore-scripts
+          mise run ui-docs-build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/.registry-publish/out
+      - id: deployment
+        uses: actions/deploy-pages@v4
+  public-consumer:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.16.0"
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: published
+      - name: Read the verified deployment artifact
+        run: tar -xf published/artifact.tar -C published
+      - name: Verify published CLI and MCP from an empty consumer
+        run: node finstack-quant-ui/scripts/verify-public.mjs '${{ needs.publish.outputs.url }}' published/r
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: registry-public-consumer
+          path: finstack-quant-ui/test-results/public

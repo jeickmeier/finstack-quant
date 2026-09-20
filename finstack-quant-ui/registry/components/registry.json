@@ -23,7 +23,9 @@
         "button",
         "checkbox",
         "label"
-      ]
+      ],
+      "categories": ["Individual Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "schema-form",
@@ -68,7 +70,15 @@
         "button",
         "popover"
       ],
-      "dependencies": ["react@19.2.8", "zod@4.6.5"]
+      "dependencies": ["react@19.2.8", "zod@4.6.5"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "valuation-summary",
@@ -85,7 +95,15 @@
         "@finstack/money-value",
         "@finstack/stamp-badge"
       ],
-      "dependencies": ["finstack-quant-wasm@0.8.0"]
+      "dependencies": ["finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "measures-grid",
@@ -104,7 +122,15 @@
         "@finstack/finstack-table",
         "@finstack/finstack-format"
       ],
-      "dependencies": ["@tanstack/react-table@9.2.4"]
+      "dependencies": ["@tanstack/react-table@9.2.4"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "curve-chart",
@@ -128,7 +154,16 @@
         "@finstack/finstack-views",
         "@finstack/finstack-table",
         "@finstack/use-linked-selection"
-      ]
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "instrument-form",
@@ -155,7 +190,93 @@
         "input-group",
         "label"
       ],
-      "dependencies": ["react@19.2.8", "@base-ui/react@1.8.0"]
+      "dependencies": ["react@19.2.8", "@base-ui/react@1.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/equity_total_return_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/asian_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/lookback_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future_option.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
+          "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "pricing-params-form",
@@ -177,7 +298,9 @@
         "button",
         "textarea"
       ],
-      "dependencies": ["lossless-json@4.3.1"]
+      "dependencies": ["lossless-json@4.3.1"],
+      "categories": ["Individual Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "cashflow-viewer",
@@ -194,7 +317,15 @@
         "@finstack/json-viewer",
         "@finstack/use-cashflows"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "monte-carlo-diagnostics",
@@ -212,7 +343,15 @@
         "@finstack/finstack-codec",
         "@finstack/finstack-host"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "explanation-trace",
@@ -229,7 +368,15 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "covenant-report",
@@ -246,7 +393,15 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "valuation-details",
@@ -272,7 +427,15 @@
         "@finstack/explanation-trace",
         "@finstack/covenant-report"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "market-context-form",
@@ -301,7 +464,17 @@
         "label",
         "textarea"
       ],
-      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"]
+      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "vol-surface-chart",
@@ -333,7 +506,16 @@
         "label",
         "select"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "fx-delta-quotes",
@@ -352,7 +534,16 @@
         "@finstack/contract-market-context-state",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "fx-surface-chart",
@@ -370,7 +561,16 @@
         "@finstack/fx-delta-quotes",
         "@finstack/use-fx-delta-samples"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "vol-cube-explorer",
@@ -391,7 +591,16 @@
         "@finstack/decimal-input",
         "@finstack/enum-field"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "fx-matrix-grid",
@@ -410,7 +619,16 @@
         "@finstack/finstack-codec",
         "@finstack/contract-market-context-state"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "market-context-browser",
@@ -442,7 +660,16 @@
         "label",
         "select"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "calibration-form",
@@ -465,7 +692,16 @@
         "@finstack/contract-calibration",
         "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "calibration-report",
@@ -484,7 +720,15 @@
         "@finstack/finstack-codec",
         "@finstack/use-linked-selection"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "calibration-fit-chart",
@@ -507,7 +751,15 @@
         "@finstack/use-linked-selection",
         "@finstack/contract-calibration"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
+        ]
+      }
     },
     {
       "name": "scenario-heatmap",
@@ -533,7 +785,15 @@
         "@finstack/finstack-codec",
         "@finstack/use-linked-selection"
       ],
-      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

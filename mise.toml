@@ -991,6 +991,7 @@ description = "Build the current Python extension, run the strict analyst public
 run = """
 mise run python-sync
 mise run python-build --release
+mise run ui-docs-install
 uv run --no-sync python docs-site/gen/build_site.py
 """
 

@@ -11,6 +11,10 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
     inputs:
+      registry_publish:
+        description: Validate and publish the component registry to GitHub Pages
+        type: boolean
+        default: false
       registry_only:
         description: Run only component registry gallery and independent installs
         type: boolean
@@ -31,7 +35,7 @@ jobs:
   # Rust docs — strict rustdoc build, public input-doc contract, doctests
   # ============================================
   rust-docs:
-    if: ${{ !inputs.registry_only }}
+    if: ${{ !inputs.registry_only && !inputs.registry_publish }}
     name: Rust Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -87,7 +91,7 @@ jobs:
   # Host docs — Python stubs, WASM/TypeScript facade, benchmark documents
   # ============================================
   host-docs:
-    if: ${{ !inputs.registry_only }}
+    if: ${{ !inputs.registry_only && !inputs.registry_publish }}
     name: Python and WASM Documentation
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -128,5 +132,14 @@ jobs:
         run: mise run materialization-benchmark-doc-check
 
   registry-gallery:
-    if: ${{ inputs.registry_only }}
+    if: ${{ inputs.registry_only && !inputs.registry_publish }}
     uses: ./.github/workflows/ui-gallery.yml
+
+  registry-publish:
+    if: ${{ inputs.registry_publish }}
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/registry-publish.yml

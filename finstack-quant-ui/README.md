@@ -198,8 +198,12 @@ validation remains in Rust. Date calendars only present dates and any supplied
 business-day highlights.
 
 `FinstackTable` uses Table 9 with no optional features and caller-owned stable row
-IDs; `KnotTable` reuses it. `JsonViewer` displays/copies the original supplied
-string and never parses it. `npm run test:primitives:browser` builds an isolated
+IDs; `KnotTable` reuses it. `JsonViewer` defaults to a readable formatted view
+using pinned `lossless-json`, preserving number tokens without converting them
+to JavaScript numbers. Its Original toggle shows the supplied bytes; Copy and
+Download always use those original bytes. Print uses the compact original text
+with wrapping, independently of the screen toggle. Invalid JSON, including duplicate keys,
+stays in Original view with a formatting notice. `npm run test:primitives:browser` builds an isolated
 consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 10,000-option virtualization, and runs axe in both themes and densities.
 
@@ -386,6 +390,21 @@ only when the detail panel is opened for a completed structured-credit request.
 interaction callbacks; the workbench owns the shared report/chart selection.
 
 ## Served gallery checks
+
+The public namespace is
+`https://jeickmeier.github.io/finstack-quant/r/{name}.json`. See the
+[installation and MCP guide](../docs-site/content/docs/registry/distribution.mdx)
+for `components.json`, pinned CLI discovery and required local WASM installation.
+Every item includes generated registry/WASM versions and canonical schema IDs;
+visual categories are Primitive Components, Individual Components and Blocks.
+`scripts/gen-metadata.mjs` derives these fields from package metadata and the
+existing schema/provenance inventory, and `ui-check` rejects drift.
+
+The **Publish Component Registry** workflow validates the registry, exports its
+docs at the deployment base path, deploys GitHub Pages and exercises public CLI
+and MCP discovery from an empty Ubuntu consumer. Its public-consumer artifact
+records the URL and commands. `scripts/verify-public.mjs <base-url>` provides the
+same check locally; local-host success does not close the public-site gate.
 
 `mise run ui-docs-build` installs all registry items into the docs consumer and
 exports `/registry-gallery/` with the production Next build. The generated

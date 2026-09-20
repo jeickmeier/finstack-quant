@@ -132,7 +132,9 @@
           "secondary-foreground": "#e6ede8",
           "destructive": "#f18d94"
         }
-      }
+      },
+      "categories": [],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     }
   ]
 }

@@ -2,6 +2,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import prettier from "prettier";
+import { isDeepStrictEqual } from "node:util";
+import { withoutMetadata } from "./registry-metadata.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 export function themeOutput(tokens) {
   const declarations = (values) =>
@@ -178,7 +180,15 @@ export async function generateTheme(check = false) {
   ];
   for (const [file, content] of outputs) {
     if (check) {
-      if ((await readFile(path.join(root, file), "utf8")) !== content)
+      const actual = await readFile(path.join(root, file), "utf8");
+      if (
+        file.endsWith(".json")
+          ? !isDeepStrictEqual(
+              withoutMetadata(JSON.parse(actual)),
+              JSON.parse(content),
+            )
+          : actual !== content
+      )
         throw new Error(`Theme drift: ${file}`);
     } else await writeFile(path.join(root, file), content);
   }

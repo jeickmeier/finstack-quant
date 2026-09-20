@@ -7,14 +7,18 @@ the browser. Hosting and the unified API-reference rollout remain separate work.
 From the repository root:
 
 ```sh
-npm --prefix docs-site ci
+mise run wasm-pkg
+mise run ui-sync
+npm --prefix docs-site ci --ignore-scripts
 mise run docs-site-build
 ```
 
 `docs-site-build` is the release entrypoint. It runs `python-sync` and then
-`python-build` before executing any course code, so every result is verified
-against an extension built from the current checkout. The development profile
-keeps this incremental rebuild fast; use a release build only for performance work.
+`python-build --release` before executing any course code, so every result is
+verified against an extension built from the current checkout. It also installs
+the built registry into the docs host, including the public `/r/` files. The
+explicit WASM/dependency preparation above keeps package installation from
+launching an unmeasured native lifecycle build.
 
 The publication build executes every displayed Python block, replays each exercise
 solution from a fresh lesson baseline, executes copies of the notebook collection,

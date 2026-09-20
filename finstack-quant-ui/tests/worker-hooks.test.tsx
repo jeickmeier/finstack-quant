@@ -171,3 +171,51 @@ it("transport cleanup and worker errors reject in-flight Comlink requests", asyn
   expect(failure).toHaveBeenCalledOnce();
   next.close();
 });
+
+it("warns once per returned mismatched WASM version without changing valuations", async () => {
+  const { createClient } = await vi.importActual<
+    typeof import("../registry/hooks/use-finstack/client")
+  >("../registry/hooks/use-finstack/client");
+  const { wasmVersion } =
+    await import("../registry/hooks/use-finstack/version");
+  let result = {
+    meta: { version: wasmVersion },
+    value: { amount: "123456789.125", currency: "USD" },
+  };
+  class Endpoint extends EventTarget {
+    postMessage(message: { id: string }) {
+      queueMicrotask(() =>
+        this.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              id: message.id,
+              type: "RAW",
+              value: { ok: true, value: result },
+            },
+          }),
+        ),
+      );
+    }
+    terminate() {}
+  }
+  const client = createClient(new Endpoint() as unknown as Worker);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const request = {
+    instrumentJson: "{}",
+    marketJson: "{}",
+    asOf: "2025-01-01",
+  };
+  try {
+    expect(await client.call("price", request)).toEqual(result);
+    expect(warn).not.toHaveBeenCalled();
+    result = { ...result, meta: { version: "0.0.0-mismatch" } };
+    expect(await client.call("price", request)).toEqual(result);
+    await client.call("price", request);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toContain(wasmVersion);
+    expect(warn.mock.calls[0]![0]).toContain("0.0.0-mismatch");
+  } finally {
+    client.close();
+    warn.mockRestore();
+  }
+});

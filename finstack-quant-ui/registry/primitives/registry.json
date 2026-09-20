@@ -18,7 +18,9 @@
         "button",
         "field",
         "popover"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "finstack-table",
@@ -43,7 +45,15 @@
         "@finstack/use-linked-selection",
         "table"
       ],
-      "dependencies": ["@tanstack/react-table@9.2.4"]
+      "dependencies": ["@tanstack/react-table@9.2.4"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "decimal-input",
@@ -63,7 +73,15 @@
         "@finstack/finstack-format",
         "@finstack/primitive-contracts",
         "input"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "enum-field",
@@ -83,7 +101,9 @@
         "label",
         "radio-group",
         "select"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "money-input",
@@ -101,7 +121,15 @@
         "@finstack/finstack-theme",
         "@finstack/decimal-input",
         "@finstack/enum-field"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "rate-input",
@@ -119,7 +147,15 @@
         "@finstack/finstack-theme",
         "@finstack/decimal-input",
         "@finstack/finstack-format"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "tenor-input",
@@ -139,7 +175,15 @@
         "@finstack/enum-field",
         "@finstack/field-frame",
         "@finstack/primitive-contracts"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "day-count-select",
@@ -157,7 +201,9 @@
         "@finstack/finstack-theme",
         "@finstack/enum-field",
         "@finstack/primitive-contracts"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "bdc-select",
@@ -175,7 +221,9 @@
         "@finstack/finstack-theme",
         "@finstack/enum-field",
         "@finstack/primitive-contracts"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "calendar-select",
@@ -192,7 +240,9 @@
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/enum-field"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "model-picker",
@@ -209,7 +259,9 @@
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/enum-field"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "metric-picker",
@@ -232,7 +284,9 @@
         "input",
         "label",
         "popover"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "knot-table",
@@ -250,7 +304,15 @@
         "@finstack/finstack-theme",
         "@finstack/finstack-table",
         "@finstack/decimal-input"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "measure-value",
@@ -267,7 +329,15 @@
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/finstack-format"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "money-value",
@@ -284,7 +354,15 @@
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/finstack-format"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "stamp-badge",
@@ -303,7 +381,15 @@
         "@finstack/contract-valuation-result",
         "@finstack/finstack-format",
         "badge"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "json-viewer",
@@ -321,6 +407,8 @@
         "@finstack/finstack-theme",
         "button"
       ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] },
       "dependencies": ["lossless-json@4.3.1"]
     },
     {
@@ -342,7 +430,9 @@
         "calendar",
         "input",
         "popover"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "id-combobox",
@@ -362,7 +452,9 @@
         "combobox",
         "input-group"
       ],
-      "dependencies": ["@tanstack/react-virtual@3.14.13"]
+      "dependencies": ["@tanstack/react-virtual@3.14.13"],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "finstack-chart",
@@ -410,7 +502,9 @@
         "@types/d3-scale@4.0.9",
         "culori@4.0.2",
         "@types/culori@4.0.1"
-      ]
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     }
   ]
 }

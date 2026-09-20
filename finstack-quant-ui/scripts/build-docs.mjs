@@ -42,6 +42,10 @@ await writeFile(
   path.join(stage, "next.config.mjs"),
   "import config from '../next.config.mjs';\nexport default config;\n",
 );
+await writeFile(
+  path.join(stage, "src/app/page.tsx"),
+  'import { redirect } from "next/navigation"; export default function Page() { redirect("/docs/registry/workbench"); }\n',
+);
 if (process.env.REGISTRY_TEST_PROBE === "1")
   await installProbe(path.join(stage, "src"));
 // This is only a navigation projection, not curriculum or execution certification.
@@ -56,7 +60,7 @@ const run = (command, args) =>
     const child = spawn(command, args, {
       cwd: stage,
       stdio: "inherit",
-      env: process.env,
+      env: { ...process.env, REGISTRY_ONLY: "1" },
     });
     child.once("error", reject);
     child.once("exit", (code) =>

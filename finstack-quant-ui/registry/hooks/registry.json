@@ -15,10 +15,23 @@
           "path": "use-finstack/client.ts",
           "type": "registry:hook",
           "target": "hooks/use-finstack/client.ts"
+        },
+        {
+          "path": "use-finstack/version.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-finstack/version.ts"
         }
       ],
       "registryDependencies": ["@finstack/finstack-worker"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-price-instrument",
@@ -32,7 +45,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-validate-instrument",
@@ -46,7 +67,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-linked-selection",
@@ -59,7 +88,9 @@
           "target": "hooks/use-linked-selection/use-linked-selection.ts"
         }
       ],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "use-instrument-validator",
@@ -73,7 +104,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-cashflows",
@@ -87,7 +126,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-market-validator",
@@ -101,7 +148,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["react@19.2.8"]
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-fx-delta-samples",
@@ -115,7 +170,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-cube-samples",
@@ -129,7 +192,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-calibrate",
@@ -143,7 +214,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     },
     {
       "name": "use-scenario-table",
@@ -157,7 +236,15 @@
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
-      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+        ]
+      }
     }
   ]
 }

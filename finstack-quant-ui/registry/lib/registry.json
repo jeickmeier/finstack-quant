@@ -21,7 +21,15 @@
         "checkbox",
         "input"
       ],
-      "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"]
+      "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.1.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

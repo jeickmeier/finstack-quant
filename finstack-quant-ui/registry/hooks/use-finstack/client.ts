@@ -1,4 +1,5 @@
 import { wrap, releaseProxy } from "comlink";
+import { wasmVersion } from "./version";
 import {
   FinstackError,
   errorValue,
@@ -15,6 +16,7 @@ export function createClient(
 ) {
   const proxy = wrap<WorkerApi>(worker);
   let closed = false;
+  const warnedVersions = new Set<string>();
   let rejectFailure: (error: Error) => void;
   const failure = new Promise<never>((_, reject) => {
     rejectFailure = reject;
@@ -44,7 +46,21 @@ export function createClient(
         const invoke = proxy[method] as (
           ...args: Parameters<WorkerApi[K]>
         ) => Promise<Envelope<Value<K>>>;
-        return unwrap(await Promise.race([invoke(...args), failure]));
+        const result = unwrap(await Promise.race([invoke(...args), failure]));
+        if (method === "price") {
+          const version = (result as Value<"price">).meta?.version;
+          if (
+            typeof version === "string" &&
+            version !== wasmVersion &&
+            !warnedVersions.has(version)
+          ) {
+            warnedVersions.add(version);
+            console.warn(
+              `Finstack registry expects WASM ${wasmVersion}, but the valuation reports ${version}. Install the matching WASM package and re-add the registry items.`,
+            );
+          }
+        }
+        return result;
       } catch (error) {
         throw error instanceof FinstackError
           ? error

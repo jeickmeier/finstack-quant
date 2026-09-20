@@ -2,6 +2,8 @@ import { readFile, writeFile, readdir } from "node:fs/promises";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import prettier from "prettier";
+import { isDeepStrictEqual } from "node:util";
+import { withoutMetadata } from "./registry-metadata.mjs";
 
 import ts from "typescript";
 import { shadcnItems } from "./shadcn.mjs";
@@ -187,7 +189,12 @@ const output = await prettier.format(
 );
 const path = `${root}registry.json`;
 if (process.argv.includes("--check")) {
-  if ((await readFile(path, "utf8")) !== output)
+  if (
+    !isDeepStrictEqual(
+      withoutMetadata(JSON.parse(await readFile(path, "utf8"))),
+      JSON.parse(output),
+    )
+  )
     throw new Error("Generated registry drift; run ui-gen");
 } else await writeFile(path, output);
 console.log(

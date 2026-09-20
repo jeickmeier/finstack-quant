@@ -1,0 +1,68 @@
+---
+title: Registry installation and MCP
+description: Discover the published source registry and install its matching local WASM package.
+---
+
+The registry publication target is
+`https://jeickmeier.github.io/finstack-quant/r/{name}.json`.
+Configure the namespace in your application's `components.json`:
+
+```json
+{
+  "registries": {
+    "@finstack": "https://jeickmeier.github.io/finstack-quant/r/{name}.json"
+  }
+}
+```
+
+Keep your application's existing Tailwind and alias settings. The registry has
+three visual categories: **Primitive Components**, **Individual Components** and
+**Blocks**. Hooks, utilities, themes and generated contracts support those groups.
+Each item reports the registry version, built WASM version and canonical schema
+IDs derived from its installed dependencies and source inventory. Pure
+presentation items have no schema IDs. A schema ID identifies a canonical wire
+contract; it does not certify deferred native capabilities.
+
+## Discover with the CLI and MCP
+
+From the application directory, run the pinned CLI:
+
+```sh
+npx --yes shadcn@4.21.0 view @finstack/pricing-workbench
+npx --yes shadcn@4.21.0 mcp init --client claude
+```
+
+The second command writes a local `.mcp.json`; it does not install the workbench
+or publish the WASM package. Restart the MCP client after reviewing its generated
+configuration. The server can list `@finstack` items and retrieve their source
+and dependency metadata. The release workflow verifies those operations from an
+empty Linux consumer against the actual deployed URL. A local preflight alone is
+not evidence of public availability.
+
+The local clean-consumer preflight passed for all 150 items: every served item
+matched the built artifact, CLI view and MCP initialization exited successfully,
+and actual MCP list/view requests returned the workbench. Public verification is
+pending deployment; the GitHub Pages environment currently permits only `master`.
+
+## Install native-backed components
+
+The WASM npm release is separate and remains unpublished. For the workbench,
+use a matching source checkout and its local package:
+
+```sh
+mise run wasm-pkg
+mise run ui-build
+mise exec -- node finstack-quant-ui/scripts/install-local.mjs /absolute/path/to/next-app
+```
+
+The local installer serves the same built registry items and substitutes only
+the native dependency with its absolute `file:` package path. It restores your
+namespace setting afterward. This avoids requesting an unpublished package from
+npm and retains the optimized local artifact. Import the installed theme after
+Tailwind and mount the workbench inside `FinstackQueryProvider`.
+
+Presentation items without a native dependency, such as `finstack-chart`, can be
+added directly from the public registry. The shared worker client warns when a
+returned valuation version differs from the version compiled into the installed
+hooks. Install the matching native package and re-add items together; the warning
+does not rewrite, reject or reinterpret native results.
