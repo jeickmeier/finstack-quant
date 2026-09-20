@@ -18,6 +18,7 @@ jobs:
   verify:
     uses: ./.github/workflows/ui-gallery.yml
   publish:
+    if: github.ref == 'refs/heads/master'
     needs: verify
     runs-on: macos-15
     timeout-minutes: 15
