@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
@@ -55,10 +56,9 @@ assert(
 );
 assert.equal(expected.badInstrument.ok, false);
 assert.equal(expected.missingMarket.ok, false);
-const server = await serveExport(
-  process.env.REGISTRY_EXPORT_DIR ?? resolve(repo, "docs-site/out"),
-  basePath,
-);
+const exportDirectory =
+  process.env.REGISTRY_EXPORT_DIR ?? resolve(repo, "docs-site/out");
+const server = await serveExport(exportDirectory, basePath);
 let browser;
 try {
   browser = await chromium.launch({ headless: true });
@@ -70,7 +70,10 @@ try {
       };
   });
   const assets = [];
+  const wasmResponses = [];
   context.on("response", (response) => {
+    if (response.url().endsWith(".wasm") && response.status() === 200)
+      wasmResponses.push(response);
     if (/\.(wasm|js)(\?|$)/.test(response.url()))
       assets.push({
         url: response.url(),
@@ -166,6 +169,32 @@ try {
         /javascript/.test(asset.mime),
     ),
   );
+  const fetchedWasm = await Promise.all(
+    wasmResponses.map(async (response) => {
+      const url = new URL(response.url());
+      assert.equal(url.origin, new URL(server.url).origin);
+      const path = resolve(
+        exportDirectory,
+        `.${decodeURIComponent(url.pathname.slice(basePath.length))}`,
+      );
+      assert(path.startsWith(`${resolve(exportDirectory)}/`));
+      // Chromium evicts large worker response bodies from its inspector cache.
+      // This server serves the emitted file unchanged; verify that requested
+      // file's digest and the response length without a second network fetch.
+      const bytes = await readFile(path);
+      assert.equal(Number(response.headers()["content-length"]), bytes.length);
+      return {
+        bytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      };
+    }),
+  );
+  assert.equal(fetchedWasm.length, 1);
+  if (process.env.REGISTRY_EXPECTED_WASM_SHA256)
+    assert.equal(
+      fetchedWasm[0].sha256,
+      process.env.REGISTRY_EXPECTED_WASM_SHA256,
+    );
   assert.deepEqual(errors, []);
   const failed = await context.newPage();
   await failed.goto(
@@ -191,6 +220,7 @@ try {
     seed: expected.stochastic.value.details.data.seed.toString(),
     cases: Object.keys(requests),
     initializationError,
+    fetchedWasm,
     workerUrl,
     errors: Object.fromEntries(
       Object.entries(expected).filter(([, result]) => !result.ok),

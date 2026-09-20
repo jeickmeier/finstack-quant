@@ -111,3 +111,15 @@ The fixture runs independently of the docs notebook publication suite. See the
 [PR-003 feasibility record](evidence/pr-003.md) for the actual docs export checks,
 configuration, browser version, and validation boundaries. The browser smoke test
 is separate from the fast `ui-check`; PR-004 owns optimized footprint acceptance.
+
+## Browser footprint gate
+
+PR-004 measured all 78 instrument validators and the optimized `release-size`
+WASM package. The corpus completed, but the optimized raw artifact is 21,534,873
+bytes against a 10,000,000-byte limit. **Phase 0 blocks PR-005.** Compression and
+successful browser execution do not waive this gate. See the
+[PR-004 evidence and reproduction commands](evidence/pr-004.md).
+
+`test:footprint` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
+package and matching generated glue. The size script reports raw/optimized/gzip/
+Brotli bytes and returns a failing exit code when the raw optimized limit is exceeded.

@@ -20,10 +20,20 @@ export default function WorkerProbe() {
     worker.addEventListener("error", failed);
     const wasmUrl =
       new URLSearchParams(location.search).get("wasm") ?? undefined;
-    window.registryProbe = { proxy, state: "starting" };
+    window.registryProbe = {
+      proxy,
+      state: "starting",
+      instrumentTypes: async () =>
+        (await import("./footprint.js")).instrumentTypes(),
+      measureInstrument: async (type) =>
+        (await import("./footprint.js")).measureInstrument(type),
+    };
+    const initializationStarted = performance.now();
     proxy
       .initialize(wasmUrl)
       .then((value) => {
+        window.registryProbe.initializationMs =
+          performance.now() - initializationStarted;
         window.registryProbe.initialization = value;
         window.registryProbe.state = value.ok ? "ready" : "failed";
         setState(window.registryProbe.state);
