@@ -90,7 +90,10 @@ it("includes every UI generated artifact in the repository manifest", async () =
     .split("\n")
     .filter((path) => path.startsWith("finstack-quant-ui/"))
     .sort();
-  const actual = ["finstack-quant-ui/src/contract-provenance.json"];
+  const actual = [
+    "finstack-quant-ui/src/contract-provenance.json",
+    "finstack-quant-ui/registry.json",
+  ];
   for await (const path of glob("finstack-quant-ui/src/generated/**/*", {
     cwd: repo,
     withFileTypes: true,
